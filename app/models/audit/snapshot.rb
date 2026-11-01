@@ -92,7 +92,11 @@ module Audit
     # stored.
     def schema_fields(record) = record.respond_to?(:definition) ? record.definition&.fields.to_a : []
 
-    def code_in?(fields) = fields.any? { |field| field.type == :code || (field.group? && code_in?(group_fields(field))) }
+    def code_in?(fields) = fields.any? { |field| digested?(field) || (field.group? && code_in?(group_fields(field))) }
+
+    # A field whose type is audited as two digests and two lengths
+    # (`FieldType#audit`), the `:code` type's way.
+    def digested?(field) = field.field_type&.audit == :digest
 
     def group_fields(field) = FieldGroups.find(field.options[:of])&.fields.to_a
 
@@ -106,7 +110,7 @@ module Audit
     end
 
     def summarised_value(field, value)
-      if field.type == :code
+      if digested?(field)
         code_summary(value)
       elsif field.group?
         nested = group_fields(field)
@@ -289,7 +293,7 @@ module Audit
     # their own (see `field_changes_for`). A code field inside a field group
     # stays where it is, as its digest and its length.
     def typed_changes(column, old, new, fields)
-      codes = fields.select { |field| field.type == :code }.map(&:name)
+      codes = fields.select { |field| digested?(field) }.map(&:name)
       result = codes.each_with_object({}) do |name, changed|
         before = old.is_a?(Hash) ? old[name] : nil
         after = new.is_a?(Hash) ? new[name] : nil

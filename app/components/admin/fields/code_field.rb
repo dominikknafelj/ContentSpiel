@@ -35,6 +35,9 @@ module Admin
     # appears and when the text passes the limit: the server draws it empty,
     # because a page that arrives is read by its own means.
     class CodeField < Base
+      # Code keeps its frame where it is shown read-only: a `pre`, not a line.
+      def self.display(_field, value) = value.present? ? Admin::EditorScreen::SharedFieldsComponent::Code.new(value.to_s) : nil
+
       def rows = 12
 
       def limit = field.options[:max]

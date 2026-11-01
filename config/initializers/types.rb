@@ -18,6 +18,11 @@ Rails.application.config.to_prepare do
   # start.
   unregistered = nil
   begin
+    # The field types first: every definition below declares its fields
+    # against them (`ContentModel::Definition#field`).
+    ContentModel::FieldTypes.reset!
+    ContentModel::FieldTypes.register_built_ins
+
     [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
     BlockTypes::RichText.register

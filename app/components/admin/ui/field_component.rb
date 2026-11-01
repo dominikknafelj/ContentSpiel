@@ -85,10 +85,17 @@ module Admin
       # `GroupsField`), so adding a field type later means adding one file,
       # not also editing a hand-kept dispatch table here.
       def input_component
-        "Admin::Fields::#{field.type.to_s.camelize}Field".constantize.new(
+        input_class.new(
           field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix, placeholder: placeholder
         )
       end
+
+      def input_class = "Admin::Fields::#{field.type.to_s.camelize}Field".constantize
+
+      # Whether the input draws its own label (a checkbox, a row of buttons),
+      # so this component draws none above it: the input's answer, not a
+      # question of the field's type name.
+      def own_label? = input_class.own_label?(field)
 
       # The help line under the input, named for its `aria-describedby`.
       def help_id = "#{input_id}-help"
@@ -109,12 +116,15 @@ module Admin
       # Text types only get the AI **Translate** button (translation helpers
       # spec §6.4): a group's original is a nested value no provider is
       # handed (`AI::Translate` skips it), and no other scalar type is
-      # translated prose. See `Admin::Columns::Base#translate_button`.
-      TRANSLATABLE_TYPES = %i[string text].freeze
+      # translated prose. Which types are prose is each type's own answer
+      # (`ContentModel::FieldType#translatable`); this list of their names is
+      # derived from the registry once, for a reader from outside, and
+      # nothing here asks it. See `Admin::Columns::Base#translate_button`.
+      TRANSLATABLE_TYPES = ContentModel::FieldTypes.all.select(&:translatable).map(&:name).freeze
 
       # Only on an empty field -- see `Admin::Columns::Base#translate_button`.
       def translate_button
-        return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type) && value.blank?
+        return unless translation_confirm && translatable? && value.blank?
 
         Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
       end
@@ -122,7 +132,7 @@ module Admin
       # **Suggest update** for an outdated text field -- see
       # `Admin::Columns::Base#suggest_update_button`.
       def suggest_update_button
-        return unless translation_state == :outdated && translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+        return unless translation_state == :outdated && translation_confirm && translatable?
 
         Admin::TranslationScreen::TranslateButtonComponent.new(
           confirm: translation_confirm, input_id: input_id, characters: original.to_s.length, mode: :update
@@ -130,6 +140,8 @@ module Admin
       end
 
       private
+
+      def translatable? = field.field_type&.translatable == true
 
       attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record, :placeholder
     end

@@ -24,31 +24,20 @@ module Admin
     # The `pre`'s template writes a line break after the opening tag: a
     # browser drops the first one there, and with it the value's own if the
     # value began with one. A stored value never does
-    # (`ContentModel::FieldSet#cast_code`), but this component is handed
+    # (the `:code` type's cast, `ContentModel::FieldTypes`), but this component is handed
     # whatever its caller read.
     class SharedFieldsComponent < Admin::AdminComponent
       # Code shown read-only: the template draws it in a `pre`, not as a line of text.
       Code = Data.define(:text)
 
+      # A scalar reads as its input says (`Admin::Fields::<Type>Field.display`);
+      # a nested group or list can't be shown flat, so it is summarised.
       def self.display(field, value)
         case field.type
-        when :boolean then value ? "Yes" : "No"
         when :groups then (count = Array(value).size).zero? ? nil : "#{count} #{"entry".pluralize(count)}"
         when :group then value.present? ? "Set" : nil
-        when :select then select_label(field, value)
-        when :code then value.present? ? Code.new(value.to_s) : nil
-        else value.to_s
+        else "Admin::Fields::#{field.type.to_s.camelize}Field".constantize.display(field, value)
         end
-      end
-
-      # The label an editor picked, not the stored value; the empty choice by
-      # its own label where it has one; a value that is no longer on the list
-      # as it is stored.
-      def self.select_label(field, value)
-        return field.options[:blank].to_s if value.blank?
-
-        options = field.options[:options]
-        (options[value.to_s] if options.is_a?(Hash)) || value.to_s
       end
 
       def initialize(fields:, primary_url: nil)

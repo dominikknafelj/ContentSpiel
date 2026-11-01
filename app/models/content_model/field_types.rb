@@ -1,0 +1,281 @@
+module ContentModel
+  # The registry of scalar field types. A field type is one entry here and
+  # one input under `Admin::Fields` (`Admin::Fields::<Type>Field`, which also
+  # answers `display`, how a value reads where it cannot be edited), and
+  # nothing else branches on its name: `test/lib/field_type_branches_test.rb`
+  # greps `app/` and `lib/` for every name registered here. The group types
+  # (`:group`, `:groups`, `Definition::GROUP_TYPES`) are not scalar and are
+  # not on it.
+  #
+  # Reset and filled first in `config/initializers/types.rb`'s `to_prepare`,
+  # before any block type, content type or field group declares a field.
+  module FieldTypes
+    URL_SCHEMES = %w[http https mailto].freeze
+
+    # Strictly `yyyy-mm-dd`: `Date.iso8601` alone also takes "20240101" and
+    # week dates, which is not what the editor's placeholder promises.
+    DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
+
+    # Text with its outer white space taken off, nil when nothing is left.
+    STRIPPED = ->(value) { value.to_s.strip.presence }
+    # The validation of a type with no rules of its own.
+    NOTHING = ->(field:, value:, raw:, errors:, stored:, translations:) { }
+
+    class << self
+      def register(type)
+        raise ArgumentError, "a field type is a ContentModel::FieldType, not #{type.inspect}" unless type.is_a?(FieldType)
+        raise ArgumentError, "the field type #{type.name.inspect} is already registered" if types.key?(type.name)
+
+        types[type.name] = type
+      end
+
+      def find(name) = types[name&.to_sym]
+
+      def fetch(name)
+        find(name) or raise KeyError, "unknown field type #{name.inspect} (known: #{names.join(", ")})"
+      end
+
+      def names = types.keys
+
+      def all = types.values
+
+      def reset! = types.clear
+
+      # The ten built-ins, in this order (it is `names`' order).
+      def register_built_ins
+        [ string, text, code, integer, boolean, date, url, select, content_type, tag ].each { |type| register(type) }
+      end
+
+      # What every type refuses that only a select, a content type field or
+      # a string takes: a group field refuses it too (`Definition#field`).
+      def refuse_choice_and_string_options(options)
+        refuse_blank(options)
+        refuse_control(options)
+        refuse_string_options(options)
+      end
+
+      private
+
+      def types = (@types ||= {})
+
+      # -- The built-ins -------------------------------------------------
+
+      def string
+        FieldType.new(
+          name: :string, cast: STRIPPED, translatable: true, audit: :value,
+          options: lambda { |options, earlier|
+            refuse_blank(options)
+            refuse_control(options)
+            # `help:` is a line under a string field in CS Studio (the Note
+            # block's title: what an empty one does).
+            raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help) && !(options[:help].is_a?(String) && options[:help].strip != "")
+            # `placeholder_from:` names a select declared BEFORE the string,
+            # whose chosen label is the string's placeholder.
+            if options.key?(:placeholder_from)
+              source = earlier.find { |candidate| candidate.name == options[:placeholder_from].to_s }
+              raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" unless source&.type == :select
+            end
+            raise ArgumentError, "`max:` on a string field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            max = field.options[:max]
+            next unless max
+
+            errors.add(field.name, :too_long, count: max) if value && value.length > max
+            # A translated string's limit in every language the object holds,
+            # not only its own: a block's settings are validated in the
+            # default language alone (`ContentBlock#settings_are_valid`), and
+            # a German title would otherwise be stored at any length (note
+            # block plan, ruling 2). One error per field, however many
+            # languages are over.
+            next unless field.translated?
+            next if errors.added?(field.name, :too_long, count: max)
+
+            over = translations.values.any? { |values| STRIPPED.call(values.to_h[field.name]).to_s.length > max }
+            errors.add(field.name, :too_long, count: max) if over
+          }
+        )
+      end
+
+      def text = plain(:text, translatable: true)
+
+      # Source code (code block spec §1) is kept as typed: the first line's
+      # indentation, tabs, inner blank lines and trailing spaces. Two things
+      # are not content: which line ending the browser sent (a form submits
+      # CRLF) and lines of only white space before the first line and after
+      # the last, which a paste brings along. Lines, not a regular
+      # expression: a run of blank lines in the middle of 20,000 characters
+      # must not be walked once per line. Never translated: the code is the
+      # same in every language, and a translated field is what is offered to
+      # an AI provider. `max:` counts characters. Audited as a digest: an
+      # event's changes would hold the source twice beside the snapshot.
+      def code
+        FieldType.new(
+          name: :code, translatable: false, audit: :digest,
+          cast: lambda { |value|
+            lines = value.to_s.gsub(/\r\n?/, "\n").split("\n", -1)
+            lines.shift while lines.any? && lines.first.strip.empty?
+            lines.pop while lines.any? && lines.last.strip.empty?
+            lines.join("\n").presence
+          },
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "code fields can't be translated (the code is the same in every language)" if options[:translated]
+            refuse_choice_and_string_options(options)
+          },
+          # The limit as its message says it: Rails' own `:too_long` with its
+          # `count`, in the words of `errors.messages.code_too_long`
+          # (config/locales/en.yml), which takes the limit grouped
+          # ("20,000"), as the counter under the field writes it.
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            max = field.options[:max]
+            next unless value && max && value.length > max
+
+            errors.add(field.name, :too_long, count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max))
+          }
+        )
+      end
+
+      # `min:` and `max:` are a number's bounds. A non-blank input that is no
+      # number casts to nil and is `:not_a_number`.
+      def integer
+        FieldType.new(
+          name: :integer, translatable: false, audit: :value,
+          cast: ->(value) { Integer(value.to_s, exception: false) },
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            next errors.add(field.name, :not_a_number) if value.nil? && raw.present?
+            next if value.nil?
+
+            errors.add(field.name, :greater_than_or_equal_to, count: field.options[:min]) if field.options[:min] && value < field.options[:min]
+            errors.add(field.name, :less_than_or_equal_to, count: field.options[:max]) if field.options[:max] && value > field.options[:max]
+          }
+        )
+      end
+
+      def boolean
+        FieldType.new(
+          name: :boolean, translatable: false, audit: :value,
+          cast: ->(value) { ActiveModel::Type::Boolean.new.cast(value) },
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: NOTHING
+        )
+      end
+
+      # A non-blank input that is no `yyyy-mm-dd` date casts to nil and is
+      # `:invalid` (`FieldSet#assign` remembers it as a rejected input).
+      def date
+        FieldType.new(
+          name: :date, translatable: false, audit: :value,
+          cast: lambda { |value|
+            next value if value.is_a?(Date)
+
+            text = value.to_s.strip
+            next nil unless text.match?(DATE_FORMAT)
+
+            begin
+              Date.iso8601(text)
+            rescue ArgumentError, TypeError
+              nil
+            end
+          },
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            errors.add(field.name, :invalid) if value.nil? && raw.present?
+          }
+        )
+      end
+
+      def url
+        FieldType.new(
+          name: :url, cast: STRIPPED, translatable: false, audit: :value,
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            errors.add(field.name, :invalid) if value && !url?(value)
+          }
+        )
+      end
+
+      # `options:` is the choices, a list of values or a Hash of value to
+      # label. `blank:` labels the empty choice of a select that isn't
+      # required; `control: :segmented` draws the choices as a row of
+      # buttons, which has no button for an empty choice.
+      def select
+        FieldType.new(
+          name: :select, cast: STRIPPED, translatable: false, audit: :value,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "select fields need `options:`" if options[:options].blank?
+            check_blank(options)
+            if options.key?(:control)
+              check_control_value(options)
+              raise ArgumentError, "`control: :segmented` has no button for a select's empty choice: it is for a select without `blank:`" if options.key?(:blank)
+            end
+            refuse_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            choices = field.options[:options]
+            errors.add(field.name, :inclusion) if value && !(choices.is_a?(Hash) ? choices.keys : Array(choices)).include?(value)
+          }
+        )
+      end
+
+      # A registered content type's name; `blank:` labels its empty choice
+      # ("All types").
+      def content_type
+        FieldType.new(
+          name: :content_type, cast: STRIPPED, translatable: false, audit: :value,
+          options: lambda { |options, _earlier|
+            check_blank(options)
+            refuse_control(options)
+            refuse_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            errors.add(field.name, :inclusion) if value && ContentTypes.find(value).nil?
+          }
+        )
+      end
+
+      def tag = plain(:tag, translatable: false)
+
+      # A type of stripped text with no rules of its own.
+      def plain(name, translatable:)
+        FieldType.new(
+          name: name, cast: STRIPPED, translatable: translatable, audit: :value,
+          options: ->(options, _earlier) { refuse_choice_and_string_options(options) },
+          validate: NOTHING
+        )
+      end
+
+      # -- Option rules several types share ------------------------------
+
+      def refuse_blank(options)
+        raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank)
+      end
+
+      def check_blank(options)
+        raise ArgumentError, "`blank:` names the empty choice of a select that isn't required" if options.key?(:blank) && options[:required]
+      end
+
+      def check_control_value(options)
+        raise ArgumentError, "`control:` is one of #{Definition::CONTROLS.map(&:inspect).join(", ")}" unless Definition::CONTROLS.include?(options[:control])
+      end
+
+      def refuse_control(options)
+        return unless options.key?(:control)
+
+        check_control_value(options)
+        raise ArgumentError, "`control: :segmented` draws a select's choices as buttons: it is for a select"
+      end
+
+      def refuse_string_options(options)
+        raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help)
+        raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
+      end
+
+      def url?(value)
+        URL_SCHEMES.include?(URI.parse(value).scheme.to_s.downcase)
+      rescue URI::InvalidURIError
+        false
+      end
+    end
+  end
+end

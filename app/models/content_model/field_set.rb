@@ -7,8 +7,6 @@
 # translated field is blank in the requested locale.
 module ContentModel
   class FieldSet
-    URL_SCHEMES = %w[http https mailto].freeze
-
     # Cached per definition *object* (not name): re-registering a type builds
     # a fresh definition, so its `FieldSet` is rebuilt too rather than reusing
     # a class whose validations/readers were built off the old field list.
@@ -52,21 +50,19 @@ module ContentModel
         respond_to?(key) ? public_send(key) : nil
       end
 
-      def initialize(values = {}, translations = {}, locale: nil, fallback: false)
+      # `stored:` is the hash of untranslated values the record already
+      # stores, handed to each type's `validate` as the field's `stored:`
+      # (a type that keeps a stored value it would refuse when typed reads
+      # it there); a caller with nothing stored passes nothing.
+      def initialize(values = {}, translations = {}, locale: nil, fallback: false, stored: {})
         @values = values.to_h.stringify_keys
         @translations = translations.to_h.transform_values { |hash| hash.to_h.stringify_keys }
         @locale = (locale || I18n.locale).to_s
         @fallback = fallback
+        @stored = stored.to_h.stringify_keys
       end
 
       validate :validate_fields
-
-      # A translated string's limit in every language this object holds, not
-      # only its own: a block's settings are validated in the default
-      # language alone (`ContentBlock#settings_are_valid`), and a German
-      # title would otherwise be stored at any length (note block plan,
-      # ruling 2). One error per field, however many languages are over.
-      validate :validate_lengths_in_every_language
 
       # Casts and sets each key for this instance's locale -- a translated
       # field's write always lands in `@translations[@locale]`, never in
@@ -86,7 +82,7 @@ module ContentModel
           # consumes this: any other caller (a block's settings) still drops an
           # unparseable date, and an integer still drops garbage -- known and
           # accepted for now.
-          rejected_inputs << key if field.type == :date && value.nil? && raw.to_s.strip.present?
+          rejected_inputs << key if rejected?(field, value, raw)
           target = field.translated? ? (@translations[@locale] ||= {}) : @values
           value.nil? ? target.delete(key) : target[key] = value
         end
@@ -97,6 +93,18 @@ module ContentModel
       # isn't a `yyyy-mm-dd` date. Not part of what is stored -- a record reads
       # it straight after `assign` (`Post#assign_fields`).
       def rejected_inputs = (@rejected_inputs ||= [])
+
+      # Text the field's type cannot read at all: it casts to nil and the
+      # type calls it `:invalid` (a date that is no `yyyy-mm-dd`). An integer
+      # that is no number is `:not_a_number`, and still dropped.
+      def rejected?(field, value, raw)
+        return false if field.group? || !value.nil? || raw.to_s.strip.empty?
+
+        scratch = ActiveModel::Errors.new(self)
+        field.field_type.validate.call(field:, value: nil, raw:, errors: scratch, stored: nil, translations: {})
+        scratch.added?(field.name, :invalid)
+      end
+      private :rejected?
 
       # The JSON-ready hash of every untranslated field -- what a save writes
       # to the record's `settings`/`metadata` column. Blanks are dropped
@@ -176,49 +184,15 @@ module ContentModel
       # Blank raw input casts to nil and stays nil (this is what replaces
       # `discard_blank_settings`) -- except `false`, which is a real boolean
       # value, not a blank one. A non-blank value that fails to parse (a bad
-      # date, a non-numeric integer) also casts to nil; `validate_fields`
-      # tells the two apart by re-checking `raw.present?` itself, since by the
-      # time a value gets here both cases already look the same.
+      # date, a non-numeric integer) also casts to nil; a type's `validate`
+      # tells the two apart by re-checking `raw.present?` itself, since by
+      # the time a value gets here both cases already look the same. What a
+      # non-blank value becomes is the type's own `cast`.
       def cast(field, value)
         value = nil if value.respond_to?(:blank?) && value.blank? && value != false
         return nil if value.nil?
 
-        case field.type
-        when :integer then Integer(value.to_s, exception: false)
-        when :boolean then ActiveModel::Type::Boolean.new.cast(value)
-        when :date then parse_date(value)
-        when :code then cast_code(value)
-        else value.to_s.strip.presence
-        end
-      end
-
-      # Source code (`:code`, code block spec §1) is kept as typed: the first
-      # line's indentation, tabs, inner blank lines and trailing spaces. Two
-      # things are not content: which line ending the browser sent (a form
-      # submits CRLF) and lines of only white space before the first line and
-      # after the last, which a paste brings along. Lines, not a regular
-      # expression: a run of blank lines in the middle of 20,000 characters
-      # must not be walked once per line.
-      def cast_code(value)
-        lines = value.to_s.gsub(/\r\n?/, "\n").split("\n", -1)
-        lines.shift while lines.any? && lines.first.strip.empty?
-        lines.pop while lines.any? && lines.last.strip.empty?
-        lines.join("\n").presence
-      end
-
-      # Strictly `yyyy-mm-dd`: `Date.iso8601` alone also takes "20240101" and
-      # week dates, which is not what the editor's placeholder promises.
-      DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
-
-      def parse_date(value)
-        return value if value.is_a?(Date)
-
-        text = value.to_s.strip
-        return nil unless text.match?(DATE_FORMAT)
-
-        Date.iso8601(text)
-      rescue ArgumentError, TypeError
-        nil
+        field.field_type.cast.call(value)
       end
 
       # What gets stored: JSON-ready, blanks dropped. Groups store their raw
@@ -232,62 +206,25 @@ module ContentModel
         value.is_a?(Date) ? value.iso8601 : value
       end
 
+      # `required` is every type's, checked here on the cast value; the rest
+      # is each type's own `validate`, handed the cast value (nil for a blank
+      # or unreadable one), the raw one, what is stored and every language.
       def validate_fields
         definition.fields.each do |field|
-          raw = raw_value(field)
-
           if field.group?
             validate_group(field)
             next
           end
 
+          raw = raw_value(field)
           value = cast(field, raw)
 
           # `value` (not `raw`) decides "blank": a `false` boolean or a `0`
           # integer must not trip `required`, and `cast` already normalized
-          # every genuinely-blank input to nil above. Once here, nil means
-          # either nothing was supplied (only `required` cares) or a non-blank
-          # input failed to parse (a specific, type-keyed error, checked
-          # against `raw.present?` so a merely-absent field doesn't also get
-          # slapped with ":invalid"/":not_a_number" on top of ":blank").
-          if value.nil?
-            errors.add(field.name, :blank) if field.required?
-            errors.add(field.name, :invalid) if raw.present? && field.type == :date
-            errors.add(field.name, :not_a_number) if raw.present? && field.type == :integer
-            next
-          end
-
-          errors.add(field.name, :inclusion) if field.type == :select && !select_options(field).include?(value)
-          errors.add(field.name, :inclusion) if field.type == :content_type && ContentTypes.find(value).nil?
-          errors.add(field.name, :too_long, **code_limit(field.options[:max])) if field.type == :code && field.options[:max] && value.length > field.options[:max]
-          errors.add(field.name, :too_long, count: field.options[:max]) if field.type == :string && field.options[:max] && value.length > field.options[:max]
-          errors.add(field.name, :invalid) if field.type == :url && !url?(value)
-          errors.add(field.name, :greater_than_or_equal_to, count: field.options[:min]) if field.options[:min] && value.is_a?(Integer) && value < field.options[:min]
-          errors.add(field.name, :less_than_or_equal_to, count: field.options[:max]) if field.options[:max] && value.is_a?(Integer) && value > field.options[:max]
+          # every genuinely-blank input to nil above.
+          errors.add(field.name, :blank) if value.nil? && field.required?
+          field.field_type.validate.call(field:, value:, raw:, errors:, stored: @stored[field.name], translations: @translations)
         end
-      end
-
-      # A code field's limit as its message says it: the error is Rails' own
-      # `:too_long` with its `count`, and its words are
-      # `errors.messages.code_too_long` (config/locales/en.yml), which takes
-      # the limit grouped ("20,000"), as the counter under the field writes
-      # it. Rails' own message would print the bare digits.
-      def code_limit(max) = { count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max) }
-
-      def validate_lengths_in_every_language
-        definition.fields.each do |field|
-          max = field.options[:max]
-          next unless field.type == :string && field.translated? && max
-          next if errors.added?(field.name, :too_long, count: max)
-
-          over = @translations.values.any? { |values| cast(field, values.to_h[field.name]).to_s.length > max }
-          errors.add(field.name, :too_long, count: max) if over
-        end
-      end
-
-      def select_options(field)
-        options = field.options[:options]
-        options.is_a?(Hash) ? options.keys : Array(options)
       end
 
       # A `group` field validates its one nested instance; `groups`
@@ -322,12 +259,6 @@ module ContentModel
         return true if raw.nil?
 
         field.type == :groups ? raw.is_a?(Array) && raw.all? { |item| item.is_a?(Hash) } : raw.is_a?(Hash)
-      end
-
-      def url?(value)
-        URL_SCHEMES.include?(URI.parse(value).scheme.to_s.downcase)
-      rescue URI::InvalidURIError
-        false
       end
     end
   end

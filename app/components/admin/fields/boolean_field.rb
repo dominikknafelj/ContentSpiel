@@ -10,6 +10,11 @@ module Admin
     # same-named fields in document order, and Rails keeps the last one for
     # a scalar (non-array) param name.
     class BooleanField < Base
+      def self.display(_field, value) = value ? "Yes" : "No"
+
+      # The switch carries its label beside it.
+      def self.own_label?(_field) = true
+
       def checked? = ActiveModel::Type::Boolean.new.cast(value) == true
     end
   end
