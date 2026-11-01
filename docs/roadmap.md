@@ -264,6 +264,12 @@ What the dry run of drafts of live content adds (2026-10-12):
 | Content quality checks: broken links, required alt | Could | Event subscribers or a job |
 | Page authorship, so pages can have an `own` scope as posts do | Could | |
 
+### Several sites
+
+| Item | Priority | Notes |
+|---|---|---|
+| Several sites of one organisation on one system (owner, 2026-11-01), its outlets: one set of people and groups, each site with its own address, page tree, content and theme, and a way to share images and people between them | Could, no date | Not multi-tenancy, which is several organisations kept apart on one system and stays out of scope. It is large: `public_paths`, the content version and caches, settings, the grants' scopes and the media library all assume one site, and a theme is built into the image, one per deployment, so several themes in one process is the first decision. Until then one deployment per site works from the same CMS image. Decide before a change would make it harder, not after |
+
 ### Search
 
 | Item | Priority | Notes |
@@ -966,7 +972,7 @@ Departures from the design mocks that the visual checks listed; none is wrong. O
 
 ## Out of scope (for now)
 
-Multi-site, e-commerce, memberships and paywalls, built-in visitor comments on the public site (editors' notes on content are shipped; the rest of collaboration is "Next", item 1).
+Multi-tenancy (several organisations on one system; several sites of one organisation is in the backlog, "Several sites"), e-commerce, memberships and paywalls, built-in visitor comments on the public site (editors' notes on content are shipped; the rest of collaboration is "Next", item 1).
 
 ## Guardrails while the roadmap is pending
 
