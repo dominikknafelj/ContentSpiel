@@ -160,7 +160,10 @@
   --th-table-ground: var(--th-band-strong);
   /* A card on this band: its ground the band's text at 6% over the band, so
      the card still stands off it, its frame the band's dim and its icon the
-     band's accent. The computed tokens would otherwise keep the page's. */
+     band's accent. The computed tokens would otherwise keep the page's.
+     The tinted band re-values none of them: the card's tokens are computed
+     on the page, where --th-meta is still the page's, and the frame is
+     still 3:1 against the band (4.06:1 light, 4.93:1 dark). */
   --th-card-ground: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
   --th-card-line: var(--th-on-band-strong-dim);
   --th-card-icon: var(--th-on-band-strong-accent);

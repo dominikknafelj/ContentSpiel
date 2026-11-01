@@ -400,6 +400,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
         assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} #{name} is #{value}")
       end
     end
+    theme_tokens.each do |theme, tokens|
+      assert_equal "var(--th-meta)", tokens.fetch("--th-card-line"), "#{theme}: the frame is the one base token that holds 3:1 (--th-line-strong is a hairline)"
+    end
     assert_equal CARD_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:card).themed_tokens
     css = Rails.root.join("app/assets/tailwind/themes/default/card.css").read.gsub(%r{/\*.*?\*/}m, "")
     CARD_TOKENS.each { |name| assert_includes css, "var(#{name})", "card.css draws with #{name}" }
