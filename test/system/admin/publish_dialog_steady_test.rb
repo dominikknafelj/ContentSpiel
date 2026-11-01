@@ -50,8 +50,9 @@ class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase
         const dialog = document.querySelector("dialog[open]")
         const button = dialog.querySelector("footer button[form]").getBoundingClientRect()
         const box = dialog.getBoundingClientRect()
+        const now = dialog.querySelector("input[type=radio][value=now]").getBoundingClientRect()
         const body = dialog.querySelector(".admin-dialog__body")
-        return { button: [button.left, button.top, button.width, button.height], dialog: [box.top, box.bottom],
+        return { nowTop: now.top, button: [button.left, button.top, button.width, button.height], dialog: [box.top, box.bottom],
                  bodyScrolls: body.scrollHeight > body.clientHeight + 1, windowHeight: window.innerHeight,
                  topOfElementAtButton: document.elementFromPoint(button.left + button.width / 2, button.top + button.height / 2)?.closest("button")?.textContent?.trim() }
       })()
@@ -68,6 +69,7 @@ class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase
     after = measure
 
     before["button"].zip(after["button"]).each { |was, now| assert_in_delta was, now, 0.5, "the button moved: #{before["button"]} to #{after["button"]}" }
+    assert_in_delta before["nowTop"], after["nowTop"], 0.5, "the Now radio moved" unless long
     assert_operator after["dialog"].last, :<=, after["windowHeight"], "the dialog stays on the screen"
     assert_equal "Publish changes", after["topOfElementAtButton"], "the button itself is what is at that point"
     assert_equal long, after["bodyScrolls"], "a long overview scrolls inside, a short one has no reason to"

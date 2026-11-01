@@ -7,13 +7,13 @@
 # urls:)` was given; `preview` is `urls.preview?`, captured once here rather
 # than read fresh off `urls` wherever it's needed, both so every reader of
 # a `RenderContext` sees one unambiguous flag (`ctx.preview`, no reaching
-# back into `ctx.urls` for it) and so it's cheap to fold into the render
-# cache key (`RichText::Document#to_html`) without the cache key builder
-# needing to know `PublicSite::Urls` has a `#preview?` at all.
+# back into `ctx.urls` for it) and so `RichText::Document#to_html` can decide
+# by it that a preview does not use the render cache, without needing to know
+# `PublicSite::Urls` has a `#preview?` at all. It is not part of the cache's key.
 #
 # `content_version` is `PublicSite.current_content_version` --
 # the site's content fingerprint, memoised per request -- captured here for
-# the same reason as `preview`: the render cache key needs it, because a
+# one reader's sake: the render cache key needs it, because a
 # rendered body bakes in link hrefs and image URLs that change without the
 # document itself changing (see `RichText::Document#to_html`).
 #

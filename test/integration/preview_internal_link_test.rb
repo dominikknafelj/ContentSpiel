@@ -109,7 +109,6 @@ class PreviewInternalLinkTest < ActionDispatch::IntegrationTest
     forget.call
     Current.actor = nil
     PublicSite.current_content_version
-    as_nobody = nil
     html_nobody = nil
     as_nobody = capture_sql { html_nobody = render.call }
 

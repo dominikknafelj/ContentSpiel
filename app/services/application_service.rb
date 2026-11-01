@@ -135,8 +135,11 @@ class ApplicationService
   # The refusal of a key under a language that a save would drop (#147), or nil
   # for none. `ContentBlocks::Save`, `Posts::Save` and `Pages::Save` read only the
   # keys they know, so any other was dropped without a word and the save answered
-  # ok: a Card seeded as `{ title:, text: }` was stored with no words. Named, and
-  # asked before anything is assigned, so nothing is written and nothing audited.
+  # ok: a Card seeded as `{ title:, text: }` was stored with no words. Named, so a
+  # caller finds out, and asked after authorization, so someone without the right
+  # is denied and audited as ever, and told nothing of the keys: a service with a
+  # second pass of rights asks this inside its transaction, behind that pass, and
+  # rolls back. Nothing is written and nothing audited.
   # Keys are compared as strings: callers send both. An unknown language and keys
   # inside a nested hash are the model's to judge.
   def unknown_language_keys_refusal(record, translations, allowed, hint: nil)

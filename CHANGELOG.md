@@ -30,9 +30,6 @@
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
 
-### Fixed
+### For a gem or an outside caller
 
-- A preview no longer prints the address of a draft outside the viewer's read scope for a rich-text link: the link is its words, as for a missing target (#152). A public page is unchanged.
-- "Publish changes" in the publish dialog no longer moves when the overview arrives: the dialog has a fixed height and a long overview scrolls inside it.
-- Translations' "Clear" sits in the filter bar at the bar's height, as on the other lists.
 - `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.

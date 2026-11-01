@@ -234,9 +234,6 @@ module ContentBlocks
       true
     end
 
-    # Every key under a language that `#assign` would drop, as strings, checked
-    # before a lock is taken or a row assigned, so a refusal writes and audits
-    # nothing.
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.

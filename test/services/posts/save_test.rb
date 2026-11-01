@@ -352,9 +352,52 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal "All", result.record.reload.title
   end
 
-  test "someone who may not edit is denied before the keys are judged" do
-    record = create_post(title: "Kept")
-    result = Posts::Save.call(record, translations: { "en" => { wrong: "x" } }, actor: users(:reader))
-    assert result.denied?, "denied, and the keys told nothing"
+  def denials = Audit::Event.where(action: "access.denied")
+
+  test "a reader creating with a bad key is denied, with one access.denied, and told nothing of the keys" do
+    result = nil
+    assert_difference -> { denials.count }, 1 do
+      assert_no_difference -> { Post.count } do
+        result = Posts::Save.call(Post.new, attributes: { content_type: "blog" }, translations: { "en" => { title: "New", wrong: "x" } }, actor: users(:reader))
+      end
+    end
+    assert result.denied?
+    assert_not_includes result.errors.join, "wrong"
+  end
+
+  test "a stored draft asked to publish, with a bad key, by someone who may edit and may not publish is denied, with one access.denied" do
+    record = create_post(title: "Kept", published: false)
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.edit", scope: {})
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+
+    result = nil
+    assert_difference -> { denials.count }, 1 do
+      result = Posts::Save.call(record, attributes: { published: true }, translations: { "en" => { title: "Changed", wrong: "x" } }, actor: users(:editor_branch))
+    end
+
+    assert result.denied?
+    assert_not_includes result.errors.join, "wrong"
+    assert_equal "Kept", record.title, "the refused value is dropped"
+    assert_nil record.reload.published_at
+    assert_equal "Kept", denials.order(:id).last.subject_label
+  end
+
+  test "someone with the right and a bad key gets the refusal, and neither the publish nor the title is written, on the object either" do
+    record = create_post(title: "Kept", published: false)
+    updated_at = record.reload.updated_at
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = Posts::Save.call(record, attributes: { published: true }, translations: { "en" => { title: "Changed", wrong: "x" } })
+    end
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_match(/wrong/, result.errors.join)
+    assert_equal "Kept", record.title
+    assert_nil record.published_at
+    assert_equal updated_at, record.reload.updated_at
+    assert_nil record.published_at
+    assert_not Publishing::Version.where(record: record).exists?
   end
 end
