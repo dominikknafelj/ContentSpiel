@@ -204,7 +204,9 @@ class Theme
 
   # The page template to draw for a page that stores `stored` (a name or nil):
   # that name while the theme declares it, otherwise the theme's first
-  # template, and the default theme's first for a theme that declares none.
+  # template, and the default theme's first for a theme that declares none
+  # (which only a Theme built around `Theme::Check` can, once the check
+  # refuses an empty list: the fallback stays as the guard for that).
   # Always a declared name with a file to draw, never nil and never the
   # unknown one: a name the theme does not know is drawn as the default and
   # nothing stored changes.

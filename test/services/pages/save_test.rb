@@ -234,4 +234,16 @@ class Pages::SaveTest < ActiveSupport::TestCase
     assert refused.record.errors.of_kind?(:template, :inclusion)
     assert_equal "landing", page.reload.template
   end
+
+  test "a blank template stores nothing, and the default's name is dropped for a page that stores none" do
+    page = create_page(title: "Pricing")
+    assert Pages::Save.call(page, attributes: { template: "standard" }).ok?
+    assert_equal({}, page.reload.settings, "the default sent for a page with none is no change")
+    assert Pages::Save.call(Page.new, attributes: { parent: root_page, template: "standard" }, translations: { "en" => { title: "New" } }).record.settings.then { |settings| assert_equal({}, settings) }
+
+    assert Pages::Save.call(page, attributes: { template: "landing" }).ok?
+    assert_equal({ "template" => "landing" }, page.reload.settings)
+    assert Pages::Save.call(page, attributes: { template: "" }).ok?
+    assert_equal({}, page.reload.settings)
+  end
 end

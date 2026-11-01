@@ -206,9 +206,24 @@ module Pages
       # attributes hash just because a stale `parent` happened to be in it.
       plain = @attributes.except(:published, :published_at)
       plain = plain.except(:parent) if @page.persisted?
+      plain = plain.except(:template) if default_template_for_none?(plain)
       @page.assign_attributes(plain)
 
       assign_publishing
+    end
+
+    # ABSENT MEANS THE DEFAULT. A page that stores no template is drawn with
+    # the theme's first, and the editors' forms send the whole form with every
+    # autosave: the theme's first template sent for such a page (by a form
+    # drawn before the forms sent it blank, a script, MCP) is no choice and
+    # is not stored, or every save of a title would pin the page to today's
+    # first template and mark a live page as changed with nothing to publish.
+    # A blank template removes the key (`Page#template=`). A page that stores
+    # a name keeps it until another is sent.
+    def default_template_for_none?(plain)
+      return false unless plain.key?(:template) && @page.template.nil?
+
+      plain[:template].to_s.strip == ContentModel.theme_choices.call(:page_templates).first&.name
     end
 
     # `published_at` schedules explicitly and wins; `published: true` makes a

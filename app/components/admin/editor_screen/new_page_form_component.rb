@@ -49,9 +49,12 @@ module Admin
         @locale = locale.to_s
         @requested_parent_id = parent_id.presence&.to_i
         @title = title.to_s
-        # A name the theme does not declare (a forged one, sent back with the
-        # refusal) is shown as the theme's first.
-        @template = ::Theme.current.page_template(template.to_s)
+        # The value selected: blank for the theme's first (absent means the
+        # default, and a new page stores nothing for it), a declared name
+        # otherwise; a name the theme does not declare (a forged one, sent
+        # back with the refusal) is shown as the first.
+        name = ::Theme.current.page_template(template.to_s)
+        @template = name == ::Theme.current.page_template(nil) ? "" : name
         @errors = errors
       end
 
@@ -99,8 +102,11 @@ module Admin
         @selected_choice ||= choices.find { |choice| choice.id == requested_parent_id } || choices.first
       end
 
-      # The theme's page templates, by their labels in the interface's language.
-      def template_options = ::Theme.current.choices(:page_templates).map { |entry| [ entry.label_for(I18n.locale), entry.name ] }
+      # The theme's page templates, by their labels in the interface's
+      # language, the first as the blank value (see `@template`).
+      def template_options
+        ::Theme.current.choices(:page_templates).each_with_index.map { |entry, index| [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ] }
+      end
 
       attr_reader :title, :template, :locale
 

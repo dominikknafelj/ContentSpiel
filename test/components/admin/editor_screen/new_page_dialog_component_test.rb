@@ -52,7 +52,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector "label[for=new-page-title]", text: "Title"
     assert_selector "input#new-page-title[name='page[title]'][autofocus]"
     assert_selector "select#new-page-inside[name='page[parent_id]']"
-    assert_selector "select#new-page-type[name='page[template]'] option[value=standard]", text: "Standard"
+    assert_selector "select#new-page-type[name='page[template]'] option[value='']", text: "Standard"
     assert_selector "select#new-page-type option[value=landing]", text: "Landing"
     assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /"
   end

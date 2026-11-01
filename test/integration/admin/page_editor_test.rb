@@ -180,6 +180,49 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(value="#{page.settings_changed_at.iso8601(6)}")
   end
 
+  # Absent means the default: the form sends a blank template for the theme's
+  # first, and an autosave of any field sends the whole form. A live standard
+  # page (`{}`) must not gain `{"template" => "standard"}` from it.
+  test "an autosave of the title on a live standard page leaves its settings empty, with no mark and no Template in the overview" do
+    publish_changes(@page)
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value='']", text: "Standard"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "" } }, as: :turbo_stream
+    assert_response :ok
+    # A form drawn before this rule sent the default's name: the same nothing.
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "standard" } }, as: :turbo_stream
+    assert_response :ok
+
+    assert_equal({}, @page.reload.settings)
+    assert_nil @page.unpublished_changes_at
+    assert_not_includes Publishing::Changes.of(@page).fields, "settings"
+  end
+
+  test "choosing Landing stores it, and choosing the default again on a Landing page removes the key" do
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal({ "template" => "landing" }, @page.reload.settings)
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value=landing]"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal({}, @page.reload.settings)
+  end
+
+  test "a stored template the theme no longer declares is kept by an unrelated autosave" do
+    with_page_templates("standard", "gallery") { assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok? }
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value=gallery]"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { subtitle: "New", template: "gallery" } }, as: :turbo_stream
+
+    assert_response :ok
+    assert_equal({ "template" => "gallery" }, @page.reload.settings)
+    assert_equal "New", @page.subtitle
+  end
+
   test "a settings autosave that holds what is stored marks the live page with nothing and moves neither base" do
     sign_in_as users(:one)
     page = create_page(title: "Pricing")

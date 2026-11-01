@@ -157,10 +157,11 @@ class Page < ApplicationRecord
   validate :settings_are_known
 
   # The stored template's name, or nil for none (the theme's first). Never
-  # raises, whatever shape a write around the model left in the column.
+  # raises, whatever shape a write around the model left in the column: a
+  # value that is no String is no name.
   def template
     value = settings_hash["template"]
-    value.is_a?(String) ? value.presence : value
+    value.is_a?(String) ? value.presence : nil
   end
 
   # A blank name removes the key, so "no template" is `{}` and never

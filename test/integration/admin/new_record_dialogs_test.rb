@@ -127,6 +127,17 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_equal({}, Page.order(:id).last.settings)
   end
 
+  test "New page with the default template stores nothing, sent blank or by its name" do
+    sign_in_as(users(:one))
+    get "/cs-studio/pages/new", params: { parent_id: @services.id }
+    assert_select "#new-page-type option[selected][value='']", text: "Standard"
+
+    post "/cs-studio/pages", params: { page: { title: "Blank", parent_id: @services.id, template: "" } }
+    assert_equal({}, Page.order(:id).last.settings)
+    post "/cs-studio/pages", params: { page: { title: "Named", parent_id: @services.id, template: "standard" } }
+    assert_equal({}, Page.order(:id).last.settings)
+  end
+
   test "a blank title answers 422 with a stream replacing the dialog's form, values kept" do
     sign_in_as(users(:one))
 

@@ -126,18 +126,28 @@ module Admin
       def translation_tab? = locale.to_s != ::Locales.default
 
       # The theme's page templates, by their labels in the interface's
-      # language, and first, by its name, a stored one the theme does not
-      # declare: the form sends the select with every save, and a name that
-      # were not offered would be replaced without anyone choosing to.
+      # language. ABSENT MEANS THE DEFAULT: the theme's first is the blank
+      # value, which stores nothing (`Pages::Save`), because the form sends the
+      # select with every autosave and a page that stores none must not gain
+      # the first's name from a save of its title. A stored name the theme
+      # does not declare comes first, by its name, so that it is what is sent.
       def template_options
-        declared = ::Theme.current.choices(:page_templates).map { |entry| [ entry.label_for(I18n.locale), entry.name ] }
+        declared = ::Theme.current.choices(:page_templates).each_with_index.map do |entry, index|
+          [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ]
+        end
         stored = page.template
-        stored.nil? || declared.any? { |_, name| name == stored } ? declared : [ [ stored, stored ], *declared ]
+        stored.nil? || ::Theme.current.choice(:page_templates, stored) ? declared : [ [ stored, stored ], *declared ]
       end
 
-      # The template selected: the stored one, else the theme's first. On the
-      # site the page is drawn with `Theme#page_template`.
-      def template = page.template || ::Theme.current.page_template(nil)
+      # The value selected: blank for the default (no stored name, or the
+      # first's), the stored name otherwise.
+      def template_value
+        stored = page.template
+        stored.nil? || stored == ::Theme.current.page_template(nil) ? "" : stored
+      end
+
+      # The template the page is drawn with (`Theme#page_template`).
+      def template = ::Theme.current.page_template(page.template)
 
       def template_label = ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || template
 
