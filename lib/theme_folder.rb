@@ -66,11 +66,16 @@ class ThemeFolder
   # `config`, no `.rb` file anywhere: a theme holds no Ruby (decision 8).
   ENTRIES = %w[views components assets javascript].freeze
 
+  # The one file a theme holds at its top: the choices it declares
+  # (`Theme::Declarations`). It is a file of the folder like any other, so
+  # `files` and `fingerprint` include it.
+  FILES = %w[theme.yml].freeze
+
   # What is said of an entry at the top that is none of them, after its
   # name: here with the variable and the whole path (the boot's refusal),
   # in `Theme::Check`'s list with the name alone, as every line there.
   STRANGER = "is not part of a theme. A theme folder holds the folders views, components, assets and javascript, " \
-             "and nothing else (dot files and a README are ignored). Move it out of the folder or delete it.".freeze
+             "and the file theme.yml, and nothing else (dot files and a README are ignored). Move it out of the folder or delete it.".freeze
 
   DEFAULT_FINGERPRINT = "default".freeze
 
@@ -209,8 +214,8 @@ class ThemeFolder
   end
 
   # What is at the folder's top NOW and is no part of a theme, by name,
-  # sorted: a file, a folder that is none of the four (with or without
-  # anything in it), and a FILE named like one of the four. Dot files, dot
+  # sorted: a file but theme.yml, a folder that is none of the four (with or
+  # without anything in it), and a FILE named like one of the four. Dot files, dot
   # folders and a README are passed over.
   #
   # Asked when the folder object is made (`check_shape!`, which refuses with
@@ -221,7 +226,8 @@ class ThemeFolder
     return [] unless configured?
 
     readable(path.to_s) { Dir.children(path.to_s) }.sort.reject do |entry|
-      ignored?(entry) || (ENTRIES.include?(entry) && path.join(entry).directory?)
+      ignored?(entry) || (ENTRIES.include?(entry) && path.join(entry).directory?) ||
+        (FILES.include?(entry) && path.join(entry).file?)
     end
   end
 
@@ -276,6 +282,9 @@ class ThemeFolder
     file = path.join(relative).to_s
     readable(file) { File.read(file) }
   end
+
+  # The theme's `theme.yml`, or nil.
+  def declarations_file = existing_file("theme.yml")
 
   # The theme's one stylesheet, imported after the default theme's by the
   # build (`ThemeCss`), or nil: a theme of templates alone has none.

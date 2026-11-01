@@ -212,4 +212,21 @@ class ThemeTest < ActiveSupport::TestCase
     assert_instance_of Theme, Theme.current
     assert_not Theme.current.configured?
   end
+
+  test "a theme answers its choices, a theme without a folder and a refused theme the default's" do
+    default = Theme::Declarations.default
+
+    assert_equal default["page_templates"], Theme.new.choices(:page_templates)
+    assert_equal default["page_templates"], Theme.new(refusal: ThemeFolder::Invalid.new("no")).choices("page_templates")
+    assert_equal default["page_templates"], plain_theme.choices(:page_templates)
+    assert_empty plain_theme.choices(:section_styles)
+
+    theme = choices_theme
+
+    assert_equal %w[services contact], theme.choices(:section_styles).map(&:name)
+    assert_equal "Kontakt", theme.choice(:section_styles, "contact").label_for("de")
+    assert_equal "Contact", theme.choice("section_styles", :contact).label_for("es")
+    assert_nil theme.choice(:section_styles, "missing")
+    assert_empty theme.choices(:icons)
+  end
 end

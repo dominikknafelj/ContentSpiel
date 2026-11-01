@@ -90,7 +90,8 @@ class Theme
                                     "compile, and one that reads the request."
       end
 
-      new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)
+      new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size,
+          declarations: Declarations.of(folder))
     end
 
     # `load` for the application's own theme, with the two ways a refusal is
@@ -182,7 +183,8 @@ class Theme
   # nil for every theme that draws.
   attr_reader :path, :fingerprint, :template_count, :refusal
 
-  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0, refusal: nil)
+  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0, refusal: nil, declarations: nil)
+    @declarations = declarations
     @refusal = refusal
     @path = path && Pathname(path)
     @fingerprint = fingerprint
@@ -191,6 +193,13 @@ class Theme
   end
 
   def configured? = !path.nil?
+
+  # The entries of one of the lists the theme declares in theme.yml
+  # (`Contract::CHOICE_LISTS`), read once when the theme was loaded. A theme
+  # without a folder and a refused one answer the default's.
+  def choices(list) = declarations.fetch(list.to_s, [])
+
+  def choice(list, name) = choices(list).find { |entry| entry.name == name.to_s }
 
   # The folder's base name, for a log line and System status.
   def name = path ? path.basename.to_s : "default"
@@ -236,6 +245,8 @@ class Theme
   end
 
   private
+
+  def declarations = @declarations ||= Declarations.default
 
   def subclass_with(component, template)
     Class.new(component) do

@@ -142,7 +142,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
         assert_equal %w[config javascript lib notes.txt sample.html.erb], problems.map { |problem| problem.split(" ").first }, problems.inspect
         problems.each do |problem|
           assert_includes problem, "is not part of a theme. A theme folder holds the folders views, components, assets and javascript, " \
-            "and nothing else (dot files and a README are ignored). Move it out of the folder or delete it."
+            "and the file theme.yml, and nothing else (dot files and a README are ignored). Move it out of the folder or delete it."
         end
       end
 
@@ -892,5 +892,15 @@ class Theme::CheckTest < ActiveSupport::TestCase
       assert_empty Theme::Check.problems(ThemeFolder.new(dir), deep: true)
       assert_equal 0, Theme.load(ThemeFolder.new(dir)).template_count
     end
+  end
+
+  test "theme.yml is checked at the plain depth: its problems are the theme's, each starting with theme.yml" do
+    found = problems_with("theme.yml" => "section_styles:\n  - name: yes\n    label: A\nsettings: {}\n")
+
+    assert_equal 2, found.size, found.inspect
+    assert found.all? { |problem| problem.start_with?("theme.yml") }, found.inspect
+    assert_empty problems_with("theme.yml" => "page_templates:\n  - name: standard\n    label: Standard\n")
+    assert_empty problems_with({ "theme.yml" => "# nothing\n" }, deep: true)
+    assert_empty Theme::Check.problems(ThemeFolder.new(ThemeTestHelper::CHOICES), deep: true)
   end
 end

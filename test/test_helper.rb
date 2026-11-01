@@ -99,8 +99,11 @@ module ActiveSupport
       parallelize_teardown { SimpleCov.result }
     end
 
-    # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
-    fixtures :all
+    # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical
+    # order. `test/fixtures/themes` holds theme folders, whose theme.yml is a
+    # theme's declarations and no fixture set: `fixtures :all` would read it
+    # as one and fail.
+    fixtures(*Dir[Rails.root.join("test/fixtures/**/*.yml")].map { |file| file.delete_prefix("#{Rails.root.join("test/fixtures")}/").delete_suffix(".yml") }.reject { |name| name.start_with?("themes/") }.sort)
 
     # Builds pages/posts through the write-path services (spec §11) instead
     # of fixtures -- see test/support/content_helper.rb.

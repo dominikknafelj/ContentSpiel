@@ -369,4 +369,26 @@ class ThemeFolderTest < ActiveSupport::TestCase
     assert_raises(ThemeFolder::Invalid) { ThemeFolder.checking { raise ThemeFolder::Invalid, "x" } }
     assert_not ThemeFolder.checking?
   end
+
+  test "theme.yml is the one file admitted beside the four folders, and the stranger sentence names it" do
+    folder_with("theme.yml" => "# nothing\n", "views/pages/show.html.erb" => "page") do |dir|
+      folder = ThemeFolder.new(dir)
+
+      assert_empty folder.strangers
+      assert_equal [ "theme.yml", "views/pages/show.html.erb" ], folder.files
+    end
+    folder_with("theme.yml/inside" => "a folder named like the file") do |dir|
+      assert_includes assert_raises(ThemeFolder::Invalid) { ThemeFolder.new(dir) }.message, File.join(dir, "theme.yml")
+    end
+    assert_includes ThemeFolder::STRANGER, "the file theme.yml"
+  end
+
+  test "the fingerprint moves with theme.yml" do
+    folder_with("theme.yml" => "# one\n") do |dir|
+      before = ThemeFolder.new(dir).fingerprint
+      File.write(File.join(dir, "theme.yml"), "# two\n")
+
+      assert_not_equal before, ThemeFolder.new(dir).fingerprint
+    end
+  end
 end

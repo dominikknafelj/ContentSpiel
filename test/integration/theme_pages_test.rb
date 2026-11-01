@@ -1103,4 +1103,33 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   ensure
     Rails.cache = original_cache
   end
+
+  test "a theme.yml refused on a reload leaves CS Studio working and every public page saying why" do
+    with_theme_copy do |dir|
+      dir.join("theme.yml").write("section_styles:\n  - name: yes\n    label: A\n")
+      bad = ThemeFolder.new(dir)
+
+      with_singleton_override(ThemeFolder, :current, -> { bad }) do
+        Rails.application.reloader.prepare!
+
+        assert_includes Theme.current.refusal.message, "theme.yml: section_styles, entry 1"
+        assert_equal Theme::Declarations.default["page_templates"], Theme.current.choices(:page_templates)
+        error = assert_raises(ThemeFolder::Invalid) { get "/about" }
+        assert_includes error.message, "theme.yml: section_styles, entry 1"
+        sign_in_as users(:one)
+        get "/cs-studio"
+        assert_response :success
+
+        dir.join("theme.yml").write("section_styles:\n  - name: services\n    label: Services\n")
+        Rails.application.reloader.prepare!
+
+        assert_nil Theme.current.refusal
+        assert_equal %w[services], Theme.current.choices(:section_styles).map(&:name)
+        get "/about"
+        assert_response :success
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end

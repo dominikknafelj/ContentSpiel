@@ -299,7 +299,9 @@ class Theme
       # reloader's prepare, before these were taken out here).
       strangers = folder.strangers
       found = strangers.map { |entry| "#{entry} #{ThemeFolder::STRANGER}" }
-      files = folder.files.reject { |file| strangers.include?(file.split("/", 2).first) }
+      # theme.yml is read for what it declares (`Declarations`), not placed.
+      found += Declarations.problems(folder)
+      files = folder.files.reject { |file| strangers.include?(file.split("/", 2).first) || file == Declarations::FILE }
 
       # A file that has no place in a theme is said once, as that: whether
       # its name is also one of the CMS's, and what it says inside, is

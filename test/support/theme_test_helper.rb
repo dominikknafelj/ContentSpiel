@@ -42,6 +42,15 @@ module ThemeTestHelper
 
   def with_table_theme(&block) = Theme.with(table_theme, &block)
 
+  # A sixth theme, of one file (`test/fixtures/themes/choices`): a theme.yml
+  # declaring two section styles (the second labelled in en and de), the two
+  # page templates, and no icons.
+  CHOICES = Rails.root.join("test/fixtures/themes/choices")
+
+  def choices_theme = Theme.load(ThemeFolder.new(CHOICES))
+
+  def with_choices_theme(&block) = Theme.with(choices_theme, &block)
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

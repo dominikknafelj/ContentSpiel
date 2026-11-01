@@ -1,0 +1,10 @@
+# The choices the default theme offers (the format is app/values/theme/declarations.rb's;
+# a theme's own theme.yml replaces a list it declares and inherits one it does not).
+# No section_styles key: the default theme offers none.
+page_templates:
+  - name: standard
+    label: Standard
+  - name: landing
+    label: Landing
+    fields: [hero]
+icons: []

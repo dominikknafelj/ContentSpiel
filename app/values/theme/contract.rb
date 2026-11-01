@@ -29,6 +29,13 @@ class Theme
   # template, so this value knows no component
   # (`test/lib/dependency_direction_test.rb`).
   module Contract
+    # The file at a theme folder's top that declares its choices, the three
+    # lists it may hold and the page fields a page template may draw
+    # (`Theme::Declarations`). Names of the contract: a change is a release note.
+    DECLARATIONS = "theme.yml".freeze
+    CHOICE_LISTS = %w[section_styles page_templates icons].freeze
+    PAGE_FIELDS = %w[hero].freeze
+
     # Tokens with a value for the light scheme and one for the dark
     # (`app/assets/tailwind/themes/default/tokens.css`, the first two
     # blocks), without the `--th-` prefix. A theme changes one by declaring
