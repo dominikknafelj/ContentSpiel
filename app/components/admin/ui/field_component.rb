@@ -97,6 +97,10 @@ module Admin
       # question of the field's type name.
       def own_label? = input_class.own_label?(field)
 
+      # A field whose input draws nothing (a theme choice with no choice
+      # to make) draws no label or chrome either.
+      def render? = input_class.respond_to?(:draws?) ? input_class.draws?(field, value) : true
+
       # The help line under the input, named for its `aria-describedby`.
       def help_id = "#{input_id}-help"
 

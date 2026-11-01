@@ -806,6 +806,50 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A theme-choice field in an editor lists the theme's labels and nothing
+  # else of the theme: its labels are escaped text, and no template,
+  # stylesheet, script or icon file is in the page.
+  test "nothing of a theme reaches CS Studio through a theme choice: its labels are escaped text, and no file of the theme is in the page" do
+    BlockTypes.register("styled_test") do |t|
+      t.label "Styled"
+      t.field :style, :theme_choice, of: :section_styles
+      t.field :icon_name, :theme_choice, of: :icons
+      TestTypes.declare(t)
+    end
+    with_theme_copy do |dir|
+      FileUtils.cp_r("#{ThemeTestHelper::CHOICES}/.", dir)
+      dir.join("theme.yml").write(<<~YAML)
+        section_styles:
+          - name: odd
+            label: "<b>Odd</b> #{LEAK}-LABEL"
+        icons:
+          - name: brush
+            label: Design
+            file: icons/brush.svg
+      YAML
+      dir.join("views/pages/show.html.erb").write("#{LEAK}-TEMPLATE\n")
+      dir.join("assets/stylesheets/theme.css").write(".#{LEAK}-STYLE { color: red }\n")
+      dir.join("assets/images/icons/brush.svg").write(%(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>#{LEAK}-SVG</title><path d="M0 0h24v24H0z"/></svg>))
+
+      Theme.with(Theme.load(ThemeFolder.new(dir))) do
+        page = create_page(title: "Choices", published: false)
+        block = page.content_blocks.create!(block_type: "styled_test", position: 0, settings: { "style" => "odd" })
+        block.update_columns(settings: { "style" => "retired" }) # version: none (a test's row, written around the services) # changes: none (a test's row)
+        sign_in_as users(:one)
+        get admin_page_path(page)
+
+        assert_response :success
+        assert_select "select option[value=odd]", text: "<b>Odd</b> #{LEAK}-LABEL"
+        assert_select "select option[selected][value=retired]", text: "retired (not in this theme)"
+        assert_select "select option[value=brush]", text: "Design"
+        assert_select "select option b", count: 0
+        assert_no_match(/#{LEAK}-(TEMPLATE|STYLE|SVG)|plain-frame|plain-mark|plain-page|M0 0h24v24H0z/, response.body)
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   # The two the three tests above never asked: the password pages are a
   # second controller under the product layout (a path given to that
   # controller alone would be seen by no other test), and a mail is drawn

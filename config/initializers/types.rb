@@ -17,6 +17,9 @@ Rails.application.config.to_prepare do
   # the next reload. At boot it is raised, and the application does not
   # start.
   unregistered = nil
+  # The theme's lists for a `:theme_choice` field, asked at each validation
+  # and each draw (`ContentModel.theme_choices`).
+  ContentModel.theme_choices = ->(list) { Theme.current.choices(list) }
   begin
     # The field types first: every definition below declares its fields
     # against them (`ContentModel::Definition#field`).

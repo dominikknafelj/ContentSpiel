@@ -253,6 +253,20 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     end
   end
 
+  test "a held theme choice's select is disabled with the stored name still selected" do
+    field = ContentModel::Definition::Field.new(name: "style", type: :theme_choice, options: { of: :section_styles })
+    html = Theme.with(choices_theme) do
+      render_inline(Admin::Fields::ThemeChoiceField.new(field:, form_name: "block[settings]", value: "retired", locale: "en"))
+      rendered_content
+    end
+
+    page = Capybara.string(held(html))
+
+    assert page.has_css?("select[name='block[settings][style]'][disabled]")
+    assert page.has_css?("select option:first-child[selected][value=retired]", text: "retired (not in this theme)")
+    assert page.has_no_css?("select:not([disabled])")
+  end
+
   test "a code block's card, rewritten; held by someone else its code is read-only with its indentation, its select disabled, and no save is wired" do
     page = create_page(title: "Held code")
     block = page.content_blocks.create!(block_type: "code", position: 0, settings: { "language" => "ruby", "filename" => "a.rb", "code" => "    indented\n\tb" })

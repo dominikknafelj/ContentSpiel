@@ -16,6 +16,17 @@ module ContentModel
     # week dates, which is not what the editor's placeholder promises.
     DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
 
+    # The name of the type whose list is the theme's. Named here once for the
+    # two places that refuse it by kind of definition (a content type, a field
+    # group, an outside block type) and so ask it of a field without a branch.
+    THEME_CHOICE = :theme_choice
+    THEME_CHOICE_LISTS = %i[section_styles icons].freeze
+
+    # Types only a built-in block type may declare: choices for posts are not
+    # built, and an outside type's list would need a key of theme.yml, which
+    # the CMS owns.
+    BLOCK_ONLY = [ THEME_CHOICE ].freeze
+
     # A link longer than this is refused, never cut.
     LINK_MAX = 2048
 
@@ -48,9 +59,9 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The eleven built-ins, in this order (it is `names`' order).
+      # The twelve built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link ].each { |type| register(type) }
+        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice ].each { |type| register(type) }
       end
 
       # The one rule for a link a visitor follows (the Card's address): an
@@ -280,6 +291,30 @@ module ContentModel
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
             errors.add(field.name, :invalid) if value && !link?(value)
+          }
+        )
+      end
+
+      # A name from one of the theme's lists (`of:`, one of THEME_CHOICE_LISTS).
+      # The list is the theme's at the moment of the validation. A name the
+      # record already stores stays valid whatever the theme declares now (a
+      # theme that drops a style must not make every section that has it
+      # unsaveable); only a NEW unknown name is refused. Never translated.
+      def theme_choice
+        FieldType.new(
+          name: THEME_CHOICE, cast: STRIPPED, translatable: false, audit: :value,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "theme choice fields can't be translated (the name is the same in every language)" if options[:translated]
+            unless THEME_CHOICE_LISTS.include?(options[:of]&.to_sym)
+              raise ArgumentError, "theme choice fields need `of:` naming a list the theme declares: #{THEME_CHOICE_LISTS.join(", ")}"
+            end
+            refuse_choice_and_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            next if value.nil? || value == stored
+            next if ContentModel.theme_choices.call(field.options[:of].to_sym).any? { |entry| entry.name == value }
+
+            errors.add(field.name, :inclusion)
           }
         )
       end

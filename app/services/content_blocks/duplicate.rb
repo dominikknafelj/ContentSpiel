@@ -103,6 +103,8 @@ module ContentBlocks
 
     def save_copy(block, section_id:, section_column:)
       copy = ContentBlock.new(owner: block.owner, block_type: block.block_type, settings: block.settings, translated_settings: block.translated_settings)
+      # A name the theme no longer declares is the original's to keep.
+      copy.carried_settings = block.settings
       copy_translations(block, copy)
       # The image reference goes in through the service (final fix wave,
       # Minor 6), so it's saved in the same authorized, audited write -- and

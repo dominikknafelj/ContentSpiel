@@ -52,6 +52,8 @@ module ContentModel
       def translated? = options[:translated] == true
       def required? = options[:required] == true
       def group? = GROUP_TYPES.include?(type)
+      # Of a type only a built-in block type may declare (`FieldTypes::BLOCK_ONLY`).
+      def block_only? = FieldTypes::BLOCK_ONLY.include?(type)
       def label = options[:label].presence || name.humanize
       # The line under the field in CS Studio, or nil.
       def help = options[:help].presence
@@ -96,10 +98,16 @@ module ContentModel
       raise ArgumentError, "#{type} fields need `of:` naming a field group" if GROUP_TYPES.include?(type) && options[:of].blank?
       raise ArgumentError, "#{type} fields can't have a default (there's no one canonical default for a nested value)" if GROUP_TYPES.include?(type) && options.key?(:default)
       raise ArgumentError, "`label:` is the field's name as a person reads it, a string" if options.key?(:label) && !(options[:label].is_a?(String) && options[:label].present?)
+      refuse_type!(type)
       scalar ? scalar.options.call(options, @fields) : FieldTypes.refuse_choice_and_string_options(options)
 
       @fields << Field.new(name: name.to_s, type: type, options: options)
     end
+
+    # Hook for a kind of definition that takes only some of the types
+    # (`FieldTypes::BLOCK_ONLY`); raises `ArgumentError`.
+    def refuse_type!(_type); end
+    private :refuse_type!
 
     def uses(*columns) = @uses_columns.concat(columns.map(&:to_s))
     def capability(*names) = @capabilities.concat(names)
