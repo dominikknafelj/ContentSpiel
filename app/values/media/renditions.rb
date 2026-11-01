@@ -14,6 +14,14 @@ module Media
       (configured.select { |width| width < original_width } + [ [ original_width, configured.max ].min ]).uniq.sort
     end
 
+    # The format a source's widths are made in. An animation is WebP whatever
+    # the setting: libvips writes an animation's AVIF as a still image
+    # collection (brands `mif1 avif miaf`, no `avis` sequence), which a
+    # browser shows as its first frame. A still GIF or WebP takes the setting.
+    def self.format_for(setting, animated:)
+      animated ? "webp" : setting.to_s
+    end
+
     # The transformations Active Storage's variant takes for one width. An
     # animated type loads every frame (`n: -1`), or only the first would be
     # made; a still one has no loader option.

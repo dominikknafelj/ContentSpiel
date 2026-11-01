@@ -465,6 +465,8 @@ class Media::Asset < ApplicationRecord
   def decode_file
     @decoded = with_attachable_io { |io| io && Media::Decoding.read(io, content_type: sniffed_content_type) }
     errors.add(:file, :unreadable) if @decoded.nil?
+  rescue Media::Decoding::TooManyFrames
+    errors.add(:file, :too_many_frames)
   rescue Media::Decoding::TooManyPixels
     errors.add(:file, :too_many_pixels)
   rescue Media::Decoding::Unreadable

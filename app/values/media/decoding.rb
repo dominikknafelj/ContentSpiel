@@ -10,8 +10,15 @@ module Media
   # first frame, so its height is one frame's (not all frames stacked) and its
   # preview is that frame. The preview is made from the oriented image with
   # no metadata (`strip`), so no camera data or location reaches a page.
+  #
+  # An animation is capped twice: each frame by `MAX_PIXELS`, and the whole
+  # animation by `MAX_ANIMATION_PIXELS` (a frame's pixels times its frames),
+  # because every width made of it decodes and encodes every frame on the one
+  # images thread. A screen recording of 1,800 full-HD frames is under 50 MB
+  # and 3.7 gigapixels of work per width.
   module Decoding
     MAX_PIXELS = 100_000_000
+    MAX_ANIMATION_PIXELS = 500_000_000
     PREVIEW_WIDTH = 24
 
     # The libvips loader each allowed type must be read by: a file whose bytes
@@ -25,6 +32,8 @@ module Media
 
     class Unreadable < StandardError; end
     class TooManyPixels < StandardError; end
+    # A kind of TooManyPixels, so whatever stops the one stops the other.
+    class TooManyFrames < TooManyPixels; end
 
     def self.read(io, content_type:)
       io.rewind if io.respond_to?(:rewind)
@@ -40,6 +49,9 @@ module Media
       shown = header.autorot
       raise TooManyPixels, "#{shown.width}x#{shown.height}" if shown.width * shown.height > MAX_PIXELS
 
+      pages = pages_of(header)
+      raise TooManyFrames, "#{shown.width}x#{shown.height}x#{pages}" if shown.width * shown.height * pages > MAX_ANIMATION_PIXELS
+
       thumbnail = Vips::Image.thumbnail_buffer(data, PREVIEW_WIDTH, height: 10_000_000)
       Result.new(width: shown.width, height: shown.height, preview: thumbnail.webpsave_buffer(strip: true), alpha: header.has_alpha?)
     rescue Vips::Error => e
@@ -48,5 +60,21 @@ module Media
       # The upload reads this io again after the save: leave it at the start.
       io.rewind if io.respond_to?(:rewind)
     end
+
+    # The number of frames, from the header alone: 1 for a still image (and
+    # for anything libvips cannot read, which the job's own read then fails).
+    def self.frames(io)
+      io.rewind if io.respond_to?(:rewind)
+      pages_of(Vips::Image.new_from_buffer(io.read.to_s.b, "", access: :sequential))
+    rescue Vips::Error
+      1
+    ensure
+      io.rewind if io.respond_to?(:rewind)
+    end
+
+    def self.pages_of(header)
+      header.get_typeof("n-pages").zero? ? 1 : [ header.get("n-pages").to_i, 1 ].max
+    end
+    private_class_method :pages_of
   end
 end

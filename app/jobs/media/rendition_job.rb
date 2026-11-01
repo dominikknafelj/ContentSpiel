@@ -117,11 +117,13 @@ module Media
 
     def make_widths(asset, settings, span)
       widths = Media::Renditions.widths_for(original_width: asset.width, configured: settings.widths)
+      format = Media::Renditions.format_for(settings.format, animated: animated?(asset, settings))
+      quality = settings.quality_for(format)
       bytes_out = 0
       files = widths.map do |width|
         started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         transformations = Media::Renditions.transformations(
-          width: width, format: settings.format, quality: settings.quality, content_type: asset.content_type
+          width: width, format: format, quality: quality, content_type: asset.content_type
         )
         variant = asset.file.variant(transformations).processed
         span.set_attribute("image.width.#{width}.ms", ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round)
@@ -131,6 +133,15 @@ module Media
       span.set_attribute("image.bytes_in", asset.file.blob.byte_size)
       span.set_attribute("image.bytes_out", bytes_out)
       files
+    end
+
+    # Whether the source has more than one frame. Asked only where the answer
+    # changes the format (a GIF or WebP under a format that is not WebP), so
+    # the default settings read no header.
+    def animated?(asset, settings)
+      return false if settings.format == "webp" || !Media::Renditions::ANIMATED_TYPES.include?(asset.content_type)
+
+      asset.file.blob.open { |file| Media::Decoding.frames(file) } > 1
     end
 
     def record(asset, fingerprint, files)

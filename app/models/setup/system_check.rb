@@ -294,10 +294,17 @@ module Setup
       # (`Media::RenditionProgress`: the kept images, so a trashed image is in
       # no count). Image processing above says whether images CAN be made;
       # this says whether they have been. A failed image is also one still
-      # to be made, so both sentences show when any failed. A probe that
-      # raises is not a warning about images: the row is left out.
+      # to be made, so both sentences show when any failed. A count that
+      # raises is not a warning about images: the row is left out, its error
+      # logged by class (a statement's message can quote the query), and
+      # System status and the setup wizard still answer.
       def images
-        counts = @image_progress ? @image_progress.counts : Media::RenditionProgress.new.counts
+        counts = begin
+          @image_progress ? @image_progress.counts : Media::RenditionProgress.new.counts
+        rescue StandardError => e
+          Rails.logger.error("[system_check] images count failed: #{e.class}")
+          return nil
+        end
         total, made, failed = counts.values_at(:total, :made, :failed)
         link = :image_settings if @image_settings_link
         return Result.new(label: "Images", status: :ok, message: "Every image is made with the current settings.", link:) if made == total

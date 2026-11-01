@@ -24,6 +24,12 @@ class Media::RenditionsTest < ActiveSupport::TestCase
     end
   end
 
+  test "an animation is made in WebP whatever the setting, a still image in the setting" do
+    assert_equal "webp", Media::Renditions.format_for("avif", animated: true)
+    assert_equal "avif", Media::Renditions.format_for("avif", animated: false)
+    assert_equal "webp", Media::Renditions.format_for("webp", animated: false)
+  end
+
   # A request finds a width's variant record by the digest of the variation
   # its address DECODES to, and the address's key is JSON: a Symbol value
   # comes back a String. So the transformations hold no Symbol value, or the

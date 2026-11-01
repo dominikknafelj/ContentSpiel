@@ -59,7 +59,7 @@ en:
           webp: "WebP"
           avif: "AVIF"
           format_help: "WebP is shown by every current browser. AVIF makes smaller files."
-          avif_note: "Browsers too old to show AVIF will show nothing in place of an image."
+          avif_note: "Browsers too old to show AVIF will show nothing in place of an image. Animated images are always made in WebP, at the WebP quality."
           avif_unavailable: "AVIF is not available: this server cannot write it."
           image_quality_webp: "WebP quality"
           image_quality_avif: "AVIF quality"

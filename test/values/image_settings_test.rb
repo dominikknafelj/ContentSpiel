@@ -29,6 +29,18 @@ class ImageSettingsTest < ActiveSupport::TestCase
     assert_not_equal base, ImageSettings.current(@site).fingerprint
   end
 
+  # Under AVIF an animation is still made in WebP, at the WebP quality: that
+  # quality is part of what the generation was made with.
+  test "under AVIF the WebP quality is in the fingerprint too, and an animation is made at it" do
+    @site.image_format = "avif"
+    base = ImageSettings.current(@site).fingerprint
+
+    @site.image_quality_webp = 60
+    assert_not_equal base, ImageSettings.current(@site).fingerprint
+    assert_equal 60, ImageSettings.current(@site).quality_for("webp")
+    assert_equal @site.image_quality_avif, ImageSettings.current(@site).quality_for("avif")
+  end
+
   test "the bounds are refused on the row" do
     {
       image_widths: [ [], [ 160, 200, 300, 400, 500, 600, 700 ], [ 159, 960 ], [ 480, 4001 ], [ 480, 480 ] ],

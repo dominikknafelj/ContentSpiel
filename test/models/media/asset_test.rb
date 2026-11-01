@@ -54,6 +54,14 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_includes asset.errors[:file], "is too large to process (over 100 megapixels)"
   end
 
+  test "an animation over 500 megapixels across its frames is refused with its own sentence" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("long_animation.gif")), filename: "long.gif", content_type: "image/gif")
+
+    assert_not asset.valid?
+    assert_includes asset.errors[:file], "is too long an animation to process (over 500 megapixels across its frames)"
+  end
+
   test "a saved asset has its width, height and preview before the save commits" do
     asset = Media::Asset.new
     asset.file.attach(io: File.open(file_fixture("transparent.png")), filename: "t.png", content_type: "image/png")

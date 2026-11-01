@@ -68,6 +68,34 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     assert_equal 3, made.get("n-pages")
   end
 
+  # libvips writes an animation's AVIF as a still image collection (no
+  # `avis` brand), which a browser shows as its first frame: an animated
+  # source is made in WebP, at the WebP quality, whatever the format.
+  test "under AVIF an animated GIF's widths are animated WebP, and a still image's are AVIF" do
+    change_settings(image_format: "avif", image_quality_webp: 70)
+    gif = upload("animated.gif", content_type: "image/gif")
+    png = upload("wide.png")
+
+    Media::RenditionJob.perform_now(gif)
+    Media::RenditionJob.perform_now(png)
+    animated = vips_of(gif.reload, gif.generation.widths.first)
+    still = vips_of(png.reload, png.generation.widths.first)
+
+    assert_equal 3, animated.get("n-pages")
+    assert_equal "webpload_buffer", animated.get("vips-loader")
+    assert_equal "heifload_buffer", still.get("vips-loader")
+    assert_equal ImageSettings.current.fingerprint, gif.renditions_fingerprint
+  end
+
+  test "under AVIF a still GIF is AVIF" do
+    change_settings(image_format: "avif")
+    gif = upload("small.gif", content_type: "image/gif")
+
+    Media::RenditionJob.perform_now(gif)
+
+    assert_equal "heifload_buffer", vips_of(gif.reload, gif.generation.widths.first).get("vips-loader")
+  end
+
   test "a second run under the same settings makes nothing" do
     asset = upload("wide.png")
     Media::RenditionJob.perform_now(asset)

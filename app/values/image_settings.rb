@@ -52,8 +52,10 @@ class ImageSettings
 
   def format = @site.image_format
 
-  def quality
-    format == "avif" ? @site.image_quality_avif : @site.image_quality_webp
+  def quality = quality_for(format)
+
+  def quality_for(format)
+    format.to_s == "avif" ? @site.image_quality_avif : @site.image_quality_webp
   end
 
   def widths = Array(@site.image_widths).map(&:to_i).sort
@@ -63,8 +65,12 @@ class ImageSettings
   def max_bytes = @site.image_max_upload_mb.megabytes
 
   # What a generation of widths was made with: the format, its quality and
-  # the widths. Not an HMAC: nothing in it is secret.
+  # the widths, and under AVIF the WebP quality as well, because an animation
+  # is made in WebP whatever the format (`Media::Renditions.format_for`). Not
+  # an HMAC: nothing in it is secret.
   def fingerprint
-    Digest::SHA256.hexdigest([ format, quality, widths ].to_json)
+    parts = [ format, quality, widths ]
+    parts << quality_for("webp") if format != "webp"
+    Digest::SHA256.hexdigest(parts.to_json)
   end
 end

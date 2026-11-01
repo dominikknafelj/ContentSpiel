@@ -50,4 +50,18 @@ class Media::DecodingTest < ActiveSupport::TestCase
     assert_raises(Media::Decoding::TooManyPixels) { read("huge_pixels.png", "image/png") }
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1.0
   end
+
+  # 8 frames of 8000 x 8000: each frame is under the 100 megapixels, the
+  # animation is 512 megapixels of work for every width made of it.
+  test "an animation over 500 megapixels across its frames is refused from the header, though each frame is under the cap" do
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    error = assert_raises(Media::Decoding::TooManyFrames) { read("long_animation.gif", "image/gif") }
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1.0
+    assert_equal "8000x8000x8", error.message
+  end
+
+  test "frames counts an animation's frames and a still image's one" do
+    assert_equal 3, File.open(file_fixture("animated.gif"), "rb") { |io| Media::Decoding.frames(io) }
+    assert_equal 1, File.open(file_fixture("wide.png"), "rb") { |io| Media::Decoding.frames(io) }
+  end
 end

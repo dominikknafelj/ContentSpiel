@@ -123,6 +123,7 @@ en:
               too_large: "must be %{size} or smaller"
               unreadable: "can't be read as an image"
               too_many_pixels: "is too large to process (over 100 megapixels)"
+              too_many_frames: "is too long an animation to process (over 500 megapixels across its frames)"
         user:
           attributes:
             # The password length rule's message is a whole sentence

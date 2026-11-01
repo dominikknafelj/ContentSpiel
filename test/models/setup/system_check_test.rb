@@ -395,6 +395,18 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal "3 of 10 images still to be made. 2 images could not be made.", both.message
   end
 
+  test "a count that raises leaves the Images row out and logs its class, and every other row is there" do
+    failing = Object.new
+    def failing.counts = raise(ActiveRecord::StatementInvalid, "PG::QueryCanceled: the counts' statement")
+
+    results = nil
+    logged = capture_log { results = run_check(image_progress: failing) }
+
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], results.map(&:label)
+    assert_includes logged, "ActiveRecord::StatementInvalid"
+    assert_not_includes logged, "PG::QueryCanceled"
+  end
+
   test "the Images row links to Settings only when the caller says the viewer may manage them, and as data" do
     behind = progress(total: 2, made: 1, failed: 0)
 
@@ -433,6 +445,16 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   private
     def progress(**counts) = Struct.new(:counts).new(counts)
+
+    def capture_log
+      io = StringIO.new
+      previous = Rails.logger
+      Rails.logger = ActiveSupport::Logger.new(io)
+      yield
+      io.string
+    ensure
+      Rails.logger = previous
+    end
 
     def run_check(**overrides)
       defaults = {
