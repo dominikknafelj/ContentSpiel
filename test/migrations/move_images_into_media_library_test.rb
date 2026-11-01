@@ -146,14 +146,6 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     assert_equal library, @block.reload.media_asset
   end
 
-  # An asset made by inserting its attachment row never fires Active
-  # Storage's own variant preprocessing, so the migration queues it.
-  test "up queues the responsive variants for each asset it creates" do
-    assert_enqueued_jobs 2 * Media::Asset::VARIANT_WIDTHS.size, only: ActiveStorage::TransformJob do
-      migrate(:up)
-    end
-  end
-
   test "blobs without a checksum are never collapsed into one asset" do
     @hero_a.update_column(:checksum, nil)
     @hero_b.update_column(:checksum, nil)

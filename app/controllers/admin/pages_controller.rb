@@ -151,14 +151,14 @@ module Admin
     # (`AccessControl.preload_branches`).
     #
     # The hero and every image block's image are preloaded with their
-    # variant records (`Media::Asset::VARIANT_INCLUDES`): each image field
+    # variant records (`Media::Asset::FILE_INCLUDES`): each image field
     # reads `#srcset` for its thumbnail, which would otherwise be a query
     # per block (media library Task 8: every list of assets loads that way).
     def show
       AccessControl.preload_branches([ @page ])
       ActiveRecord::Associations::Preloader.new(records: [ @page ], associations: [
-        { hero_media_asset: Media::Asset::VARIANT_INCLUDES },
-        { content_blocks: { media_asset: Media::Asset::VARIANT_INCLUDES } }
+        { hero_media_asset: Media::Asset::FILE_INCLUDES },
+        { content_blocks: { media_asset: Media::Asset::FILE_INCLUDES } }
       ]).call
     end
 

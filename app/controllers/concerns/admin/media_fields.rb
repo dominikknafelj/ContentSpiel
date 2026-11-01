@@ -61,7 +61,7 @@ module Admin
       return if sent.to_s == stored_id.to_s
       return unless result.denied? || record.errors.include?(error_attribute)
 
-      stored = stored_id && Media::Asset.with_variants.find_by(id: stored_id)
+      stored = stored_id && Media::Asset.with_file.find_by(id: stored_id)
       component = yield(stored, record.errors.full_messages_for(error_attribute))
       turbo_stream.replace(component.section_dom_id, component)
     end

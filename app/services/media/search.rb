@@ -27,7 +27,7 @@ class Media::Search
   # Only a String is a query (final fix wave, M8): a forged `?q[]=x` or
   # `?q[a]=x` arrives as an Array/Parameters, which `sanitize_sql_like`
   # can't take -- it's no search at all rather than a 500.
-  def initialize(q: nil, filter: nil, actor: nil, scope: Media::Asset.kept.with_variants)
+  def initialize(q: nil, filter: nil, actor: nil, scope: Media::Asset.kept.with_file)
     @scope = scope
     @query = q.is_a?(String) ? q : nil
     @filter = FILTERS.include?(filter) && available?(filter) ? filter : "all"
@@ -81,7 +81,7 @@ class Media::Search
     # matching asset's own row for however many locales matched.
     #
     # `file_attachment: :blob` is the same association `Media::Asset
-    # ::VARIANT_INCLUDES`/`#with_variants` already preload, joined here (not
+    # ::FILE_INCLUDES`/`#with_file` already preload, joined here (not
     # `includes`d) purely to filter on `active_storage_blobs.filename` --
     # every asset has exactly one `file` attachment (`Media::Asset
     # #file_is_attached`), so the inner join can't drop or duplicate a row

@@ -96,9 +96,9 @@ class Admin::FiltersTest < ActionDispatch::IntegrationTest
     assert_select "li[id^='media-asset-']", 5
 
     # One page only: no pager to read the total from, so pin the count the
-    # pager is built on -- `with_variants` is an `includes`, which must not
+    # pager is built on -- `with_file` is an `includes`, which must not
     # inflate or break `count`.
-    scope = Media::Asset.kept.with_variants
+    scope = Media::Asset.kept.with_file
     assert_equal 8, scope.count
     assert_equal 5, Media::Search.call(scope, "needle").count
     assert_equal 8, scope.unused.count

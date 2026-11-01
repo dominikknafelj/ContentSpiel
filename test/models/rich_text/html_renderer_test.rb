@@ -49,11 +49,11 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   end
 
   test "an image renders a figure with its alt and caption" do
-    asset = create_media_asset
+    asset = make_renditions!(create_media_asset)
     html = render({ "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "A", "caption" => "C" } })
     assert_includes html, "<figure"
     assert_includes html, %(alt="A")
-    assert_includes html, %(src="#{asset.url}")
+    assert_includes html, %(src="#{asset.src}")
     assert_includes html, "<figcaption"
     assert_includes html, "C</figcaption>"
   end
@@ -63,9 +63,9 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   # the page must show it too -- both through the document's preload and
   # through a context built without a document.
   test "an image whose asset_id is stored as a String still renders" do
-    asset = create_media_asset
+    asset = make_renditions!(create_media_asset)
     html = render({ "type" => "image", "attrs" => { "asset_id" => asset.id.to_s, "alt" => "A" } })
-    assert_includes html, %(src="#{asset.url}")
+    assert_includes html, %(src="#{asset.src}")
 
     context = RichText::RenderContext.new(locale: "en", urls: PublicSite::Urls.new)
     assert_equal asset, context.media_asset(asset.id.to_s)
@@ -89,7 +89,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
 
   # `RichText::RenderContext#media_asset` preloads every `image` node's
   # `Media::Asset` for the whole document in one query
-  # (`Media::Asset.with_variants`), rather than `RichText::BuiltIns
+  # (`Media::Asset.with_file`), rather than `RichText::BuiltIns
   # .render_image` running `Media::Asset.find_by` once per node while the
   # tree is walked -- the number of `media_assets` queries a document costs
   # must not grow with how many image nodes it has.
@@ -291,7 +291,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   # resetting it here, the second render would just reuse the first
   # render's memoized (now-stale) version and never see the variants that
   # finished in between, the same reasoning the N+1 test above needs it for.
-  test "the render cache picks up an image's srcset once its variants finish processing" do
+  test "the render cache picks up an image's srcset once its widths are made" do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
 
@@ -307,7 +307,7 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
       before_html = document.to_html(locale: "en", urls: PublicSite::Urls.new)
       assert_not_includes before_html, "srcset"
 
-      perform_enqueued_jobs
+      make_renditions!(asset)
       Current.reset
 
       after_html = document.to_html(locale: "en", urls: PublicSite::Urls.new)

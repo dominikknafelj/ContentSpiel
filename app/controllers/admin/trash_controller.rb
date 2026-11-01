@@ -254,7 +254,7 @@ module Admin
       relation = roots(type).includes(:trashed_by)
       case type
       when "page" then relation.includes(:parent)
-      when "media" then relation.with_variants
+      when "media" then relation.with_file
       else relation
       end
     end

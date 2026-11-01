@@ -13,7 +13,7 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
     with_request_url(at) { render_inline Admin::MediaLibrary::GridComponent.new(assets: assets, **options) }
   end
 
-  def loaded(*assets) = Media::Asset.with_variants.where(id: assets.map(&:id)).order(:id)
+  def loaded(*assets) = Media::Asset.with_file.where(id: assets.map(&:id)).order(:id)
 
   test "one tile per image, each a link to the panel that keeps the grid's own state" do
     first = create_media_asset

@@ -251,9 +251,9 @@ module Admin
       # spec §6: per-use overrides show the image's default).
       def assets_json
         ids = self.class.collect(document) { |node| node["type"] == "image" ? node.dig("attrs", "asset_id") : nil }
-        Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h do |asset|
+        Media::Asset.where(id: ids.grep(Integer)).with_file.to_h do |asset|
           [ asset.id.to_s, {
-            url: asset.url,
+            url: asset.display_url(min_width: 960),
             alt: asset.alt_text(override: nil, locale: editor_locale).to_s,
             caption: asset.caption_text(override: nil, locale: editor_locale).to_s
           } ]

@@ -41,11 +41,9 @@ class ActiveStorageAccessTest < ActionDispatch::IntegrationTest
   # Active Storage's routes after config/routes.rb, so the public `*path`
   # catch-all used to answer every blob URL with a 404.
   test "reading a stored file stays public" do
-    asset = create_media_asset
+    asset = make_renditions!(create_media_asset)
 
-    get asset.url
-    assert_response :redirect
-    follow_redirect!
+    get asset.srcset.first.first
     assert_response :success
   end
 end

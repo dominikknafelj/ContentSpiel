@@ -64,11 +64,9 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
   # Same thumbnail rule as the Media module's grid: the `w480` variant once
   # it's processed, not the (much larger) original.
   test "a processed image's thumbnail is its w480 variant" do
-    asset = create_media_asset(filename: "wide.png")
-    asset.file.analyze
-    perform_enqueued_jobs
+    asset = make_renditions!(create_media_asset(filename: "wide.png"))
 
-    render_column(Media::Asset.with_variants.find(asset.id))
+    render_column(Media::Asset.with_file.find(asset.id))
 
     w480_url, = asset.srcset.find { |_url, width| width == 480 }
     assert_selector "img[src='#{w480_url}']"

@@ -24,14 +24,6 @@ class Media::Asset < ApplicationRecord
   # regardless of what a client's Content-Type header or filename claims.
   ALLOWED_CONTENT_TYPES = %w[image/png image/jpeg image/gif image/webp].freeze
 
-  # The exact responsive widths this app ever serves (global constraints:
-  # "Variant names are exactly w480, w960, w1600 and w2400"). Doubles as
-  # both the variant *name* Active Storage keys each transformation under
-  # (the `has_one_attached` block below, `#srcset`'s own `file.variant
-  # (name)`) and the target width `#srcset` compares against the original
-  # to decide whether that variant would ever upscale.
-  VARIANT_WIDTHS = { w480: 480, w960: 960, w1600: 1600, w2400: 2400 }.freeze
-
   # This asset's own translated defaults for alt text and caption -- jsonb,
   # same shape and backend as every other translated attribute in this app
   # (config/initializers/mobility.rb). A *placement* (a rich-text image
@@ -74,59 +66,19 @@ class Media::Asset < ApplicationRecord
   # directly.
   scope :unused, -> { where.missing(:usages) }
 
-  # Fix round 1 (I2/I3): every list that calls `#srcset` on more than one
-  # asset -- a library listing, a picker -- must load through this scope.
-  # `#srcset` answers "is this variant processed" by reading `file.blob
-  # .variant_records` (`#processed_variant_digests`'s own comment); without
-  # this preload that's one query per asset, and `.variant_records` itself
-  # nested three associations deep (`file_attachment` -> `blob` ->
-  # `variant_records`) isn't something `includes` infers on its own from a
-  # bare `Media::Asset.all`. This is deliberately narrower than the
-  # `with_attached_file` scope `has_one_attached` already generates (which
-  # also preloads each variant's own attached image, `image_attachment:
-  # :blob` -- a second N+1 `#srcset` has no use for, since all it ever reads
-  # off a `variant_records` row is `variation_digest`).
-  # The `includes` shape itself, pulled out to a constant (media library
-  # Task 5) so a caller that can't just call `.with_variants` on a
-  # `Media::Asset` relation -- because it's preloading *through* another
-  # model's association instead, e.g. `PublicPageRendering`'s `belongs_to
-  # :hero_media_asset`/`has_many :content_blocks -> belongs_to :media_asset`
-  # via `ActiveRecord::Associations::Preloader` -- can still ask for exactly
-  # this same shape rather than hand-copying it.
-  VARIANT_INCLUDES = { file_attachment: { blob: :variant_records } }.freeze
+  # The `includes` shape every list that draws an asset's image loads it by.
+  # The generation is a column of the row, so an address needs the file's
+  # blob (its signed id and filename) and nothing more: no variant record is
+  # read. A caller that preloads *through* another model's association
+  # (`PublicPageRendering`'s hero and image blocks) asks for this same shape.
+  FILE_INCLUDES = { file_attachment: :blob }.freeze
 
-  scope :with_variants, -> { includes(VARIANT_INCLUDES) }
+  scope :with_file, -> { includes(FILE_INCLUDES) }
 
-  has_one_attached :file do |attachable|
-    # Every responsive width the public site can ever ask for, preprocessed
-    # right after upload (a truthy `preprocessed:` enqueues one `ActiveStorage
-    # ::TransformJob` per variant, from `ActiveStorage::Attachment`'s own
-    # `after_create_commit :transform_variants_later`, as soon as this
-    # attachment's blob finishes uploading) so a variant is normally already
-    # sitting on the storage service by the time a page first requests it --
-    # but never something a page *waits* on: `#srcset` below only ever lists
-    # a variant that's already finished (`#processed_variant_digests`), so a
-    # slow, still-queued or failed job just means fewer `srcset` entries for
-    # this request, never a request that blocks on -- or 500s over -- one.
-    #
-    # `preprocessed:` takes a `Proc` (`ActiveStorage::NamedVariant
-    # #preprocessed?`: `Proc` gets `.call(record)`, `Symbol` gets `record
-    # .send(...)`) called with the owning `Media::Asset` itself -- fix round
-    # 1's I1 (a plain `true` here doesn't condition on content type at all,
-    # so a GIF's `w480`..`w2400` were being enqueued and processed every
-    # upload, wastefully generating four resized-still WebPs of an
-    # animation no page has ever shown -- `#variable_image?` already exists
-    # for exactly this check, but nothing read it before enqueuing). Called
-    # from `transform_variants_later`'s own `after_create_commit`, strictly
-    # after this record's `before_save :cache_metadata_from_file` has run
-    # and that whole save has committed, so `record.content_type` -- what
-    # `#variable_image?` actually reads -- is always the real, sniffed
-    # value by the time this proc runs, never the pre-save `nil`.
-    VARIANT_WIDTHS.each do |name, target_width|
-      attachable.variant name, resize_to_limit: [ target_width, nil ], format: :webp,
-        preprocessed: ->(asset) { asset.variable_image? }
-    end
-  end
+  # No variant is declared here: the widths of an image are made by
+  # `Media::RenditionJob`, recorded in `renditions`, and addressed through
+  # the blob's representation proxy by the keys that generation holds.
+  has_one_attached :file
 
   before_validation :set_default_title
 
@@ -158,82 +110,58 @@ class Media::Asset < ApplicationRecord
   # rich-text bodies, which costs more than the bump it would save.
   after_commit { PublicSite.bump_version! }
 
-  # The public URL an `image` node's `html` render (`RichText::BuiltIns`)
-  # points an `<img>` at -- `rails_blob_path`, not `rails_blob_url`: this is
-  # embedded inside a page's own HTML, which already carries its own host,
-  # same reasoning `PublicSite::Urls` gives for every other in-page link
-  # being a path, not a full URL.
-  def url
-    return nil unless file.attached?
-
-    Rails.application.routes.url_helpers.rails_blob_path(file, only_path: true)
+  # The generation the public site is served from: the widths made with the
+  # settings in force when they were made, as recorded on the row. Nothing
+  # here reads the storage service, a variant record or the original, so a
+  # list of fifty assets loaded `with_file` costs no query to address.
+  def generation(name = "current")
+    Media::Generation.from((renditions || {})[name])
   end
 
-  # An `<img src>` always points at the original -- whatever `#srcset`
-  # comes back with (including empty, Review Focus 3: a page never fails
-  # to render just because every variant is missing, slow, or broken) is
-  # additive, never a replacement for this.
-  def src
-    url
+  def made? = generation.present? && generation.files.any?
+
+  def made_with?(fingerprint)
+    made? && generation.fingerprint == fingerprint
   end
 
-  # CS Studio's thumbnail for this image (design spec §6: the Media grid,
-  # the picker, a hero/image-block field): the `w480` variant once it's
-  # processed, else the original. `#srcset` only ever lists a finished
-  # variant, so "processed" is just "present in that list" -- and it
-  # skips GIFs and anything narrower than 480px, which fall back to the
-  # original. Load through `with_variants` when rendering several.
-  def thumbnail_url
-    w480_url, = srcset.find { |_url, width| width == VARIANT_WIDTHS[:w480] }
-    w480_url || src
-  end
-
-  # Whether this asset can have size variants at all: every allowed type
-  # except GIF (global constraints: "GIFs get no variants") -- an animated
-  # GIF is served as-is, its frames intact, rather than resized down into a
-  # handful of static WebP stills.
-  def variable_image?
-    file.attached? && content_type != "image/gif"
-  end
-
-  # `[url_path, width]` pairs for every variant that's actually usable right
-  # now (design spec §3.1, global constraints, Review Focus 3) -- skipping:
-  #
-  # - a GIF entirely (`#variable_image?`);
-  # - any width at or above the original's own (`width.present? &&
-  #   target_width >= width`) -- `resize_to_limit` already refuses to
-  #   *upscale*, so a variant no bigger than the original would just be a
-  #   redundant re-encode of it, not a smaller file a `srcset` should offer;
-  # - a variant that hasn't *finished* processing (`#processed_variant_
-  #   digests`) -- preprocessing is a best-effort head start (the
-  #   `has_one_attached` block's own comment), never something this waits
-  #   on;
-  # - a variant whose processing blew up (a corrupt upload, a `vips`
-  #   error) -- caught and logged per variant, not left to bubble up and
-  #   break the page around it.
-  #
-  # `width` (this asset's *own* dimensions column, from `file.analyze`) may
-  # itself be nil -- analysis hasn't run, or failed (`Media::Upload
-  # #analyze_dimensions`'s own comment) -- in which case the "never upscale"
-  # check is simply skipped for lack of anything to compare against; the
-  # processed check below still applies.
+  # `[address, width]` for every width made, ascending; empty without a
+  # generation. A bare path: no query, no host. The original is never a
+  # candidate: only a file this app made is addressed.
   def srcset
-    return [] unless variable_image?
+    return [] unless made? && file.attached?
 
-    digests = processed_variant_digests
-
-    VARIANT_WIDTHS.filter_map do |name, target_width|
-      next if width.present? && target_width >= width
-
-      variant = file.variant(name)
-      next unless digests.include?(variant.variation.digest)
-
-      [ Rails.application.routes.url_helpers.rails_representation_path(variant, only_path: true), target_width ]
-    rescue StandardError => e
-      Rails.logger.error("[media_assets] Media::Asset##{id} srcset variant #{name} failed: #{e.class}: #{e.message}")
-      nil
-    end
+    generation.files.map { |made| [ rendition_path(made), made.width ] }
   end
+
+  # The address an `<img src>` takes: the middle of the widths made (the one
+  # a browser without `srcset` support is least badly served by), else the
+  # preview as a data URI while none is made, else nothing. Never the
+  # original.
+  def src
+    made_files = srcset
+    return made_files[(made_files.size - 1) / 2].first if made_files.any?
+
+    preview_data_url
+  end
+
+  # The ~24px preview as a `data:` URI, strict base64, or nil without one.
+  def preview_data_url
+    return nil if preview.blank?
+
+    "data:image/webp;base64,#{Base64.strict_encode64(preview)}"
+  end
+
+  # The smallest width made that covers `min_width`, else the largest made,
+  # else the preview, else nil.
+  def display_url(min_width:)
+    made_files = srcset
+    return preview_data_url if made_files.empty?
+
+    (made_files.find { |_url, width| width >= min_width } || made_files.last).first
+  end
+
+  # CS Studio's thumbnail (the Media grid, the picker, an image field).
+  def thumbnail_url = display_url(min_width: 480)
 
   # The alt text a placement actually shows (global constraints: "override
   # .presence, then the asset's default in the locale, then the Mobility
@@ -413,6 +341,14 @@ class Media::Asset < ApplicationRecord
 
   private
 
+  # The proxy representation path of one made width: the blob's signed id and
+  # the signed variation key the generation recorded.
+  def rendition_path(made)
+    Rails.application.routes.url_helpers.rails_blob_representation_proxy_path(
+      signed_blob_id: file.blob.signed_id, variation_key: made.key, filename: file.filename, only_path: true
+    )
+  end
+
   def usage_place_of(owner) = owner.is_a?(ContentBlock) ? owner&.owner : owner
 
   def describe_usage_place(place, actor)
@@ -449,7 +385,7 @@ class Media::Asset < ApplicationRecord
   #
   # One query total for *all four* widths, not one per width and not one
   # per asset: `variant_records.loaded?` is true when a caller preloaded it
-  # (`Media::Asset.with_variants`, which every multi-asset list must use),
+  # (`Media::Asset.with_file`, which every multi-asset list must use),
   # in which case this reads the already-loaded rows in memory; otherwise
   # `pluck` issues the one query itself. Either way, comparing a `Set` of
   # digests against each variant's own `variation.digest` (`#srcset`) never

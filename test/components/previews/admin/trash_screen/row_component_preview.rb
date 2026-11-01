@@ -18,7 +18,7 @@ module Admin
 
       def image_in_use
         created = PreviewFixtures.media_asset.tap { |a| a.update_columns(trashed_at: 2.days.ago) }
-        asset = Media::Asset.with_variants.find(created.id)
+        asset = Media::Asset.with_file.find(created.id)
         table(row(asset, who: "System", used_by: 2))
       end
 

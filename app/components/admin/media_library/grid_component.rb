@@ -18,7 +18,7 @@ module Admin
     # side panel, `PanelComponent`) with the grid's own state (`link_params`:
     # `q`, `filter`, `page`) kept; `selected_id` is the tile with the ring.
     # Every asset this renders must be
-    # loaded through `Media::Asset.with_variants` (`Media::Search`'s default
+    # loaded through `Media::Asset.with_file` (`Media::Search`'s default
     # scope has it) -- `#thumbnail_url` reads `#srcset`, which is
     # exactly the N+1 that scope exists to prevent over a whole page of
     # cards.

@@ -556,14 +556,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # back.
   test "a landing page renders its title, subtitle, and hero image" do
     root = Page.create!(page_type: :landing, title: "Welcome", subtitle: "A warm welcome", slug: "",
-      published_at: Time.current, hero_media_asset: create_media_asset(filename: "tiny.png"))
+      published_at: Time.current, hero_media_asset: make_renditions!(create_media_asset(filename: "tiny.png")))
 
     get "/"
 
     assert_response :success
     assert_includes response.body, ">Welcome</h1>"
     assert_includes response.body, "A warm welcome"
-    assert_select "header img[src*='tiny.png']"
+    assert_select "header img[src^='/rails/active_storage/representations/proxy/']"
   end
 
   # Media library Task 5 fix round 1 (I2): the hero's alt text is

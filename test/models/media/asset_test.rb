@@ -81,14 +81,65 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal File.size(file_fixture("tiny.png")), asset.byte_size
   end
 
-  test "#url is the blob's own path, or nil with no file attached" do
-    asset = Media::Asset.new
-    assert_nil asset.url
+  test "with no generation srcset is empty and src is the preview, never the original" do
+    asset = create_media_asset
+    assert asset.preview.present?
 
-    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    asset.save!
+    assert_equal [], asset.srcset
+    assert asset.src.start_with?("data:image/webp;base64,")
+    assert_equal asset.preview, Base64.strict_decode64(asset.src.delete_prefix("data:image/webp;base64,"))
+    assert_not_includes asset.src, "/blobs/"
+    assert_not_includes asset.thumbnail_url, "/blobs/"
+  end
 
-    assert_equal Rails.application.routes.url_helpers.rails_blob_path(asset.file, only_path: true), asset.url
+  test "with no generation and no preview src is nil" do
+    asset = create_media_asset
+    asset.update_columns(preview: nil) # version: none (a test removes the derived preview)
+
+    assert_nil asset.reload.src
+    assert_nil asset.display_url(min_width: 480)
+    assert_nil asset.thumbnail_url
+  end
+
+  test "with a generation srcset lists exactly its widths as proxy representation addresses and src is the middle one" do
+    asset = make_renditions!(create_media_asset, widths: [ 480, 960, 1600 ])
+
+    assert_equal [ 480, 960, 1600 ], asset.srcset.map(&:last)
+    asset.srcset.each do |url, width|
+      key = asset.generation.files.find { |f| f.width == width }.key
+      assert url.start_with?("/rails/active_storage/representations/proxy/#{asset.file.blob.signed_id}/#{key}/"), url
+      assert_not_includes url, "?"
+    end
+    assert_equal asset.srcset[1].first, asset.src
+    assert asset.made?
+    assert asset.made_with?(ImageSettings.current.fingerprint)
+    assert_not asset.made_with?("other")
+
+    four = make_renditions!(asset, widths: [ 480, 960, 1600, 2400 ])
+    assert_equal four.srcset[1].first, four.src
+  end
+
+  test "the srcset of fifty assets loaded with with_file costs no query" do
+    created = Array.new(3) { make_renditions!(create_media_asset, widths: [ 480, 960 ]) }
+    ids = created.map(&:id) * 1
+    assets = Media::Asset.with_file.where(id: ids).to_a * 17
+
+    statements = capture_sql { assets.each(&:srcset) }
+
+    assert_empty statements
+  end
+
+  test "display_url takes the smallest width that covers, else the largest, else the preview" do
+    asset = make_renditions!(create_media_asset, widths: [ 480, 960, 1600 ])
+    by_width = asset.srcset.to_h { |url, width| [ width, url ] }
+
+    assert_equal by_width[480], asset.display_url(min_width: 100)
+    assert_equal by_width[960], asset.display_url(min_width: 481)
+    assert_equal by_width[1600], asset.display_url(min_width: 5000)
+    assert_equal by_width[480], asset.thumbnail_url
+
+    asset.update_columns(renditions: {}) # version: none (a test removes the generation)
+    assert asset.reload.display_url(min_width: 480).start_with?("data:image/webp")
   end
 
   # Fix round 1's I3: this class only knows how to sniff bytes out of a

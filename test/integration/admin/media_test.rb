@@ -260,7 +260,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   end
 
   # Mirrors `Admin::AuditEventsTest`'s own "constant number of queries"
-  # test: `Media::Asset.with_variants` (`Admin::MediaController
+  # test: `Media::Asset.with_file` (`Admin::MediaController
   # #filtered_assets`) is what's supposed to keep this flat regardless of
   # how many assets the library holds.
   test "the grid issues a constant number of queries for 10 assets and for 60" do

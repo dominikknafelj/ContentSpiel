@@ -7,7 +7,7 @@ module Admin
       def with_assets
         assets = Array.new(3) { PreviewFixtures.media_asset }.each(&:reload)
 
-        render Admin::MediaLibrary::GridComponent.new(assets: Media::Asset.with_variants.where(id: assets.map(&:id)))
+        render Admin::MediaLibrary::GridComponent.new(assets: Media::Asset.with_file.where(id: assets.map(&:id)))
       end
 
       def empty

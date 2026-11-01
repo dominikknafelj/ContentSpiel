@@ -41,7 +41,7 @@ module Admin
     # locale, filename) and the segments All / Unused / Missing alt /
     # Untranslated / Mine, newest first, 48 tiles a page, each segment with its
     # count (`Media::Search#counts`: respects the search, not the segment).
-    # `Media::Asset.with_variants` is what keeps this a constant number of
+    # `Media::Asset.with_file` is what keeps this a constant number of
     # queries whether the page holds 10 assets or 60 -- see that scope's
     # own comment; every grid render (this action, and every filtered
     # re-render of it) must load through it, never a bare `Media::Asset
@@ -173,7 +173,7 @@ module Admin
     # a library image has no owner-scoped "read" permission the way a
     # page/post does -- `media.upload` alone (checked above, for every
     # action this is `before_action`ed on) is what CS Studio's whole
-    # library-browsing story ever gates on. `with_variants` here (not just
+    # library-browsing story ever gates on. `with_file` here (not just
     # on the grid's own `Media::Search` scope) is what lets `Admin::MediaLibrary
     # ::PanelComponent`'s own preview/thumbnail read `#srcset` without an
     # extra query either.
@@ -181,7 +181,7 @@ module Admin
       # `.kept`: a trashed image is 404 here, like a trashed page or post
       # (trash spec §5.1, "not found, not forbidden") -- it can't be
       # viewed, edited or deleted from the library, only from the Trash.
-      @asset = Media::Asset.kept.with_variants.find(params[:id])
+      @asset = Media::Asset.kept.with_file.find(params[:id])
     end
 
     # The panel's image for `?selected=`, loaded like `set_asset` (kept, with
@@ -197,7 +197,7 @@ module Admin
       @not_found_back = { label: "Back to Media", url: admin_media_path(**list_query.except(:page), **admin_url_options) }
       raise ActiveRecord::RecordNotFound, "Couldn't find Media::Asset" unless raw.is_a?(String)
 
-      Media::Asset.kept.with_variants.find(raw)
+      Media::Asset.kept.with_file.find(raw)
     end
 
     # The grid's own state, kept by every link out of the panel and by the

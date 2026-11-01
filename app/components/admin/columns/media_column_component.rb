@@ -39,7 +39,7 @@ module Admin
     # autosave.
     #
     # `value` is the chosen `Media::Asset` or nil. Load it through
-    # `Media::Asset.with_variants` when several of these are rendered at
+    # `Media::Asset.with_file` when several of these are rendered at
     # once (the page editor's block cards) -- `#thumbnail_url` reads
     # `#srcset`.
     class MediaColumnComponent < Base

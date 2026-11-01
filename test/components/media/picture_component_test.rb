@@ -17,7 +17,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     render_inline(Media::PictureComponent.new(asset: asset, alt: "A bright room"))
 
     img = page.find("img")
-    assert_equal asset.url, img["src"]
+    assert_equal asset.src, img["src"]
     assert_equal asset.width.to_s, img["width"]
     assert_equal asset.height.to_s, img["height"]
     assert_equal "A bright room", img["alt"]
@@ -28,26 +28,14 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     asset.srcset.each { |url, width| assert_includes srcset, "#{url} #{width}w" }
   end
 
-  # Final fix wave (I3): once `srcset` has `w` descriptors a browser never
-  # falls back to `src`, so without the original as a candidate a wide
-  # screen would top out at the largest variant (2400px) of a larger image.
-  test "the original is the widest srcset candidate once there are variants" do
+  test "the original is no candidate: a srcset holds exactly the widths made" do
     asset = processed_asset
 
     render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
 
     candidates = page.find("img")["srcset"].split(", ")
-    assert_equal "#{asset.url} #{asset.width}w", candidates.last
-    assert_equal asset.srcset.size + 1, candidates.size
-  end
-
-  test "without a known width the original isn't offered as a candidate" do
-    asset = processed_asset
-    asset.update_columns(width: nil, height: nil)
-
-    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
-
-    assert_not_includes page.find("img")["srcset"], "#{asset.url} "
+    assert_equal asset.srcset.map { |url, width| "#{url} #{width}w" }, candidates
+    assert(candidates.none? { |candidate| candidate.include?("/blobs/") })
   end
 
   # Final fix wave (M4): lazy by default; a caller (the hero) can ask for
@@ -78,7 +66,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
 
     img = page.find("img")
-    assert_equal asset.url, img["src"]
+    assert_equal asset.src, img["src"]
     assert_nil img["srcset"]
     assert_nil img["sizes"]
   end
@@ -113,16 +101,9 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
 
   private
 
-  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG -- every
-  # declared variant width (480/960/1600/2400) is smaller than that, so all
-  # four end up in `srcset` once the preprocessing jobs run
-  # (`test/models/media/asset_test.rb`'s own fixture and pattern).
+  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG: all four
+  # configured widths are below it, so a recorded generation holds four.
   def processed_asset
-    asset = create_media_asset(filename: "wide.png")
-    asset.file.analyze
-    metadata = asset.file.blob.metadata || {}
-    asset.update_columns(width: metadata["width"], height: metadata["height"])
-    perform_enqueued_jobs
-    asset
+    make_renditions!(create_media_asset(filename: "wide.png"))
   end
 end

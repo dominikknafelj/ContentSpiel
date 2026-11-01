@@ -22,7 +22,7 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     body = response.parsed_body
     asset = Media::Asset.last
     assert_equal asset.id, body["id"]
-    assert_equal asset.url, body["url"]
+    assert_equal asset.display_url(min_width: 960), body["url"]
     assert_equal "tiny", body["title"]
     assert asset.file.attached?
   end

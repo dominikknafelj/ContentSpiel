@@ -156,8 +156,8 @@ module Admin
       if @record.is_a?(Page)
         AccessControl.preload_branches([ @record ])
         ActiveRecord::Associations::Preloader.new(records: [ @record ], associations: [
-          { hero_media_asset: Media::Asset::VARIANT_INCLUDES },
-          { content_blocks: { media_asset: Media::Asset::VARIANT_INCLUDES } }
+          { hero_media_asset: Media::Asset::FILE_INCLUDES },
+          { content_blocks: { media_asset: Media::Asset::FILE_INCLUDES } }
         ]).call
       end
     end

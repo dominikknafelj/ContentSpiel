@@ -57,19 +57,11 @@ module Media
     # rendering an empty one -- an unprocessed asset, or a GIF (design spec:
     # "GIFs get no variants"), then renders `src` alone (Review Focus 3).
     #
-    # The original is appended as the widest candidate when its width is
-    # known (final fix wave, I3): once a `srcset` carries `w` descriptors, a
-    # browser picks only among them and never falls back to `src`, so
-    # without it a screen that wants more than the largest variant
-    # (`#srcset` skips widths at or above the original's) would be capped
-    # at a downscaled copy of a larger image. Without a known width there's
-    # no descriptor to give it, and the variants alone still beat nothing.
     # Memoized: the template reads it twice (`srcset` and `sizes`).
     def srcset_attribute
       return @srcset_attribute if defined?(@srcset_attribute)
 
       pairs = asset.srcset
-      pairs += [ [ asset.src, asset.width ] ] if pairs.any? && asset.width.present?
       @srcset_attribute = pairs.empty? ? nil : pairs.map { |url, width| "#{url} #{width}w" }.join(", ")
     end
 

@@ -20,12 +20,8 @@ module Media
 
     private
 
-    # `PreviewFixtures.media_asset` alone is never processed (no job runner
-    # in a Lookbook request) -- this preview needs a real `srcset`, so it
-    # analyzes and processes the asset's variants inline (`#processed`
-    # forces synchronous processing regardless of the environment's job
-    # adapter, unlike `test/models/media/asset_test.rb`'s own `perform_
-    # enqueued_jobs`, which only works with the test adapter). `wide.png`
+    # `PreviewFixtures.media_asset` alone has no generation -- this preview
+    # needs a real `srcset`, so it records one (no file is made). `wide.png`
     # (`test/fixtures/files`, already used for exactly this in that test)
     # is a real 3000x2000 PNG, so every one of the four declared widths is
     # smaller than the original and ends up in `srcset`.
@@ -36,8 +32,7 @@ module Media
       asset.file.analyze
       metadata = asset.file.blob.metadata || {}
       asset.update_columns(width: metadata["width"], height: metadata["height"])
-      Media::Asset::VARIANT_WIDTHS.each_key { |name| asset.file.variant(name).processed }
-      asset
+      MediaRenditions.instance_method(:make_renditions!).bind_call(self, asset)
     end
   end
 end

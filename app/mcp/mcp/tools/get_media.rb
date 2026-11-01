@@ -46,7 +46,7 @@ module Mcp
         # above, is the whole gate. So a plain `find_by` id lookup is
         # enough; an unknown id is the only "not found" this ever needs --
         # and a trashed image reads as unknown (trash spec §5.1).
-        asset = Media::Asset.kept.with_variants.find_by(id: id)
+        asset = Media::Asset.kept.with_file.find_by(id: id)
         return image_not_found unless asset
 
         locale ||= Locales.default

@@ -31,7 +31,7 @@ module Admin
       end
 
       {
-        id: asset.id, title: asset.title, url: asset.url,
+        id: asset.id, title: asset.title, url: asset.display_url(min_width: 960),
         tile: view_context.render(tile),
         counts: media_counts
       }
