@@ -150,7 +150,6 @@ class Admin::SettingsImagesTest < ActionDispatch::IntegrationTest
   end
 
   test "Regenerate images without settings.manage is the 403 and queues nothing" do
-    delete "/cs-studio/session" rescue nil
     sign_in_as(settings_manager_without("languages.manage"))
     create_media_asset
     clear_enqueued_jobs

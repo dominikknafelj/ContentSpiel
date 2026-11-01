@@ -1210,7 +1210,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
   test "a trashed image is in no count of the Images card" do
     Media::Asset.delete_all
-    kept = create_media_asset
+    create_media_asset
     trashed = create_media_asset(filename: "tiny.png")
     trashed.update_columns(trashed_at: Time.current, renditions_failed_at: Time.current) # version: none (a test trashes an image whose widths failed)
     sign_in_as(users(:one))
@@ -1221,7 +1221,6 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "[data-images-failed]", 0
     assert_select "#settings-images-forms dialog", /1 image is not made/
     assert_equal({ total: 1, made: 0, failed: 0 }, Media::RenditionProgress.new.counts)
-    assert_not_nil kept
   end
 
   private

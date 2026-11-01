@@ -43,16 +43,38 @@ class Media::RegenerateTest < ActiveSupport::TestCase
     assert_equal Current.site, event.subject
   end
 
-  test "a second press while the jobs are queued makes each image once" do
+  # The job reads the settings when it RUNS. Two presses queue the image
+  # twice; the settings are then changed and saved; the first job makes the
+  # image once, with the NEW widths and format, and the second finds it made
+  # and does nothing. Counted by the work done (a width transformed, the
+  # generation written), never by variant records, which Active Storage
+  # finds again instead of making twice.
+  test "two presses, then new settings saved before the jobs run: each image is made once, with the new settings only" do
     asset = upload("wide.png")
-    Media::Regenerate.call(actor: nil)
-    Media::Regenerate.call(actor: nil)
+    old_fingerprint = ImageSettings.current.fingerprint
+    2.times { assert Media::Regenerate.call(actor: nil).ok? }
     assert_enqueued_jobs 2, only: Media::RenditionJob
 
-    assert_difference -> { ActiveStorage::VariantRecord.where(blob_id: asset.file.blob.id).count }, 4 do
-      perform_enqueued_jobs(only: Media::RenditionJob)
+    SiteSetting.instance.update!(image_widths: [ 300, 700 ], image_quality_webp: 40)
+    Current.reset
+    new_fingerprint = ImageSettings.current.fingerprint
+    assert_not_equal old_fingerprint, new_fingerprint
+
+    widths_made = []
+    original = Media::Renditions.method(:transformations)
+    statements = capture_sql do
+      with_singleton_override(Media::Renditions, :transformations, ->(**args) { widths_made << args[:width]; original.call(**args) }) do
+        perform_enqueued_jobs(only: Media::RenditionJob)
+      end
     end
-    assert_equal ImageSettings.current.fingerprint, asset.reload.renditions_fingerprint
+
+    assert_equal [ 300, 700 ], widths_made, "each new width transformed once; none of the old ones; nothing twice"
+    assert_equal 1, statements.count { |sql| sql.include?('UPDATE "media_assets"') && sql.include?('"renditions" =') }, "the generation is written once"
+    asset.reload
+    assert_equal new_fingerprint, asset.renditions_fingerprint
+    assert_equal [ 300, 700 ], asset.generation.widths
+    assert_equal new_fingerprint, asset.generation.fingerprint
+    assert_nil asset.renditions["previous"]
   end
 
   test "without settings.manage it is denied, queues nothing and audits the refusal" do

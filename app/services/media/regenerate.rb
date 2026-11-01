@@ -23,14 +23,12 @@ module Media
       site = Current.site || SiteSetting.instance
       return denied("settings.manage", site) unless authorize!("settings.manage", site)
 
-      count = 0
-      Media::Asset.needing_regeneration(ImageSettings.current(site).fingerprint).find_each do |asset|
-        Media::RenditionJob.perform_later(asset)
-        count += 1
-      end
-      record_event("media.regenerated", subject: site, metadata: { "count" => count })
+      assets = Media::Asset.needing_regeneration(ImageSettings.current(site).fingerprint).to_a
+      # The event first: a press that cannot be recorded queues nothing.
+      record_event("media.regenerated", subject: site, metadata: { "count" => assets.size })
+      ActiveJob.perform_all_later(assets.map { |asset| Media::RenditionJob.new(asset) })
 
-      success(count)
+      success(assets.size)
     end
   end
 end
