@@ -18,6 +18,9 @@ module ContentModel
 
     # What no link holds, wherever it stands: white space (Unicode's too),
     # a control or invisible format character, a backslash.
+    # A link longer than this is refused, never cut.
+    LINK_MAX = 2048
+
     LINK_REFUSED = /[[:space:]\p{Cc}\p{Cf}\\]/
 
     # Text with its outer white space taken off, nil when nothing is left.
@@ -60,6 +63,8 @@ module ContentModel
       # any value: a non-String is no link.
       def link?(value)
         return false unless value.is_a?(String)
+        value = value.dup.force_encoding(Encoding::UTF_8)
+        return false unless value.valid_encoding? && value.length <= LINK_MAX
         return false if value.match?(LINK_REFUSED)
         return value.match?(%r{\A/(?![/\\])}) if value.start_with?("/")
 
@@ -67,8 +72,10 @@ module ContentModel
         scheme = uri.scheme.to_s.downcase
         return false unless URL_SCHEMES.include?(scheme)
 
-        scheme == "mailto" || uri.host.present?
-      rescue URI::InvalidURIError
+        # An address with userinfo ("https://example.com@evil") reads as
+        # one host and goes to another.
+        scheme == "mailto" || (uri.host.present? && uri.userinfo.nil?)
+      rescue URI::Error
         false
       end
 
@@ -314,7 +321,7 @@ module ContentModel
 
       def url?(value)
         URL_SCHEMES.include?(URI.parse(value).scheme.to_s.downcase)
-      rescue URI::InvalidURIError
+      rescue URI::Error
         false
       end
     end

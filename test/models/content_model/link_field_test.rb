@@ -35,6 +35,25 @@ class ContentModel::LinkFieldTest < ActiveSupport::TestCase
     end
   end
 
+  test "link? never raises: a malformed address, bad bytes and a long one are no link" do
+    [ "mailto:", "mailto:javascript:x", "https://", "http://[", "/a\xFF", "https://x.example/\xFF".b, "/#{"a" * 2048}" ].each do |value|
+      assert_not link?(value), "#{value.inspect} is no link"
+    end
+    assert link?("/#{"a" * 2047}")
+    set = fields("target" => "mailto:")
+    assert_not set.valid?
+  end
+
+  test "an address with userinfo is refused: it reads as one host and goes to another" do
+    [ "https://example.com@evil.example", "https://user:pw@host.example", "http://a@b" ].each { |value| assert_not link?(value), value }
+    assert link?("https://example.com/a@b")
+  end
+
+  test ":url too never raises on a malformed address" do
+    assert_not fields("plain" => "mailto:").valid?
+    assert_not fields("plain" => "mailto:javascript:x").valid?
+  end
+
   test "link? is the one rule, and the field validates by it" do
     assert ContentModel::FieldTypes.link?("/about")
     assert_not ContentModel::FieldTypes.link?("//evil")
