@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # The form inside the New page dialog (design pass round 2, handoff §10 /
     # `Studio Modals.dc.html`): Title, Inside (a `<select>` of the pages the
-    # viewer may create under, indented by depth), Page type and a live
+    # viewer may create under, indented by depth), Template and a live
     # "URL: /about/team" line. It is its own component, not part of the dialog,
     # for two reasons: the no-JS `GET /pages/new` page renders the same form
     # without a dialog around it, and a refused create answers with a Turbo
@@ -107,6 +107,10 @@ module Admin
       def template_options
         ::Theme.current.choices(:page_templates).each_with_index.map { |entry, index| [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ] }
       end
+
+      # Asked for when the theme declares two or more; with one, a new page
+      # stores no template (absent means the theme's first).
+      def template_field? = ::Theme.current.choices(:page_templates).size >= 2
 
       attr_reader :title, :template, :locale
 

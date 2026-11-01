@@ -120,6 +120,19 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_page_path(page)
   end
 
+  test "a new page stores the template chosen, and {} when the dialog offered none" do
+    sign_in_as(users(:one))
+    post "/cs-studio/pages", params: { page: { title: "Chosen", parent_id: @services.id, template: "landing" } }
+    assert_equal({ "template" => "landing" }, Page.order(:id).last.settings)
+
+    with_page_templates("standard") do
+      get "/cs-studio/pages/new", params: { parent_id: @services.id }
+      assert_select "#new-page-form select[name='page[template]']", count: 0
+    end
+    post "/cs-studio/pages", params: { page: { title: "None", parent_id: @services.id } }
+    assert_equal({}, Page.order(:id).last.settings)
+  end
+
   test "no template means the theme's first, stored as nothing" do
     sign_in_as(users(:one))
     post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id } }

@@ -370,6 +370,10 @@ en:
         page_settings_form:
           address: "Address"
           change_address: "Change address…"
+          template: "Template"
+          shared: "Shared by all languages."
+        new_page_form:
+          template: "Template"
         slug_dialog:
           title: "Change this page’s address"
           label: "Last part of the address"

@@ -1,9 +1,9 @@
 module Admin
   module EditorScreen
     # The page editor's "Page settings" panel (cs-studio spec §5.1): title,
-    # slug, page type, subtitle, hero image (a library
+    # slug, template, subtitle, hero image (a library
     # image, chosen through `Media::PickerComponent`) + alt
-    # (landing pages only), and meta title/description under "SEO" -- one
+    # (a template that lists `hero` only), and meta title/description under "SEO" -- one
     # autosaving `<form>` (spec §6.1), PATCHing `Admin::PagesController#update`
     # on every field's `input`/`change` (debounced) or `focusout` (immediate).
     #
@@ -136,8 +136,15 @@ module Admin
           [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ]
         end
         stored = page.template
-        stored.nil? || ::Theme.current.choice(:page_templates, stored) ? declared : [ [ stored, stored ], *declared ]
+        stored.nil? || ::Theme.current.choice(:page_templates, stored) ? declared : [ [ Admin::Fields::ThemeChoiceField.unknown_word(stored), stored ], *declared ]
       end
+
+      # A page's template is asked for when the theme declares two or more, and
+      # always when the stored name is not the theme's (it is sent back by every
+      # save, so it has to be seen).
+      def template_field? = ::Theme.current.choices(:page_templates).size >= 2 || template_unknown?
+
+      def template_unknown? = page.template.present? && ::Theme.current.choice(:page_templates, page.template).nil?
 
       # The value selected: blank for the default (no stored name, or the
       # first's), the stored name otherwise.
@@ -149,7 +156,7 @@ module Admin
       # The template the page is drawn with (`Theme#page_template`).
       def template = ::Theme.current.page_template(page.template)
 
-      def template_label = ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || template
+      def template_label = ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || Admin::Fields::ThemeChoiceField.unknown_word(template)
 
       # The hero fields are offered for a template that draws the hero.
       def hero? = Array(::Theme.current.choice(:page_templates, template)&.fields).include?("hero")

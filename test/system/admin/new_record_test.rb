@@ -62,7 +62,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     click_link "+ New page"
-    select "Landing", from: "new-page-type"
+    within("dialog#new-page-dialog") { select "Landing", from: "Template" }
     click_button "Create page"
 
     assert_selector "dialog#new-page-dialog[open] .admin-error-summary", text: "1 thing needs fixing", wait: 10

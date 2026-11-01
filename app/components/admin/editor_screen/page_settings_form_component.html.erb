@@ -48,15 +48,16 @@
       <% end %>
     <% end %>
 
-    <% if translation_tab? %>
+    <% if !template_field? %>
+    <% elsif translation_tab? %>
       <%# The template is the same in every language: a read-only line here, not a `<select>`,
           so this tab's autosave never sends it. %>
       <p class="admin-column mb-4 text-sm text-meta" data-field-name="template">
-        Page type: <span class="text-ink"><%= template_label %></span> — Shared by all languages.
+        <%= t(".template") %>: <span class="text-ink"><%= template_label %></span> — <%= t(".shared") %>
       </p>
     <% else %>
       <div class="admin-column mb-4" data-field-name="template">
-        <%= label_tag field_id("template"), "Page type", class: setup_label_class %>
+        <%= label_tag field_id("template"), t(".template"), class: setup_label_class %>
         <%= select_tag field_html_name("template"), options_for_select(template_options, template_value),
               id: field_id("template"), class: setup_select_class %>
         <div id="<%= errors_id("template") %>" class="mt-1 text-sm text-danger-ink"></div>

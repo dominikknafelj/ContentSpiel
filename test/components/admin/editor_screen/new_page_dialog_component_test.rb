@@ -46,7 +46,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
   end
 
-  test "the form: Title, Inside, Page type, a URL line and the draft note, posting to pages" do
+  test "the form: Title, Inside, Template, a URL line and the draft note, posting to pages" do
     render_form
     assert_selector "form#new-page-form[action='/cs-studio/pages'][data-turbo-frame='_top']"
     assert_selector "label[for=new-page-title]", text: "Title"
@@ -55,6 +55,17 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector "select#new-page-type[name='page[template]'] option[value='']", text: "Standard"
     assert_selector "select#new-page-type option[value=landing]", text: "Landing"
     assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /"
+  end
+
+  test "the dialog asks for the template under the select's rule" do
+    render_form
+    assert_selector "label[for=new-page-type]", text: "Template"
+    assert_selector "select#new-page-type option", count: 2
+
+    with_page_templates("standard") { render_form }
+    assert_no_selector "select[name='page[template]']"
+    assert_no_selector "label[for=new-page-type]"
+    assert_selector "select#new-page-inside"
   end
 
   test "Inside lists every page the owner may create under, indented by depth, in tree order" do

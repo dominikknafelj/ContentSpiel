@@ -211,6 +211,31 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal({}, @page.reload.settings)
   end
 
+  test "a template is saved by the settings autosave and refused when it is unknown and not the stored one" do
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal "landing", @page.reload.template
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "nonesuch" } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_equal "landing", @page.reload.template
+    # The stored one, unknown to the theme, is still accepted: a form sends it back.
+    with_page_templates("standard") { assert Page.where(id: @page.id).update_all(settings: { "template" => "gallery" }) == 1 }
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "gallery", subtitle: "Kept" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal "gallery", @page.reload.template
+  end
+
+  test "switching to Landing draws the hero fields in the answer" do
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main [data-field-name=hero_alt]", count: 0
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main [data-field-name=hero_alt]"
+  end
+
   test "a stored template the theme no longer declares is kept by an unrelated autosave" do
     with_page_templates("standard", "gallery") { assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok? }
     get "/cs-studio/pages/#{@page.id}"
@@ -654,7 +679,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
     assert_select "form.admin-translation-form"
     assert_select "main form select[name='page[template]']", count: 0
-    assert_select "[data-field-name='template']", text: /Page type:\s*Standard\s*— Shared by all languages\./
+    assert_select "[data-field-name='template']", text: /Template:\s*Standard\s*— Shared by all languages\./
   end
 
   test "a translation-tab save without the template leaves it untouched" do
