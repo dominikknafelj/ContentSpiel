@@ -1464,4 +1464,32 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       end
     end
   end
+
+  test "a check that raises never stops the page: no notice, and the page draws" do
+    in_environment("development") do
+      folder = ThemeFolder.new(nil).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| raise Errno::EACCES, "styles" } }
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
+
+  test "the notice's command carries the THEME_PATH of a theme in use, and none for the default theme" do
+    in_environment("development") do
+      themed = ThemeFolder.new(Rails.root.join("test/fixtures/themes/plain")).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| true } }
+      with_singleton_override(ThemeFolder, :current, -> { themed }) do
+        get "/about"
+        assert_select "[data-stale-stylesheet] code", text: /\ATHEME_PATH=\S*themes\/plain bin\/rails tailwindcss:build\z/
+      end
+
+      default = stale_folder(true)
+      with_singleton_override(ThemeFolder, :current, -> { default }) do
+        get "/about"
+        assert_select "[data-stale-stylesheet] code", text: "bin/rails tailwindcss:build"
+      end
+    end
+  end
 end

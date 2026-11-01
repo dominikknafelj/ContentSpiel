@@ -1,7 +1,10 @@
-<%# Development only (`PublicPageRendering#note_stale_stylesheet`): the theme
-    changed after the public stylesheet was built. The CMS's own notice,
-    outside the theme's frame, and no theme replaces it. In the flow, not
-    fixed, so it moves nothing it does not have to. %>
+<%# Development only (`PublicPageRendering#note_stale_stylesheet`): the public
+    stylesheet was not built for the theme in use, or the theme or the default
+    styles changed after it was built. The CMS's own notice, outside the
+    theme's frame, and no theme replaces it. In the flow, not fixed, so it
+    moves nothing it does not have to. The command carries the THEME_PATH of
+    the theme in use: without it the build makes the default theme's. %>
+<% folder = ThemeFolder.current %>
 <p role="status" class="border-b border-line bg-sunken px-4 py-2 text-center text-sm text-ink" data-stale-stylesheet>
-  The public stylesheet is older than the theme. Run <code>bin/rails tailwindcss:build</code> to see the change.
+  The public stylesheet is not up to date. Run <code><%= "THEME_PATH=#{Shellwords.escape(folder.path.to_s)} " if folder.configured? %>bin/rails tailwindcss:build</code> to rebuild it.
 </p>

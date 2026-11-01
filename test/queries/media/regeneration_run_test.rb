@@ -99,4 +99,33 @@ class Media::RegenerationRunTest < ActiveSupport::TestCase
 
     assert_equal({ done: 0, of: 1 }, current_run)
   end
+
+  test "a settings save that merged into an earlier one after the press ends the run, though the event began before it" do
+    image
+    pressed(1, at: 2.minutes.ago)
+    # Quality saved, Regenerate pressed, quality saved again within the
+    # window: one event, begun before the press, last moved after it.
+    Audit::Event.create!(action: "settings.updated", field_changes: { "image_quality_webp" => [ 75, 60 ] },
+      occurred_at: 5.minutes.ago, last_occurred_at: 1.minute.ago)
+
+    assert_nil current_run
+  end
+
+  test "a settings event that ended before the press, of image settings, leaves the run on" do
+    image
+    pressed(1, at: 2.minutes.ago)
+    Audit::Event.create!(action: "settings.updated", field_changes: { "image_quality_webp" => [ 75, 60 ] },
+      occurred_at: 5.minutes.ago, last_occurred_at: 3.minutes.ago)
+
+    assert_equal({ done: 0, of: 1 }, current_run)
+  end
+
+  test "a trashed image stays out of the outstanding count" do
+    image
+    trashed = image
+    trashed.update_columns(trashed_at: Time.current) # version: none (a test trashes an image)
+    pressed(2)
+
+    assert_equal({ done: 1, of: 2 }, current_run)
+  end
 end

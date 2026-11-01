@@ -14,6 +14,12 @@ module Media
   #   failed (a failed image is not being made and waits for the next press).
   #   An upload after the press never counts: it has its own job.
   #
+  # An event is coalesced: a second save within `Audit::COALESCE_WINDOW`
+  # merges into the first and moves only its `last_occurred_at`, so "after
+  # the press" is read from that time on both sides (a press's own merge, if
+  # any, is the press's newest moment). The outstanding images are still
+  # those that existed at the first moment of the press.
+  #
   # The line is "done of N": N is the press's own count and `done` is N less
   # what is outstanding, never below 0. As of the page's load; nothing polls.
   #
@@ -39,7 +45,7 @@ module Media
       queued = press&.metadata&.dig("count").to_i
       return nil unless queued.positive?
       return nil if press.occurred_at < @now - MAX_AGE
-      return nil if image_settings_changed_since?(press.occurred_at)
+      return nil if image_settings_changed_since?(press.last_occurred_at)
 
       outstanding = outstanding_at(press.occurred_at)
       return nil unless outstanding.positive?
@@ -50,14 +56,13 @@ module Media
     private
 
     def outstanding_at(time)
-      table = Media::Asset.arel_table
-      @scope.where(table[:created_at].lteq(time))
-        .where(table[:renditions_fingerprint].is_distinct_from(@fingerprint))
+      @scope.where(created_at: ..time)
+        .where(Media::Asset.arel_table[:renditions_fingerprint].is_distinct_from(@fingerprint))
         .where(renditions_failed_at: nil).count
     end
 
     def image_settings_changed_since?(time)
-      Audit::Event.where(action: "settings.updated").where(Audit::Event.arel_table[:occurred_at].gt(time))
+      Audit::Event.where(action: "settings.updated").where(Audit::Event.arel_table[:last_occurred_at].gt(time))
         .pluck(:field_changes).any? { |changes| changes.keys.any? { |name| name.start_with?("image_") } }
     end
   end

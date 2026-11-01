@@ -343,4 +343,55 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     assert_select "h1", /not found/i
   end
+
+  # The development notice for a stale stylesheet changes the body, so the
+  # ETag follows it in both directions: a 304 neither hides a notice that has
+  # come nor keeps one that has gone.
+  def with_stale_answer(answer, &block)
+    folder = ThemeFolder.new(nil).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| answer } }
+    with_singleton_override(Rails, :env, -> { ActiveSupport::EnvironmentInquirer.new("development") }) do
+      with_singleton_override(ThemeFolder, :current, -> { folder }, &block)
+    end
+  end
+
+  test "a page revalidated with an ETag from before the stylesheet went stale is drawn again with the notice" do
+    etag = nil
+    with_stale_answer(false) do
+      get "/"
+      etag = response.headers["ETag"]
+      assert_select "[data-stale-stylesheet]", count: 0
+    end
+
+    with_stale_answer(true) do
+      get "/", headers: { "If-None-Match" => etag }
+      assert_response :success
+      assert_select "[data-stale-stylesheet]"
+    end
+  end
+
+  test "a page revalidated with an ETag from while the stylesheet was stale is drawn again without the notice once it is rebuilt" do
+    etag = nil
+    with_stale_answer(true) do
+      get "/"
+      etag = response.headers["ETag"]
+      get "/", headers: { "If-None-Match" => etag }
+      assert_response :not_modified, "while it stays stale the page is confirmed"
+    end
+
+    with_stale_answer(false) do
+      get "/", headers: { "If-None-Match" => etag }
+      assert_response :success
+      assert_select "[data-stale-stylesheet]", count: 0
+    end
+  end
+
+  test "a request outside development has the ETag it always had, whatever the stylesheet is" do
+    get "/"
+    plain = response.headers["ETag"]
+    folder = ThemeFolder.new(nil).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| true } }
+    with_singleton_override(ThemeFolder, :current, -> { folder }) do
+      get "/"
+      assert_equal plain, response.headers["ETag"]
+    end
+  end
 end

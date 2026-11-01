@@ -180,9 +180,19 @@ module PublicPageRendering
     prepend_view_path(views) if views
   end
 
+  # The check never stops a page (`ThemeFolder#stylesheet_stale?` answers false
+  # for what it cannot read; the rescue is the second fence).
   def note_stale_stylesheet
     @stale_stylesheet = Rails.env.development? && ThemeFolder.current.stylesheet_stale?(Rails.root)
+  rescue ThemeFolder::Invalid, SystemCallError
+    @stale_stylesheet = false
   end
+
+  # The notice is part of the body, so it is part of the ETag, but only while
+  # it is shown: a 304 must neither hide a notice that has come nor keep one
+  # that has gone. Nothing outside development, so a production ETag is
+  # unchanged.
+  def stale_stylesheet_etag_key = @stale_stylesheet ? [ "stale-stylesheet" ] : []
 
   def render_in_requested_locale(&block)
     I18n.with_locale(effective_locale, &block)

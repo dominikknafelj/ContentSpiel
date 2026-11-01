@@ -305,21 +305,28 @@ class ThemeFolder
   # a folder). No stamp is no build.
   def built?(root) = self.class.stamp(root) == fingerprint
 
-  # Whether the public stylesheet in `root` is older than the theme that
-  # draws the site, for the development notice (`PublicPageRendering`).
-  # A CONFIGURED theme is stale when it is not built (the stamp is its
-  # fingerprint, which digests every file), AND, as any theme is, when the
-  # default styles (which every build includes first) are newer than the
-  # stylesheet. THE DEFAULT THEME'S FINGERPRINT
-  # IS A CONSTANT, so `built?` cannot see a change to it: its styles are the
-  # CMS's own `app/assets/tailwind/themes/default/`, and a change there is
-  # seen by time, the newest file under it against the built stylesheet's.
-  # A stylesheet that is not there is stale. The answer is kept for
-  # `STALE_FOR` seconds (monotonic clock) per root: a page asks on every
+  # Whether the public stylesheet in `root` is out of step with the theme
+  # that draws the site, for the development notice (`PublicPageRendering`):
+  # it was built for another theme (its stamp is not this folder's
+  # fingerprint, "default" without a folder; no stamp is no build, and this
+  # holds for the default theme too: built under THEME_PATH, served without
+  # it), or the default theme's styles or templates (which every build
+  # includes first) are newer than it. THE DEFAULT THEME'S FINGERPRINT IS A
+  # CONSTANT, so the stamp cannot see a change to it: that is seen by time,
+  # the newest file under its styles and `DEFAULT_SOURCES` against the built
+  # stylesheet's. A stylesheet that is not there is stale. The answer is kept
+  # for `STALE_FOR` seconds (monotonic clock) per root: a page asks on every
   # request and the configured theme's fingerprint reads every file.
   STALE_FOR = 2
   DEFAULT_STYLES = "app/assets/tailwind/themes/default".freeze
   BUILT_STYLESHEET = "app/assets/builds/theme.css".freeze
+  # What the default theme's build reads besides its styles: the `@source`
+  # lines of its theme.css (a utility used in one of these templates is built
+  # only when the build ran after the template was written).
+  DEFAULT_SOURCES = %w[
+    app/views/pages app/views/layouts/application.html.erb app/views/layouts/public app/views/shared
+    app/helpers/theme_helper.rb app/components/blocks app/components/posts app/components/fields app/components/public
+  ].freeze
 
   def stylesheet_stale?(root)
     now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -327,9 +334,16 @@ class ThemeFolder
     asked, answer = @stale[root.to_s]
     return answer if asked && now - asked < STALE_FOR
 
-    # Both: the build of a configured theme reads the default theme's
-    # styles too (they come first in the one stylesheet).
-    answer = default_styles_newer?(root) || (configured? && !built?(root))
+    # Both: the build of ANY theme reads the default theme's styles and
+    # templates (they come first in the one stylesheet), and the stamp says
+    # which theme the build was made for: built under THEME_PATH and served
+    # without it is as stale as the other way round. The question never stops
+    # a page: whatever the check cannot read is "not stale".
+    answer = begin
+      !built?(root) || default_styles_newer?(root)
+    rescue ThemeFolder::Invalid, SystemCallError
+      false
+    end
     @stale[root.to_s] = [ now, answer ]
     answer
   end
@@ -352,7 +366,11 @@ class ThemeFolder
     return true unless File.file?(built)
 
     built_at = File.mtime(built)
-    Dir.glob(File.join(root.to_s, DEFAULT_STYLES, "**", "*")).any? { |f| File.file?(f) && File.mtime(f) > built_at }
+    [ DEFAULT_STYLES, *DEFAULT_SOURCES ].any? do |path|
+      full = File.join(root.to_s, path)
+      files = File.directory?(full) ? Dir.glob(File.join(full, "**", "*")) : [ full ]
+      files.any? { |f| File.file?(f) && File.mtime(f) > built_at }
+    end
   end
 
   def existing_file(relative)

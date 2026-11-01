@@ -473,6 +473,25 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_match(/text/, result.errors.join)
   end
 
+  test "string keys are refused like symbol keys, and a valid caption beside an invalid key is refused whole" do
+    page = create_page(title: "Page")
+    block = ContentBlock.create!(owner: page, block_type: "rich_text")
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = as_owner { ContentBlocks::Save.call(block, attributes: {}, translations: { "en" => { "title" => "T", "caption" => "Kept?" } }) }
+    end
+
+    assert_not result.ok?
+    assert_match(/title/, result.errors.join)
+    assert_nil Mobility.with_locale(:en) { block.reload.caption }, "the valid caption was not saved either"
+
+    symbol = as_owner { ContentBlocks::Save.call(block, attributes: {}, translations: { "en" => { title: "T", caption: "Kept?" } }) }
+    assert_not symbol.ok?
+    assert_match(/title/, symbol.errors.join)
+    assert_nil Mobility.with_locale(:en) { block.reload.caption }
+  end
+
   test "caption, alt, body and settings under a language still save, and an unknown language and unknown settings keys behave as before" do
     page = create_page(title: "Page")
     result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "card" },

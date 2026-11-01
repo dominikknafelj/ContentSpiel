@@ -46,7 +46,7 @@ Target: under 5,000 words. It is a target, not a limit: an unguarded rule is nev
 
 `docs/getting-started.md`, nested `CLAUDE.md` files and the review rule that #109 also suggests are left out, and the issue is closed with a comment saying so, or a smaller issue is opened for them (the builder's call).
 
-## Part 2: a stale stylesheet says so (Nordlicht, item 1)
+## Part 2: a stale stylesheet says so
 
 In development, when the built stylesheet's stamp no longer matches the theme in use (`ThemeFolder#built?`, the check production already boots under, if its fingerprint covers the files the build reads; otherwise the stylesheet is compared with the newest of those files, a `theme.yml` and templates included), for a theme folder and for the default theme alike, the public page says so, in the same place and way a theme refusal already says why on every public page (`Theme.prepare`, `docs/reference/theming.md`), naming the command that rebuilds. It never stops a page drawing, and production and test never see it. The check costs a few `stat`s; if the builder finds it noticeable per request, it may be cached for a second or two.
 

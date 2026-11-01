@@ -409,6 +409,7 @@ class ThemeFolderTest < ActiveSupport::TestCase
       source.write("a")
       built.write("b")
       source.utime(Time.now - 60, Time.now - 60)
+      ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
 
       assert_not ThemeFolder.new(nil).stylesheet_stale?(root), "built after the newest source"
 
@@ -417,6 +418,46 @@ class ThemeFolderTest < ActiveSupport::TestCase
 
       built.delete
       assert ThemeFolder.new(nil).stylesheet_stale?(root), "no stylesheet is a stale one"
+    end
+  end
+
+  test "the default theme is stale under a stamp of another theme, and under none" do
+    with_built_root do |root|
+      root.join(ThemeFolder::BUILT_STYLESHEET).write("b")
+      assert ThemeFolder.new(nil).stylesheet_stale?(root), "no stamp"
+
+      ThemeCss.stamp!(ThemeFolder.new(PLAIN), root: root)
+      assert ThemeFolder.new(nil).stylesheet_stale?(root), "built under THEME_PATH, served without it"
+    end
+  end
+
+  test "a changed template the default build scans makes the stylesheet stale, and one it does not scan does not" do
+    with_built_root do |root|
+      built = root.join(ThemeFolder::BUILT_STYLESHEET)
+      built.write("b")
+      ThemeCss.stamp!(ThemeFolder.new(nil), root: root)
+      built.utime(Time.now - 60, Time.now - 60)
+      scanned = root.join("app/components/blocks/text_component.html.erb")
+      elsewhere = root.join("app/components/admin/thing.html.erb")
+      [ scanned, elsewhere ].each { |f| FileUtils.mkdir_p(f.dirname) && f.write("x") }
+      elsewhere.utime(Time.now, Time.now)
+      scanned.utime(Time.now - 120, Time.now - 120)
+      assert_not ThemeFolder.new(nil).stylesheet_stale?(root)
+
+      scanned.utime(Time.now, Time.now)
+      assert ThemeFolder.new(nil).stylesheet_stale?(root)
+    end
+  end
+
+  test "what the check cannot read is not stale, and never raises" do
+    with_built_root do |root|
+      folder = ThemeFolder.new(nil)
+      folder.define_singleton_method(:built?) { |_root| raise Errno::EACCES, "stamp" }
+      assert_not folder.stylesheet_stale?(root)
+
+      folder = ThemeFolder.new(nil)
+      folder.define_singleton_method(:built?) { |_root| raise ThemeFolder::Invalid, "folder" }
+      assert_not folder.stylesheet_stale?(root)
     end
   end
 
