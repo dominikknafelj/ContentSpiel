@@ -105,6 +105,9 @@ module ContentBlocks
       copy = ContentBlock.new(owner: block.owner, block_type: block.block_type, settings: block.settings, translated_settings: block.translated_settings)
       # A name the theme no longer declares is the original's to keep.
       copy.carried_settings = block.settings
+      # A section's anchor is the original's alone: a second one on the page
+      # would be refused, and the copy must always save.
+      copy.settings = copy.settings.except("anchor") if copy.container?
       copy_translations(block, copy)
       # The image reference goes in through the service (final fix wave,
       # Minor 6), so it's saved in the same authorized, audited write -- and

@@ -144,6 +144,23 @@ class ThemeHelperTest < ActionView::TestCase
     assert_includes html, %(<h2 id="use-bin-rails-more">Use <code>bin/rails</code> &amp; more</h2>)
   end
 
+  # The article a template hands over may not hold the sections (a theme that
+  # draws them apart, or a section that draws nothing), and a link to
+  # `#services` still reaches the section: the page's anchors are taken ids.
+  test "with_heading_ids gives a heading whose words are a section's anchor on the shown page the next free suffix, and an anchor of no shown page is no reason" do
+    page = create_page(title: "Anchored")
+    section = page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    other = create_page(title: "Other").content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(other, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    @page = page.reload
+
+    html, headings = with_heading_ids("<h2>Services</h2><h2>Services</h2><h2>Contact</h2>".html_safe)
+
+    assert_equal %w[services-2 services-3 contact], headings.map(&:id)
+    assert_includes html, %(<h2 id="services-2">Services</h2>)
+  end
+
   test "with_heading_ids keeps an id a heading already has and never gives it to another" do
     _, headings = with_heading_ids(%(<h2 id="setup">Other words</h2><h2>Setup</h2><p id="setup-2">x</p><h2>Setup</h2>).html_safe)
 

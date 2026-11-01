@@ -75,6 +75,14 @@ module Blocks
       name if name.present? && Theme.current.choice(:section_styles, name)
     end
 
+    # The section's anchor, the section element's `id`: the stored one when it
+    # has the shape the service enforces (`BlockTypes::Section::ANCHOR`), else
+    # nil, so a value written around the service never reaches an `id`.
+    def anchor
+      name = settings.anchor.to_s
+      name if BlockTypes::Section::ANCHOR.match?(name)
+    end
+
     private
 
     attr_reader :block, :page

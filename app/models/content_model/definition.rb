@@ -39,7 +39,11 @@ module ContentModel
     # placeholder (the Note block's title shows the kind's word, design
     # answer B3). Both are literals of the type's definition, as `label:` is.
     # `max:` on a string counts characters, as on a code field.
-    OPTIONS = %i[required default min max translated options of blank label control help placeholder_from].freeze
+    #
+    # `format:` is the shape a string must have (a Regexp, tested against the whole
+    # cast value; a blank value has none to test) and `format_message:` the I18n
+    # key of the sentence that refuses it, shown whole, with no field prefix.
+    OPTIONS = %i[required default min max translated options of blank label control help placeholder_from format format_message].freeze
     CONTROLS = %i[segmented].freeze
 
     # One field in the schema: `options` carries everything but name/type

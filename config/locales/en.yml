@@ -61,6 +61,13 @@ en:
       table_too_large: "A table can have at most %{columns} columns and %{rows} rows."
       table_cell_too_long: "A cell can have at most %{characters} characters."
 
+  # A Section's anchor (`BlockTypes::Section`): whole sentences, shown under the
+  # field with no prefix (`activerecord.errors.models.content_block` below).
+  block_types:
+    section:
+      anchor_format: "An anchor can hold lowercase letters, digits and hyphens, must start with a letter and can have at most 40 characters."
+      anchor_taken: "Another section on this page is already called `%{anchor}`."
+
   # How these columns are named in validation messages ("AI provider isn't
   # an available provider", not Rails' default "Ai provider ...").
   activerecord:
@@ -115,6 +122,12 @@ en:
             image_max_upload_mb:
               format: "%{message}"
               upload_range: "Largest upload must be a whole number of MB, from 1 to 50."
+        # A Section's anchor is named by its sentence: the attribute is the dotted
+        # `settings.anchor` (`ContentBlock#settings_are_valid`).
+        content_block/settings:
+          attributes:
+            anchor:
+              format: "%{message}"
         # An image upload's refusals (`Media::Asset`), read as Active Record
         # joins them with the attribute: "File can't be read as an image".
         media/asset:

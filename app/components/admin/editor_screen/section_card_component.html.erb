@@ -62,12 +62,18 @@
           <%= select_tag "block[settings][style]", options_for_select(style_options, setting("style")),
                 id: field_id("style"), class: select_class, "aria-label": t(".style") %>
         <% end %>
+        <%# The address of a link that jumps here. Its help line is the field's description
+            for a screen reader and its tooltip; the header has no room for it in sight. %>
+        <%= text_field_tag "block[settings][anchor]", setting("anchor"), id: field_id("anchor"), maxlength: BlockTypes::Section::ANCHOR_MAX, autocomplete: "off", spellcheck: false,
+              placeholder: t(".anchor"), title: t(".anchor_help"), "aria-label": t(".anchor"), "aria-describedby": field_id("anchor-help"),
+              class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 font-cs-mono text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
+        <span id="<%= field_id("anchor-help") %>" class="sr-only"><%= t(".anchor_help") %></span>
         <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
         <%# One slot per setting, as every field of a block has: `update` replaces all three
             with each answer. Together they take a line of their own, and no room at all
             while none holds a message (`.admin-section-errors`). %>
         <div class="admin-section-errors basis-full">
-          <% %w[layout background width style].each do |name| %>
+          <% %w[layout background width style anchor].each do |name| %>
             <%= helpers.render "admin/shared/field_errors", id: error_id(name), messages: [] %>
           <% end %>
         </div>

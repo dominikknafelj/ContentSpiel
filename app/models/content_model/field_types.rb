@@ -120,8 +120,16 @@ module ContentModel
               raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" unless source&.type == :select
             end
             raise ArgumentError, "`max:` on a string field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+            raise ArgumentError, "`format:` on a string field is a Regexp, with `format_message:` the I18n key of the sentence that refuses a value" if options.key?(:format) && !(options[:format].is_a?(Regexp) && options[:format_message].is_a?(String))
+            raise ArgumentError, "`format_message:` belongs to a `format:`" if options.key?(:format_message) && !options.key?(:format)
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            # A shape the whole value must have, refused with a sentence of its own.
+            # An unchanged stored value is not this save's to refuse (a row written
+            # around the service).
+            pattern = field.options[:format]
+            errors.add(field.name, :invalid, message: I18n.t(field.options[:format_message])) if pattern && value && value != stored && !pattern.match?(value)
+
             max = field.options[:max]
             next unless max
 
@@ -352,6 +360,7 @@ module ContentModel
       def refuse_string_options(options)
         raise ArgumentError, "`help:` is a line under a string field, written as a String" if options.key?(:help)
         raise ArgumentError, "`placeholder_from:` is for a string field and names a select field declared before it" if options.key?(:placeholder_from)
+        raise ArgumentError, "`format:` is for a string field" if options.key?(:format) || options.key?(:format_message)
       end
 
       def url?(value)

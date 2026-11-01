@@ -241,7 +241,9 @@ module ThemeHelper
     nodes = nodes.reject { |node| template_item?(node) } # before an id is put on anything: an item is known by its markup
     return [ html, [] ] if nodes.empty?
 
-    taken = fragment.css("[id]").map { |node| node["id"] }.to_set
+    # A section's anchor is the author's word for the band and a link to it must
+    # land there, so it is taken whether or not the section is in this article.
+    taken = fragment.css("[id]").map { |node| node["id"] }.to_set.merge(page_anchors)
     headings = nodes.map do |node|
       id = node["id"].presence || begin
         base = Heading.id_from(Heading.words_of(node)).presence || "section"
@@ -375,6 +377,17 @@ module ThemeHelper
   def block_outline(page)
     @block_outlines ||= {}
     @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
+  end
+
+  # The anchors of the shown page's sections, from the blocks the page was
+  # drawn from (the published copy's on the site, the rows in the preview): the
+  # ids `with_heading_ids` leaves to the sections. Empty where there is no shown
+  # page, as in a helper's own test.
+  def page_anchors
+    page = @page
+    return [] unless page.respond_to?(:content_blocks)
+
+    page.content_blocks.select(&:container?).filter_map { |block| block.settings["anchor"].presence } # public: rows (the page is the published view the controller resolved: its loaded blocks are the copy's; the preview shows the rows)
   end
 
   # Whether a heading is in a list item that is NOT a rendered text's: a

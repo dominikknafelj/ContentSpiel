@@ -1170,6 +1170,31 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # `with_heading_ids` works on what the page's template captured, after
   # that cache. With a real store: the suite's null store would never hand a
   # cached render back.
+  # The anchor is the page author's word for the section, and a link to
+  # `#services` must reach it: a heading whose words give the same id is the
+  # one that yields, on the copy of the rendered page and nowhere else.
+  test "a heading whose id is a section's anchor on the same page gets a suffix, the anchor wins, and another page's anchor is nothing to it" do
+    section = @about.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    @about.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0, body: rich_doc("Inside the band"))
+    heading = ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 1 },
+      translations: { "en" => { body: rich_doc("## Services\n\nWords.\n\n## Contact") } })
+    assert heading.ok?, heading.errors.to_sentence
+    elsewhere = create_page(title: "Elsewhere")
+    other = elsewhere.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(other, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    publish_changes(@about)
+    publish_changes(elsewhere)
+
+    with_plain_theme { get "/about" }
+
+    assert_select "section#services", 1
+    assert_select "article.plain-page h2#services-2", text: "Services"
+    assert_select "article.plain-page h2#contact", text: "Contact"
+    assert_select "ol.plain-contents a[href='#services-2']", text: "Services"
+    assert_select "[id='services']", 1
+  end
+
   test "heading ids are on the page a theme draws and not in the cached render of the text" do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new

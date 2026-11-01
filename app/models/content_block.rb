@@ -136,6 +136,10 @@ class ContentBlock < ApplicationRecord
   # loads them with the list blocks, for `BlockOutline`).
   scope :containers, -> { where(block_type: BlockTypes.with_capability(:container).map(&:name)) }
 
+  # The containers whose `anchor` setting is `anchor`: what a save asks of the
+  # page's other sections before it takes the name (`ContentBlocks::Save`).
+  scope :with_anchor, ->(anchor) { containers.where(SqlNodes.json_text(arel_table[:settings], :anchor).eq(anchor.to_s)) }
+
   # `ActiveModel::Validations` aliases this to `#send` by default, which
   # chokes on the dotted paths `settings_are_valid` below adds errors under
   # (`settings.content_type` is not a method) -- generating an error's full

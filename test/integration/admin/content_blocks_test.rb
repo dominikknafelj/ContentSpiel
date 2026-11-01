@@ -307,6 +307,30 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "services", section.reload.settings["style"]
   end
 
+  test "a section's anchor is saved from its card, a second section's same anchor is a 422 with the sentence in the anchor's slot, and an anchor that is not one says how it is written" do
+    first = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    second = @page.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "two" })
+    save = ->(section, anchor) { patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content", anchor: anchor } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream }
+
+    save.call(first, "services")
+    assert_response :success
+    assert_equal "services", first.reload.settings["anchor"]
+
+    save.call(second, "services")
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{second.id}-anchor-errors'] template", text: /Another section on this page is already called `services`\./
+    assert_not second.reload.settings.key?("anchor")
+
+    save.call(second, "Not An Anchor")
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{second.id}-anchor-errors'] template", text: /can hold lowercase letters, digits and hyphens/
+    assert_not second.reload.settings.key?("anchor")
+
+    save.call(first, "")
+    assert_response :success
+    assert_not first.reload.settings.key?("anchor")
+  end
+
   test "the first save of a section that stores no settings yet is no change of layout" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     section.update_column(:settings, {})

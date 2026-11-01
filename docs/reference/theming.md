@@ -380,7 +380,7 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 | `blocks/table_component` | `block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
-| `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style` |
+| `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style`, `anchor` |
 | `posts/blog_list_component` | `posts`, `page` |
 | `posts/resume_list_component` | `posts`, `page` |
 | `posts/now_list_component` | `posts`, `page` |
@@ -393,6 +393,8 @@ A class the CMS's own templates write from a choice the theme declared in `theme
 | Class | Where |
 |---|---|
 | `content-section--style-<name>` | on the section, for a style the theme declares |
+
+The Section's `anchor` is the stored anchor when it is well formed (lowercase letters, digits and hyphens, a letter first, at most 40 characters; unique among the page's sections) and nil otherwise; the default template writes it as the section element's `id`, and a theme that replaces the template does the same. A heading of the article whose id would equal an anchor of the shown page gets the next free suffix (`services-2`), so the anchor is always the section's.
 
 ### Helpers
 

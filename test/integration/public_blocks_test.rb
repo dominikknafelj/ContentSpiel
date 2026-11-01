@@ -206,6 +206,39 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section--style-services", text: /Styled words/
   end
 
+  # The anchor is a setting like the rest, so the visitor reads the copy's.
+  test "a section's anchor is the section element's id, read from the published copy: a save shows nothing until it is published" do
+    section = section_with_texts([ 1, "Anchored words" ], layout: "one")
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    publish_changes(@root)
+    get "/"
+
+    assert_select "section.content-section#services", text: /Anchored words/
+
+    ContentBlocks::Save.call(section.reload, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    get "/"
+    assert_select "section#services", 1
+    assert_select "section#contact", 0
+
+    publish_changes(@root)
+    get "/"
+    assert_select "section#contact", 1
+    assert_select "section#services", 0
+  end
+
+  test "a section with no anchor has no id, and an anchor written around the service that is not one is not printed" do
+    section = section_with_texts([ 1, "Plain words" ], layout: "one")
+    publish_changes(@root)
+    get "/"
+    assert_select "section.content-section:not([id])", text: /Plain words/
+
+    section.update_columns(settings: section.settings.merge("anchor" => %(x" onclick="y)))
+    publish_changes(@root)
+    get "/"
+    assert_select "section.content-section:not([id])", text: /Plain words/
+    assert_not_includes response.body, "onclick"
+  end
+
   test "a style in a tinted and in a strong band keeps the band's class beside the style's" do
     with_choices_theme do
       section_with_texts([ 1, "Tinted words" ], layout: "one", background: "tinted").update!(settings: { "layout" => "one", "background" => "tinted", "width" => "content", "style" => "services" })

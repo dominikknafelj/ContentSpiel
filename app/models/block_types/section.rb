@@ -14,6 +14,13 @@ module BlockTypes
     }.freeze
     BACKGROUNDS = %w[none tinted strong].freeze
     WIDTHS = %w[content full].freeze
+    # The address of a link that jumps to the band (`#services`): what the
+    # section's `id` is on the public page, so it is a name an `id` and a URL
+    # fragment hold without escaping, and one the page's headings cannot be
+    # given (`ThemeHelper#with_heading_ids`). Refused when it differs, never
+    # cleaned: the editor sees what was stored.
+    ANCHOR_MAX = 40
+    ANCHOR = /\A[a-z][a-z0-9-]{0,#{ANCHOR_MAX - 1}}\z/
 
     def self.register
       BlockTypes.register :section do |t|
@@ -25,10 +32,14 @@ module BlockTypes
         # A name from the theme's `section_styles` (theme.yml): the theme
         # draws it, the default theme declares none and draws nothing for it.
         t.field :style, :theme_choice, of: :section_styles
+        # One anchor for every language, unique among the page's sections
+        # (`ContentBlocks::Save`, with `index_content_blocks_on_section_anchor`
+        # behind it); blank is none and is stored as absent.
+        t.field :anchor, :string, format: ANCHOR, format_message: "block_types.section.anchor_format"
         t.capability :container
         t.columns ->(settings) { weights(settings["layout"]).size }
         t.component Blocks::SectionComponent
-        t.theme_methods :block, :page, :columns, :layout, :background, :width, :style
+        t.theme_methods :block, :page, :columns, :layout, :background, :width, :style, :anchor
         # No `stylesheet` and no `summary` (block types plan, departure 1):
         # sections.css is the default theme's own file, imported by
         # theme.css before every type's, and a section's tile is its lanes.

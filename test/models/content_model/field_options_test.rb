@@ -15,6 +15,20 @@ class ContentModel::FieldOptionsTest < ActiveSupport::TestCase
     assert_not define { |t| t.field :kind, :select, options: %w[a b] }.fields.sole.segmented?, "a select without it is a select"
   end
 
+  test "a string's format refuses a value that does not match with the sentence of its key, leaves a blank and an unchanged stored value alone, and is refused anywhere else or half given" do
+    definition = define { |t| t.field :code, :string, format: /\A[a-z]+\z/, format_message: "block_types.section.anchor_format" }
+    check = ->(value, stored: {}) { definition.field_set.new({ "code" => value }, {}, stored: stored).tap(&:valid?).errors }
+
+    assert_empty check.call("fine")
+    assert_empty check.call("")
+    assert_equal [ I18n.t("block_types.section.anchor_format") ], check.call("No!").map(&:message)
+    assert_empty check.call("No!", stored: { "code" => "No!" })
+
+    assert_raises(ArgumentError) { define { |t| t.field :code, :string, format: /a/ } }
+    assert_raises(ArgumentError) { define { |t| t.field :code, :string, format_message: "x" } }
+    assert_raises(ArgumentError) { define { |t| t.field :n, :integer, format: /a/, format_message: "x" } }
+  end
+
   test "a segmented control is refused on any field but a select, on a select with a blank choice, and as any other control" do
     error = assert_raises(ArgumentError) { define { |t| t.field :name, :string, control: :segmented } }
     assert_includes error.message, "select"

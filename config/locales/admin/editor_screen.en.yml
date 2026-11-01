@@ -177,6 +177,9 @@ en:
             full: "Full width"
           # The theme's section style, drawn only when the theme declares one.
           style: "Style"
+          # The section's anchor: what a link `#anchor` jumps to.
+          anchor: "Anchor"
+          anchor_help: "Lets a link jump here, as #anchor. Leave empty for none."
           # The section's "⋯" menu and the dialog its last item opens.
           actions: "Section actions"
           move_up: "Move up"
