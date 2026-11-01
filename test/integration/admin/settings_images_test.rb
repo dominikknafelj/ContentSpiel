@@ -61,7 +61,7 @@ class Admin::SettingsImagesTest < ActionDispatch::IntegrationTest
 
     # The card now counts the image as made with other settings.
     get "/cs-studio/settings"
-    assert_select "[data-images-progress]", /0 of 1 image made with these settings/
+    assert_select "[data-images-progress]", /1 image was made with other settings/
   end
 
   test "widths typed out of order are saved sorted; a width typed twice is refused with a sentence and nothing is saved" do
@@ -101,7 +101,7 @@ class Admin::SettingsImagesTest < ActionDispatch::IntegrationTest
     with_singleton_override(ImageSettings, :avif_available?, ->(**) { true }) do
       get "/cs-studio/settings"
       assert_select "input#settings-image_format-avif:not([disabled])"
-      assert_select "[data-images-avif-note]", /too old to show AVIF will show nothing/
+      assert_select "[data-images-avif-note]", /very old browsers show no image/
       save(image_format: "avif", image_quality_avif: "40")
       assert_redirected_to "/cs-studio/settings"
       assert_equal [ "avif", 40 ], [ @site.reload.image_format, @site.image_quality_avif ]
@@ -147,6 +147,25 @@ class Admin::SettingsImagesTest < ActionDispatch::IntegrationTest
     assert_equal 1, Audit::Event.where(action: "media.regenerated").count
     assert_equal 1, Audit::Event.find_by!(action: "media.regenerated").metadata["count"]
     assert_equal stale.id, enqueued_jobs.map { |job| ActiveJob::Arguments.deserialize(job["arguments"]).first }.compact.first.id
+  end
+
+  test "after a press the card says how far the run is, and the failed count links to System status only for a viewer who may open it" do
+    stale = create_media_asset
+    failed = create_media_asset(filename: "tiny.png")
+    failed.update_columns(renditions_failed_at: Time.current) # version: none (a test records a failure)
+    post "/cs-studio/settings/regenerate_images"
+    follow_redirect!
+
+    assert_select "[data-images-running]", "Regenerating: 1 of 2"
+    assert_select "[data-images-failed] a[href='/cs-studio/system_status']", "1 could not be made"
+    assert_select "#settings-images-forms dialog", /Remake 2 images\? This runs in the background/
+    assert_predicate stale, :persisted?
+
+    viewer = settings_manager_without("settings.manage")
+    sign_in_as(viewer)
+    get "/cs-studio/settings"
+    assert_select "[data-images-failed] a", 0
+    assert_select "[data-images-failed]", /1 could not be made/
   end
 
   test "Regenerate images without settings.manage is the 403 and queues nothing" do

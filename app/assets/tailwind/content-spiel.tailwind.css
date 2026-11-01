@@ -378,6 +378,31 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
 
+/* A filter bar's one height (Design System: "Controls in one row share one
+   height. Forms are 42px; a filter bar is 38px, set by the bar, never by a
+   control"). The bar sets it, as a minimum: a control keeps its own text size
+   and focus ring, and a segmented group that wraps (Media's five segments in a
+   narrow window) grows instead of clipping, which a group height would do. It
+   is unlayered like `.cs-select`, so it beats the utilities written beside a
+   control (`py-1.5`, `py-2`): those are dead inside a bar. The segments sit
+   inside the group's 1px frame, hence two pixels less. */
+.admin-filter-bar > div,
+.admin-filter-bar > fieldset { display: flex; }
+.admin-filter-bar input:not(.sr-only),
+.admin-filter-bar select,
+.admin-filter-bar a.inline-block,
+.admin-filter-bar button,
+.admin-filter-bar [data-subject-chip] {
+  min-height: var(--cs-control-compact);
+  padding-block: 0;
+}
+.admin-filter-bar a.inline-block,
+.admin-filter-bar button { display: inline-flex; align-items: center; }
+.admin-filter-bar fieldset label {
+  min-height: calc(var(--cs-control-compact) - 2px);
+  padding-block: 0;
+}
+
 /* A disclosure whose summary is a mono label ("▸ PAGE SETTINGS", the SEO
    and Shared fields boxes, an audit event's Snapshot). The browser's own
    marker stood against the first letter; this triangle is the

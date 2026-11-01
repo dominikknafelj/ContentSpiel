@@ -29,3 +29,9 @@ The Tiptap editor is vendored under `vendor/javascript` via import maps (`config
 ## Importing ActionText
 
 `bin/rails rich_text:migrate_from_action_text` (`lib/tasks/rich_text.rake`) runs `RichText::ActionTextImport`, which orchestrates the conversion of every stored ActionText/Trix body — it never aborts partway and reports counts plus every unmapped fragment — handing each HTML fragment to `RichText::HtmlImport`, the per-fragment HTML → `RichText::Document` converter. The ActionText tables are dropped by a later, guarded migration (`db/migrate/20260928040000_drop_action_text.rb`) that refuses to run while unimported rows remain, unless `FORCE_DROP_ACTION_TEXT=1` overrides the guard.
+
+## Rules a change can break silently
+
+Moved word for word from `CLAUDE.md`, where "above" and "below" meant the list these rules stood in: a rule named that way may now be in another reference file. Each names the test that guards it; a rule or a part of one with no guard is also said in `CLAUDE.md`.
+
+- The public content version moves only through `PublicSite.bump_version!`; a write that goes around the callbacks (`update_all`, `update_columns`, `touch_all`, `insert_all`, `delete_all`) bumps it or says `# version: none (reason)` on the line (`test/lib/version_bump_test.rb`). For a record with a published copy a content write moves it not at all and taking a copy (or a scheduled change coming into force, a read-time part with no write and no job) moves it; for a record with no copy every write moves it (`test/models/public_site/version_test.rb`: "creating a live page moves; editing it stays, and publishing the changes moves", "a scheduled change coming into force by the clock changes the version with no write").

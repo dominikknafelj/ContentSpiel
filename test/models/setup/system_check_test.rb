@@ -375,24 +375,37 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "the Images row is OK when every kept image is made with the current settings, and warns with the counts otherwise" do
     ok = result("Images", run_check(image_progress: progress(total: 4, made: 4, failed: 0)))
     assert ok.ok?
-    assert_equal "Every image is made with the current settings.", ok.message
+    assert_equal "All images are ready.", ok.message
 
     none = result("Images", run_check(image_progress: progress(total: 0, made: 0, failed: 0)))
     assert none.ok?
 
     behind = result("Images", run_check(image_progress: progress(total: 10, made: 7, failed: 0)))
     assert_not behind.ok?
-    assert_equal "3 of 10 images still to be made.", behind.message
+    assert_equal "3 images are still being made.", behind.message
     assert_nil behind.command
   end
 
   test "a failed image is counted as could not be made" do
     only_failed = result("Images", run_check(image_progress: progress(total: 10, made: 8, failed: 2)))
-    assert_equal "2 of 10 images still to be made. 2 images could not be made.", only_failed.message
+    assert_equal "2 images could not be made.", only_failed.message
+    assert_not only_failed.ok?
 
     both = result("Images", run_check(image_progress: progress(total: 10, made: 7, failed: 2)))
     assert_not both.ok?
-    assert_equal "3 of 10 images still to be made. 2 images could not be made.", both.message
+    assert_equal "1 image is still being made. 2 images could not be made.", both.message
+
+    one_failed = result("Images", run_check(image_progress: progress(total: 10, made: 9, failed: 1)))
+    assert_equal "1 image could not be made.", one_failed.message
+  end
+
+  test "waiting images are total minus made minus failed, and one image is singular" do
+    one = result("Images", run_check(image_progress: progress(total: 5, made: 4, failed: 0)))
+    assert_equal "1 image is still being made.", one.message
+    assert_not one.ok?
+
+    eight = result("Images", run_check(image_progress: progress(total: 10, made: 2, failed: 0)))
+    assert_equal "8 images are still being made.", eight.message
   end
 
   test "a count that raises leaves the Images row out and logs its class, and every other row is there" do

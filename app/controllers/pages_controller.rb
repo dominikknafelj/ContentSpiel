@@ -77,6 +77,9 @@ class PagesController < PublicController
       #   response is built from" as one of the CMS's;
       # - the year, which the footer prints: a 304 on 1 January would
       #   otherwise confirm last year's copyright line;
+      # - in development, the stale-stylesheet notice, which changes the body
+      #   (`stale_stylesheet_etag_key`: nothing at all otherwise, so a
+      #   production ETag is what it was);
       # - with no site address configured, the request's origin
       #   (`origin_etag_key`): the head's addresses then follow the host the
       #   request named, and nothing else here does.
@@ -89,7 +92,7 @@ class PagesController < PublicController
       # is actually rendered.
       expires_in 0, public: true, must_revalidate: true
       keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
-      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, *origin_etag_key ], public: true)
+      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
         assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show

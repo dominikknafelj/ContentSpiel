@@ -61,15 +61,22 @@
     </div>
 
     <div id="settings-images-progress" class="flex flex-col gap-2 border-t border-line pt-4">
-      <p class="text-sm text-ink" data-images-progress>
-        <% if total.zero? %>
-          <%= t(".no_images") %>
-        <% else %>
-          <%= t(".progress", count: total, made: made) %>
-        <% end %>
-      </p>
+      <% if total.zero? %>
+        <p class="text-sm text-ink" data-images-progress><%= t(".no_images") %></p>
+      <% elsif other_settings.positive? %>
+        <p class="text-sm text-ink" data-images-progress><%= t(".progress", count: other_settings) %></p>
+      <% end %>
+      <% if run %>
+        <p class="text-sm text-ink" data-images-running><%= t(".running", done: run[:done], of: run[:of]) %></p>
+      <% end %>
       <% if failed.positive? %>
-        <p class="text-sm text-danger-ink" data-images-failed><%= t(".failed", count: failed) %></p>
+        <p class="text-sm text-danger-ink" data-images-failed>
+          <% if status_link? %>
+            <%= link_to t(".failed", count: failed), status_path, class: "underline hover:no-underline" %>
+          <% else %>
+            <%= t(".failed", count: failed) %>
+          <% end %>
+        </p>
       <% end %>
       <p class="text-sm text-meta"><%= t(".regenerate_help") %></p>
       <div>

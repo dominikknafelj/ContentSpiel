@@ -60,6 +60,31 @@ class ImageBoxSystemTest < ApplicationSystemTestCase
     assert_in_delta 320, bare["width"], 0.5
   end
 
+  test "on a public page the empty image carries the 28px mark, centred and not repeated, on the one <img>, in --th-meta in either scheme" do
+    publish_changes(@page)
+    visit PublicSite::Urls.new.path_for(@page, "en")
+    assert_selector "img[data-image-empty]:not([src])", visible: :all
+
+    read = <<~JS
+      (() => {
+        const element = document.querySelector("img[data-image-empty]")
+        const style = getComputedStyle(element)
+        return { "tag": element.tagName, "wrapped": element.parentElement.tagName, "repeat": style.backgroundRepeat, "position": style.backgroundPosition,
+                 "size": style.backgroundSize, "image": decodeURIComponent(style.backgroundImage) }
+      })()
+    JS
+    { "light" => "#6c6d72", "dark" => "#8e8f95" }.each do |scheme, colour|
+      page.execute_script("document.documentElement.dataset.theme = '#{scheme}'")
+      mark = page.evaluate_script(read)
+      assert_equal "IMG", mark["tag"]
+      assert_equal "no-repeat", mark["repeat"]
+      assert_equal "50% 50%", mark["position"]
+      assert_equal "28px", mark["size"].split.first
+      assert_includes mark["image"], "stroke='#{colour}'", "the mark in the #{scheme} scheme"
+    end
+    assert_selector "img[data-image-empty]", count: 1, visible: :all
+  end
+
   test "in the media library the empty image is a box of the image's shape on the sunken ground" do
     sign_in_via_form(users(:one))
     visit "/cs-studio/media"

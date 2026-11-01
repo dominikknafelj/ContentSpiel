@@ -177,7 +177,7 @@ class Theme::ContractTest < ActiveSupport::TestCase
     %w[layouts/public/_frame layouts/public/_title layouts/public/_icons layouts/public/_head pages/show pages/not_found].each do |name|
       assert Theme::Contract::TEMPLATES.key?("#{name}.html.erb"), "#{name} is not replaceable"
     end
-    %w[layouts/application pages/_seo_meta shared/_theme_head layouts/public/_preview_banner].each do |name|
+    %w[layouts/application pages/_seo_meta shared/_theme_head layouts/public/_preview_banner layouts/public/_stale_stylesheet].each do |name|
       assert_not Theme::Contract::TEMPLATES.key?("#{name}.html.erb"), "#{name} is the CMS's and must not be replaceable"
     end
   end

@@ -33,7 +33,7 @@ module Editing
   # (`now:`), handed to the statement as a value (never the database's
   # NOW()), so a test asks about any instant without moving time.
   #
-  # NOT A SERVICE (`CLAUDE.md`): a reservation is not content, nobody asks for
+  # NOT A SERVICE (`docs/reference/live-editing.md`): a reservation is not content, nobody asks for
   # one by name and it is gone in two minutes; audited, it would flood the
   # log. The one audited write is `Editing::TakeOver`.
   class Reservation < ApplicationRecord

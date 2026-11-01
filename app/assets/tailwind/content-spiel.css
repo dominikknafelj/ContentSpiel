@@ -119,6 +119,8 @@
   --cs-sp-5: 34px; --cs-sp-6: 54px; --cs-sp-7: 80px;
   --cs-radius: 2px; --cs-radius-pill: 999px;
   --cs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
+  --cs-control-compact: 2.375rem;
   /* The editors' and Settings' form column (layout points spec, decision 1),
      and on an editor's translation tab two 560px columns and their 24px gap
      (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */

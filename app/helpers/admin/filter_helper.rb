@@ -18,7 +18,7 @@ module Admin
     def filter_form_options(url, frame: "content")
       data = { controller: "admin--ui--auto-submit", action: FILTER_ACTIONS, turbo_frame: frame }
       data[:turbo_action] = "replace" if frame == "content"
-      { url: url, method: :get, class: "mb-4 flex flex-wrap items-end gap-3", data: data }
+      { url: url, method: :get, class: "admin-filter-bar mb-4 flex flex-wrap items-start gap-3", data: data }
     end
 
     def filters_active?(keys) = keys.any? { |key| params[key].present? }

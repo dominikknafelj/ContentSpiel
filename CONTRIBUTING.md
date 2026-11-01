@@ -14,8 +14,7 @@ Thank you for wanting to help. This page says how a change gets in.
 
 The README's "Getting started" is the whole setup: Postgres in Docker, then
 `bin/setup`. Read `CLAUDE.md` before you change anything. It holds the
-commands and the rules a change can break without a test failing loudly, and
-it points to the file in `docs/reference/` that explains the part you are
+commands, the conventions and the rules no test holds, and it points to the file in `docs/reference/` that explains the part you are
 about to change.
 
 ## Making the change
@@ -27,7 +26,7 @@ about to change.
 - A string a person reads in CS Studio is a translation key, not a literal
   (`docs/reference/i18n.md`).
 - Add or change tests with the code. A rule that a change can break silently
-  gets a guard test, as the ones `CLAUDE.md` names.
+  gets a guard test, as the ones `docs/reference/` names.
 
 ## Checking it
 

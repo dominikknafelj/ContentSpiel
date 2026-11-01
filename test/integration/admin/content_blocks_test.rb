@@ -1468,7 +1468,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   end
 
   # "Nothing is written" is the row, the audit log and the content version.
-  # An edit reservation is no content and follows the save rule (CLAUDE.md,
+  # An edit reservation is no content and follows the save rule (docs/reference/live-editing.md,
   # "A save is a claim"): a request that names no tab claims nothing, and a
   # claim a request took is KEPT on a 422, since the person is still typing
   # in the form that was refused.

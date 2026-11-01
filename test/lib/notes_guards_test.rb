@@ -1,8 +1,8 @@
 require "test_helper"
 
 # Three rules of notes that nothing else fails on when they are broken
-# (CLAUDE.md, "Rules a change can break silently"; `docs/reference/notes.md`
-# has the incidents behind them). Source scans, like
+# (`docs/reference/notes.md`, "Rules a change can break silently", which
+# has the incidents behind them too). Source scans, like
 # `test/services/service_contract_test.rb`: tripwires for the change that
 # never thought about the rule, not proofs of behaviour -- those are the
 # tests each rule names beside these.

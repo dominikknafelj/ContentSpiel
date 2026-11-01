@@ -247,6 +247,27 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The image mark of an image with neither a width nor a preview
+  # (`images.css`): a data-URI SVG cannot read a token, so each scheme has a
+  # value of its own, and this holds each to `--th-meta` as `tokens.css`
+  # defines it for that scheme. A theme that overrides `--th-meta` is not
+  # followed (media.md says so).
+  test "the empty image's mark is 28px, centred, not repeated, one <img>'s background, and drawn in --th-meta in both schemes" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/images.css").read.gsub(%r{/\*.*?\*/}m, "")
+    base = css[/^img\[data-image-empty\]\s*\{(.*?)\}/m, 1] or flunk("images.css has no base rule for img[data-image-empty]")
+    assert_match(/background-repeat:\s*no-repeat/, base)
+    assert_match(/background-position:\s*center/, base)
+    assert_match(/background-size:\s*28px/, base)
+
+    theme_tokens.each do |theme, tokens|
+      rule = (theme == :dark ? css[/\[data-theme="dark"\]\s+img\[data-image-empty\]\s*\{(.*?)\}/m, 1] : base) or flunk("no mark rule for #{theme}")
+      uri = rule[/background-image:\s*url\("data:image\/svg\+xml,([^"]+)"\)/, 1] or flunk("no data-URI mark for #{theme}")
+      svg = CGI.unescape(uri)
+      colour = svg[/stroke='(#\h{6})'/, 1] or flunk("the mark has no stroke colour for #{theme}: #{svg}")
+      assert_equal tokens.fetch("--th-meta").downcase, colour.downcase, "the mark is --th-meta (#{theme})"
+    end
+  end
+
   test "the bands step from the page: tinted at 1.15:1 or more, the light strong band the inverted page, the dark one a raised ground" do
     theme_tokens.each do |theme, tokens|
       page = resolve_colour(tokens, "--th-paper")

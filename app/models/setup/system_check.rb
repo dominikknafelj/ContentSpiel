@@ -293,8 +293,9 @@ module Setup
       # How far the library is from the current image settings
       # (`Media::RenditionProgress`: the kept images, so a trashed image is in
       # no count). Image processing above says whether images CAN be made;
-      # this says whether they have been. A failed image is also one still
-      # to be made, so both sentences show when any failed. A count that
+      # this says whether they have been: images still being made (not made and
+      # not failed) and images that could not be made are two sentences, both
+      # shown when both exist. A count that
       # raises is not a warning about images: the row is left out, its error
       # logged by class (a statement's message can quote the query), and
       # System status and the setup wizard still answer.
@@ -307,11 +308,13 @@ module Setup
         end
         total, made, failed = counts.values_at(:total, :made, :failed)
         link = :image_settings if @image_settings_link
-        return Result.new(label: "Images", status: :ok, message: "Every image is made with the current settings.", link:) if made == total
+        waiting = total - made - failed
+        return Result.new(label: "Images", status: :ok, message: "All images are ready.", link:) if made == total
 
-        message = "#{total - made} of #{total} #{total == 1 ? "image" : "images"} still to be made."
-        message += " #{failed} #{failed == 1 ? "image" : "images"} could not be made." if failed.positive?
-        Result.new(label: "Images", status: :warning, message:, link:)
+        sentences = []
+        sentences << "#{waiting} #{waiting == 1 ? "image is" : "images are"} still being made." if waiting.positive?
+        sentences << "#{failed} #{failed == 1 ? "image" : "images"} could not be made." if failed.positive?
+        Result.new(label: "Images", status: :warning, message: sentences.join(" "), link:)
       end
 
       def background_jobs

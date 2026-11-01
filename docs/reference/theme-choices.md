@@ -135,3 +135,13 @@ Tests: `test/lib/field_type_branches_test.rb` (no file outside the registry comp
 - **A choice validated without `stored`/`carried_settings`**: every form holding a dangling name would be refused on its next keystroke, and a discard would roll back.
 - **A theme's icon inlined in CS Studio**, or a label marked safe: the first theme data that reaches CS Studio crosses the line `test/integration/theme_pages_test.rb` holds.
 - **A form that sends the theme's first template for a page that stores none**: every save would pin the page and mark a live page as changed.
+
+## Rules a change can break silently
+
+Moved word for word from `CLAUDE.md`, where "above" and "below" meant the list these rules stood in: a rule named that way may now be in another reference file. Each names the test that guards it; a rule or a part of one with no guard is also said in `CLAUDE.md`.
+
+- A scalar field type is one entry of `ContentModel::FieldTypes` and one `Admin::Fields::<Type>Field`, and nothing else branches on its name (`test/lib/field_type_branches_test.rb`; every type answers every question: `test/models/content_model/field_types_test.rb`, `test/components/admin/fields/field_types_studio_test.rb`).
+- A stored choice (a section's style, a page's template, a card's icon) the current theme does not know is drawn as the default and changes nothing stored, and a save keeps a name that is stored or carried (`carried_settings`, a duplicate's and a discard's): no draw, open or deploy rewrites one (`test/models/content_model/theme_choice_field_test.rb`, `test/models/page_test.rb`, `test/services/publishing/discard_changes_test.rb`, `test/services/content_blocks/duplicate_test.rb`).
+- CS Studio reads a theme's declarations and nothing else of it: labels as escaped text, icons as `<img>` of their served address, never inlined, and no theme template, stylesheet or script (`test/integration/theme_pages_test.rb`, the "nothing of a theme reaches CS Studio" cases).
+- An icon file is fenced, not sanitised, and holds no `id` (`Theme::IconFile`, at the check and again on the bytes inlined; `test/values/theme/icon_file_test.rb`).
+- A page's template is `pages.settings` (`{}` is the theme's first, stored as absent), in the published copy and written by `Pages::Save`; there is no `page_type` or `landing?` (`test/models/publishing_test.rb`, `test/models/publishing/page_settings_migration_test.rb`, `test/services/pages/save_test.rb`).

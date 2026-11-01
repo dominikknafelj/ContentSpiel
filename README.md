@@ -40,9 +40,9 @@ Run the test suite with `bin/rails test`, and the browser tests with
 
 ## Learning the code
 
-`CLAUDE.md` holds the commands and the rules a change can break without a test
-failing loudly. `docs/reference/` explains each part of the system, one file
-per topic: start with the one that covers what you are about to change.
+`CLAUDE.md` holds the commands, the conventions and the rules no test holds.
+`docs/reference/` explains each part of the system and holds the rules a test
+guards, one file per topic: start with the one that covers what you are about to change.
 Hosting a site is `docs/reference/hosting.md`, and writing a theme is
 `docs/reference/theming.md`.
 

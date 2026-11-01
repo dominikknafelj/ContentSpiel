@@ -1418,4 +1418,78 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   ensure
     Rails.application.reloader.prepare!
   end
+
+  def stale_folder(answer)
+    ThemeFolder.new(nil).tap { |folder| folder.define_singleton_method(:stylesheet_stale?) { |_root| answer } }
+  end
+
+  def in_environment(name, &block)
+    with_singleton_override(Rails, :env, -> { ActiveSupport::EnvironmentInquirer.new(name) }, &block)
+  end
+
+  test "in development a theme changed since its stylesheet was built says so on the public page, naming the rebuild command, and the page still draws" do
+    in_environment("development") do
+      folder = stale_folder(true)
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", text: /bin\/rails tailwindcss:build/
+        assert_select "head link[rel=stylesheet]"
+      end
+    end
+  end
+
+  test "a freshly built stylesheet says nothing" do
+    in_environment("development") do
+      folder = stale_folder(false)
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
+
+  test "production and test never say it, whatever the stylesheet is" do
+    folder = stale_folder(true)
+    with_singleton_override(ThemeFolder, :current, -> { folder }) do
+      get "/about"
+      assert_select "[data-stale-stylesheet]", count: 0
+
+      in_environment("production") do
+        get "/about"
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
+
+  test "a check that raises never stops the page: no notice, and the page draws" do
+    in_environment("development") do
+      folder = ThemeFolder.new(nil).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| raise Errno::EACCES, "styles" } }
+      with_singleton_override(ThemeFolder, :current, -> { folder }) do
+        get "/about"
+
+        assert_response :success
+        assert_select "[data-stale-stylesheet]", count: 0
+      end
+    end
+  end
+
+  test "the notice's command carries the THEME_PATH of a theme in use, and none for the default theme" do
+    in_environment("development") do
+      themed = ThemeFolder.new(Rails.root.join("test/fixtures/themes/plain")).tap { |f| f.define_singleton_method(:stylesheet_stale?) { |_root| true } }
+      with_singleton_override(ThemeFolder, :current, -> { themed }) do
+        get "/about"
+        assert_select "[data-stale-stylesheet] code", text: /\ATHEME_PATH=\S*themes\/plain bin\/rails tailwindcss:build\z/
+      end
+
+      default = stale_folder(true)
+      with_singleton_override(ThemeFolder, :current, -> { default }) do
+        get "/about"
+        assert_select "[data-stale-stylesheet] code", text: "bin/rails tailwindcss:build"
+      end
+    end
+  end
 end
