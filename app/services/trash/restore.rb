@@ -87,9 +87,14 @@ module Trash
         end
       end
 
-      # After the transaction has committed, so the job never runs before the
-      # row it reads is untrashed.
-      enqueue_renditions(@record, *@restored_assets)
+      # After the OUTERMOST commit, so the job never runs before the row it
+      # reads is untrashed: inside a caller's transaction (`Posts::BulkRestore`
+      # runs each restore in one) `after_all_transactions_commit` waits for
+      # that commit and queues nothing if it rolls back; outside one it runs
+      # now. This app enqueues at once otherwise (`enqueue_after_transaction_
+      # commit` is not on).
+      assets = [ @record, *@restored_assets ]
+      ActiveRecord.after_all_transactions_commit { enqueue_renditions(*assets) }
       success(@record)
     rescue ActiveRecord::RecordInvalid
       # The savepoint has rolled back the branch members, the assets and the

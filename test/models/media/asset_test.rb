@@ -74,6 +74,22 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert row.has_alpha
   end
 
+  # Active Storage would analyze the blob again after the commit: a second
+  # read of the whole file on the images queue, for metadata nothing reads,
+  # and a touch of the asset afterwards that moves its `updated_at`, the
+  # media panel's autosave base, under an editor typing the alt text.
+  test "an upload's blob is analyzed from the validation's decode: no analysis job, and the blob says the image's size" do
+    asset = nil
+    assert_no_enqueued_jobs(only: ActiveStorage::AnalyzeJob) do
+      asset = create_media_asset(filename: "wide.png")
+    end
+
+    blob = asset.file.blob.reload
+    assert blob.analyzed?
+    assert blob.identified?
+    assert_equal [ asset.width, asset.height ], [ blob.metadata["width"], blob.metadata["height"] ]
+  end
+
   test "with no file attached at all" do
     asset = Media::Asset.new
 

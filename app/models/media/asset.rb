@@ -572,11 +572,13 @@ class Media::Asset < ApplicationRecord
   end
 
   # The size, preview and alpha flag are the validation's one decode
-  # (`#decode_file`); the file's bytes are not read again.
+  # (`#decode_file`); the file's bytes are not read again, by this class or
+  # by Active Storage (`#mark_blob_analyzed`).
   def cache_metadata_from_file
     self.byte_size = file.blob.byte_size
     self.content_type = sniffed_content_type
     force_blob_content_type
+    mark_blob_analyzed
 
     self.width = @decoded.width
     self.height = @decoded.height
@@ -604,7 +606,7 @@ class Media::Asset < ApplicationRecord
   # silently rewrite -- and nothing here needs to, since `unfurl` never
   # touches an existing blob's `content_type` in the first place. Guarded
   # on `sniffed_content_type` being present too: a still-new blob this
-  # class genuinely can't sniff (I3 above) leaves the blob's own `identify`d
+  # class genuinely can't sniff (`#sniffed_content_type`) leaves the blob's own `identify`d
   # guess alone rather than overwriting it with `nil`, though that guess is
   # moot either way -- an unsniffable attachment is already invalid
   # (`#image_type_and_size`), so this record is never getting saved with it.
@@ -612,5 +614,21 @@ class Media::Asset < ApplicationRecord
     return unless sniffed_content_type && file.blob.new_record?
 
     file.blob.content_type = sniffed_content_type
+  end
+
+  # A blob this save creates is marked analyzed with the size the decode
+  # read, as Active Storage's image analyzer would have written it (the
+  # size it is shown at). Unmarked, the attachment's commit queues
+  # `ActiveStorage::AnalyzeJob`, which downloads and decodes the whole file
+  # again on the images queue for metadata nothing here reads, and then
+  # touches the asset (`Blob#touch_attachments`): its `updated_at` is the
+  # media panel's autosave base, so an editor typing the alt text right
+  # after an upload was told it had changed elsewhere. An existing blob is
+  # another record's row and is left alone, as above.
+  def mark_blob_analyzed
+    blob = file.blob
+    return unless blob.new_record? && @decoded
+
+    blob.metadata = blob.metadata.merge("identified" => true, "analyzed" => true, "width" => @decoded.width, "height" => @decoded.height)
   end
 end

@@ -42,6 +42,32 @@ class Posts::BulkRestoreTest < ActiveSupport::TestCase
     assert_predicate a.reload, :trashed?
   end
 
+  # Each restore runs in a transaction of its own: an image's job queued
+  # inside it could run before the commit, find the image still trashed and
+  # return, so the image would not be made again until a Regenerate.
+  test "an image that comes back with a post is queued only once the post's transaction has committed" do
+    asset = as(users(:one), channel: :admin) { create_media_asset }
+    post = create_post(title: "With an image", published: false)
+    post.assign_body(rich_doc(%(::image{asset="#{asset.id}"})), locale: "en")
+    post.save!
+    Media::UsageIndex.refresh(post)
+    as(users(:one), channel: :admin) do
+      Trash::Move.call(post.reload)
+      Trash::Move.call(asset.reload)
+    end
+    asset.update_columns(renditions: {}, renditions_fingerprint: nil) # version: none (a test makes the image look stale)
+    open_when_queued = []
+    callback = ->(*, payload) { open_when_queued << ActiveRecord.all_open_transactions.size if payload[:job].is_a?(Media::RenditionJob) }
+
+    ActiveSupport::Notifications.subscribed(callback, "enqueue.active_job") do
+      result = as(users(:one), channel: :admin) { Posts::BulkRestore.call(ids: [ post.id ]) }
+      assert_equal [ post ], result.restored
+    end
+
+    assert_not asset.reload.trashed?
+    assert_equal [ 0 ], open_when_queued
+  end
+
   test "more than the maximum is an ArgumentError" do
     assert_raises(ArgumentError) { Posts::BulkRestore.call(ids: (1..201).to_a) }
   end
