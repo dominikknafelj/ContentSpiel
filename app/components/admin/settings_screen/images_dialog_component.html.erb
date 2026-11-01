@@ -1,0 +1,8 @@
+<%= render Admin::Ui::ConfirmDialogComponent.new(id: Admin::SettingsScreen::ImagesCardComponent::DIALOG, title: t(".title"),
+      body: t(".body", count: pending)) do |dialog| %>
+  <% dialog.with_confirm_action do %>
+    <%= form_with url: regenerate_images_admin_settings_path, method: :post do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :primary, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>

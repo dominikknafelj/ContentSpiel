@@ -2,7 +2,7 @@ module Admin
   module SettingsScreen
     # The in-page nav at the left of the Settings screen (round 3, Task 5,
     # handoff §4.5): one link per card, to its anchor on the same screen --
-    # `#site`, `#languages`, `#publishing`, `#ai`, `#mail` (the ids sit on the cards'
+    # `#site`, `#languages`, `#publishing`, `#ai`, `#mail`, `#images` (the ids sit on the cards'
     # headings, so a jump lands on the title rather than the middle of a tall
     # card). Only the links for cards the viewer may manage (decision D9):
     # Languages for `languages.manage`, the other four for `settings.manage`.
@@ -23,7 +23,8 @@ module Admin
         { id: "languages", label: "Languages", permission: "languages.manage" },
         { id: "publishing", label: "Publishing", permission: "settings.manage" },
         { id: "ai", label: "AI translation", permission: "settings.manage" },
-        { id: "mail", label: "Mail", permission: "settings.manage" }
+        { id: "mail", label: "Mail", permission: "settings.manage" },
+        { id: "images", label: "Images", permission: "settings.manage" }
       ].freeze
 
       def self.sections_for(&holds) = SECTIONS.select { |section| holds.call(section[:permission]) }

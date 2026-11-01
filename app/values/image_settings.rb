@@ -19,6 +19,15 @@ class ImageSettings
     true
   end
 
+  # The widths field's text ("480, 960 1600") as the list the column stores.
+  # A token that is not a whole number stays a string, so the model refuses the
+  # list with its one sentence instead of this guessing what was meant; a
+  # width typed twice stays twice, and is refused the same way. Order is the
+  # model's to fix (it saves them ascending).
+  def self.parse_widths(text)
+    text.to_s.split(/[\s,;]+/).reject(&:blank?).map { |token| token.match?(/\A\d{1,9}\z/) ? token.to_i : token }
+  end
+
   def self.current(site = Current.site || SiteSetting.instance)
     new(site)
   end

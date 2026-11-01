@@ -233,6 +233,9 @@ Rails.application.routes.draw do
       # remove (`Admin::MailLoginsController`), written once and never shown
       # again -- instant actions beside the Settings form, like the AI key's.
       post :send_test_mail
+      # Settings → Images: queues the widths of every image not made with the
+      # saved image settings (`Media::Regenerate`), answered with a 303 to the card.
+      post :regenerate_images
       resource :mail_login, only: %i[update destroy]
     end
 

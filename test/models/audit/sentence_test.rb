@@ -143,6 +143,8 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You signed in", read(sentence_for(Audit::Event.new(base.merge(action: "session.created"))))
     assert_equal "You signed out", read(sentence_for(Audit::Event.new(base.merge(action: "session.destroyed"))))
     assert_equal "You emptied the trash", read(sentence_for(Audit::Event.new(base.merge(action: "trash.emptied"))))
+    assert_equal "You regenerated 12 images", read(sentence_for(Audit::Event.new(base.merge(action: "media.regenerated", metadata: { "count" => 12 }))))
+    assert_equal "You regenerated 1 image", read(sentence_for(Audit::Event.new(base.merge(action: "media.regenerated", metadata: { "count" => 1 }))))
     assert_equal "You added the starter content", read(sentence_for(Audit::Event.new(base.merge(action: "starter_content.added"))))
     assert_equal "You turned on German", read(sentence_for(Audit::Event.new(base.merge(action: "language.enabled", metadata: { "code" => "de" }))))
     assert_equal "You turned off German", read(sentence_for(Audit::Event.new(base.merge(action: "language.disabled", metadata: { "code" => "de" }))))

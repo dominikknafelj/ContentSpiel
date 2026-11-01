@@ -17,21 +17,15 @@ namespace :media do
   end
 
   # Queues the widths of every kept image not made with the current image
-  # settings: one whose recorded generation has another fingerprint (an
-  # adopted one, a setting changed since) or none at all. It looks at what is
-  # made, never at what is queued, so running it again queues the same images
-  # again and the job, which reads the settings when it runs and does nothing
-  # for an image already made with them, makes each once.
+  # settings (or still without a preview or a size), through the same service
+  # as the Regenerate images button, run as System: the console may do what
+  # the button does, and the event is in the audit log.
   desc "Queue the widths of every image not made with the current image settings"
   task regenerate: :environment do
-    fingerprint = ImageSettings.current.fingerprint
-    count = 0
-    Media::Asset.not_made_with(fingerprint).find_each do |asset|
-      Media::RenditionJob.perform_later(asset)
-      count += 1
-    end
+    result = Current.set(actor: nil, channel: :system) { Media::Regenerate.call(actor: nil) }
+    abort "media:regenerate: #{result.errors.to_sentence}" unless result.ok?
 
-    puts "media:regenerate: #{count} image(s) queued"
+    puts "media:regenerate: #{result.record} image(s) queued"
   end
 
   # Design spec §3.4 step 5: every `ActiveStorage::Blob` no attachment row

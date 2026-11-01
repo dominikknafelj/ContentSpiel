@@ -71,11 +71,11 @@ class SiteSetting < ApplicationRecord
   before_validation :sort_image_widths
   validate :image_format_is_offered, if: :will_save_change_to_image_format?
   validate :image_widths_are_in_bounds, if: :will_save_change_to_image_widths?
-  validates :image_quality_webp, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE },
+  validates :image_quality_webp, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE, message: :quality_range },
     if: :will_save_change_to_image_quality_webp?
-  validates :image_quality_avif, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE },
+  validates :image_quality_avif, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE, message: :quality_range },
     if: :will_save_change_to_image_quality_avif?
-  validates :image_max_upload_mb, numericality: { only_integer: true, in: ImageSettings::UPLOAD_MB_RANGE },
+  validates :image_max_upload_mb, numericality: { only_integer: true, in: ImageSettings::UPLOAD_MB_RANGE, message: :upload_range },
     if: :will_save_change_to_image_max_upload_mb?
 
   validate :only_one_record_exists, on: :create

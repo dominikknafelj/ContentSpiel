@@ -65,7 +65,8 @@ module Editing
       (Audit::Sentence::NOTE_VERBS.keys + Audit::Sentence::SPECIAL_ACTIONS).index_with { "not a change to a page's or a post's content" },
       %w[user.created user.updated user.deleted invitation.created invitation.resent invitation.withdrawn
         group.created group.updated group.deleted token.issued token.revoked]
-        .index_with { "an account, an invitation, a group or a token is not content" }
+        .index_with { "an account, an invitation, a group or a token is not content" },
+      "media.regenerated" => "regenerating images changes no content an editor has open"
     ).freeze
 
     module_function

@@ -77,6 +77,11 @@ en:
         mail_sender_address: "Sender address"
         mail_username: "Username"
         mail_password: "Password"
+        image_format: "Image format"
+        image_quality_webp: "WebP quality"
+        image_quality_avif: "AVIF quality"
+        image_widths: "Image widths"
+        image_max_upload_mb: "Largest upload"
     errors:
       models:
         # Settings → Mail: each refusal is a whole sentence, the same under
@@ -98,6 +103,18 @@ en:
             image_widths:
               format: "%{message}"
               image_widths: "Use 1 to 6 different widths, each from 160 to 4000 pixels."
+            image_format:
+              format: "%{message}"
+              inclusion: "Image format must be WebP or AVIF."
+            image_quality_webp:
+              format: "%{message}"
+              quality_range: "WebP quality must be a whole number from 1 to 100."
+            image_quality_avif:
+              format: "%{message}"
+              quality_range: "AVIF quality must be a whole number from 1 to 100."
+            image_max_upload_mb:
+              format: "%{message}"
+              upload_range: "Largest upload must be a whole number of MB, from 1 to 50."
         # An image upload's refusals (`Media::Asset`), read as Active Record
         # joins them with the attribute: "File can't be read as an image".
         media/asset:

@@ -26,11 +26,14 @@
 <% manage_languages = can?("languages.manage") %>
 <% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
+<% images_progress = (Media::RenditionProgress.new(fingerprint: ImageSettings.current(SiteSetting.find(@site_setting.id)).fingerprint).counts if manage_settings) %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
      "mail_security" => "settings-mail_security", "mail_sender_name" => "settings-mail_sender_name",
-     "mail_sender_address" => "settings-mail_sender_address" } %>
+     "mail_sender_address" => "settings-mail_sender_address", "image_format" => "settings-image_format",
+     "image_quality_webp" => "settings-image_quality_webp", "image_quality_avif" => "settings-image_quality_avif",
+     "image_widths" => "settings-image_widths", "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
 
 <div class="grid grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,var(--cs-form-max))]">
   <div class="lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
@@ -65,6 +68,8 @@
                 provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
           <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: MailSettings.current(@site_setting), values: values,
                 errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+          <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
+                errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
         <% end %>
 
         <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
@@ -74,6 +79,9 @@
       <% if manage_settings %>
         <%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %>
         <%= render "admin/settings/mail_login_forms", site_setting: @site_setting, main_base: base %>
+      <% end %>
+      <% if manage_settings %>
+        <div id="settings-images-forms"><%= render Admin::SettingsScreen::ImagesDialogComponent.new(progress: images_progress) %></div>
       <% end %>
       <% if manage_languages %>
         <div id="settings-language-forms"><%= render Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: @site_setting) %></div>

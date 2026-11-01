@@ -90,6 +90,13 @@ class Media::Asset < ApplicationRecord
   # or that has none: what `media:regenerate` queues.
   scope :not_made_with, ->(fingerprint) { kept.where.not(renditions_fingerprint: fingerprint).or(kept.where(renditions_fingerprint: nil)) }
 
+  # What Regenerate images queues: a kept image not made with these settings
+  # (`not_made_with`), or one still missing its preview or its size, which the
+  # job makes before its widths.
+  scope :needing_regeneration, lambda { |fingerprint|
+    not_made_with(fingerprint).or(kept.where(preview: nil)).or(kept.where(width: nil))
+  }
+
   # No variant is declared here: the widths of an image are made by
   # `Media::RenditionJob`, recorded in `renditions`, and addressed through
   # the blob's representation proxy by the keys that generation holds.

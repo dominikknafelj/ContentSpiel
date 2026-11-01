@@ -98,4 +98,16 @@ class Media::BackfillJobTest < ActiveJob::TestCase
     assert_nil Media::RenditionJob.concurrency_key
     assert_equal "images", job.queue_name
   end
+
+  # Solid Queue runs the smaller number first. An upload's and a Regenerate's
+  # plain job keep the default (0); the backfill's re-encodes wait behind them
+  # so a new upload's widths never queue behind a library of old images.
+  test "the backfill's job runs after the plain job in the images queue" do
+    plain = Media::RenditionJob.new(old_row)
+    backfill = Media::BackfillRenditionJob.new(old_row)
+
+    assert_equal "images", backfill.queue_name
+    assert_equal "images", plain.queue_name
+    assert_operator backfill.priority, :>, plain.priority.to_i
+  end
 end

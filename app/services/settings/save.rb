@@ -54,6 +54,10 @@ module Settings
   # not the screen's to change: naming one refuses the whole call, before
   # anything is written.
   #
+  # The image settings (`IMAGE_ATTRIBUTES`) are plain `attributes` too; they
+  # are in the settings event's changes like any other, and change no image
+  # until Regenerate images is pressed.
+  #
   # WITHOUT ENCRYPTION KEYS (spec "Security rules") writing the AI key or the
   # mail login raises `ActiveRecord::Encryption::Errors::Configuration` at
   # the first encryption, inside the transaction: it is answered with one
@@ -65,6 +69,14 @@ module Settings
     TRANSLATED = %i[title tagline].freeze
 
     MAIL_LOGIN = %i[mail_username mail_password].freeze
+
+    # Settings → Images (docs/reference/media.md). Plain `attributes` like the
+    # rest, checked by `SiteSetting`'s validations, with one rule the model
+    # cannot know: AVIF is refused when this server cannot write it.
+    # Saving them changes no image: only `Media::Regenerate` does.
+    IMAGE_ATTRIBUTES = %i[image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb].freeze
+
+    def self.avif_unavailable = I18n.t("admin.settings.save.avif_unavailable", raise: true)
 
     # The attribute of each `MailSettings` field.
     MAIL_ATTRIBUTES = {
@@ -117,6 +129,10 @@ module Settings
 
       if site_part? && (from_host = mail_attributes_from_host).any?
         return failure(@site, from_host.map { |attribute| self.class.set_by_host(attribute) })
+      end
+
+      if site_part? && choosing_unavailable_avif?
+        return failure(@site, [ self.class.avif_unavailable ])
       end
 
       needed_languages = languages_part?
@@ -284,6 +300,12 @@ module Settings
 
       settings = MailSettings.current(@site)
       given.select { |attribute| settings.from_host?(MAIL_ATTRIBUTES[attribute]) }
+    end
+
+    # AVIF asked for on a server whose libvips cannot write it. A site already
+    # on AVIF keeps saving its other fields when the server changes under it.
+    def choosing_unavailable_avif?
+      @attributes[:image_format].to_s == "avif" && @site.image_format != "avif" && !ImageSettings.avif_available?
     end
 
     # Whether the call carries site fields (or nothing at all, which has
