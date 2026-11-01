@@ -266,7 +266,7 @@ module ContentModel
 
     # The component's own template, found beside its source file, not
     # through ViewComponent's `sidecar_files` (`Theme#component_for` is the
-    # one place that names that, `CLAUDE.md`). `theme:new` copies it; the
+    # one place that names that, `docs/reference/theming.md`). `theme:new` copies it; the
     # build scans the component's folder (`component_folder`), template or
     # not, when it is outside app/components/blocks.
     def component_template

@@ -1,7 +1,7 @@
 require "test_helper"
 
-# What mail can break without anything failing loudly (CLAUDE.md, "Rules a
-# change can break silently"; docs/reference/mail.md). Source greps: each is a
+# What mail can break without anything failing loudly (docs/reference/mail.md,
+# "Rules a change can break silently"). Source greps: each is a
 # fence against a mistake, not a proof, and each list of exceptions names its
 # reason and fails when an entry no longer excuses anything.
 class MailGuardsTest < ActiveSupport::TestCase

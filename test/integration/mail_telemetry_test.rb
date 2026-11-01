@@ -1,6 +1,6 @@
 require "test_helper"
 
-# No secret reaches a span (CLAUDE.md, telemetry). A send is traced: the job's
+# No secret reaches a span (docs/reference/hosting.md, telemetry). A send is traced: the job's
 # `process` span (a consumer root, `Telemetry::WorkSampler`) and Action
 # Mailer's instrumentation, which records the delivery and the exception it
 # raised. A server that echoes the login in its refusal (`:login_refused`

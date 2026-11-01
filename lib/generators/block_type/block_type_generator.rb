@@ -72,8 +72,8 @@ class BlockTypeGenerator < Rails::Generators::NamedBase
     refuse "a locale file reads #{name}: as #{YAML.load("#{name}: 1").keys.first.inspect}, so the type's scope could not be named; choose another name" if YAML_WORDS.include?(name)
     # `BlockTypes::Post` would be what a bare `Post` written inside
     # `module BlockTypes` means: `Post.kept` in the Post list, `Blocks::` in
-    # every definition's `t.component` (the shadowing CLAUDE.md describes
-    # for `Admin::`).
+    # every definition's `t.component` (the shadowing
+    # `test/lib/admin_namespace_shadow_test.rb` describes for `Admin::`).
     refuse "#{class_name} is a constant of the application, which a module BlockTypes::#{class_name} would shadow inside module BlockTypes (every built-in names #{class_name} there or may); choose another name" if Object.const_defined?(class_name)
   end
 
