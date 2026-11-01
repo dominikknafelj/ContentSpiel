@@ -974,6 +974,8 @@ Departures from the design mocks that the visual checks listed; none is wrong. O
 
 Multi-tenancy (several organisations on one system; several sites of one organisation is in the backlog, "Several sites"), e-commerce, memberships and paywalls, built-in visitor comments on the public site (editors' notes on content are shipped; the rest of collaboration is "Next", item 1).
 
+If multi-tenancy ever becomes real (owner, 2026-11-01): not tenants inside the CMS, but a bespoke environment per tenant on Kubernetes, spun up by an orchestration app, and scalability discussed then. It keeps the CMS as it is. What it asks of the CMS, worth protecting meanwhile: a site runs from its image, its variables and its database alone, and, the gap today, a first start that needs no person in the setup wizard.
+
 ## Guardrails while the roadmap is pending
 
 From the structure review: no new integer enums, no new `has_one_attached` on content models, no new `after_save` side effects on `Page` or `Post` (use services and events), no hand-built URLs outside `PublicSite::Urls`, no new per-locale columns or indexes. Respect the "don't touch" list in §6 of the structure review.
