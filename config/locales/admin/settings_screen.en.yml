@@ -59,7 +59,7 @@ en:
           webp: "WebP"
           avif: "AVIF"
           format_help: "WebP is shown by every current browser. AVIF makes smaller files."
-          avif_note: "Browsers too old to show AVIF will show nothing in place of an image. Animated images are always made in WebP, at the WebP quality."
+          avif_note: "Smaller files, slower to make; very old browsers show no image. Animated images are always made in WebP, at the WebP quality."
           avif_unavailable: "AVIF is not available: this server cannot write it."
           image_quality_webp: "WebP quality"
           image_quality_avif: "AVIF quality"
@@ -70,19 +70,20 @@ en:
           mb: "MB"
           no_images: "There are no images yet."
           progress:
-            one: "%{made} of %{count} image made with these settings."
-            other: "%{made} of %{count} images made with these settings."
+            one: "%{count} image was made with other settings"
+            other: "%{count} images were made with other settings"
+          running: "Regenerating: %{done} of %{of}"
           failed:
-            one: "%{count} image could not be made. It is tried again when you regenerate."
-            other: "%{count} images could not be made. They are tried again when you regenerate."
+            one: "%{count} could not be made"
+            other: "%{count} could not be made"
           regenerate_help: "Images are made again with the saved settings, a few at a time, so the site keeps its current ones until each is ready."
           regenerate: "Regenerate images…"
         images_dialog:
           title: "Regenerate images?"
           body:
             zero: "Every image is already made with the saved settings. Nothing will be made."
-            one: "%{count} image is not made with the saved settings. It will be made again in the background; the site keeps its current one until it is ready."
-            other: "%{count} images are not made with the saved settings. They will be made again in the background; the site keeps the current ones until each is ready."
+            one: "Remake %{count} image? This runs in the background and can take a few minutes."
+            other: "Remake %{count} images? This runs in the background and can take a few minutes."
           confirm: "Regenerate images"
     settings:
       mail_login:

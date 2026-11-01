@@ -14,7 +14,7 @@ class Admin::SettingsImagesSystemTest < ApplicationSystemTestCase
     within "#settings-images-card" do
       fill_in "WebP quality", with: "60"
       fill_in "Widths", with: "800, 400"
-      assert_text "0 of 1 image made with these settings."
+      assert_text "1 image was made with other settings"
       # The press makes images from the SAVED settings: it waits for the save.
       assert_button "Regenerate images…", disabled: true
     end
@@ -26,7 +26,7 @@ class Admin::SettingsImagesSystemTest < ApplicationSystemTestCase
 
     press "Regenerate images…"
     within "dialog[open]" do
-      assert_text "1 image is not made with the saved settings."
+      assert_text "Remake 1 image? This runs in the background and can take a few minutes."
       click_button "Cancel"
     end
     assert_no_selector "#toasts .admin-toast", text: "Regenerating"

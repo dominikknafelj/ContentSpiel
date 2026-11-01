@@ -1217,9 +1217,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get admin_settings_path
 
-    assert_select "[data-images-progress]", /0 of 1 image made with these settings/
+    assert_select "[data-images-progress]", /1 image was made with other settings/
     assert_select "[data-images-failed]", 0
-    assert_select "#settings-images-forms dialog", /1 image is not made/
+    assert_select "#settings-images-forms dialog", /Remake 1 image\?/
     assert_equal({ total: 1, made: 0, failed: 0 }, Media::RenditionProgress.new.counts)
   end
 

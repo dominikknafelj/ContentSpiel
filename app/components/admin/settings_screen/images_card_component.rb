@@ -9,9 +9,12 @@ module Admin
     #   AVIF is opt-in: it is disabled, with its reason, on a server that
     #   cannot write it, and where it is offered a line says that browsers
     #   too old to show it then show nothing.
-    # - Saving changes no image. The card says how many images were made with
-    #   the saved settings ("N of M images made with these settings") and how
-    #   many could not be made; "Regenerate images..." is the press that makes
+    # - Saving changes no image. The card says how many images were NOT made with
+    #   the saved settings ("12 images were made with other settings", nothing
+    #   when none) and how many could not be made (a link to System status for
+    #   `status_link`), and, while a regenerate runs (`run`, from
+    #   `Media::RegenerationRun`, as of the page's load: no live refresh),
+    #   "Regenerating: 5 of 12"; "Regenerate images..." is the press that makes
     #   the rest. It sits outside the form (a button of its own, opening the
     #   dialog `ImagesDialogComponent` renders after the form, which has the
     #   POST), so a press never counts as an unsaved change.
@@ -24,12 +27,29 @@ module Admin
       FIELDS = %i[image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb].freeze
       DIALOG = "settings-images-regenerate-dialog".freeze
 
-      def initialize(values:, progress:, avif_available:, errors: nil)
+      def initialize(values:, progress:, avif_available:, errors: nil, run: nil, status_link: false)
         @values = values
         @progress = progress
         @avif_available = avif_available
         @errors = errors
+        @run = run
+        @status_link = status_link
       end
+
+      # `{ done:, of: }` while a regenerate is running (`Media::RegenerationRun`),
+      # as of the page's load, or nil.
+      attr_reader :run
+
+      # Whether the failed count links to System status: the viewer holds
+      # `system_status.view` (the caller asks), else it is plain text.
+      def status_link? = @status_link
+
+      def status_path
+        helpers.admin_system_status_path(**(helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}))
+      end
+
+      # Images not made with the saved settings (the failed ones included).
+      def other_settings = total - made
 
       def avif_available? = @avif_available
 
