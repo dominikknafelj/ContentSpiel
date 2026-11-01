@@ -2,7 +2,8 @@ require "application_system_test_case"
 
 # The Card block's card in the page editor, in a browser: added from the
 # picker, its title, text and link typed and saved by themselves and back
-# after a reload (the icon select only under a theme that declares icons),
+# after a reload (the icon select offers the default theme's twelve icons,
+# and a theme's own set replaces them),
 # and a second person's card read-only while the first holds it, the icon
 # select disabled.
 class Admin::CardBlockSystemTest < ApplicationSystemTestCase
@@ -29,16 +30,19 @@ class Admin::CardBlockSystemTest < ApplicationSystemTestCase
     block = @page.content_blocks.sole
     await_admin_controllers
 
-    assert_no_selector "#block-#{block.id}-icon", wait: 0
+    assert_equal [ "No icon", "Arrow right", "Check", "Star", "Heart", "Mail", "Map pin", "Calendar", "User", "Shield", "Briefcase", "Clock", "Globe" ],
+      field(block, "icon").all("option").map(&:text)
+    field(block, "icon").select("Star")
     field(block, "title").set("Our services")
     field(block, "text").set("What we do, in a line.")
     field(block, "link").set("/about")
     assert_writes_settled
 
     settings = block.reload.settings_object(locale: "en")
-    assert_equal [ "Our services", "What we do, in a line.", "/about" ], [ settings.title, settings.text, settings.link ]
+    assert_equal [ "star", "Our services", "What we do, in a line.", "/about" ], [ settings.icon, settings.title, settings.text, settings.link ]
 
     open_editor
+    assert_equal "Star", field(block, "icon").find("option[selected]").text
     assert_equal "Our services", field(block, "title").value
     assert_equal "/about", field(block, "link").value
   end
