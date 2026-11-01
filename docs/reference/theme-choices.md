@@ -126,7 +126,6 @@ Tests: `test/lib/field_type_branches_test.rb` (no file outside the registry comp
 - `pages.translated_settings`, a page schema, field groups for pages.
 - A link that follows a page (Links, D13): a card's link to a page by its address breaks when the slug changes.
 - Hiding a section's `layout`, `background` and `width` for a style that ignores them; how the editor's lanes read for a style that draws its own grid.
-- An image on a card.
 
 ## What a change can break silently
 

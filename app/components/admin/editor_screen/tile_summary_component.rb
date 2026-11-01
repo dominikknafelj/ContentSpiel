@@ -6,7 +6,8 @@ module Admin
     # name, or its language and first line; a post list's filter).
     # A block in a section's column is a tile until it is opened, so this
     # line is all that says which block it is -- and what marks the ones that
-    # need attention, as a card would: an image block without an image, a
+    # need attention, as a card would: an image block without an image (see
+    # `#missing_image?`), a
     # type that is no longer registered, a save that was refused as invalid
     # (`invalid:`).
     #
@@ -92,7 +93,12 @@ module Admin
 
       def uses?(column) = definition&.uses_columns&.include?(column) || false
 
-      def missing_image? = uses?("image") && asset.nil?
+      # The mark is for a block that is nothing without its image. A type with
+      # a `summary` of its own has more than an image to say (a Card's image is
+      # optional, and a card without one is as finished as any), and says what
+      # it lacks on its own line; without this every card with no picture
+      # would read as needing attention the day the type began to use one.
+      def missing_image? = uses?("image") && asset.nil? && definition.summary.nil?
 
       def content
         if definition.nil? then t(".unavailable", type: block.block_type)

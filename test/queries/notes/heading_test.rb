@@ -66,6 +66,17 @@ class Notes::HeadingTest < ActiveSupport::TestCase
     assert_equal [ nil, "tiny.png" ], headings.for(block).to_h.values_at(:words, :file_name)
   end
 
+  test "a card with an image is named by its file once the images are read; one without is named by its place" do
+    pictured = @page.content_blocks.create!(block_type: "card", position: 3, media_asset: create_media_asset(filename: "tiny.png"))
+    bare = @page.content_blocks.create!(block_type: "card", position: 4)
+    headings = heading
+    found = headings.instance_variable_get(:@by_id)
+
+    headings.preload_images([ found.fetch(pictured.id), found.fetch(bare.id) ])
+    assert_equal "tiny.png", headings.for(found.fetch(pictured.id)).to_h[:file_name]
+    assert_equal [ nil, nil ], headings.for(found.fetch(bare.id)).to_h.values_at(:words, :file_name)
+  end
+
   test "a block with no text and no image has only its place on the page, in display order, a section counted" do
     assert_equal [ [ nil, nil, 1 ], [ nil, nil, 2 ], [ nil, nil, 3 ], [ nil, nil, 4 ] ],
       [ @text, @section, @image, @list ].map { |block| name_of(block).to_h.values_at(:words, :file_name, :position) }

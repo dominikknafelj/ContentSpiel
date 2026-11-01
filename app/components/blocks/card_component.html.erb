@@ -1,4 +1,9 @@
 <div class="content-block content-block--card">
+  <%# One link per card: the title's, else the text's, and only with neither the image's, whose alt then names it. %>
+  <% if image %>
+    <% picture = render(Media::PictureComponent.new(**image, css_class: "content-block--card__image")) %>
+    <% if link && !title && !text %><%= tag.a picture, href: link, class: "content-block--card__image-link" %><% else %><%= picture %><% end %>
+  <% end %>
   <% if icon %>
     <span class="content-block--card__icon" aria-hidden="true"><%= icon %></span>
   <% end %>

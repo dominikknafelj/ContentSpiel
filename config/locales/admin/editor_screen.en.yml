@@ -39,6 +39,7 @@ en:
             # bin/rails generate block_type adds a type's scope below this line.
             card:
               empty: "Empty"
+              image_link_without_alt: "Image link has no alt text"
             table:
               empty: "Empty table"
             note:

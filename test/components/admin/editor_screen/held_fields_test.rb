@@ -201,6 +201,17 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     assert_survives(rendered_content)
   end
 
+  test "a card with an image, rewritten: the image's buttons and the alt are as a held image block's, no save wired" do
+    page = create_page(title: "Card media")
+    asset = create_media_asset
+    block = page.content_blocks.create!(block_type: "card", position: 0, media_asset: asset)
+    as_owner { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true) }
+
+    assert_selector "[data-admin--media--field-target=choose]", visible: :all
+    assert_selector "input[type=hidden][name='block[media_asset_id]'][value='#{asset.id}']", visible: :all
+    assert_survives(rendered_content)
+  end
+
   test "the section's selects and its layout menu, rewritten" do
     page = create_page(title: "Section")
     section = page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })

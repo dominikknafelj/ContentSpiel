@@ -756,4 +756,45 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       assert_selector "details[data-shared-fields] dd", text: "Tip", visible: :all
     end
   end
+
+  test "a card's form starts with the Image block's control and its alt override, above the icon; the library's words are the placeholder" do
+    page = create_page(title: "Card image")
+    asset = create_media_asset
+    asset.update!(alt: "A dog")
+    block = page.content_blocks.create!(block_type: "card", position: 0, media_asset: asset)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+
+    as_owner { render_card(block, page: page, editable: true) }
+
+    names = Nokogiri::HTML5.fragment(rendered_content).css("[id^='#{prefix}-']").map { |node| node["id"].delete_prefix("#{prefix}-") }
+    ordered = names & %w[image-section alt icon title text link]
+    assert_equal %w[image-section alt icon title text link], ordered
+    assert_selector "input[type=hidden][name='block[media_asset_id]'][value='#{asset.id}']", visible: :all
+    assert_selector "##{prefix}-alt[placeholder='A dog']"
+    assert_text "Empty uses the alt text from Media"
+    assert_no_selector "##{prefix}-caption"
+  end
+
+  test "an image block's form keeps its order: image, caption, alt" do
+    page = create_page(title: "Image order")
+    block = page.content_blocks.create!(block_type: "image", position: 0)
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+    as_owner { render_card(block, page: page, editable: true) }
+
+    names = Nokogiri::HTML5.fragment(rendered_content).css("[id^='#{prefix}-']").map { |node| node["id"].delete_prefix("#{prefix}-") }
+    assert_equal %w[image-section caption alt], names & %w[image-section caption alt]
+  end
+
+  test "on a translation tab a card's image is the one every language shares and its alt is this language's, beside the original" do
+    page = create_page(title: "Card tab")
+    asset = create_media_asset
+    block = page.content_blocks.create!(block_type: "card", position: 0, media_asset: asset, alt: "English words")
+    prefix = Admin::EditorScreen::BlockCardComponent.error_prefix(block)
+
+    as_owner { render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "de", editable: true) }
+
+    assert_selector "input[type=hidden][name='block[media_asset_id]'][value='#{asset.id}']", visible: :all
+    assert_selector "##{prefix}-alt"
+    assert_text "English words"
+  end
 end

@@ -9,7 +9,8 @@ class BlockTypes::CardTest < ActiveSupport::TestCase
     assert_equal :icons, definition.fields.first.options[:of]
     assert definition.fields.none?(&:required?)
     assert_equal %w[title text], definition.fields.select(&:translated?).map(&:name)
+    assert_equal %w[image alt], definition.uses_columns
     assert_equal Blocks::CardComponent, definition.component
-    assert_equal %w[block page title text link icon icon_name], definition.theme_methods.map(&:to_s)
+    assert_equal %w[block page title text link icon icon_name image], definition.theme_methods.map(&:to_s)
   end
 end

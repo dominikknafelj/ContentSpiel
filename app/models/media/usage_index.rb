@@ -180,12 +180,12 @@ class Media::UsageIndex
       [ row(asset_id: asset_id, owner: page, role: "hero", locale: nil, now: now) ]
     end
 
-    # An image block's own attachment (design spec §3.3):
+    # A block's own image (design spec §3.3):
     # `content_blocks.media_asset_id`, also not per-locale for the same
     # reason -- one image per block, only its `alt`/`caption` overrides are
-    # translated. `nil` for every other block type (`media_asset_id` is
-    # only ever set on an `image` block), so this is safe to call
-    # unconditionally for any `ContentBlock`. Same FK-backed guarantee as
+    # translated. Nothing for a block with no image (only a type that
+    # `uses :image` sets the column: the Image block, the Card), so this is
+    # safe to call unconditionally for any `ContentBlock`. Same FK-backed guarantee as
     # `#hero_rows` above.
     def block_image_rows(block, now)
       asset_id = block.media_asset_id

@@ -10,6 +10,10 @@
   border: 1px solid var(--th-card-line);
   border-radius: 0.5rem;
 }
+/* The full inner width at the image's own proportions: width and height on the
+   img reserve its box, nothing crops it and no ratio is forced. */
+.content-block--card__image { display: block; width: 100%; height: auto; }
+.content-block--card__image-link { display: block; }
 .content-block--card__icon {
   display: inline-flex;
   width: 2rem;

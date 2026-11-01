@@ -5,7 +5,8 @@ require "application_system_test_case"
 # after a reload (the icon select offers the default theme's twelve icons,
 # and a theme's own set replaces them),
 # and a second person's card read-only while the first holds it, the icon
-# select disabled.
+# select disabled; and its library image chosen with the picker, saved and
+# back after a reload, and read-only for the second person too.
 class Admin::CardBlockSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -64,6 +65,53 @@ class Admin::CardBlockSystemTest < ApplicationSystemTestCase
         assert_selector "#block-#{block.id}-icon[disabled]"
         assert_equal "Mind the gap", field(block, "title").value
       end
+    end
+  end
+
+  test "an image chosen on a card with the picker is saved by itself and back after a reload, and Remove takes it away" do
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update!(title: "Harbour photo", alt: "The harbour")
+    block = @page.content_blocks.create!(block_type: "card", position: 0)
+    open_editor
+    section = "#block-#{block.id}-image-section"
+
+    within(section) { click_on "Choose image" }
+    within("dialog[open]") do
+      click_on "Harbour photo"
+      click_on "Use image"
+    end
+    refute_selector "dialog[open]"
+    assert_eventually(wait: 10, message: "the pick was saved") { block.reload.media_asset_id == asset.id }
+    assert_selector "#block-#{block.id}-alt[placeholder='The harbour']"
+    assert_writes_settled
+
+    open_editor
+    assert_selector "#{section} input[type=hidden][value='#{asset.id}']", visible: :all
+    within(section) { assert_button "Change image" }
+    assert_selector "#block-#{block.id}-alt[placeholder='The harbour']"
+
+    field(block, "alt").set("Our own words")
+    assert_writes_settled
+    assert_equal "Our own words", block.reload.alt(locale: "en")
+
+    within(section) { click_on "Remove image" }
+    assert_eventually(wait: 10, message: "the removal was saved") { block.reload.media_asset_id.nil? }
+  end
+
+  test "while one person holds a card with an image, a second person cannot change the image or its alt" do
+    asset = create_media_asset(filename: "tiny.png")
+    block = @page.content_blocks.create!(block_type: "card", position: 0, media_asset: asset)
+    open_editor
+    field(block, "title").set("Mind the gap")
+    assert_writes_settled
+
+    using_session(:dana) do
+      sign_in_via_form(users(:two))
+      open_editor
+
+      assert_selector "#content_block_#{block.id}[data-editing-held=true]"
+      assert_selector "#block-#{block.id}-alt[readonly]"
+      assert_no_selector "#block-#{block.id}-image-section button:not([disabled])", visible: :visible
     end
   end
 end
