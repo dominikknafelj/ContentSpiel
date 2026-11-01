@@ -92,7 +92,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     assert_select ".content-block--rich-text a[href='/preview/draft']", text: "the draft"
   end
 
-  # Fix round 1 (I1): with a real cache store (the suite otherwise runs on
+  # With a real cache store (the suite otherwise runs on
   # :null_store), a cached render must not outlive a change to what its
   # internal links point at -- publishing the target, deleting it, renaming
   # its slug -- none of which changes the document's own digest.
@@ -120,15 +120,19 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a cached body picks up an image's media asset being deleted" do
+  test "a cached body stops showing an image once its page stops using it and the image is deleted" do
     with_memory_cache do
       asset = create_media_asset
-      @root.content_blocks.create!(block_type: :rich_text, position: 0,
+      block = @root.content_blocks.create!(block_type: :rich_text, position: 0,
         body: rich_doc(%(Intro\n\n::image{asset="#{asset.id}" alt="Alt" caption="Cap"})))
 
       get "/"
       assert_select ".content-block--rich-text img[alt='Alt']"
 
+      # An image a page still uses cannot be deleted: the page stops using it
+      # first, and that save moves the version.
+      block.update!(body: rich_doc("Intro"))
+      Media::UsageIndex.refresh(block)
       asset.destroy!
       get "/"
       assert_select ".content-block--rich-text img", count: 0

@@ -1,10 +1,10 @@
 require "test_helper"
 
 # `Admin::MediaAssetsController#create` (design spec §4.1/§4.2): the media
-# picker's header Upload (media library Task 8) POSTs here directly (no page
+# picker's header Upload POSTs here directly (no page
 # or post owns this upload -- the picker hands the id to whichever field or
 # editor opened it once this answers), and gets back `{ id, title, url, tile,
-# counts }` (the finished pick tile and the segment counts, round 3 Task 9) or
+# counts }` (the finished pick tile and the segment counts) or
 # `{ errors }`.
 class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
   setup do
@@ -22,12 +22,12 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     body = response.parsed_body
     asset = Media::Asset.last
     assert_equal asset.id, body["id"]
-    assert_equal asset.url, body["url"]
+    assert_equal asset.display_url(min_width: 960), body["url"]
     assert_equal "tiny", body["title"]
     assert asset.file.attached?
   end
 
-  # Round 3 Task 9: the picker puts the finished tile into its grid, so the
+  # The picker puts the finished tile into its grid, so the
   # answer carries it -- a pick button with the asset's payload -- and counts.
   test "the answer carries the picker's finished tile and the new counts" do
     sign_in_as(users(:one))

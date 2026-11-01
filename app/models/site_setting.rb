@@ -39,7 +39,7 @@ class SiteSetting < ApplicationRecord
   normalizes :mail_server, :mail_security, :mail_sender_name, :mail_sender_address,
     :mail_username, :mail_password, with: ->(value) { value.to_s.strip.presence }
 
-  # Settings → Mail's fields (spec "Settings → Mail", plan Review Focus 2),
+  # Settings → Mail's fields (spec "Settings → Mail"),
   # each a sentence of its own (config/locales/en.yml). Checked only when the
   # field changes, like the time zone: a value written around the model must
   # not block an unrelated save.
@@ -65,6 +65,18 @@ class SiteSetting < ApplicationRecord
   # provider whose plugin was later removed mustn't block an unrelated
   # title edit -- `AI.configured?` already treats it as not set up.
   validate :ai_provider_is_registered, if: :will_save_change_to_ai_provider?
+
+  # Image delivery's settings (`ImageSettings`): bounds checked only when the
+  # column changes, like the mail fields. Widths are stored ascending.
+  before_validation :sort_image_widths
+  validate :image_format_is_offered, if: :will_save_change_to_image_format?
+  validate :image_widths_are_in_bounds, if: :will_save_change_to_image_widths?
+  validates :image_quality_webp, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE, message: :quality_range },
+    if: :will_save_change_to_image_quality_webp?
+  validates :image_quality_avif, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE, message: :quality_range },
+    if: :will_save_change_to_image_quality_avif?
+  validates :image_max_upload_mb, numericality: { only_integer: true, in: ImageSettings::UPLOAD_MB_RANGE, message: :upload_range },
+    if: :will_save_change_to_image_max_upload_mb?
 
   validate :only_one_record_exists, on: :create
 
@@ -93,7 +105,7 @@ class SiteSetting < ApplicationRecord
   # option values are Rails names -- a stored "Europe/Berlin" matched no
   # option, the browser showed the first one instead, and the next autosave
   # of *any* field (the form resends everything) silently wrote
-  # "International Date Line West" back (final fix wave, I2).
+  # "International Date Line West" back.
   #
   # Validated only when it changes: a value written around the model that
   # no Rails name covers (raw SQL, a restored backup) is still shown and
@@ -219,6 +231,22 @@ class SiteSetting < ApplicationRecord
     errors.add(:mail_port, :port_range) unless port && (1..65_535).cover?(port)
   end
 
+  def sort_image_widths
+    self.image_widths = image_widths.sort if image_widths.is_a?(Array) && image_widths.all?(Integer)
+  end
+
+  def image_format_is_offered
+    errors.add(:image_format, :inclusion) unless ImageSettings::FORMATS.include?(image_format)
+  end
+
+  def image_widths_are_in_bounds
+    widths = image_widths
+    unless widths.is_a?(Array) && widths.all?(Integer) && ImageSettings::WIDTH_COUNT.cover?(widths.size) &&
+        widths.all? { |w| ImageSettings::WIDTH_RANGE.cover?(w) } && widths.uniq.size == widths.size
+      errors.add(:image_widths, :image_widths)
+    end
+  end
+
   def mail_security_is_offered
     return if mail_security.blank?
 
@@ -271,7 +299,7 @@ class SiteSetting < ApplicationRecord
     end
   end
 
-  # Final fix wave (E): a link the footer can't render -- `github.com/dana`
+  # A link the footer can't render -- `github.com/dana`
   # typed without its scheme, most often -- is an error where it's typed,
   # rather than saving fine and then silently never appearing.
   def social_links_are_safe

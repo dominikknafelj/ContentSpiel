@@ -26,13 +26,68 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_includes asset.errors[:file].join, "PNG, JPEG, GIF, or WEBP"
   end
 
-  test "a file over 10 MB is invalid" do
+  test "a file over the site's largest upload is refused with its size in the sentence" do
+    SiteSetting.instance.update!(image_max_upload_mb: 1)
+    big = File.binread(file_fixture("tiny.png")) + ("\x00".b * (1.megabyte + 100))
     asset = Media::Asset.new
-    oversized = "\x00" * (10.megabytes + 1)
-    asset.file.attach(io: StringIO.new(oversized), filename: "big.png", content_type: "image/png")
+    asset.file.attach(io: StringIO.new(big), filename: "big.png", content_type: "image/png")
 
     assert_not asset.valid?
-    assert_includes asset.errors[:file].join, "10 MB"
+    assert_includes asset.errors[:file], "must be 1 MB or smaller"
+  end
+
+  test "a file that cannot be read as an image is refused, and nothing is kept" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("not_an_image.png")), filename: "broken.png", content_type: "image/png")
+
+    assert_no_difference [ "Media::Asset.count", "ActiveStorage::Blob.count" ] do
+      assert_not asset.save
+    end
+    assert_includes asset.errors.full_messages, "File can't be read as an image"
+  end
+
+  test "an image over 100 megapixels is refused with its own sentence" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("huge_pixels.png")), filename: "huge.png", content_type: "image/png")
+
+    assert_not asset.valid?
+    assert_includes asset.errors[:file], "is too large to process (over 100 megapixels)"
+  end
+
+  test "an animation over 500 megapixels across its frames is refused with its own sentence" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("long_animation.gif")), filename: "long.gif", content_type: "image/gif")
+
+    assert_not asset.valid?
+    assert_includes asset.errors[:file], "is too long an animation to process (over 500 megapixels across its frames)"
+  end
+
+  test "a saved asset has its width, height and preview before the save commits" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("transparent.png")), filename: "t.png", content_type: "image/png")
+
+    asset.save! # no job is performed: the size comes from the validation's decode
+
+    row = Media::Asset.find(asset.id)
+    assert_equal [ 30, 20 ], [ row.width, row.height ]
+    assert_equal 24, Vips::Image.new_from_buffer(row.preview, "").width
+    assert row.has_alpha
+  end
+
+  # Active Storage would analyze the blob again after the commit: a second
+  # read of the whole file on the images queue, for metadata nothing reads,
+  # and a touch of the asset afterwards that moves its `updated_at`, the
+  # media panel's autosave base, under an editor typing the alt text.
+  test "an upload's blob is analyzed from the validation's decode: no analysis job, and the blob says the image's size" do
+    asset = nil
+    assert_no_enqueued_jobs(only: ActiveStorage::AnalyzeJob) do
+      asset = create_media_asset(filename: "wide.png")
+    end
+
+    blob = asset.file.blob.reload
+    assert blob.analyzed?
+    assert blob.identified?
+    assert_equal [ asset.width, asset.height ], [ blob.metadata["width"], blob.metadata["height"] ]
   end
 
   test "with no file attached at all" do
@@ -50,17 +105,68 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal File.size(file_fixture("tiny.png")), asset.byte_size
   end
 
-  test "#url is the blob's own path, or nil with no file attached" do
-    asset = Media::Asset.new
-    assert_nil asset.url
+  test "with no generation srcset is empty and src is the preview, never the original" do
+    asset = create_media_asset
+    assert asset.preview.present?
 
-    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    asset.save!
-
-    assert_equal Rails.application.routes.url_helpers.rails_blob_path(asset.file, only_path: true), asset.url
+    assert_equal [], asset.srcset
+    assert asset.src.start_with?("data:image/webp;base64,")
+    assert_equal asset.preview, Base64.strict_decode64(asset.src.delete_prefix("data:image/webp;base64,"))
+    assert_not_includes asset.src, "/blobs/"
+    assert_not_includes asset.thumbnail_url, "/blobs/"
   end
 
-  # Fix round 1's I3: this class only knows how to sniff bytes out of a
+  test "with no generation and no preview src is nil" do
+    asset = create_media_asset
+    asset.update_columns(preview: nil) # version: none (a test removes the derived preview)
+
+    assert_nil asset.reload.src
+    assert_nil asset.display_url(min_width: 480)
+    assert_nil asset.thumbnail_url
+  end
+
+  test "with a generation srcset lists exactly its widths as proxy representation addresses and src is the middle one" do
+    asset = make_renditions!(create_media_asset, widths: [ 480, 960, 1600 ])
+
+    assert_equal [ 480, 960, 1600 ], asset.srcset.map(&:last)
+    asset.srcset.each do |url, width|
+      key = asset.generation.files.find { |f| f.width == width }.key
+      assert url.start_with?("/rails/active_storage/representations/proxy/#{asset.file.blob.signed_id}/#{key}/"), url
+      assert_not_includes url, "?"
+    end
+    assert_equal asset.srcset[1].first, asset.src
+    assert asset.made?
+    assert asset.made_with?(ImageSettings.current.fingerprint)
+    assert_not asset.made_with?("other")
+
+    four = make_renditions!(asset, widths: [ 480, 960, 1600, 2400 ])
+    assert_equal four.srcset[1].first, four.src
+  end
+
+  test "the srcset of fifty assets loaded with with_file costs no query" do
+    created = Array.new(3) { make_renditions!(create_media_asset, widths: [ 480, 960 ]) }
+    ids = created.map(&:id) * 1
+    assets = Media::Asset.with_file.where(id: ids).to_a * 17
+
+    statements = capture_sql { assets.each(&:srcset) }
+
+    assert_empty statements
+  end
+
+  test "display_url takes the smallest width that covers, else the largest, else the preview" do
+    asset = make_renditions!(create_media_asset, widths: [ 480, 960, 1600 ])
+    by_width = asset.srcset.to_h { |url, width| [ width, url ] }
+
+    assert_equal by_width[480], asset.display_url(min_width: 100)
+    assert_equal by_width[960], asset.display_url(min_width: 481)
+    assert_equal by_width[1600], asset.display_url(min_width: 5000)
+    assert_equal by_width[480], asset.thumbnail_url
+
+    asset.update_columns(renditions: {}) # version: none (a test removes the generation)
+    assert asset.reload.display_url(min_width: 480).start_with?("data:image/webp")
+  end
+
+  # This class only knows how to sniff bytes out of a
   # `Hash`/`UploadedFile`-shaped attachable -- a signed blob id String
   # (Active Storage's own "attach an already-uploaded blob" shape, e.g. a
   # direct upload) resolves to an *already*-persisted, already-uploaded
@@ -91,7 +197,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert asset.valid?
   end
 
-  # Fix round 1's I4: the served Content-Type (`file.blob.content_type`) --
+  # The served Content-Type (`file.blob.content_type`) --
   # not just this record's own cached `content_type` column -- must equal
   # the sniffed type, even when the upload's own declared Content-Type and
   # filename both lie about it. A `.png` extension with a `text/html`
@@ -103,12 +209,12 @@ class Media::AssetTest < ActiveSupport::TestCase
     asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "x.html", content_type: "text/html")
     assert asset.save, asset.errors.full_messages.to_sentence
 
-    # From the database (final fix wave, P4): the in-memory blob could hold
+    # From the database: the in-memory blob could hold
     # the forced value without it ever having been written.
     assert_equal "image/png", ActiveStorage::Blob.find(asset.file.blob.id).content_type
   end
 
-  # Final fix wave (C, P5): an already-persisted blob attached by signed id
+  # An already-persisted blob attached by signed id
   # keeps its stored `content_type` -- which is what it's served with -- and
   # this class never rewrites another record's blob. So when that stored
   # type disagrees with the bytes, the attachment is refused rather than
@@ -124,7 +230,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_includes asset.errors[:file], "doesn't match its stored content type"
   end
 
-  # Task 2 (media library sub-project): `title` is the one field a library
+  # `title` is the one field a library
   # listing/picker always has *something* to show, so it defaults from the
   # upload's own filename the moment it's blank -- but only then, so an
   # editor's own title (or a deliberate rename) always sticks.
@@ -168,7 +274,7 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal "", asset.alt_text(override: nil, locale: "de")
   end
 
-  # Final fix wave (I1): a translated override (a block's `alt`, a page's
+  # A translated override (a block's `alt`, a page's
   # `hero_alt`) arrives as its `{locale => value}` hash and is interleaved
   # per locale -- the override in a locale, then the asset in that locale,
   # then the next locale in the fallback chain -- so another locale's
@@ -202,160 +308,5 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal "Deutsche Bildunterschrift", asset.caption_text(override: nil, locale: "de")
 
     assert_equal "Override caption", asset.caption_text(override: "Override caption", locale: "de")
-  end
-
-  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG -- every
-  # declared variant width (480/960/1600/2400) is smaller than that, so all
-  # four should eventually process and appear in `srcset`.
-  test "srcset is empty before the preprocessing jobs run, then lists all four widths once they do" do
-    asset = Media::Asset.new
-    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
-    asset.save!
-    analyze(asset)
-
-    assert_equal [], asset.srcset
-
-    perform_enqueued_jobs
-
-    srcset = asset.srcset
-    assert_equal [ 480, 960, 1600, 2400 ], srcset.map(&:last)
-    srcset.each do |path, _width|
-      assert_match %r{\A/rails/active_storage/representations/}, path
-    end
-  end
-
-  # `medium.png` is a real 800x600 PNG: `resize_to_limit` never upscales, so
-  # only the one variant narrower than the original (w480) should ever
-  # appear -- w960/w1600/w2400 are all >= the original's own 800px width.
-  test "srcset skips variants that would upscale the original" do
-    asset = Media::Asset.new
-    asset.file.attach(io: File.open(file_fixture("medium.png")), filename: "medium.png", content_type: "image/png")
-    asset.save!
-    analyze(asset)
-
-    perform_enqueued_jobs
-
-    assert_equal [ 480 ], asset.srcset.map(&:last)
-  end
-
-  test "a GIF is never variable, and never gets a srcset entry" do
-    asset = Media::Asset.new
-    asset.file.attach(io: File.open(file_fixture("small.gif")), filename: "small.gif", content_type: "image/gif")
-    asset.save!
-    analyze(asset)
-
-    perform_enqueued_jobs
-
-    assert_not asset.variable_image?
-    assert_equal [], asset.srcset
-  end
-
-  # Fix round 1's I1: `preprocessed:` used to be a plain `true`, which
-  # doesn't condition on content type at all -- `ActiveStorage.variable_
-  # content_types` includes `image/gif`, so every GIF upload was enqueuing
-  # (and a background worker would then actually run) four resized-still
-  # WebP transforms of an image `#srcset`/`#variable_image?` were always
-  # going to refuse to ever list. `preprocessed: ->(asset) { asset
-  # .variable_image? }` is read from `ActiveStorage::Attachment`'s own
-  # `after_create_commit`, strictly after this record's save (including
-  # `before_save :cache_metadata_from_file`, which is what makes
-  # `#variable_image?`'s `content_type` read meaningful) has committed.
-  test "uploading a GIF enqueues no TransformJob, but a PNG enqueues one per variant" do
-    assert_enqueued_jobs(4, only: ActiveStorage::TransformJob) do
-      png = Media::Asset.new
-      png.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-      png.save!
-    end
-
-    assert_no_enqueued_jobs(only: ActiveStorage::TransformJob) do
-      gif = Media::Asset.new
-      gif.file.attach(io: File.open(file_fixture("small.gif")), filename: "small.gif", content_type: "image/gif")
-      gif.save!
-    end
-  end
-
-  # Review Focus 3 (global constraints): a variant job that fails or is slow
-  # -- a corrupt image, a `vips` error -- must never take the public page
-  # down with it. Stubbing `file.variant` itself to blow up stands in for
-  # "processing this variant failed": `#srcset` must still return normally,
-  # with the error logged instead of raised, once per variant it skipped.
-  test "a variant that fails to process is caught, logged, and srcset still returns without raising" do
-    asset = Media::Asset.new
-    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
-    asset.save!
-    analyze(asset)
-
-    logged_messages = []
-
-    with_singleton_override(Rails.logger, :error, ->(message) { logged_messages << message }) do
-      with_singleton_override(asset.file, :variant, ->(*) { raise "vips blew up" }) do
-        assert_equal [], asset.srcset
-      end
-    end
-
-    assert_equal 4, logged_messages.size
-    assert logged_messages.all? { |message| message.include?("vips blew up") }
-  end
-
-  # Fix round 1's I2/I3: `#srcset` reads `file.blob.variant_records` to
-  # answer "is this variant processed" (`#processed_variant_digests`'s own
-  # comment) instead of the private `Variant#processed?`/`VariantWithRecord
-  # #processed?`. Read one asset at a time that's one query per asset (a
-  # library listing's own N+1); `Media::Asset.with_variants` exists so a
-  # caller doesn't have to pay it -- `#srcset` over every asset in a
-  # preloaded batch must cost nothing further at all, not "fewer" queries.
-  test "srcset over many assets preloaded via .with_variants issues no further queries" do
-    assets = Array.new(20) do |index|
-      asset = Media::Asset.new
-      asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide-#{index}.png", content_type: "image/png")
-      asset.save!
-      analyze(asset)
-      asset
-    end
-    perform_enqueued_jobs
-
-    loaded = Media::Asset.with_variants.where(id: assets.map(&:id)).to_a
-
-    ActiveRecord::Base.uncached do
-      assert_no_queries do
-        loaded.each { |asset| assert_equal [ 480, 960, 1600, 2400 ], asset.srcset.map(&:last) }
-      end
-    end
-  end
-
-  # The other half of I2/I3: the processed check itself -- `#processed_
-  # variant_digests` -- costs exactly one query total for all four widths,
-  # not one per variant (the bug it fixes: plucking every digest for this
-  # asset's blob once, up front, rather than asking Active Storage's own
-  # `variant_records.find_by` once per width). Warms `file.blob` first,
-  # the same as any earlier read in a real request (`#url`, `#src`) would
-  # already have done before `#srcset` ever runs, so the one query this
-  # asserts is only the digest lookup, not the attachment/blob association
-  # loading for the first time -- a cost this fix has no way to remove and
-  # isn't what I2/I3 are about.
-  test "srcset's processed check costs exactly one query, not one per variant" do
-    asset = Media::Asset.new
-    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
-    asset.save!
-    analyze(asset)
-    perform_enqueued_jobs
-
-    reloaded = Media::Asset.find(asset.id)
-    reloaded.file.blob
-
-    ActiveRecord::Base.uncached do
-      assert_queries_count(1) { assert_equal [ 480, 960, 1600, 2400 ], reloaded.srcset.map(&:last) }
-    end
-  end
-
-  private
-
-  # Mirrors `Media::Upload#analyze_dimensions`: `file.analyze` needs the
-  # blob's real bytes on the storage service, which only exist once this
-  # record's save has actually committed.
-  def analyze(asset)
-    asset.file.analyze
-    metadata = asset.file.blob.metadata || {}
-    asset.update_columns(width: metadata["width"], height: metadata["height"])
   end
 end

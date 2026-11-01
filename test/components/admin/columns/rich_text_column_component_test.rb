@@ -70,7 +70,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_selector "[role=toolbar] button[aria-label='Link'][aria-haspopup=dialog]"
   end
 
-  # Media library Task 8: the Image button opens the media picker (a
+  # The Image button opens the media picker (a
   # dialog) and the picked asset arrives as `media-picker:picked` -- the
   # editor has no file input or upload endpoint of its own any more.
   test "the Image button opens the media picker instead of a file input" do
@@ -112,7 +112,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document)
 
-    assert_equal({ asset.id.to_s => { "url" => asset.url, "alt" => "A dog", "caption" => "Our dog" } },
+    assert_equal({ asset.id.to_s => { "url" => asset.display_url(min_width: 960), "alt" => "A dog", "caption" => "Our dog" } },
       JSON.parse(controller_element["data-admin--rich-text--editor-assets-value"]))
     assert_equal({ "page:#{target.id}" => "Contact" }, JSON.parse(controller_element["data-admin--rich-text--editor-link-titles-value"]))
   end
@@ -127,7 +127,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document, locale: "de")
 
-    assert_equal({ "url" => asset.url, "alt" => "Ein Hund", "caption" => "Our dog" },
+    assert_equal({ "url" => asset.display_url(min_width: 960), "alt" => "Ein Hund", "caption" => "Our dog" },
       JSON.parse(controller_element["data-admin--rich-text--editor-assets-value"])[asset.id.to_s])
   end
 
@@ -139,7 +139,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_text Locales.name(Locales.default, native: true)
   end
 
-  # Fix round 1 (m2): the read-only original is rendered HTML, so markup
+  # The read-only original is rendered HTML, so markup
   # typed as *text* in the primary language must come out escaped, never
   # live.
   test "the original escapes script tags and event handlers typed as text" do

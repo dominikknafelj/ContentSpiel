@@ -52,6 +52,38 @@ en:
           sent: "Test mail sent to %{address}. Check your inbox."
         mail_state:
           label: "Mail state"
+        images_card:
+          title: "Images"
+          intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."
+          format: "Format"
+          webp: "WebP"
+          avif: "AVIF"
+          format_help: "WebP is shown by every current browser. AVIF makes smaller files."
+          avif_note: "Browsers too old to show AVIF will show nothing in place of an image. Animated images are always made in WebP, at the WebP quality."
+          avif_unavailable: "AVIF is not available: this server cannot write it."
+          image_quality_webp: "WebP quality"
+          image_quality_avif: "AVIF quality"
+          widths: "Widths"
+          widths_placeholder: "480, 960, 1600, 2400"
+          widths_help: "Pixels, separated by commas: %{count_min} to %{count_max} different widths, each from %{min} to %{max}. A larger width is made only for an image that is at least as wide."
+          max_upload: "Largest upload"
+          mb: "MB"
+          no_images: "There are no images yet."
+          progress:
+            one: "%{made} of %{count} image made with these settings."
+            other: "%{made} of %{count} images made with these settings."
+          failed:
+            one: "%{count} image could not be made. It is tried again when you regenerate."
+            other: "%{count} images could not be made. They are tried again when you regenerate."
+          regenerate_help: "Images are made again with the saved settings, a few at a time, so the site keeps its current ones until each is ready."
+          regenerate: "Regenerate images…"
+        images_dialog:
+          title: "Regenerate images?"
+          body:
+            zero: "Every image is already made with the saved settings. Nothing will be made."
+            one: "%{count} image is not made with the saved settings. It will be made again in the background; the site keeps its current one until it is ready."
+            other: "%{count} images are not made with the saved settings. They will be made again in the background; the site keeps the current ones until each is ready."
+          confirm: "Regenerate images"
     settings:
       mail_login:
         saved: "Mail login saved"
@@ -59,6 +91,12 @@ en:
         blank: "Enter a username or a password first."
       mail_test:
         too_many: "Too many test mails. Try again in a few minutes."
+      regenerate_images:
+        queued:
+          zero: "No image needed regenerating."
+          one: "Regenerating %{count} image."
+          other: "Regenerating %{count} images."
       save:
+        avif_unavailable: "AVIF can't be chosen: this server cannot write it."
         no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
         set_by_host: "%{field} is set by the host and can't be changed here."

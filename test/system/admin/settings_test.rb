@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The Settings screen in a real browser (round 3, Task 5): one form, one save
+# The Settings screen in a real browser: one form, one save
 # footer. Switching the language tabs is not a change and asks nothing, a
 # sidebar link or Back with a typed change asks first, a social link row added
 # and removed is counted and uncounted, Save toasts "Settings saved" with both
@@ -153,16 +153,16 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   test "at the end of a page that scrolls the last section is current, though its heading is not above the 40% line" do
-    # A window tall enough that the last card's (Mail's) heading is still below the 40% line at the page's end:
+    # A window tall enough that the last card's (Images') heading is still below the 40% line at the page's end:
     # only the nav's at-end rule can make it current.
     page.driver.resize(1400, 2400)
     visit admin_settings_path
     await_admin_controllers
     page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
 
-    assert page.evaluate_script("document.getElementById('mail').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the Mail heading is below the 40% line at the end"
+    assert page.evaluate_script("document.getElementById('images').getBoundingClientRect().top > window.innerHeight * 0.4"), "the premise: the Images heading is below the 40% line at the end"
     assert page.evaluate_script("document.documentElement.scrollHeight > window.innerHeight"), "the premise: the page scrolls"
-    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Mail", count: 1
+    assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Images", count: 1
   ensure
     page.driver.resize(1400, 1400)
   end
@@ -271,7 +271,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{footer} a[data-turbo-action]"
   end
 
-  # Task 9 M14: a file dropped beside a drop zone must not navigate away.
+  # A file dropped beside a drop zone must not navigate away.
   test "a file dropped on a screen that takes none is refused, not navigated to" do
     visit admin_settings_path
     await_admin_controllers
@@ -295,7 +295,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal [ true, true, false ], prevented
   end
 
-  # -- Languages (round 3, Task 6) ---------------------------------------------------
+  # -- Languages ---------------------------------------------------
 
   def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)
 

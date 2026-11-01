@@ -114,6 +114,24 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the Images row links to Settings → Images for settings.manage and to nothing otherwise" do
+    Media::Asset.delete_all
+    create_media_asset.update_columns(renditions_fingerprint: "other") # version: none (a test)
+
+    sign_in_as(users(:one))
+    get "/cs-studio/system_status"
+    assert_select "li[data-status=warning]", text: /Images.*still to be made/m do
+      assert_select "a[href=?]", "/cs-studio/settings#images", text: "Open Image settings →"
+    end
+
+    viewer = users(:reader)
+    access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
+    sign_in_as(viewer)
+    get "/cs-studio/system_status"
+    assert_select "li", text: /Images.*still to be made/m
+    assert_select "a", text: "Open Image settings →", count: 0
+  end
+
   test "someone who may view System status but not manage Settings is shown the state and no link" do
     viewer = users(:reader)
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})

@@ -2,7 +2,7 @@ module Admin
   # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
   # this namespace is `MediaLibrary`, not `Media`.
   module MediaLibrary
-    # One image in the Media grid (round 3, Task 8, handoff §4.6): the
+    # One image in the Media grid (handoff §4.6): the
     # thumbnail, the title, its size in mono and two chips -- `NO ALT` (warn)
     # while the default-language alt is empty and `UNUSED` (meta) while nothing
     # uses it. The tile is a link into the `content` frame that opens the panel
@@ -14,11 +14,11 @@ module Admin
     # replaces exactly that element (`Admin::MediaController#update`), so an
     # alt text typed in the panel takes `NO ALT` off the tile without a reload.
     #
-    # `pick: true` is the same tile inside `Media::PickerComponent` (round 3,
-    # Task 9): a button, not a link, because the picker is select-then-confirm
-    # (D14). A click selects it (`admin--media--select#select`, `aria-pressed`
-    # drawing the same accent ring the panel's selected tile has), a double
-    # click selects and confirms, Enter on a selected one confirms. Its whole
+    # `pick: true` is the same tile inside `Media::PickerComponent`: a button,
+    # not a link, because the picker is select-then-confirm (D14). A click
+    # selects it (`admin--media--select#select`, `aria-pressed` drawing
+    # the same accent ring the panel's selected tile has), a double click
+    # selects and confirms, Enter on a selected one confirms. Its whole
     # payload for the opener (`media-picker:picked`'s detail) is one JSON action
     # param (not one param per key: Stimulus JSON-parses each param value on its
     # own, so an alt text that reads "42" or "true" would arrive as a number or
@@ -73,6 +73,7 @@ module Admin
         {
           id: asset.id,
           url: thumbnail_url,
+          width: asset.width, height: asset.height, preview: Media::Asset.preview_url?(thumbnail_url),
           title: asset.title,
           alt: asset.alt_text(override: nil, locale: locale).to_s,
           caption: asset.caption_text(override: nil, locale: locale).to_s

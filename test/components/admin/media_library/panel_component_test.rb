@@ -1,7 +1,7 @@
 require "test_helper"
 
 # `Admin::MediaLibrary::PanelComponent`'s trash-aware "Used on" panel (trash
-# spec §4.1/§5.1, Task 4): a trashed owner is never listed as a place the image
+# spec §4.1/§5.1): a trashed owner is never listed as a place the image
 # is used, and an asset used only by trashed owners says so (naming only the
 # ones the viewer may read) instead of the ordinary "Not used anywhere yet".
 # These tests set `trashed_at` directly the same way
@@ -34,6 +34,18 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_selector "form"
     assert_no_selector "input, textarea"
     assert_no_selector "button", text: /Move to trash/
+  end
+
+  # Anyone the panel is drawn for may open it (`media.upload`), editor or
+  # not, so the link is there for a viewer who cannot edit the image too. It
+  # is a plain download, never a Turbo visit, and never an Active Storage URL.
+  test "the panel offers Download original to someone who may open it" do
+    asset = create_media_asset
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+
+    assert_selector "a[href='/cs-studio/media/#{asset.id}/original'][data-turbo='false'][download]", text: "Download original"
+    assert_no_selector "a[href*='/rails/active_storage']"
   end
 
   test "the panel is a focusable region and its close link tells admin--media--panel which tile to return to" do
@@ -119,7 +131,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_text "Not used anywhere yet."
   end
 
-  # Task 10: Move to trash is disabled only while a *kept* owner uses the
+  # Move to trash is disabled only while a *kept* owner uses the
   # image -- an asset used solely by something already in the trash is the
   # same "trash_only" state as the first test above, and `Trash::Move`
   # itself would let this one through, so the button must too.
@@ -237,6 +249,17 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
 
     assert_selector "#media-panel"
     assert_no_selector "#media-notes"
+  end
+
+  test "the panel shows a width or the preview or a box, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en") }
+
+    assert_no_selector "img[src*='/blobs/']"
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
   end
 
   private

@@ -1,4 +1,4 @@
-<%# The side panel of one image (round 3, Task 8). `id="media-panel"` is what the
+<%# The side panel of one image. `id="media-panel"` is what the
     Media screen's own layout and the tests look for; the title, the save status
     and the base-updated-at field keep stable ids because the autosave answer
     (`Admin::MediaController#update`) addresses them. %>
@@ -18,7 +18,7 @@
   </div>
 
   <span class="block overflow-hidden rounded-cs border border-line bg-sunken">
-    <%= image_tag preview_url, alt: "", class: "w-full" %>
+    <%= render Admin::Ui::LibraryImageComponent.new(asset: asset, min_width: 960, css_class: "w-full h-auto", loading: "eager") %>
   </span>
 
   <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-cs-mono text-xs text-meta">
@@ -31,6 +31,10 @@
       <% if uploader? %>by <%= render Admin::Ui::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
     </dd>
   </dl>
+  <%# The original file, for whoever may open the panel (`media.upload`):
+      CS Studio's own route, a plain download (no Turbo visit), never an
+      Active Storage URL, which refuses a library original to everyone. %>
+  <%= link_to t(".download_original"), original_path, download: "", data: { turbo: false }, class: "self-start text-sm text-ink underline hover:no-underline" %>
 
   <div class="flex items-center justify-between gap-3">
     <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>

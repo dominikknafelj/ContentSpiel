@@ -8,7 +8,7 @@
   <meta name="turbo-cache-control" content="no-cache">
   <meta name="turbo-prefetch" content="false">
 <% end %>
-<%# The Media module (media library design spec §6; round 3 Task 8, handoff §4.6):
+<%# The Media module (media library design spec §6, handoff §4.6):
     the header with "Upload images", the drop zone, the toolbar (search and
     segments with counts) and the grid, with the chosen image's side panel
     (`Admin::MediaLibrary::PanelComponent`) at the right -- 340px; with nothing
@@ -16,7 +16,7 @@
     frame that keeps the search, the segment, the page and the language, so Back
     returns to the previous choice. No tree column (a library image has no tree
     position of its own, the same reason Tags/Posts render plain content frames). %>
-<%# Uploading (round 3, Task 9): the wrapper carries `admin--media--drop` (a file drag
+<%# Uploading: the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
     `admin--media--upload`) and `admin--media--upload` itself (the queue: a progress
     tile per file at the start of the grid, one at a time, nothing reloads). The
@@ -38,7 +38,7 @@
       outside it, for a screen reader. %>
   <%= tag.div hidden: @library_has_images, data: { media_drop_zone: "" } do %>
     <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
-          hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
+          hint: t("admin.components.media_library.upload_hint", mb: ImageSettings.current.max_upload_mb),
           data: { "admin--media--upload-target": "input", action: "change->admin--media--upload#filesSelected" }) %>
   <% end %>
   <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>

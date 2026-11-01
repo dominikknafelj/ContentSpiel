@@ -1,7 +1,7 @@
 module Admin
   # What both upload endpoints (`Admin::MediaController#create`, the Media
   # screen's drop zone and button; `Admin::MediaAssetsController#create`, the
-  # picker's header Upload) answer a finished upload with (round 3, Task 9):
+  # picker's header Upload) answer a finished upload with:
   # enough for the browser to turn the file's progress tile into the real one
   # and fix the segment counts without reloading anything -- a reload would
   # throw away what an editor is typing in the side panel, and the other
@@ -31,7 +31,7 @@ module Admin
       end
 
       {
-        id: asset.id, title: asset.title, url: asset.url,
+        id: asset.id, title: asset.title, url: asset.display_url(min_width: 960),
         tile: view_context.render(tile),
         counts: media_counts
       }

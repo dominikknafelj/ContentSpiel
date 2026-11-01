@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `RichTextScrubber` directly (Task 5 fix round 1, m1): since rich text is
+# `RichTextScrubber` directly: since rich text is
 # rendered from JSON documents, no public path can hand the scrubber raw
 # iframe HTML any more (`rich_text_sanitizing_test.rb`), so the scrubber's
 # own rules are pinned here instead -- it's still the last line of defence
@@ -59,7 +59,7 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_not_includes scrub(%(<p>ok</p><script>alert(1)</script>)), "<script"
   end
 
-  # Media library Task 5: `Media::PictureComponent`'s own `<img>` carries
+  # `Media::PictureComponent`'s own `<img>` carries
   # four attributes the built-in Rails safe-list never had reason to allow
   # (`src`/`width`/`height`/`alt` were already there) -- all four must
   # survive the scrub, or every responsive image on the site would render
@@ -73,5 +73,34 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_includes html, %(height="320")
     assert_includes html, %(loading="lazy")
     assert_includes html, %(decoding="async")
+  end
+
+  test "a rendered rich-text image keeps its preview style, its preview src and its state attributes" do
+    style = Media::PictureComponent.preview_style("data:image/webp;base64,UklGRg==")
+    html = scrub(%(<img src="data:image/webp;base64,UklGRg==" style='#{style}' data-image-preview data-image-empty width="3" height="2" alt="x">))
+
+    assert_includes html, %(src="data:image/webp;base64,UklGRg==")
+    assert_includes html, "background:url"
+    assert_includes html, "data-image-preview"
+    assert_includes html, "data-image-empty"
+  end
+
+  test "any other style on an img, another data: src, and the state attributes on another element are dropped" do
+    html = scrub(%(<img src="/a.webp" style="position:fixed;inset:0" alt="x"><p style="background:url(&quot;data:image/webp;base64,AAAA&quot;) center/cover no-repeat" data-image-preview data-image-empty>t</p><img src="data:text/html;base64,AAAA" alt="y">))
+
+    assert_not_includes html, "style="
+    assert_not_includes html, "data-image-preview"
+    assert_not_includes html, "data-image-empty"
+    assert_not_includes html, "data:text/html"
+  end
+
+  test "an img keeps a data: src only when it is exactly the WebP preview, however the scheme is written" do
+    [ "data:image/png;base64,iVBORw0KGgo=", "da\nta:image/png;base64,iVBORw0KGgo=", "da\tta:image/png;base64,iVBORw0KGgo=",
+      "&#1;data:image/png;base64,iVBORw0KGgo=", "&#x20;DATA:image/png;base64,iVBORw0KGgo=",
+      "data:image/webp,notbase64", " data:image/webp;base64,UklGRg==", "data:image/webp;base64,UklGRg==\n" ].each do |src|
+      html = scrub(%(<img src="#{src}" alt="x">))
+      assert_not_includes html.downcase.delete("\n\t "), "data:image", "kept #{src.inspect}: #{html}"
+    end
+    assert_includes scrub(%(<img src="data:image/webp;base64,UklGRg==" alt="x">)), "data:image/webp;base64,UklGRg=="
   end
 end

@@ -1,5 +1,5 @@
 module Admin
-  # The Settings module (cs-studio spec §6.1; round 3, Task 5): one screen of
+  # The Settings module (cs-studio spec §6.1): one screen of
   # cards -- Site, Languages, Publishing, AI translation -- and ONE form
   # (`#settings-form`) with ONE save footer. Settings no longer autosaves
   # (design pass spec §4, handoff B12): `PATCH /settings` is an ordinary form
@@ -34,7 +34,7 @@ module Admin
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
     # also let a languages-only viewer reach it.
-    before_action -> { require_permission("settings.manage") }, only: %i[test_ai_connection send_test_mail]
+    before_action -> { require_permission("settings.manage") }, only: %i[test_ai_connection send_test_mail regenerate_images]
     # Five test mails per person per three minutes, in one bucket with the
     # setup wizard's (`MailTestLimit`). Declared after the permission check,
     # so a refused press does not count.
@@ -51,7 +51,7 @@ module Admin
     # `Locales::MakeDefault`; the service still accepts `default_locale` for
     # the setup wizard, so this list is what keeps a settings-only user from
     # changing it from here), and neither is `locales`. The language ORDER and
-    # fallbacks are `languages` (rows of `code` and `fallback`; round 3, Task 6).
+    # fallbacks are `languages` (rows of `code` and `fallback`).
     # Every enabled language's title and tagline arrive together,
     # `translations[<code>][title|tagline]`.
     #
@@ -73,7 +73,7 @@ module Admin
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
         :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
-        *Admin::SettingsScreen::MailCardComponent::FIELDS,
+        *Admin::SettingsScreen::MailCardComponent::FIELDS, *Admin::SettingsScreen::ImagesCardComponent::FIELDS,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
         # `language_order` is the one tracked field that makes a reorder a
@@ -136,6 +136,19 @@ module Admin
       render turbo_stream: mail_test_streams(**result.except(:status)), status: result.fetch(:status)
     end
 
+    # Regenerate images (Settings → Images): queues the widths of every image
+    # not made with the SAVED image settings, behind the card's dialog.
+    # `Media::Regenerate` is the writer; the answer is a 303 to the card with a
+    # toast that names the count. A person without `settings.manage` is the 403
+    # of the gate above.
+    def regenerate_images
+      result = Media::Regenerate.call
+      return forbidden_or(result) { redirect_to admin_settings_path(anchor: "images", **admin_url_options), status: :see_other, alert: result.errors.to_sentence } unless result.ok?
+
+      redirect_to admin_settings_path(anchor: "images", **admin_url_options), status: :see_other,
+        notice: t("admin.settings.regenerate_images.queued", count: result.record)
+    end
+
     private
 
     # The card's foot and its state, as they are after a test mail.
@@ -152,7 +165,9 @@ module Admin
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS).to_h
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS,
+        *Admin::SettingsScreen::ImagesCardComponent::FIELDS).to_h
+      attributes["image_widths"] = ImageSettings.parse_widths(attributes["image_widths"]) if attributes.key?("image_widths")
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(permitted[:remove_logo])
       if rows_posted?(permitted[:social_links]) || permitted[:social_links_present] == "1"

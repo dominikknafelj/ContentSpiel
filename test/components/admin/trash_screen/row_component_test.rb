@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `Admin::TrashScreen::RowComponent` (trash spec §7, round 3): the parts of a
+# `Admin::TrashScreen::RowComponent` (trash spec §7): the parts of a
 # row the integration tests don't pin down -- the who/when cell, the delete
 # dialog's subpage count, the disabled "Delete now…" with its reason as
 # visible text, and the inline "Restore under" for a page that can't go back
@@ -92,7 +92,7 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_selector "select[disabled]"
     assert_selector "button[disabled]", text: "Restore"
-    # The reason, as visible text tied to the controls (final fix wave, m5).
+    # The reason, as visible text tied to the controls.
     assert_selector "p#trash-page-#{child.id}-no-parent", text: "No page you can restore it under."
     assert_selector "select[disabled][aria-describedby='trash-page-#{child.id}-no-parent']"
     assert_selector "button[disabled][aria-describedby='trash-page-#{child.id}-no-parent']", text: "Restore"
@@ -109,6 +109,17 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_no_selector "select"
     assert_selector "form[action='/cs-studio/trash/page/#{section.id}/restore'] button", text: "Restore"
+  end
+
+  test "an image row shows a width, the preview or a box, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+    Trash::Move.call(asset)
+
+    render_inline row(asset.reload, who: "Ada")
+
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
   end
 
   private

@@ -55,7 +55,7 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     Rails.application.reloader.prepare!
   end
 
-  # Task 4 review M2: an outside type's summary is a gem's code, and a fault
+  # An outside type's summary is a gem's code, and a fault
   # in it was a 500 on every editor page that holds a block of the type. Its
   # tile shows the type's label instead, and the log says it once per
   # registration, naming the type and the error's class, never the block's
@@ -130,6 +130,16 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector ".admin-block-tile__summary", text: "tiny.png"
     assert_selector ".admin-block-tile__summary img[alt=''][src]"
     assert_no_selector attention
+  end
+
+  test "an image's thumbnail is never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_summary block("image", media_asset: asset.reload)
+
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
   end
 
   test "an image block without an image needs attention" do
@@ -223,7 +233,7 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_equal "Empty · Needs fixing", page.find(line).text
   end
 
-  # Task 4 review M5: the line is the type's summary now, and each kind of
+  # The line is the type's summary now, and each kind of
   # part it answers is text on the tile, the file name's plain part as much
   # as the code's monospace one.
   test "a code block's file name that looks like markup is text on the type's summary path" do

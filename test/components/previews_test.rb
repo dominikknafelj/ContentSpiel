@@ -12,6 +12,9 @@ class ComponentPreviewsTest < ActiveSupport::TestCase
   include ComponentTestHelper
 
   test "every Lookbook preview renders its examples without raising" do
+    # Lookbook runs in development, where test/support is not loaded: a
+    # preview that names a test-support module must fail here too.
+    support = Object.send(:remove_const, :MediaRenditions)
     previews = ViewComponent::Preview.all
     assert previews.any?, "expected at least one Lookbook preview to be registered"
 
@@ -25,5 +28,7 @@ class ComponentPreviewsTest < ActiveSupport::TestCase
         flunk("#{preview_class}##{example_name} raised #{error.class}: #{error.message}")
       end
     end
+  ensure
+    Object.const_set(:MediaRenditions, support) if support
   end
 end

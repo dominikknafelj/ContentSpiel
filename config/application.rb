@@ -69,6 +69,25 @@ module ContentSpiel
     config.i18n.available_locales = SUPPORTED_LOCALES.keys.map(&:to_sym)
     config.i18n.default_locale = :en
 
+    # Two job queues (`config/queue.yml`): the jobs that decode and encode
+    # pictures are on `images`, served by one thread, and everything else is
+    # on `default`. Active Storage's analysis and transform jobs are image
+    # work too; its purge and mirror jobs are not.
+    config.active_storage.queues.analysis = :images
+    config.active_storage.queues.transform = :images
+    config.active_storage.queues.purge = :default
+    config.active_storage.queues.mirror = :default
+
+    # Every attachment's address is Active Storage's PROXY route (image
+    # delivery spec, decision 2): one request, answered public, for a hundred
+    # years and immutable (`http_cache_forever`), at an address that names its
+    # bytes for ever (a signed id carries no expiry, a variation key is a
+    # digest of the transformation). So the logo and every other public image
+    # is cacheable without code having to remember which helper to call. What
+    # these routes refuse (a note's file, a library original, a width not
+    # made) is config/initializers/active_storage_access.rb.
+    config.active_storage.resolve_model_to_route = :rails_storage_proxy
+
     # Lets config/locales/en.yml set a per-attribute `format` for validation
     # messages (Rails ignores it otherwise). Used for exactly one thing:
     # User's password length message is a whole sentence ("Use at least 12

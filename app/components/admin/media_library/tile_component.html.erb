@@ -1,6 +1,6 @@
 <% face = capture do %>
   <span class="relative block aspect-[4/3] w-full overflow-hidden bg-sunken">
-    <%= image_tag thumbnail_url, alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
+    <%= render Admin::Ui::LibraryImageComponent.new(asset: asset, min_width: 480, css_class: "h-full w-full object-cover") %>
     <%# Open notes (notes handoff, "Media tile chip"): on the image, where the
         title's chips below never push it. Words for a screen reader, like
         the chips: the number alone says nothing. %>

@@ -11,13 +11,13 @@
 # cache key (`RichText::Document#to_html`) without the cache key builder
 # needing to know `PublicSite::Urls` has a `#preview?` at all.
 #
-# `content_version` (fix round 1) is `PublicSite.current_content_version` --
+# `content_version` is `PublicSite.current_content_version` --
 # the site's content fingerprint, memoised per request -- captured here for
 # the same reason as `preview`: the render cache key needs it, because a
 # rendered body bakes in link hrefs and image URLs that change without the
 # document itself changing (see `RichText::Document#to_html`).
 #
-# `document:` (media library Task 5) is the whole `RichText::Document`
+# `document:` is the whole `RichText::Document`
 # being rendered -- handed through so `#media_asset` can preload every
 # `image` node's `Media::Asset` in one query, rather than
 # `RichText::BuiltIns.render_image` running `Media::Asset.find_by` once per
@@ -47,7 +47,7 @@ module RichText
     # against a `nil` or malformed key just misses, same as a `find_by`
     # would.
     #
-    # Normalised to an Integer first (final fix wave, M6), the same way
+    # Normalised to an Integer first, the same way
     # `Media::UsageIndex#normalize_asset_id` reads it: an id stored as a
     # String (`"42"` -- an older import, a hand edit) is a usage there, so
     # it has to render here too, and the preload's Integer keys would
@@ -64,22 +64,22 @@ module RichText
 
     private
 
-    # `Media::Asset.with_variants` (not a bare `where`): every asset this
+    # `Media::Asset.with_file` (not a bare `where`): every asset this
     # loads is about to have `#srcset` called on it by
     # `Media::PictureComponent`, and that scope is exactly what lets
     # `#srcset` answer "is this variant processed" without a second query
-    # per asset (`Media::Asset.with_variants`'s own comment) -- the same
+    # per asset (`Media::Asset.with_file`'s own comment) -- the same
     # N+1 this preload exists to close in the first place, just one join
     # deeper.
     #
-    # `return {} if ids.empty?` (fix round 1): most documents have no
-    # `image` node at all, and `Media::Asset.with_variants.where(id: [])`
+    # `return {} if ids.empty?`: most documents have no
+    # `image` node at all, and `Media::Asset.with_file.where(id: [])`
     # would still be a real (if trivially empty) query -- every document
     # without an image shouldn't pay for one.
     def preloaded_media_assets
       @preloaded_media_assets ||= begin
         ids = @document.references.filter_map { |type, attribute, value| self.class.normalize_asset_id(value) if type == "image" && attribute == "asset_id" }
-        ids.empty? ? {} : Media::Asset.with_variants.where(id: ids).index_by(&:id)
+        ids.empty? ? {} : Media::Asset.with_file.where(id: ids).index_by(&:id)
       end
     end
   end

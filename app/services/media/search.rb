@@ -4,13 +4,13 @@
 # term and the viewer's id reach the query as quoted values and there is no
 # SQL text to interpolate anything into.
 #
-# Pulled out of `Admin::MediaController` (Task 7) so the MCP `list_media_tool`,
+# Pulled out of `Admin::MediaController` so the MCP `list_media_tool`,
 # the ⌘K palette and the Media screen all search the same way without
 # duplicating this SQL. `Media::Search.call(scope, query)` narrows any
 # `Media::Asset` relation by the query alone; `Media::Search.new(...)` is the
 # Media screen's form (the search plus a segment, and the segments' counts).
 class Media::Search
-  # The library's segments (round 3, Task 8, decision D13). `untranslated`
+  # The library's segments (decision D13). `untranslated`
   # exists only while the site has a target language to be untranslated in.
   FILTERS = %w[all unused missing_alt untranslated mine].freeze
 
@@ -24,10 +24,10 @@ class Media::Search
   # is what is searched: kept images, with their variants preloaded, unless a
   # caller says otherwise.
   #
-  # Only a String is a query (final fix wave, M8): a forged `?q[]=x` or
+  # Only a String is a query: a forged `?q[]=x` or
   # `?q[a]=x` arrives as an Array/Parameters, which `sanitize_sql_like`
   # can't take -- it's no search at all rather than a 500.
-  def initialize(q: nil, filter: nil, actor: nil, scope: Media::Asset.kept.with_variants)
+  def initialize(q: nil, filter: nil, actor: nil, scope: Media::Asset.kept.with_file)
     @scope = scope
     @query = q.is_a?(String) ? q : nil
     @filter = FILTERS.include?(filter) && available?(filter) ? filter : "all"
@@ -81,7 +81,7 @@ class Media::Search
     # matching asset's own row for however many locales matched.
     #
     # `file_attachment: :blob` is the same association `Media::Asset
-    # ::VARIANT_INCLUDES`/`#with_variants` already preload, joined here (not
+    # ::FILE_INCLUDES`/`#with_file` already preload, joined here (not
     # `includes`d) purely to filter on `active_storage_blobs.filename` --
     # every asset has exactly one `file` attachment (`Media::Asset
     # #file_is_attached`), so the inner join can't drop or duplicate a row

@@ -2,7 +2,7 @@ require "test_helper"
 require "rake"
 require Rails.root.join("db/migrate/20260929050000_move_images_into_media_library").to_s
 
-# Media library Task 4's data migration (design spec §3.4, that migration's
+# The media library's data migration (design spec §3.4, that migration's
 # own comment): every legacy `Page#hero_image` / `ContentBlock#image` Active
 # Storage attachment becomes a reference to a `Media::Asset` that re-attaches
 # the *same* blob. The models no longer declare either attachment, so each
@@ -97,7 +97,7 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
       Media::Usage.where(role: %w[hero block_image]).pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale).sort_by { |row| [ row[1], row[2] ] }
   end
 
-  # Final fix wave (C1): a rich-text upload that predates the library is
+  # A rich-text upload that predates the library is
   # already an asset, embedded by `asset_id` in a body -- which has no FK,
   # so only its `rich_text` usage row keeps it out of "Unused" (and out of
   # reach of Delete, whose purge is permanent). Bodies are written here
@@ -144,14 +144,6 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     migrate(:up)
 
     assert_equal library, @block.reload.media_asset
-  end
-
-  # An asset made by inserting its attachment row never fires Active
-  # Storage's own variant preprocessing, so the migration queues it.
-  test "up queues the responsive variants for each asset it creates" do
-    assert_enqueued_jobs 2 * Media::Asset::VARIANT_WIDTHS.size, only: ActiveStorage::TransformJob do
-      migrate(:up)
-    end
   end
 
   test "blobs without a checksum are never collapsed into one asset" do
@@ -202,7 +194,7 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     assert ActiveStorage::Attachment.exists?(record_type: "Page", record_id: @first.id, name: "hero_image", blob_id: @hero_a.id)
   end
 
-  # Fix round 1 (M1): `down` removes only what `up` created (its ledger).
+  # `down` removes only what `up` created (its ledger).
   test "down keeps a pre-existing library asset up deduped onto, and a later upload" do
     library = create_media_asset(filename: "medium.png")
     migrate(:up)
@@ -224,7 +216,6 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     assert_not ActiveRecord::Base.connection.table_exists?(:media_library_migrated_assets)
   end
 
-  # Fix round 1 (M3).
   test "an attachment whose owner no longer exists gets no asset" do
     gone = create_page(title: "Gone")
     legacy_attach(gone, "hero_image", blob_for("wide.png", filename: "gone.png"))
@@ -236,7 +227,7 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     assert ActiveStorage::Attachment.exists?(record_type: "Page", record_id: gone.id, name: "hero_image")
   end
 
-  # Fix round 1 (M4): a database error while queueing variants is rescued
+  # A database error while queueing variants is rescued
   # inside its own savepoint, so the migration's transaction -- and the
   # data it already moved -- stays usable.
   test "a database error while queueing variants doesn't abort the migration" do
@@ -289,7 +280,7 @@ class MediaOrphansTaskTest < ActiveSupport::TestCase
     assert ActiveStorage::Blob.exists?(@orphan.id)
   end
 
-  # Fix round 1 (M5): only a purge confirmed by the row being gone counts.
+  # Only a purge confirmed by the row being gone counts.
   test "CONFIRM=1 doesn't count a purge that failed" do
     ActiveStorage::Blob.class_eval do
       alias_method :__original_purge, :purge

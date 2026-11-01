@@ -77,9 +77,10 @@ module Admin
 
       def attention? = invalid || definition.nil? || missing_image?
 
-      # The image's thumbnail (`Media::Asset#thumbnail_url`, the rule of the
-      # Media grid and the image field), for a type that uses one and has it.
-      def thumbnail_url = (asset.thumbnail_url if uses?("image") && asset)
+      # The image drawn small (`Admin::Ui::LibraryImageComponent`: a width, the
+      # preview or a box, as the Media grid draws it), for a type that uses one
+      # and has it.
+      def thumbnail_asset = (asset if uses?("image"))
 
       private
 

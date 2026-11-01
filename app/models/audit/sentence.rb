@@ -1,6 +1,5 @@
 module Audit
-  # One audit event told as one English sentence (design pass round 3, Task
-  # 15) -- the audit log's rows, the event page's title and the dashboard's
+  # One audit event told as one English sentence -- the audit log's rows, the event page's title and the dashboard's
   # "Recent activity" all word an event through here, so they can't tell one
   # event two ways.
   #
@@ -105,7 +104,7 @@ module Audit
 
     # Sentences with no subject or their own shape (`#special`).
     SPECIAL_ACTIONS = %w[
-      starter_content.added trash.emptied user.owner_changed invitation.accepted
+      starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
       language.enabled language.disabled language.configured language.default_changed
       session.created session.destroyed session.failed access.denied
     ].freeze
@@ -354,6 +353,7 @@ module Audit
         case @action
         when "starter_content.added" then [ text("added the starter content") ]
         when "trash.emptied" then [ text("emptied the trash") ]
+        when "media.regenerated" then regenerated_parts
         when "session.created" then [ text("signed in") ]
         when "session.destroyed" then [ text("signed out") ]
         # No user, no email: the attempted address is in `metadata` for the
@@ -365,6 +365,13 @@ module Audit
         when "invitation.accepted" then [ text("accepted the invite") ]
         else language_parts
         end
+      end
+
+      # "regenerated 12 images": the count is in the metadata (no subject
+      # named: the site's settings are where the press was made).
+      def regenerated_parts
+        count = event.metadata.is_a?(Hash) ? event.metadata["count"].to_i : 0
+        [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
       end
 
       def denied_parts

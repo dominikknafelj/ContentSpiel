@@ -80,7 +80,7 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_no_active_storage_url(response.body)
   end
 
-  # The pinned cost of the thread view (Task 16): ONE read more than before
+  # The pinned cost of the thread view: ONE read more than before
   # files, for the attachments of all its messages with their blobs joined
   # in -- whatever the number of messages and of files. The list reads none.
   test "the thread view reads its files in one statement, with three files on one message or eleven on eight" do
@@ -420,7 +420,7 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
 
   # --- Active Storage's own read routes (they stay public for the site's images) ---
 
-  test "Active Storage's public routes refuse a note's blob, by signed id and by a disk key, and still serve a library image" do
+  test "Active Storage's public routes refuse a note's blob, by signed id and by a disk key, and still serve a library image's made width" do
     blob = @image.blob
     signed = blob.signed_id
     disk_key = ActiveStorage.verifier.generate({ key: blob.key, disposition: "inline", content_type: "image/png", service_name: "notes" }, purpose: :blob_key)
@@ -440,12 +440,35 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_equal 0, ActiveStorage::VariantRecord.count
     assert_equal 3, Dir.glob("#{note_service.root}/**/*").count { |file| @note.files.blobs.any? { |blob| file.include?(blob.key) } }
 
-    library = create_media_asset.file.blob
-    get "/rails/active_storage/blobs/redirect/#{library.signed_id}/tiny.png"
-    assert_response :redirect
-    get response.location
+    library = make_renditions!(create_media_asset)
+    get library.srcset.first.first
     assert_response :ok
-    assert_equal file_fixture("tiny.png").binread, response.body
+    assert_includes response.headers["Cache-Control"].to_s.split(/,\s*/), "public"
+  end
+
+  # Proxy mode makes Active Storage's answers public and cacheable for a
+  # hundred years: a note's blob must get none of that by any read route,
+  # signed in as someone who may read the note or not.
+  test "a note's blob through every read route answers no public, cacheable answer" do
+    blob = @image.blob
+    signed = blob.signed_id
+    disk_key = ActiveStorage.verifier.generate({ key: blob.key, disposition: "inline", content_type: "image/png", service_name: "notes" }, purpose: :blob_key)
+    variation = ActiveStorage::Variation.encode(resize_to_limit: [ 10, 10 ])
+    paths = [ "/rails/active_storage/blobs/proxy/#{signed}/shot.png", "/rails/active_storage/blobs/redirect/#{signed}/shot.png",
+      "/rails/active_storage/representations/proxy/#{signed}/#{variation}/shot.png", "/rails/active_storage/representations/redirect/#{signed}/#{variation}/shot.png",
+      "/rails/active_storage/disk/#{disk_key}/shot.png" ]
+
+    [ nil, users(:reader) ].each do |user|
+      sign_in_as(user) if user
+      paths.each do |path|
+        get path
+        assert_response :not_found, path
+        assert_not_includes response.headers["Cache-Control"].to_s, "public", path
+        assert_nil response.headers["Location"], path
+        assert_not_includes response.body.b, file_fixture("tiny.png").binread, path
+      end
+    end
+    assert_equal 0, ActiveStorage::VariantRecord.count
   end
 
   private

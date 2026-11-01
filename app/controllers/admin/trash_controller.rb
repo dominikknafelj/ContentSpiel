@@ -106,8 +106,8 @@ module Admin
       @hidden_items = @items.empty? && !@pagination.out_of_range? && hidden_items?
     end
 
-    # `params[:from] == "undo"` is the flash's own Undo link (Task 10, added
-    # to its URL by each module's `#destroy`): restoring the one item it
+    # `params[:from] == "undo"` is the flash's own Undo link (added to its
+    # URL by each module's `#destroy`): restoring the one item it
     # named lands the actor back on that item's own CS Studio screen ("as if
     # the delete never happened") rather than the Trash screen they never
     # chose to open. Every other restore -- from the Trash list itself, in
@@ -132,7 +132,7 @@ module Admin
       end
     end
 
-    # The Undo of a bulk trash from the posts list (Task 17): `Trash::Restore`
+    # The Undo of a bulk trash from the posts list: `Trash::Restore`
     # once per named post, each with its own permission check and audit event
     # (the service's), nothing else. Posts only -- the one bulk trash there
     # is. Ids are looked up through `visible("post")`, the trashed posts the
@@ -254,12 +254,12 @@ module Admin
       relation = roots(type).includes(:trashed_by)
       case type
       when "page" then relation.includes(:parent)
-      when "media" then relation.with_variants
+      when "media" then relation.with_file
       else relation
       end
     end
 
-    # The item's own editor/detail screen (Task 10's Undo): `params[:type]`
+    # The item's own editor/detail screen (the Undo's): `params[:type]`
     # is already constrained to `page|post|media` by the route, and `@item`
     # is that very record -- `set_item` (through `visible`) already loaded
     # it as this type, so there's no case this falls through to `nil`.

@@ -1,0 +1,28 @@
+/* A library image's three states (`Media::PictureComponent`). Plain rules,
+   no script and no transition: the browser draws the sharp image over the
+   preview as it arrives.
+
+   - Widths made: the preview is the image's own `style` background, drawn
+     by the browser behind the image; nothing here.
+   - No width yet: the preview is the `src` itself, ~24px, so it is
+     blurred (the blur is a placeholder the Design System's question 1 will
+     set) and scaled just past the box so the blur's soft edge falls outside
+     the clip.
+   - Neither: no `src`, a box of the image's size on the sunken ground. The
+     box is the `<img>` itself: its `width` and `height` attributes give it
+     the image's aspect ratio (the browser's own mapping, which holds for an
+     image with no file), and `display: block` keeps it a box where a
+     stylesheet made images inline, which would lay it out as its alt text
+     (`test/system/image_box_test.rb`). */
+img[data-image-preview] {
+  filter: blur(12px);
+  transform: scale(1.1);
+  clip-path: inset(5%);
+}
+
+img[data-image-empty] {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: var(--th-sunken);
+}

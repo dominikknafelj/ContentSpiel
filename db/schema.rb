@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -188,7 +188,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_090000) do
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.binary "preview"
+    t.boolean "has_alpha", default: false, null: false
+    t.jsonb "renditions", default: {}, null: false
+    t.string "renditions_fingerprint"
+    t.datetime "renditions_failed_at"
+    t.string "renditions_error"
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
+    t.index ["id"], name: "index_media_assets_backfill_due", where: "((trashed_at IS NULL) AND (renditions_failed_at IS NULL) AND ((preview IS NULL) OR (width IS NULL) OR ((renditions_fingerprint)::text = 'adopted'::text)))"
+    t.index ["renditions_fingerprint"], name: "index_media_assets_on_renditions_fingerprint"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
   end
@@ -458,6 +466,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_090000) do
     t.datetime "mail_last_sent_at"
     t.datetime "mail_failed_at"
     t.jsonb "mail_failure"
+    t.string "image_format", default: "webp", null: false
+    t.integer "image_quality_webp", default: 75, null: false
+    t.integer "image_quality_avif", default: 50, null: false
+    t.jsonb "image_widths", default: [480, 960, 1600, 2400], null: false
+    t.integer "image_max_upload_mb", default: 10, null: false
   end
 
   create_table "tags", force: :cascade do |t|

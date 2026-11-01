@@ -1,4 +1,4 @@
-<%# System status (design spec §6.1, Task 9; round 3): the setup wizard's own
+<%# System status (design spec §6.1): the setup wizard's own
     `Setup::SystemCheck` results, through the same row component, so both
     screens word every check identically. "Run checks again" is a plain GET
     back to this screen, which re-runs every check -- idempotent, so a reload
@@ -17,5 +17,6 @@
   </div>
 
   <%= render "setup/system_check_results", results: @results, copyable: true,
-        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")) %>
+        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
+        image_settings_href: (admin_settings_path(anchor: "images", **admin_url_options) if can?("settings.manage")) %>
 </div>

@@ -58,7 +58,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_selector "a[data-turbo-frame='content'][data-turbo-action='advance']"
   end
 
-  # Round 3 Task 9: the picker's tile is a button that selects, not a link.
+  # The picker's tile is a button that selects, not a link.
   test "a pick tile is a button with the picker's id, the select actions and the payload" do
     asset = create_media_asset
     Mobility.with_locale(:en) { asset.update!(alt: "A dune", caption: "At dusk") }
@@ -71,7 +71,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_includes button["data-action"], "click->admin--media--select#select"
     assert_includes button["data-action"], "dblclick->admin--media--select#choose"
     assert_includes button["data-action"], "keydown->admin--media--select#key"
-    assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
+    assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "width" => asset.width, "height" => asset.height, "preview" => true, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
       JSON.parse(button["data-admin--media--select-asset-param"]))
     assert_text "UNUSED"
   end
@@ -82,5 +82,27 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, unused: false, pick: true)
 
     assert_selector "button.aria-pressed\\:ring-accent-tint.aria-pressed\\:border-accent"
+  end
+
+  test "a tile of an image whose widths exist shows the 480 width with its size, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200) # version: none (a test's own dimensions)
+    asset = make_renditions!(asset.reload, widths: [ 480, 960, 1600 ])
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
+
+    assert_selector "img[src='#{asset.display_url(min_width: 480)}'][width='1600'][height='1200']"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  test "a tile of an image with neither a width nor a preview is a box, not the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
+
+    assert_no_selector "img"
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
   end
 end

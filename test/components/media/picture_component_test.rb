@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `Media::PictureComponent` (media library design spec §4, Task 5): the one
+# `Media::PictureComponent` (media library design spec §4): the one
 # place every image render on this site builds its `<img>` tag from. Every
 # other image component (`Blocks::ImageComponent`, `RichText::ImageComponent`,
 # the page hero) renders through this one, so its own contract -- what ends
@@ -17,7 +17,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     render_inline(Media::PictureComponent.new(asset: asset, alt: "A bright room"))
 
     img = page.find("img")
-    assert_equal asset.url, img["src"]
+    assert_equal asset.src, img["src"]
     assert_equal asset.width.to_s, img["width"]
     assert_equal asset.height.to_s, img["height"]
     assert_equal "A bright room", img["alt"]
@@ -28,29 +28,17 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     asset.srcset.each { |url, width| assert_includes srcset, "#{url} #{width}w" }
   end
 
-  # Final fix wave (I3): once `srcset` has `w` descriptors a browser never
-  # falls back to `src`, so without the original as a candidate a wide
-  # screen would top out at the largest variant (2400px) of a larger image.
-  test "the original is the widest srcset candidate once there are variants" do
+  test "the original is no candidate: a srcset holds exactly the widths made" do
     asset = processed_asset
 
     render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
 
     candidates = page.find("img")["srcset"].split(", ")
-    assert_equal "#{asset.url} #{asset.width}w", candidates.last
-    assert_equal asset.srcset.size + 1, candidates.size
+    assert_equal asset.srcset.map { |url, width| "#{url} #{width}w" }, candidates
+    assert(candidates.none? { |candidate| candidate.include?("/blobs/") })
   end
 
-  test "without a known width the original isn't offered as a candidate" do
-    asset = processed_asset
-    asset.update_columns(width: nil, height: nil)
-
-    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
-
-    assert_not_includes page.find("img")["srcset"], "#{asset.url} "
-  end
-
-  # Final fix wave (M4): lazy by default; a caller (the hero) can ask for
+  # Lazy by default; a caller (the hero) can ask for
   # eager loading at a high fetch priority.
   test "loading and fetchpriority can be set, and default to lazy and none" do
     render_inline(Media::PictureComponent.new(asset: create_media_asset, alt: "x"))
@@ -68,7 +56,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     assert_equal "(min-width: 768px) 768px, 100vw", page.find("img")["sizes"]
   end
 
-  # Review Focus 3: a variant that hasn't finished processing (or never
+  # A variant that hasn't finished processing (or never
   # will -- a GIF, or a corrupt upload `Media::Asset#srcset` caught and
   # logged) must never keep the page from rendering an image at all, just
   # from offering a `srcset` for it.
@@ -78,7 +66,7 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
 
     img = page.find("img")
-    assert_equal asset.url, img["src"]
+    assert_equal asset.src, img["src"]
     assert_nil img["srcset"]
     assert_nil img["sizes"]
   end
@@ -111,18 +99,80 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     assert_no_selector "img"
   end
 
+  test "with widths the img offers only them, the middle one as src, its size and its preview as background, and no address of the original" do
+    asset = processed_asset
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal asset.src, img["src"]
+    assert_not_includes img["src"], "data:"
+    assert img["srcset"].present?
+    assert_match Media::PictureComponent::PREVIEW_STYLE, img["style"]
+    assert_equal Media::PictureComponent.preview_style(asset.preview_data_url), img["style"]
+    assert_nil img["data-image-preview"]
+    assert_nil img["data-image-empty"]
+    assert_no_match(%r{/blobs/}, img.native.to_s)
+  end
+
+  test "an image with alpha gets no background" do
+    asset = processed_asset
+    asset.update_columns(has_alpha: true) # version: none (a test's row)
+    render_inline(Media::PictureComponent.new(asset: asset.reload, alt: "x"))
+
+    assert_nil page.find("img")["style"]
+  end
+
+  test "with no width the src is the preview and the img carries its size" do
+    asset = create_media_asset(filename: "wide.png")
+    asset.update_columns(renditions: {}, renditions_fingerprint: nil) # version: none (a test's row)
+    asset.reload
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal asset.preview_data_url, img["src"]
+    assert_equal asset.width.to_s, img["width"]
+    assert_equal asset.height.to_s, img["height"]
+    assert_nil img["srcset"]
+    assert_nil img["style"]
+    assert img["data-image-preview"]
+  end
+
+  test "with neither the img is a sized box with its alt and no src" do
+    asset = create_media_asset(filename: "wide.png")
+    asset.update_columns(renditions: {}, renditions_fingerprint: nil, preview: nil) # version: none (a test's row)
+    render_inline(Media::PictureComponent.new(asset: asset.reload, alt: "A room"))
+
+    img = page.find("img")
+    assert_nil img["src"]
+    assert_nil img["srcset"]
+    assert_equal asset.width.to_s, img["width"]
+    assert_equal asset.height.to_s, img["height"]
+    assert_equal "A room", img["alt"]
+    assert img["data-image-empty"]
+    assert_nil img["data-image-preview"]
+  end
+
+  test "it is one img and nothing around it" do
+    render_inline(Media::PictureComponent.new(asset: processed_asset, alt: "x"))
+
+    fragment = Nokogiri::HTML5.fragment(rendered_content)
+    assert_equal [ "img" ], fragment.css("*").map(&:name)
+    assert_equal 1, fragment.children.count(&:element?)
+  end
+
+  test "an image narrower than 480px offers its own width" do
+    asset = make_renditions!(create_media_asset(filename: "tiny.png"))
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal [ asset.width ], img["srcset"].scan(/ (\d+)w/).flatten.map(&:to_i)
+  end
+
   private
 
-  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG -- every
-  # declared variant width (480/960/1600/2400) is smaller than that, so all
-  # four end up in `srcset` once the preprocessing jobs run
-  # (`test/models/media/asset_test.rb`'s own fixture and pattern).
+  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG: all four
+  # configured widths are below it, so a recorded generation holds four.
   def processed_asset
-    asset = create_media_asset(filename: "wide.png")
-    asset.file.analyze
-    metadata = asset.file.blob.metadata || {}
-    asset.update_columns(width: metadata["width"], height: metadata["height"])
-    perform_enqueued_jobs
-    asset
+    make_renditions!(create_media_asset(filename: "wide.png"))
   end
 end

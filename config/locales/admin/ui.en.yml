@@ -34,6 +34,7 @@ en:
         # System status's Mail row.
         system_check_row:
           open_mail_settings: "Open Mail settings →"
+          open_image_settings: "Open Image settings →"
 
         toast:
           dismiss: "Dismiss"

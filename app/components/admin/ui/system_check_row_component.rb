@@ -17,15 +17,17 @@ module Admin
     # SITE_ADDRESS_COMMAND`), never built from anything of the viewer's.
     #
     # A result may carry a `link` (a symbol: the model names no route). Today
-    # `:mail_settings`, drawn as "Open Mail settings →" at `mail_settings_href`,
+    # `:mail_settings` and `:image_settings`, drawn as "Open Mail settings →"
+    # at `mail_settings_href` and "Open Image settings →" at `image_settings_href`,
     # which the screen hands over (System status, for a viewer who holds
     # `settings.manage`); without an address there is no link, whatever the
     # result says.
     class SystemCheckRowComponent < AdminComponent
-      def initialize(result:, copyable: true, mail_settings_href: nil)
+      def initialize(result:, copyable: true, mail_settings_href: nil, image_settings_href: nil)
         @result = result
         @copyable = copyable
         @mail_settings_href = mail_settings_href
+        @image_settings_href = image_settings_href
       end
 
       private
@@ -33,6 +35,8 @@ module Admin
       attr_reader :result
 
       def mail_settings_link? = result.link == :mail_settings && @mail_settings_href.present?
+
+      def image_settings_link? = result.link == :image_settings && @image_settings_href.present?
 
       def copyable? = @copyable && result.command.present?
 

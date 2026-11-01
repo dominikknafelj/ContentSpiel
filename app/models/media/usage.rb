@@ -37,4 +37,21 @@ class Media::Usage < ApplicationRecord
       .or(where(owner_type: "Post", owner_id: Post.kept.select(:id)))
       .or(where(owner_type: "ContentBlock", owner_id: kept_blocks.select(:id)))
   }
+  # Usages a visitor can see now or soon: the published copy's row of a kept
+  # page or post, a kept owner that has been published (a scheduled one
+  # included: its copy is what the site shows), or a block of such a page or
+  # post. A draft's image, a trashed record's and a block of either are not:
+  # no cached public page holds them. Active Record's `.or`, as
+  # `by_kept_owner` is written.
+  scope :shown_publicly, -> {
+    live_pages = Page.kept.where.not(published_at: nil).select(:id)
+    live_posts = Post.kept.where.not(published_at: nil).select(:id)
+    shown_blocks = ContentBlock.where(owner_type: "Page", owner_id: live_pages)
+      .or(ContentBlock.where(owner_type: "Post", owner_id: live_posts))
+    where(role: "published", owner_type: "Page", owner_id: live_pages)
+      .or(where(role: "published", owner_type: "Post", owner_id: live_posts))
+      .or(where(owner_type: "Page", owner_id: live_pages))
+      .or(where(owner_type: "Post", owner_id: live_posts))
+      .or(where(owner_type: "ContentBlock", owner_id: shown_blocks.select(:id)))
+  }
 end

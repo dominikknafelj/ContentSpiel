@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The Media module (media library design spec §6, Task 7): the grid (access,
+# The Media module (media library design spec §6): the grid (access,
 # search, filters, pagination, query count), the detail panel (fields,
 # "Used on", Delete) and the grid's own multi-file upload.
 class Admin::MediaTest < ActionDispatch::IntegrationTest
@@ -36,7 +36,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  # Final fix wave (S-M7): update and destroy sat outside the module gate, so
+  # Update and destroy sat outside the module gate, so
   # for a user who can't even open Media the asset lookup ran first -- a 404
   # for an id that names nothing, the service's 403 for one that exists. One
   # answer for both now, before anything is looked up.
@@ -113,7 +113,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{unrelated.id}", count: 0
   end
 
-  # Media library Task 8: `Media::PickerComponent`'s grid is this
+  # `Media::PickerComponent`'s grid is this
   # same listing with `picker=1` -- no layout, just the picker's frame,
   # each card a pick button carrying the asset's id, thumbnail, title and
   # its own alt/caption defaults in the editing language.
@@ -134,7 +134,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       assert_select "a[href*='selected=#{asset.id}']", count: 0
     end
     payload = JSON.parse(css_select(PICK).first["data-admin--media--select-asset-param"])
-    assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
+    assert_equal({ "id" => asset.id, "url" => asset.src, "width" => asset.width, "height" => asset.height, "preview" => true, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
   end
 
   test "picker mode searches and paginates like the grid, staying in picker mode" do
@@ -150,7 +150,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#media-picker-grid a[href*='picker=1'][href*='page=2']", text: "Next"
   end
 
-  # Round 3 Task 9: the picker reuses the grid's toolbar -- an instant search
+  # The picker reuses the grid's toolbar -- an instant search
   # and the segments (the translation one is not a picking concern) -- inside
   # its own frame, so typing or choosing a segment never leaves the dialog.
   test "picker mode draws the toolbar in its own frame and filters by query and segment" do
@@ -260,7 +260,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   end
 
   # Mirrors `Admin::AuditEventsTest`'s own "constant number of queries"
-  # test: `Media::Asset.with_variants` (`Admin::MediaController
+  # test: `Media::Asset.with_file` (`Admin::MediaController
   # #filtered_assets`) is what's supposed to keep this flat regardless of
   # how many assets the library holds.
   test "the grid issues a constant number of queries for 10 assets and for 60" do
@@ -296,7 +296,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       "expected a constant number of queries regardless of asset count (10 assets: #{few_count}, 60 assets: #{many_count})"
   end
 
-  # Final fix wave (M12): each file's upload status is announced.
+  # Each file's upload status is announced.
   test "the upload status list is a polite live region" do
     sign_in_as(users(:one))
 
@@ -305,7 +305,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "[data-admin--media--upload-target='status'][aria-live='polite']"
   end
 
-  # Final fix wave (M8): a forged non-String `q` (`?q[]=x`, `?q[a]=x`)
+  # A forged non-String `q` (`?q[]=x`, `?q[a]=x`)
   # is no search at all, never a 500.
   test "a non-string search query is ignored" do
     sign_in_as(users(:one))
@@ -319,9 +319,9 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  # Final fix wave (M7): a usage row whose owner is gone (a stale index)
+  # A usage row whose owner is gone (a stale index)
   # still keeps "Used on" from claiming the image is "Not used anywhere
-  # yet" -- it says the use can't be shown instead. Task 10: Move to trash
+  # yet" -- it says the use can't be shown instead. Move to trash
   # itself is no longer disabled for this case -- `Trash::Move` only
   # refuses a *kept* owner, and a stale row (like a trash-only one) isn't
   # one, so disabling the button here would refuse something the server
@@ -340,7 +340,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "button", text: "Move to trash…"
   end
 
-  # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
+  # `Media::Asset#usages_summary`'s own
   # `owner.owner` second hop -- a block-owned usage is named by its page or
   # post, never the block itself (`Admin::MediaLibrary::PanelComponent
   # #place_for`) -- used to cost one query per block-owned usage. `Media
@@ -423,7 +423,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-trash-help", text: /In use on 1 page\. Remove it there first\./
   end
 
-  # Task 10: the redirect carries a flash naming the image and an Undo that
+  # The redirect carries a flash naming the image and an Undo that
   # posts straight back to `Admin::TrashController#restore` with
   # `from=undo` -- landing the actor back on this image's own detail panel
   # rather than the Trash list.
@@ -450,7 +450,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#toasts .admin-toast[role=status]", text: "Restored “#{asset.title}”"
   end
 
-  # Final fix wave (Task 8 M-4): trashing from the panel used to drop the
+  # Trashing from the panel used to drop the
   # search, the segment and the page the editor was working through.
   test "trashing from the panel keeps the grid's search, segment and page" do
     sign_in_as(users(:one))
@@ -561,7 +561,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_equal "Mine to edit", asset.reload.title
   end
 
-  # --- Round 3, Task 8: the grid with a side panel ----------------------------
+  # --- The grid with a side panel ---------------------------------------------
 
   test "GET /media/:id redirects to the panel, keeping the language" do
     sign_in_as(users(:one))
@@ -652,7 +652,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{mine.id}"
   end
 
-  # Final fix wave (Task 8 M-6): the tile and the panel call an alt of only
+  # The tile and the panel call an alt of only
   # whitespace missing (`String#strip`); the segment's SQL trimmed spaces only,
   # so an alt of a newline or a tab wore the NO ALT chip but wasn't listed.
   test "Missing alt lists an alt of only whitespace of any kind, as the tile's NO ALT chip does" do
@@ -830,7 +830,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Round 3 Task 9: what the drop zone needs to turn a progress tile into the
+  # What the drop zone needs to turn a progress tile into the
   # real one without a reload -- the tile's own markup (a link into the panel,
   # NO ALT and UNUSED while they hold) and the segment counts.
   test "an upload answers with the finished tile and the new counts" do
@@ -850,6 +850,25 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_equal "media-asset-#{asset.id}", tile.at_css("li")["id"]
     assert_includes tile.at_css("a")["href"], "selected=#{asset.id}"
     assert_includes tile.text, "NO ALT"
+  end
+
+  test "the upload answer's url is a width or the preview, never the original" do
+    sign_in_as(users(:one))
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png") }
+
+    asset = Media::Asset.order(:id).last
+    assert_equal asset.display_url(min_width: 960), response.parsed_body["url"]
+    assert_not_includes response.parsed_body.to_json, "/blobs/"
+  end
+
+  test "the drop zone's hint reads the site's largest upload" do
+    site_settings(:default).update_columns(image_max_upload_mb: 7) # version: none (a test's own setting)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/media"
+
+    assert_select ".admin-file-drop", text: /up to 7 MB/
   end
 
   test "an uploaded tile's link keeps the grid's search, segment and page like every other tile's" do

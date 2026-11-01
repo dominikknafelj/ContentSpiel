@@ -48,6 +48,7 @@ require_relative "support/block_samples"
 require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
+require_relative "support/media_renditions"
 require_relative "support/mail_state"
 require_relative "support/invites"
 require_relative "support/smtp_stub"
@@ -114,6 +115,9 @@ module ActiveSupport
     # `SiteAddress`'s memo dropped on both sides -- see
     # test/support/site_address_helper.rb.
     include SiteAddressHelper
+    # `make_renditions!(asset)`: a recorded generation, no file made -- see
+    # test/support/media_renditions.rb.
+    include MediaRenditions
     include MailState
     # `open_invitation(email)`: an open invitation -- see
     # test/support/invites.rb.

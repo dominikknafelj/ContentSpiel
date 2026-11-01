@@ -22,7 +22,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "figcaption", text: /Our studio/
   end
 
-  # Task 4 review, addressed in Task 5: an image block's own `media_asset`
+  # An image block's own `media_asset`
   # was one query per block (`Blocks::ImageComponent#asset` ->
   # `block.media_asset`) until `PublicPageRendering#preload_page_images`
   # started preloading every block's asset (and the page's hero) in one
@@ -177,11 +177,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # `sizes` (`Media::PictureComponent` writes neither for an unprocessed
   # one). The pattern is `test/components/media/picture_component_test.rb`'s.
   def processed_asset
-    asset = create_media_asset(filename: "wide.png")
-    asset.file.analyze
-    asset.update_columns(asset.file.blob.metadata.slice("width", "height"))
-    perform_enqueued_jobs
-    asset
+    make_renditions!(create_media_asset(filename: "wide.png"))
   end
 
   def section_with_texts(*columns, layout: "two", background: "none", width: "content")

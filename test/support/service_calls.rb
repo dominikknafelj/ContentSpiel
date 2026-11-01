@@ -301,6 +301,12 @@ module ServiceCalls
       { call: -> { Locales::MakeDefault.call("de") }, permission: "languages.manage", on: Current.site.reload }
     },
 
+    "Media::Regenerate" => lambda {
+      create_media_asset
+      { call: -> { Media::Regenerate.call }, permission: "settings.manage", on: Current.site.reload,
+        control_audit_only: "it queues jobs and records the count; the jobs write the media rows" }
+    },
+
     "Media::Save" => lambda {
       asset = create_media_asset
       { call: -> { Media::Save.call(asset, attributes: { title: "Renamed" }, translations: { "en" => { alt: "Alt" } }) },

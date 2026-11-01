@@ -1,6 +1,6 @@
 module Admin
   module Columns
-    # A library image field (media library design spec §6, Task 8): a
+    # A library image field (media library design spec §6): a
     # page's hero (`hero_media_asset_id`) and an image block's image
     # (`media_asset_id`). Shows the chosen image's thumbnail and title,
     # **Choose image**/**Change image** (opens `Media::PickerComponent`)
@@ -39,7 +39,7 @@ module Admin
     # autosave.
     #
     # `value` is the chosen `Media::Asset` or nil. Load it through
-    # `Media::Asset.with_variants` when several of these are rendered at
+    # `Media::Asset.with_file` when several of these are rendered at
     # once (the page editor's block cards) -- `#thumbnail_url` reads
     # `#srcset`.
     class MediaColumnComponent < Base

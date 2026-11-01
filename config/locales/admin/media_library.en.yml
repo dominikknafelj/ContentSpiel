@@ -1,0 +1,11 @@
+# The Media library's components (`app/components/admin/media_library/`):
+# `admin.components.media_library.*` are their keys (docs/reference/i18n.md:
+# one file per component folder). The panel's older words are still
+# literals; only "Download original" is a key so far.
+en:
+  admin:
+    components:
+      media_library:
+        upload_hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
+        panel:
+          download_original: "Download original"

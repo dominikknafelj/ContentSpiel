@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The one media picker (media library design spec §6, Task 8; round 3 Task 9):
+# The one media picker (media library design spec §6):
 # `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
 # search, segments, selectable tiles, a header Upload and a footer "N selected ·
 # Cancel · Use image" -- opened from the page hero field, an image block's image
@@ -26,10 +26,31 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     # up front so the public page's `srcset` has something to list.
     @asset = create_media_asset(filename: "wide.png")
     @asset.file.analyze
-    perform_enqueued_jobs
+    perform_enqueued_jobs # includes Media::RenditionJob: the widths are made here
+    @asset.reload
 
     @landing = create_page(title: "Landing")
     assert Pages::Save.call(@landing, attributes: { page_type: "landing" }).ok?
+  end
+
+  test "picking an image sets the field's width, height and blur, and the next pick replaces them" do
+    bare = create_media_asset(filename: "tiny.png") # its widths are not made: the preview stands in
+    @asset.update_columns(width: 3000, height: 2000) # version: none (a test's own size)
+
+    visit_editor
+    within("#page-hero-image-section") { click_on "Choose image" }
+    pick_from_library(bare)
+    thumb = "#page-hero-image-section img[data-admin--media--field-target=thumbnail]"
+    assert_selector "#{thumb}[src^='data:'][width='#{bare.width}'][height='#{bare.height}'].blur-sm"
+
+    within("#page-hero-image-section") { click_on "Change image" }
+    pick_from_library(@asset)
+    assert_selector "#{thumb}[width='3000'][height='2000']:not([src^='data:']):not(.blur-sm)"
+
+    # The pick's autosave answer replaces the section: wait for it before pressing Remove.
+    assert_eventually(wait: 10, message: "the pick was saved") { @landing.reload.hero_media_asset_id == @asset.id }
+    within("#page-hero-image-section") { click_on "Remove image" }
+    assert_selector "#{thumb}[hidden]:not([width]):not([height])", visible: :all
   end
 
   test "one library image as hero, image block and rich text is listed under Used on, and removing the hero drops its usage" do
@@ -48,7 +69,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     # The public page renders it responsively. The site shows the page's
     # published copy, so the hero chosen in the editor is published first
-    # (setup fix, Task 5).
+    # (setup fix).
     publish_changes(@landing)
     visit "/landing"
     assert_selector "header img[src='#{@asset.src}'][srcset*='480w']"
@@ -65,12 +86,11 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     find(".ProseMirror").click
     press_insert "Image"
-    # Picking opens the image dialog (Task 13), so not `pick_from_library`,
+    # Picking opens the image dialog, so not `pick_from_library`,
     # which waits for every dialog to close.
     within("dialog[open]") { click_on @asset.title; click_on "Use image" }
     assert_selector "dialog#rich-text-image-dialog[open]"
-    # The per-use fields show the image's own defaults as placeholders
-    # (fix round 1, I1).
+    # The per-use fields show the image's own defaults as placeholders.
     within("dialog#rich-text-image-dialog[open]") do
       assert_field "Alt text", with: "", placeholder: "A wide view"
       assert_field "Caption", with: "", placeholder: "Wide"
@@ -286,7 +306,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_no_image_chosen after_a_save: "Landing, nothing chosen"
   end
 
-  # Fix round 1 (I2), with a realistic trigger: the image is deleted
+  # With a realistic trigger: the image is deleted
   # between opening the picker and picking it. The save is refused
   # ("doesn't exist"), the field goes back to the stored hero with the
   # message showing, and the next autosave doesn't resend the refused id.
@@ -301,7 +321,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert delete_for_good(doomed)
     pick_from_library(doomed)
 
-    # Waited for outside `within` first (final fix wave): the refusal
+    # Waited for outside `within` first: the refusal
     # replaces the whole section, and a `within` scope found before that
     # stream lands goes stale (Cuprite's ObsoleteNode) instead of retrying.
     # A longer wait than Capybara's 2s default: picking runs an autosave

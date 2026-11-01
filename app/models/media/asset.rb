@@ -1,7 +1,7 @@
 # One library image (media library design spec §3.1): what a page's hero
 # (`Page#hero_media_asset`), an image block (`ContentBlock#media_asset`) and
 # a rich-text `image` node's `asset_id` (`RichText::BuiltIns`) all reference
-# -- since Task 4 there is one storage path for all three. Uploaded through
+# -- there is one storage path for all three. Uploaded through
 # `Media::Upload`; where it's used is indexed in `media_usages`
 # (`Media::UsageIndex`), and the FKs into `media_assets` keep a used
 # asset from being deleted. Cleanup of unused assets is manual only.
@@ -10,8 +10,8 @@ class Media::Asset < ApplicationRecord
   include Trashable
 
   # Zeitwerk infers a namespaced model's table name by demodulizing it
-  # (`Media::Asset` -> `assets`), so this has to be explicit: Task 1 (media
-  # library sub-project) renamed the bare `MediaAsset` to `Media::Asset` for
+  # (`Media::Asset` -> `assets`), so this has to be explicit: the media
+  # library renamed the bare `MediaAsset` to `Media::Asset` for
   # the constant alone, keeping the existing `media_assets` table (global
   # constraints: "the table `media_assets` is unchanged") -- the data, and
   # every foreign key/polymorphic `record_type`/`subject_type` string that
@@ -23,16 +23,6 @@ class Media::Asset < ApplicationRecord
   # external resource loads a browser will happily follow) and nothing else,
   # regardless of what a client's Content-Type header or filename claims.
   ALLOWED_CONTENT_TYPES = %w[image/png image/jpeg image/gif image/webp].freeze
-
-  MAX_BYTE_SIZE = 10.megabytes
-
-  # The exact responsive widths this app ever serves (global constraints:
-  # "Variant names are exactly w480, w960, w1600 and w2400"). Doubles as
-  # both the variant *name* Active Storage keys each transformation under
-  # (the `has_one_attached` block below, `#srcset`'s own `file.variant
-  # (name)`) and the target width `#srcset` compares against the original
-  # to decide whether that variant would ever upscale.
-  VARIANT_WIDTHS = { w480: 480, w960: 960, w1600: 1600, w2400: 2400 }.freeze
 
   # This asset's own translated defaults for alt text and caption -- jsonb,
   # same shape and backend as every other translated attribute in this app
@@ -56,7 +46,7 @@ class Media::Asset < ApplicationRecord
   # whenever an owner's own state might have changed, never written to
   # directly. `dependent:` is deliberately left unset: the database's own
   # FK (NO ACTION, see `MediaForeignKeysNoAction`) is what actually backs "can't delete an
-  # asset that's in use" (global constraints, Review Focus 4) -- an
+  # asset that's in use" (global constraints) -- an
   # `:restrict_with_exception` here would only intercept an ordinary
   # `#destroy` with a *different* exception (`DeleteRestrictionError`)
   # before the query ever reaches Postgres, which would both duplicate the
@@ -76,59 +66,41 @@ class Media::Asset < ApplicationRecord
   # directly.
   scope :unused, -> { where.missing(:usages) }
 
-  # Fix round 1 (I2/I3): every list that calls `#srcset` on more than one
-  # asset -- a library listing, a picker -- must load through this scope.
-  # `#srcset` answers "is this variant processed" by reading `file.blob
-  # .variant_records` (`#processed_variant_digests`'s own comment); without
-  # this preload that's one query per asset, and `.variant_records` itself
-  # nested three associations deep (`file_attachment` -> `blob` ->
-  # `variant_records`) isn't something `includes` infers on its own from a
-  # bare `Media::Asset.all`. This is deliberately narrower than the
-  # `with_attached_file` scope `has_one_attached` already generates (which
-  # also preloads each variant's own attached image, `image_attachment:
-  # :blob` -- a second N+1 `#srcset` has no use for, since all it ever reads
-  # off a `variant_records` row is `variation_digest`).
-  # The `includes` shape itself, pulled out to a constant (media library
-  # Task 5) so a caller that can't just call `.with_variants` on a
-  # `Media::Asset` relation -- because it's preloading *through* another
-  # model's association instead, e.g. `PublicPageRendering`'s `belongs_to
-  # :hero_media_asset`/`has_many :content_blocks -> belongs_to :media_asset`
-  # via `ActiveRecord::Associations::Preloader` -- can still ask for exactly
-  # this same shape rather than hand-copying it.
-  VARIANT_INCLUDES = { file_attachment: { blob: :variant_records } }.freeze
+  # The `includes` shape every list that draws an asset's image loads it by.
+  # The generation is a column of the row, so an address needs the file's
+  # blob (its signed id and filename) and nothing more: no variant record is
+  # read. A caller that preloads *through* another model's association
+  # (`PublicPageRendering`'s hero and image blocks) asks for this same shape.
+  FILE_INCLUDES = { file_attachment: :blob }.freeze
 
-  scope :with_variants, -> { includes(VARIANT_INCLUDES) }
+  scope :with_file, -> { includes(FILE_INCLUDES) }
 
-  has_one_attached :file do |attachable|
-    # Every responsive width the public site can ever ask for, preprocessed
-    # right after upload (a truthy `preprocessed:` enqueues one `ActiveStorage
-    # ::TransformJob` per variant, from `ActiveStorage::Attachment`'s own
-    # `after_create_commit :transform_variants_later`, as soon as this
-    # attachment's blob finishes uploading) so a variant is normally already
-    # sitting on the storage service by the time a page first requests it --
-    # but never something a page *waits* on: `#srcset` below only ever lists
-    # a variant that's already finished (`#processed_variant_digests`), so a
-    # slow, still-queued or failed job just means fewer `srcset` entries for
-    # this request, never a request that blocks on -- or 500s over -- one.
-    #
-    # `preprocessed:` takes a `Proc` (`ActiveStorage::NamedVariant
-    # #preprocessed?`: `Proc` gets `.call(record)`, `Symbol` gets `record
-    # .send(...)`) called with the owning `Media::Asset` itself -- fix round
-    # 1's I1 (a plain `true` here doesn't condition on content type at all,
-    # so a GIF's `w480`..`w2400` were being enqueued and processed every
-    # upload, wastefully generating four resized-still WebPs of an
-    # animation no page has ever shown -- `#variable_image?` already exists
-    # for exactly this check, but nothing read it before enqueuing). Called
-    # from `transform_variants_later`'s own `after_create_commit`, strictly
-    # after this record's `before_save :cache_metadata_from_file` has run
-    # and that whole save has committed, so `record.content_type` -- what
-    # `#variable_image?` actually reads -- is always the real, sniffed
-    # value by the time this proc runs, never the pre-save `nil`.
-    VARIANT_WIDTHS.each do |name, target_width|
-      attachable.variant name, resize_to_limit: [ target_width, nil ], format: :webp,
-        preprocessed: ->(asset) { asset.variable_image? }
-    end
-  end
+  # What `Media::BackfillJob` queues: a kept image whose job has not failed
+  # and that has no preview or no size yet (a row from before the decode at
+  # upload), or whose widths are still the adopted ones, which carry camera
+  # data. The partial index `index_media_assets_backfill_due` has this
+  # predicate, so on a site with nothing due the question is answered from
+  # the index.
+  scope :backfill_due, lambda {
+    kept.where(renditions_failed_at: nil)
+      .and(where(preview: nil).or(where(width: nil)).or(where(renditions_fingerprint: Media::Generation::ADOPTED)))
+  }
+
+  # A kept image whose recorded generation was not made with these settings,
+  # or that has none: what `media:regenerate` queues.
+  scope :not_made_with, ->(fingerprint) { kept.where.not(renditions_fingerprint: fingerprint).or(kept.where(renditions_fingerprint: nil)) }
+
+  # What Regenerate images queues: a kept image not made with these settings
+  # (`not_made_with`), or one still missing its preview or its size, which the
+  # job makes before its widths.
+  scope :needing_regeneration, lambda { |fingerprint|
+    not_made_with(fingerprint).or(kept.where(preview: nil)).or(kept.where(width: nil))
+  }
+
+  # No variant is declared here: the widths of an image are made by
+  # `Media::RenditionJob`, recorded in `renditions`, and addressed through
+  # the blob's representation proxy by the keys that generation holds.
+  has_one_attached :file
 
   before_validation :set_default_title
 
@@ -145,97 +117,99 @@ class Media::Asset < ApplicationRecord
   # callback is piggybacking on.
   #
   # Both this and `image_type_and_size` run only when a file is being
-  # attached (`#file_changing?`, final fix wave I2): the file never changes
-  # after upload, so re-checking it on an edit of the title or alt text
-  # re-read it from the storage service -- a download of up to 10 MB per
-  # autosave, and a failed save whenever the stored file was unreachable.
+  # attached (`#file_changing?`): the file never changes after upload, so
+  # an edit of the title or alt text never reads it from the storage
+  # service again -- that would be a download of up to the largest upload
+  # (Settings → Images) per autosave, and a failed save whenever the stored
+  # file was unreachable.
   before_save :cache_metadata_from_file, if: :file_changing?
 
-  # Every committed change to a library image moves the public content
-  # version (`PublicSite`, technical cleanup spec §4.8): an upload, its
-  # title, alt or caption, the trash and a purge -- and a `touch`, which is
-  # what replacing the attached file does. Used or not: a rendered page bakes
-  # in the image's URL, alt, caption and dimensions, and whether a *live*
-  # page shows this image is a lookup across heroes, image blocks and
-  # rich-text bodies, which costs more than the bump it would save.
-  after_commit { PublicSite.bump_version! }
+  # A committed change to a library image (an upload, its title, alt or
+  # caption, the trash, a purge, a `touch`) moves the public content version
+  # only when a live page can show the image: a rendered page bakes in the
+  # image's address, alt, caption and dimensions, and a page that does not use
+  # it holds none of them. No race loses a bump: the usage rows are written in
+  # the transaction of the save that makes a page use the image, and that save
+  # moves the version itself when it publishes; a change committed here before
+  # that row exists is read by the page's later render, and one committed
+  # after finds the row. A question that fails answers yes: a needless bump
+  # costs a cache, a missed one a stale page.
+  after_commit { PublicSite.bump_version! if shown_publicly? }
 
-  # The public URL an `image` node's `html` render (`RichText::BuiltIns`)
-  # points an `<img>` at -- `rails_blob_path`, not `rails_blob_url`: this is
-  # embedded inside a page's own HTML, which already carries its own host,
-  # same reasoning `PublicSite::Urls` gives for every other in-page link
-  # being a path, not a full URL.
-  def url
-    return nil unless file.attached?
-
-    Rails.application.routes.url_helpers.rails_blob_path(file, only_path: true)
+  def shown_publicly?
+    usages.shown_publicly.exists?
+  rescue StandardError => e
+    Rails.logger.error("[media_asset] shown_publicly? failed: #{e.class}")
+    true
   end
 
-  # An `<img src>` always points at the original -- whatever `#srcset`
-  # comes back with (including empty, Review Focus 3: a page never fails
-  # to render just because every variant is missing, slow, or broken) is
-  # additive, never a replacement for this.
-  def src
-    url
+  # The widths are made once the upload has committed, on the images queue
+  # (`Media::RenditionJob`); until then the preview stands in for the image.
+  after_create_commit { Media::RenditionJob.perform_later(self) }
+
+  # The generation the public site is served from: the widths made with the
+  # settings in force when they were made, as recorded on the row. Nothing
+  # here reads the storage service, a variant record or the original, so a
+  # list of fifty assets loaded `with_file` costs no query to address.
+  def generation(name = "current")
+    Media::Generation.from((renditions || {})[name])
   end
 
-  # CS Studio's thumbnail for this image (design spec §6: the Media grid,
-  # the picker, a hero/image-block field): the `w480` variant once it's
-  # processed, else the original. `#srcset` only ever lists a finished
-  # variant, so "processed" is just "present in that list" -- and it
-  # skips GIFs and anything narrower than 480px, which fall back to the
-  # original. Load through `with_variants` when rendering several.
-  def thumbnail_url
-    w480_url, = srcset.find { |_url, width| width == VARIANT_WIDTHS[:w480] }
-    w480_url || src
+  def made? = generation.present? && generation.files.any?
+
+  def made_with?(fingerprint)
+    made? && generation.fingerprint == fingerprint
   end
 
-  # Whether this asset can have size variants at all: every allowed type
-  # except GIF (global constraints: "GIFs get no variants") -- an animated
-  # GIF is served as-is, its frames intact, rather than resized down into a
-  # handful of static WebP stills.
-  def variable_image?
-    file.attached? && content_type != "image/gif"
+  # The variation digests of every width a page may still name: the current
+  # generation's and the previous one's, which a page cached before the switch
+  # still lists. The public representation routes serve these and nothing else
+  # of a library image (`ActiveStoragePublicFiles`).
+  def served_digests
+    %w[current previous].flat_map { |name| generation(name)&.files.to_a.map(&:digest) }.compact_blank
   end
 
-  # `[url_path, width]` pairs for every variant that's actually usable right
-  # now (design spec §3.1, global constraints, Review Focus 3) -- skipping:
-  #
-  # - a GIF entirely (`#variable_image?`);
-  # - any width at or above the original's own (`width.present? &&
-  #   target_width >= width`) -- `resize_to_limit` already refuses to
-  #   *upscale*, so a variant no bigger than the original would just be a
-  #   redundant re-encode of it, not a smaller file a `srcset` should offer;
-  # - a variant that hasn't *finished* processing (`#processed_variant_
-  #   digests`) -- preprocessing is a best-effort head start (the
-  #   `has_one_attached` block's own comment), never something this waits
-  #   on;
-  # - a variant whose processing blew up (a corrupt upload, a `vips`
-  #   error) -- caught and logged per variant, not left to bubble up and
-  #   break the page around it.
-  #
-  # `width` (this asset's *own* dimensions column, from `file.analyze`) may
-  # itself be nil -- analysis hasn't run, or failed (`Media::Upload
-  # #analyze_dimensions`'s own comment) -- in which case the "never upscale"
-  # check is simply skipped for lack of anything to compare against; the
-  # processed check below still applies.
+  # `[address, width]` for every width made, ascending; empty without a
+  # generation. A bare path: no query, no host. The original is never a
+  # candidate: only a file this app made is addressed.
   def srcset
-    return [] unless variable_image?
+    return [] unless made? && file.attached?
 
-    digests = processed_variant_digests
-
-    VARIANT_WIDTHS.filter_map do |name, target_width|
-      next if width.present? && target_width >= width
-
-      variant = file.variant(name)
-      next unless digests.include?(variant.variation.digest)
-
-      [ Rails.application.routes.url_helpers.rails_representation_path(variant, only_path: true), target_width ]
-    rescue StandardError => e
-      Rails.logger.error("[media_assets] Media::Asset##{id} srcset variant #{name} failed: #{e.class}: #{e.message}")
-      nil
-    end
+    generation.files.map { |made| [ rendition_path(made), made.width ] }
   end
+
+  # The address an `<img src>` takes: the middle of the widths made (the one
+  # a browser without `srcset` support is least badly served by), else the
+  # preview as a data URI while none is made, else nothing. Never the
+  # original.
+  def src
+    made_files = srcset
+    return made_files[(made_files.size - 1) / 2].first if made_files.any?
+
+    preview_data_url
+  end
+
+  # The ~24px preview as a `data:` URI, strict base64, or nil without one.
+  def preview_data_url
+    return nil if preview.blank?
+
+    "data:image/webp;base64,#{Base64.strict_encode64(preview)}"
+  end
+
+  # The smallest width made that covers `min_width`, else the largest made,
+  # else the preview, else nil.
+  def display_url(min_width:)
+    made_files = srcset
+    return preview_data_url if made_files.empty?
+
+    (made_files.find { |_url, width| width >= min_width } || made_files.last).first
+  end
+
+  # True for the `data:` URI the preview is drawn as (never an address).
+  def self.preview_url?(url) = url.to_s.start_with?("data:")
+
+  # CS Studio's thumbnail (the Media grid, the picker, an image field).
+  def thumbnail_url = display_url(min_width: 480)
 
   # The alt text a placement actually shows (global constraints: "override
   # .presence, then the asset's default in the locale, then the Mobility
@@ -248,7 +222,7 @@ class Media::Asset < ApplicationRecord
   #   on their own, config/initializers/mobility.rb);
   # - a `{locale => value}` Hash -- a *translated* override column read
   #   whole (`block.read_attribute(:alt)`, `page.read_attribute(:hero_alt)`).
-  #   Final fix wave (I1): the two are interleaved per locale -- the
+  #   The two are interleaved per locale -- the
   #   override in a locale, then this asset in that locale, then the next
   #   locale in `Locales.fallback_chain`. Resolving the override through the
   #   chain first (what `translated(block, :alt)` did) let an `en`-only
@@ -361,7 +335,7 @@ class Media::Asset < ApplicationRecord
   def in_use_message(kept_only: false, actor: Current.actor)
     scope = kept_only ? usages.by_kept_owner : usages
     loaded = scope.includes(:owner).order(:id).to_a
-    # Fix round 1 (review of `0695e7a`): batches the `ContentBlock#owner`
+    # Batches the `ContentBlock#owner`
     # second hop for every block-owned row in one shot, one query per
     # owner type (Page, Post) -- see `.preload_usage_places`'s own comment
     # for why this can't just share `#usages_summary`'s own query (this
@@ -382,7 +356,7 @@ class Media::Asset < ApplicationRecord
   # Batches the second hop every caller of a `media_usages` row's owner
   # needs for a `block_image`/`rich_text` usage: which page or post the
   # owning `ContentBlock` actually sits on (`ContentBlock#owner`, itself
-  # polymorphic). Fix round 1 (review of `0695e7a`): `#usages_summary`'s
+  # polymorphic). `#usages_summary`'s
   # own `owner: group.first.owner` and `#in_use_message`'s
   # own `usage_place_of` both used to call that bare `.owner` once per
   # `ContentBlock`-owned usage -- fine for the "and 2 more" case `#in_use_
@@ -415,6 +389,14 @@ class Media::Asset < ApplicationRecord
 
   private
 
+  # The proxy representation path of one made width: the blob's signed id and
+  # the signed variation key the generation recorded.
+  def rendition_path(made)
+    Rails.application.routes.url_helpers.rails_blob_representation_proxy_path(
+      signed_blob_id: file.blob.signed_id, variation_key: made.key, filename: file.filename, only_path: true
+    )
+  end
+
   def usage_place_of(owner) = owner.is_a?(ContentBlock) ? owner&.owner : owner
 
   def describe_usage_place(place, actor)
@@ -436,30 +418,6 @@ class Media::Asset < ApplicationRecord
       return value if value
     end
     nil
-  end
-
-  # The `ActiveStorage::VariantRecord#variation_digest` for every variant of
-  # this asset's blob that's already been processed -- fix round 1's I2/I3:
-  # `Variant#processed?`/`VariantWithRecord#processed?` are both `private`
-  # (deliberately: the public alternative, `#processed`, *runs* the
-  # transformation inline the moment it isn't done yet, a `vips` call
-  # `#srcset` must never trigger -- see the `has_one_attached` block's own
-  # comment), so this reads the same thing those private methods themselves
-  # read (`VariantWithRecord#record`'s own `blob.variant_records.find_by
-  # (variation_digest: ...)`) through the public, documented `variant_
-  # records` association instead.
-  #
-  # One query total for *all four* widths, not one per width and not one
-  # per asset: `variant_records.loaded?` is true when a caller preloaded it
-  # (`Media::Asset.with_variants`, which every multi-asset list must use),
-  # in which case this reads the already-loaded rows in memory; otherwise
-  # `pluck` issues the one query itself. Either way, comparing a `Set` of
-  # digests against each variant's own `variation.digest` (`#srcset`) never
-  # queries per variant.
-  def processed_variant_digests
-    variant_records = file.blob.variant_records
-    digests = variant_records.loaded? ? variant_records.map(&:variation_digest) : variant_records.pluck(:variation_digest)
-    digests.to_set
   end
 
   # `hero-photo.jpg` -> "hero-photo": the title an editor never has to type
@@ -485,20 +443,38 @@ class Media::Asset < ApplicationRecord
     attachment_changes["file"].present? && file.attached?
   end
 
-  # The one rule design spec §4.2 states (global constraints: "png/jpeg/gif/
-  # webp only, max 10 MB") -- checked against the blob's *actual* bytes, not
+  # The one rule design spec §4.2 states: png/jpeg/gif/webp only, and no
+  # larger than the largest upload (Settings → Images) -- checked against the blob's *actual* bytes, not
   # whatever the upload's own Content-Type header or filename claimed (see
   # `#sniffed_content_type`'s own comment: that's exactly the pair an
   # attacker controls, and exactly the pair Marcel's own sniffing falls back
   # to *trusting* when asked to guess from a name/declared type it hasn't
   # ruled out with real magic bytes).
   def image_type_and_size
-    errors.add(:file, "must be 10 MB or smaller") if file.blob.byte_size > MAX_BYTE_SIZE
+    max = ImageSettings.current.max_bytes
+    errors.add(:file, :too_large, size: "#{max / 1.megabyte} MB") if file.blob.byte_size > max
     errors.add(:file, "must be a PNG, JPEG, GIF, or WEBP image") unless ALLOWED_CONTENT_TYPES.include?(sniffed_content_type)
     errors.add(:file, "doesn't match its stored content type") if stored_type_mismatch?
+    # Decoded only once everything above passed: a file the byte sniff or the
+    # size refuses is never handed to libvips.
+    decode_file if errors.empty?
   end
 
-  # Final fix wave (C, P5): an already-persisted blob (attached by signed id,
+  # The one decode of the upload (`Media::Decoding`), kept for
+  # `#cache_metadata_from_file`, which writes its size, preview and alpha
+  # flag in the same save.
+  def decode_file
+    @decoded = with_attachable_io { |io| io && Media::Decoding.read(io, content_type: sniffed_content_type) }
+    errors.add(:file, :unreadable) if @decoded.nil?
+  rescue Media::Decoding::TooManyFrames
+    errors.add(:file, :too_many_frames)
+  rescue Media::Decoding::TooManyPixels
+    errors.add(:file, :too_many_pixels)
+  rescue Media::Decoding::Unreadable
+    errors.add(:file, :unreadable)
+  end
+
+  # An already-persisted blob (attached by signed id,
   # or as an `ActiveStorage::Blob`) is served with *its own* stored
   # `content_type`, which `#force_blob_content_type` deliberately never
   # rewrites (it's some other record's committed row). So the sniff passing
@@ -522,9 +498,9 @@ class Media::Asset < ApplicationRecord
   # the one answer this validation is willing to trust.
   #
   # `nil` (never a raise) when `#with_attachable_io` can't get at the bytes
-  # at all -- an attachable this class doesn't know how to read yet (fix
-  # round 1's I3: a signed blob id String, or an `ActiveStorage::Blob`
-  # that's itself still unsaved). `ALLOWED_CONTENT_TYPES.include?(nil)` is
+  # at all -- an attachable this class doesn't know how to read yet (an
+  # unsaved `ActiveStorage::Blob`, or a bare `File` or `Pathname`, for a
+  # blob not yet uploaded: see `#with_attachable_io`). `ALLOWED_CONTENT_TYPES.include?(nil)` is
   # `false`, so that's just an ordinary "must be a PNG, JPEG, GIF, or WEBP
   # image" validation failure, exactly like a real file of some other type
   # would produce -- not a distinct error message, since from a caller's
@@ -573,7 +549,7 @@ class Media::Asset < ApplicationRecord
   # sniff is exactly as safe as Active Storage's own eventual upload
   # reading it a third time once this record is actually saved.
   #
-  # Any *other* attachable shape for a still-new blob (fix round 1's I3: a
+  # Any *other* attachable shape for a still-new blob (a
   # bare `File`/`Pathname` passed directly, say -- `.attach` accepts both,
   # this class just has no reader taught for either yet) has no safe way to
   # read bytes from at all -- yielding `nil` here, not calling an arbitrary
@@ -595,36 +571,22 @@ class Media::Asset < ApplicationRecord
     end
   end
 
-  # `width`/`height` come from the blob's own `metadata`, written by
-  # `file.analyze` (design spec §4.2's "Implement" step) -- but *not* by
-  # this callback: `Media::Upload#analyze_dimensions` calls
-  # `analyze` (and writes these two columns) in a second pass, strictly
-  # after this record's own save has actually committed and Active
-  # Storage's own `after_commit` hook has uploaded the blob's bytes --
-  # analysis needs the real file on the storage service, which isn't there
-  # yet at `before_save` time (`#with_attachable_io`'s own comment). So
-  # this callback leaves both nil on every ordinary save; that's fine,
-  # neither is a NOT NULL column, and `Media::PictureComponent` (media
-  # library Task 5, the one place every image render reads these) just
-  # omits the `<img width height>` attributes it would otherwise set from
-  # them -- `image_tag` drops a `nil` attribute rather than rendering it
-  # empty.
+  # The size, preview and alpha flag are the validation's one decode
+  # (`#decode_file`); the file's bytes are not read again, by this class or
+  # by Active Storage (`#mark_blob_analyzed`).
   def cache_metadata_from_file
     self.byte_size = file.blob.byte_size
     self.content_type = sniffed_content_type
     force_blob_content_type
+    mark_blob_analyzed
 
-    # Merged onto whatever's already there, not overwritten outright: a
-    # second save of an already-analyzed asset (nothing about this model
-    # re-attaches a file after the fact today, but nothing rules it out
-    # later either) must not blank out real `width`/`height` this callback
-    # itself has no way to recompute yet.
-    metadata = file.blob.metadata || {}
-    self.width = metadata["width"] if metadata.key?("width")
-    self.height = metadata["height"] if metadata.key?("height")
+    self.width = @decoded.width
+    self.height = @decoded.height
+    self.preview = @decoded.preview
+    self.has_alpha = @decoded.alpha
   end
 
-  # Fix round 1's I4: `file.blob.content_type` -- the column that actually
+  # `file.blob.content_type` -- the column that actually
   # decides what Content-Type this asset gets *served* with
   # (`ActiveStorage::Blob#service_metadata`) -- otherwise still comes from
   # Rails' own `unfurl`, which (by default, `identify: true`) re-derives it
@@ -644,7 +606,7 @@ class Media::Asset < ApplicationRecord
   # silently rewrite -- and nothing here needs to, since `unfurl` never
   # touches an existing blob's `content_type` in the first place. Guarded
   # on `sniffed_content_type` being present too: a still-new blob this
-  # class genuinely can't sniff (I3 above) leaves the blob's own `identify`d
+  # class genuinely can't sniff (`#sniffed_content_type`) leaves the blob's own `identify`d
   # guess alone rather than overwriting it with `nil`, though that guess is
   # moot either way -- an unsniffable attachment is already invalid
   # (`#image_type_and_size`), so this record is never getting saved with it.
@@ -652,5 +614,21 @@ class Media::Asset < ApplicationRecord
     return unless sniffed_content_type && file.blob.new_record?
 
     file.blob.content_type = sniffed_content_type
+  end
+
+  # A blob this save creates is marked analyzed with the size the decode
+  # read, as Active Storage's image analyzer would have written it (the
+  # size it is shown at). Unmarked, the attachment's commit queues
+  # `ActiveStorage::AnalyzeJob`, which downloads and decodes the whole file
+  # again on the images queue for metadata nothing here reads, and then
+  # touches the asset (`Blob#touch_attachments`): its `updated_at` is the
+  # media panel's autosave base, so an editor typing the alt text right
+  # after an upload was told it had changed elsewhere. An existing blob is
+  # another record's row and is left alone, as above.
+  def mark_blob_analyzed
+    blob = file.blob
+    return unless blob.new_record? && @decoded
+
+    blob.metadata = blob.metadata.merge("identified" => true, "analyzed" => true, "width" => @decoded.width, "height" => @decoded.height)
   end
 end

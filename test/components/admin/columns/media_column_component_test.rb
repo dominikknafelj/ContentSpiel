@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A library image field (media library Task 8): the hidden id input
+# A library image field: the hidden id input
 # autosave sends, the thumbnail, Choose/Change and Remove.
 class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
   include ActiveJob::TestHelper
@@ -23,7 +23,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_selector "input[type=file]", visible: :all
   end
 
-  # Round 3 Task 9: no `media.upload` means no picker on the page, so the field
+  # No `media.upload` means no picker on the page, so the field
   # offers Remove only and says why Choose is missing.
   test "without media.upload there is no Choose, Remove stays, and the field says why" do
     asset = Media::Asset.new(title: "Lake")
@@ -42,7 +42,7 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_text "You can't choose images."
   end
 
-  # Final fix wave (M12): a refused choice's message is announced.
+  # A refused choice's message is announced.
   test "the error slot is a polite live region" do
     render_column(nil, errors: [ "Hero image doesn't exist" ])
 
@@ -59,16 +59,26 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_text asset.title
     assert_button "Change image"
     assert_button "Remove image"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  test "a chosen image with neither a width nor a preview is a box, and the img is hidden" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_column(asset.reload)
+
+    assert_selector "[data-image-empty]:not([hidden])"
+    assert_selector "img[hidden]:not([src])", visible: :all
+    assert_no_match %r{/blobs/}, rendered_content
   end
 
   # Same thumbnail rule as the Media module's grid: the `w480` variant once
   # it's processed, not the (much larger) original.
   test "a processed image's thumbnail is its w480 variant" do
-    asset = create_media_asset(filename: "wide.png")
-    asset.file.analyze
-    perform_enqueued_jobs
+    asset = make_renditions!(create_media_asset(filename: "wide.png"))
 
-    render_column(Media::Asset.with_variants.find(asset.id))
+    render_column(Media::Asset.with_file.find(asset.id))
 
     w480_url, = asset.srcset.find { |_url, width| width == 480 }
     assert_selector "img[src='#{w480_url}']"

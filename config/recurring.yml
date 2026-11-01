@@ -29,6 +29,10 @@ production:
     class: Editing::Sweep
     queue: default
     schedule: every 5 minutes
+  media_backfill:
+    class: Media::BackfillJob
+    queue: images
+    schedule: every 10 minutes
 
 development:
   trash_purge_expired:
@@ -47,6 +51,10 @@ development:
     class: Editing::Sweep
     queue: default
     schedule: every 5 minutes
+  media_backfill:
+    class: Media::BackfillJob
+    queue: images
+    schedule: every 10 minutes
 
 test:
   trash_purge_expired:

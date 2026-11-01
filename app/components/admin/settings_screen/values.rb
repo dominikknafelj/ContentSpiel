@@ -42,6 +42,14 @@ module Admin
       # not a field of it and never rendered).
       def mail(name) = field(name) { site.public_send(name) }
 
+      # The Images card's fields (`ImagesCardComponent::FIELDS`). The widths
+      # are one text of comma-separated numbers; typed text comes back as typed.
+      def image(name)
+        return field(name) { Array(site.image_widths).join(", ") } if name == :image_widths
+
+        field(name) { site.public_send(name) }
+      end
+
       def remove_logo? = ActiveModel::Type::Boolean.new.cast(submitted&.dig(:remove_logo)) || false
 
       # The stored logo. After a refused save the record in memory holds the

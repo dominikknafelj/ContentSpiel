@@ -1,0 +1,82 @@
+<section id="settings-images-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="images"
+         data-controller="admin--saving--pending-lock">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="images" class="text-h2 text-ink"><%= t(".title") %></h2>
+    <p class="mt-1 text-sm text-dim"><%= t(".intro") %></p>
+  </div>
+
+  <div class="flex flex-col gap-4 p-4">
+    <div class="admin-column" data-field-name="image_format">
+      <%= tag.fieldset id: input_id(:image_format), class: "m-0 min-w-0 border-0 p-0", aria: { describedby: "#{input_id(:image_format)}-help" } do %>
+        <legend class="<%= setup_label_class %> mb-1"><%= t(".format") %></legend>
+        <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+          <% ImageSettings::FORMATS.each do |option| %>
+            <% unavailable = option == "avif" && !avif_available? %>
+            <label for="<%= input_id(:image_format) %>-<%= option %>" class="<%= segment_class %>">
+              <%= radio_button_tag "site_setting[image_format]", option, format == option, id: "#{input_id(:image_format)}-#{option}", class: "sr-only", disabled: unavailable %>
+              <span><%= t(".#{option}") %></span>
+            </label>
+          <% end %>
+        </div>
+      <% end %>
+      <p id="<%= input_id(:image_format) %>-help" class="mt-1.5 text-sm text-meta"><%= t(".format_help") %></p>
+      <% if avif_available? %>
+        <p class="mt-1 text-sm text-meta" data-images-avif-note><%= t(".avif_note") %></p>
+      <% else %>
+        <p class="mt-1 text-sm text-meta" data-images-avif-unavailable><%= t(".avif_unavailable") %></p>
+      <% end %>
+      <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:image_format)}-errors", messages: field_errors(:image_format) %>
+    </div>
+
+    <div class="grid gap-3.5 sm:grid-cols-2">
+      <% %i[image_quality_webp image_quality_avif].each do |name| %>
+        <div class="admin-column" data-field-name="<%= name %>">
+          <%= label_tag input_id(name), t(".#{name}"), class: setup_label_class %>
+          <%= number_field_tag "site_setting[#{name}]", value(name), id: input_id(name), min: quality_range.min, max: quality_range.max, step: 1,
+                class: setup_input_class, aria: { describedby: "#{input_id(name)}-errors" } %>
+          <%= helpers.render "admin/shared/field_errors", id: "#{input_id(name)}-errors", messages: field_errors(name) %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="admin-column" data-field-name="image_widths">
+      <%= label_tag input_id(:image_widths), t(".widths"), class: setup_label_class %>
+      <%= text_field_tag "site_setting[image_widths]", value(:image_widths), id: input_id(:image_widths), inputmode: "numeric", autocomplete: "off", spellcheck: false,
+            placeholder: t(".widths_placeholder"), class: setup_input_class, aria: { describedby: "#{input_id(:image_widths)}-help #{input_id(:image_widths)}-errors" } %>
+      <p id="<%= input_id(:image_widths) %>-help" class="mt-1.5 text-sm text-meta">
+        <%= t(".widths_help", count_min: width_count.min, count_max: width_count.max, min: width_range.min, max: width_range.max) %>
+      </p>
+      <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:image_widths)}-errors", messages: field_errors(:image_widths) %>
+    </div>
+
+    <div class="admin-column" data-field-name="image_max_upload_mb">
+      <div class="flex flex-wrap items-center gap-2 text-ink">
+        <label for="<%= input_id(:image_max_upload_mb) %>"><%= t(".max_upload") %></label>
+        <%= number_field_tag "site_setting[image_max_upload_mb]", value(:image_max_upload_mb), id: input_id(:image_max_upload_mb),
+              min: upload_range.min, max: upload_range.max, step: 1, class: "#{setup_input_class} !mt-0 !w-18",
+              aria: { describedby: "#{input_id(:image_max_upload_mb)}-errors" } %>
+        <span><%= t(".mb") %></span>
+      </div>
+      <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:image_max_upload_mb)}-errors", messages: field_errors(:image_max_upload_mb) %>
+    </div>
+
+    <div id="settings-images-progress" class="flex flex-col gap-2 border-t border-line pt-4">
+      <p class="text-sm text-ink" data-images-progress>
+        <% if total.zero? %>
+          <%= t(".no_images") %>
+        <% else %>
+          <%= t(".progress", count: total, made: made) %>
+        <% end %>
+      </p>
+      <% if failed.positive? %>
+        <p class="text-sm text-danger-ink" data-images-failed><%= t(".failed", count: failed) %></p>
+      <% end %>
+      <p class="text-sm text-meta"><%= t(".regenerate_help") %></p>
+      <div>
+        <%# Outside the form's Save: a button of its own that opens the dialog (rendered after the form, which holds the POST). %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".regenerate"), variant: :secondary, data: dialog_trigger(DIALOG).merge("admin--saving--pending-lock-target": "control")) %>
+      </div>
+      <p class="text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
+    </div>
+  </div>
+</section>

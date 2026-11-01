@@ -1,8 +1,8 @@
 module Admin
   # The one thing an autosave endpoint with a library image field (a
   # page's hero, an image block's image -- `Admin::Columns
-  # ::MediaColumnComponent`) has to add to its usual response (media
-  # library Task 8 fix round 1, I2): after a *refused* choice, a stream
+  # ::MediaColumnComponent`) has to add to its usual response:
+  # after a *refused* choice, a stream
   # that re-renders the whole field with the image actually stored.
   #
   # By the time the PATCH lands, `admin--media--field` has already swapped
@@ -61,7 +61,7 @@ module Admin
       return if sent.to_s == stored_id.to_s
       return unless result.denied? || record.errors.include?(error_attribute)
 
-      stored = stored_id && Media::Asset.with_variants.find_by(id: stored_id)
+      stored = stored_id && Media::Asset.with_file.find_by(id: stored_id)
       component = yield(stored, record.errors.full_messages_for(error_attribute))
       turbo_stream.replace(component.section_dom_id, component)
     end

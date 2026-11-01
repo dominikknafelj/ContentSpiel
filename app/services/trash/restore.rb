@@ -87,6 +87,14 @@ module Trash
         end
       end
 
+      # After the OUTERMOST commit, so the job never runs before the row it
+      # reads is untrashed: inside a caller's transaction (`Posts::BulkRestore`
+      # runs each restore in one) `after_all_transactions_commit` waits for
+      # that commit and queues nothing if it rolls back; outside one it runs
+      # now. This app enqueues at once otherwise (`enqueue_after_transaction_
+      # commit` is not on).
+      assets = [ @record, *@restored_assets ]
+      ActiveRecord.after_all_transactions_commit { enqueue_renditions(*assets) }
       success(@record)
     rescue ActiveRecord::RecordInvalid
       # The savepoint has rolled back the branch members, the assets and the
@@ -191,6 +199,16 @@ module Trash
       # Around the callbacks, so `Media::Asset`'s own bump doesn't run: an
       # image back in the library renders again wherever a page uses it.
       PublicSite.bump_version! if @restored_assets.any?
+    end
+
+    # An image that was in the trash while the settings changed is made again
+    # under the settings in force now (the job itself returns at once for one
+    # that is already made with them).
+    def enqueue_renditions(*records)
+      fingerprint = ImageSettings.current.fingerprint
+      records.grep(Media::Asset).each do |asset|
+        Media::RenditionJob.perform_later(asset) unless asset.made_with?(fingerprint)
+      end
     end
 
     def owners_for_assets(branch_ids)

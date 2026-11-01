@@ -4,7 +4,7 @@ module Audit
   # 3's versioning will build on), what changed (`.field_changes_for`), and a
   # human label that outlives the record (`.label_for`).
   #
-  # Secrets never reach the log (Review Focus 5). Two layers:
+  # Secrets never reach the log. Two layers:
   # - each serializer below names what it stores rather than dumping
   #   `attributes` for the sensitive models (users, tokens), so a column
   #   added to `users` later isn't logged until someone decides it should be;
@@ -27,7 +27,7 @@ module Audit
     # included: never shown, logged or audited.
     NEVER_STORED = %w[
       password password_confirmation password_digest token token_digest lookup_digest ai_api_key
-      mail_username mail_password mail_verified_fingerprint
+      mail_username mail_password mail_verified_fingerprint preview renditions
     ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
@@ -47,7 +47,8 @@ module Audit
     # (when the login was saved, the last success and failure), written by
     # sends, never a setting someone changed.
     IGNORED_CHANGES = %w[created_at updated_at unpublished_changes_at translation_sources translation_original_changed_at ai_api_key_saved_at
-      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure].freeze
+      mail_login_saved_at mail_verified_at mail_last_sent_at mail_failed_at mail_failure
+      has_alpha renditions_fingerprint renditions_failed_at renditions_error].freeze
 
     # The columns that hold a type's schema fields (`ContentBlock#settings`,
     # `Post#metadata`), whose changes are read with the record's
@@ -122,7 +123,7 @@ module Audit
     # bounded, but every snapshot of it on the append-only log would repeat
     # those copies next to the body they were taken from. The snapshot keeps
     # what says *which* version a translation was made against (`digest`,
-    # `saved_at`, `from`), not the text (final review A, M6).
+    # `saved_at`, `from`), not the text.
     def without_source_text(hash)
       sources = hash["translation_sources"]
       return hash unless sources.is_a?(Hash)

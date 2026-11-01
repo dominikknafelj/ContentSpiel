@@ -15,7 +15,7 @@ module Admin
         post = PreviewFixtures.post(title: "Retired announcement").tap { |record| record.update_columns(trashed_at: 1.day.ago) }
         asset = PreviewFixtures.media_asset.tap { |record| record.update_columns(trashed_at: 2.days.ago) }
 
-        render Admin::TrashScreen::ListComponent.new(items: [ section.reload, post.reload, Media::Asset.with_variants.find(asset.id) ], retention_days: 30)
+        render Admin::TrashScreen::ListComponent.new(items: [ section.reload, post.reload, Media::Asset.with_file.find(asset.id) ], retention_days: 30)
       end
 
       def empty

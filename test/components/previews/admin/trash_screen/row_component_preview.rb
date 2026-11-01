@@ -1,6 +1,6 @@
 module Admin
   module TrashScreen
-    # `RowComponent` (round 3, Task 14): a post row, a page row with its
+    # `RowComponent`: a post row, a page row with its
     # subpage sentence, and an image that is still used (Delete now… disabled
     # with its reason as text) -- built from unsaved records -- and the three
     # ways a page's Restore is drawn, built from real pages (rolled back with
@@ -18,7 +18,7 @@ module Admin
 
       def image_in_use
         created = PreviewFixtures.media_asset.tap { |a| a.update_columns(trashed_at: 2.days.ago) }
-        asset = Media::Asset.with_variants.find(created.id)
+        asset = Media::Asset.with_file.find(created.id)
         table(row(asset, who: "System", used_by: 2))
       end
 
