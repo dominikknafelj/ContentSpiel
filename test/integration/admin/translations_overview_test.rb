@@ -289,6 +289,20 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # One readable type has no segments, and a language can still be chosen: the
+  # bar is drawn for Clear alone, which would otherwise be lost with the move.
+  test "a viewer with one type and a language chosen still gets Clear, in the bar" do
+    create_post(title: "Needs work")
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/translations", params: { language: "de" }
+
+    assert_response :success
+    assert_select "form.admin-filter-bar fieldset", count: 0
+    assert_select "form.admin-filter-bar a[href='/cs-studio/translations']", text: "Clear"
+  end
+
   test "the Site settings row appears only for settings.manage and only while incomplete" do
     get "/cs-studio/translations"
     assert_select "#translation-item-settings th[scope=row] a[href='/cs-studio/settings?locale=de']", text: /Site settings/

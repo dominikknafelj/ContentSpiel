@@ -78,14 +78,45 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
     assert_one_height(%w[select#user_id select#subject_type input#from input#to])
   end
 
-  # Its "Clear" is a link under the bar, outside the form, so not a control of the bar.
-  test "the translations bar: its segments are the bar's height" do
+  test "the translations bar: its segments and Clear are one height" do
     with_locales(%w[en de es], default: "en")
     create_page(title: "Untranslated page")
     create_post(title: "Untranslated post")
     visit admin_translations_path(type: "post")
     await_admin_controllers
-    assert_one_height(%w[segments])
+    assert_one_height(%w[segments link\ Clear])
+  end
+
+  test "the translations bar shows no Clear with no filter set" do
+    with_locales(%w[en de es], default: "en")
+    create_page(title: "Untranslated page")
+    create_post(title: "Untranslated post")
+    visit admin_translations_path
+    await_admin_controllers
+    assert_selector BAR
+    assert_no_selector "#{BAR} a", text: "Clear"
+  end
+
+  # In the form now, and a link: following it submits nothing, so neither the
+  # chosen type nor the form's hidden language comes along.
+  test "the translations bar's Clear goes to the whole list and does not submit the form" do
+    with_locales(%w[en de es], default: "en")
+    create_page(title: "Untranslated page")
+    create_post(title: "Untranslated post")
+    visit admin_translations_path(type: "post", language: "de")
+    await_admin_controllers
+    within(BAR) { assert_equal "/cs-studio/translations", URI(find("a", text: "Clear")[:href]).path }
+    page.execute_script(<<~JS)
+      window.__submits = 0
+      document.querySelector("#{BAR}").addEventListener("submit", () => { window.__submits += 1 })
+    JS
+
+    click_frame_link("Clear")
+
+    assert_no_selector "#{BAR} a", text: "Clear"
+    assert_equal "/cs-studio/translations", page.current_url.then { |url| URI(url).request_uri }
+    assert find("#translations-type-all", visible: :all).checked?
+    assert_equal 0, page.evaluate_script("window.__submits ?? 0")
   end
 
   test "a wrapped segment row still shows every segment, inside its frame" do
