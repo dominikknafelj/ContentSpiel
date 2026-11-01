@@ -43,12 +43,15 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
   # (`scrub_attribute`).
   CELL_ALIGN_CLASS = /\Aalign-(left|center|right)\z/
 
+  IMAGE_ONLY = %w[style data-image-preview data-image-empty].freeze
+  PREVIEW_SRC = %r{\Adata:image/webp;base64,[A-Za-z0-9+/=]+\z}
+
   YOUTUBE_NOCOOKIE_EMBED_SRC = %r{\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}\z}
 
   def initialize
     super
     self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe s table tbody tr th td]
-    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding scope class]
+    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding scope class style data-image-preview data-image-empty]
   end
 
   private
@@ -57,6 +60,12 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
   # everywhere, but on a `th` or `td` only as a cell's alignment
   # (`CELL_ALIGN_CLASS`), otherwise removed.
   def scrub_attribute(node, attr_node)
+    return attr_node.remove unless image_attribute_ok?(node, attr_node)
+    # Already matched against the exact shapes; the default pass would rewrite
+    # the style through its CSS filter (dropping the url()) and the src
+    # through its protocol list (dropping the data: URI).
+    return if node.name == "img" && (attr_node.name == "style" || (attr_node.name == "src" && attr_node.value.match?(PREVIEW_SRC)))
+
     if attr_node.name == "class" && %w[th td].include?(node.name)
       return if attr_node.value.match?(CELL_ALIGN_CLASS)
 
@@ -64,6 +73,26 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
     end
 
     super
+  end
+
+  # `style` and the state marks live on an `img` and nowhere else, `style` in
+  # the one shape `Media::PictureComponent` writes; an `img`'s `data:` src is
+  # kept only as the WebP preview. Anything else is removed.
+  # The default pass would rewrite the preview style through its CSS filter
+  # (dropping the url()); a style that matched PREVIEW_STYLE exactly is left
+  # as it is, and every other one has already been removed above.
+  def scrub_css_attribute(node)
+    return if node.name == "img" && node["style"]&.match?(Media::PictureComponent::PREVIEW_STYLE)
+
+    super
+  end
+
+  def image_attribute_ok?(node, attr_node)
+    case attr_node.name
+    when *IMAGE_ONLY then node.name == "img" && (attr_node.name != "style" || attr_node.value.match?(Media::PictureComponent::PREVIEW_STYLE))
+    when "src" then node.name != "img" || !attr_node.value.strip.downcase.start_with?("data:") || attr_node.value.match?(PREVIEW_SRC)
+    else true
+    end
   end
 
   def allowed_node?(node)

@@ -14,12 +14,22 @@ module Media
   # three different resolution paths that only their own caller knows how
   # to walk.
   #
-  # `src` always points at the original file (`Media::Asset#src`), matching
-  # that method's own contract: whatever `srcset` comes back with is
-  # additive, never a replacement -- a browser that ignores `srcset`
-  # entirely (or one that's told to via `sizes`) still gets a real image,
-  # and a variant that's missing, slow, or failed to process never breaks
-  # the page around it (Review Focus 3).
+  # One `<img>` in three states, and no wrapper around it (a wrapper would
+  # be a second element in rich text, where nothing but the contract's
+  # elements may appear, and a second box for a theme to style):
+  #
+  # - Widths made: `src` is the middle of them, `srcset` offers exactly
+  #   them, never the original, and the ~24px preview is the image's own
+  #   background (`style`), so the browser draws the sharp image over it
+  #   as it arrives. An image with an alpha channel gets no background, or
+  #   the preview would show through its transparent parts for ever.
+  # - No width yet: `src` is the preview itself (a data: URI) and
+  #   `data-image-preview` lets the stylesheet blur it to its box.
+  # - Neither: no `src` at all, a box of the image's size with its alt
+  #   (`data-image-empty`, sunken by the stylesheet). Never the original.
+  #
+  # The attributes carry no script: the page needs none of them to show
+  # the image, and nothing is hidden by CSS alone.
   #
   # `loading="lazy"` by default, with `decoding="async"` always. The page
   # hero (`app/views/pages/show.html.erb`) passes `loading: "eager",
@@ -27,6 +37,15 @@ module Media
   # thing a landing page shows and usually its largest paint, so lazy-
   # loading it only delays it. `fetchpriority` is omitted unless given.
   class PictureComponent < ApplicationComponent
+    # The one style an `<img>` here carries, and the only one the rich-text
+    # scrubber keeps on an `img` (`RichTextScrubber`): the preview as the
+    # background. A data URI of strict base64 cannot close the quotes.
+    PREVIEW_STYLE = /\Abackground:url\("data:image\/webp;base64,[A-Za-z0-9+\/=]+"\) center\/cover no-repeat\z/
+
+    def self.preview_style(data_url)
+      %(background:url("#{data_url}") center/cover no-repeat)
+    end
+
     def initialize(asset:, alt:, sizes: "100vw", css_class: nil, loading: "lazy", fetchpriority: nil)
       @asset = asset
       @alt = alt
@@ -49,15 +68,9 @@ module Media
 
     attr_reader :asset, :alt, :sizes, :css_class, :loading, :fetchpriority
 
-    # The `srcset` attribute's own `"url widthw, url widthw"` shape, built
-    # from `Media::Asset#srcset` -- already just the variants that exist,
-    # are smaller than the original, and have actually finished processing
-    # (that method's own comment). `nil` (not `""`) when there's nothing to
-    # offer, so the template omits the attribute outright rather than
-    # rendering an empty one -- an unprocessed asset, or a GIF (design spec:
-    # "GIFs get no variants"), then renders `src` alone (Review Focus 3).
-    #
-    # Memoized: the template reads it twice (`srcset` and `sizes`).
+    # `srcset` as `"url widthw, ..."`, from the widths made; nil (the
+    # attribute is omitted) when none is. Memoized: the template reads it
+    # twice (`srcset` and `sizes`).
     def srcset_attribute
       return @srcset_attribute if defined?(@srcset_attribute)
 
@@ -65,14 +78,25 @@ module Media
       @srcset_attribute = pairs.empty? ? nil : pairs.map { |url, width| "#{url} #{width}w" }.join(", ")
     end
 
-    # `sizes` only means anything paired with a real `srcset` -- a browser
-    # ignores it on an `<img>` with a single candidate, but shipping it
-    # anyway would still claim widths this particular render has no
-    # candidates for. `nil` here, like `srcset_attribute`, drops the
-    # attribute from the tag entirely rather than rendering a misleading
-    # one.
+    # `sizes` only means anything paired with a real `srcset`.
     def sizes_attribute
       sizes if srcset_attribute
+    end
+
+    def preview = asset.preview_data_url
+
+    # The preview as the background of an image whose widths exist, unless
+    # it has transparency.
+    def style_attribute
+      self.class.preview_style(preview) if srcset_attribute && preview && !asset.has_alpha
+    end
+
+    def src_attribute = srcset_attribute ? asset.src : preview
+
+    def state_attributes
+      return {} if srcset_attribute
+
+      preview ? { "data-image-preview": true } : { "data-image-empty": true }
     end
   end
 end

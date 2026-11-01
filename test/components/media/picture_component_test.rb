@@ -99,6 +99,75 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     assert_no_selector "img"
   end
 
+  test "with widths the img offers only them, the middle one as src, its size and its preview as background, and no address of the original" do
+    asset = processed_asset
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal asset.src, img["src"]
+    assert_not_includes img["src"], "data:"
+    assert img["srcset"].present?
+    assert_match Media::PictureComponent::PREVIEW_STYLE, img["style"]
+    assert_equal Media::PictureComponent.preview_style(asset.preview_data_url), img["style"]
+    assert_nil img["data-image-preview"]
+    assert_nil img["data-image-empty"]
+    assert_no_match(%r{/blobs/}, img.native.to_s)
+  end
+
+  test "an image with alpha gets no background" do
+    asset = processed_asset
+    asset.update_columns(has_alpha: true) # version: none (a test's row)
+    render_inline(Media::PictureComponent.new(asset: asset.reload, alt: "x"))
+
+    assert_nil page.find("img")["style"]
+  end
+
+  test "with no width the src is the preview and the img carries its size" do
+    asset = create_media_asset(filename: "wide.png")
+    asset.update_columns(renditions: {}, renditions_fingerprint: nil) # version: none (a test's row)
+    asset.reload
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal asset.preview_data_url, img["src"]
+    assert_equal asset.width.to_s, img["width"]
+    assert_equal asset.height.to_s, img["height"]
+    assert_nil img["srcset"]
+    assert_nil img["style"]
+    assert img["data-image-preview"]
+  end
+
+  test "with neither the img is a sized box with its alt and no src" do
+    asset = create_media_asset(filename: "wide.png")
+    asset.update_columns(renditions: {}, renditions_fingerprint: nil, preview: nil) # version: none (a test's row)
+    render_inline(Media::PictureComponent.new(asset: asset.reload, alt: "A room"))
+
+    img = page.find("img")
+    assert_nil img["src"]
+    assert_nil img["srcset"]
+    assert_equal asset.width.to_s, img["width"]
+    assert_equal asset.height.to_s, img["height"]
+    assert_equal "A room", img["alt"]
+    assert img["data-image-empty"]
+    assert_nil img["data-image-preview"]
+  end
+
+  test "it is one img and nothing around it" do
+    render_inline(Media::PictureComponent.new(asset: processed_asset, alt: "x"))
+
+    fragment = Nokogiri::HTML5.fragment(rendered_content)
+    assert_equal [ "img" ], fragment.css("*").map(&:name)
+    assert_equal 1, fragment.children.count(&:element?)
+  end
+
+  test "an image narrower than 480px offers its own width" do
+    asset = make_renditions!(create_media_asset(filename: "tiny.png"))
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    img = page.find("img")
+    assert_equal [ asset.width ], img["srcset"].scan(/ (\d+)w/).flatten.map(&:to_i)
+  end
+
   private
 
   # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG: all four

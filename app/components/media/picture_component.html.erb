@@ -1,2 +1,3 @@
-<%= image_tag asset.src, srcset: srcset_attribute, sizes: sizes_attribute, width: asset.width, height: asset.height,
-      alt: alt, loading: loading, fetchpriority: fetchpriority, decoding: "async", class: css_class %>
+<%= tag.img src: src_attribute, srcset: srcset_attribute, sizes: sizes_attribute, width: asset.width, height: asset.height,
+      alt: alt, loading: loading, fetchpriority: fetchpriority, decoding: "async", class: css_class,
+      style: style_attribute, **state_attributes %>

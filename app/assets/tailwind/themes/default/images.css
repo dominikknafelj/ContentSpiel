@@ -1,0 +1,20 @@
+/* A library image's three states (`Media::PictureComponent`). Plain rules,
+   no script and no transition: the browser draws the sharp image over the
+   preview as it arrives.
+
+   - Widths made: the preview is the image's own `style` background, drawn
+     by the browser behind the image; nothing here.
+   - No width yet: the preview is the `src` itself, ~24px, so it is
+     blurred (the blur is a placeholder the Design System's question 1 will
+     set) and scaled just past the box so the blur's soft edge falls outside
+     the clip.
+   - Neither: no `src`, a box of the image's size on the sunken ground. */
+img[data-image-preview] {
+  filter: blur(12px);
+  transform: scale(1.1);
+  clip-path: inset(5%);
+}
+
+img[data-image-empty] {
+  background: var(--th-sunken);
+}

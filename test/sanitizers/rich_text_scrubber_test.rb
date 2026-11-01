@@ -74,4 +74,23 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_includes html, %(loading="lazy")
     assert_includes html, %(decoding="async")
   end
+
+  test "a rendered rich-text image keeps its preview style, its preview src and its state attributes" do
+    style = Media::PictureComponent.preview_style("data:image/webp;base64,UklGRg==")
+    html = scrub(%(<img src="data:image/webp;base64,UklGRg==" style='#{style}' data-image-preview data-image-empty width="3" height="2" alt="x">))
+
+    assert_includes html, %(src="data:image/webp;base64,UklGRg==")
+    assert_includes html, "background:url"
+    assert_includes html, "data-image-preview"
+    assert_includes html, "data-image-empty"
+  end
+
+  test "any other style on an img, another data: src, and the state attributes on another element are dropped" do
+    html = scrub(%(<img src="/a.webp" style="position:fixed;inset:0" alt="x"><p style="background:url(&quot;data:image/webp;base64,AAAA&quot;) center/cover no-repeat" data-image-preview data-image-empty>t</p><img src="data:text/html;base64,AAAA" alt="y">))
+
+    assert_not_includes html, "style="
+    assert_not_includes html, "data-image-preview"
+    assert_not_includes html, "data-image-empty"
+    assert_not_includes html, "data:text/html"
+  end
 end
