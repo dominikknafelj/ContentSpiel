@@ -110,6 +110,10 @@ class Media::Asset < ApplicationRecord
   # rich-text bodies, which costs more than the bump it would save.
   after_commit { PublicSite.bump_version! }
 
+  # The widths are made once the upload has committed, on the images queue
+  # (`Media::RenditionJob`); until then the preview stands in for the image.
+  after_create_commit { Media::RenditionJob.perform_later(self) }
+
   # The generation the public site is served from: the widths made with the
   # settings in force when they were made, as recorded on the row. Nothing
   # here reads the storage service, a variant record or the original, so a

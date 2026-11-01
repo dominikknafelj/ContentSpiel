@@ -500,12 +500,16 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_not asset.reload.trashed?
   end
 
-  test "a variant record created or removed moves" do
-    asset = create_media_asset
+  test "a variant record of any other blob moves, one of a library image does not (the job bumps once)" do
+    logo = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "logo.png", content_type: "image/png")
     record = nil
 
-    assert_moves("a processed variant") { record = ActiveStorage::VariantRecord.create!(blob: asset.file.blob, variation_digest: "w480-digest") }
-    assert_moves("a variant removed") { record.destroy! }
+    assert_moves("a processed variant of a blob the library does not hold") { record = ActiveStorage::VariantRecord.create!(blob: logo, variation_digest: "w480-digest") }
+    assert_moves("that variant removed") { record.destroy! }
+
+    asset = create_media_asset
+    assert_stays("a processed variant of a library image") { record = ActiveStorage::VariantRecord.create!(blob: asset.file.blob, variation_digest: "w480-digest") }
+    assert_stays("a library image's variant removed") { record.destroy! }
   end
 
   # --- Settings and languages --------------------------------------------------

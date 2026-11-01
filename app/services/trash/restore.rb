@@ -78,6 +78,7 @@ module Trash
         @record.assign_attributes(trashed_at: nil, trashed_by: nil, **(page? ? { trash_root_id: nil } : {}))
         @record.save!
         restore_referenced_assets(branch_ids)
+        enqueue_renditions(@record, *@restored_assets)
         record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata(branch_ids))
         # Each image that came along gets its own event too, so an image's
         # history in the audit log shows it leaving the trash, not only its
@@ -191,6 +192,16 @@ module Trash
       # Around the callbacks, so `Media::Asset`'s own bump doesn't run: an
       # image back in the library renders again wherever a page uses it.
       PublicSite.bump_version! if @restored_assets.any?
+    end
+
+    # An image that was in the trash while the settings changed is made again
+    # under the settings in force now (the job itself returns at once for one
+    # that is already made with them).
+    def enqueue_renditions(*records)
+      fingerprint = ImageSettings.current.fingerprint
+      records.grep(Media::Asset).each do |asset|
+        Media::RenditionJob.perform_later(asset) unless asset.made_with?(fingerprint)
+      end
     end
 
     def owners_for_assets(branch_ids)

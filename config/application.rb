@@ -69,6 +69,15 @@ module ContentSpiel
     config.i18n.available_locales = SUPPORTED_LOCALES.keys.map(&:to_sym)
     config.i18n.default_locale = :en
 
+    # Two job queues (`config/queue.yml`): the jobs that decode and encode
+    # pictures are on `images`, served by one thread, and everything else is
+    # on `default`. Active Storage's analysis and transform jobs are image
+    # work too; its purge and mirror jobs are not.
+    config.active_storage.queues.analysis = :images
+    config.active_storage.queues.transform = :images
+    config.active_storage.queues.purge = :default
+    config.active_storage.queues.mirror = :default
+
     # Lets config/locales/en.yml set a per-attribute `format` for validation
     # messages (Rails ignores it otherwise). Used for exactly one thing:
     # User's password length message is a whole sentence ("Use at least 12

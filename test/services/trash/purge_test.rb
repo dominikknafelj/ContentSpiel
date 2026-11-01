@@ -255,6 +255,7 @@ class Trash::PurgeTest < ActiveSupport::TestCase
   test "an unused image goes, records media.purged and purges the file after commit" do
     asset = upload_by(users(:author))
     blob = asset.file.blob
+    clear_enqueued_jobs # the upload's image job names a row this test deletes
     assert as(users(:two)) { Trash::Move.call(asset) }.ok?
 
     result = nil
