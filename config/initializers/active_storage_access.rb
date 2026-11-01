@@ -28,21 +28,19 @@
 # controller, not their base classes: a callback added to a parent after its
 # child was loaded does not reach the child.
 #
-# A library image's ORIGINAL is the editors' alone (image delivery spec,
-# decision 2), and the public gets only the widths `Media::RenditionJob` made.
-# The two blob controllers and the disk controller refuse a blob attached as
-# `Media::Asset#file` to everyone (`ActiveStorageLibraryOriginalRefusal`): the
-# proxy ones take no session (`ActiveStorage::DisableSession`) and cannot tell
-# an editor from a visitor, so an editor downloads the original through CS
-# Studio, `Admin::MediaOriginalsController`. The logo is no library image and
-# stays a public original.
-#
-# And no request makes a variant of a library image: the two representation
-# controllers answer 404 for a width that has no variant record
+# What else the read routes serve is an ALLOW-LIST that fails closed
+# (`ActiveStoragePublicFiles`, which says why: a purged image's blob outlives
+# its attachment row). The two blob controllers and the disk controller serve
+# an original only of the site logo (`ActiveStorageLibraryOriginalRefusal`): a
+# library image's original is the editors' alone, downloaded through CS Studio
+# (`Admin::MediaOriginalsController`), because the proxy controllers take no
+# session (`ActiveStorage::DisableSession`) and cannot tell an editor from a
+# visitor. The two representation controllers serve only a width a library
+# image's generation records and has made, or a logo variant
 # (`ActiveStorageMadeVariantsOnly`), by OVERRIDING Rails' `set_representation`
 # rather than following it with a callback of our own, because Rails'
 # callback processes the variant inline, so one after it would come too late.
-# The logo's variants keep Rails' behaviour.
+# Only the logo's variants are made on request.
 #
 # In `to_prepare` so a code reload in development re-applies it to the
 # freshly loaded controller classes; the `include?` guards keep a repeated

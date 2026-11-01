@@ -138,6 +138,14 @@ class Media::Asset < ApplicationRecord
     made? && generation.fingerprint == fingerprint
   end
 
+  # The variation digests of every width a page may still name: the current
+  # generation's and the previous one's, which a page cached before the switch
+  # still lists. The public representation routes serve these and nothing else
+  # of a library image (`ActiveStoragePublicFiles`).
+  def served_digests
+    %w[current previous].flat_map { |name| generation(name)&.files.to_a.map(&:digest) }.compact_blank
+  end
+
   # `[address, width]` for every width made, ascending; empty without a
   # generation. A bare path: no query, no host. The original is never a
   # candidate: only a file this app made is addressed.
