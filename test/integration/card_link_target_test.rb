@@ -245,4 +245,110 @@ class CardLinkTargetTest < ActionDispatch::IntegrationTest
       assert_links_to address
     end
   end
+
+  test "a preview shows a draft inside the viewer's read scope, and tells them nothing of one outside it" do
+    branch = @section
+    inside = create_page(title: "Draft inside", parent: branch, published: false)
+    outside = create_page(title: "Draft outside", published: false)
+    holder = create_page(title: "Holder", parent: branch)
+    [ inside, outside ].each { |target| add_card(reference(target), page: holder) }
+    %w[pages.read pages.edit].each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ branch.id ] }) }
+    sign_in_as(users(:editor_branch))
+
+    get "/preview#{PublicSite::Urls.new.path_for(holder, "en")}"
+
+    assert_response :success
+    assert_select ".content-block--card h3 a", count: 1
+    assert_select ".content-block--card h3 a[href=?]", PublicSite::Urls.new(preview: true).path_for(inside, "en")
+    assert_select ".content-block--card h3", count: 2
+    assert_not_includes response.body, PublicSite::Urls.new.path_for(outside, "en")
+  end
+
+  test "a post's address that moves when a list block on another page is published reaches the card, and until then it is a 304" do
+    first = create_page(title: "First list")
+    second = create_page(title: "Second list")
+    blocks = [ first, second ].map do |page|
+      saved = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+      assert saved.ok?, saved.errors.to_sentence
+      publish_changes(page)
+      saved.record
+    end
+    post = create_post(title: "Hello")
+    add_card(reference(post))
+    was = PublicSite::Urls.new.path_for(post, "en")
+    assert_equal "/first-list/hello", was
+    before = etag_of(holder_path)
+    assert_links_to was
+
+    assert ContentBlocks::Destroy.call(blocks.first.reload).ok?
+    get holder_path, headers: { "If-None-Match" => before }
+    assert_response :not_modified, "a list block removed in the rows moves no address"
+
+    publish_changes(first)
+    assert_not_confirmed holder_path, before
+    assert_links_to "/second-list/hello"
+  end
+
+  # All the statements of a rendered page. Each page is asked once first, so
+  # what a first request warms (the settings row's cache, the theme) counts in
+  # neither figure.
+  def statements_of_holder
+    get holder_path
+    capture_sql { get holder_path }
+  end
+
+  def assert_same_statements(one, several, what)
+    assert_equal one.size, several.size, "#{what}, one card:\n#{one.join("\n")}\n\nseveral:\n#{several.join("\n")}"
+  end
+
+  test "a page of cards linked to pages costs the same statements for one card and for four, and for one target four times" do
+    add_card(reference(@target))
+    one = statements_of_holder
+
+    add_card(reference(@target))
+    add_card(reference(@target))
+    add_card(reference(@target))
+    assert_same_statements one, statements_of_holder, "one target four times"
+
+    others = Array.new(3) { |index| create_page(title: "Target #{index}") }
+    ContentBlock.where(owner: @holder).destroy_all
+    add_card(reference(@target))
+    one = statements_of_holder
+    others.each { |other| add_card(reference(other)) }
+    assert_same_statements one, statements_of_holder, "four targets"
+  end
+
+  test "a page of cards linked to posts costs the same statements for one card and for four, and for one target four times" do
+    listing = create_page(title: "Blog")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    publish_changes(listing)
+    posts = Array.new(4) { |index| create_post(title: "Post #{index}") }
+
+    add_card(reference(posts.first))
+    one = statements_of_holder
+    posts.drop(1).each { |post| add_card(reference(post)) }
+    several = statements_of_holder
+    assert_same_statements one, several, "four posts"
+    assert_select ".content-block--card h3 a", count: 4
+
+    ContentBlock.where(owner: @holder).destroy_all
+    4.times { add_card(reference(posts.first)) }
+    assert_same_statements one, statements_of_holder, "one post four times"
+  end
+
+  test "a card in a section's column is read with the rest of the page, and a 304 reads no target" do
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: @holder), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    assert section, "the section is saved"
+    saved = ContentBlocks::Save.call(ContentBlock.new(owner: @holder),
+      attributes: { block_type: "card", section_id: section.id, section_column: 1, settings: { "link" => reference(@target), "title" => "Card words" } })
+    assert saved.ok?, saved.errors.to_sentence
+    add_card(reference(@target))
+    get holder_path
+    assert_select ".content-block--card h3 a", count: 2
+    etag = response.headers["ETag"]
+
+    statements = capture_sql { get holder_path, headers: { "If-None-Match" => etag } }
+    assert_response :not_modified
+    assert_equal 1, statements.grep(/page_hierarchies/).size, "the resolver's own, for the page asked for:\n#{statements.join("\n")}"
+  end
 end

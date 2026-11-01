@@ -16,13 +16,13 @@ en:
           over: "%{used} of %{limit} characters · %{over} over"
         # A link field's other half: a page or a post chosen by its title
         # (`Admin::Fields::LinkField`). `unavailable` is one answer for a target
-        # the viewer can't read and one that is gone: it must tell neither.
+        # outside the viewer's scope, in the trash or gone: it must tell none.
         link_field:
           chosen: Linked page or post
           clear: Clear
           not_public: Not public at the moment, so the card draws no link.
           search: Or search pages and posts…
-          unavailable: A page or post that isn't available
+          unavailable: A page or post you can't open here
           untitled: Untitled
         # A theme's choices (`theme.yml`): the empty choice of a style list
         # and of an icon list, and a stored name the theme does not declare.

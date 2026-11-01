@@ -20,8 +20,6 @@ Rails.application.config.to_prepare do
   # The theme's lists for a `:theme_choice` field, asked at each validation
   # and each draw (`ContentModel.theme_choices`).
   ContentModel.theme_choices = ->(list) { Theme.current.choices(list) }
-  # Whether a `:link` field may take a new reference to a page or a post.
-  ContentModel.link_target_readable = ->(reference) { LinkTargets.readable(reference) }
   begin
     # The field types first: every definition below declares its fields
     # against them (`ContentModel::Definition#field`).

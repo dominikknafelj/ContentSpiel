@@ -65,8 +65,6 @@ module Admin
       end
 
       def search_url = helpers.admin_link_targets_path
-
-      def group_id = "#{input_id}-group"
     end
   end
 end

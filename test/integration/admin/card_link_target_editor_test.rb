@@ -38,22 +38,22 @@ class Admin::CardLinkTargetEditorTest < ActionDispatch::IntegrationTest
     assert_equal "cs:page/#{@outside.id}", @card.reload.settings["link"]
   end
 
-  test "a new reference outside the viewer's scope is refused like one to nothing, and writes nothing" do
+  test "a new reference to what the viewer can't read is saved, tells them nothing, and a malformed one is refused" do
     other = ContentBlocks::Save.call(ContentBlock.new(owner: @holder), attributes: { block_type: "card", settings: { "title" => "Second" } }).record
     sign_in_as(users(:editor_branch))
-    answers = [ "cs:page/#{@outside.id}", "cs:page/999999", "cs:page/nonsense" ].map do |link|
+    send_link = ->(link) {
       patch "/cs-studio/pages/#{@holder.id}/content_blocks/#{other.id}",
         params: { block: { settings: { link: link, title: "Second" } }, base_updated_at: other.reload.updated_at.iso8601(6) }, as: :turbo_stream
-      assert_response :unprocessable_entity
-      assert_nil other.reload.settings["link"]
-      response.body.gsub(/<input[^>]*>/, "").gsub(link, "").gsub(/value="[^"]*"/, "")
-    end
-    assert_not_includes answers.first, "Outside target"
+    }
 
-    patch "/cs-studio/pages/#{@holder.id}/content_blocks/#{other.id}",
-      params: { block: { settings: { link: "cs:page/#{@inside.id}", title: "Second" } }, base_updated_at: other.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    send_link.call("cs:page/nonsense")
+    assert_response :unprocessable_entity
+    assert_nil other.reload.settings["link"]
+
+    send_link.call("cs:page/#{@outside.id}")
     assert_response :success
-    assert_equal "cs:page/#{@inside.id}", other.reload.settings["link"]
+    assert_not_includes response.body, "Outside target"
+    assert_equal "cs:page/#{@outside.id}", other.reload.settings["link"]
   end
 
   test "the picker offers only what the person may read" do

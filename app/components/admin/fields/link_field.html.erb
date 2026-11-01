@@ -5,7 +5,7 @@
      data-action="input->admin--ui--link-target#swallow change->admin--ui--link-target#swallow">
   <%= tag.input type: "text", inputmode: "url", name: input_name, id: input_id, value: value, class: setup_input_class, required: field.required?, hidden: reference.present?,
         data: { admin__ui__link_target_target: "value" } %>
-  <%= tag.div id: group_id, role: "group", "aria-label": t(".chosen"), hidden: reference.nil?, class: "flex items-center gap-2 text-sm text-ink",
+  <%= tag.div role: "group", "aria-label": t(".chosen"), hidden: reference.nil?, class: "flex items-center gap-2 text-sm text-ink",
         data: { admin__ui__link_target_target: "chip" } do %>
     <span class="min-w-0 truncate" data-admin--ui--link-target-target="title"><%= chosen_title %></span>
     <button type="button" class="shrink-0 rounded-cs px-1.5 py-0.5 text-meta underline hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:hidden"

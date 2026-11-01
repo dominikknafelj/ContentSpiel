@@ -392,7 +392,17 @@ module ThemeHelper
   # one outline, the one its page is drawn from").
   def block_outline(page)
     @block_outlines ||= {}
-    @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
+    outline = @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
+    # Here and not where an outline is made, because a post's page hands its
+    # outline over from the controller before `stale?`, and a 304 must not pay
+    # for addresses it does not draw. Any value of a block's settings that reads
+    # as a reference counts: a stray one costs a read and draws nothing.
+    (@link_targets_read ||= {}.compare_by_identity)[outline] ||= begin
+      references = outline.reading_order.flat_map { |block| block.settings.to_h.values.filter_map { |value| ContentModel::LinkReference.parse(value) } }
+      public_urls.prefetch_targets(references) if references.any?
+      true
+    end
+    outline
   end
 
   # The anchors of the shown page's sections, from the blocks the page was

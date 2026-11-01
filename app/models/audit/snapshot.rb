@@ -92,7 +92,7 @@ module Audit
     # stored.
     def schema_fields(record) = record.respond_to?(:definition) ? record.definition&.fields.to_a : []
 
-    def code_in?(fields) = fields.any? { |field| digested?(field) || field.field_type&.audit == :reference || (field.group? && code_in?(group_fields(field))) }
+    def summarised_field_in?(fields) = fields.any? { |field| digested?(field) || field.field_type&.audit == :reference || (field.group? && summarised_field_in?(group_fields(field))) }
 
     # A field whose type is audited as two digests and two lengths
     # (`FieldType#audit`), the `:code` type's way.
@@ -164,7 +164,7 @@ module Audit
     def field_changes_for(record, changes = record.saved_changes)
       translated = record.class.respond_to?(:mobility_attributes) ? record.class.mobility_attributes.map(&:to_s) : []
       fields = schema_fields(record)
-      fields = [] unless code_in?(fields)
+      fields = [] unless summarised_field_in?(fields)
 
       changes = changes.except(*IGNORED_CHANGES).each_with_object({}) do |(field, (old, new)), result|
         next unless keep?(field)

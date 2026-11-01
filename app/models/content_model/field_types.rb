@@ -310,16 +310,11 @@ module ContentModel
 
       def tag = plain(:tag, translatable: false)
 
-      # An address a visitor follows (see `link?`), or a reference to a page or
-      # a post (`LinkReference`). The same on every language, so never
-      # translated.
-      #
-      # A NEW reference must name something the actor may read
-      # (`ContentModel.link_target_readable`), with one answer for what is
-      # outside their scope and what does not exist. One the record already
-      # stores, or carries (a duplicate, a discard), is not this save's to
-      # refuse: a target deleted since is left stored and draws nothing, and
-      # someone who can't read the target can still save the card's title.
+      # An address a visitor follows (see `link?`), or a well formed reference
+      # to a page or a post (`LinkReference`), whatever the actor may read: the
+      # editor shows the title only of what they may read, and a target that
+      # is gone or was never there draws nothing. The same on every language,
+      # so never translated.
       def link
         FieldType.new(
           name: :link, cast: STRIPPED, translatable: false, audit: :reference,
@@ -328,11 +323,7 @@ module ContentModel
             refuse_choice_and_string_options(options)
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
-            next if value.nil? || value == stored
-
-            reference = LinkReference.parse(value)
-            valid = reference ? ContentModel.link_target_readable.call(reference) : link?(value)
-            errors.add(field.name, :invalid) unless valid
+            errors.add(field.name, :invalid) if value && !link_value?(value)
           }
         )
       end

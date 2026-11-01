@@ -18,7 +18,6 @@ class ContentModel::LinkReferenceTest < ActiveSupport::TestCase
     reference = ContentModel::LinkReference.parse("cs:page/12")
     assert_equal [ "page", 12 ], [ reference.type, reference.id ]
     assert_equal "post", ContentModel::LinkReference.parse("cs:post/7").type
-    assert_equal "cs:post/7", ContentModel::LinkReference.parse("cs:post/7").to_s
     assert_not Types.link?("cs:page/12")
     assert Types.link_value?("cs:page/12")
     assert Types.link_value?("/about")
@@ -28,7 +27,7 @@ class ContentModel::LinkReferenceTest < ActiveSupport::TestCase
   test "anything else is no reference, whatever the value, and never raises" do
     [ nil, 12, [], {}, "", "cs:", "cs:page", "cs:page/", "cs:page/abc", "cs:page/0", "cs:page/012", "cs:page/-1", "cs:page/1.5", "cs:page/1/2",
       "cs:page/1 ", " cs:page/1", "cs:page/1\n", "\ncs:page/1", "CS:page/1", "cs:PAGE/1", "cs:user/1", "cs:media/1", "cs://page/1", "cs:page/1?x", "cs:page/1#x",
-      "cs:page/#{"1" * 19}", "cs:page/١", "cs:page/1\xFF", "/about", "#team" ].each do |value|
+      "cs:page/#{"1" * 19}", "cs:page/١", "cs:page/1\xFF", "cs:page/1\xFF".b, "cs:page/1".b, "/about", "#team" ].each do |value|
       assert_nil ContentModel::LinkReference.parse(value), "#{value.inspect} is no reference"
     end
   end
@@ -41,28 +40,12 @@ class ContentModel::LinkReferenceTest < ActiveSupport::TestCase
     end
   end
 
-  test "a reference to something that exists is taken, with its outer white space off; one to nothing is refused like one the actor can't read" do
+  test "a well formed reference is taken with its outer white space off, whatever it names and whoever asks" do
     set = fields("target" => " cs:page/#{@page.id} ")
     assert set.valid?
     assert_equal "cs:page/#{@page.id}", set.untranslated_hash["target"]
 
-    assert_not fields("target" => "cs:page/#{@page.id + 1000}").valid?
-    assert_not fields("target" => "cs:post/#{@page.id + 1000}").valid?
-  end
-
-  test "someone who can't read the target can't set a new reference to it, and the answer is the same as for nothing" do
-    as(users(:editor_branch)) do
-      unreadable = fields("target" => "cs:page/#{@page.id}")
-      missing = fields("target" => "cs:page/#{@page.id + 1000}")
-      assert_not unreadable.valid?
-      assert_not missing.valid?
-      assert_equal missing.errors.full_messages, unreadable.errors.full_messages
-
-      assert fields({ "target" => "cs:page/#{@page.id}" }, { "target" => "cs:page/#{@page.id}" }).valid?, "a stored reference still saves"
-    end
-  end
-
-  test "a stored reference whose target was deleted still saves: it is left stored and draws nothing" do
-    assert fields({ "target" => "cs:page/999999" }, { "target" => "cs:page/999999" }).valid?
+    assert fields("target" => "cs:page/999999").valid?, "a target that is gone stays stored and draws nothing"
+    as(users(:editor_branch)) { assert fields("target" => "cs:page/#{@page.id}").valid? }
   end
 end

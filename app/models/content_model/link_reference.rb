@@ -17,18 +17,16 @@ module ContentModel
   # Strict by shape: lowercase, no sign, no leading zero, `\A…\z` so a line
   # break is not a way past it, and at most 18 digits so an id always fits the
   # column's bigint. `parse` is total over any value and raises nothing.
-  LinkReference = Data.define(:type, :id) do
-    def to_s = "cs:#{type}/#{id}"
-  end
+  LinkReference = Data.define(:type, :id)
 
   class LinkReference
     FORMAT = %r{\Acs:(page|post)/([1-9][0-9]{0,17})\z}
 
     def self.parse(value)
-      return nil unless value.is_a?(String)
+      return nil unless value.is_a?(String) && value.encoding == Encoding::UTF_8 && value.valid_encoding?
 
-      match = FORMAT.match(value.dup.force_encoding(Encoding::UTF_8).scrub(""))
-      match && value.valid_encoding? ? new(type: match[1], id: match[2].to_i) : nil
+      match = FORMAT.match(value)
+      match && new(type: match[1], id: match[2].to_i)
     end
   end
 end
