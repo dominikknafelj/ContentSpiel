@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_31_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -458,6 +458,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_090000) do
     t.datetime "mail_last_sent_at"
     t.datetime "mail_failed_at"
     t.jsonb "mail_failure"
+    t.string "image_format", default: "webp", null: false
+    t.integer "image_quality_webp", default: 75, null: false
+    t.integer "image_quality_avif", default: 50, null: false
+    t.jsonb "image_widths", default: [480, 960, 1600, 2400], null: false
+    t.integer "image_max_upload_mb", default: 10, null: false
   end
 
   create_table "tags", force: :cascade do |t|

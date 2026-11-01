@@ -66,6 +66,18 @@ class SiteSetting < ApplicationRecord
   # title edit -- `AI.configured?` already treats it as not set up.
   validate :ai_provider_is_registered, if: :will_save_change_to_ai_provider?
 
+  # Image delivery's settings (`ImageSettings`): bounds checked only when the
+  # column changes, like the mail fields. Widths are stored ascending.
+  before_validation :sort_image_widths
+  validate :image_format_is_offered, if: :will_save_change_to_image_format?
+  validate :image_widths_are_in_bounds, if: :will_save_change_to_image_widths?
+  validates :image_quality_webp, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE },
+    if: :will_save_change_to_image_quality_webp?
+  validates :image_quality_avif, numericality: { only_integer: true, in: ImageSettings::QUALITY_RANGE },
+    if: :will_save_change_to_image_quality_avif?
+  validates :image_max_upload_mb, numericality: { only_integer: true, in: ImageSettings::UPLOAD_MB_RANGE },
+    if: :will_save_change_to_image_max_upload_mb?
+
   validate :only_one_record_exists, on: :create
 
   # The title is the site's one required translated field, and only in the
@@ -217,6 +229,22 @@ class SiteSetting < ApplicationRecord
 
     port = Integer(raw.to_s.strip, 10, exception: false)
     errors.add(:mail_port, :port_range) unless port && (1..65_535).cover?(port)
+  end
+
+  def sort_image_widths
+    self.image_widths = image_widths.sort if image_widths.is_a?(Array) && image_widths.all?(Integer)
+  end
+
+  def image_format_is_offered
+    errors.add(:image_format, :inclusion) unless ImageSettings::FORMATS.include?(image_format)
+  end
+
+  def image_widths_are_in_bounds
+    widths = image_widths
+    unless widths.is_a?(Array) && widths.all?(Integer) && ImageSettings::WIDTH_COUNT.cover?(widths.size) &&
+        widths.all? { |w| ImageSettings::WIDTH_RANGE.cover?(w) } && widths.uniq.size == widths.size
+      errors.add(:image_widths, :image_widths)
+    end
   end
 
   def mail_security_is_offered

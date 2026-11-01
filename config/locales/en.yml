@@ -95,6 +95,9 @@ en:
             mail_security:
               format: "%{message}"
               security_choice: "Security must be STARTTLS or TLS."
+            image_widths:
+              format: "%{message}"
+              image_widths: "Use 1 to 6 different widths, each from 160 to 4000 pixels."
         user:
           attributes:
             # The password length rule's message is a whole sentence
