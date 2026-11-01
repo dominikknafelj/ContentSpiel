@@ -1,6 +1,6 @@
 # Theme choices: section styles, page templates and the Card block
 
-Status: design (2026-10-31), not built. Issues #104 (section styles), #106 (page templates) and #105 (the Card block). The owner's decisions are those of 2026-10-31 and are binding; calls marked "(my call)" are this spec's and the owner may overturn them; calls marked "(controller's call)" were made on a reviewer's points by the coordinator on 2026-10-31. The owner's answers of 2026-10-31 to this spec's first questions are folded in ("The owner's answers"). Looks are not decided here: "Open design questions" lists what goes to the Design System. The architecture review of 2026-10-31 is folded in where this work touches the code a finding is about ("The architecture review's findings", near the end).
+Status: built (2026-11-01); "As built", at the end, lists where the build left this design. Issues #104 (section styles), #106 (page templates) and #105 (the Card block). The owner's decisions are those of 2026-10-31 and are binding; calls marked "(my call)" are this spec's and the owner may overturn them; calls marked "(controller's call)" were made on a reviewer's points by the coordinator on 2026-10-31. The owner's answers of 2026-10-31 to this spec's first questions are folded in ("The owner's answers"). Looks are not decided here: "Open design questions" lists what goes to the Design System. The architecture review of 2026-10-31 is folded in where this work touches the code a finding is about ("The architecture review's findings", near the end).
 
 ## Why
 
@@ -347,3 +347,56 @@ In `contentspiel-docs`, updated before the release:
 - `integrators/how-it-works/blocks-content-types-and-registries.md`: page types are gone; a page's template is the theme's.
 
 In this repository: `docs/reference/theme-choices.md` (new), the tables and a pointer in `docs/reference/theming.md` (decision 5's wording, "What is not built" without "A template per page type"), `docs/reference/publishing.md` (`settings` in the copy, the migration's rewrite), `docs/reference/content-blocks-and-types.md` (the Card, the `FieldType` seam in "Adding a block type" step 3), `CHANGELOG.md`, the CLAUDE.md index and its one-line rules, and the roadmap's rows (#104, #105, #106; page types in "Next", item 2).
+
+## As built (2026-11-01)
+
+The mechanism's account is `docs/reference/theme-choices.md`; the theme's side (the format, the tables, the fence) is `docs/reference/theming.md`; the Card and "A new field type" are in `docs/reference/content-blocks-and-types.md`; the release notes are `CHANGELOG.md`.
+
+### Rulings on gaps in the spec
+
+1. **The `FieldType` value names no component.** Dependency direction keeps `ContentModel` from naming CS Studio, so a type's input and its read-only display are its `Admin::Fields::<Type>Field` (found by name) and that class's `self.display`; the guard that every registered type answers every question is two tests, one of the model (`test/models/content_model/field_types_test.rb`) and one of the components (`test/components/admin/fields/field_types_studio_test.rb`). `Admin::Ui::FieldComponent::TRANSLATABLE_TYPES` stays, derived from the registry, as a named exception of `test/lib/field_type_branches_test.rb`, because an existing test reads it and existing tests stay unchanged.
+2. **Carried names.** "A save keeps an unknown name it did not change" (decision 2) did not cover a duplicate or a discard, which write a name onto a record that did not store it: `carried_settings` (on `ContentBlock` and `Page`, not stored) makes the source's names count as stored there. The discard sets it for the page and for every restored and re-created block, so discarding changes to a section whose published style the theme dropped is no longer refused.
+3. **`:theme_choice` is refused for content types and field groups**, beside outside types: choices for posts are a non-goal.
+4. **An entry of the theme naming a default entry** keeps the theme's own label and fields; only the file falls back.
+5. **`theme:new` writes a `theme.yml` of comments only** (the spec's "one more file", showing the three lists with the default's entries) and copies the two page templates.
+6. **The Card's component line was written before design questions A and B**, since its seven names were the spec's; only its tokens and the default icon names waited for them.
+7. **Absent means the default template.** A page stores no template while it uses the theme's first: the settings form and the New page dialog send blank for the first, and `Pages::Save` drops a template equal to the first when the page stores none, so an autosave of a title never pins a page (and never marks a live page as changed with nothing to publish). The cost: a page cannot be pinned to the first template explicitly.
+8. **`page_templates: []` is refused** (a page needs a template; omit the list to take the default's). The other lists keep the spec's rule: an empty list is none.
+9. **The hero fields are always in the settings form**, shown or hidden in the browser by the chosen option's declared fields (`data-fields`, `admin--editor--template-fields`), never by replacing part of the form: a form with unsaved text is never replaced. A hidden hero still posts its values.
+10. **The deep check also refuses `@page`, `@post` and `@post_list_block` in a page template**, naming the local to write: the locals are the contract and instance variables are not promised. A theme template written against today's internals is told to change at `theme:check`, not refused at boot.
+11. **A card with a link and a text but no title draws the link on the text**: the link an editor gave is never dropped silently.
+12. **The default icon names use underscores** (`arrow_right`, `map_pin`): the one name rule forbids hyphens; the files keep Lucide's names.
+13. **The development `<title>` annotation fix was folded in**: view-annotation comments ended up inside `<title>` in development (`PagesHelper#themed_title` now takes out exactly the BEGIN/END annotations there); it sits in the public layout's head this work touches, and a theme author hit it.
+
+### The owner's decisions taken during the build
+
+- **The Card's tokens (question A)**: (b), three themed tokens, `--th-card-ground`, `--th-card-line`, `--th-card-icon`; the title `--th-ink`, the text `--th-dim`. `--th-card-line` is `--th-meta` for now; the owner may switch it to `--th-line-strong` (one line; the docs promise the name, not the value).
+- **The default icons (question B)**: (a), twelve Lucide outlines: arrow right, check, star, heart, mail, map pin, calendar, user, shield, briefcase, clock, globe.
+- **Icon rules** (binding, 2026-11-01). The drawing rules (24 view box, stroke 2, `currentColor`, round caps, no fill) apply to the DEFAULT set only. A theme's own icons may use their own stroke, filled shapes, several layers with classes, gradients and filters defined in the theme's layout (referenced as `url(#…)`) and their own size (`width`, `height` and `viewBox` on the root, kept as written). **Ids are refused in every icon**, which departs from decision 8's "the check does not refuse ids": an icon drawn twice repeats its ids, and a reference meant for the layout could find the icon's own. The fence also grew past decision 8's list, because the file is checked as XML and inlined into HTML: a `style` attribute, an element that is not one of SVG's drawing elements or is written with a prefix (an undeclared `xlink:` prefix was a bypass a review found), CDATA, a processing instruction and a comment an HTML parser ends early are refused, and names are compared lowercased by their local part. The bytes inlined are fenced again at render (`Theme#icon_svg`).
+- **A section's anchor** (not in this spec; approved 2026-11-01): an optional Anchor setting on a Section, lowercase letters, digits and hyphens, a letter first, at most 40, refused otherwise and never cleaned; unique among the page's sections (checked in `ContentBlocks::Save` under the page's lock, a partial unique expression index behind it); cleared on duplicate; shared by every language; in the copy; drawn as the section's `id`; a heading id equal to an anchor gets a suffix; the Section's template gets `anchor` (a contract name). A discard releases the anchors it changes before writing any back.
+- **The image loading state is the theme's to restyle**: `img[data-image-preview]` and `img[data-image-empty]` (`Media::PictureComponent`) became contract names (`Theme::Contract::ATTRIBUTES`, a ledger line, a table in `theming.md` and a `CHANGELOG.md` line).
+- **A friction log** was kept while a real theme was built on this branch (in generic terms, no design of it in this repository); each entry is fixed by this work, documented in the references, or a row of `docs/roadmap.md` ("Theme choices", "Found building a theme").
+
+### Where the build left the spec
+
+- **`theme.yml` is checked more strictly than decision 1 says**: besides YAML's safe loader, a tag, an anchor, an alias, a key written twice, nesting deeper than 16 and a file over 64 KB are each refused, because each passed the plain loader (a `!!binary` value, YAML's last-key-wins, a `SystemStackError` out of a reload). `settings:` is refused as "`settings` is not available. Appearance settings are not built yet." A page template file no entry names, and a declared template with no file the default lacks, are refused both ways (decision 5).
+- **The deep check flags `landing?` and `page_type`** as a method call read from a tag's code (decision 5's fence), and the instance variables of a page template (ruling 10).
+- **The subpages list's addresses are read in one statement in `published_views`**, so every list that helper answers is prefetched, not the subpages list alone (decision 11's row "Public read path").
+- **Twelve field types** are on the registry: the ten that existed and `:link` and `:theme_choice` (decision 7).
+- **Test citations.** The new reference file, `docs/reference/theme-choices.md`, cites tests by file, not by their full names, which takes the review's "stop citing tests by their full name" further than decision 11's row said ("Test citations keep the house style"); the existing references keep theirs.
+
+### The architecture review's findings, as built
+
+| Finding | Promised | Built | |
+|---|---|---|---|
+| Shrink CLAUDE.md to an index, the commands and the unguarded rules | part pulled in | Five new rules in `CLAUDE.md`, one line each with the guard's file (the field-type registry, the stored-name rule, CS Studio and the theme, the icon fence, the page's template), and one index line for `docs/reference/theme-choices.md`; the copy rule names `COPY_MIGRATIONS` | DONE |
+| Version the CMS: a version number, release tags and a changelog | part pulled in | `CHANGELOG.md` at the top, Unreleased under the four headings, every contract change of this work | DONE |
+| The docs disagree on whether a CMS image is published | part pulled in | Already true on `main` when this was built: `theming.md`'s "Deployment" says the image is published and "What is not built" names no published image; read again, nothing to correct | DONE |
+| Keep code comments about invariants, not plan steps and review rounds | part pulled in | No `Task N`, round or spec step in a comment this work wrote (a grep of its diff over `app`, `lib`, `config`, `db` and `test`) | DONE |
+| Split the reference docs and stop citing tests by their full name | part pulled in | `docs/reference/theme-choices.md` holds the mechanism and cites test files; `theming.md` got the contract's tables, the theme author's format (`theme.yml`, the fence, building icons, which the friction log asked for) and a pointer | DONE |
+| Public read path: one path query per link, and lists that load every body | part pulled in | `PublicSite::Urls#prefetch`, called by `published_views` (`app/helpers/theme_helper.rb`); `test/integration/public_subpages_test.rb` holds one statement at 3 and 30 subpages | DONE |
+| A field type's behaviour is spread over seven core files | part pulled in | `ContentModel::FieldType`, `ContentModel::FieldTypes` with all twelve types, `test/lib/field_type_branches_test.rb` and the two every-question tests | DONE |
+| Pages have no extensible fields | part pulled in | `pages.settings` (jsonb, a closed set of keys), in `Publishing::CONTENT`, the overview and the discard, written by `Pages::Save`; the enum gone | DONE |
+| Add a schema field type that refers to library images | advanced | The seam `:media` would use is built; the type is not | DONE |
+| Client sites need editable appearance and site structure | advanced | Templates per page kind are built; `theme.yml` is the manifest's home and refuses `settings:` with its own sentence | DONE |
+| Remove compatibility code a pre-release CMS does not need | followed | No alias for `page_type` or `landing?`, no reader of old copies: the migration rewrites every copy | DONE |
