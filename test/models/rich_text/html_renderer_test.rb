@@ -307,6 +307,10 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
       before_html = document.to_html(locale: "en", urls: PublicSite::Urls.new)
       assert_not_includes before_html, "srcset"
 
+      # A live page shows the image, so its finished widths move the version.
+      page = create_page(title: "Shows it")
+      page.update!(hero_media_asset: asset)
+      Media::UsageIndex.refresh(page)
       make_renditions!(asset)
       Current.reset
 

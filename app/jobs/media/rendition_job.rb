@@ -19,7 +19,7 @@ module Media
   # afterwards: two generations are kept so a page cached under the old one
   # still finds its files.
   #
-  # The content version moves once per image, at the end, because the library's
+  # The content version moves once per image, at the end, and only for an image a live page can show, because the library's
   # widths change the `srcset` a cached page holds. The variant records the
   # job makes do not bump (`config/initializers/public_site_version.rb`).
   #
@@ -103,9 +103,11 @@ module Media
         renditions_fingerprint: fingerprint, renditions_failed_at: nil, renditions_error: nil
       )
       drop_generation(asset, old_previous, kept: [ current, old_current ])
-      # Every finished image moves the content version once: the generation
-      # just written changes the srcset a cached page holds.
-      PublicSite.bump_version!
+      # A finished image moves the content version once, when a live page can
+      # show it: the generation just written changes the srcset a cached page
+      # holds. The write above is committed before this question, so a page
+      # published meanwhile either sees the generation or bumps after it.
+      PublicSite.bump_version! if asset.shown_publicly?
     end
 
     # The variant records of the generation before the one that was current,

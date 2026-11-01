@@ -165,6 +165,9 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
 
   test "one bump of the content version per image, at the end of the job" do
     asset = upload("wide.png")
+    page = create_page(title: "Shows it")
+    page.update!(hero_media_asset: asset)
+    Media::UsageIndex.refresh(page)
 
     bumps = 0
     counter = PublicSite.method(:bump_version!)

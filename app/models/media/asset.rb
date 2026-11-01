@@ -101,14 +101,25 @@ class Media::Asset < ApplicationRecord
   # autosave, and a failed save whenever the stored file was unreachable.
   before_save :cache_metadata_from_file, if: :file_changing?
 
-  # Every committed change to a library image moves the public content
-  # version (`PublicSite`, technical cleanup spec §4.8): an upload, its
-  # title, alt or caption, the trash and a purge -- and a `touch`, which is
-  # what replacing the attached file does. Used or not: a rendered page bakes
-  # in the image's URL, alt, caption and dimensions, and whether a *live*
-  # page shows this image is a lookup across heroes, image blocks and
-  # rich-text bodies, which costs more than the bump it would save.
-  after_commit { PublicSite.bump_version! }
+  # A committed change to a library image (an upload, its title, alt or
+  # caption, the trash, a purge, a `touch`) moves the public content version
+  # only when a live page can show the image: a rendered page bakes in the
+  # image's address, alt, caption and dimensions, and a page that does not use
+  # it holds none of them. No race loses a bump: the usage rows are written in
+  # the transaction of the save that makes a page use the image, and that save
+  # moves the version itself when it publishes; a change committed here before
+  # that row exists is read by the page's later render, and one committed
+  # after finds the row. A question that fails answers yes: a needless bump
+  # costs a cache, a missed one a stale page.
+  after_commit { PublicSite.bump_version! if shown_publicly? }
+
+  def shown_publicly?
+    usages.shown_publicly.exists?
+  rescue StandardError => e
+    Rails.logger.error("[media_asset] shown_publicly? failed: #{e.class}")
+    true
+  end
+
 
   # The widths are made once the upload has committed, on the images queue
   # (`Media::RenditionJob`); until then the preview stands in for the image.

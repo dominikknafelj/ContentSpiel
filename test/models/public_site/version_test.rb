@@ -469,19 +469,34 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
 
   # --- Library images ----------------------------------------------------------
 
-  test "uploading, editing, trashing and purging a library image each move" do
+  # An image moves the version only when a live page can show it
+  # (`Media::Asset#shown_publicly?`; `test/models/media/asset_version_test.rb`).
+  test "uploading, editing, trashing and purging a library image no page shows stay" do
     asset = nil
-    assert_moves("an upload") { asset = ok(Media::Upload.call(file: png_upload)).record }
-    assert_moves("an image's alt") { ok(Media::Save.call(asset, translations: { "en" => { alt: "A picture" } })) }
-    assert_moves("an image's title") { ok(Media::Save.call(asset, attributes: { title: "Renamed" })) }
-    assert_moves("trashing an image") { ok(Trash::Move.call(asset)) }
-    assert_moves("restoring an image") { ok(Trash::Restore.call(asset.reload)) }
+    assert_stays("an upload") { asset = ok(Media::Upload.call(file: png_upload)).record }
+    assert_stays("an image's alt") { ok(Media::Save.call(asset, translations: { "en" => { alt: "A picture" } })) }
+    assert_stays("an image's title") { ok(Media::Save.call(asset, attributes: { title: "Renamed" })) }
+    assert_stays("trashing an image") { ok(Trash::Move.call(asset)) }
+    assert_stays("restoring an image") { ok(Trash::Restore.call(asset.reload)) }
     ok(Trash::Move.call(asset.reload))
-    assert_moves("purging an image") { ok(Trash::Purge.call(asset.reload)) }
+    assert_stays("purging an image") { ok(Trash::Purge.call(asset.reload)) }
   end
 
-  test "an image's file replaced moves" do
+  test "editing an image a live page shows moves" do
     asset = create_media_asset
+    page = create_page(title: "Live")
+    page.update!(hero_media_asset: asset)
+    publish_changes(page)
+
+    assert_moves("an image's alt") { ok(Media::Save.call(asset, translations: { "en" => { alt: "A picture" } })) }
+    assert_moves("an image's title") { ok(Media::Save.call(asset, attributes: { title: "Renamed" })) }
+  end
+
+  test "an image's file replaced moves when a live page shows it" do
+    asset = create_media_asset
+    page = create_page(title: "Live")
+    page.update!(hero_media_asset: asset)
+    publish_changes(page)
 
     assert_moves do
       asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
