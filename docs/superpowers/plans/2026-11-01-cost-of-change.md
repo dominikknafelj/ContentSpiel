@@ -131,3 +131,23 @@ Follow the spec's Part 1 exactly. Before starting, copy `CLAUDE.md` to `/private
 - [ ] Write the quick start: about two screens. `theme.yml`, template locals, links to the Section and Card tables, the `settings:` seed example, the `.to_h` note, the rebuild and its notice. Generic examples only.
 - [ ] Update the three image pages to the decided words.
 - [ ] Run `bin/check`: no problems. Commit.
+
+### Task 9: the filter bar's one height (owner delegated to a design agent, 2026-11-01)
+
+Rule (Design System): "Controls in one row share one height. Forms are 42px; a filter bar is 38px, set by the bar, never by a control."
+
+Heights today, from the classes: select 42, search 38, segment 34, "Clear" 42. Text sizes stay 16px and 14px.
+
+Files:
+- `content-spiel.css`: `--cs-control-compact: 2.375rem`, written once; the public theme does not import it.
+- `Admin::FilterHelper#filter_form_options`: class `admin-filter-bar mb-4 flex flex-wrap items-start gap-3`.
+- `content-spiel.tailwind.css`, all under `.admin-filter-bar`:
+  - `> div, > fieldset`: `display: flex`.
+  - `input:not(.sr-only), select, a.inline-block, button`: `min-height: var(--cs-control-compact); padding-block: 0`; the link and button also `display: inline-flex; align-items: center`.
+  - `fieldset label`: `min-height: calc(var(--cs-control-compact) - 2px); padding-block: 0`.
+- Use min-height, never a group height: media's segments wrap and the group clips. Posts' segment group gains `flex-wrap`.
+- The audit log's subject chip (34px) in its bar is included. Check the translations bar. Standalone segments and Trash tabs stay 34.
+
+The design agent wrote this without rendering it. Verify in a browser test; unlayered CSS beats utilities, so a `py-*` beside `.cs-select` is dead.
+
+Tests: the token is written once (`test/lib/admin_design_rules_test.rb`); a system test measures every control of the bar at one height on Posts, Media, the media picker and the audit log, at a wide window, and that a wrapped row still shows every segment. Update `docs/reference/design-system.md`.
