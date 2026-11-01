@@ -270,6 +270,8 @@ What the dry run of drafts of live content adds (2026-10-12):
 |---|---|---|
 | Several sites of one organisation on one system (owner, 2026-11-01), its outlets: one set of people and groups, each site with its own address, page tree, content and theme, and a way to share images and people between them | Could, no date | Not multi-tenancy, which is several organisations kept apart on one system and stays out of scope. It is large: `public_paths`, the content version and caches, settings, the grants' scopes and the media library all assume one site, and a theme is built into the image, one per deployment, so several themes in one process is the first decision. Until then one deployment per site works from the same CMS image. Decide before a change would make it harder, not after |
 
+The owner's own sites come first this way (2026-11-01): one server with a deployment per site, as the documentation site and Photo·Spiel already run. Studio Nordlicht and the owner's personal page go on ContentSpiel; the personal page, not built yet, is the next field test after Nordlicht. Photo·Spiel stays its own application for now, a possible first gem later. A site that needs preview environments takes over Photo·Spiel's CI/CD workflow, in the site's own repository; nothing of it enters the CMS.
+
 ### Search
 
 | Item | Priority | Notes |
