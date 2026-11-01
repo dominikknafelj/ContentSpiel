@@ -78,7 +78,6 @@ module Trash
         @record.assign_attributes(trashed_at: nil, trashed_by: nil, **(page? ? { trash_root_id: nil } : {}))
         @record.save!
         restore_referenced_assets(branch_ids)
-        enqueue_renditions(@record, *@restored_assets)
         record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata(branch_ids))
         # Each image that came along gets its own event too, so an image's
         # history in the audit log shows it leaving the trash, not only its
@@ -88,6 +87,9 @@ module Trash
         end
       end
 
+      # After the transaction has committed, so the job never runs before the
+      # row it reads is untrashed.
+      enqueue_renditions(@record, *@restored_assets)
       success(@record)
     rescue ActiveRecord::RecordInvalid
       # The savepoint has rolled back the branch members, the assets and the

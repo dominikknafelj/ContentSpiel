@@ -26,7 +26,8 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     # up front so the public page's `srcset` has something to list.
     @asset = create_media_asset(filename: "wide.png")
     @asset.file.analyze
-    perform_enqueued_jobs
+    perform_enqueued_jobs # includes Media::RenditionJob: the widths are made here
+    @asset.reload
 
     @landing = create_page(title: "Landing")
     assert Pages::Save.call(@landing, attributes: { page_type: "landing" }).ok?

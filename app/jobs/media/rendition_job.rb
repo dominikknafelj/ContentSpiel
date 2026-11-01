@@ -30,11 +30,14 @@ module Media
   class RenditionJob < ApplicationJob
     queue_as :images
 
-    discard_on ActiveJob::DeserializationError
-
     retry_on StandardError, attempts: 3, wait: :polynomially_longer do |job, error|
       Media::RenditionJob.record_failure(job.arguments.first, error)
     end
+
+    # Declared AFTER retry_on: Active Support takes the handler declared last
+    # that matches, so before it the retry would also catch an image purged
+    # before its job ran, and retry a row that is gone.
+    discard_on ActiveJob::DeserializationError
 
     def self.record_failure(asset, error)
       return unless asset.is_a?(Media::Asset)
@@ -100,8 +103,8 @@ module Media
         renditions_fingerprint: fingerprint, renditions_failed_at: nil, renditions_error: nil
       )
       drop_generation(asset, old_previous, kept: [ current, old_current ])
-      # Narrowed to a change of what a page shows in Task 5; until then every
-      # finished image moves the content version.
+      # Every finished image moves the content version once: the generation
+      # just written changes the srcset a cached page holds.
       PublicSite.bump_version!
     end
 

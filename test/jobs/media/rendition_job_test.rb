@@ -99,11 +99,13 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     asset = upload("wide.png")
     preview = asset.preview
 
-    with_singleton_override(Media::Renditions, :transformations, ->(**) { raise ArgumentError, "secret detail of /some/path.png" }) do
+    attempts = 0
+    with_singleton_override(Media::Renditions, :transformations, ->(**) { attempts += 1; raise ArgumentError, "secret detail of /some/path.png" }) do
       perform_enqueued_jobs { Media::RenditionJob.perform_later(asset) }
     end
 
     asset.reload
+    assert_equal 3, attempts
     assert_equal "ArgumentError", asset.renditions_error
     assert_not_nil asset.renditions_failed_at
     assert_equal preview, asset.preview
@@ -158,7 +160,7 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     end
 
     assert_equal ImageSettings.current.fingerprint, asset.reload.renditions_fingerprint
-    assert_equal 1, asset.renditions.keys.count { |key| key == "current" }
+    assert_equal 4, asset.generation.files.size
   end
 
   test "one bump of the content version per image, at the end of the job" do
@@ -184,6 +186,7 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     # the current one while `perform` runs.
     spans = @exporter.finished_spans.select { |span| span.attributes.key?("image.bytes_in") }
     assert_equal 1, spans.size
+    assert_not_equal "job", spans.first.name, "the attributes belong on the job's own span"
     attributes = spans.first.attributes
 
     assert attributes["image.queue_latency_ms"]
@@ -206,5 +209,19 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     Trash::Move.call(asset.reload)
     clear_enqueued_jobs
     assert_no_enqueued_jobs(only: Media::RenditionJob) { assert Trash::Restore.call(asset.reload).ok? }
+  end
+
+  test "an image purged before its job ran runs once and is not retried" do
+    asset = upload("wide.png")
+    job = Media::RenditionJob.perform_later(asset)
+    assert job
+    Media::Asset.where(id: asset.id).delete_all # version: none (a test removes the row the job names)
+    runs = 0
+    with_singleton_override(Media::Decoding, :read, ->(*, **) { runs += 1 }) do
+      perform_enqueued_jobs(only: Media::RenditionJob)
+    end
+
+    assert_equal 0, runs
+    assert_no_enqueued_jobs(only: Media::RenditionJob)
   end
 end

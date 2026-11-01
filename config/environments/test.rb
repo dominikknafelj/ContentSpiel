@@ -31,8 +31,8 @@ Rails.application.configure do
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test
 
-  # Jobs are enqueued and not run unless a test performs them: an upload's
-  # image job would otherwise run on a thread of its own, behind the test.
+  # Rails' default in test, written down: jobs are enqueued and not run
+  # unless a test performs them.
   config.active_job.queue_adapter = :test
 
   # Tell Action Mailer not to deliver emails to the real world.
