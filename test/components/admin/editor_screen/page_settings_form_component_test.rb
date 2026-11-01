@@ -57,15 +57,17 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     assert_selector "select[name='page[template]'] option", count: 2
   end
 
-  test "the hero fields are drawn only when the chosen template lists hero, and the subtitle always" do
+  test "the hero fields are always in the form, hidden unless the chosen template lists hero, and the subtitle always" do
     render_settings(create_page(title: "About"))
     assert_selector "input[name='page[subtitle]']"
-    assert_no_selector "[data-field-name=hero_alt]"
-    assert_no_selector "input[name='page[hero_media_asset_id]']", visible: :all
+    assert_selector "[data-template-field=hero][hidden] [data-field-name=hero_alt]", visible: :all
+    assert_selector "select[name='page[template]'] option[value=landing][data-fields=hero]"
+    assert_selector "select[name='page[template]'] option[value=''][data-fields='']"
+    assert_selector "[data-controller~='admin--editor--template-fields']"
 
     render_settings(landing_with_hero)
     assert_selector "input[name='page[subtitle]']"
-    assert_selector "[data-field-name=hero_alt]"
+    assert_selector "[data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
   end
 
   test "on a translation tab the template is a read-only line with its label" do

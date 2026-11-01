@@ -35,7 +35,7 @@ import { slugify } from "controllers/admin/editor/slug_preview_controller"
 // 5. A load that fails (a network error, an error status, or a response with no
 //    frame) shows a message with "Try again" instead of an empty dialog.
 export default class extends Controller {
-  static targets = [ "title", "inside", "pageType", "type", "url", "note", "loading", "failure", "submitFailure" ]
+  static targets = [ "title", "inside", "type", "url", "note", "loading", "failure", "submitFailure" ]
   static values = { kind: String, url: String }
 
   connect() {

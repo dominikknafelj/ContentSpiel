@@ -35,7 +35,7 @@ module Admin
       FORM_ID = "new-page-form".freeze
       TITLE_ID = "new-page-title".freeze
       INSIDE_ID = "new-page-inside".freeze
-      TYPE_ID = "new-page-type".freeze
+      TEMPLATE_ID = "new-page-template".freeze
       GONE = "Choose a page that still exists.".freeze
 
       Choice = Struct.new(:id, :title, :depth, :path, keyword_init: true) do
@@ -130,7 +130,7 @@ module Admin
         @error_summary ||= normalise(errors)
       end
 
-      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "template" => TYPE_ID }
+      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "template" => TEMPLATE_ID }
 
       def inside_invalid? = error_summary.is_a?(Hash) && error_summary.key?("parent")
 

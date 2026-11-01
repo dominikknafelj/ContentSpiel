@@ -52,19 +52,19 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector "label[for=new-page-title]", text: "Title"
     assert_selector "input#new-page-title[name='page[title]'][autofocus]"
     assert_selector "select#new-page-inside[name='page[parent_id]']"
-    assert_selector "select#new-page-type[name='page[template]'] option[value='']", text: "Standard"
-    assert_selector "select#new-page-type option[value=landing]", text: "Landing"
+    assert_selector "select#new-page-template[name='page[template]'] option[value='']", text: "Standard"
+    assert_selector "select#new-page-template option[value=landing]", text: "Landing"
     assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /"
   end
 
   test "the dialog asks for the template under the select's rule" do
     render_form
-    assert_selector "label[for=new-page-type]", text: "Template"
-    assert_selector "select#new-page-type option", count: 2
+    assert_selector "label[for=new-page-template]", text: "Template"
+    assert_selector "select#new-page-template option", count: 2
 
     with_page_templates("standard") { render_form }
     assert_no_selector "select[name='page[template]']"
-    assert_no_selector "label[for=new-page-type]"
+    assert_no_selector "label[for=new-page-template]"
     assert_selector "select#new-page-inside"
   end
 
@@ -149,7 +149,7 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     assert_selector ".admin-error-summary", text: "1 thing needs fixing"
     assert_selector ".admin-error-summary a[href='#new-page-title']", text: "Title can't be blank"
     assert_selector "input#new-page-title[value=Typed][aria-invalid=true]"
-    assert_selector "#new-page-type option[selected][value=landing]"
+    assert_selector "#new-page-template option[selected][value=landing]"
   end
 
   test "a title with no letter or digit collapses its slug errors into one sentence" do

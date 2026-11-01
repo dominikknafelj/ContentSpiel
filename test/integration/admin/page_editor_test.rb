@@ -226,14 +226,14 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "gallery", @page.reload.template
   end
 
-  test "switching to Landing draws the hero fields in the answer" do
+  test "the hero fields are in a standard page's form, hidden, and shown for a Landing page" do
     get "/cs-studio/pages/#{@page.id}"
-    assert_select "main [data-field-name=hero_alt]", count: 0
+    assert_select "main [data-template-field=hero][hidden] [data-field-name=hero_alt]"
 
     patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
     assert_response :ok
     get "/cs-studio/pages/#{@page.id}"
-    assert_select "main [data-field-name=hero_alt]"
+    assert_select "main [data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
   end
 
   test "a stored template the theme no longer declares is kept by an unrelated autosave" do

@@ -1,5 +1,5 @@
 <%= tag.details id: "page-settings", open: true, class: "admin-page-settings #{Admin::EditorScreen::FormColumn.classes(locale)} rounded-cs border border-line bg-surface p-4",
-      data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks } do %>
+      data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks, **template_fields_data } do %>
   <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
@@ -59,7 +59,8 @@
       <div class="admin-column mb-4" data-field-name="template">
         <%= label_tag field_id("template"), t(".template"), class: setup_label_class %>
         <%= select_tag field_html_name("template"), options_for_select(template_options, template_value),
-              id: field_id("template"), class: setup_select_class %>
+              id: field_id("template"), class: setup_select_class,
+              data: { "admin--editor--template-fields-target": "select", action: "change->admin--editor--template-fields#update" } %>
         <div id="<%= errors_id("template") %>" class="mt-1 text-sm text-danger-ink"></div>
       </div>
     <% end %>
@@ -69,7 +70,10 @@
           value: value(:subtitle), original: original(:subtitle), locale: locale, **translation(:subtitle)
         ) %>
 
-    <% if hero? %>
+    <%# Always drawn and shown or hidden by the template chosen
+        (`admin--editor--template-fields`): a form holding unsaved text is
+        never replaced, so a change of template cannot fetch the fields. %>
+    <%= tag.div hidden: !hero?, data: { "admin--editor--template-fields-target": "group", template_field: "hero" } do %>
       <%# The hero is a library image (media library Task 8): chosen
           through the picker into a hidden `hero_media_asset_id` that
           autosaves like any other field, with `hero_alt` as this page's

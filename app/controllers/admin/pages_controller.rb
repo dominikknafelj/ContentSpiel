@@ -102,9 +102,9 @@ module Admin
       render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID
     end
 
-    # From the New page dialog (title, Inside, Page type) or the standalone
+    # From the New page dialog (title, Inside, Template) or the standalone
     # form: a draft under the chosen parent -- the homepage if none was named
-    # -- with the chosen type. The slug fills itself from the title
+    # -- with the chosen template. The slug fills itself from the title
     # (`LocalizedSlug#fill_blank_slugs`, run inside `Pages::Save` ->
     # `Page#save`).
     #

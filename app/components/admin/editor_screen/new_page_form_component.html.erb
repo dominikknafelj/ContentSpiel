@@ -21,9 +21,8 @@
     <% end %>
     <% if template_field? %>
     <div class="min-w-0">
-      <label for="<%= TYPE_ID %>" class="<%= setup_label_class %>"><%= t(".template") %></label>
-      <%= select_tag "page[template]", options_for_select(template_options, template), id: TYPE_ID, class: "mt-1 #{setup_select_class}",
-            data: { admin__editor__new_record_target: "pageType" } %>
+      <label for="<%= TEMPLATE_ID %>" class="<%= setup_label_class %>"><%= t(".template") %></label>
+      <%= select_tag "page[template]", options_for_select(template_options, template), id: TEMPLATE_ID, class: "mt-1 #{setup_select_class}" %>
     </div>
     <% end %>
   </div>

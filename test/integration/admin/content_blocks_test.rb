@@ -988,7 +988,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
       assert_select "button", text: "Change image"
     end
-    assert_select "p", text: "Hero image", count: 0
+    # The standard page's hero fields are in the form but hidden.
+    assert_select "[data-template-field=hero]:not([hidden]) p", text: "Hero image", count: 0
     assert_select "input[name='block[alt]'][placeholder='A dog']"
     assert_select "input[name='block[caption]'][placeholder='Our dog']"
     assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },

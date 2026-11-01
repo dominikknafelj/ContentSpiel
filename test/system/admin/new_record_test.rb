@@ -66,7 +66,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     click_button "Create page"
 
     assert_selector "dialog#new-page-dialog[open] .admin-error-summary", text: "1 thing needs fixing", wait: 10
-    assert_equal "Landing", find("#new-page-type").find("option[selected]").text
+    assert_equal "Landing", find("#new-page-template").find("option[selected]").text
     assert_eventually { page.evaluate_script("document.activeElement.classList.contains('admin-error-summary')") }
     assert_current_path admin_page_path(@about)
 

@@ -143,7 +143,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
   test "New page with the default template stores nothing, sent blank or by its name" do
     sign_in_as(users(:one))
     get "/cs-studio/pages/new", params: { parent_id: @services.id }
-    assert_select "#new-page-type option[selected][value='']", text: "Standard"
+    assert_select "#new-page-template option[selected][value='']", text: "Standard"
 
     post "/cs-studio/pages", params: { page: { title: "Blank", parent_id: @services.id, template: "" } }
     assert_equal({}, Page.order(:id).last.settings)
@@ -162,7 +162,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=replace][target=new-page-form]"
     assert_select "template form#new-page-form .admin-error-summary", text: /1 thing needs fixing/
     assert_select "template #new-page-inside option[selected][value='#{@services.id}']"
-    assert_select "template #new-page-type option[selected][value=landing]"
+    assert_select "template #new-page-template option[selected][value=landing]"
   end
 
   test "a refused create without JavaScript re-renders the standalone page with the summary" do

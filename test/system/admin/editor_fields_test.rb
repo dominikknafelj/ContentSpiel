@@ -59,6 +59,24 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     assert_selector announcement, text: "Back within the recommended length.", visible: :all
   end
 
+  test "choosing Landing shows the hero fields with no reload, keeps what was typed, and Standard hides them again" do
+    about = create_page(title: "About")
+    visit "/cs-studio/pages/#{about.id}"
+    await_admin_controllers
+    assert_no_field "page-hero_alt", visible: true
+
+    fill_in "page-subtitle", with: "Typed first"
+    select "Landing", from: "Template"
+    assert_field "page-hero_alt", visible: true
+    assert_field "page-subtitle", with: "Typed first"
+    assert_eventually(message: "the template was never saved") { about.reload.template == "landing" }
+
+    select "Standard", from: "Template"
+    assert_no_field "page-hero_alt", visible: true
+    assert_field "page-subtitle", with: "Typed first"
+    assert_eventually(message: "the default was never saved") { about.reload.settings == {} }
+  end
+
   test "Reset empties an overridden hero alt, shows the library alt as the placeholder and saves the cleared value" do
     asset = create_media_asset
     asset.update!(alt: "A dog on a beach")

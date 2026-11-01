@@ -133,11 +133,16 @@ module Admin
       # does not declare comes first, by its name, so that it is what is sent.
       def template_options
         declared = ::Theme.current.choices(:page_templates).each_with_index.map do |entry, index|
-          [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ]
+          [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name, { data: { fields: Array(entry.fields).join(" ") } } ]
         end
         stored = page.template
-        stored.nil? || ::Theme.current.choice(:page_templates, stored) ? declared : [ [ Admin::Fields::ThemeChoiceField.unknown_word(stored), stored ], *declared ]
+        return declared if stored.nil? || ::Theme.current.choice(:page_templates, stored)
+
+        # Drawn as the theme's default, so it shows the default's fields.
+        [ [ Admin::Fields::ThemeChoiceField.unknown_word(stored), stored, { data: { fields: Array(::Theme.current.choice(:page_templates, template)&.fields).join(" ") } } ], *declared ]
       end
+
+      def template_fields_data = { controller: "admin--editor--template-fields" }
 
       # A page's template is asked for when the theme declares two or more, and
       # always when the stored name is not the theme's (it is sent back by every
