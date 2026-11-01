@@ -93,4 +93,14 @@ class RichTextScrubberTest < ActiveSupport::TestCase
     assert_not_includes html, "data-image-empty"
     assert_not_includes html, "data:text/html"
   end
+
+  test "an img keeps a data: src only when it is exactly the WebP preview, however the scheme is written" do
+    [ "data:image/png;base64,iVBORw0KGgo=", "da\nta:image/png;base64,iVBORw0KGgo=", "da\tta:image/png;base64,iVBORw0KGgo=",
+      "&#1;data:image/png;base64,iVBORw0KGgo=", "&#x20;DATA:image/png;base64,iVBORw0KGgo=",
+      "data:image/webp,notbase64", " data:image/webp;base64,UklGRg==", "data:image/webp;base64,UklGRg==\n" ].each do |src|
+      html = scrub(%(<img src="#{src}" alt="x">))
+      assert_not_includes html.downcase.delete("\n\t "), "data:image", "kept #{src.inspect}: #{html}"
+    end
+    assert_includes scrub(%(<img src="data:image/webp;base64,UklGRg==" alt="x">)), "data:image/webp;base64,UklGRg=="
+  end
 end

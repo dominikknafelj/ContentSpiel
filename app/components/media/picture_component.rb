@@ -40,7 +40,9 @@ module Media
     # The one style an `<img>` here carries, and the only one the rich-text
     # scrubber keeps on an `img` (`RichTextScrubber`): the preview as the
     # background. A data URI of strict base64 cannot close the quotes.
-    PREVIEW_STYLE = /\Abackground:url\("data:image\/webp;base64,[A-Za-z0-9+\/=]+"\) center\/cover no-repeat\z/
+    PREVIEW_DATA_URL = %r{data:image/webp;base64,[A-Za-z0-9+/=]+}
+    PREVIEW_SRC = /\A#{PREVIEW_DATA_URL}\z/
+    PREVIEW_STYLE = /\Abackground:url\("#{PREVIEW_DATA_URL}"\) center\/cover no-repeat\z/
 
     def self.preview_style(data_url)
       %(background:url("#{data_url}") center/cover no-repeat)

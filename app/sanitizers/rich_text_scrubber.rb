@@ -44,7 +44,6 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
   CELL_ALIGN_CLASS = /\Aalign-(left|center|right)\z/
 
   IMAGE_ONLY = %w[style data-image-preview data-image-empty].freeze
-  PREVIEW_SRC = %r{\Adata:image/webp;base64,[A-Za-z0-9+/=]+\z}
 
   YOUTUBE_NOCOOKIE_EMBED_SRC = %r{\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}\z}
 
@@ -64,7 +63,7 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
     # Already matched against the exact shapes; the default pass would rewrite
     # the style through its CSS filter (dropping the url()) and the src
     # through its protocol list (dropping the data: URI).
-    return if node.name == "img" && (attr_node.name == "style" || (attr_node.name == "src" && attr_node.value.match?(PREVIEW_SRC)))
+    return if node.name == "img" && (preview_style?(attr_node.value) && attr_node.name == "style" || attr_node.name == "src" && preview_src?(attr_node.value))
 
     if attr_node.name == "class" && %w[th td].include?(node.name)
       return if attr_node.value.match?(CELL_ALIGN_CLASS)
@@ -82,15 +81,25 @@ class RichTextScrubber < Rails::HTML::PermitScrubber
   # (dropping the url()); a style that matched PREVIEW_STYLE exactly is left
   # as it is, and every other one has already been removed above.
   def scrub_css_attribute(node)
-    return if node.name == "img" && node["style"]&.match?(Media::PictureComponent::PREVIEW_STYLE)
+    return if node.name == "img" && preview_style?(node["style"])
 
     super
   end
 
+  def preview_style?(value) = value.to_s.match?(Media::PictureComponent::PREVIEW_STYLE)
+
+  def preview_src?(value) = value.to_s.match?(Media::PictureComponent::PREVIEW_SRC)
+
+  # A src as a browser reads it: it drops tabs and line breaks anywhere and
+  # ignores leading control characters and spaces, and the parser has
+  # already decoded entities. Judged on that form, so a `data:` split by a
+  # newline or led by a control character is still a data URL.
+  def data_url?(value) = value.to_s.gsub(/[\x00-\x20]/, "").downcase.start_with?("data:")
+
   def image_attribute_ok?(node, attr_node)
     case attr_node.name
-    when *IMAGE_ONLY then node.name == "img" && (attr_node.name != "style" || attr_node.value.match?(Media::PictureComponent::PREVIEW_STYLE))
-    when "src" then node.name != "img" || !attr_node.value.strip.downcase.start_with?("data:") || attr_node.value.match?(PREVIEW_SRC)
+    when *IMAGE_ONLY then node.name == "img" && (attr_node.name != "style" || preview_style?(attr_node.value))
+    when "src" then node.name != "img" || preview_src?(attr_node.value) || !data_url?(attr_node.value)
     else true
     end
   end
