@@ -554,15 +554,17 @@ module RichText
     # page that would 404 (or, worse, redirect them into a draft) the
     # instant they clicked it. In preview (`ctx.preview`), editors are
     # exactly the audience who needs to see and click links to unpublished
-    # content, so the visibility gate is skipped entirely there --
+    # content, so the visibility gate is skipped there and the reader's own
+    # read scope stands in for it: outside it the link is its words, like a
+    # missing target (#152) --
     # `PublicSite::Resolver` draws the same distinction for its own
     # `:preview` scope, and reusing its `visible?` here (rather than
     # re-deriving "published, with every ancestor also published" from
     # scratch) is what keeps the two rules from drifting apart. The rule is
-    # `PublicSite::Urls#target_path`, which a Card's link asks too.
+    # `PublicSite::Urls#drawn_target_path`, which a Card's link asks too.
     def self.render_internal_link(mark_data, content, ctx)
       attrs = mark_data["attrs"] || {}
-      path = ctx.urls.target_path(attrs["type"], attrs["id"], ctx.locale)
+      path = ctx.urls.drawn_target_path(attrs["type"], attrs["id"], ctx.locale)
       path ? TAG.tag.a(content, href: path) : content
     end
   end

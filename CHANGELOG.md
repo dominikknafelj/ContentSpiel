@@ -29,3 +29,7 @@
 ### Removed
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
+
+### Fixed
+
+- A preview no longer prints the address of a draft outside the viewer's read scope for a rich-text link: the link is its words, as for a missing target (#152). A public page is unchanged.
