@@ -78,6 +78,16 @@ module ContentSpiel
     config.active_storage.queues.purge = :default
     config.active_storage.queues.mirror = :default
 
+    # Every attachment's address is Active Storage's PROXY route (image
+    # delivery spec, decision 2): one request, answered public, for a hundred
+    # years and immutable (`http_cache_forever`), at an address that names its
+    # bytes for ever (a signed id carries no expiry, a variation key is a
+    # digest of the transformation). So the logo and every other public image
+    # is cacheable without code having to remember which helper to call. What
+    # these routes refuse (a note's file, a library original, a width not
+    # made) is config/initializers/active_storage_access.rb.
+    config.active_storage.resolve_model_to_route = :rails_storage_proxy
+
     # Lets config/locales/en.yml set a per-attribute `format` for validation
     # messages (Rails ignores it otherwise). Used for exactly one thing:
     # User's password length message is a whole sentence ("Use at least 12

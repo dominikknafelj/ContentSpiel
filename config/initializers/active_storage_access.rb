@@ -18,7 +18,7 @@
 # session check CS Studio uses, answering a signed-out request with a bare
 # 401 (`ActiveStorageWriteAuthentication`, which says why not a redirect).
 # The *read* side (blob redirects, representations, `GET /disk/...`) stays
-# public -- public pages embed those URLs.
+# public -- public pages embed those URLs -- but for the blobs below.
 #
 # One kind of blob is NOT public on the read side (notes spec D15): the files
 # of notes, which live on a storage service of their own (`notes`,
@@ -27,6 +27,22 @@
 # `Admin::NoteFilesController`. The concern goes into each concrete
 # controller, not their base classes: a callback added to a parent after its
 # child was loaded does not reach the child.
+#
+# A library image's ORIGINAL is the editors' alone (image delivery spec,
+# decision 2), and the public gets only the widths `Media::RenditionJob` made.
+# The two blob controllers and the disk controller refuse a blob attached as
+# `Media::Asset#file` to everyone (`ActiveStorageLibraryOriginalRefusal`): the
+# proxy ones take no session (`ActiveStorage::DisableSession`) and cannot tell
+# an editor from a visitor, so an editor downloads the original through CS
+# Studio, `Admin::MediaOriginalsController`. The logo is no library image and
+# stays a public original.
+#
+# And no request makes a variant of a library image: the two representation
+# controllers answer 404 for a width that has no variant record
+# (`ActiveStorageMadeVariantsOnly`), by OVERRIDING Rails' `set_representation`
+# rather than following it with a callback of our own, because Rails'
+# callback processes the variant inline, so one after it would come too late.
+# The logo's variants keep Rails' behaviour.
 #
 # In `to_prepare` so a code reload in development re-applies it to the
 # freshly loaded controller classes; the `include?` guards keep a repeated
@@ -42,5 +58,13 @@ Rails.application.config.to_prepare do
   [ ActiveStorage::Blobs::RedirectController, ActiveStorage::Blobs::ProxyController, ActiveStorage::Representations::RedirectController,
     ActiveStorage::Representations::ProxyController, ActiveStorage::DiskController ].each do |controller|
     controller.include(ActiveStorageNoteFilesRefusal) unless controller.include?(ActiveStorageNoteFilesRefusal)
+  end
+
+  [ ActiveStorage::Blobs::RedirectController, ActiveStorage::Blobs::ProxyController, ActiveStorage::DiskController ].each do |controller|
+    controller.include(ActiveStorageLibraryOriginalRefusal) unless controller.include?(ActiveStorageLibraryOriginalRefusal)
+  end
+
+  [ ActiveStorage::Representations::RedirectController, ActiveStorage::Representations::ProxyController ].each do |controller|
+    controller.include(ActiveStorageMadeVariantsOnly) unless controller.include?(ActiveStorageMadeVariantsOnly)
   end
 end

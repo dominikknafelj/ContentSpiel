@@ -36,6 +36,18 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: /Move to trash/
   end
 
+  # Anyone the panel is drawn for may open it (`media.upload`), editor or
+  # not, so the link is there for a viewer who cannot edit the image too. It
+  # is a plain download, never a Turbo visit, and never an Active Storage URL.
+  test "the panel offers Download original to someone who may open it" do
+    asset = create_media_asset
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+
+    assert_selector "a[href='/cs-studio/media/#{asset.id}/original'][data-turbo='false'][download]", text: "Download original"
+    assert_no_selector "a[href*='/rails/active_storage']"
+  end
+
   test "the panel is a focusable region and its close link tells admin--media--panel which tile to return to" do
     asset = create_media_asset
 

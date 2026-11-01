@@ -31,6 +31,10 @@
       <% if uploader? %>by <%= render Admin::Ui::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
     </dd>
   </dl>
+  <%# The original file, for whoever may open the panel (`media.upload`):
+      CS Studio's own route, a plain download (no Turbo visit), never an
+      Active Storage URL, which refuses a library original to everyone. %>
+  <%= link_to t(".download_original"), original_path, download: "", data: { turbo: false }, class: "self-start text-sm text-ink underline hover:no-underline" %>
 
   <div class="flex items-center justify-between gap-3">
     <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>

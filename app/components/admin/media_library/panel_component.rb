@@ -157,6 +157,10 @@ module Admin
 
       def destroy_path = helpers.admin_medium_path(asset, **link_params, **url_options)
 
+      # "Download original": the original is the editors' alone, served by
+      # `Admin::MediaOriginalsController` and by no Active Storage route.
+      def original_path = helpers.admin_media_original_path(asset)
+
       # The Alt field's warn border (handoff §4.6, "warn border when empty"):
       # asked of the DEFAULT language's alt, whatever tab is open, since that is
       # the text every other language falls back to. Only the class is decided

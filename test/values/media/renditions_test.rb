@@ -17,10 +17,24 @@ class Media::RenditionsTest < ActiveSupport::TestCase
 
   test "an animated format keeps its frames, a still one has no loader option" do
     still = Media::Renditions.transformations(width: 480, format: "webp", quality: 75, content_type: "image/jpeg")
-    assert_equal({ resize_to_limit: [ 480, nil ], format: :webp, saver: { quality: 75, strip: true } }, still)
+    assert_equal({ resize_to_limit: [ 480, nil ], format: "webp", saver: { quality: 75, strip: true } }, still)
 
     %w[image/gif image/webp].each do |type|
       assert_equal({ n: -1 }, Media::Renditions.transformations(width: 480, format: "webp", quality: 75, content_type: type)[:loader])
+    end
+  end
+
+  # A request finds a width's variant record by the digest of the variation
+  # its address DECODES to, and the address's key is JSON: a Symbol value
+  # comes back a String. So the transformations hold no Symbol value, or the
+  # digest the job recorded is not the one a request asks for, the request
+  # finds no record, and Rails would make the width again on a Puma thread.
+  test "the digest of a width's transformations is the digest of the variation its key decodes to, still and animated" do
+    %w[image/jpeg image/gif].each do |type|
+      transformations = Media::Renditions.transformations(width: 480, format: "webp", quality: 75, content_type: type)
+      made = ActiveStorage::Variation.wrap(transformations).default_to(format: :png)
+
+      assert_equal made.digest, ActiveStorage::Variation.decode(made.key).digest, type
     end
   end
 

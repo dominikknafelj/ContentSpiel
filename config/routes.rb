@@ -133,6 +133,11 @@ Rails.application.routes.draw do
     # default for this one English word, left as-is rather than overridden
     # with an `:as` this app has no other resource needing.
     resources :media, only: %i[index show create update destroy]
+    # "Download original" (image delivery spec, decision 2): the library
+    # image's original file, for a holder of `media.upload` alone. Active
+    # Storage's own blob routes refuse it to everyone
+    # (config/initializers/active_storage_access.rb).
+    get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
 
     # Trash (trash spec §7). `:type` is page|post|media -- one screen for
     # three models, so the item is addressed by type and id rather than by a
