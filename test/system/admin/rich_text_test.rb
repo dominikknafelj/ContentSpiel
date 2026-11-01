@@ -51,7 +51,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal({ "id" => YOUTUBE_ID }, youtube["attrs"])
   end
 
-  # Media library Task 8 / design pass round 2 Task 13: the Image button opens
+  # The Image button opens
   # the media picker; the picked asset then opens the 560 image dialog (alt
   # text and caption), and "Insert image" there inserts it after the text
   # already typed (not over it). Nothing is inserted before that.
@@ -62,7 +62,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     type_text "Intro"
     press_insert "Image"
     # The upload shows as a tile, which is selected once it has finished; the
-    # editor confirms with Use image (select-then-use, round 3 Task 9).
+    # editor confirms with Use image (select-then-use).
     within("dialog[open]") do
       attach_file "Image file", file_fixture("tiny.png").to_s
       assert_text "1 selected", wait: 10
@@ -83,7 +83,13 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     asset = Media::Asset.find(image.dig("attrs", "asset_id"))
     assert_equal({ "asset_id" => asset.id, "alt" => "A", "caption" => "" }, image["attrs"])
     assert_equal "Intro", doc_text(document).strip
-    assert_selector ".ProseMirror img[src='#{asset.url}']"
+    # The editor draws what CS Studio draws of a library image
+    # (`Media::Asset#display_url`): a width the app made, else the preview,
+    # never the original.
+    src = find(".ProseMirror img")[:src]
+    asset.reload
+    assert(src == asset.preview_data_url || asset.srcset.map(&:first).include?(src), "the inserted image is a width or the preview, not #{src.first(80)}")
+    assert_not_includes src, asset.file.blob.signed_id
     # Focus is back in the editor.
     assert_selector ".ProseMirror:focus"
 

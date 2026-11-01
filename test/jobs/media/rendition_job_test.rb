@@ -68,26 +68,38 @@ class Media::RenditionJobTest < ActiveSupport::TestCase
     assert_equal 3, made.get("n-pages")
   end
 
+  def skip_unless_avif
+    skip "this libvips cannot write AVIF (ImageSettings.avif_available? is false), so Settings offers no AVIF here" unless ImageSettings.avif_available?
+  end
+
   # libvips writes an animation's AVIF as a still image collection (no
   # `avis` brand), which a browser shows as its first frame: an animated
-  # source is made in WebP, at the WebP quality, whatever the format.
-  test "under AVIF an animated GIF's widths are animated WebP, and a still image's are AVIF" do
+  # source is made in WebP, at the WebP quality, whatever the format. Its
+  # widths need no AVIF encoder, so this runs on any libvips.
+  test "under AVIF an animated GIF's widths are animated WebP, under the AVIF fingerprint" do
     change_settings(image_format: "avif", image_quality_webp: 70)
     gif = upload("animated.gif", content_type: "image/gif")
-    png = upload("wide.png")
 
     Media::RenditionJob.perform_now(gif)
-    Media::RenditionJob.perform_now(png)
     animated = vips_of(gif.reload, gif.generation.widths.first)
-    still = vips_of(png.reload, png.generation.widths.first)
 
     assert_equal 3, animated.get("n-pages")
     assert_equal "webpload_buffer", animated.get("vips-loader")
-    assert_equal "heifload_buffer", still.get("vips-loader")
     assert_equal ImageSettings.current.fingerprint, gif.renditions_fingerprint
   end
 
+  test "under AVIF a still image's widths are AVIF" do
+    skip_unless_avif
+    change_settings(image_format: "avif")
+    png = upload("wide.png")
+
+    Media::RenditionJob.perform_now(png)
+
+    assert_equal "heifload_buffer", vips_of(png.reload, png.generation.widths.first).get("vips-loader")
+  end
+
   test "under AVIF a still GIF is AVIF" do
+    skip_unless_avif
     change_settings(image_format: "avif")
     gif = upload("small.gif", content_type: "image/gif")
 
