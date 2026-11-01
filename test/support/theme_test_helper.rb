@@ -42,6 +42,46 @@ module ThemeTestHelper
 
   def with_table_theme(&block) = Theme.with(table_theme, &block)
 
+  # An eighth theme (`test/fixtures/themes/card`): its own template for the
+  # Card block, written from the reference's section alone
+  # (docs/reference/theming.md, "The Card block"), one icon of its own that
+  # is drawn with classes, a filled shape, its own size and a gradient its
+  # layout defines, and a stylesheet that declares the Card's tokens again
+  # for both schemes.
+  CARD = Rails.root.join("test/fixtures/themes/card")
+
+  def card_theme = Theme.load(ThemeFolder.new(CARD))
+
+  def with_card_theme(&block) = Theme.with(card_theme, &block)
+
+  # A sixth theme (`test/fixtures/themes/choices`): a theme.yml declaring two
+  # section styles (the second labelled in en and de), the two page
+  # templates, and one icon of its own (`brush`, labelled Design, a 24-unit
+  # outline in currentColor under assets/images/icons).
+  CHOICES = Rails.root.join("test/fixtures/themes/choices")
+
+  def choices_theme = Theme.load(ThemeFolder.new(CHOICES))
+
+  def with_choices_theme(&block) = Theme.with(choices_theme, &block)
+
+  # A seventh theme (`test/fixtures/themes/section_grid`): a theme.yml declaring
+  # the section style `grid_six`, and its own template for the Section, written
+  # from the reference's Section row alone: with that style it draws the
+  # section's blocks in reading order in a grid of its own.
+  SECTION_GRID = Rails.root.join("test/fixtures/themes/section_grid")
+
+  def section_grid_theme = Theme.load(ThemeFolder.new(SECTION_GRID))
+
+  def with_section_grid_theme(&block) = Theme.with(section_grid_theme, &block)
+
+  # The default theme with its page templates replaced by `names` (no fields,
+  # no files), for the length of a block: a theme that dropped a template a
+  # page stores, or one that offers another. Every other list is the default's.
+  def with_page_templates(*names, &block)
+    templates = names.map { |name| Theme::Choice.new(list: "page_templates", name: name, labels: { "en" => name.humanize }, fields: [], file: nil, from: :theme) }
+    Theme.with(Theme.new(declarations: Theme::Declarations.default.merge("page_templates" => templates)), &block)
+  end
+
   # A copy of the second theme in a directory of its own, for a test that
   # adds, changes or removes a file. Yields the directory as a Pathname.
   def with_theme_copy

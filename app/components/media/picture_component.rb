@@ -28,6 +28,10 @@ module Media
   # - Neither: no `src` at all, a box of the image's size with its alt
   #   (`data-image-empty`, sunken by the stylesheet). Never the original.
   #
+  # The two attributes are contract names (`Theme::Contract::ATTRIBUTES`): a
+  # theme's stylesheet selects them to restyle the loading state, so a
+  # rename is a release note.
+  #
   # The attributes carry no script: the page needs none of them to show
   # the image, and nothing is hidden by CSS alone.
   #

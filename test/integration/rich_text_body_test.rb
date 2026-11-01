@@ -9,7 +9,7 @@ require "test_helper"
 class RichTextBodyTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "a rich_text block renders its JSON document as HTML" do
@@ -22,7 +22,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a post detail renders its JSON body" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago, body: rich_doc("## Section\n\nBody *text*"))
 
@@ -72,7 +72,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "internal links resolve in the request's locale" do
-    about = Page.create!(parent: @root, page_type: :standard, title: "About", published_at: Time.current)
+    about = Page.create!(parent: @root, title: "About", published_at: Time.current)
     Mobility.with_locale(:de) { about.update!(slug: "ueber-uns") }
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [about](cs:page/#{about.id})"))
 
@@ -83,7 +83,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
 
   test "internal links in a preview stay under /preview" do
     sign_in_as(users(:one))
-    draft = Page.create!(parent: @root, page_type: :standard, title: "Draft", published_at: nil)
+    draft = Page.create!(parent: @root, title: "Draft", published_at: nil)
     @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [the draft](cs:page/#{draft.id})"))
 
     get "/preview"
@@ -98,7 +98,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   # its slug -- none of which changes the document's own digest.
   test "a cached body picks up a link target being published, renamed and deleted" do
     with_memory_cache do
-      target = Page.create!(parent: @root, page_type: :standard, title: "Later", published_at: nil)
+      target = Page.create!(parent: @root, title: "Later", published_at: nil)
       @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [later](cs:page/#{target.id})"))
 
       get "/"

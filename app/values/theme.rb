@@ -90,7 +90,8 @@ class Theme
                                     "compile, and one that reads the request."
       end
 
-      new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size)
+      new(path: folder.path, fingerprint: folder.fingerprint, template_count: folder.templates.size,
+          declarations: Declarations.of(folder))
     end
 
     # `load` for the application's own theme, with the two ways a refusal is
@@ -182,15 +183,70 @@ class Theme
   # nil for every theme that draws.
   attr_reader :path, :fingerprint, :template_count, :refusal
 
-  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0, refusal: nil)
+  def initialize(path: nil, fingerprint: DEFAULT_FINGERPRINT, template_count: 0, refusal: nil, declarations: nil)
+    @declarations = declarations
     @refusal = refusal
     @path = path && Pathname(path)
     @fingerprint = fingerprint
     @template_count = template_count
     @components = Concurrent::Map.new
+    @icons = Concurrent::Map.new
   end
 
   def configured? = !path.nil?
+
+  # The entries of one of the lists the theme declares in theme.yml
+  # (`Contract::CHOICE_LISTS`), read once when the theme was loaded. A theme
+  # without a folder and a refused one answer the default's.
+  def choices(list) = declarations.fetch(list.to_s, [])
+
+  def choice(list, name) = choices(list).find { |entry| entry.name == name.to_s }
+
+  # The page template to draw for a page that stores `stored` (a name or nil):
+  # that name while the theme declares it, otherwise the theme's first
+  # template, and the default theme's first for a theme that declares none
+  # (which only a Theme built around `Theme::Check` can, once the check
+  # refuses an empty list: the fallback stays as the guard for that).
+  # Always a declared name with a file to draw, never nil and never the
+  # unknown one: a name the theme does not know is drawn as the default and
+  # nothing stored changes.
+  def page_template(stored)
+    templates = choices(:page_templates)
+    templates = Declarations.default.fetch("page_templates") if templates.empty?
+    (templates.find { |entry| entry.name == stored } || templates.first).name
+  end
+
+  # The declared icon `name` as the public site draws it: the file inlined
+  # (`Theme::IconFile.inline`), safe markup, or nil for a blank name, a name
+  # the theme does not declare and a file that does not pass the fence. Read
+  # once per Theme: the icon files are in the fingerprint, so a changed one
+  # is a new Theme (a reload in development, a deploy in production). The
+  # bytes inlined are the bytes fenced, here, and not only those the check
+  # read when the theme was loaded.
+  def icon_svg(name)
+    icon = name.to_s.strip.empty? ? nil : choice(:icons, name)
+    return nil unless icon&.file
+
+    @icons.compute_if_absent(icon.name) do
+      source = icon_path(icon).binread
+      IconFile.problems_in(source, file: icon.file).empty? ? IconFile.inline(source).html_safe : nil
+    rescue SystemCallError, IOError, EncodingError, ArgumentError, Nokogiri::SyntaxError
+      # A file gone or unreadable since the check, or one `inline` cannot
+      # take apart: the card draws no icon rather than the page a 500.
+      nil
+    end
+  end
+
+  # The logical asset path of the declared icon `name`, for `image_path`
+  # (CS Studio shows an icon as an image and never inlines it): the entry's
+  # file, which Propshaft serves from the theme's assets/images, or from the
+  # CMS's app/assets/images for one of the default theme's icons. nil for a
+  # blank or undeclared name.
+  def icon_asset(name)
+    return nil if name.to_s.strip.empty?
+
+    choice(:icons, name)&.file
+  end
 
   # The folder's base name, for a log line and System status.
   def name = path ? path.basename.to_s : "default"
@@ -236,6 +292,12 @@ class Theme
   end
 
   private
+
+  def declarations = @declarations ||= Declarations.default
+
+  def icon_path(icon)
+    icon.from == :default || path.nil? ? Rails.root.join("app/assets/images", icon.file) : path.join("assets/images", icon.file)
+  end
 
   def subclass_with(component, template)
     Class.new(component) do

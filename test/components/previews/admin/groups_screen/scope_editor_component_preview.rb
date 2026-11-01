@@ -44,8 +44,8 @@ module Admin
       # Home > About > Team > Member.
       def family
         about = PreviewFixtures.page(title: "About")
-        team = about.children.create!(page_type: :standard, title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
-        member = team.children.create!(page_type: :standard, title: "Member #{SecureRandom.hex(4)}", published_at: Time.current)
+        team = about.children.create!(title: "Team #{SecureRandom.hex(4)}", published_at: Time.current)
+        member = team.children.create!(title: "Member #{SecureRandom.hex(4)}", published_at: Time.current)
         [ about, team, member ]
       end
 

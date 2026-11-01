@@ -8,8 +8,8 @@ module Admin
       def default
         root = PreviewFixtures.root_page
         about = PreviewFixtures.page(title: "About")
-        about.children.create!(page_type: :standard, title: "Team")
-        root.children.create!(page_type: :standard, title: "Contact", published_at: 1.week.from_now)
+        about.children.create!(title: "Team")
+        root.children.create!(title: "Contact", published_at: 1.week.from_now)
 
         render Admin::PagesScreen::TreeComponent.new(root: root, selected: about, locale: "en")
       end

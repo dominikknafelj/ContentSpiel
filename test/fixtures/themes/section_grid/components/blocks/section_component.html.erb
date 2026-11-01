@@ -1,0 +1,11 @@
+<%# A section drawn from the contract's names alone: `style`, `columns` and
+    the blocks in reading order. %>
+<% if style == "grid_six" %>
+  <div class="grid-six"<% if anchor %> id="<%= anchor %>"<% end %> data-block="<%= block.id %>" data-page="<%= page.id %>">
+    <% columns.flatten.each do |inner| %><div class="grid-six__cell"><%= render_block(inner) %></div><% end %>
+  </div>
+<% else %>
+  <div class="grid-plain" data-layout="<%= layout %>" data-background="<%= background %>" data-width="<%= width %>">
+    <% columns.each do |blocks| %><div class="grid-plain__column"><% blocks.each do |inner| %><%= render_block(inner) %><% end %></div><% end %>
+  </div>
+<% end %>

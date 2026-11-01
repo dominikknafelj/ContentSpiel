@@ -105,6 +105,8 @@ module ContentBlocks
         lock_owner(@block.owner)
         reread_container
         assign
+        raise ActiveRecord::Rollback if refuse_taken_anchor
+
         @block.save || raise(ActiveRecord::Rollback)
         folded = fold_removed_columns
         Media::UsageIndex.refresh(@block)
@@ -198,6 +200,27 @@ module ContentBlocks
     rescue ActiveRecord::RecordNotFound
       @block.errors.add(:base, "This block no longer exists")
       raise ActiveRecord::Rollback
+    end
+
+    # A section's anchor is one name on the page: the address of a link that
+    # jumps to the band, and its `id`. Asked under the page's lock, of the
+    # page's other containers (sections do not nest, so these are all of
+    # them), and only of a well-formed anchor: a malformed one is the model's
+    # refusal, with its own sentence. The index `index_content_blocks_on_section_anchor`
+    # is the backstop for a row written around this. Answers true when it
+    # refused (the errors are on the block), like `@block.save` answers false.
+    def refuse_taken_anchor
+      return false unless @block.container?
+
+      anchor = @block.settings["anchor"].to_s
+      return false unless BlockTypes::Section::ANCHOR.match?(anchor)
+      reserved = BlockTypes::Section.reserved_anchor?(anchor)
+      return false unless reserved || @block.owner.content_blocks.with_anchor(anchor).where.not(id: @block.id).exists?
+
+      @block.valid? # the other refusals first, which clear what is added below
+      key = reserved ? "anchor_reserved" : "anchor_taken"
+      @block.errors.add("settings.anchor", :taken, message: I18n.t("block_types.section.#{key}", anchor: anchor))
+      true
     end
 
     def assign

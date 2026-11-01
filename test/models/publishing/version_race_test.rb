@@ -9,7 +9,7 @@ class Publishing::VersionRaceTest < ActiveSupport::TestCase
 
   setup do
     clean
-    @page = Page.create!(page_type: :standard, title: "Old", slug: "", published_at: 1.day.ago)
+    @page = Page.create!(title: "Old", slug: "", published_at: 1.day.ago)
   end
 
   teardown { clean }

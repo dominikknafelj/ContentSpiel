@@ -15,6 +15,19 @@ module Admin
     # bubbles to the form's autosave like a select's; a form someone else
     # holds disables every radio (`HeldFields`).
     class SelectField < Base
+      # The label an editor picked, not the stored value; the empty choice by
+      # its own label where it has one; a value that is no longer on the list
+      # as it is stored.
+      def self.display(field, value)
+        return field.options[:blank].to_s if value.blank?
+
+        options = field.options[:options]
+        (options[value.to_s] if options.is_a?(Hash)) || value.to_s
+      end
+
+      # A segmented control's legend is its label.
+      def self.own_label?(field) = field.segmented?
+
       # The posts list's scope toggle's look (`PostsScreen::ToolbarComponent::
       # SEGMENT_CLASS`: the chosen segment inverted, ink on paper, with a
       # paper focus ring), with a disabled state for a held or view-only

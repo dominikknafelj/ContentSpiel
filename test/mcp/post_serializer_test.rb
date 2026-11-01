@@ -41,8 +41,8 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
   # place a public URL is built -- `PublicSite::Urls` -- not assembled here
   # by hand from the page and slug.
   test "url is the canonical listing page's path plus the post's slug" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title: "Hello World", published_at: Time.current)
 

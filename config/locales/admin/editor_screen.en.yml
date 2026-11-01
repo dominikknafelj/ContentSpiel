@@ -37,6 +37,8 @@ en:
           # answers (block types spec, decision 8).
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            card:
+              empty: "Empty"
             table:
               empty: "Empty table"
             note:
@@ -175,6 +177,11 @@ en:
           widths:
             content: "Content width"
             full: "Full width"
+          # The theme's section style, drawn only when the theme declares one.
+          style: "Style"
+          # The section's anchor: what a link `#anchor` jumps to.
+          anchor: "Anchor"
+          anchor_help: "Lets a link jump here, as #anchor. Leave empty for none."
           # The section's "⋯" menu and the dialog its last item opens.
           actions: "Section actions"
           move_up: "Move up"
@@ -365,6 +372,10 @@ en:
         page_settings_form:
           address: "Address"
           change_address: "Change address…"
+          template: "Template"
+          shared: "Shared by all languages."
+        new_page_form:
+          template: "Template"
         slug_dialog:
           title: "Change this page’s address"
           label: "Last part of the address"
@@ -423,7 +434,7 @@ en:
             meta_description: "Meta description"
             hero_alt: "Hero image alt text"
             hero_media_asset_id: "Hero image"
-            page_type: "Page type"
+            settings: "Template"
             excerpt: "Excerpt"
             body: "Body"
             metadata: "Fields"

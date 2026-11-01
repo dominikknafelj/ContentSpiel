@@ -2,93 +2,10 @@
     spec §2): the head tags that describe the page (pages/_seo_meta) and the
     preview bar are rendered by the layout, so a theme that replaces this
     file cannot lose either. %>
-<%# The page's own heading and, for a landing page, its hero fields -- skipped
-    at a post's own detail view, since Posts::DetailComponent (which replaced
-    the old content_blocks partial _post_list_detail) already renders that
-    post's title as the response's one <h1>. %>
-<% if @post.nil? %>
-  <header class="mb-12">
-    <% tagline = translated(theme_site, :tagline) if @page.root? %>
-    <% if tagline.present? %>
-      <p class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= tagline %></p>
-    <% end %>
-    <h1 class="mt-3 font-semibold leading-tight tracking-tight <%= @page.root? ? "text-display" : "text-h1" %>"><%= translated(@page, :title) %></h1>
-    <% if @page.landing? %>
-      <% subtitle = translated(@page, :subtitle) %>
-      <% if subtitle.present? %>
-        <p class="subtitle mt-4 max-w-2xl text-lg text-dim"><%= subtitle %></p>
-      <% end %>
-      <%# The hero is a library image (media library design spec §3.3); the
-          page's own translated `hero_alt` overrides the image's default alt.
-          Rendered through `Media::PictureComponent` for a real
-          `srcset` -- `sizes: "100vw"`, unlike a block/rich-text image's own
-          content-width `sizes` (`Blocks::ImageComponent::SIZES`), since the
-          hero always spans the full viewport width, not the `max-w-3xl`
-          content column. `Media::PictureComponent#render?` already handles
-          a missing hero or a reference whose file is somehow gone.
-          `hero_alt` goes in whole, as its {locale => value} jsonb:
-          `Media::Asset#alt_text` interleaves it with the asset's
-          own defaults locale by locale, so an override written in another
-          language never beats the asset's default in this one. Eager and
-          `fetchpriority="high"`: the hero is the first thing a landing
-          page shows, usually its largest paint; every other image stays
-          lazy. %>
-      <% hero = @page.hero_media_asset %>
-      <%= render Media::PictureComponent.new(asset: hero, alt: hero&.alt_text(override: @page.read_attribute(:hero_alt)).to_s,
-            sizes: "100vw", css_class: "mt-8 w-full rounded-cs", loading: "eager", fetchpriority: "high") %>
-    <% end %>
-  </header>
-<% end %>
-<%# A page's body is its blocks in `position` order (the association is
-    ordered), each rendered by its own registered type's ViewComponent
-    (`Theme.current.component_for`, open-types spec §5) rather than a partial
-    named after `block_type` -- the registry, not the view path, is what a
-    plugin's block type or an alternate theme now hooks into.
-
-    The one exception is a post detail request (`/en/blog/my-post`): the block
-    the controller matched the post under renders that single post, through
-    its content type's `detail_component`, in place of its listing, while the
-    page's other blocks -- its intro text, its image -- still render around
-    it. Compared against `@post_list_block` -- the block the controller
-    resolved the post under -- rather than `block.post_list?`, so that a page
-    carrying more than one listing swaps out only that block.
-
-    A stored `block_type` that isn't (or is no longer) registered --
-    `block.definition` is nil -- renders nothing rather than 500ing the public
-    site (global constraints): a removed plugin's type must degrade
-    gracefully for whoever already has it on a page, not take the whole
-    request down.
-
-    The dispatch itself is `ThemeHelper#render_block`. Only the top-level
-    blocks are walked here: a section renders the blocks in it through the
-    same helper (`Blocks::SectionComponent`), so each block is drawn once.
-    The outline is the page's one (`ThemeHelper#block_outline`), which the
-    sections ask too. %>
-<% block_outline(@page).top_level.each do |block| %><%= render_block(block) %><% end %>
-<%# The tree is otherwise reachable only by typing an exact URL -- this is what
-    makes clicking from a page down into its children possible at all.
-    Published only, matching every other public listing on this site, and
-    kept only: a page in the trash keeps its `published_at` but has no URL
-    any more (`PublicSite::Paths#compute_path`), so "published" alone would
-    list it by name with a link to nowhere. Hiding trashed records is
-    explicit at every such query (`Trashable` has no default scope); this
-    one is pinned in `test/integration/trash_visibility_test.rb`. %>
-<%# Their titles are the published ones. %>
-<%# The list is navigation, named by its mono label (`aria-labelledby`, so a
-    screen reader's landmarks say "In this section" and not a second unnamed
-    "navigation"), and its links are set as the header's menu is: dim, ink on
-    hover, no underline, one per line. A post's own page draws none (O7): its
-    listing page's subpages are that page's, and the post is not one of them.
-    Nothing without subpages -- no label, no rule -- so the label is inside the
-    same `if` as the rule. %>
-<% children = @post.nil? ? published_views(@page.children.kept.published) : [] # public: rows (the subpages' membership and order are the tree's; titles come from published_views) %>
-<% if children.any? %>
-  <nav class="page-children mt-12 border-t border-line pt-6" aria-labelledby="page-children-label">
-    <p id="page-children-label" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= site_string(:in_this_section) %></p>
-    <ul class="mt-3 space-y-2">
-      <% children.each do |child| %>
-        <li><%= link_to translated(child, :title), page_url_path(child), class: "text-dim hover:text-ink" %></li>
-      <% end %>
-    </ul>
-  </nav>
-<% end %>
+<%# The page is drawn by its template (`page_template`: the page's stored
+    template while the theme declares it, the theme's first otherwise), each
+    a partial `pages/templates/_<name>.html.erb` handed the three locals a
+    template is promised: the page shown, the post on a post's own detail
+    view, and the list block that post was found under. This file ends with no
+    line break after the render, so the page ends where the template does. %>
+<%= render "pages/templates/#{page_template}", page: @page, post: @post, list_block: @post_list_block %>

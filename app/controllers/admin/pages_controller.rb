@@ -25,7 +25,7 @@ module Admin
     # the settings form, not `Pages::Save`'s; the two only happen to agree
     # today) versus plain attributes. Split here, not left to `Pages::Save`,
     # because `attributes:` there is assigned with no allowlist of its own
-    # (`page_type`/`hero_media_asset_id` are the only two attributes an
+    # (`template`/`hero_media_asset_id` are the only two attributes an
     # editor's own PATCH may ever set -- anything else, e.g.
     # `published`/`parent_id`, must never arrive by way of a form field with
     # that name). `hero_media_asset_id` is the hero field's hidden input
@@ -34,7 +34,7 @@ module Admin
     # (`Media::Choosing`) checks `media.upload` and that the asset exists
     # for a new one.
     TRANSLATED_FIELDS = %w[title slug subtitle meta_title meta_description hero_alt].freeze
-    ATTRIBUTE_FIELDS = %w[page_type hero_media_asset_id].freeze
+    ATTRIBUTE_FIELDS = %w[template hero_media_asset_id].freeze
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule slug]
 
@@ -102,27 +102,27 @@ module Admin
       render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID
     end
 
-    # From the New page dialog (title, Inside, Page type) or the standalone
+    # From the New page dialog (title, Inside, Template) or the standalone
     # form: a draft under the chosen parent -- the homepage if none was named
-    # -- with the chosen type. The slug fills itself from the title
+    # -- with the chosen template. The slug fills itself from the title
     # (`LocalizedSlug#fill_blank_slugs`, run inside `Pages::Save` ->
     # `Page#save`).
     #
     # A refusal that is the editor's to fix (a blank title, a taken or
-    # reserved slug, an unknown page type) answers 422: a Turbo Stream that
+    # reserved slug, an unknown template) answers 422: a Turbo Stream that
     # replaces just the dialog's form with the typed values and an error
     # summary, so the dialog stays open and the editor behind it is untouched;
     # a plain request (no JS) gets the standalone page again. A permission
     # refusal is the 403 page, and a parent outside the read scope is a 404
     # (`requested_parent`), as for any forged id.
     def create
-      page_type = new_page_params[:page_type].presence
+      template = new_page_params[:template].presence
       parent = requested_parent
       return render_new_page_failure(gone: true) if parent == :gone
 
-      # An unknown `page_type` is `Page`'s own validation failure (`enum ...
-      # validate: true`), reported on the field like any other.
-      result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, page_type: page_type }.compact,
+      # A template the theme does not declare is `Page`'s own validation
+      # failure, reported on the field like any other.
+      result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, template: template }.compact,
         translations: { admin_locale => { title: new_page_params[:title] } })
 
       if result.ok?
@@ -336,7 +336,7 @@ module Admin
         meta_title: [ :meta_title ],
         meta_description: [ :meta_description ],
         hero_alt: [ :hero_alt ],
-        page_type: [ :page_type ],
+        template: [ :template ],
         hero_image: [ :hero_image ]
       }
     end
@@ -382,7 +382,7 @@ module Admin
       @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
       form = Admin::EditorScreen::NewPageFormComponent.new(
         url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || new_page_params[:parent_id] unless gone),
-        title: new_page_params[:title], page_type: new_page_params[:page_type], errors: @page.errors
+        title: new_page_params[:title], template: new_page_params[:template], errors: @page.errors
       )
 
       respond_to do |format|
@@ -410,7 +410,7 @@ module Admin
     # drops anything non-scalar, so a forged shape is the ordinary blank-title
     # 422 or the default parent.
     def new_page_params
-      @new_page_params ||= (params[:page].respond_to?(:permit) ? params[:page] : ActionController::Parameters.new).permit(:title, :parent_id, :page_type)
+      @new_page_params ||= (params[:page].respond_to?(:permit) ? params[:page] : ActionController::Parameters.new).permit(:title, :parent_id, :template)
     end
 
     def requested_parent

@@ -23,7 +23,7 @@ module Admin
       private
 
       def unpublished_page
-        PreviewFixtures.root_page.children.create!(page_type: :standard, title: "Schedule preview #{SecureRandom.hex(4)}")
+        PreviewFixtures.root_page.children.create!(title: "Schedule preview #{SecureRandom.hex(4)}")
       end
     end
   end

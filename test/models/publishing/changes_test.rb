@@ -32,11 +32,20 @@ class Publishing::ChangesTest < ActiveSupport::TestCase
   end
 
   test "a field of the record is named, with the language it changed in" do
-    assert Pages::Save.call(@page, attributes: { page_type: "landing" }, translations: { "de" => { title: "Preise" }, "en" => { subtitle: "Plans" } }).ok?
+    assert Pages::Save.call(@page, attributes: { template: "landing" }, translations: { "de" => { title: "Preise" }, "en" => { subtitle: "Plans" } }).ok?
 
-    assert_equal %w[page_type subtitle title], changes.fields.sort
+    assert_equal %w[settings subtitle title], changes.fields.sort
     assert_equal %w[de en], changes.locales
     assert_empty changes.blocks
+  end
+
+  test "a changed template is named in the overview as Template" do
+    assert Pages::Save.call(@page, attributes: { template: "landing" }).ok?
+
+    assert_equal %w[settings], changes.fields
+    assert_empty changes.locales
+    assert_equal "Template", I18n.t("admin.components.editor_screen.changes_overview.field_names.settings")
+    assert_not I18n.exists?("admin.components.editor_screen.changes_overview.field_names.page_type"), "the page type's name is gone with it"
   end
 
   test "a changed block, an added one and a removed one are each named once, the removed one as the copy had it" do

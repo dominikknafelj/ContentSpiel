@@ -1,0 +1,48 @@
+# The choices the default theme offers (the format is app/values/theme/declarations.rb's;
+# a theme's own theme.yml replaces a list it declares and inherits one it does not).
+# No section_styles key: the default theme offers none.
+page_templates:
+  - name: standard
+    label: Standard
+  - name: landing
+    label: Landing
+    fields: [hero]
+# Twelve Lucide outlines (app/assets/images/icons, LICENSE-lucide there). The
+# names follow the name rule (underscores); the files keep Lucide's own.
+icons:
+  - name: arrow_right
+    label: Arrow right
+    file: icons/arrow-right.svg
+  - name: check
+    label: Check
+    file: icons/check.svg
+  - name: star
+    label: Star
+    file: icons/star.svg
+  - name: heart
+    label: Heart
+    file: icons/heart.svg
+  - name: mail
+    label: Mail
+    file: icons/mail.svg
+  - name: map_pin
+    label: Map pin
+    file: icons/map-pin.svg
+  - name: calendar
+    label: Calendar
+    file: icons/calendar.svg
+  - name: user
+    label: User
+    file: icons/user.svg
+  - name: shield
+    label: Shield
+    file: icons/shield.svg
+  - name: briefcase
+    label: Briefcase
+    file: icons/briefcase.svg
+  - name: clock
+    label: Clock
+    file: icons/clock.svg
+  - name: globe
+    label: Globe
+    file: icons/globe.svg

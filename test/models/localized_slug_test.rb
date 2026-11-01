@@ -2,11 +2,11 @@ require "test_helper"
 
 class LocalizedSlugTest < ActiveSupport::TestCase
   setup do
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "a new page gets a slug per locale from that locale's title" do
-    page = Page.create!(parent: @root, page_type: :standard, title_en: "About Us", title_de: "Über uns")
+    page = Page.create!(parent: @root, title_en: "About Us", title_de: "Über uns")
 
     assert_equal "about-us", page.slug_en
     assert_equal "uber-uns", page.slug_de
@@ -19,7 +19,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   end
 
   test "an existing slug is never overwritten when the title changes" do
-    page = Page.create!(parent: @root, page_type: :standard, title_en: "About", slug_en: "who-we-are")
+    page = Page.create!(parent: @root, title_en: "About", slug_en: "who-we-are")
     page.update!(title_en: "About the team")
 
     assert_equal "who-we-are", page.reload.slug_en
@@ -32,7 +32,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # does to a hand-typed one, so a real German title arriving afterwards must
   # not retroactively replace it.
   test "a fallback-filled slug is not retroactively replaced once a real translation arrives" do
-    page = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    page = Page.create!(parent: @root, title_en: "About")
     assert_equal "about", page.slug_de, "German has no title yet, so it falls back to the English one"
 
     page.update!(title_de: "Über")
@@ -61,7 +61,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # queries, rather than stubbing (no mocking library, per project
   # constraints), so this exercises the real callback.
   test "saving a page with every locale already slugged does not query SiteSetting" do
-    page = Page.create!(parent: @root, page_type: :standard, title_en: "About", slug_en: "about",
+    page = Page.create!(parent: @root, title_en: "About", slug_en: "about",
       title_de: "Über uns", slug_de: "uber-uns", title_es: "Sobre Nosotros", slug_es: "sobre-nosotros")
 
     site_setting_queries = 0
@@ -105,7 +105,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # locale still gets a real, working URL rather than silently having none.
   test "a title with no Latin letters gets a Unicode slug instead of a blank one" do
     with_locales(%w[en ja], default: "en") do
-      about = Page.create!(page_type: :standard, parent: @root, title_ja: "日本語のタイトル")
+      about = Page.create!(parent: @root, title_ja: "日本語のタイトル")
 
       assert_equal "日本語のタイトル", about.slug_ja
       assert_equal "/日本語のタイトル", about.full_path("ja")
@@ -118,7 +118,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # make this cross-locale test-writing-adjacent case go through the wrong
   # branch and still pass.
   test "a title with Latin diacritics still slugifies through parameterize, not the fallback" do
-    page = Page.create!(parent: @root, page_type: :standard, title_de: "Über uns")
+    page = Page.create!(parent: @root, title_de: "Über uns")
 
     assert_equal "uber-uns", page.slug_de
   end
@@ -131,7 +131,7 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # "some locale has one," because a slug (unlike a title) has no fallback
   # when read back.
   test "a title made only of punctuation leaves that locale's slug blank, caught by the presence check" do
-    page = Page.new(page_type: :standard, parent: @root, title_en: "About", title_de: "…")
+    page = Page.new(parent: @root, title_en: "About", title_de: "…")
 
     assert_not page.valid?
     assert_equal "about", page.slug_en
@@ -146,10 +146,10 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # refuse the new page's `/about` as another record's live address, which
   # is a different check from the one under test here.
   test "a trashed page doesn't hold its slug" do
-    gone = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    gone = Page.create!(parent: @root, title_en: "About")
     gone.update!(trashed_at: Time.current)
 
-    fresh = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    fresh = Page.create!(parent: @root, title_en: "About")
 
     assert_equal "about", fresh.slug_en
     assert gone.slug_taken?(:en, "about"), "the kept page now holds it"
@@ -171,9 +171,9 @@ class LocalizedSlugTest < ActiveSupport::TestCase
   # trashed record itself (its own trashing, or anything else) is never
   # refused over a slug a kept record has since taken.
   test "a trashed page's own save skips the uniqueness check" do
-    gone = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    gone = Page.create!(parent: @root, title_en: "About")
     gone.update!(trashed_at: Time.current)
-    Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    Page.create!(parent: @root, title_en: "About")
 
     assert gone.reload.valid?, gone.errors.full_messages.to_sentence
   end

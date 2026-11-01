@@ -14,6 +14,23 @@ module BlockTypes
     }.freeze
     BACKGROUNDS = %w[none tinted strong].freeze
     WIDTHS = %w[content full].freeze
+    # The address of a link that jumps to the band (`#services`): what the
+    # section's `id` is on the public page, so it is a name an `id` and a URL
+    # fragment hold without escaping, and one the page's headings cannot be
+    # given (`ThemeHelper#with_heading_ids`). Refused when it differs, never
+    # cleaned: the editor sees what was stored.
+    ANCHOR_MAX = 40
+    ANCHOR = /\A[a-z][a-z0-9-]{0,#{ANCHOR_MAX - 1}}\z/
+
+    # Ids the public templates write themselves: the subpages list's label,
+    # and a note's heading, a code block's file name and a table's caption,
+    # each made from a block's database id (`note-<id>-heading`,
+    # `code-<id>-file`, `table-<id>-caption`). An anchor equal to one would
+    # give the page an id twice and make an `aria-labelledby` ambiguous. The
+    # block ones are unbounded, so the whole prefix with digits is reserved.
+    RESERVED_ANCHORS = /\A(?:page-children-label|(?:note|code|table)-\d+(?:-.*)?)\z/
+
+    def self.reserved_anchor?(anchor) = RESERVED_ANCHORS.match?(anchor.to_s)
 
     def self.register
       BlockTypes.register :section do |t|
@@ -22,14 +39,21 @@ module BlockTypes
         t.field :layout, :select, options: LAYOUTS.keys, default: "two", required: true
         t.field :background, :select, options: BACKGROUNDS, default: "none", required: true
         t.field :width, :select, options: WIDTHS, default: "content", required: true
+        # A name from the theme's `section_styles` (theme.yml): the theme
+        # draws it, the default theme declares none and draws nothing for it.
+        t.field :style, :theme_choice, of: :section_styles
+        # One anchor for every language, unique among the page's sections
+        # (`ContentBlocks::Save`, with `index_content_blocks_on_section_anchor`
+        # behind it); blank is none and is stored as absent.
+        t.field :anchor, :string, format: ANCHOR, format_message: "block_types.section.anchor_format"
         t.capability :container
         t.columns ->(settings) { weights(settings["layout"]).size }
         t.component Blocks::SectionComponent
-        t.theme_methods :block, :page, :columns, :layout, :background, :width
+        t.theme_methods :block, :page, :columns, :layout, :background, :width, :style, :anchor
         # No `stylesheet` and no `summary` (block types plan, departure 1):
         # sections.css is the default theme's own file, imported by
         # theme.css before every type's, and a section's tile is its lanes.
-        t.sample settings: { "layout" => "two", "background" => "tinted", "width" => "content" }, shows: [ "content-section--tinted" ]
+        t.sample settings: { "layout" => "two", "background" => "tinted", "width" => "content", "anchor" => "sample-section" }, shows: [ "content-section--tinted", "sample-section" ]
       end
     end
 

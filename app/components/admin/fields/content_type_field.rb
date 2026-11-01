@@ -14,6 +14,11 @@ module Admin
     # subclass with no sidecar template of its own falls back to its
     # superclass's).
     class ContentTypeField < SelectField
+      # The stored name as it is, not a select's label lookup.
+      def self.display(_field, value) = value.to_s
+
+      def self.own_label?(_field) = false
+
       def option_pairs = ContentTypes.all.map { |definition| [ definition.label, definition.name ] }
     end
   end

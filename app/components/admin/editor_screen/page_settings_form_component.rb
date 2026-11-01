@@ -1,9 +1,9 @@
 module Admin
   module EditorScreen
     # The page editor's "Page settings" panel (cs-studio spec §5.1): title,
-    # slug, page type, subtitle, hero image (a library
+    # slug, template, subtitle, hero image (a library
     # image, chosen through `Media::PickerComponent`) + alt
-    # (landing pages only), and meta title/description under "SEO" -- one
+    # (a template that lists `hero` only), and meta title/description under "SEO" -- one
     # autosaving `<form>` (spec §6.1), PATCHing `Admin::PagesController#update`
     # on every field's `input`/`change` (debounced) or `focusout` (immediate).
     #
@@ -64,7 +64,7 @@ module Admin
       def field_html_name(field) = "page[#{field}]"
 
       # The one non-`Admin::Columns::*` field this form renders by hand
-      # (`page_type`'s `<select>`) still needs an error slot id that agrees
+      # (the template's `<select>`) still needs an error slot id that agrees
       # with `Admin::AutosaveResponses`, so it goes through the exact same
       # formula every other field's id already matches.
       def errors_id(field) = Admin::Ui::FieldComponent.error_id(ID_PREFIX, field)
@@ -125,9 +125,52 @@ module Admin
 
       def translation_tab? = locale.to_s != ::Locales.default
 
-      def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
+      # The theme's page templates, by their labels in the interface's
+      # language. ABSENT MEANS THE DEFAULT: the theme's first is the blank
+      # value, which stores nothing (`Pages::Save`), because the form sends the
+      # select with every autosave and a page that stores none must not gain
+      # the first's name from a save of its title. A stored name the theme
+      # does not declare comes first, by its name, so that it is what is sent.
+      def template_options
+        declared = ::Theme.current.choices(:page_templates).each_with_index.map do |entry, index|
+          [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name, { data: { fields: Array(entry.fields).join(" ") } } ]
+        end
+        stored = page.template
+        return declared if stored.nil? || ::Theme.current.choice(:page_templates, stored)
 
-      def landing? = page.landing?
+        # Drawn as the theme's default, so it shows the default's fields.
+        [ [ Admin::Fields::ThemeChoiceField.unknown_word(stored), stored, { data: { fields: Array(::Theme.current.choice(:page_templates, template)&.fields).join(" ") } } ], *declared ]
+      end
+
+      def template_fields_data = { controller: "admin--editor--template-fields" }
+
+      # A page's template is asked for when the theme declares two or more, and
+      # always when the stored name is not the theme's (it is sent back by every
+      # save, so it has to be seen).
+      def template_field? = ::Theme.current.choices(:page_templates).size >= 2 || template_unknown?
+
+      def template_unknown? = page.template.present? && ::Theme.current.choice(:page_templates, page.template).nil?
+
+      # The value selected: blank for the default (no stored name, or the
+      # first's), the stored name otherwise.
+      def template_value
+        stored = page.template
+        stored.nil? || stored == ::Theme.current.page_template(nil) ? "" : stored
+      end
+
+      # The template the page is drawn with (`Theme#page_template`).
+      def template = ::Theme.current.page_template(page.template)
+
+      # A stored name the theme dropped is shown by its name, not as the default
+      # it is drawn with.
+      def template_label
+        return Admin::Fields::ThemeChoiceField.unknown_word(page.template) if template_unknown?
+
+        ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || Admin::Fields::ThemeChoiceField.unknown_word(template)
+      end
+
+      # The hero fields are offered for a template that draws the hero.
+      def hero? = Array(::Theme.current.choice(:page_templates, template)&.fields).include?("hero")
 
       # A page the user can read but not edit (access-control design spec §5,
       # `can_edit?`: `pages.edit`, plus `pages.publish` once published): every

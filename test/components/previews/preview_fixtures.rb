@@ -19,7 +19,7 @@ module PreviewFixtures
   # whatever's already in a developer's dev database, mid-setup or not, so
   # this can't assume there's no root yet the way a test's own fixtures can.
   def root_page
-    Page.find_by(parent_id: nil) || Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.find_by(parent_id: nil) || Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   # A fresh child page for a preview's block(s) to live on -- never the root
@@ -31,7 +31,7 @@ module PreviewFixtures
   # slug keyed off the bare (non-unique) title instead, which collides the
   # moment two previews share one.
   def page(title: "Preview page")
-    root_page.children.create!(page_type: :standard, title: "#{title} #{SecureRandom.hex(4)}", published_at: Time.current)
+    root_page.children.create!(title: "#{title} #{SecureRandom.hex(4)}", published_at: Time.current)
   end
 
   def post_list_block(page, settings = {})

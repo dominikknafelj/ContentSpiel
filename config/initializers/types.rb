@@ -17,7 +17,15 @@ Rails.application.config.to_prepare do
   # the next reload. At boot it is raised, and the application does not
   # start.
   unregistered = nil
+  # The theme's lists for a `:theme_choice` field, asked at each validation
+  # and each draw (`ContentModel.theme_choices`).
+  ContentModel.theme_choices = ->(list) { Theme.current.choices(list) }
   begin
+    # The field types first: every definition below declares its fields
+    # against them (`ContentModel::Definition#field`).
+    ContentModel::FieldTypes.reset!
+    ContentModel::FieldTypes.register_built_ins
+
     [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
     BlockTypes::RichText.register
@@ -25,6 +33,7 @@ Rails.application.config.to_prepare do
     BlockTypes::Code.register
     BlockTypes::Note.register
     BlockTypes::Table.register
+    BlockTypes::Card.register
     BlockTypes::PostList.register
     BlockTypes::Section.register
     # bin/rails generate block_type adds a built-in's line above this one.

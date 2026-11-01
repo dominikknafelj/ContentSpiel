@@ -30,7 +30,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     @asset.reload
 
     @landing = create_page(title: "Landing")
-    assert Pages::Save.call(@landing, attributes: { page_type: "landing" }).ok?
+    assert Pages::Save.call(@landing, attributes: { template: "landing" }).ok?
   end
 
   test "picking an image sets the field's width, height and blur, and the next pick replaces them" do

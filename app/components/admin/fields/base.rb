@@ -12,6 +12,17 @@ module Admin
     # `placeholder:` is what the caller hands a field that shows one
     # (`Admin::Fields::StringField`); every other type ignores it.
     class Base < Admin::AdminComponent
+      # How a value of this type reads where it cannot be edited (a
+      # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
+      # a String, nil for nothing to show, or a
+      # `SharedFieldsComponent::Code` for code drawn in a `pre`. A type's
+      # input answers it, so the read-only view asks no type by its name.
+      def self.display(_field, value) = value.to_s
+
+      # Whether this input draws its own label beside it (a checkbox, a row
+      # of buttons with its legend), so `Ui::FieldComponent` draws none.
+      def self.own_label?(_field) = false
+
       # `id_prefix:` mirrors `Ui::FieldComponent`'s own (see its comment) --
       # forwarded here unchanged so `input_id` agrees with the wrapping
       # `Ui::FieldComponent#errors_id` a Turbo Stream targets, whichever one a

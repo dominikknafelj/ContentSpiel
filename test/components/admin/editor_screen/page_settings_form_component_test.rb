@@ -15,8 +15,71 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     asset.update!(alt: alt)
     translations = { Locales.default => { title: "Landing" } }
     translations[Locales.default][:hero_alt] = hero_alt if hero_alt
-    Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: asset.id },
+    Pages::Save.call(attributes: { parent: root_page, template: "landing", published: true, hero_media_asset_id: asset.id },
       translations: translations).record
+  end
+
+  # The form sends the select with every save: a stored template the theme
+  # no longer declares must be what is selected, or the next save of any
+  # field would replace it with the theme's first.
+  test "a stored template the theme does not declare stays selected, and a declared one is selected as stored" do
+    page = with_page_templates("standard", "gallery") { Pages::Save.call(attributes: { parent: root_page }, translations: { "en" => { title: "Gallery" } }).record.tap { |record| assert Pages::Save.call(record, attributes: { template: "gallery" }).ok? } }
+    render_settings(page.reload)
+    assert_selector "select[name='page[template]'] option[selected][value=gallery]", text: "gallery"
+    assert_selector "select[name='page[template]'] option[value=landing]", text: "Landing"
+
+    render_settings(landing_with_hero)
+    assert_selector "select[name='page[template]'] option[selected][value=landing]", text: "Landing"
+    assert_selector "select[name='page[template]'] option", count: 2
+  end
+
+  test "under the default theme the Template select offers Standard and Landing" do
+    render_settings(create_page(title: "About"))
+    assert_selector "label[for=page-template]", text: "Template"
+    assert_no_text "Page type"
+    assert_selector "select#page-template[name='page[template]'] option", count: 2
+    assert_selector "select#page-template option[value='']", text: "Standard"
+    assert_selector "select#page-template option[value=landing]", text: "Landing"
+  end
+
+  test "a theme with one template draws no select" do
+    page = create_page(title: "About")
+    with_page_templates("standard") { render_settings(page) }
+    assert_no_selector "select[name='page[template]']"
+    assert_no_selector "[data-field-name=template]"
+  end
+
+  test "a stored template the theme does not know is first, selected and marked not in this theme" do
+    page = with_page_templates("standard", "gallery") { Pages::Save.call(attributes: { parent: root_page }, translations: { "en" => { title: "Gallery" } }).record.tap { |record| assert Pages::Save.call(record, attributes: { template: "gallery" }).ok? } }
+    # One declared template and an unknown stored name: the select is there.
+    with_page_templates("standard") { render_settings(page.reload) }
+    assert_selector "select[name='page[template]'] option:first-child[selected][value=gallery]", text: "gallery (not in this theme)"
+    assert_selector "select[name='page[template]'] option", count: 2
+  end
+
+  test "on a translation tab a stored template the theme dropped reads by its name, marked not in this theme, not as the default's label" do
+    page = with_page_templates("standard", "gallery") { Pages::Save.call(attributes: { parent: root_page }, translations: { "en" => { title: "Gallery" } }).record.tap { |record| assert Pages::Save.call(record, attributes: { template: "gallery" }).ok? } }
+    with_page_templates("standard") { render_settings(page.reload, locale: "de") }
+    assert_selector "[data-field-name=template]", text: "Template: gallery (not in this theme)"
+  end
+
+  test "the hero fields are always in the form, hidden unless the chosen template lists hero, and the subtitle always" do
+    render_settings(create_page(title: "About"))
+    assert_selector "input[name='page[subtitle]']"
+    assert_selector "[data-template-field=hero][hidden] [data-field-name=hero_alt]", visible: :all
+    assert_selector "select[name='page[template]'] option[value=landing][data-fields=hero]"
+    assert_selector "select[name='page[template]'] option[value=''][data-fields='']"
+    assert_selector "[data-controller~='admin--editor--template-fields']"
+
+    render_settings(landing_with_hero)
+    assert_selector "input[name='page[subtitle]']"
+    assert_selector "[data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
+  end
+
+  test "on a translation tab the template is a read-only line with its label" do
+    render_settings(landing_with_hero, locale: "de")
+    assert_no_selector "select[name='page[template]']"
+    assert_selector "[data-field-name=template]", text: "Template: Landing"
   end
 
   # A published page's slug is not a field (drafts spec D7): the help text belongs to the draft's.
@@ -107,7 +170,7 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     assert_no_selector "[data-controller~='admin--saving--autosave']"
     assert_equal editable_controls, controls
     assert_selector "fieldset.admin-held input[name='page[title]'][readonly]"
-    assert_selector "fieldset.admin-held select[name='page[page_type]'][disabled]"
+    assert_selector "fieldset.admin-held select[name='page[template]'][disabled]"
     assert_selector "button[data-action='admin--editing--hold#takeOver']", text: "Take over"
   end
 

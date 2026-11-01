@@ -28,7 +28,7 @@ module Publishing
   # what the save services leave when the text is written back). They are
   # kept as a record of what the marks were when the copy was taken.
   CONTENT = {
-    "Page" => %w[title subtitle meta_title meta_description hero_alt hero_media_asset_id page_type
+    "Page" => %w[title subtitle meta_title meta_description hero_alt hero_media_asset_id settings
                  translation_sources translation_original_changed_at],
     "Post" => %w[title excerpt body metadata translated_metadata translation_sources translation_original_changed_at],
     # A block's copy is the whole row (`Snapshot.blocks_of`).

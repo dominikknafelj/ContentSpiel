@@ -13,17 +13,24 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
 
   def built_in(list, reader) = list - outside.flat_map(&reader)
 
-  def assert_ledger(components: built_in_components, themed: built_in(Theme::Contract.themed_tokens, :themed_tokens), fixed: built_in(Theme::Contract.fixed_tokens, :fixed_tokens))
+  def assert_ledger(components: built_in_components, themed: built_in(Theme::Contract.themed_tokens, :themed_tokens), fixed: built_in(Theme::Contract.fixed_tokens, :fixed_tokens), classes: Theme::Contract.classes, attributes: Theme::Contract.attributes)
     note = "Theme::Contract no longer says what the ledger says. A theme outside this repository relies on every name here: " \
            "if the change is meant, write the release note and change the ledger in test/support/contract_ledger.rb with it"
     assert_equal COMPONENTS.keys, components.keys, "#{note} (the components, in order)"
     COMPONENTS.each { |path, methods| assert_equal methods, components.fetch(path), "#{note} (the methods of #{path})" }
+    assert_equal CLASSES, classes, "#{note} (the classes)"
+    assert_equal ATTRIBUTES, attributes, "#{note} (the attributes)"
     assert_equal THEMED_TOKENS, themed, "#{note} (the themed tokens, in order)"
     assert_equal FIXED_TOKENS, fixed, "#{note} (the fixed tokens, in order)"
   end
 
   test "the built-in types' part of the contract is the ledger: a name added, renamed or removed is a release note" do
     assert_ledger
+  end
+
+  test "the page templates' locals are the ledger's" do
+    assert_equal PAGE_TEMPLATE_LOCALS, Theme::Contract::PAGE_TEMPLATE_LOCALS, "a local a page template is handed added, renamed or removed is a release note"
+    assert_equal PAGE_TEMPLATES, Theme::Contract::PAGE_TEMPLATES
   end
 
   test "the ledger can fail: a method dropped from a built-in's line, and a token renamed, are each named" do
@@ -38,5 +45,9 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
     renamed = built_in(Theme::Contract.themed_tokens, :themed_tokens).map { |name| name == "syn-attribute" ? "syn-attr" : name }
     error = assert_raises(Minitest::Assertion) { assert_ledger(components: ledgered, themed: renamed) }
     assert_includes error.message, "the themed tokens, in order"
+  end
+
+  test "the default theme's icon names are the ledger's" do
+    assert_equal DEFAULT_ICONS, Theme::Declarations.default["icons"].map(&:name), "an icon name added, renamed or removed is a release note"
   end
 end

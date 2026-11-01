@@ -15,7 +15,7 @@ class StarterContents::EnsureHomeTest < ActiveSupport::TestCase
 
   test "keeps an existing homepage and its blocks" do
     Page.destroy_all
-    existing = Page.create!(page_type: :standard, title: "Mine", slug: "", published_at: Time.current)
+    existing = Page.create!(title: "Mine", slug: "", published_at: Time.current)
     existing.content_blocks.create!(block_type: :post_list, position: 0)
 
     assert_no_difference [ "Page.count", "ContentBlock.count" ] do

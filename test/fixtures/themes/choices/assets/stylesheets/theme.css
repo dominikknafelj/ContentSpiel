@@ -1,0 +1,3 @@
+/* Rules for the classes a section's style writes. */
+.content-section--style-services { border-top: 4px solid var(--th-accent); }
+.content-section--style-contact { background: var(--th-accent-tint); }

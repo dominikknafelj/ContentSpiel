@@ -8,7 +8,7 @@
   <% field_side = capture do %>
     <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`), and a segmented
         control its legend (`Admin::Fields::SelectField`); a second one above either would say it twice. %>
-    <% unless field.type == :boolean || field.segmented? %>
+    <% unless own_label? %>
       <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
     <% end %>
     <%= render input_component %>

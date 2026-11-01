@@ -18,13 +18,32 @@ module ContractLedger
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
+    "blocks/card_component" => %w[block page title text link icon icon_name],
     "blocks/post_list_component" => %w[block page list_component],
-    "blocks/section_component" => %w[block page columns layout background width],
+    "blocks/section_component" => %w[block page columns layout background width style anchor],
     "posts/blog_list_component" => %w[posts page],
     "posts/resume_list_component" => %w[posts page],
     "posts/now_list_component" => %w[posts page],
     "posts/detail_component" => %w[post]
   }.freeze
+
+  # The classes a theme's stylesheet may rely on that a template of the CMS
+  # writes from a choice of the theme's own (`Theme::Contract::CLASSES`).
+  CLASSES = {
+    "content-section--style-<name>" => "on the section, for a style the theme declares"
+  }.freeze
+
+  # The attributes a theme's stylesheet may select that a CMS template
+  # writes: a library image's two loading states (`Theme::Contract::ATTRIBUTES`).
+  ATTRIBUTES = {
+    "img[data-image-preview]" => "an image whose widths are not made yet: `src` is its ~24px preview",
+    "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
+  }.freeze
+
+  # The locals every page template is handed, and the folder of the templates
+  # (`Theme::Contract::PAGE_TEMPLATE_LOCALS`, `PAGE_TEMPLATES`).
+  PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze
+  PAGE_TEMPLATES = "pages/templates/".freeze
 
   THEMED_TOKENS = %w[
     paper surface sunken ink dim meta line line-strong
@@ -38,6 +57,7 @@ module ContractLedger
     note-important-ground note-important-line note-important-ink note-important-border
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
+    card-ground card-line card-icon
   ].freeze
 
   FIXED_TOKENS = %w[
@@ -47,4 +67,8 @@ module ContractLedger
     sp-1 sp-2 sp-3 sp-4 sp-5 sp-6 sp-7
     radius radius-pill ease
   ].freeze
+
+  # The default theme's icon names (a promise: a theme outside this
+  # repository may store one, and a card keeps drawing it).
+  DEFAULT_ICONS = %w[arrow_right check star heart mail map_pin calendar user shield briefcase clock globe].freeze
 end

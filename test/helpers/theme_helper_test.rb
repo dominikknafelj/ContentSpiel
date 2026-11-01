@@ -23,8 +23,8 @@ class ThemeHelperTest < ActionView::TestCase
   # (config/application.rb) -- so an integration test can't reach this text;
   # a direct helper test is the only way to pin it.
   test "language_links names each locale natively, not in English" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(parent: root, page_type: :standard, title_en: "About", title_de: "Über",
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    page = Page.create!(parent: root, title_en: "About", title_de: "Über",
       published_at: Time.current)
 
     links = language_links(page)
@@ -142,6 +142,23 @@ class ThemeHelperTest < ActionView::TestCase
     assert_equal headings.map(&:id), headings.map(&:id).uniq
     assert_equal "Use bin/rails & more", headings[4].text
     assert_includes html, %(<h2 id="use-bin-rails-more">Use <code>bin/rails</code> &amp; more</h2>)
+  end
+
+  # The article a template hands over may not hold the sections (a theme that
+  # draws them apart, or a section that draws nothing), and a link to
+  # `#services` still reaches the section: the page's anchors are taken ids.
+  test "with_heading_ids gives a heading whose words are a section's anchor on the shown page the next free suffix, and an anchor of no shown page is no reason" do
+    page = create_page(title: "Anchored")
+    section = page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    other = create_page(title: "Other").content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(other, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    @page = page.reload
+
+    html, headings = with_heading_ids("<h2>Services</h2><h2>Services</h2><h2>Contact</h2>".html_safe)
+
+    assert_equal %w[services-2 services-3 contact], headings.map(&:id)
+    assert_includes html, %(<h2 id="services-2">Services</h2>)
   end
 
   test "with_heading_ids keeps an id a heading already has and never gives it to another" do
@@ -344,5 +361,32 @@ class ThemeHelperTest < ActionView::TestCase
     assert_equal [ home.id ], page_ancestors(below).map(&:id)
     assert_nil page_section(hidden)
     assert_nil page_section(home)
+  end
+
+  test "page_template is the stored name when declared, the first template otherwise, never nil" do
+    @page = Page.new(title: "Shown", template: "landing")
+    assert_equal "landing", page_template
+
+    @page = Page.new(title: "Shown")
+    assert_equal "standard", page_template, "no stored name is the theme's first template"
+
+    @page = Page.new(title: "Shown").tap { |page| page.settings = { "template" => "gallery" } }
+    assert_equal "standard", page_template, "a name the theme does not declare is drawn by the first"
+
+    with_page_templates("gallery", "landing") do
+      assert_equal "gallery", page_template
+      @page = Page.new(title: "Shown", template: "landing")
+      assert_equal "landing", page_template
+      @page = Page.new(title: "Shown")
+      assert_equal "gallery", page_template
+    end
+
+    with_page_templates do
+      assert_equal "standard", page_template, "a theme that declares none is drawn by the default's first"
+    end
+
+    @page = nil
+    assert_equal "standard", page_template
+    assert_includes Theme::Contract::HELPERS, "page_template"
   end
 end

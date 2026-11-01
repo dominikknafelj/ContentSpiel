@@ -136,6 +136,10 @@ class ContentBlock < ApplicationRecord
   # loads them with the list blocks, for `BlockOutline`).
   scope :containers, -> { where(block_type: BlockTypes.with_capability(:container).map(&:name)) }
 
+  # The containers whose `anchor` setting is `anchor`: what a save asks of the
+  # page's other sections before it takes the name (`ContentBlocks::Save`).
+  scope :with_anchor, ->(anchor) { containers.where(SqlNodes.json_text(arel_table[:settings], :anchor).eq(anchor.to_s)) }
+
   # `ActiveModel::Validations` aliases this to `#send` by default, which
   # chokes on the dotted paths `settings_are_valid` below adds errors under
   # (`settings.content_type` is not a method) -- generating an error's full
@@ -190,8 +194,20 @@ class ContentBlock < ApplicationRecord
   # The type's `ContentModel::FieldSet` instance over this block's
   # `settings`/`translated_settings`, or nil when `block_type` isn't
   # registered (there is no schema to build one from).
-  def settings_object(locale: I18n.locale, fallback: false)
-    definition&.field_set&.new(settings, translated_settings, locale:, fallback:)
+  def settings_object(locale: I18n.locale, fallback: false, stored: {})
+    definition&.field_set&.new(settings, translated_settings, locale:, fallback:, stored:)
+  end
+
+  # Settings carried from another record (a duplicate's original) whose
+  # choice names count as stored: a name the copy was never saved with, which
+  # the theme may no longer declare, is the original's and must not stop the
+  # copy (`ContentModel::FieldTypes`, the stored-name rule). Not stored.
+  attr_accessor :carried_settings
+
+  # What this block stores, for a field whose type keeps a stored value it
+  # would refuse when typed: the row's own settings, and the carried ones.
+  def stored_settings
+    (persisted? ? settings_in_database.to_h : {}).merge(carried_settings.to_h)
   end
 
   # Casts and validates `hash` against the type's schema, then writes the
@@ -334,7 +350,7 @@ class ContentBlock < ApplicationRecord
   # leave ambient -- unrelated to the site's own default -- would reject a
   # block that saved correctly the moment those two locales disagree.
   def settings_are_valid
-    object = settings_object(locale: Locales.default) or return
+    object = settings_object(locale: Locales.default, stored: stored_settings) or return
     return if object.valid?
 
     object.errors.each { |error| errors.add("settings.#{error.attribute}", error.type, message: error.message) }

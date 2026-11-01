@@ -28,14 +28,14 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
 
   test "a live page's heading, subtitle, description and blocks stay as published while its rows change, and follow a publish" do
     page, block = live_page_with_text("Pricing", "As published")
-    assert Pages::Save.call(page, attributes: { page_type: "landing" }, translations: { "en" => { subtitle: "Plans", meta_description: "Our plans" } }).ok?
+    assert Pages::Save.call(page, attributes: { template: "landing" }, translations: { "en" => { subtitle: "Plans", meta_description: "Our plans" } }).ok?
     publish_changes(page)
     get path_of(page)
     before = main_html
     assert_select "h1", text: "Pricing"
     assert_select "meta[name=description][content='Our plans']"
 
-    assert Pages::Save.call(page, attributes: { page_type: "standard" },
+    assert Pages::Save.call(page, attributes: { template: "standard" },
       translations: { "en" => { title: "Half a sent", subtitle: "Typed", meta_title: "Typed title", meta_description: "Typed" } }).ok?
     assert ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("Half a sent") } }).ok?
     text_block(page, "A block added since")
@@ -53,6 +53,26 @@ class PublicDraftsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "A block added since"
     assert_select "title", text: "Typed title"
     assert_select ".subtitle", count: 0
+  end
+
+  test "a live page switched to Landing shows its hero only after Publish changes" do
+    asset = create_media_asset
+    page, _block = live_page_with_text("Pricing", "As published")
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }, translations: { "en" => { subtitle: "Plans", hero_alt: "A room" } }).ok?
+    publish_changes(page)
+    get path_of(page)
+    assert_select "main img", count: 0
+    assert_select ".subtitle", count: 0
+
+    assert Pages::Save.call(page, attributes: { template: "landing" }).ok?
+    get path_of(page)
+    assert_select "main img", count: 0
+    assert_select ".subtitle", count: 0
+
+    publish_changes(page)
+    get path_of(page)
+    assert_select "main img[alt='A room']", count: 1
+    assert_select ".subtitle", text: "Plans"
   end
 
   test "blocks deleted, moved and put into a section in the rows are where they were on the site" do

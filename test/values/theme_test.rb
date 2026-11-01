@@ -212,4 +212,82 @@ class ThemeTest < ActiveSupport::TestCase
     assert_instance_of Theme, Theme.current
     assert_not Theme.current.configured?
   end
+
+  test "a theme answers its choices, a theme without a folder and a refused theme the default's" do
+    default = Theme::Declarations.default
+
+    assert_equal default["page_templates"], Theme.new.choices(:page_templates)
+    assert_equal default["page_templates"], Theme.new(refusal: ThemeFolder::Invalid.new("no")).choices("page_templates")
+    assert_equal default["page_templates"], plain_theme.choices(:page_templates)
+    assert_empty plain_theme.choices(:section_styles)
+
+    theme = choices_theme
+
+    assert_equal %w[services contact], theme.choices(:section_styles).map(&:name)
+    assert_equal "Kontakt", theme.choice(:section_styles, "contact").label_for("de")
+    assert_equal "Contact", theme.choice("section_styles", :contact).label_for("es")
+    assert_nil theme.choice(:section_styles, "missing")
+    assert_equal %w[brush], theme.choices(:icons).map(&:name)
+  end
+
+  test "icon_svg inlines a declared icon once per theme and is nil for blank and unknown names" do
+    theme = choices_theme
+    file = ThemeTestHelper::CHOICES.join("assets/images/icons/brush.svg")
+    icon = theme.icon_svg("brush")
+
+    assert_predicate icon, :html_safe?
+    assert_equal Theme::IconFile.inline(file.read), icon
+    assert_includes icon, %(<svg aria-hidden="true" focusable="false")
+    assert_same icon, theme.icon_svg(:brush), "read once per theme"
+    [ nil, "", "  ", "missing" ].each { |name| assert_nil theme.icon_svg(name), name.inspect }
+    assert_nil Theme.new.icon_svg("brush"), "the default theme declares no brush"
+  end
+
+  test "icon_svg is nil for an icon whose file no longer passes the fence, and reads a default icon from the CMS's images" do
+    with_theme_copy do |dir|
+      dir.join("assets/images/icons").mkpath
+      icon = dir.join("assets/images/icons/brush.svg")
+      icon.write(%(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0"/></svg>))
+      dir.join("theme.yml").write("icons:\n  - name: brush\n    label: Brush\n    file: icons/brush.svg\n")
+      theme = Theme.load(ThemeFolder.new(dir))
+      icon.write(%(<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>))
+
+      assert_nil theme.icon_svg("brush"), "the bytes inlined are the bytes fenced"
+    end
+
+    # The default theme's own icons are among the CMS's images; one is put
+    # there for this test under a name nothing else uses.
+    name = "theme-test-#{SecureRandom.hex(6)}.svg"
+    own = Rails.root.join("app/assets/images", name)
+    own.write(%(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0"/></svg>))
+    arrow = Theme::Choice.new(list: "icons", name: "arrow", labels: { "en" => "Arrow" }, fields: [], file: name, from: :default)
+    theme = Theme.new(path: ThemeTestHelper::CHOICES, declarations: { "icons" => [ arrow ] })
+
+    assert_equal Theme::IconFile.inline(own.read), theme.icon_svg("arrow")
+    assert_equal name, theme.icon_asset("arrow")
+  ensure
+    own&.delete if own&.exist?
+  end
+
+  test "icon_svg draws no icon, and raises nothing, when the file cannot be read or taken apart" do
+    # The suite has no minitest/mock: the module's own method is put back.
+    inline = Theme::IconFile.method(:inline)
+    [ Errno::EACCES, IOError, ArgumentError ].each do |error|
+      theme = choices_theme
+      Theme::IconFile.define_singleton_method(:inline) { |_| raise error }
+
+      assert_nil theme.icon_svg("brush"), error.name
+    end
+  ensure
+    Theme::IconFile.define_singleton_method(:inline, inline)
+  end
+
+  test "icon_asset is the served path of the theme's file" do
+    theme = choices_theme
+
+    assert_equal "icons/brush.svg", theme.icon_asset("brush")
+    assert_match %r{\A/assets/icons/brush-\h+\.svg\z}, ActionController::Base.helpers.image_path(theme.icon_asset("brush"))
+    assert_nil theme.icon_asset("missing")
+    assert_nil theme.icon_asset(nil)
+  end
 end

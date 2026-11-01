@@ -452,6 +452,32 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "<title>Dana&#39;s Notes</title>"
   end
 
+  # Development annotates every rendered template with BEGIN/END comments;
+  # inside <title> (raw text) a browser would show them in the tab. The
+  # title is the partial's text and nothing else, under either theme.
+  test "the title holds only the title text when views are annotated, under the default theme and a theme that replaces _title" do
+    was = ActionView::Base.annotate_rendered_view_with_filenames
+    ActionView::Base.annotate_rendered_view_with_filenames = true
+    # A compiled template carries the setting it was compiled under.
+    ActionView::LookupContext::DetailsKey.clear
+    begin
+      get "/about"
+      assert_includes response.body, "<title>About – Dana&#39;s Notes</title>"
+      assert_includes response.body, "<!-- BEGIN", "annotations stay on for the rest of the page"
+
+      with_theme_copy do |dir|
+        dir.join("views/layouts/public/_title.html.erb").write("<%= site_title %> / <%= page_title %>\n")
+        Theme.with(Theme.load(ThemeFolder.new(dir.to_s))) do
+          get "/about"
+          assert_includes response.body, "<title>Dana&#39;s Notes / About</title>"
+        end
+      end
+    ensure
+      ActionView::Base.annotate_rendered_view_with_filenames = was
+      ActionView::LookupContext::DetailsKey.clear
+    end
+  end
+
   test "a meta title an editor typed is taken as written, whatever the theme's pattern" do
     assert Pages::Save.call(@about, translations: { "en" => { meta_title: "About us & them" } }).ok?
     publish_changes(@about)
@@ -551,6 +577,155 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  def styled_section(style, texts = [ "Styled words" ])
+    section = with_choices_theme { @home.content_blocks.create!(block_type: "section", position: 5, settings: { "layout" => "one", "style" => style }) }
+    texts.each_with_index { |text, index| @home.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: index, body: rich_doc(text)) }
+    publish_changes(@home)
+    section
+  end
+
+  test "a theme's own template, written from the locals' table alone, draws a page and a post's detail under it" do
+    folder = ThemeFolder.new(ThemeTestHelper::CHOICES)
+    template = folder.read("views/pages/templates/_project.html.erb")
+    Theme::Contract::PAGE_TEMPLATE_LOCALS.each { |name| assert_match(/\b#{name}\b/, template, "the template reads the local #{name}") }
+    assert_no_match(/@page|@post/, template, "no instance variable: the locals alone")
+    assert_empty Theme::Check.problems(folder, deep: true)
+
+    blog = create_page(title: "Projects")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert result.ok?, result.errors.to_sentence
+    with_choices_theme { blog.update!(template: "project") }
+    create_post(title: "First post")
+    publish_changes(blog)
+
+    with_choices_theme { get "/projects" }
+
+    assert_response :success
+    assert_select "div.project-page h1", text: "Projects"
+    assert_select "div.project-page a[href='/projects/first-post']", text: "First post"
+
+    with_choices_theme { get "/projects/first-post" }
+
+    assert_response :success
+    assert_select "div.project-page", count: 1
+    assert_select "div.project-page h1", count: 1, text: "First post"
+    assert_select "div.project-page h1", text: "Projects", count: 0
+
+    with_choices_theme { get "/about" }
+
+    assert_select "div.project-page", count: 0
+  end
+
+  test "a page whose stored template the theme does not know is drawn by the first template" do
+    @about.update_columns(settings: { "template" => "retired" }) # version: none (a test's row, written around the services) # changes: none (a test's row)
+    publish_changes(@about)
+
+    with_choices_theme { get "/about" }
+
+    assert_response :success
+    assert_select "div.project-page", count: 0
+    assert_select "h1", text: "About"
+    assert_select "p.subtitle", count: 0
+    assert_equal "standard", with_choices_theme { Theme.current.page_template("retired") }
+    assert_equal "retired", @about.reload.template, "nothing stored changes"
+  end
+
+  test "a theme that declares styles and writes CSS styles a section by its class alone" do
+    styled_section("services")
+    folder = ThemeFolder.new(ThemeTestHelper::CHOICES)
+
+    with_choices_theme { get "/" }
+
+    assert_response :success
+    assert_select "section.content-section.content-section--style-services", text: /Styled words/
+    assert_includes folder.read("assets/stylesheets/theme.css"), ".content-section--style-services"
+    assert_equal [ "views/pages/templates/_project.html.erb" ], folder.files.grep(%r{\Acomponents/|\Aviews/}), "the theme replaces no template of the CMS: the class is all it asks for"
+    assert_empty Theme::Check.problems(folder, deep: true)
+  end
+
+  test "a theme that replaces the Section's template draws its own six-column grid from the section's blocks in reading order" do
+    section = with_section_grid_theme { @home.content_blocks.create!(block_type: "section", position: 5, settings: { "layout" => "two", "style" => "grid_six" }) }
+    [ [ 2, "Fourth" ], [ 1, "First" ], [ 1, "Second" ], [ 2, "Third" ] ].each_with_index do |(column, text), index|
+      @home.content_blocks.create!(block_type: "rich_text", section: section, section_column: column, position: index, body: rich_doc(text))
+    end
+    publish_changes(@home)
+    folder = ThemeFolder.new(ThemeTestHelper::SECTION_GRID)
+
+    with_section_grid_theme { get "/" }
+
+    assert_response :success
+    assert_select "div.grid-six[data-block='#{section.id}'][data-page='#{@home.id}']" do
+      assert_equal %w[First Second Fourth Third].sort, css_select("div.grid-six__cell").map { |cell| cell.text.squish }.sort
+      assert_equal 4, css_select("div.grid-six__cell").size
+    end
+    assert_select "section.content-section", 0
+    assert_empty Theme::Check.problems(folder, deep: true)
+    Theme::Contract.components.fetch("blocks/section_component").each { |name| assert_includes folder.read("components/blocks/section_component.html.erb"), name }
+  end
+
+  test "a stored style the theme does not know draws the section as the default draws it and changes nothing stored" do
+    section = styled_section("services")
+    before = section.reload.attributes
+
+    with_plain_theme { get "/" }
+
+    assert_response :success
+    assert_select "section.content-section", text: /Styled words/
+    assert_select "section[class*='style-']", 0
+    assert_equal before, section.reload.attributes
+    assert_equal "services", section.settings["style"]
+  end
+
+  test "a theme replaces the Card's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    about = create_page(title: "About cards")
+    # The icon is the theme's own, so the save that stores its name is made under that theme.
+    result = with_card_theme do
+      ContentBlocks::Save.call(ContentBlock.new(owner: about),
+        attributes: { block_type: "card", settings: { "icon" => "ribbon", "link" => "/about-cards", "title" => "<b>Tile</b>", "text" => "Words & more" } })
+    end
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(about)
+    source = Rails.root.join("test/fixtures/themes/card/assets/images/icons/ribbon.svg").read
+    root = source[/<svg[^>]*>/]
+    inner = source.sub(root, "").sub("</svg>", "").strip
+
+    with_card_theme { get "/about-cards" }
+
+    assert_response :success
+    assert_select "article.tile[data-icon='ribbon'][data-block='#{block.id}'][data-page='#{about.id}']" do
+      assert_select "h3.tile__title a[href='/about-cards']", text: "<b>Tile</b>"
+      assert_select "p.tile__text", text: "Words & more"
+      assert_select "span.tile__icon[aria-hidden=true] svg[width='48'][height='48'][viewBox='0 0 48 48'][aria-hidden=true][focusable=false]", count: 1
+    end
+    assert_select "div.content-block--card", count: 0
+    assert_select "article.tile b", count: 0
+
+    # The icon is drawn as its author wrote it: its layers and their classes, the filled dot, the fill that
+    # names the layout's gradient, its own size. Nothing was rewritten but the root's two added attributes.
+    assert_includes response.body, inner
+    assert_includes response.body, %(class="ribbon-back")
+    assert_includes response.body, %(<circle class="ribbon-dot" cx="24" cy="30" r="4" fill="currentColor"/>)
+    assert_includes response.body, %(fill="url(#tile-wash)")
+    assert_equal 1, response.body.scan(/\bid="tile-wash"/).size, "the gradient is defined once, by the layout, and the icon holds no id"
+    assert_not_includes inner, " id="
+
+    # Both schemes draw the same markup; what differs is the tokens it reads. The layout's gradient and the icon's
+    # classes take their colours from the Card's tokens, which the stylesheet declares for light and for dark.
+    css = Rails.root.join("test/fixtures/themes/card/assets/stylesheets/theme.css").read
+    assert_select "linearGradient#tile-wash stop[style*='var(--th-card-icon)']", minimum: 1
+    assert_match(/:root, \[data-theme="light"\]\s*\{[^}]*--th-card-ground:[^}]*--th-card-line:[^}]*--th-card-icon:/m, css)
+    assert_match(/\[data-theme="dark"\]\s*\{[^}]*--th-card-ground:[^}]*--th-card-line:[^}]*--th-card-icon:/m, css)
+    assert_match(/\.ribbon-back\s*\{[^}]*var\(--th-card-icon\)/, css)
+
+    with_plain_theme { get "/about-cards" }
+
+    assert_response :success
+    assert_select "div.content-block--card h3.content-block--card__title a[href='/about-cards']", text: "<b>Tile</b>"
+    assert_select "article.tile", count: 0
+    assert_select "div.content-block--card svg", count: 0
+  end
+
   test "a theme replaces the Note block's template from the contract's names alone, and a theme that does not is drawn the default one" do
     guide = create_page(title: "Guide")
     result = ContentBlocks::Save.call(ContentBlock.new(owner: guide), attributes: { block_type: "note", settings: { "kind" => "warning", "title" => "<b>Mind</b>" } },
@@ -585,6 +760,16 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     template = folder.read("components/blocks/note_component.html.erb")
     Theme::Contract.components.fetch("blocks/note_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
     assert_no_match(/settings|title\b|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name (the kind's word is `word`, not a key looked up), and no string marked safe")
+  end
+
+  test "the eighth theme is sound, checked deeply too: a Card template of the contract's names and an icon of its own" do
+    folder = ThemeFolder.new(ThemeTestHelper::CARD)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    template = folder.read("components/blocks/card_component.html.erb")
+    Theme::Contract.components.fetch("blocks/card_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
+    assert_no_match(/settings|I18n|\bt\(|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+    assert_empty Theme::IconFile.problems(ThemeTestHelper::CARD.join("assets/images/icons/ribbon.svg"), file: "icons/ribbon.svg")
   end
 
   test "a theme replaces the Table block's template from the contract's names alone, and a theme that does not is drawn the default one" do
@@ -623,6 +808,21 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     template = folder.read("components/blocks/table_component.html.erb")
     Theme::Contract.components.fetch("blocks/table_component").each { |name| assert_match(/#{Regexp.escape(name)}/, template, "the template calls #{name}") }
     assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
+  end
+
+  test "the preview reads the rows' anchors for a heading's id, and the public page the copy's" do
+    sign_in_as users(:one)
+    ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 0 },
+      translations: { "en" => { body: rich_doc("## Contact") } })
+    publish_changes(@about)
+    section = @about.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+
+    with_plain_theme { get "/preview/about" }
+    assert_select "article.plain-page h2#contact-2", text: "Contact"
+
+    with_plain_theme { get "/about" }
+    assert_select "article.plain-page h2#contact", text: "Contact"
   end
 
   test "the preview is drawn by the theme too, with the CMS's preview bar" do
@@ -804,6 +1004,67 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       assert_no_theme_here
       assert_select "head meta[name='theme-color'][content='#123456']", count: 0
     end
+  end
+
+  # A theme-choice field in an editor lists the theme's labels and nothing
+  # else of the theme: its labels are escaped text, and no template,
+  # stylesheet, script or icon file is in the page.
+  test "nothing of a theme reaches CS Studio through a theme choice: its labels are escaped text, and no file of the theme is in the page" do
+    BlockTypes.register("styled_test") do |t|
+      t.label "Styled"
+      t.field :style, :theme_choice, of: :section_styles
+      t.field :icon_name, :theme_choice, of: :icons
+      TestTypes.declare(t)
+    end
+    with_theme_copy do |dir|
+      FileUtils.cp_r("#{ThemeTestHelper::CHOICES}/.", dir)
+      FileUtils.rm_rf(dir.join("views/pages/templates")) # the theme.yml below declares no `project` for it
+      dir.join("theme.yml").write(<<~YAML)
+        section_styles:
+          - name: odd
+            label: "<b>Odd</b> #{LEAK}-LABEL"
+        icons:
+          - name: brush
+            label: Design
+            file: icons/brush.svg
+      YAML
+      dir.join("views/pages/show.html.erb").write("#{LEAK}-TEMPLATE\n")
+      dir.join("assets/stylesheets/theme.css").write(".#{LEAK}-STYLE { color: red }\n")
+      dir.join("assets/images/icons/brush.svg").write(%(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>#{LEAK}-SVG</title><path d="M0 0h24v24H0z"/></svg>))
+
+      Theme.with(Theme.load(ThemeFolder.new(dir))) do
+        page = create_page(title: "Choices", published: false)
+        block = page.content_blocks.create!(block_type: "styled_test", position: 0, settings: { "style" => "odd" })
+        block.update_columns(settings: { "style" => "retired" }) # version: none (a test's row, written around the services) # changes: none (a test's row)
+        sign_in_as users(:one)
+        get admin_page_path(page)
+
+        assert_response :success
+        assert_select "select option[value=odd]", text: "<b>Odd</b> #{LEAK}-LABEL"
+        assert_select "select option[selected][value=retired]", text: "retired (not in this theme)"
+        assert_select "select option[value=brush]", text: "Design"
+        assert_select "select option b", count: 0
+        assert_no_match(/#{LEAK}-(TEMPLATE|STYLE|SVG)|plain-frame|plain-mark|plain-page|M0 0h24v24H0z/, response.body)
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "nothing of a theme reaches CS Studio through a Card's icon: a picture of its served address, never the file's markup" do
+    with_choices_theme do
+      page = create_page(title: "Card icons", published: false)
+      page.content_blocks.create!(block_type: "card", position: 0, settings: { "icon" => "brush" })
+      sign_in_as users(:one)
+      get admin_page_path(page)
+
+      assert_response :success
+      assert_select "img[data-theme-icon=brush][src*='/assets/icons/brush-']", count: 1
+      assert_select "select option[value=brush]", text: "Design"
+      assert_select "select svg, option svg", count: 0
+    end
+  ensure
+    Rails.application.reloader.prepare!
   end
 
   # The two the three tests above never asked: the password pages are a
@@ -1073,6 +1334,31 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # `with_heading_ids` works on what the page's template captured, after
   # that cache. With a real store: the suite's null store would never hand a
   # cached render back.
+  # The anchor is the page author's word for the section, and a link to
+  # `#services` must reach it: a heading whose words give the same id is the
+  # one that yields, on the copy of the rendered page and nowhere else.
+  test "a heading whose id is a section's anchor on the same page gets a suffix, the anchor wins, and another page's anchor is nothing to it" do
+    section = @about.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    @about.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0, body: rich_doc("Inside the band"))
+    heading = ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 1 },
+      translations: { "en" => { body: rich_doc("## Services\n\nWords.\n\n## Contact") } })
+    assert heading.ok?, heading.errors.to_sentence
+    elsewhere = create_page(title: "Elsewhere")
+    other = elsewhere.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+    ContentBlocks::Save.call(other, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    publish_changes(@about)
+    publish_changes(elsewhere)
+
+    with_plain_theme { get "/about" }
+
+    assert_select "section#services", 1
+    assert_select "article.plain-page h2#services-2", text: "Services"
+    assert_select "article.plain-page h2#contact", text: "Contact"
+    assert_select "ol.plain-contents a[href='#services-2']", text: "Services"
+    assert_select "[id='services']", 1
+  end
+
   test "heading ids are on the page a theme draws and not in the cached render of the text" do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
@@ -1102,5 +1388,34 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_select "article.plain-page h2#setup", text: "Setup"
   ensure
     Rails.cache = original_cache
+  end
+
+  test "a theme.yml refused on a reload leaves CS Studio working and every public page saying why" do
+    with_theme_copy do |dir|
+      dir.join("theme.yml").write("section_styles:\n  - name: yes\n    label: A\n")
+      bad = ThemeFolder.new(dir)
+
+      with_singleton_override(ThemeFolder, :current, -> { bad }) do
+        Rails.application.reloader.prepare!
+
+        assert_includes Theme.current.refusal.message, "theme.yml: section_styles, entry 1"
+        assert_equal Theme::Declarations.default["page_templates"], Theme.current.choices(:page_templates)
+        error = assert_raises(ThemeFolder::Invalid) { get "/about" }
+        assert_includes error.message, "theme.yml: section_styles, entry 1"
+        sign_in_as users(:one)
+        get "/cs-studio"
+        assert_response :success
+
+        dir.join("theme.yml").write("section_styles:\n  - name: services\n    label: Services\n")
+        Rails.application.reloader.prepare!
+
+        assert_nil Theme.current.refusal
+        assert_equal %w[services], Theme.current.choices(:section_styles).map(&:name)
+        get "/about"
+        assert_response :success
+      end
+    end
+  ensure
+    Rails.application.reloader.prepare!
   end
 end

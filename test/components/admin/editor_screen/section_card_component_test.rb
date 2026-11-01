@@ -381,6 +381,26 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
   def controls_of(selector) = form_controls(within: selector)
 
+  test "the header carries the anchor field with its stored value, its help line and its own error slot" do
+    @section.update!(settings: @section.settings.merge("anchor" => "services"))
+    render_card
+
+    assert_selector "#section-#{@section.id}-form input[type=text][name='block[settings][anchor]'][value=services][id='block-#{@section.id}-anchor'][autocomplete=off]:not([maxlength])"
+    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][aria-label='Anchor'][aria-describedby='block-#{@section.id}-anchor-help']"
+    assert_selector "#block-#{@section.id}-anchor-help", text: "Lets a link jump here, as #anchor. Leave empty for none.", visible: :all
+    assert_selector "#block-#{@section.id}-anchor-errors", visible: :all
+  end
+
+  test "a section whose anchor field is held by someone else keeps the anchor field read-only with its value" do
+    @section.update!(settings: @section.settings.merge("anchor" => "services"))
+    dana = users(:two)
+    dana.update!(name: "Dana Weiss")
+    reserve(@section, @editor_page, dana, "tab-bbbbbbbb")
+    render_card_for(users(:one), "tab-aaaaaaaa")
+
+    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][value=services][readonly]"
+  end
+
   test "a section whose own settings are held by someone else: the strip in its slot, the form read-only with the same names and values, no autosave on it" do
     dana = users(:two)
     dana.update!(name: "Dana Weiss")

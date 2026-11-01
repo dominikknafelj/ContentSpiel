@@ -6,12 +6,12 @@ module Admin
     # and a post.
     class HeaderComponentPreview < ViewComponent::Preview
       def draft
-        page = PreviewFixtures.root_page.children.create!(page_type: :standard, title: "Draft page #{SecureRandom.hex(4)}")
+        page = PreviewFixtures.root_page.children.create!(title: "Draft page #{SecureRandom.hex(4)}")
         render Admin::EditorScreen::HeaderComponent.new(record: page, locale: "en")
       end
 
       def scheduled
-        page = PreviewFixtures.root_page.children.create!(page_type: :standard, title: "Scheduled page #{SecureRandom.hex(4)}", published_at: 1.week.from_now)
+        page = PreviewFixtures.root_page.children.create!(title: "Scheduled page #{SecureRandom.hex(4)}", published_at: 1.week.from_now)
         render Admin::EditorScreen::HeaderComponent.new(record: page, locale: "en")
       end
 

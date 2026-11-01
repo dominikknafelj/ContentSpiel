@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # The form inside the New page dialog (design pass round 2, handoff §10 /
     # `Studio Modals.dc.html`): Title, Inside (a `<select>` of the pages the
-    # viewer may create under, indented by depth), Page type and a live
+    # viewer may create under, indented by depth), Template and a live
     # "URL: /about/team" line. It is its own component, not part of the dialog,
     # for two reasons: the no-JS `GET /pages/new` page renders the same form
     # without a dialog around it, and a refused create answers with a Turbo
@@ -35,7 +35,7 @@ module Admin
       FORM_ID = "new-page-form".freeze
       TITLE_ID = "new-page-title".freeze
       INSIDE_ID = "new-page-inside".freeze
-      TYPE_ID = "new-page-type".freeze
+      TEMPLATE_ID = "new-page-template".freeze
       GONE = "Choose a page that still exists.".freeze
 
       Choice = Struct.new(:id, :title, :depth, :path, keyword_init: true) do
@@ -44,12 +44,17 @@ module Admin
 
       # `errors` is an `ActiveModel::Errors`, a hash or an array of sentences
       # (`Admin::Ui::ErrorSummaryComponent` takes all three).
-      def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, page_type: nil, errors: nil)
+      def initialize(url_options: {}, locale: ::Locales.default, parent_id: nil, title: nil, template: nil, errors: nil)
         @url_options = url_options
         @locale = locale.to_s
         @requested_parent_id = parent_id.presence&.to_i
         @title = title.to_s
-        @page_type = Page.page_types.key?(page_type.to_s) ? page_type.to_s : "standard"
+        # The value selected: blank for the theme's first (absent means the
+        # default, and a new page stores nothing for it), a declared name
+        # otherwise; a name the theme does not declare (a forged one, sent
+        # back with the refusal) is shown as the first.
+        name = ::Theme.current.page_template(template.to_s)
+        @template = name == ::Theme.current.page_template(nil) ? "" : name
         @errors = errors
       end
 
@@ -97,9 +102,17 @@ module Admin
         @selected_choice ||= choices.find { |choice| choice.id == requested_parent_id } || choices.first
       end
 
-      def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
+      # The theme's page templates, by their labels in the interface's
+      # language, the first as the blank value (see `@template`).
+      def template_options
+        ::Theme.current.choices(:page_templates).each_with_index.map { |entry, index| [ entry.label_for(I18n.locale), index.zero? ? "" : entry.name ] }
+      end
 
-      attr_reader :title, :page_type, :locale
+      # Asked for when the theme declares two or more; with one, a new page
+      # stores no template (absent means the theme's first).
+      def template_field? = ::Theme.current.choices(:page_templates).size >= 2
+
+      attr_reader :title, :template, :locale
 
       def title_value = title
 
@@ -117,7 +130,7 @@ module Admin
         @error_summary ||= normalise(errors)
       end
 
-      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "page_type" => TYPE_ID }
+      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "parent" => INSIDE_ID, "template" => TEMPLATE_ID }
 
       def inside_invalid? = error_summary.is_a?(Hash) && error_summary.key?("parent")
 

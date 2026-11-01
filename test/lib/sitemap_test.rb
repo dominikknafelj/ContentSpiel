@@ -9,8 +9,8 @@ require "tmpdir"
 # only the output redirected, and the generated XML read back.
 class SitemapTest < ActiveSupport::TestCase
   test "every published page is listed once per locale, at that locale's path" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(title: "About", slug: "about", parent: root,
       published_at: Time.current)
     Mobility.with_locale(:de) { about.update!(slug: "ueber-uns") }
 
@@ -34,9 +34,9 @@ class SitemapTest < ActiveSupport::TestCase
   # listing it in the sitemap would be inviting search engines to crawl a URL
   # that does not resolve.
   test "unpublished pages are not listed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
-    Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root,
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Draft", slug: "draft", parent: root, published_at: nil)
+    Page.create!(title: "Scheduled", slug: "scheduled", parent: root,
       published_at: 1.day.from_now)
 
     paths = sitemap_paths
@@ -50,13 +50,13 @@ class SitemapTest < ActiveSupport::TestCase
   # `include_root: false` stops sitemap_generator adding "/" a second time on
   # top of the root Page's own entry above (which is exactly what "/" means).
   test "the root page's entry is not duplicated by sitemap_generator's own include_root" do
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
 
     assert_equal 1, sitemap_paths.count("")
   end
 
   test "every listed URL is absolute" do
-    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "Home", slug: "", published_at: Time.current)
 
     assert sitemap_locs.all? { |loc| loc.start_with?("http://", "https://") },
       "expected absolute URLs, got #{sitemap_locs.inspect}"
@@ -66,8 +66,8 @@ class SitemapTest < ActiveSupport::TestCase
   # canonical listing page's path plus its slug, exactly the URL
   # `PagesController#show`'s permalink fallback resolves back to a post.
   test "a published post is listed at its canonical url" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     Post.create!(content_type: :blog, title: "Hello", published_at: Time.current)
 
@@ -78,8 +78,8 @@ class SitemapTest < ActiveSupport::TestCase
   # §5.4) -- it is `live?`, not "has a row", that decides whether the
   # sitemap lists it, same as a page.
   test "an unpublished post is not listed even though it has a canonical page" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     Post.create!(content_type: :blog, title: "Draft Post")
 
@@ -91,8 +91,8 @@ class SitemapTest < ActiveSupport::TestCase
   # rule) -- otherwise the sitemap would send a crawler to a permalink
   # PagesController 404s, since a draft listing page serves no permalinks.
   test "a published post under an unpublished listing page is not listed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: root)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     Post.create!(content_type: :blog, title: "Hello", published_at: Time.current)
 
@@ -103,8 +103,8 @@ class SitemapTest < ActiveSupport::TestCase
   # tags (spec §6.5) -- one XML entry per language, each pointing at every
   # other language's URL for the same page.
   test "a page entry carries an hreflang alternate link for every enabled language" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title: "About", slug: "about", parent: root, published_at: Time.current)
 
     doc = sitemap_document
     about_url = doc.css("url").find { |url| url.at_css("loc").text.end_with?("/about") }

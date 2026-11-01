@@ -1,0 +1,15 @@
+<%# The gradient the card icon's fill names: defined once, here, because an icon holds no id. The stops read the
+    Card's token, so it follows light and dark. %>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="tile-wash" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color: var(--th-card-icon); stop-opacity: 0.35"/>
+      <stop offset="1" style="stop-color: var(--th-card-icon); stop-opacity: 0.1"/>
+    </linearGradient>
+  </defs>
+</svg>
+<div class="tile-frame">
+  <%= render "layouts/public/header" %>
+  <main><%= yield %></main>
+  <%= render "layouts/public/footer" %>
+</div>

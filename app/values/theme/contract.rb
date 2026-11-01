@@ -29,6 +29,13 @@ class Theme
   # template, so this value knows no component
   # (`test/lib/dependency_direction_test.rb`).
   module Contract
+    # The file at a theme folder's top that declares its choices, the three
+    # lists it may hold and the page fields a page template may draw
+    # (`Theme::Declarations`). Names of the contract: a change is a release note.
+    DECLARATIONS = ThemeFolder::DECLARATIONS
+    CHOICE_LISTS = %w[section_styles page_templates icons].freeze
+    PAGE_FIELDS = %w[hero].freeze
+
     # Tokens with a value for the light scheme and one for the dark
     # (`app/assets/tailwind/themes/default/tokens.css`, the first two
     # blocks), without the `--th-` prefix. A theme changes one by declaring
@@ -58,6 +65,25 @@ class Theme
     # preview bar's two colours and the image placeholder's two.
     OWN_TOKENS = /\A--th-(?:preview|ph)-/
 
+    # The classes a CMS template writes from a choice the theme declared, which
+    # the theme's stylesheet may rely on: the name pattern and what it marks.
+    CLASSES = {
+      "content-section--style-<name>" => "on the section, for a style the theme declares"
+    }.freeze
+
+    def self.classes = CLASSES
+
+    # The attributes a CMS template writes on an element a theme's stylesheet
+    # may select, with what each marks: the two loading states of a library
+    # image's `<img>` (`Media::PictureComponent`), which the default theme's
+    # `images.css` blurs and sinks and a theme may restyle.
+    ATTRIBUTES = {
+      "img[data-image-preview]" => "an image whose widths are not made yet: `src` is its ~24px preview",
+      "img[data-image-empty]" => "an image with neither widths nor a preview: no `src`, a box of the image's size"
+    }.freeze
+
+    def self.attributes = ATTRIBUTES
+
     # The templates a theme may replace through its `views/` folder, by
     # their path under it, with what each is. The default is the file of the
     # same path under app/views.
@@ -73,6 +99,15 @@ class Theme
       "pages/show.html.erb" => "a page: its heading, hero and blocks, and the list of its subpages",
       "pages/not_found.html.erb" => "the page for an address that is nobody's"
     }.freeze
+
+    # A page template: `views/pages/templates/_<name>.html.erb` for each name
+    # the theme's `page_templates` list declares (a name the default also has
+    # may leave the file out and is drawn by the default's). `pages/show`
+    # renders it with exactly these locals: `post` and `list_block` are nil
+    # but on a post's own detail view. Names of the contract: a change is a
+    # release note.
+    PAGE_TEMPLATES = "pages/templates/".freeze
+    PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze
 
     # A theme's own partials, under any name: `views/theme/_anything.html.erb`,
     # rendered as `render "theme/anything"`.
@@ -129,7 +164,7 @@ class Theme
     # What a page or layout template may call. `public_urls.preview?` is the
     # one question a template may ask of `public_urls`.
     HELPERS = %w[
-      theme_site translated rich_text render_block block_outline published_views navigation_pages
+      theme_site translated rich_text render_block block_outline published_views navigation_pages page_template
       language_links safe_social_links home_url_path page_url_path post_url_path post_date resume_period
       page_found? page_ancestors page_section page_tree pages_in_reading_order neighbouring_pages with_heading_ids site_string
     ].freeze

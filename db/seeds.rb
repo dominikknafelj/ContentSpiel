@@ -45,11 +45,11 @@ def find_or_create_post!(content_type:, title:, published_at:, excerpt: nil, bod
   result.record
 end
 
-def find_or_create_page!(parent:, slug:, title:, published_at: Time.current, page_type: :standard)
+def find_or_create_page!(parent:, slug:, title:, published_at: Time.current, template: nil)
   page = Page.i18n.where(slug: slug).where(parent_id: parent.id).first
   return page if page
 
-  result = Pages::Save.call(attributes: { parent: parent, page_type: page_type, published_at: published_at },
+  result = Pages::Save.call(attributes: { parent: parent, template: template, published_at: published_at },
     translations: { "en" => { title: title, slug: slug } })
   raise "seeds: #{result.errors.to_sentence}" unless result.ok?
 
@@ -156,7 +156,7 @@ find_or_create_post!(content_type: :now_update, title: "What I'm up to now", pub
 
 root = Page.find_by(parent_id: nil)
 root ||= begin
-  result = Pages::Save.call(attributes: { page_type: :standard, published: true },
+  result = Pages::Save.call(attributes: { published: true },
     translations: { "en" => { title: "Home", slug: "" } })
   raise "seeds: #{result.errors.to_sentence}" unless result.ok?
 

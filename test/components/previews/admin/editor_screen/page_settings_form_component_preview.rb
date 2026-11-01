@@ -10,7 +10,7 @@ module Admin
       end
 
       def landing_page
-        page = PreviewFixtures.root_page.children.create!(page_type: :landing, title: "Landing page #{SecureRandom.hex(4)}", published_at: Time.current)
+        page = PreviewFixtures.root_page.children.create!(template: "landing", title: "Landing page #{SecureRandom.hex(4)}", published_at: Time.current)
         render Admin::EditorScreen::PageSettingsFormComponent.new(page: page, locale: "en")
       end
 

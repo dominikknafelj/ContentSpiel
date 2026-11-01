@@ -2,21 +2,79 @@ require "test_helper"
 
 class PageTest < ActiveSupport::TestCase
   test "title is required" do
-    page = Page.new(page_type: :standard)
+    page = Page.new
     assert_not page.valid?
     assert_includes page.errors[:title], "can't be blank"
   end
 
-  test "page_type is an enum with standard and landing" do
-    page = Page.create!(page_type: :landing, title: "Home")
+  test "a page's template is a name the theme declares, blank, or the one already stored" do
+    page = Page.create!(template: "landing", title: "Home")
+    assert_equal "landing", page.reload.template
+    assert_equal({ "template" => "landing" }, page.settings)
 
-    assert page.landing?
-    assert_equal %w[standard landing], Page.page_types.keys
+    page.template = "  "
+    assert_nil page.template
+    assert_equal({}, page.settings, "a blank template removes the key")
+    assert page.valid?
+
+    page.template = "gallery"
+    assert_not page.valid?
+    assert page.errors.of_kind?(:template, :inclusion)
+
+    # The theme drops the stored name: the page still saves with it, and a
+    # new unknown name is still refused.
+    with_page_templates("standard") do
+      page.reload
+      assert_equal "landing", page.template
+      page.title = "Home, again"
+      assert page.valid?, page.errors.full_messages.to_sentence
+      page.template = "gallery"
+      assert_not page.valid?
+    end
+
+    # A name carried from elsewhere (a discard writing back the copy's) counts as stored.
+    with_page_templates("standard") do
+      fresh = Page.new(title: "Carried", parent: page, template: "landing")
+      assert_not fresh.valid?
+      fresh.carried_settings = { "template" => "landing" }
+      assert fresh.valid?, fresh.errors.full_messages.to_sentence
+    end
+  end
+
+  test "settings holds template and nothing else" do
+    page = Page.new(title: "Home")
+    assert_equal({}, page.settings)
+    assert_nil page.template
+
+    page.settings = { "template" => "standard", "colour" => "red" }
+    assert_not page.valid?
+    assert page.errors.of_kind?(:settings, :invalid)
+
+    page.settings = [ "template" ]
+    assert_not page.valid?
+    assert page.errors.of_kind?(:settings, :invalid)
+    assert_nil page.template, "settings of the wrong shape answer no template and raise nothing"
+
+    page.settings = { "template" => "standard" }
+    assert page.valid?, page.errors.full_messages.to_sentence
+    assert_not Page.method_defined?(:landing?)
+    assert_not Page.method_defined?(:page_type)
+  end
+
+  test "a change of template moves settings_changed_at" do
+    page = create_page(title: "Pricing")
+    before = page.reload.settings_changed_at
+    assert_not_includes Page::SETTINGS_BASE_IGNORES, "settings"
+
+    travel 1.minute do
+      assert Pages::Save.call(page, attributes: { template: "landing" }).ok?
+      assert_operator page.reload.settings_changed_at, :>, before
+    end
   end
 
   test "a page can have a parent and children" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    child = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    child = Page.create!(title: "About", slug: "about", parent: root)
 
     assert_equal root, child.parent
     assert_includes root.children, child
@@ -25,9 +83,9 @@ class PageTest < ActiveSupport::TestCase
   # closure_tree's whole point is the hierarchy table: ancestors/descendants
   # are answered by a join, not by walking parent_id in Ruby.
   test "descendants and ancestors span more than one generation" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "Section", slug: "section", parent: root)
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "Section", slug: "section", parent: root)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
 
     assert_equal [ section, leaf ], root.descendants.to_a
     assert_equal [ section, root ], leaf.ancestors.to_a
@@ -37,9 +95,9 @@ class PageTest < ActiveSupport::TestCase
   # closure_tree maintains the ordering column itself; siblings come back in
   # that order rather than in insertion or id order.
   test "siblings are ordered by a position column closure_tree maintains" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    first = Page.create!(page_type: :standard, title: "First", slug: "first", parent: root)
-    second = Page.create!(page_type: :standard, title: "Second", slug: "second", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    first = Page.create!(title: "First", slug: "first", parent: root)
+    second = Page.create!(title: "Second", slug: "second", parent: root)
 
     assert_equal [ 0, 1 ], [ first.reload.position, second.reload.position ]
 
@@ -49,8 +107,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "only one page may have no parent" do
-    Page.create!(page_type: :standard, title: "Home", slug: "")
-    second_root = Page.new(page_type: :standard, title: "Also Home", slug: "also-home")
+    Page.create!(title: "Home", slug: "")
+    second_root = Page.new(title: "Also Home", slug: "also-home")
 
     assert_not second_root.valid?
     assert_includes second_root.errors[:base], "a root page already exists"
@@ -59,7 +117,7 @@ class PageTest < ActiveSupport::TestCase
   # The root check excludes the record itself, or the one legitimate root would
   # fail validation on every subsequent save.
   test "the existing root page stays valid on update" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    root = Page.create!(title: "Home", slug: "")
 
     root.title = "Homepage"
 
@@ -70,8 +128,8 @@ class PageTest < ActiveSupport::TestCase
   # A create-only check would let a second root in through the back door by
   # detaching an existing child.
   test "an existing child cannot be promoted to a second root" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    child = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    child = Page.create!(title: "About", slug: "about", parent: root)
 
     child.parent = nil
 
@@ -93,8 +151,8 @@ class PageTest < ActiveSupport::TestCase
   # `:slug` -- every enabled locale is missing one here, so every one of
   # them gets its own error; `en` stands in for all three.
   test "a non-root page requires a slug" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    slugless = Page.new(page_type: :standard, parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    slugless = Page.new(parent: root)
 
     assert_not slugless.valid?
     assert_includes slugless.errors[:slug_en], "can't be blank in EN"
@@ -107,10 +165,10 @@ class PageTest < ActiveSupport::TestCase
   # No title, for the same reason as above: a title would get this page an
   # auto-generated slug and the create would succeed.
   test "a slugless child cannot be saved onto its parent's path" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
 
     assert_raises(ActiveRecord::RecordInvalid) do
-      Page.create!(page_type: :standard, parent: root, published_at: Time.current)
+      Page.create!(parent: root, published_at: Time.current)
     end
 
     assert_equal [ root ], Page.where(id: PublicPath.current.where(locale: "en", path: "/").select(:record_id)).to_a
@@ -119,7 +177,7 @@ class PageTest < ActiveSupport::TestCase
   # The root is the one page allowed a blank slug: it contributes no segment
   # and its path is "/" by design.
   test "the root page may have a blank slug" do
-    root = Page.new(page_type: :standard, title: "Home", slug: "")
+    root = Page.new(title: "Home", slug: "")
 
     assert root.valid?, root.errors.full_messages.inspect
     assert root.save
@@ -133,8 +191,8 @@ class PageTest < ActiveSupport::TestCase
   # not-yet-set (it's blank) and overwrite it with a title-derived slug
   # before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    blank = Page.new(page_type: :standard, slug: "   ", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    blank = Page.new(slug: "   ", parent: root)
 
     assert_not blank.valid?
     assert_includes blank.errors[:slug_en], "can't be blank in EN"
@@ -149,9 +207,9 @@ class PageTest < ActiveSupport::TestCase
   # not the app's fixed English default -- decides the fallback.
   test "slugs for untitled locales fall back to the site's default-locale title" do
     SiteSetting.instance.update!(default_locale: "de")
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
 
-    child = Mobility.with_locale(:de) { Page.create!(page_type: :standard, title: "Über uns", parent: root) }
+    child = Mobility.with_locale(:de) { Page.create!(title: "Über uns", parent: root) }
 
     assert_equal "uber-uns", child.slug_en
     assert_equal "uber-uns", child.slug_es
@@ -163,9 +221,9 @@ class PageTest < ActiveSupport::TestCase
   # Mobility.available_locales and takes the first one it finds.
   test "slugs fall back to the first present title when the default locale has none" do
     SiteSetting.instance.update!(default_locale: "de")
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
 
-    child = Mobility.with_locale(:es) { Page.create!(page_type: :standard, title: "Sobre Nosotros", parent: root) }
+    child = Mobility.with_locale(:es) { Page.create!(title: "Sobre Nosotros", parent: root) }
 
     assert_equal "sobre-nosotros", child.slug_en
     assert_equal "sobre-nosotros", child.slug_de
@@ -175,10 +233,10 @@ class PageTest < ActiveSupport::TestCase
   # written in a locale other than the page's title, is left alone.
   test "an explicitly set slug is kept even when the default-locale fallback would differ" do
     SiteSetting.instance.update!(default_locale: "de")
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
 
     child = Mobility.with_locale(:de) do
-      Page.create!(page_type: :standard, title: "Über uns", slug_en: "who-we-are", parent: root)
+      Page.create!(title: "Über uns", slug_en: "who-we-are", parent: root)
     end
 
     assert_equal "who-we-are", child.slug_en
@@ -192,10 +250,10 @@ class PageTest < ActiveSupport::TestCase
   # default-locale-only page knows which tab to open.
   test "a fallback-filled slug can produce a real collision, reported against the locale it clashes in" do
     SiteSetting.instance.update!(default_locale: "de")
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    Page.create!(page_type: :standard, title_en: "Team", slug_en: "team", title_de: "Mannschaft", parent: root)
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    Page.create!(title_en: "Team", slug_en: "team", title_de: "Mannschaft", parent: root)
 
-    clashing = Mobility.with_locale(:de) { Page.new(page_type: :standard, title: "Team", parent: root) }
+    clashing = Mobility.with_locale(:de) { Page.new(title: "Team", parent: root) }
 
     # Ambient :de throughout: `clashing` is only titled in German, so title
     # presence (a separate, unrelated validation) would otherwise fail under
@@ -211,9 +269,9 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "slug is unique among siblings, scoped to locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    duplicate = Page.new(page_type: :standard, title: "Also About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    Page.create!(title: "About", slug: "about", parent: root)
+    duplicate = Page.new(title: "Also About", slug: "about", parent: root)
 
     assert_not duplicate.valid?
     # Attributed to the locale that actually collides, so the admin form can
@@ -222,26 +280,26 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "the same slug is allowed under a different parent" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section_a = Page.create!(page_type: :standard, title: "Section A", slug: "section-a", parent: root)
-    section_b = Page.create!(page_type: :standard, title: "Section B", slug: "section-b", parent: root)
-    Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section_a)
-    other_team = Page.new(page_type: :standard, title: "Team", slug: "team", parent: section_b)
+    root = Page.create!(title: "Home", slug: "")
+    section_a = Page.create!(title: "Section A", slug: "section-a", parent: root)
+    section_b = Page.create!(title: "Section B", slug: "section-b", parent: root)
+    Page.create!(title: "Team", slug: "team", parent: section_a)
+    other_team = Page.new(title: "Team", slug: "team", parent: section_b)
 
     assert other_team.valid?, other_team.errors.full_messages.inspect
   end
 
   test "the same slug is allowed among siblings in different locales" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    root = Page.create!(title: "Home", slug: "")
     # A German title of its own, so its real German slug is "kontakt" rather
     # than a default-locale fallback of "about" -- otherwise this sibling
     # would already hold "about" in German too (Task 8c), and the collision
     # below would be a real one instead of the false one this test guards
     # against.
-    Page.create!(page_type: :standard, title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
+    Page.create!(title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
 
     Mobility.with_locale(:de) do
-      other = Page.new(page_type: :standard, title: "Ueber uns", slug: "about", parent: root)
+      other = Page.new(title: "Ueber uns", slug: "about", parent: root)
       assert other.valid?, "a slug used in one locale must not block the same slug in another locale"
     end
   end
@@ -251,11 +309,11 @@ class PageTest < ActiveSupport::TestCase
   # slugs through to the database, where the per-locale unique indexes turn a
   # would-be form error into an unhandled RecordNotUnique.
   test "a sibling slug duplicated in a locale other than the current one is rejected" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    existing = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    existing = Page.create!(title: "About", slug: "about", parent: root)
     Mobility.with_locale(:de) { existing.update!(slug: "ueber-uns") }
 
-    duplicate = Page.new(page_type: :standard, title: "Contact", slug: "contact", parent: root)
+    duplicate = Page.new(title: "Contact", slug: "contact", parent: root)
     duplicate.slug_de = "ueber-uns"
 
     assert_not duplicate.valid?
@@ -277,10 +335,10 @@ class PageTest < ActiveSupport::TestCase
   # bulk import) could still be in, the same way the "bypassed" tests further
   # down force other pre/post-validation states.
   test "a page with no slug anywhere is not blocked by a sibling's slug in the current locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    untitled = Page.create!(page_type: :standard, title: "Placeholder", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    untitled = Page.create!(title: "Placeholder", parent: root)
     untitled.update_columns(title: {}, slug: {})
-    german = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root)
+    german = Page.create!(title: "Contact", slug: "contact", parent: root)
     Mobility.with_locale(:de) { german.update!(slug: "about") }
 
     Mobility.with_locale(:de) do
@@ -295,8 +353,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "a page does not collide with its own slug on update" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    child = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    child = Page.create!(title: "About", slug: "about", parent: root)
 
     assert child.valid?
     Mobility.with_locale(:de) do
@@ -306,8 +364,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "a page with children cannot be destroyed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    child = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    child = Page.create!(title: "About", slug: "about", parent: root)
 
     assert_not root.destroy
     assert_includes root.errors[:base], "cannot delete a page that still has children"
@@ -319,8 +377,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "a childless page can be destroyed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    child = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    child = Page.create!(title: "About", slug: "about", parent: root)
 
     assert child.destroy
     assert_empty PageHierarchy.where(descendant_id: child.id)
@@ -328,7 +386,7 @@ class PageTest < ActiveSupport::TestCase
 
   test "title, slug, subtitle and meta fields are independently translatable" do
     page = Page.create!(
-      page_type: :standard, title: "About", slug: "about",
+      title: "About", slug: "about",
       subtitle: "Who we are", meta_title: "About us", meta_description: "A short bio"
     )
 
@@ -356,7 +414,7 @@ class PageTest < ActiveSupport::TestCase
   # Proves the jsonb backend is what's storing these -- every locale lives in
   # one column on the pages row, not in a side table.
   test "translated attributes are stored in a jsonb column per attribute" do
-    page = Page.create!(page_type: :standard, title: "About", slug: "about")
+    page = Page.create!(title: "About", slug: "about")
     Mobility.with_locale(:de) { page.update!(title: "Ueber uns") }
 
     raw = Page.connection.select_one("SELECT title FROM pages WHERE id = #{page.id}")
@@ -368,7 +426,7 @@ class PageTest < ActiveSupport::TestCase
   # an attachment of the page's own.
   test "the hero is a library asset reference" do
     asset = create_media_asset
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", hero_media_asset: asset)
+    page = Page.create!(title: "About", slug: "about", hero_media_asset: asset)
 
     assert_equal asset, page.reload.hero_media_asset
     assert_not page.respond_to?(:hero_image)
@@ -376,14 +434,14 @@ class PageTest < ActiveSupport::TestCase
 
   test "a library asset a page still shows as its hero can't be deleted" do
     asset = create_media_asset
-    Page.create!(page_type: :standard, title: "About", slug: "about", hero_media_asset: asset)
+    Page.create!(title: "About", slug: "about", hero_media_asset: asset)
 
     assert_raises(ActiveRecord::InvalidForeignKey) { asset.destroy }
   end
 
   test "published_at records when a page went live" do
     at = Time.current.change(usec: 0)
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", published_at: at)
+    page = Page.create!(title: "About", slug: "about", published_at: at)
 
     assert_equal at, page.reload.published_at
   end
@@ -395,10 +453,10 @@ class PageTest < ActiveSupport::TestCase
   # `public_paths`, which nothing about a slug update touches directly, so the
   # bypass has to write a `PublicPath` row itself to exercise the index.)
   test "the database rejects a duplicate current path when validation is bypassed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+    root = Page.create!(title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(title: "About", slug: "about", parent: root,
       published_at: Time.current)
-    sneaky = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root,
+    sneaky = Page.create!(title: "Contact", slug: "contact", parent: root,
       published_at: Time.current)
 
     assert_raises ActiveRecord::RecordNotUnique do
@@ -409,13 +467,13 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "the database allows the same sibling slug in two different locales" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    root = Page.create!(title: "Home", slug: "")
     # A German title of its own, so "about" isn't also this sibling's real
     # German slug (Task 8c's default-locale fallback would otherwise put it
     # there) -- the point here is the *other* page's German slug, not a
     # same-locale collision with this one.
-    Page.create!(page_type: :standard, title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
-    other = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root)
+    Page.create!(title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
+    other = Page.create!(title: "Contact", slug: "contact", parent: root)
 
     other.update_column(:slug, { "en" => "contact", "de" => "about" })
 
@@ -423,10 +481,10 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "the database allows the same slug under a different parent" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "Section", slug: "section", parent: root)
-    Page.create!(page_type: :standard, title: "Team", slug: "team", parent: root)
-    other = Page.create!(page_type: :standard, title: "Team", slug: "crew", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "Section", slug: "section", parent: root)
+    Page.create!(title: "Team", slug: "team", parent: root)
+    other = Page.create!(title: "Team", slug: "crew", parent: section)
 
     other.update_column(:slug, { "en" => "team" })
 
@@ -436,15 +494,15 @@ class PageTest < ActiveSupport::TestCase
   # The root is the homepage: it contributes no path segment of its own, so it
   # answers to "/" no matter what slug it carries.
   test "full_path is computed from the page's own slug for a root page" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    root = Page.create!(title: "Home", slug: "")
 
     assert_equal "/", root.full_path(:en)
   end
 
   test "full_path concatenates ancestor slugs" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "About", slug: "about", parent: root)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
 
     # A child of the root is "/about", not "//about".
     assert_equal "/about", section.full_path(:en)
@@ -452,8 +510,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "full_path differs per locale when slugs are translated" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    page = Page.create!(title: "About", slug: "about", parent: root)
     Mobility.with_locale(:de) { page.update!(title: "Ueber uns", slug: "ueber-uns") }
 
     assert_equal "/about", page.full_path(:en)
@@ -464,18 +522,18 @@ class PageTest < ActiveSupport::TestCase
   # locale. A German path built from a literal German slug the page doesn't
   # have would be "/ueber-uns/" -- a hole where a segment should be.
   test "full_path falls back to the default locale for an untranslated slug" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "About", slug: "about", parent: root)
     Mobility.with_locale(:de) { section.update!(slug: "ueber-uns") }
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
 
     assert_equal "/ueber-uns/team", leaf.full_path(:de)
   end
 
   test "updating a slug recomputes public_paths for the page and its descendants" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "About", slug: "about", parent: root)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
 
     section.update!(slug: "company")
 
@@ -486,10 +544,10 @@ class PageTest < ActiveSupport::TestCase
   # The cascade has to reach the whole subtree, not just the direct children:
   # a grandchild's path is shifted by its grandparent's slug just as much.
   test "updating a slug recomputes public_paths for indirect descendants too" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    team = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
-    member = Page.create!(page_type: :standard, title: "Ada", slug: "ada", parent: team)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "About", slug: "about", parent: root)
+    team = Page.create!(title: "Team", slug: "team", parent: section)
+    member = Page.create!(title: "Ada", slug: "ada", parent: team)
 
     section.update!(slug: "company")
 
@@ -499,9 +557,9 @@ class PageTest < ActiveSupport::TestCase
   # Every locale is recomputed, not just `Mobility.locale`: the cascade runs
   # once, under whatever locale happened to be current for the edit.
   test "recomputing paths covers every available locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    section = Page.create!(title: "About", slug: "about", parent: root)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
     Mobility.with_locale(:de) { section.update!(slug: "ueber-uns") }
 
     assert_equal %w[de en es], PublicPath.current.where(record: leaf).pluck(:locale).sort
@@ -511,11 +569,11 @@ class PageTest < ActiveSupport::TestCase
 
   # A page's path changes when it moves, even though none of its own slugs did.
   test "moving a page recomputes public_paths for it and its descendants" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    origin = Page.create!(page_type: :standard, title: "Origin", slug: "origin", parent: root)
-    destination = Page.create!(page_type: :standard, title: "Destination", slug: "destination", parent: root)
-    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: origin)
-    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    root = Page.create!(title: "Home", slug: "")
+    origin = Page.create!(title: "Origin", slug: "origin", parent: root)
+    destination = Page.create!(title: "Destination", slug: "destination", parent: root)
+    section = Page.create!(title: "About", slug: "about", parent: origin)
+    leaf = Page.create!(title: "Team", slug: "team", parent: section)
 
     section.update!(parent: destination)
 
@@ -524,8 +582,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "public_paths is populated on create" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(title: "Home", slug: "")
+    page = Page.create!(title: "About", slug: "about", parent: root)
 
     assert_equal({ "en" => "/about", "de" => "/about", "es" => "/about" },
       PublicPath.current.where(record: page).pluck(:locale, :path).to_h)

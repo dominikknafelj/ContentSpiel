@@ -7,7 +7,7 @@
           data: { admin__editor__new_record_target: "title" }, aria: { invalid: (title_invalid? ? "true" : nil) } %>
   </div>
 
-  <div class="mb-4 grid <%= choices.any? ? "grid-cols-2" : "grid-cols-1" %> gap-3">
+  <div class="mb-4 grid <%= choices.any? && template_field? ? "grid-cols-2" : "grid-cols-1" %> gap-3">
     <% if choices.any? %>
       <div class="min-w-0">
         <label for="<%= INSIDE_ID %>" class="<%= setup_label_class %>">Inside</label>
@@ -19,11 +19,12 @@
         </select>
       </div>
     <% end %>
+    <% if template_field? %>
     <div class="min-w-0">
-      <label for="<%= TYPE_ID %>" class="<%= setup_label_class %>">Page type</label>
-      <%= select_tag "page[page_type]", options_for_select(page_type_options, page_type), id: TYPE_ID, class: "mt-1 #{setup_select_class}",
-            data: { admin__editor__new_record_target: "pageType" } %>
+      <label for="<%= TEMPLATE_ID %>" class="<%= setup_label_class %>"><%= t(".template") %></label>
+      <%= select_tag "page[template]", options_for_select(template_options, template), id: TEMPLATE_ID, class: "mt-1 #{setup_select_class}" %>
     </div>
+    <% end %>
   </div>
 
   <p data-admin--editor--new-record-target="url" class="font-cs-mono text-[13px] text-dim"><%= initial_url %></p>

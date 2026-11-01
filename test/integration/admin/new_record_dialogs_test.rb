@@ -1,7 +1,7 @@
 require "test_helper"
 
 # The New page and New post dialogs (design pass round 2, Task 15): where they
-# are rendered, what `create` accepts (`page[page_type]`, `post[content_type]`),
+# are rendered, what `create` accepts (`page[template]`, `post[content_type]`),
 # and how a refusal comes back -- a Turbo Stream replacing just the dialog's
 # form for a Turbo submission, the standalone page for a plain request.
 class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
@@ -110,35 +110,59 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
 
     assert_difference "Page.count", 1 do
-      post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id, page_type: "landing" } }
+      post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id, template: "landing" } }
     end
 
     page = Page.order(:id).last
     assert_equal @services, page.parent
-    assert page.landing?
+    assert_equal "landing", page.template
     assert_not page.live?
     assert_redirected_to admin_page_path(page)
   end
 
-  test "no page type means a standard page" do
+  test "a new page stores the template chosen, and {} when the dialog offered none" do
+    sign_in_as(users(:one))
+    post "/cs-studio/pages", params: { page: { title: "Chosen", parent_id: @services.id, template: "landing" } }
+    assert_equal({ "template" => "landing" }, Page.order(:id).last.settings)
+
+    with_page_templates("standard") do
+      get "/cs-studio/pages/new", params: { parent_id: @services.id }
+      assert_select "#new-page-form select[name='page[template]']", count: 0
+    end
+    post "/cs-studio/pages", params: { page: { title: "None", parent_id: @services.id } }
+    assert_equal({}, Page.order(:id).last.settings)
+  end
+
+  test "no template means the theme's first, stored as nothing" do
     sign_in_as(users(:one))
     post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id } }
 
-    assert Page.order(:id).last.standard?
+    assert_equal({}, Page.order(:id).last.settings)
+  end
+
+  test "New page with the default template stores nothing, sent blank or by its name" do
+    sign_in_as(users(:one))
+    get "/cs-studio/pages/new", params: { parent_id: @services.id }
+    assert_select "#new-page-template option[selected][value='']", text: "Standard"
+
+    post "/cs-studio/pages", params: { page: { title: "Blank", parent_id: @services.id, template: "" } }
+    assert_equal({}, Page.order(:id).last.settings)
+    post "/cs-studio/pages", params: { page: { title: "Named", parent_id: @services.id, template: "standard" } }
+    assert_equal({}, Page.order(:id).last.settings)
   end
 
   test "a blank title answers 422 with a stream replacing the dialog's form, values kept" do
     sign_in_as(users(:one))
 
     assert_no_difference "Page.count" do
-      post "/cs-studio/pages", params: { page: { title: "", parent_id: @services.id, page_type: "landing" } }, as: :turbo_stream
+      post "/cs-studio/pages", params: { page: { title: "", parent_id: @services.id, template: "landing" } }, as: :turbo_stream
     end
 
     assert_response :unprocessable_entity
     assert_select "turbo-stream[action=replace][target=new-page-form]"
     assert_select "template form#new-page-form .admin-error-summary", text: /1 thing needs fixing/
     assert_select "template #new-page-inside option[selected][value='#{@services.id}']"
-    assert_select "template #new-page-type option[selected][value=landing]"
+    assert_select "template #new-page-template option[selected][value=landing]"
   end
 
   test "a refused create without JavaScript re-renders the standalone page with the summary" do
@@ -158,24 +182,24 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_select "template .admin-error-summary a[href='#new-page-title']"
   end
 
-  test "a forged page_type in an autosave is a validation failure, never a 500" do
+  test "a forged template in an autosave is a validation failure, never a 500" do
     sign_in_as(users(:one))
 
-    patch "/cs-studio/pages/#{@services.id}", params: { page: { page_type: "bogus" } }, as: :turbo_stream
+    patch "/cs-studio/pages/#{@services.id}", params: { page: { template: "bogus" } }, as: :turbo_stream
 
     assert_response :unprocessable_entity
-    assert_equal "standard", @services.reload.page_type
+    assert_nil @services.reload.template
   end
 
-  test "a forged page type is a validation failure, never a 500" do
+  test "a forged template is a validation failure, never a 500" do
     sign_in_as(users(:one))
 
     assert_no_difference "Page.count" do
-      post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id, page_type: "bogus" } }, as: :turbo_stream
+      post "/cs-studio/pages", params: { page: { title: "Team", parent_id: @services.id, template: "bogus" } }, as: :turbo_stream
     end
 
     assert_response :unprocessable_entity
-    assert_select "template .admin-error-summary", text: /Page type/
+    assert_select "template .admin-error-summary", text: /Template/
   end
 
   test "Inside offers only the pages the viewer may create under" do
@@ -381,7 +405,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
 
   test "the database allows one root page, and a lost race fails like the validation" do
     assert_raises(ActiveRecord::RecordNotUnique) do
-      Page.new(page_type: :standard, title: "Second root", slug: "second-root").tap { |page| page.save(validate: false) }
+      Page.new(title: "Second root", slug: "second-root").tap { |page| page.save(validate: false) }
     end
 
     PublicPath.delete_all # so nothing but the root rule can refuse the second root
@@ -403,7 +427,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
       assert_response :unprocessable_entity, forged.inspect
     end
     assert_difference -> { Page.count }, 2 do
-      post "/cs-studio/pages", params: { page: { title: "Forged type", page_type: { a: "b" } } }
+      post "/cs-studio/pages", params: { page: { title: "Forged type", template: { a: "b" } } }
       assert_response :see_other
       post "/cs-studio/pages", params: { page: { title: "Forged parent", parent_id: [ @inside.id, @branch.id ] } }
     end

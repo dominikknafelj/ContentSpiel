@@ -35,8 +35,26 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal (ContractLedger::THEMED_TOKENS + ContractLedger::FIXED_TOKENS).map { "--th-#{_1}" }.sort, rows("Tokens").keys.sort
   end
 
+  test "the classes table names exactly the contract's classes, each with what it is for" do
+    table = rows("Classes")
+
+    assert_equal ContractLedger::CLASSES.keys.sort, table.keys.sort
+    ContractLedger::CLASSES.each { |name, meaning| assert_includes table.fetch(name), meaning, "what #{name} is for" }
+  end
+
+  test "the attributes table names exactly the contract's attributes, each with what it marks" do
+    table = rows("Attributes")
+
+    assert_equal ContractLedger::ATTRIBUTES.keys.sort, table.keys.sort
+    ContractLedger::ATTRIBUTES.each { |name, meaning| assert_includes table.fetch(name), meaning, "what #{name} marks" }
+  end
+
   test "the templates table names exactly the contract's templates" do
-    assert_equal Theme::Contract::TEMPLATES.keys.sort, rows("Templates").keys.sort
+    assert_equal (Theme::Contract::TEMPLATES.keys + [ "#{ContractLedger::PAGE_TEMPLATES}_<name>.html.erb" ]).sort, rows("Templates").keys.sort
+  end
+
+  test "the page templates table names exactly the locals of the ledger" do
+    assert_equal ContractLedger::PAGE_TEMPLATE_LOCALS.sort, rows("Page templates").keys.sort
   end
 
   test "the components table names exactly the contract's components, each with the methods its template may call" do
@@ -72,6 +90,15 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_equal ContractLedger::COMPONENTS.fetch("blocks/note_component").sort, section.scan(/^\| `([^`]+)` \|/).flatten.sort
     BlockTypes.fetch(:note).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
     BlockTypes::Note::ICONS.each_value { |icon| assert_includes section, "`#{icon}`" }
+  end
+
+  # The Card block's section: what its template is handed, held to its line
+  # of the ledger, its three tokens named.
+  test "the Card block's table names exactly the methods of its entry, and the section names its tokens" do
+    section = section("The Card block")
+
+    assert_equal ContractLedger::COMPONENTS.fetch("blocks/card_component").sort, section.scan(/^\| `([^`]+)` \|/).flatten.sort
+    BlockTypes.fetch(:card).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
   end
 
   # The Code block's own section: what its template is handed, the four
@@ -132,5 +159,9 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     assert_includes Theme::Contract::TEMPLATES.keys - templates, "pages/not_found.html.erb", "a contract entry with no row"
     assert_equal [ "page_found?", "page_tree(top)" ], self.class.rows("Helpers", text).keys
     assert_nil self.class.rows("Tokens", text)
+  end
+
+  test "the default icons table names exactly the ledger's icon names" do
+    assert_equal ContractLedger::DEFAULT_ICONS.sort, rows("Default icons").keys.sort
   end
 end

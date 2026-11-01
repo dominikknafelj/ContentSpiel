@@ -26,7 +26,7 @@ class Admin::SlugBaseUrlTest < ViewComponent::TestCase
 
   test "a page below another page keeps exactly one slash between segments" do
     parent = PreviewFixtures.page(title: "Parent")
-    child = parent.children.create!(page_type: :standard, title: "Grandchild #{SecureRandom.hex(4)}", published_at: nil)
+    child = parent.children.create!(title: "Grandchild #{SecureRandom.hex(4)}", published_at: nil)
     as_owner { render_inline Admin::EditorScreen::PageSettingsFormComponent.new(page: child, locale: "de") }
     assert_no_text "//"
     assert_selector ".admin-prefix-input span.bg-sunken", text: %r{\A/de/.+/\z}

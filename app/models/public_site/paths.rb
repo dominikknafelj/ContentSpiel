@@ -379,9 +379,9 @@ module PublicSite
     # A post or page of an unregistered stored type gets no path at all: it
     # renders nothing on the public site (global constraints -- unknown
     # stored types never 500 it), so it must not be reachable at a URL
-    # either. Only `Post` has a type to check here -- a `Page`'s `page_type`
-    # is a closed enum (layout, not open content), so it has no equivalent
-    # "unregistered" state.
+    # either. Only `Post` has a type to check here -- a `Page`'s template is
+    # a look (a name in its settings, drawn as the theme's first when the
+    # theme does not declare it), never what decides whether it has a URL.
     #
     # A trashed page or post has no URL either (trash spec §5.2). Returning
     # nil here, rather than deleting rows from the trash services, is what

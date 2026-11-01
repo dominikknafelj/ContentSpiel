@@ -141,9 +141,15 @@ module Publishing
       raise ActiveRecord::Rollback
     end
 
+    # The page's template goes back as the copy names it, whether or not the
+    # theme still declares it: the name is carried, not chosen, so the copy's
+    # settings count as stored for this save (`Page#carried_settings`).
     def restore_page(version)
       fields = version.snapshot.fetch("fields", {})
-      attributes = %w[page_type hero_media_asset_id].select { |name| fields[name] != @record.read_attribute(name) }.to_h { |name| [ name.to_sym, fields[name] ] }
+      attributes = %w[hero_media_asset_id].select { |name| fields[name] != @record.read_attribute(name) }.to_h { |name| [ name.to_sym, fields[name] ] }
+      template = fields["settings"].to_h["template"]
+      attributes[:template] = template unless template == @record.template
+      @record.carried_settings = fields["settings"]
       translations = translations_back(fields, @record, PAGE_TRANSLATED)
       step Pages::Save.call(@record, attributes: attributes, translations: translations, actor: actor) if attributes.any? || translations.any?
       restore_blocks(version.blocks)
@@ -198,6 +204,7 @@ module Publishing
       extras.select(&:container?).each { |block| step ContentBlocks::Destroy.call(block.reload, keep_blocks: true, actor: actor) }
 
       rows = ContentBlock.where(owner: @record).index_by { |row| stands_for.fetch(row.id, row.id) }
+      release_changed_anchors(rows, copied)
       ids = {} # a copy's block id => the id of the row that stands for it now
       sections, others = copied.partition { |block| BlockTypes.find(block["block_type"])&.capability?(:container) }
       (sections + others).each do |attributes|
@@ -208,9 +215,29 @@ module Publishing
       place(copied, ids)
     end
 
+    # A section's anchor is unique on the page and the sections are restored one
+    # at a time, so restoring one section's anchor while another row still holds
+    # it would be refused. Every anchor that differs from the copy's is cleared
+    # first (under the page lock the discard holds); the restore then writes
+    # each copy anchor back onto a free name.
+    def release_changed_anchors(rows, copied)
+      copied.each do |attributes|
+        row = rows[attributes["id"]]
+        next unless row&.container? && row.settings["anchor"].present?
+        next if row.settings["anchor"] == attributes["settings"].to_h["anchor"]
+
+        step ContentBlocks::Save.call(row, attributes: { settings: { "anchor" => nil } }, actor: actor)
+      end
+    end
+
     # A block both sides have: what differs is written, the rest is left. A
     # change of type is written too (no screen changes a block's type, but a
     # token can).
+    #
+    # A block's choice names (a section's style) go back as the copy has
+    # them, as the page's template does: carried, so a name the theme no
+    # longer declares is written back and not refused (`carried_settings`),
+    # here and for a block made again.
     def rewrite(row, attributes)
       changed = {}
       changed[:block_type] = attributes["block_type"] unless attributes["block_type"] == row.block_type
@@ -220,13 +247,16 @@ module Publishing
       translations = block_translations(attributes, row)
       return row if changed.empty? && translations.empty?
 
+      row.carried_settings = settings
       step ContentBlocks::Save.call(row, attributes: changed, translations: translations, actor: actor)
     end
 
     def recreate(attributes, ids)
       placement = { section_id: ids[attributes["section_id"]], section_column: attributes["section_column"] }.compact
-      step ContentBlocks::Save.call(ContentBlock.new(owner: @record),
-        attributes: { block_type: attributes["block_type"], media_asset_id: attributes["media_asset_id"], settings: settings_back(attributes), **placement },
+      settings = settings_back(attributes)
+      block = ContentBlock.new(owner: @record).tap { |fresh| fresh.carried_settings = settings }
+      step ContentBlocks::Save.call(block,
+        attributes: { block_type: attributes["block_type"], media_asset_id: attributes["media_asset_id"], settings: settings, **placement },
         translations: block_translations(attributes, nil), actor: actor)
     end
 

@@ -14,3 +14,9 @@ en:
         code_field:
           count: "%{used} of %{limit} characters"
           over: "%{used} of %{limit} characters · %{over} over"
+        # A theme's choices (`theme.yml`): the empty choice of a style list
+        # and of an icon list, and a stored name the theme does not declare.
+        theme_choice_field:
+          default: Default
+          no_icon: No icon
+          not_in_theme: "%{name} (not in this theme)"

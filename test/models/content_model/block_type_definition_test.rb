@@ -94,6 +94,19 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_includes error.message, "body, caption, alt, image"
   end
 
+  test "an outside type may not declare a :theme_choice field" do
+    error = assert_raises(ArgumentError) do
+      BlockTypes.register("gallery/album") do |t|
+        t.field :style, :theme_choice, of: :section_styles
+        TestTypes.declare(t)
+      end
+    end
+    assert_match(/a block type from outside may not declare a :theme_choice field/, error.message)
+    assert_match(/theme\.yml/, error.message)
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
   test "body_content is :rich unless declared, takes :table, refuses anything else; an outside type may not declare :table" do
     d = definition
     assert_equal :rich, d.body_content

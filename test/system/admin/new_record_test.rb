@@ -62,18 +62,18 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     click_link "+ New page"
-    select "Landing", from: "new-page-type"
+    within("dialog#new-page-dialog") { select "Landing", from: "Template" }
     click_button "Create page"
 
     assert_selector "dialog#new-page-dialog[open] .admin-error-summary", text: "1 thing needs fixing", wait: 10
-    assert_equal "Landing", find("#new-page-type").find("option[selected]").text
+    assert_equal "Landing", find("#new-page-template").find("option[selected]").text
     assert_eventually { page.evaluate_script("document.activeElement.classList.contains('admin-error-summary')") }
     assert_current_path admin_page_path(@about)
 
     fill_in "new-page-title", with: "Fixed"
     click_button "Create page"
     assert_selector "header.admin-editor-header", wait: 10
-    assert Page.order(:id).last.landing?
+    assert_equal "landing", Page.order(:id).last.template
   end
 
   test "a title typed in the editor and still waiting to save is saved before the new page opens" do

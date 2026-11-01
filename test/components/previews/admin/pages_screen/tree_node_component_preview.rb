@@ -7,7 +7,7 @@ module Admin
       def default
         PreviewFixtures.root_page
         about = PreviewFixtures.page(title: "About")
-        about.children.create!(page_type: :standard, title: "Team")
+        about.children.create!(title: "Team")
         children_by_parent = Page.all.to_a.group_by(&:parent_id)
 
         render Admin::PagesScreen::TreeNodeComponent.new(page: about, children_by_parent: children_by_parent, selected: about, locale: "en")

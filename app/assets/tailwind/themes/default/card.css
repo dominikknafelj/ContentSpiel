@@ -1,0 +1,22 @@
+/* The Card block's public styles. Every colour is a --th- token: the card's
+   own three (ground, line, icon), the title's --th-ink and the text's
+   --th-dim. */
+.content-block--card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  background: var(--th-card-ground);
+  border: 1px solid var(--th-card-line);
+  border-radius: 0.5rem;
+}
+.content-block--card__icon {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  color: var(--th-card-icon);
+}
+.content-block--card__icon > svg { width: 100%; height: 100%; }
+.content-block--card__title { margin: 0; color: var(--th-ink); }
+.content-block--card__title a { color: inherit; }
+.content-block--card__text { margin: 0; color: var(--th-dim); }

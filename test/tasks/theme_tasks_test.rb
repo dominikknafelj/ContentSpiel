@@ -21,6 +21,8 @@ class ThemeTasksTest < ActiveSupport::TestCase
       output = capture_io { @new.invoke(target) }.first
 
       assert File.file?(File.join(target, "views/pages/show.html.erb"))
+      %w[standard landing].each { |name| assert File.file?(File.join(target, "views/pages/templates/_#{name}.html.erb")), name }
+      assert_nil YAML.safe_load_file(File.join(target, "theme.yml")), "theme.yml is comments only"
       assert_includes output, target
       assert_includes output, "THEME_PATH=#{target} bin/dev", "the next step is the command that also builds the stylesheet"
     end

@@ -272,6 +272,65 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--editor--section-layout-param='one_two'][aria-current='true']"
   end
 
+  test "a section's style is saved and audited as a setting, its select drawn only under the choices theme, and an autosave after the theme dropped the style saves" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    save = ->(style) { patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content", style: style } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream }
+
+    get admin_page_path(@page)
+    assert_select "#section-#{section.id}-header select[name='block[settings][style]']", 0
+    assert_select "#section-#{section.id}-header select[name='block[settings][width]']", 1
+
+    with_choices_theme do
+      get admin_page_path(@page)
+      assert_select "#section-#{section.id}-header select[name='block[settings][style]'][id='block-#{section.id}-style']" do
+        assert_select "option", count: 3
+        assert_select "option[value='']", text: "Default"
+        assert_select "option[value=services]", text: "Services"
+      end
+
+      save.call("services")
+      assert_response :success
+      assert_equal "services", section.reload.settings["style"]
+      assert_select "turbo-stream[target='block-#{section.id}-style-errors']", 1
+      event = Audit::Event.where(action: "block.updated").order(:id).last
+      assert_equal [ nil, "services" ], event.field_changes["settings"].map { |settings| settings["style"] }
+    end
+
+    # The theme no longer declares it: the stored name is shown first, marked,
+    # and a save that keeps it is not refused; another unknown name is.
+    get admin_page_path(@page)
+    assert_select "#section-#{section.id}-header select[name='block[settings][style]'] option[selected][value=services]", text: "services (not in this theme)"
+    save.call("services")
+    assert_response :success
+    save.call("elsewhere")
+    assert_response :unprocessable_entity
+    assert_equal "services", section.reload.settings["style"]
+  end
+
+  test "a section's anchor is saved from its card, a second section's same anchor is a 422 with the sentence in the anchor's slot, and an anchor that is not one says how it is written" do
+    first = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    second = @page.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "two" })
+    save = ->(section, anchor) { patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content", anchor: anchor } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream }
+
+    save.call(first, "services")
+    assert_response :success
+    assert_equal "services", first.reload.settings["anchor"]
+
+    save.call(second, "services")
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{second.id}-anchor-errors'] template", text: /Another section on this page is already called `services`\./
+    assert_not second.reload.settings.key?("anchor")
+
+    save.call(second, "Not An Anchor")
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='block-#{second.id}-anchor-errors'] template", text: /can hold lowercase letters, digits and hyphens/
+    assert_not second.reload.settings.key?("anchor")
+
+    save.call(first, "")
+    assert_response :success
+    assert_not first.reload.settings.key?("anchor")
+  end
+
   test "the first save of a section that stores no settings yet is no change of layout" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     section.update_column(:settings, {})
@@ -929,7 +988,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
       assert_select "button", text: "Change image"
     end
-    assert_select "p", text: "Hero image", count: 0
+    # The standard page's hero fields are in the form but hidden.
+    assert_select "[data-template-field=hero]:not([hidden]) p", text: "Hero image", count: 0
     assert_select "input[name='block[alt]'][placeholder='A dog']"
     assert_select "input[name='block[caption]'][placeholder='Our dog']"
     assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },
@@ -1643,5 +1703,51 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     delete "#{blocks_path}/#{copy.id}", as: :turbo_stream
     assert_response :success
     assert_not ContentBlock.exists?(copy.id)
+  end
+  # ---- The Card block ------------------------------------------------------
+
+  def save_card(block, settings, base: block.reload.updated_at.iso8601(6), tab: nil)
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: settings }, base_updated_at: base }, as: :turbo_stream, headers: { "X-Notes-Tab" => tab }.compact
+  end
+
+  test "a Card added from the picker saves its four values, a bad link is refused with the field's error and nothing is written, and its save is refused when stale and under another tab's hold" do
+    with_choices_theme do
+      post blocks_path, params: { block: { block_type: "card" } }, as: :turbo_stream
+      assert_response :success
+      block = @page.content_blocks.sole
+      assert_equal "card", block.block_type
+      assert_select "turbo-stream template select[name='block[settings][icon]']"
+      assert_select "turbo-stream template input[name='block[settings][title]']"
+      assert_select "turbo-stream template textarea[name='block[settings][text]']"
+      assert_select "turbo-stream template input[name='block[settings][link]']"
+
+      save_card(block, { icon: "brush", title: "Hello", text: "Some words", link: "/about" })
+      assert_response :success
+      block = block.reload
+      assert_equal "brush", block.settings["icon"]
+      assert_equal "/about", block.settings["link"]
+      assert_equal [ "Hello", "Some words" ], block.settings_object.then { |settings| [ settings.title, settings.text ] }
+
+      events = Audit::Event.count
+      version = PublicSite.content_version
+      save_card(block, { icon: "brush", title: "Other", text: "Other", link: "javascript:alert(1)" })
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[target='block-#{block.id}-link-errors']", text: /link|valid/i
+      assert_equal "/about", block.reload.settings["link"]
+      assert_equal "Hello", block.settings_object.title
+      assert_equal [ events, version ], [ Audit::Event.count, PublicSite.content_version ]
+
+      base = block.updated_at.iso8601(6)
+      save_card(block, { title: "One" }, base: base, tab: "tab-aaaaaaaa")
+      assert_response :success
+      save_card(block, { title: "Two" }, base: base, tab: "tab-aaaaaaaa")
+      assert_response :conflict
+      assert_equal "One", block.reload.settings_object.title
+
+      sign_in_as users(:two)
+      save_card(block, { title: "Theirs" }, tab: "tab-bbbbbbbb")
+      assert_response :conflict
+      assert_equal "One", block.reload.settings_object.title
+    end
   end
 end

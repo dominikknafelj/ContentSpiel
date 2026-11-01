@@ -81,4 +81,24 @@ class PublicSubpagesTest < ActionDispatch::IntegrationTest
     assert_select "nav.page-children", count: 0
     assert_not_includes response.body, "In this section"
   end
+
+  # One statement for the list's addresses (`PublicSite::Urls#prefetch`), not
+  # one per subpage: the number of statements that read `public_paths` is the
+  # same for three subpages and for thirty.
+  test "the subpages' addresses are read in one statement at 3 and at 30 subpages" do
+    reads = [ 3, 30 ].map do |count|
+      parent = create_page(title: "Guides #{count}")
+      children = Array.new(count) { |index| create_page(title: "Step #{index}", parent: parent) }
+      get path_of(parent)
+      sql = capture_sql { get path_of(parent) }
+
+      assert_response :success
+      assert_select "nav.page-children li a", count: count do |links|
+        assert_equal children.map { |child| path_of(child) }, links.map { |a| a["href"] }
+      end
+      sql.grep(/public_paths/i)
+    end
+
+    assert_equal reads.first.size, reads.last.size, "a subpage costs a statement of its own:\n#{reads.last.join("\n")}"
+  end
 end

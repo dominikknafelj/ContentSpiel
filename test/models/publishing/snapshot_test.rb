@@ -37,16 +37,16 @@ class Publishing::SnapshotTest < ActiveSupport::TestCase
     assert_equal "Prices", Mobility.with_locale(:en) { page.reload.title }, "rebuilding wrote nothing"
   end
 
-  test "a page type and a hero image come back as the copy had them" do
+  test "a page template and a hero image come back as the copy had them" do
     asset = create_media_asset
-    page = Pages::Save.call(attributes: { parent: root_page, published: true, page_type: "landing", hero_media_asset_id: asset.id },
+    page = Pages::Save.call(attributes: { parent: root_page, published: true, template: "landing", hero_media_asset_id: asset.id },
       translations: { "en" => { title: "Landing", hero_alt: "A room" } }).record
     version = Publishing.current(page)
-    assert Pages::Save.call(page, attributes: { page_type: "standard", hero_media_asset_id: nil }).ok?
+    assert Pages::Save.call(page, attributes: { template: "standard", hero_media_asset_id: nil }).ok?
 
     view = Publishing::Snapshot.rebuild(version, page.reload)
 
-    assert view.landing?
+    assert_equal "landing", view.template
     assert_equal asset, view.hero_media_asset
     assert_equal({ "en" => "A room" }, view.read_attribute(:hero_alt))
   end

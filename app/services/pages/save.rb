@@ -54,10 +54,12 @@ module Pages
     # Everything `attributes:` may carry. `parent` (a `Page`, never
     # `parent_id`) places a NEW page and is dropped on an update (see
     # `#assign`); `published`/`published_at` are the publish state
-    # (`#assign_publishing`); the hero goes through `Media::Choosing`. A new
+    # (`#assign_publishing`); the hero goes through `Media::Choosing`;
+    # `template` is a template's name or nil, written into the page's
+    # `settings` by `Page#template=` and checked there. A new
     # page's rank among its siblings is not on the list: it joins at the
     # end, and `Pages::Move` puts it anywhere else.
-    ATTRIBUTES = %i[parent page_type hero_media_asset_id published published_at].freeze
+    ATTRIBUTES = %i[parent template hero_media_asset_id published published_at].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
 
@@ -204,9 +206,24 @@ module Pages
       # attributes hash just because a stale `parent` happened to be in it.
       plain = @attributes.except(:published, :published_at)
       plain = plain.except(:parent) if @page.persisted?
+      plain = plain.except(:template) if default_template_for_none?(plain)
       @page.assign_attributes(plain)
 
       assign_publishing
+    end
+
+    # ABSENT MEANS THE DEFAULT. A page that stores no template is drawn with
+    # the theme's first, and the editors' forms send the whole form with every
+    # autosave: the theme's first template sent for such a page (by a form
+    # drawn before the forms sent it blank, a script, MCP) is no choice and
+    # is not stored, or every save of a title would pin the page to today's
+    # first template and mark a live page as changed with nothing to publish.
+    # A blank template removes the key (`Page#template=`). A page that stores
+    # a name keeps it until another is sent.
+    def default_template_for_none?(plain)
+      return false unless plain.key?(:template) && @page.template.nil?
+
+      plain[:template].to_s.strip == ContentModel.theme_choices.call(:page_templates).first&.name
     end
 
     # `published_at` schedules explicitly and wins; `published: true` makes a

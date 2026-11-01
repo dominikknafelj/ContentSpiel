@@ -36,6 +36,20 @@ class Admin::EditorScreen::SharedFieldsComponentTest < ViewComponent::TestCase
     assert_equal "small", Admin::EditorScreen::SharedFieldsComponent.display(Field.new(name: "size", type: :select, options: { options: %w[small] }), "small")
   end
 
+  test "a theme choice is shown by its label, its blank word, or its name marked not in this theme" do
+    field = Field.new(name: "style", type: :theme_choice, options: { of: :section_styles })
+    icon = Field.new(name: "icon_name", type: :theme_choice, options: { of: :icons })
+    display = ->(field, value) { Admin::EditorScreen::SharedFieldsComponent.display(field, value) }
+
+    with_choices_theme do
+      assert_equal "Services", display.(field, "services")
+      assert_equal "Default", display.(field, nil)
+      assert_equal "No icon", display.(icon, "")
+      assert_equal "Design", display.(icon, "brush")
+      assert_equal "retired (not in this theme)", display.(field, "retired")
+    end
+  end
+
   # Design answer C6.
   test "code keeps its frame in a scrolling pre of at most twelve lines, as text in full ink, under one small line that says where it is edited; no code is a dash" do
     field = Field.new(name: "code", type: :code, options: {})

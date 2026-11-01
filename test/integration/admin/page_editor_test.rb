@@ -180,6 +180,74 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(value="#{page.settings_changed_at.iso8601(6)}")
   end
 
+  # Absent means the default: the form sends a blank template for the theme's
+  # first, and an autosave of any field sends the whole form. A live standard
+  # page (`{}`) must not gain `{"template" => "standard"}` from it.
+  test "an autosave of the title on a live standard page leaves its settings empty, with no mark and no Template in the overview" do
+    publish_changes(@page)
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value='']", text: "Standard"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "" } }, as: :turbo_stream
+    assert_response :ok
+    # A form drawn before this rule sent the default's name: the same nothing.
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "standard" } }, as: :turbo_stream
+    assert_response :ok
+
+    assert_equal({}, @page.reload.settings)
+    assert_nil @page.unpublished_changes_at
+    assert_not_includes Publishing::Changes.of(@page).fields, "settings"
+  end
+
+  test "choosing Landing stores it, and choosing the default again on a Landing page removes the key" do
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal({ "template" => "landing" }, @page.reload.settings)
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value=landing]"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal({}, @page.reload.settings)
+  end
+
+  test "a template is saved by the settings autosave and refused when it is unknown and not the stored one" do
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal "landing", @page.reload.template
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "nonesuch" } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_equal "landing", @page.reload.template
+    # The stored one, unknown to the theme, is still accepted: a form sends it back.
+    with_page_templates("standard") { assert Page.where(id: @page.id).update_all(settings: { "template" => "gallery" }) == 1 }
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "gallery", subtitle: "Kept" } }, as: :turbo_stream
+    assert_response :ok
+    assert_equal "gallery", @page.reload.template
+  end
+
+  test "the hero fields are in a standard page's form, hidden, and shown for a Landing page" do
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main [data-template-field=hero][hidden] [data-field-name=hero_alt]"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { template: "landing" } }, as: :turbo_stream
+    assert_response :ok
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main [data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
+  end
+
+  test "a stored template the theme no longer declares is kept by an unrelated autosave" do
+    with_page_templates("standard", "gallery") { assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok? }
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "main form select[name='page[template]'] option[selected][value=gallery]"
+
+    patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { subtitle: "New", template: "gallery" } }, as: :turbo_stream
+
+    assert_response :ok
+    assert_equal({ "template" => "gallery" }, @page.reload.settings)
+    assert_equal "New", @page.subtitle
+  end
+
   test "a settings autosave that holds what is stored marks the live page with nothing and moves neither base" do
     sign_in_as users(:one)
     page = create_page(title: "Pricing")
@@ -230,7 +298,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
   test "a later save that did not touch the hero leaves its refusal message in place; acting on the hero clears it" do
     landing = create_page(title: "Landing 2")
-    assert Pages::Save.call(landing, attributes: { page_type: "landing" }).ok?
+    assert Pages::Save.call(landing, attributes: { template: "landing" }).ok?
     chosen = create_media_asset
 
     patch admin_page_path(landing), params: { page: { subtitle: "Other field", hero_media_asset_id: "" }, base_updated_at: landing.reload.updated_at.iso8601(6) }, as: :turbo_stream
@@ -599,28 +667,28 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   private
 
   def landing_page_with_hero_image
-    Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: create_media_asset.id },
+    Pages::Save.call(attributes: { parent: root_page, template: "landing", published: true, hero_media_asset_id: create_media_asset.id },
       translations: { Locales.default => { title: "Landing" } }).record
   end
 
-  test "the page type is a select on the default tab and a read-only shared line on a translation tab" do
+  test "the template is a select on the default tab and a read-only shared line on a translation tab" do
     get "/cs-studio/pages/#{@page.id}"
     # `main`: the layout's New page dialog has a select of the same name.
-    assert_select "main form select[name='page[page_type]']"
+    assert_select "main form select[name='page[template]']"
 
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
     assert_select "form.admin-translation-form"
-    assert_select "main form select[name='page[page_type]']", count: 0
-    assert_select "[data-field-name='page_type']", text: /Page type:\s*Standard\s*— Shared by all languages\./
+    assert_select "main form select[name='page[template]']", count: 0
+    assert_select "[data-field-name='template']", text: /Template:\s*Standard\s*— Shared by all languages\./
   end
 
-  test "a translation-tab save without the page type leaves it untouched" do
-    @page.update!(page_type: "landing")
+  test "a translation-tab save without the template leaves it untouched" do
+    @page.update!(template: "landing")
 
     patch "/cs-studio/pages/#{@page.id}", params: { locale: "de", page: { title: "Über uns" }, base_updated_at: @page.reload.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success
-    assert_equal "landing", @page.reload.page_type
+    assert_equal "landing", @page.reload.template
     assert_equal "Über uns", @page.title(locale: :de)
   end
 

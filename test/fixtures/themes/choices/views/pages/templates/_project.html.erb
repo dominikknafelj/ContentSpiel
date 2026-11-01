@@ -1,0 +1,8 @@
+<%# The theme's own page template, written from the reference's locals table
+    (`page`, `post`, `list_block`) and its helpers table alone. %>
+<div class="project-page">
+  <% if post.nil? %>
+    <h1><%= translated(page, :title) %></h1>
+  <% end %>
+  <% block_outline(page).top_level.each do |block| %><%= render_block(block) %><% end %>
+</div>

@@ -142,7 +142,7 @@ class Theme::CheckTest < ActiveSupport::TestCase
         assert_equal %w[config javascript lib notes.txt sample.html.erb], problems.map { |problem| problem.split(" ").first }, problems.inspect
         problems.each do |problem|
           assert_includes problem, "is not part of a theme. A theme folder holds the folders views, components, assets and javascript, " \
-            "and nothing else (dot files and a README are ignored). Move it out of the folder or delete it."
+            "and the file theme.yml, and nothing else (dot files and a README are ignored). Move it out of the folder or delete it."
         end
       end
 
@@ -289,7 +289,8 @@ class Theme::CheckTest < ActiveSupport::TestCase
     reasons = {
       Rails.root.join(Theme::Check::BUILDS).to_s => "built files: there or not by whether a build has run, and no name a theme may bring",
       ThemeTestHelper::PLAIN.join("assets/images").to_s => "the second theme's, on the path in the test environment only",
-      ThemeTestHelper::PLAIN.join("javascript").to_s => "the second theme's, on the path in the test environment only"
+      ThemeTestHelper::PLAIN.join("javascript").to_s => "the second theme's, on the path in the test environment only",
+      ThemeTestHelper::CHOICES.join("assets/images").to_s => "the choices theme's icons, on the path in the test environment only"
     }
 
     unknown = Rails.application.config.assets.paths.map(&:to_s) - known - reasons.keys
@@ -891,6 +892,103 @@ class Theme::CheckTest < ActiveSupport::TestCase
     Dir.mktmpdir("theme") do |dir|
       assert_empty Theme::Check.problems(ThemeFolder.new(dir), deep: true)
       assert_equal 0, Theme.load(ThemeFolder.new(dir)).template_count
+    end
+  end
+
+  test "theme.yml is checked at the plain depth: its problems are the theme's, each starting with theme.yml" do
+    found = problems_with("theme.yml" => "section_styles:\n  - name: yes\n    label: A\nsettings: {}\n")
+
+    assert_equal 2, found.size, found.inspect
+    assert found.all? { |problem| problem.start_with?("theme.yml") }, found.inspect
+    assert_empty problems_with("theme.yml" => "page_templates:\n  - name: standard\n    label: Standard\n")
+    assert_empty problems_with({ "theme.yml" => "# nothing\n" }, deep: true)
+    assert_empty Theme::Check.problems(ThemeFolder.new(ThemeTestHelper::CHOICES), deep: true)
+  end
+  PAGE_TEMPLATE = "views/pages/templates/_project.html.erb".freeze
+  PROJECT_LIST = "page_templates:\n  - name: standard\n    label: Standard\n  - name: project\n    label: Project\n".freeze
+
+  test "a page template file is admitted only for a declared template, and a declared template the default lacks must bring its file" do
+    # Declared and brought: nothing to say, deeply too.
+    assert_empty problems_with({ "theme.yml" => PROJECT_LIST, PAGE_TEMPLATE => "<%= translated(page, :title) %>" }, deep: true)
+
+    # Declared, and the default has no template of that name: the file must come.
+    missing = problems_with("theme.yml" => PROJECT_LIST)
+    assert_equal 1, missing.size, missing.inspect
+    assert missing.first.start_with?("theme.yml"), missing.first
+    assert_includes missing.first, PAGE_TEMPLATE
+    assert_match(/Add the file|remove the entry/, missing.first)
+
+    # A name the default has needs no file: it is drawn by the default's.
+    assert_empty problems_with("theme.yml" => "page_templates:\n  - name: standard\n    label: Standard\n")
+    assert_empty problems_with("views/pages/templates/_landing.html.erb" => "<%= translated(page, :title) %>")
+
+    # A file no entry names, with a theme.yml and without one.
+    { { "views/pages/templates/_stray.html.erb" => "x" } => "views/pages/templates/_stray.html.erb",
+      { "theme.yml" => PROJECT_LIST, PAGE_TEMPLATE => "x", "views/pages/templates/_other.html.erb" => "x" } => "views/pages/templates/_other.html.erb" }.each do |files, file|
+      found = problems_with(files)
+      assert_equal 1, found.size, found.inspect
+      assert found.first.start_with?(file), found.first
+      assert_match(/theme\.yml/, found.first)
+    end
+
+    # Not the shape of a template's name at all: the contract's own refusal.
+    found = problems_with("views/pages/templates/_Bad Name.html.erb" => "x", "views/pages/templates/standard.html.erb" => "x")
+    assert_equal 2, found.size
+    found.each { |sentence| assert_includes sentence, "is not part of the theme contract" }
+  end
+
+  test "a page_templates list that is empty is refused with what to do" do
+    found = problems_with("theme.yml" => "page_templates: []\n")
+
+    assert_equal 1, found.size, found.inspect
+    assert found.first.start_with?("theme.yml"), found.first
+    assert_includes found.first, "omit the list to use the default theme's, or declare at least one"
+  end
+
+  test "the deep check refuses landing? and page_type in a theme's template and says what to write instead" do
+    %w[landing? page_type].each do |word|
+      found = problems_with({ "views/pages/show.html.erb" => "<% if page.#{word} %>x<% end %>" }, deep: true)
+
+      assert_equal 1, found.size, found.inspect
+      assert found.first.start_with?("views/pages/show.html.erb"), found.first
+      assert_includes found.first, word
+      assert_includes found.first, 'page_template == "landing"'
+      assert_empty problems_with({ "views/pages/show.html.erb" => "<% if page.#{word} %>x<% end %>" })
+    end
+  end
+
+  test "a word landing? in a string or a comment is not refused" do
+    source = <<~ERB
+      <%# landing? and page_type were the old way %>
+      <p>Is it landing? A page_type of its own.</p>
+      <%= link_to "landing? page_type", "/landing?" %>
+      <% label = "page.landing?" # page_type %>
+    ERB
+
+    assert_empty problems_with({ "views/pages/show.html.erb" => source }, deep: true)
+  end
+
+  test "a page template that reads @page, @post or @post_list_block is told the local to use, and show.html.erb is not" do
+    source = "<%= @page.id %><%= @post&.id %><%= @post_list_block %>"
+    found = problems_with({ "views/pages/templates/_standard.html.erb" => source }, deep: true)
+
+    assert_equal 3, found.size, found.inspect
+    { "@page" => "`page`", "@post" => "`post`", "@post_list_block" => "`list_block`" }.each do |variable, local|
+      sentence = found.find { |each| each.include?("reads #{variable}:") }
+      assert sentence, found.inspect
+      assert sentence.start_with?("views/pages/templates/_standard.html.erb")
+      assert_includes sentence, local
+    end
+    assert_empty problems_with({ "views/pages/templates/_standard.html.erb" => '<%= "@page" %><%# @post %>' }, deep: true)
+    assert_empty problems_with({ "views/pages/show.html.erb" => "<%= @page.id %>" }, deep: true)
+  end
+
+  test "no default icon is shadowed by a theme's file of the same path" do
+    Theme::Declarations.default["icons"].each do |icon|
+      problems = problems_with("assets/images/#{icon.file}" => %(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"/>))
+
+      assert_equal 1, problems.size, problems.inspect
+      assert_includes problems.first, "assets/images/#{icon.file}"
     end
   end
 end

@@ -107,8 +107,24 @@ module ThemeHelper
   # as published (`Publishing.published_all`, one statement per record type).
   # The preview shows the rows. The CALLER narrows first, on the rows
   # (`kept.published`): whether a record is shown at all is not in a copy.
+  #
+  # Their addresses in the language shown are read here too, in one statement
+  # (`PublicSite::Urls#prefetch`): a list of pages is drawn as links, and
+  # `page_url_path` of each would otherwise read its own.
   def published_views(records)
-    public_urls.preview? ? records.to_a : Publishing.published_all(records)
+    views = public_urls.preview? ? records.to_a : Publishing.published_all(records)
+    public_urls.prefetch(views)
+    views
+  end
+
+  # The name of the page template `pages/show` draws the shown page with
+  # (`views/pages/templates/_<name>.html.erb`): the page's stored template
+  # while the theme declares it, the theme's first otherwise (`Theme#page_template`).
+  # Read from the page the controller resolved, which on the site is rebuilt
+  # from its copy, so a template changed and not published is not drawn.
+  # Never nil, also with no page.
+  def page_template
+    Theme.current.page_template(@page&.template)
   end
 
   # Memoised for the render: a theme may draw the menu more than once (a
@@ -241,7 +257,9 @@ module ThemeHelper
     nodes = nodes.reject { |node| template_item?(node) } # before an id is put on anything: an item is known by its markup
     return [ html, [] ] if nodes.empty?
 
-    taken = fragment.css("[id]").map { |node| node["id"] }.to_set
+    # A section's anchor is the author's word for the band and a link to it must
+    # land there, so it is taken whether or not the section is in this article.
+    taken = fragment.css("[id]").map { |node| node["id"] }.to_set.merge(page_anchors)
     headings = nodes.map do |node|
       id = node["id"].presence || begin
         base = Heading.id_from(Heading.words_of(node)).presence || "section"
@@ -375,6 +393,17 @@ module ThemeHelper
   def block_outline(page)
     @block_outlines ||= {}
     @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
+  end
+
+  # The anchors of the shown page's sections, from the blocks the page was
+  # drawn from (the published copy's on the site, the rows in the preview): the
+  # ids `with_heading_ids` leaves to the sections. Empty where there is no shown
+  # page, as in a helper's own test.
+  def page_anchors
+    page = @page
+    return [] unless page.respond_to?(:content_blocks)
+
+    page.content_blocks.select(&:container?).filter_map { |block| block.settings["anchor"].presence } # public: rows (the page is the published view the controller resolved: its loaded blocks are the copy's; the preview shows the rows)
   end
 
   # Whether a heading is in a list item that is NOT a rendered text's: a

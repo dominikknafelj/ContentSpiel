@@ -40,7 +40,7 @@ module ContentModel
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
     # its blocks' cards and tiles draw through `for_block:`; `table`
     # is the Table block's.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table].freeze
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card].freeze
 
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
@@ -364,6 +364,9 @@ module ContentModel
       # The table body is the CMS's own: its editor, its Markdown form and its
       # public markup are the Table block's, so an outside type has no way to
       # say what a table in its body would mean.
+      if fields.any?(&:block_only?)
+        refuse "a block type from outside may not declare a :theme_choice field: its list would need a key of theme.yml, which the CMS owns"
+      end
       refuse "a block type from outside holds rich text only: `body_content :table` is the CMS's own" unless body_content == :rich
       if icon_follows_block?
         refuse "a block type from outside names one icon for all its blocks: `icon for_block:` is the CMS's own yet, " \

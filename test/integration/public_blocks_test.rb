@@ -3,7 +3,7 @@ require "test_helper"
 class PublicBlocksTest < ActionDispatch::IntegrationTest
   setup do
     SiteSetting.instance.update!(tagline: "Writing about Rails")
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "the homepage shows the tagline eyebrow and rich text in prose" do
@@ -153,7 +153,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a post detail shows date, excerpt and tags" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title: "Hello", excerpt: "Short summary",
       published_at: Time.zone.local(2026, 9, 12), body: rich_doc("Body text"))
@@ -187,6 +187,68 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
       @root.content_blocks.create!(block_type: :rich_text, section: section, section_column: column, position: index, body: rich_doc(text))
     end
     section
+  end
+
+  # The page is live with a copy; a save of the style writes the rows and the
+  # visitor reads the copy until the changes are published.
+  test "a section's style is read from the published copy: a save shows nothing until it is published" do
+    section = with_choices_theme { section_with_texts([ 1, "Styled words" ], layout: "one") }
+    publish_changes(@root)
+    with_choices_theme { ContentBlocks::Save.call(section, attributes: { settings: { "style" => "services" } }, actor: nil) }
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section", 1
+    assert_select "section.content-section--style-services", 0
+
+    publish_changes(@root)
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section--style-services", text: /Styled words/
+  end
+
+  # The anchor is a setting like the rest, so the visitor reads the copy's.
+  test "a section's anchor is the section element's id, read from the published copy: a save shows nothing until it is published" do
+    section = section_with_texts([ 1, "Anchored words" ], layout: "one")
+    ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one", "anchor" => "services" } }, actor: nil)
+    publish_changes(@root)
+    get "/"
+
+    assert_select "section.content-section#services", text: /Anchored words/
+
+    ContentBlocks::Save.call(section.reload, attributes: { settings: { "layout" => "one", "anchor" => "contact" } }, actor: nil)
+    get "/"
+    assert_select "section#services", 1
+    assert_select "section#contact", 0
+
+    publish_changes(@root)
+    get "/"
+    assert_select "section#contact", 1
+    assert_select "section#services", 0
+  end
+
+  test "a section with no anchor has no id, and an anchor written around the service that is not one is not printed" do
+    section = section_with_texts([ 1, "Plain words" ], layout: "one")
+    publish_changes(@root)
+    get "/"
+    assert_select "section.content-section:not([id])", text: /Plain words/
+
+    section.update_columns(settings: section.settings.merge("anchor" => %(x" onclick="y)))
+    publish_changes(@root)
+    get "/"
+    assert_select "section.content-section:not([id])", text: /Plain words/
+    assert_not_includes response.body, "onclick"
+  end
+
+  test "a style in a tinted and in a strong band keeps the band's class beside the style's" do
+    with_choices_theme do
+      section_with_texts([ 1, "Tinted words" ], layout: "one", background: "tinted").update!(settings: { "layout" => "one", "background" => "tinted", "width" => "content", "style" => "services" })
+      section_with_texts([ 1, "Strong words" ], layout: "one", background: "strong").update!(settings: { "layout" => "one", "background" => "strong", "width" => "full", "style" => "contact" })
+    end
+    publish_changes(@root)
+    with_choices_theme { get "/" }
+
+    assert_select "section.content-section.content-section--tinted.content-section--content.content-section--style-services"
+    assert_select "section.content-section.content-section--strong.content-section--full.content-section--style-contact"
   end
 
   # Design answer, first reply: Home drew an empty tinted band. A section
@@ -225,7 +287,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a post's permalink shows the post in place of its listing when the listing sits in a column" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 0, body: rich_doc("Beside the list"))
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 2, position: 0, settings: { "content_type" => "blog" })
@@ -254,7 +316,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # two of them can tie. Asked three times: an order the database happens to
   # return must not decide it.
   test "a post's permalink stands in for the first listing in reading order, in a column or not, on every request" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 4, body: rich_doc("Before the first listing"))
     in_column = blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 5, settings: { "content_type" => "blog" })
@@ -282,7 +344,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   # draws from the same one (`PublicPageRendering#assign_record` hands it
   # over): a permalink builds one outline, as a page does.
   test "a post's permalink builds one outline, the one its page is drawn from" do
-    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    blog = Page.create!(title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
     section = blog.content_blocks.create!(block_type: :section, position: 0)
     blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 0, settings: { "content_type" => "blog" })
     post = create_post(title: "Counted")
@@ -559,6 +621,30 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
       assert_select "aside .note-body", text: /New words/
       get PublicSite::Urls.new.path_for(page, "de")
       assert_select "#note-#{block.id}-heading", text: "Warning: Geändert"
+    end
+  end
+
+  test "a card on a live page is read from its published copy" do
+    with_locales(%w[en de es], default: "en") do
+      page = create_page(title: "Guide")
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "card", settings: { "link" => "/about", "title" => "First title", "text" => "First text" } },
+        translations: { "de" => { settings: { "title" => "Erster Titel" } } }).record
+      publish_changes(page)
+
+      assert ContentBlocks::Save.call(block, attributes: { settings: { "link" => "/contact", "title" => "Changed title", "text" => "Changed text" } },
+        translations: { "de" => { settings: { "title" => "Geaenderter Titel" } } }).ok?
+
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select ".content-block--card h3 a[href='/about']", text: "First title"
+      assert_select ".content-block--card p", text: "First text"
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select ".content-block--card h3", text: "Erster Titel"
+
+      publish_changes(page)
+      get PublicSite::Urls.new.path_for(page, "en")
+      assert_select ".content-block--card h3 a[href='/contact']", text: "Changed title"
+      get PublicSite::Urls.new.path_for(page, "de")
+      assert_select ".content-block--card h3", text: "Geaenderter Titel"
     end
   end
 

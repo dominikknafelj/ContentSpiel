@@ -1,0 +1,20 @@
+section_styles:
+  - name: services
+    label: Services
+  - name: contact
+    label:
+      en: Contact
+      de: Kontakt
+page_templates:
+  - name: standard
+    label: Standard
+  - name: landing
+    label: Landing
+    fields: [hero]
+  - name: project
+    label: Project
+    fields: [hero]
+icons:
+  - name: brush
+    label: Design
+    file: icons/brush.svg

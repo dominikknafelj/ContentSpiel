@@ -299,7 +299,9 @@ class Theme
       # reloader's prepare, before these were taken out here).
       strangers = folder.strangers
       found = strangers.map { |entry| "#{entry} #{ThemeFolder::STRANGER}" }
-      files = folder.files.reject { |file| strangers.include?(file.split("/", 2).first) }
+      # theme.yml is read for what it declares (`Declarations`), not placed.
+      found += Declarations.problems(folder)
+      files = folder.files.reject { |file| strangers.include?(file.split("/", 2).first) || file == Declarations::FILE }
 
       # A file that has no place in a theme is said once, as that: whether
       # its name is also one of the CMS's, and what it says inside, is
@@ -314,6 +316,7 @@ class Theme
       templates = folder.templates & placed
       foreign, templates = templates.partition { |file| !folder.read(file).force_encoding(Encoding::UTF_8).valid_encoding? }
       found += foreign.map { |file| "#{file} is not UTF-8 text, so it cannot be read or drawn. Save the file as UTF-8." }
+      found += page_template_files(folder, files)
       found += templates.flat_map { |file| written(file, folder.read(file)) }
       found += templates.flat_map { |file| unsound(file, folder.read(file)) } if deep
       found
@@ -327,11 +330,41 @@ class Theme
         "render that names it would still find it. Rename it without the dot, or take it out of the folder."
     end
 
+    # The name a page template's file carries (`pages/templates/_<name>.html.erb`
+    # under views), or nil for any other path. Only the SHAPE is admitted
+    # here; whether an entry of `page_templates` names it is
+    # `page_template_files`.
+    def page_template_name(rest)
+      rest[%r{\Apages/templates/_([a-z][a-z0-9_]{0,39})\.html\.erb\z}, 1]
+    end
+
+    # Declarations and files agree, both ways: a file no entry of
+    # `page_templates` names would never be drawn, and a declared name the
+    # default theme lacks with no file would be a page the site cannot draw.
+    # A name the default has needs no file of the theme's (the default's is
+    # drawn). Said only for a theme.yml that was read: its own problems are
+    # the sentence then.
+    def page_template_files(folder, files)
+      return [] if Declarations.problems(folder).any?
+
+      declared = Declarations.of(folder).fetch("page_templates").map(&:name)
+      defaults = Declarations.default.fetch("page_templates").map(&:name)
+      brought = files.filter_map { |file| (name = page_template_name(file.delete_prefix("views/"))) && file.start_with?("views/") ? [ name, file ] : nil }.to_h
+      found = brought.reject { |name, _| declared.include?(name) }.map do |name, file|
+        "#{file} is a page template that no entry of `page_templates` in #{Declarations::FILE} names, so no page is ever drawn with it. " \
+          "Add `- name: #{name}` with a `label:` to that list, or take the file out of the folder."
+      end
+      found + (declared - defaults - brought.keys).map do |name|
+        "#{Declarations::FILE}: the page template `#{name}` is declared and the file views/#{Contract::PAGE_TEMPLATES}_#{name}.html.erb " \
+          "does not exist, and the default theme has no template of that name. Add the file, or remove the entry."
+      end
+    end
+
     def misplaced(file, root: Rails.root)
       area, rest = file.split("/", 2)
       allowed =
         case area
-        when "views" then Contract::TEMPLATES.key?(rest) || (rest.start_with?(Contract::OWN_PARTIALS) && rest.end_with?(".html.erb"))
+        when "views" then Contract::TEMPLATES.key?(rest) || page_template_name(rest) || (rest.start_with?(Contract::OWN_PARTIALS) && rest.end_with?(".html.erb"))
         when "components" then rest.end_with?(".html.erb") && Contract.components.key?(rest.delete_suffix(".html.erb"))
         when "assets" then rest == "stylesheets/theme.css" || asset?(rest)
         when "javascript" then rest.start_with?("controllers/") && rest.end_with?("_controller.js")
@@ -647,6 +680,37 @@ class Theme
       (parameters + assigned) & names
     end
 
+    # A page's type is gone: a page has a template, and the template asks
+    # `page_template == "landing"`. A method call only (`page.landing?`,
+    # `page&.page_type`), read from a tag's code, so the words in a string, a
+    # comment or a hash key are no call.
+    RETIRED = /(?:\.|&\.)\s*(?:landing\?|page_type)(?![\w?!])/
+
+    def retired_page_type(file, tags)
+      return [] unless tags.any? { |tag| reads?(tag, RETIRED) }
+
+      [ "#{file} asks the page for its type (`landing?` or `page_type`), which a page no longer has: a page has a template. " \
+        "Write `page_template == \"landing\"` (the helper `page_template` answers the name of the template drawing the page) instead." ]
+    end
+
+    # A page template is rendered by `pages/show` with the locals `page`,
+    # `post` and `list_block` (`Contract::PAGE_TEMPLATE_LOCALS`), and takes
+    # nothing from the controller's instance variables, which are the show
+    # template's and the layout's. Asked of a partial of
+    # `pages/templates/` alone.
+    PAGE_TEMPLATE_IVARS = { "@page" => "page", "@post_list_block" => "list_block", "@post" => "post" }.freeze
+
+    def instance_variables_of_a_page_template(file, tags)
+      return [] unless page_template_name(file.delete_prefix("views/")) && file.start_with?("views/")
+
+      PAGE_TEMPLATE_IVARS.filter_map do |variable, local|
+        next unless tags.any? { |tag| reads?(tag, /(?<![\w@$])#{variable}\b/) }
+
+        "#{file} reads #{variable}: a page template is handed `#{local}` as a local (with `#{Contract::PAGE_TEMPLATE_LOCALS.join("`, `")}`), " \
+          "and the instance variable is the controller's. Write `#{local}` instead of #{variable}."
+      end
+    end
+
     # What is wrong with a template Ruby will not compile, as one sentence.
     # Ruby's own message is a drawing of the COMPILED template over several
     # lines (the output buffer's calls, the method it was wrapped in), under
@@ -702,6 +766,8 @@ class Theme
       # A name is exempt from the tag that binds it onward, and not before
       # it (`bound_through`).
       bound = bound_through(tags, FORBIDDEN)
+      found += retired_page_type(file, tags)
+      found += instance_variables_of_a_page_template(file, tags)
       FORBIDDEN.each do |name|
         # Not a method of something else (`text.request_id`, `post.session`),
         # not a symbol or an instance variable (`asked_of`), and not a Hash

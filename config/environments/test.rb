@@ -73,7 +73,9 @@ Rails.application.configure do
   # fonts and controllers are there from the start, through the same two
   # doors a real theme's go through at boot (config/initializers/theme.rb,
   # config/importmap.rb).
-  second_theme = ThemeFolder.new(Rails.root.join("test/fixtures/themes/plain"))
-  second_theme.asset_paths.each { |directory| config.assets.paths << directory.to_s }
+  # The choices theme's icons are served the same way.
+  %w[plain choices].each do |fixture|
+    ThemeFolder.new(Rails.root.join("test/fixtures/themes", fixture)).asset_paths.each { |directory| config.assets.paths << directory.to_s }
+  end
   config.importmap.paths << Rails.root.join("test/fixtures/themes/importmap.rb")
 end

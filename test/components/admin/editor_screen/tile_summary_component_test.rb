@@ -6,6 +6,7 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
   include ContentHelper
   include TestTypes
   include LogCapture
+  include ThemeTestHelper
 
   # `@site_page`, not `@page`: `render_inline` keeps its Capybara node in `@page`.
   setup do
@@ -277,6 +278,31 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     empty = block("table")
     render_summary empty
     assert_text "Empty table"
+  end
+
+  test "a card is its icon's label and its title; an empty one says Empty" do
+    with_choices_theme do
+      card = block("card", settings: { "icon" => "brush" })
+      card.assign_settings({ "title" => "Our services" }, locale: "en")
+      card.save!
+      render_summary card
+      assert_equal "Design · Our services", page.find(line).text
+
+      titled = block("card")
+      titled.assign_settings({ "title" => "No icon here" }, locale: "en")
+      titled.save!
+      render_summary titled
+      assert_equal "No icon here", page.find(line).text
+
+      retired = block("card")
+      retired.update_columns(settings: { "icon" => "retired" }) # version: none (a test's row, written around the services) # changes: none (a test's row)
+      render_summary retired
+      assert_equal "Empty", page.find(line).text
+      assert_selector "#{line} > span.text-meta", exact_text: "Empty"
+    end
+
+    render_summary block("card")
+    assert_equal "Empty", page.find(line).text
   end
 
   test "a note is its word or its title and the start of its text; one without text says Empty" do

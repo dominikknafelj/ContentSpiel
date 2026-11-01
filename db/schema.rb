@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_01_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
     t.jsonb "translation_original_changed_at", default: {}, null: false
     t.bigint "section_id"
     t.integer "section_column"
+    t.index "owner_type, owner_id, ((settings ->> 'anchor'::text))", name: "index_content_blocks_on_section_anchor", unique: true, where: "(((block_type)::text = 'section'::text) AND (COALESCE((settings ->> 'anchor'::text), ''::text) <> ''::text))"
     t.index ["block_type"], name: "index_content_blocks_on_block_type"
     t.index ["media_asset_id"], name: "index_content_blocks_on_media_asset_id"
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
@@ -301,7 +302,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
     t.jsonb "hero_alt", default: {}, null: false
     t.jsonb "meta_description", default: {}, null: false
     t.jsonb "meta_title", default: {}, null: false
-    t.integer "page_type", default: 0, null: false
     t.bigint "parent_id"
     t.integer "position"
     t.datetime "published_at"
@@ -317,6 +317,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
     t.jsonb "translation_original_changed_at", default: {}, null: false
     t.datetime "settings_changed_at", null: false
     t.datetime "unpublished_changes_at"
+    t.jsonb "settings", default: {}, null: false
     t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"

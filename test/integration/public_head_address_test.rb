@@ -18,8 +18,8 @@ class PublicHeadAddressTest < ActionDispatch::IntegrationTest
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: 1.day.ago)
-    @about = Page.create!(parent: @root, page_type: :standard, title_en: "About", title_de: "Über", published_at: 1.day.ago)
+    @root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    @about = Page.create!(parent: @root, title_en: "About", title_de: "Über", published_at: 1.day.ago)
   end
 
   test "under a foreign Host, og:url, every hreflang and the canonical link carry the configured address" do
@@ -50,7 +50,7 @@ class PublicHeadAddressTest < ActionDispatch::IntegrationTest
   end
 
   test "a post's permalink has a canonical link to itself" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: 1.day.ago)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
     blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
 

@@ -6,6 +6,13 @@
 module ContentModel
   class ContentTypeDefinition < Definition
     dsl_attribute :list_component
+
+    # Choices for posts are not built: a block's theme choice is the only
+    # one (`FieldTypes::BLOCK_ONLY`).
+    def refuse_type!(type)
+      raise ArgumentError, "a content type may not declare a #{type} field: choices for posts are not built" if FieldTypes::BLOCK_ONLY.include?(type)
+    end
+    private :refuse_type!
     dsl_attribute :detail_component
 
     # The 1-based slot in CS Studio's six-hue content-type palette

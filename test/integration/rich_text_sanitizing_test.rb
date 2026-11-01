@@ -13,7 +13,7 @@ require "test_helper"
 class RichTextSanitizingTest < ActionDispatch::IntegrationTest
   setup do
     SiteSetting.instance.update!(tagline: "Writing about Rails")
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: Time.current)
   end
 
   test "raw iframe HTML in Markdown never reaches a page's rich text" do
@@ -29,7 +29,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
   end
 
   test "raw iframe HTML in Markdown never reaches a post's rich text" do
-    blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
+    blog = Page.create!(parent: @root, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     document, = RichText::Document.from_markdown(%(Before <iframe src="https://evil.example/x"></iframe> after))
     Post.create!(content_type: :blog, title: "Hello", published_at: Time.current, body: document.to_h)

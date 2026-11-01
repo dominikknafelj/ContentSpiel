@@ -80,7 +80,7 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
   end
 
   test "a landing page draws its subtitle and hero from the copy" do
-    page = Pages::Save.call(attributes: { parent: @home, published: true, page_type: "landing", hero_media_asset_id: @asset.id },
+    page = Pages::Save.call(attributes: { parent: @home, published: true, template: "landing", hero_media_asset_id: @asset.id },
       translations: { "en" => { title: "Landing", subtitle: "Be quick", hero_alt: "A room", meta_title: "Meta", meta_description: "Described" },
                       "de" => { title: "Landung", slug: "landung", subtitle: "Sei schnell" } }).record
     add_block(page, block_type: "rich_text", translations: { "en" => { body: rich_doc("Welcome") } })
@@ -136,7 +136,7 @@ class PublishedCopyRenderTest < ActionDispatch::IntegrationTest
   end
 
   test "an image that was trashed after the copy was taken draws as the rows draw it, and a hero too" do
-    page = Pages::Save.call(attributes: { parent: @home, published: true, page_type: "landing", hero_media_asset_id: @asset.id },
+    page = Pages::Save.call(attributes: { parent: @home, published: true, template: "landing", hero_media_asset_id: @asset.id },
       translations: { "en" => { title: "Pictures" } }).record
     add_block(page, block_type: "image", media_asset_id: @asset.id, translations: { "en" => { alt: "Alt" } })
     publish_changes(page)
