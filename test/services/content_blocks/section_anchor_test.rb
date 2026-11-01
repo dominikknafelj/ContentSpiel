@@ -35,6 +35,21 @@ class ContentBlocks::SectionAnchorTest < ActiveSupport::TestCase
     end
   end
 
+  test "an anchor that equals an id the public templates write is refused as taken, writes nothing, and the CMS's ids are listed in one place" do
+    save(@section, "kept")
+
+    %w[page-children-label note-12-heading note-7 code-3-file table-98-caption].each do |anchor|
+      result = save(@section, anchor)
+
+      assert_not result.ok?, "#{anchor} was accepted"
+      assert_equal [ "`#{anchor}` is already taken by the page itself. Choose another anchor." ], result.errors
+      assert_equal "kept", @section.reload.settings["anchor"]
+    end
+    %w[note-taking table-of-contents code-review page-children].each do |anchor|
+      assert save(@section, anchor).ok?, "#{anchor} was refused"
+    end
+  end
+
   test "a blank anchor stores nothing: the key is absent" do
     save(@section, "services")
 

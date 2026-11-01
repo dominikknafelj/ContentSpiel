@@ -136,8 +136,7 @@ class Page < ApplicationRecord
   scope :trash_branch_members, -> { where.not(trash_root_id: nil).where(arel_table[:trash_root_id].not_eq(arel_table[:id])) }
 
   # THE PAGE'S SETTINGS: what the theme draws the page with, a jsonb hash of
-  # names (decision 11, "pages have no extensible fields": a column that can
-  # take more keys, not one column per choice). Today it holds one key,
+  # names (a column that can take more keys, not one column per choice). Today it holds one key,
   # `template`, the name of the page template the theme declares
   # (`Theme#choices(:page_templates)`); `{}` is the theme's first template.
   # A closed set of keys: anything else is refused, so a forged key never

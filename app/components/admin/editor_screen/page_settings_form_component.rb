@@ -161,7 +161,13 @@ module Admin
       # The template the page is drawn with (`Theme#page_template`).
       def template = ::Theme.current.page_template(page.template)
 
-      def template_label = ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || Admin::Fields::ThemeChoiceField.unknown_word(template)
+      # A stored name the theme dropped is shown by its name, not as the default
+      # it is drawn with.
+      def template_label
+        return Admin::Fields::ThemeChoiceField.unknown_word(page.template) if template_unknown?
+
+        ::Theme.current.choice(:page_templates, template)&.label_for(I18n.locale) || Admin::Fields::ThemeChoiceField.unknown_word(template)
+      end
 
       # The hero fields are offered for a template that draws the hero.
       def hero? = Array(::Theme.current.choice(:page_templates, template)&.fields).include?("hero")

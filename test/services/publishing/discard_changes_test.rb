@@ -172,7 +172,7 @@ class Publishing::DiscardChangesTest < ActiveSupport::TestCase
     assert_equal({ "template" => "landing" }, @page.reload.settings)
   end
 
-  # Review Focus 3: the copy's name is carried, not chosen. A theme that
+  # The copy's name is carried, not chosen. A theme that
   # dropped it must not make the discard fail and roll back.
   test "discard writes back a template the theme no longer declares" do
     with_page_templates("standard", "gallery") do

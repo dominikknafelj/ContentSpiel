@@ -214,10 +214,12 @@ module ContentBlocks
 
       anchor = @block.settings["anchor"].to_s
       return false unless BlockTypes::Section::ANCHOR.match?(anchor)
-      return false unless @block.owner.content_blocks.with_anchor(anchor).where.not(id: @block.id).exists?
+      reserved = BlockTypes::Section.reserved_anchor?(anchor)
+      return false unless reserved || @block.owner.content_blocks.with_anchor(anchor).where.not(id: @block.id).exists?
 
       @block.valid? # the other refusals first, which clear what is added below
-      @block.errors.add("settings.anchor", :taken, message: I18n.t("block_types.section.anchor_taken", anchor: anchor))
+      key = reserved ? "anchor_reserved" : "anchor_taken"
+      @block.errors.add("settings.anchor", :taken, message: I18n.t("block_types.section.#{key}", anchor: anchor))
       true
     end
 

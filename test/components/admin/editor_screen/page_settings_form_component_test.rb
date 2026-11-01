@@ -57,6 +57,12 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     assert_selector "select[name='page[template]'] option", count: 2
   end
 
+  test "on a translation tab a stored template the theme dropped reads by its name, marked not in this theme, not as the default's label" do
+    page = with_page_templates("standard", "gallery") { Pages::Save.call(attributes: { parent: root_page }, translations: { "en" => { title: "Gallery" } }).record.tap { |record| assert Pages::Save.call(record, attributes: { template: "gallery" }).ok? } }
+    with_page_templates("standard") { render_settings(page.reload, locale: "de") }
+    assert_selector "[data-field-name=template]", text: "Template: gallery (not in this theme)"
+  end
+
   test "the hero fields are always in the form, hidden unless the chosen template lists hero, and the subtitle always" do
     render_settings(create_page(title: "About"))
     assert_selector "input[name='page[subtitle]']"

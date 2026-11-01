@@ -390,8 +390,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   CARD_TOKENS = %w[--th-card-ground --th-card-line --th-card-icon].freeze
 
-  # Theme choices spec, design question A (b): the Card's ground, frame and
-  # icon are three tokens of its own; the title stays --th-ink and the text
+  # The Card's ground, frame and icon are three tokens of its own; the title stays --th-ink and the text
   # --th-dim.
   test "the card's tokens are defined from the theme's base tokens in both schemes, never a literal" do
     theme_tokens.each do |theme, tokens|

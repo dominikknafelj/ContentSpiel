@@ -22,6 +22,16 @@ module BlockTypes
     ANCHOR_MAX = 40
     ANCHOR = /\A[a-z][a-z0-9-]{0,#{ANCHOR_MAX - 1}}\z/
 
+    # Ids the public templates write themselves: the subpages list's label,
+    # and a note's heading, a code block's file name and a table's caption,
+    # each made from a block's database id (`note-<id>-heading`,
+    # `code-<id>-file`, `table-<id>-caption`). An anchor equal to one would
+    # give the page an id twice and make an `aria-labelledby` ambiguous. The
+    # block ones are unbounded, so the whole prefix with digits is reserved.
+    RESERVED_ANCHORS = /\A(?:page-children-label|(?:note|code|table)-\d+(?:-.*)?)\z/
+
+    def self.reserved_anchor?(anchor) = RESERVED_ANCHORS.match?(anchor.to_s)
+
     def self.register
       BlockTypes.register :section do |t|
         t.label "Section"

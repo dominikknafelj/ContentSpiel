@@ -56,7 +56,7 @@ class PageSettingsMigrationTest < ActiveSupport::TestCase
     assert_equal({}, Page.new.settings)
   end
 
-  # Review Focus 5.
+  # Whatever form a copy holds, current, pending or superseded, it is rewritten.
   test "every copy of a page is rewritten: current, pending and superseded, and a copy with no page_type is left as it is" do
     page = create_page(title: "Many copies")
     assert Pages::Save.call(page, translations: { "en" => { title: "Second" } }).ok?

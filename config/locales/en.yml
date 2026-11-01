@@ -67,6 +67,7 @@ en:
     section:
       anchor_format: "An anchor can hold lowercase letters, digits and hyphens, must start with a letter and can have at most 40 characters."
       anchor_taken: "Another section on this page is already called `%{anchor}`."
+      anchor_reserved: "`%{anchor}` is already taken by the page itself. Choose another anchor."
 
   # How these columns are named in validation messages ("AI provider isn't
   # an available provider", not Rails' default "Ai provider ...").
