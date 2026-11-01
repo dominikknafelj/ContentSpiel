@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_01_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_01_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -286,7 +286,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_100000) do
     t.datetime "updated_at", null: false
     t.index ["container_type", "container_id", "state"], name: "idx_on_container_type_container_id_state_597734391c"
     t.index ["subject_type", "subject_id"], name: "index_note_threads_on_subject_type_and_subject_id"
-    t.check_constraint "state::text = ANY (ARRAY['open'::character varying, 'resolved'::character varying]::text[])", name: "note_threads_state"
+    t.check_constraint "state::text = ANY (ARRAY['open'::text, 'resolved'::text])", name: "note_threads_state"
   end
 
   create_table "page_hierarchies", id: false, force: :cascade do |t|
@@ -385,7 +385,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_100000) do
     t.datetime "state_at", null: false
     t.index ["record_type", "record_id", "seen_at"], name: "index_presence_marks_on_record_and_seen_at"
     t.index ["user_id", "record_type", "record_id", "tab"], name: "index_presence_marks_on_user_record_tab", unique: true
-    t.check_constraint "state::text = ANY (ARRAY['here'::character varying, 'away'::character varying]::text[])", name: "presence_marks_state_known"
+    t.check_constraint "state::text = ANY (ARRAY['here'::text, 'away'::text])", name: "presence_marks_state_known"
   end
 
   create_table "public_paths", force: :cascade do |t|
