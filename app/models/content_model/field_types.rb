@@ -16,6 +16,10 @@ module ContentModel
     # week dates, which is not what the editor's placeholder promises.
     DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
 
+    # What no link holds, wherever it stands: white space (Unicode's too),
+    # a control or invisible format character, a backslash.
+    LINK_REFUSED = /[[:space:]\p{Cc}\p{Cf}\\]/
+
     # Text with its outer white space taken off, nil when nothing is left.
     STRIPPED = ->(value) { value.to_s.strip.presence }
     # The validation of a type with no rules of its own.
@@ -41,9 +45,31 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The ten built-ins, in this order (it is `names`' order).
+      # The eleven built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, integer, boolean, date, url, select, content_type, tag ].each { |type| register(type) }
+        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link ].each { |type| register(type) }
+      end
+
+      # The one rule for a link a visitor follows (the Card's address): an
+      # http, https or mailto address, or a site-relative one, `/` and then
+      # neither `/` nor a backslash. Browsers read a backslash as a slash and drop
+      # tabs and line breaks inside an address, so "/<backslash>evil.example" and
+      # "/\t/evil" are another host, "//evil" is one, and none of those
+      # (nor any white space, control or invisible format character) is
+      # accepted anywhere. A scheme is read case-insensitively. Total over
+      # any value: a non-String is no link.
+      def link?(value)
+        return false unless value.is_a?(String)
+        return false if value.match?(LINK_REFUSED)
+        return value.match?(%r{\A/(?![/\\])}) if value.start_with?("/")
+
+        uri = URI.parse(value)
+        scheme = uri.scheme.to_s.downcase
+        return false unless URL_SCHEMES.include?(scheme)
+
+        scheme == "mailto" || uri.host.present?
+      rescue URI::InvalidURIError
+        false
       end
 
       # What every type refuses that only a select, a content type field or
@@ -235,6 +261,21 @@ module ContentModel
       end
 
       def tag = plain(:tag, translatable: false)
+
+      # An address a visitor follows; see `link?`. The same on every
+      # language, so never translated.
+      def link
+        FieldType.new(
+          name: :link, cast: STRIPPED, translatable: false, audit: :value,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "link fields can't be translated (the address is the same in every language)" if options[:translated]
+            refuse_choice_and_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            errors.add(field.name, :invalid) if value && !link?(value)
+          }
+        )
+      end
 
       # A type of stripped text with no rules of its own.
       def plain(name, translatable:)
