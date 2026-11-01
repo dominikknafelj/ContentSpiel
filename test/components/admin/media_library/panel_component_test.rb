@@ -46,6 +46,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
 
     assert_selector "a[href='/cs-studio/media/#{asset.id}/original'][data-turbo='false'][download]", text: "Download original"
     assert_no_selector "a[href*='/rails/active_storage']"
+    assert_selector "p.text-sm.text-meta", text: "Only editors can download the original."
   end
 
   test "the panel is a focusable region and its close link tells admin--media--panel which tile to return to" do

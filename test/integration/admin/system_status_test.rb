@@ -120,7 +120,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     sign_in_as(users(:one))
     get "/cs-studio/system_status"
-    assert_select "li[data-status=warning]", text: /Images.*still to be made/m do
+    assert_select "li[data-status=warning]", text: /Images.*still being made/m do
       assert_select "a[href=?]", "/cs-studio/settings#images", text: "Open Image settings →"
     end
 
@@ -128,7 +128,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
     sign_in_as(viewer)
     get "/cs-studio/system_status"
-    assert_select "li", text: /Images.*still to be made/m
+    assert_select "li", text: /Images.*still being made/m
     assert_select "a", text: "Open Image settings →", count: 0
   end
 
