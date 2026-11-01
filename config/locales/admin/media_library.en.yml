@@ -9,4 +9,4 @@ en:
         upload_hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
         panel:
           download_original: "Download original"
-          download_original_note: "Only editors can download the original."
+          download_hint: "Only editors can download the original."

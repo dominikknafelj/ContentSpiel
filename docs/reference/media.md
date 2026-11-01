@@ -39,7 +39,7 @@ What the public routes refuse is an allow-list that fails closed (`ActiveStorage
 - A refusal is a bare 404 before `http_cache_forever` runs, so it carries no `Cache-Control: public`.
 - A note's file stays refused by `ActiveStorageNoteFilesRefusal`; no MCP answer, public route or srcset carries a library original.
 
-**Download original.** Signed-in editors download the original from the media panel through `Admin::MediaOriginalsController` (`GET media/:id/original`, `media.upload`, a kept image; a 403 before anything is looked up). It is not the blob proxy because Active Storage's proxy controllers take no session and cannot tell an editor from a visitor. It streams the original's bytes as an attachment, `private, no-store` (`test/controllers/admin/media_originals_controller_test.rb`). The panel's link is a plain text link with one small line under it, "Only editors can download the original." (`admin.components.media_library.panel.download_original_note`).
+**Download original.** Signed-in editors download the original from the media panel through `Admin::MediaOriginalsController` (`GET media/:id/original`, `media.upload`, a kept image; a 403 before anything is looked up). It is not the blob proxy because Active Storage's proxy controllers take no session and cannot tell an editor from a visitor. It streams the original's bytes as an attachment, `private, no-store` (`test/controllers/admin/media_originals_controller_test.rb`). The panel's link is a plain text link with one small line under it, "Only editors can download the original." (`admin.components.media_library.panel.download_hint`).
 
 ## The content version
 
