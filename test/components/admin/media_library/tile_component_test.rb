@@ -83,4 +83,26 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
 
     assert_selector "button.aria-pressed\\:ring-accent-tint.aria-pressed\\:border-accent"
   end
+
+  test "a tile of an image whose widths exist shows the 480 width with its size, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200) # version: none (a test's own dimensions)
+    asset = make_renditions!(asset.reload, widths: [ 480, 960, 1600 ])
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
+
+    assert_selector "img[src='#{asset.display_url(min_width: 480)}'][width='1600'][height='1200']"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  test "a tile of an image with neither a width nor a preview is a box, not the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
+
+    assert_no_selector "img"
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
 end

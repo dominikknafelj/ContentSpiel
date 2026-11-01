@@ -260,4 +260,15 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
       AccessControl::Membership.create!(user: viewer, group: group)
     end
   end
+
+  test "the panel shows a width or the preview or a box, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    as(media_only_viewer) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en") }
+
+    assert_no_selector "img[src*='/blobs/']"
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
 end

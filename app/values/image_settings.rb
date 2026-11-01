@@ -49,6 +49,8 @@ class ImageSettings
 
   def widths = Array(@site.image_widths).map(&:to_i).sort
 
+  def max_upload_mb = @site.image_max_upload_mb
+
   def max_bytes = @site.image_max_upload_mb.megabytes
 
   # What a generation of widths was made with: the format, its quality and

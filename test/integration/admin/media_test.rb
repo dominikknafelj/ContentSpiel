@@ -852,6 +852,25 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_includes tile.text, "NO ALT"
   end
 
+  test "the upload answer's url is a width or the preview, never the original" do
+    sign_in_as(users(:one))
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png") }
+
+    asset = Media::Asset.order(:id).last
+    assert_equal asset.display_url(min_width: 960), response.parsed_body["url"]
+    assert_not_includes response.parsed_body.to_json, "/blobs/"
+  end
+
+  test "the drop zone's hint reads the site's largest upload" do
+    site_settings(:default).update_columns(image_max_upload_mb: 7) # version: none (a test's own setting)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/media"
+
+    assert_select ".admin-file-drop", text: /up to 7 MB/
+  end
+
   test "an uploaded tile's link keeps the grid's search, segment and page like every other tile's" do
     sign_in_as(users(:one))
 

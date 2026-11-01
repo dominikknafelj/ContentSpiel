@@ -4,7 +4,7 @@
   <%= tag.input type: "hidden", name: html_name, id: id, value: asset&.id.to_s, data: { "admin--media--field-target": "input" } %>
 
   <div class="mb-2 flex items-center gap-3">
-    <%= tag.img src: thumbnail_url, alt: "", hidden: !chosen?, class: "max-h-32 rounded-cs border border-line object-cover",
+    <%= tag.img src: thumbnail_url, alt: "", width: asset&.width, height: asset&.height, hidden: !thumbnail_url, class: "max-h-32 w-auto rounded-cs border border-line object-cover #{"blur-sm" if thumbnail_url&.start_with?("data:")}",
           data: { "admin--media--field-target": "thumbnail" } %>
     <%= tag.span(chosen? ? asset.title : "No image chosen", class: "text-sm text-meta", data: { "admin--media--field-target": "title" }) %>
   </div>

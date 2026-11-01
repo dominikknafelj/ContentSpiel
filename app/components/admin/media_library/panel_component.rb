@@ -51,8 +51,6 @@ module Admin
         @editable = can?("media.manage") || (Current.user.present? && asset.created_by_id == Current.user.id)
       end
 
-      def preview_url = asset.display_url(min_width: 960)
-
       def dimensions
         return nil unless asset.width && asset.height
 

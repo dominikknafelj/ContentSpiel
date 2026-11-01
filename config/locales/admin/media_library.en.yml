@@ -6,5 +6,6 @@ en:
   admin:
     components:
       media_library:
+        upload_hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
         panel:
           download_original: "Download original"

@@ -116,4 +116,15 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   def row(item, who: "You", retention_days: 30, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil)
     Admin::TrashScreen::RowComponent.new(item:, retention_days:, who:, subpage_sentence:, purge_subpage_count:, used_by:, parent_choices:, tab:)
   end
+
+  test "an image row shows a width, the preview or a box, never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+    Trash::Move.call(asset)
+
+    render_inline row(asset.reload, who: "Ada")
+
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
 end

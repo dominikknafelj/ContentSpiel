@@ -18,7 +18,7 @@
   </div>
 
   <span class="block overflow-hidden rounded-cs border border-line bg-sunken">
-    <%= image_tag preview_url, alt: "", class: "w-full" %>
+    <%= render Admin::Ui::LibraryImageComponent.new(asset: asset, min_width: 960, css_class: "w-full h-auto", loading: "eager") %>
   </span>
 
   <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-cs-mono text-xs text-meta">

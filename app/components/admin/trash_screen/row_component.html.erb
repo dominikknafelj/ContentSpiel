@@ -3,7 +3,7 @@
     <div class="flex items-center gap-3">
       <% if image? %>
         <span class="block size-12 shrink-0 overflow-hidden rounded-cs bg-sunken">
-          <%= image_tag item.thumbnail_url, alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
+          <%= render Admin::Ui::LibraryImageComponent.new(asset: item, min_width: 480, css_class: "h-full w-full object-cover") %>
         </span>
       <% end %>
       <span class="font-semibold text-ink"><%= title %></span>
