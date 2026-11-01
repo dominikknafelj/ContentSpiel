@@ -244,7 +244,7 @@ module Admin
       # The pairs, each style the theme declares carrying `data-fields` for
       # `admin--editor--template-fields`, which shows the note for the chosen
       # one: the default (blank) and a name the theme does not know (drawn as
-      # the default) carry none. #146: a note, not a declaration, since the
+      # the default) carry none. Issue 146: a note, not a declaration, since the
       # CMS cannot know what a style draws; no `theme.yml` key says so.
       def style_options
         style_field.option_pairs.map do |text, value|

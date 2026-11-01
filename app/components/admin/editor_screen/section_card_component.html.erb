@@ -70,7 +70,7 @@
               class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 font-cs-mono text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
         <span id="<%= field_id("anchor-help") %>" class="sr-only"><%= t(".anchor_help") %></span>
         <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
-        <%# #146: a style may set its own layout, background or width, and the CMS cannot
+        <%# Issue 146: a style may set its own layout, background or width, and the CMS cannot
             know whether this one does, so a style other than the default gets one help
             line. Always drawn and shown or hidden by the chosen style, as the page
             settings' template fields are (`admin--editor--template-fields`); it writes
