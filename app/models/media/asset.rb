@@ -372,30 +372,6 @@ class Media::Asset < ApplicationRecord
     nil
   end
 
-  # The `ActiveStorage::VariantRecord#variation_digest` for every variant of
-  # this asset's blob that's already been processed -- fix round 1's I2/I3:
-  # `Variant#processed?`/`VariantWithRecord#processed?` are both `private`
-  # (deliberately: the public alternative, `#processed`, *runs* the
-  # transformation inline the moment it isn't done yet, a `vips` call
-  # `#srcset` must never trigger -- see the `has_one_attached` block's own
-  # comment), so this reads the same thing those private methods themselves
-  # read (`VariantWithRecord#record`'s own `blob.variant_records.find_by
-  # (variation_digest: ...)`) through the public, documented `variant_
-  # records` association instead.
-  #
-  # One query total for *all four* widths, not one per width and not one
-  # per asset: `variant_records.loaded?` is true when a caller preloaded it
-  # (`Media::Asset.with_file`, which every multi-asset list must use),
-  # in which case this reads the already-loaded rows in memory; otherwise
-  # `pluck` issues the one query itself. Either way, comparing a `Set` of
-  # digests against each variant's own `variation.digest` (`#srcset`) never
-  # queries per variant.
-  def processed_variant_digests
-    variant_records = file.blob.variant_records
-    digests = variant_records.loaded? ? variant_records.map(&:variation_digest) : variant_records.pluck(:variation_digest)
-    digests.to_set
-  end
-
   # `hero-photo.jpg` -> "hero-photo": the title an editor never has to type
   # before an upload is usable in a listing or a picker. `ActiveStorage
   # ::Filename#base` already strips the extension the same way the

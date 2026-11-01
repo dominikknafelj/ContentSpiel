@@ -32,7 +32,15 @@ module Media
       asset.file.analyze
       metadata = asset.file.blob.metadata || {}
       asset.update_columns(width: metadata["width"], height: metadata["height"])
-      MediaRenditions.instance_method(:make_renditions!).bind_call(self, asset)
+      settings = ImageSettings.current
+      files = Media::Renditions.widths_for(original_width: asset.width, configured: settings.widths).map do |width|
+        variation = ActiveStorage::Variation.wrap(Media::Renditions.transformations(
+          width: width, format: settings.format, quality: settings.quality, content_type: asset.content_type
+        ))
+        { "width" => width, "key" => variation.key, "digest" => variation.digest }
+      end
+      asset.update_columns(renditions: { "current" => { "fingerprint" => settings.fingerprint, "files" => files } }) # version: none (a preview's recorded generation)
+      asset
     end
   end
 end
