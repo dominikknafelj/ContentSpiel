@@ -422,6 +422,10 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
   test "restore_many restores only trashed posts the viewer may restore, ignores the rest" do
     trashed = create_post(title: "In trash")
     kept = create_post(title: "Kept")
+    # The page's id comes from another table's sequence, so it could equal a
+    # post's id; the ids are deduplicated, which would drop the count by one
+    # ("3 posts were not found"). Start the pages' sequence past both posts.
+    Page.connection.execute("SELECT setval(pg_get_serial_sequence('pages','id'), #{[ Page.maximum(:id).to_i, trashed.id, kept.id ].max + 1000}, true)")
     page = create_page(title: "A page")
     as_owner { Trash::Move.call(trashed) }
     post "/cs-studio/trash/restore_many", params: { type: "post", ids: [ trashed.id, kept.id, page.id, 99_999_999, "abc" ] }
