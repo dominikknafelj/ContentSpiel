@@ -43,7 +43,7 @@ class Blocks::CardComponentTest < ActiveSupport::TestCase
   end
 
   test "each accepted link is drawn as the link, and a stored value no longer accepted is drawn as no link" do
-    [ "https://example.org/a?b=1", "http://example.org", "mailto:a@example.org", "/about" ].each do |address|
+    [ "https://example.org/a?b=1", "http://example.org", "mailto:a@example.org", "/about", "#team" ].each do |address|
       draw block_with({ "link" => address }, title: "T")
       assert_selector "h3 a[href='#{address}']", text: "T"
     end

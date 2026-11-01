@@ -32,6 +32,15 @@ module ContentModel
 
     # What no link holds, wherever it stands: white space (Unicode's too),
     # a control or invisible format character, a backslash.
+    # The fragment of a same-page link (`#team`): what an element id the CMS
+    # writes can hold. A Section's anchor (`BlockTypes::Section::ANCHOR`,
+    # lowercase ASCII letters, digits and hyphens) is inside it, and so is a
+    # heading's id (`Heading.id_from`: letters of any script, marks, digits,
+    # underscores and hyphens). Nothing else: no `/`, `?`, `:`, `.`, `%` or `#`,
+    # so a fragment is never read as a path, a query, a scheme or a second
+    # fragment.
+    LINK_FRAGMENT = /\A#[\p{L}\p{M}\p{N}_-]+\z/
+
     LINK_REFUSED = /[[:space:]\p{Cc}\p{Cf}\\]/
 
     # Text with its outer white space taken off, nil when nothing is left.
@@ -72,12 +81,19 @@ module ContentModel
       # (nor any white space, control or invisible format character) is
       # accepted anywhere. A scheme is read case-insensitively. Total over
       # any value: a non-String is no link.
+      #
+      # A bare same-page anchor is accepted too, `#` and then at least one
+      # character of `LINK_FRAGMENT`, so a card can jump to a section (or a
+      # heading) of the page it is on. `#` alone, a fragment with a space, a
+      # slash or any other character, and an anchor after an address
+      # ("about#team" stays no link: a bare word) are refused.
       def link?(value)
         return false unless value.is_a?(String)
         value = value.dup.force_encoding(Encoding::UTF_8)
         return false unless value.valid_encoding? && value.length <= LINK_MAX
         return false if value.match?(LINK_REFUSED)
         return value.match?(%r{\A/(?![/\\])}) if value.start_with?("/")
+        return value.match?(LINK_FRAGMENT) if value.start_with?("#")
 
         uri = URI.parse(value)
         scheme = uri.scheme.to_s.downcase

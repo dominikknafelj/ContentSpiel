@@ -19,8 +19,20 @@ class ContentModel::LinkFieldTest < ActiveSupport::TestCase
     end
   end
 
+  test "a link takes a bare same-page anchor: a section's anchor or a heading's id" do
+    [ "#team", "#sample-section", "#uber-uns", "#section_2", "#über-uns", "#2024", "#\u0395\u03BB\u03BB\u03AC\u03B4\u03B1" ].each do |value|
+      assert fields("target" => value).valid?, "#{value.inspect} is a link"
+    end
+  end
+
+  test "a lone # and a fragment that is more than an element id are refused" do
+    [ "#", "# team", "#a b", "#/evil", "#//evil.example", "##a", "#a#b", "#a?b", "#a:b", "#a.b", "#a%20b", "#a\\b", "#\u200Bteam", "#a\tb", "#javascript:alert(1)" ].each do |value|
+      assert_not link?(value), "#{value.inspect} is no link"
+    end
+  end
+
   test "a link refuses another host by //, javascript:, data:, a bare word and a relative path" do
-    [ "//host", "javascript:alert(1)", "data:text/html,x", "about", "about/us", "JaVaScRiPt:alert(1)", "ftp://host/x", "https:", "#top" ].each do |value|
+    [ "//host", "javascript:alert(1)", "data:text/html,x", "about", "about/us", "JaVaScRiPt:alert(1)", "ftp://host/x", "https:" ].each do |value|
       set = fields("target" => value)
 
       assert_not set.valid?, "#{value.inspect} is no link"

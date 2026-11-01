@@ -655,7 +655,7 @@ A tile of an icon, a title, a short plain text and a link (theme choices spec, "
 | `page` | the page the block is drawn on; `page.id` tells two pages apart |
 | `title` | the title in the language shown, with the site's fallback; nil when there is none |
 | `text` | the text in the same way; plain text, nil when there is none |
-| `link` | the address, nil when there is none or the stored one is no longer accepted; `http`, `https`, `mailto` or a site-relative address |
+| `link` | the address, nil when there is none or the stored one is no longer accepted; `http`, `https`, `mailto`, a site-relative address or a same-page anchor (`#team`) |
 | `icon` | the chosen icon's SVG, inlined as the theme's file has it (marked safe, so `<%= icon %>`), or nil: no icon chosen, a name the theme does not declare, a file that is gone or no longer passes the check |
 | `icon_name` | the chosen icon's name when the theme declares it, otherwise nil; a name of the name rule, so it is safe as a class suffix or a `data-` value |
 
