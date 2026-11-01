@@ -73,7 +73,8 @@ module PublicSite
     # NO ACTOR, on purpose: a rich-text render is cached with no actor in its
     # key. What only some people may see is decided above this (`link_for`).
     def target_path(type, id, locale = I18n.locale)
-      id = Integer(id, exception: false)
+      # Base 10 from a string: a stored "010" is not octal 8, another page.
+      id = Integer(id.to_s, 10, exception: false)
       return nil if id.nil? || LinkTargets.model(type).nil?
 
       read_targets([ [ type, id ] ], locale)

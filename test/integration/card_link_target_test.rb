@@ -351,4 +351,54 @@ class CardLinkTargetTest < ActionDispatch::IntegrationTest
     assert_response :not_modified
     assert_equal 1, statements.grep(/page_hierarchies/).size, "the resolver's own, for the page asked for:\n#{statements.join("\n")}"
   end
+
+  test "an id written with a leading zero or in another base is read in base 10 or not at all" do
+    urls = PublicSite::Urls.new
+    target = Page.find(@target.id)
+    assert_equal urls.path_for(target, "en"), urls.target_path("page", target.id.to_s, "en")
+    assert_equal urls.path_for(target, "en"), urls.target_path("page", "0#{target.id}", "en")
+    [ "0x#{target.id}", "abc", "", nil, 1.5 ].each { |id| assert_nil urls.target_path("page", id, "en"), id.inspect }
+
+    octal = "0#{target.id.to_s(8)}"
+    assert_not_equal urls.path_for(target, "en"), urls.target_path("page", octal, "en") unless octal.to_i == target.id
+  end
+
+  test "only a page or a post can be visible" do
+    assert_not PublicSite::Resolver.visible?(create_media_asset)
+    assert_not PublicSite::Resolver.visible?(Object.new)
+    assert PublicSite::Resolver.visible?(@target)
+  end
+
+  # A post's page draws the blocks of the page that lists it, and its outline
+  # is handed over by the controller before `stale?`.
+  test "a post's page costs the same statements for one linked card and for four, and its 304 reads no target" do
+    targets = Array.new(4) { |index| create_page(title: "Linked #{index}") }
+    listing = create_page(title: "Listing")
+    add_card_to = ->(target) {
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "card", settings: { "link" => reference(target), "title" => "Card words" } }).ok?
+      publish_changes(listing)
+    }
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?
+    add_card_to.call(targets.first)
+    path = PublicSite::Urls.new.path_for(create_post(title: "Shown post"), "en")
+    assert_equal "/listing/shown-post", path
+
+    measure = -> {
+      get path
+      rendered = capture_sql { get path }
+      etag = response.headers["ETag"]
+      confirmed = capture_sql { get path, headers: { "If-None-Match" => etag } }
+      assert_response :not_modified
+      [ rendered, confirmed ]
+    }
+    one, one_304 = measure.call
+    targets.drop(1).each { |target| add_card_to.call(target) }
+    several, several_304 = measure.call
+
+    get path
+    assert_select ".content-block--card h3 a", count: 4
+    assert_equal one.size, several.size, "one:\n#{one.join("\n")}\n\nseveral:\n#{several.join("\n")}"
+    assert_equal one_304.size, several_304.size, "a 304 reads no target:\n#{one_304.join("\n")}\n\n#{several_304.join("\n")}"
+    assert_operator several_304.size, :<, several.size
+  end
 end

@@ -21,8 +21,7 @@ module PublicSite
     # `canonical_page` prefers a published listing (spec §5.3), so this only
     # turns a post away when no published page lists it at all -- then its
     # URL runs through a draft page, reachable in preview only. One closure-table
-    # query per record: `self_and_ancestors` is a scope, not a loaded array,
-    # so this stays a single indexed lookup rather than N ancestor checks.
+    # query however many records are asked about, rather than N ancestor checks.
     #
     # A trashed record is never visible (trash spec §5.2). It has no
     # `public_paths` row to be found by in the first place -- this is the
@@ -35,7 +34,7 @@ module PublicSite
     def self.visible?(record) = visible_among([ record ]).any?
 
     def self.visible_among(records)
-      kept = records.reject(&:trashed?)
+      kept = records.select { |record| (record.is_a?(Page) || record.is_a?(Post)) && !record.trashed? }
       posts = kept.select { |record| record.is_a?(Post) }
       canonical = posts.empty? ? {} : PublicSite::Paths.canonical_pages(posts) # public: rows (an address is the rows')
       chains = kept.filter_map do |record|
