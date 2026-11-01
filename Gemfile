@@ -128,7 +128,7 @@ gem "mcp", "~> 1.8"
 
 gem "rack-attack", "~> 6.8"
 
-gem "view_component", "~> 4.18"
+gem "view_component", "~> 4.20"
 
 # Colours the Code block's source on the server (code block spec §2). It was
 # in the bundle only through Lookbook, a development and test gem; a
