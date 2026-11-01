@@ -241,7 +241,20 @@ module Admin
         end
       end
 
-      def style_options = style_field.option_pairs
+      # The pairs, each style the theme declares carrying `data-fields` for
+      # `admin--editor--template-fields`, which shows the note for the chosen
+      # one: the default (blank) and a name the theme does not know (drawn as
+      # the default) carry none. #146: a note, not a declaration, since the
+      # CMS cannot know what a style draws; no `theme.yml` key says so.
+      def style_options
+        style_field.option_pairs.map do |text, value|
+          [ text, value, { data: { fields: (STYLE_NOTE if ::Theme.current.choice(:section_styles, value.to_s)) } } ]
+        end
+      end
+
+      STYLE_NOTE = "style-note".freeze
+
+      def style_note_hidden? = ::Theme.current.choice(:section_styles, setting("style")).nil?
 
       def style? = style_field&.render? || false
 

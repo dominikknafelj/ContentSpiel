@@ -125,7 +125,7 @@ Tests: `test/lib/field_type_branches_test.rb` (no file outside the registry comp
 - Appearance settings (`settings:` in `theme.yml`, an Appearance card, a contract helper).
 - A choice a gem's block type declares; choices for posts, content types or per language.
 - `pages.translated_settings`, a page schema, field groups for pages.
-- Hiding a section's `layout`, `background` and `width` for a style that ignores them; how the editor's lanes read for a style that draws its own grid.
+- Hiding a section's `layout`, `background` and `width` for a style that ignores them (#146), and a `theme.yml` declaration of which settings a style ignores. Decided against on 2026-11-01: a declaration is one more promise to themes, and the CMS cannot know what a style draws. Instead the Section's form shows one help line, "This style may set its own layout, background or width.", while a style the theme declares (not the default, not a dropped name) is chosen. It follows the select without a save through `admin--editor--template-fields` (each such option carries `data-fields="style-note"`; the line is the group), writes nothing but `hidden` and so works in a held form. How the editor's lanes read for a style that draws its own grid is still not built.
 
 ## What a change can break silently
 

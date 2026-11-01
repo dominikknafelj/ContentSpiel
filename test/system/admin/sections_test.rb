@@ -53,6 +53,18 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     JS
   end
 
+  test "the style help line follows the select without a save: shown for a style, hidden for the default" do
+    with_section_grid_theme do
+      open_editor
+      note = "[data-template-field='style-note']"
+      assert_selector note, visible: :hidden
+      find("select[aria-label=Style]").select("Six-column grid")
+      assert_selector note, text: "This style may set its own layout, background or width.", visible: :visible
+      find("select[aria-label=Style]").select("Default")
+      assert_selector note, visible: :hidden
+    end
+  end
+
   test "a section shows a tile per block in its lane and no form until a tile is pressed" do
     open_editor
 

@@ -47,7 +47,7 @@
     <%# The section's own settings (see the component): an autosave form like a block
         card's, with the same ids. No form may be nested in it. %>
     <%= form_with url: form_url, method: :patch, id: form_id, class: "flex flex-wrap items-center gap-2", data: form_data.merge(editing_unit: "", editing_subject: ::Editing.key(section), editing_version: editing_version, **held_marks) do %>
-      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
+      <%= tag.fieldset disabled: !editable?, data: { controller: "admin--editor--template-fields" }, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
       <%= fields do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
         <%# What the layout menu writes into. Beside the menu, not in it: the menu is
@@ -60,7 +60,8 @@
               id: field_id("width"), class: select_class, "aria-label": t(".width") %>
         <% if style? %>
           <%= select_tag "block[settings][style]", options_for_select(style_options, setting("style")),
-                id: field_id("style"), class: select_class, "aria-label": t(".style") %>
+                id: field_id("style"), class: select_class, "aria-label": t(".style"), "aria-describedby": field_id("style-note"),
+                data: { "admin--editor--template-fields-target": "select", action: "change->admin--editor--template-fields#update" } %>
         <% end %>
         <%# The address of a link that jumps here. Its help line is the field's description
             for a screen reader and its tooltip; the header has no room for it in sight. %>
@@ -69,6 +70,15 @@
               class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 font-cs-mono text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
         <span id="<%= field_id("anchor-help") %>" class="sr-only"><%= t(".anchor_help") %></span>
         <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
+        <%# #146: a style may set its own layout, background or width, and the CMS cannot
+            know whether this one does, so a style other than the default gets one help
+            line. Always drawn and shown or hidden by the chosen style, as the page
+            settings' template fields are (`admin--editor--template-fields`); it writes
+            nothing but `hidden`, so a held form keeps it. %>
+        <% if style? %>
+          <p id="<%= field_id("style-note") %>" class="basis-full text-xs text-meta" <%= "hidden" if style_note_hidden? %>
+             data-admin--editor--template-fields-target="group" data-template-field="style-note"><%= t(".style_note") %></p>
+        <% end %>
         <%# One slot per setting, as every field of a block has: `update` replaces all five
             with each answer. Together they take a line of their own, and no room at all
             while none holds a message (`.admin-section-errors`). %>

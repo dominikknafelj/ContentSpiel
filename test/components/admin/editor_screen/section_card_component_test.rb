@@ -25,6 +25,31 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-lane-3 > .admin-block-tile", text: "No image chosen"
   end
 
+  # #146, decided as a note and not a declaration: the CMS cannot know what a
+  # style draws, so a style other than the default only gets the words "may".
+  test "a style other than the default shows a help line that it may set its own layout, background or width; the default and a dropped name do not" do
+    with_section_grid_theme do
+      @section.update!(settings: { "layout" => "three", "style" => "grid_six" })
+      render_card
+      assert_selector "form [data-template-field='style-note']:not([hidden])", text: "This style may set its own layout, background or width."
+      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='grid_six'][data-fields='style-note']"
+      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='']:not([data-fields])"
+
+      @section.update!(settings: { "layout" => "three" })
+      render_card
+      assert_selector "[data-template-field='style-note'][hidden]", visible: :all
+
+      @section.update_columns(settings: { "layout" => "three", "style" => "dropped_style" }) # version: none (a stored name the theme dropped)
+      render_card
+      assert_selector "[data-template-field='style-note'][hidden]", visible: :all
+    end
+  end
+
+  test "a theme that declares no style draws no style select and no help line" do
+    render_card
+    assert_no_selector "[data-template-field='style-note']", visible: :all
+  end
+
   test "every block's form is in the panels, hidden" do
     render_card
 
