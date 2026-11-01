@@ -29,3 +29,7 @@
 ### Removed
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
+
+### For a gem or an outside caller
+
+- `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.

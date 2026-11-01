@@ -40,4 +40,11 @@ class Admin::Ui::DialogComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::DialogComponent.new(id: "d3", title: "t")) { |d| d.with_footer { "Actions" } }
     assert_selector "dialog#d3 footer", text: "Actions"
   end
+
+  test "steady marks the dialog for its fixed height, and a dialog is not steady unless asked" do
+    render_inline(Admin::Ui::DialogComponent.new(id: "d9", title: "T", width: :form, steady: true)) { "body" }
+    assert_selector "dialog#d9[data-dialog-steady]", visible: :all
+    render_inline(Admin::Ui::DialogComponent.new(id: "d8", title: "T", width: :form)) { "body" }
+    assert_no_selector "dialog#d8[data-dialog-steady]", visible: :all
+  end
 end

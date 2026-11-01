@@ -315,4 +315,89 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert as_owner { Posts::Save.call(result.record, attributes: { published: true }) }.ok?
     assert result.record.reload.live?
   end
+
+  # Unknown keys under a language are refused by name (#147's rule, for Posts::Save):
+  # the assignment reads only what it knows, so anything else was dropped without
+  # a word and the save answered ok.
+  test "a key under a language that Posts::Save would drop is refused by name, as a string and as a symbol, and nothing is written or audited" do
+    [ { "en" => { subtitle_x: "S", "nonsense" => "N" } }, { "en" => { "subtitle_x" => "S", nonsense: "N" } } ].each do |translations|
+      result = nil
+      assert_no_difference [ -> { Post.count }, -> { Audit::Event.count } ] do
+        result = Posts::Save.call(Post.new, attributes: { content_type: "blog" }, translations: translations)
+      end
+      assert_not result.ok?
+      assert_match(/subtitle_x/, result.errors.join)
+      assert_match(/nonsense/, result.errors.join)
+    end
+  end
+
+  test "a valid key beside an invalid one writes neither, on a stored record too" do
+    record = create_post(title: "Kept")
+    updated_at = record.reload.updated_at
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = Posts::Save.call(record, translations: { "en" => { title: "Changed", wrong: "x" }, "de" => { other_wrong: "y" } })
+    end
+
+    assert_not result.ok?
+    assert_match(/\ANot saved: wrong, other_wrong are not saved/, result.errors.join)
+    assert_equal "Kept", record.reload.title
+    assert_equal updated_at, record.updated_at
+  end
+
+  test "every key Posts::Save reads under a language still saves" do
+    result = Posts::Save.call(create_post(title: "Kept"), translations: { "en" => { title: "All", slug: "all", excerpt: "E", body: rich_doc("B"), fields: {} } })
+    assert result.ok?, result.errors.inspect
+    assert_equal "All", result.record.reload.title
+  end
+
+  def denials = Audit::Event.where(action: "access.denied")
+
+  test "a reader creating with a bad key is denied, with one access.denied, and told nothing of the keys" do
+    result = nil
+    assert_difference -> { denials.count }, 1 do
+      assert_no_difference -> { Post.count } do
+        result = Posts::Save.call(Post.new, attributes: { content_type: "blog" }, translations: { "en" => { title: "New", wrong: "x" } }, actor: users(:reader))
+      end
+    end
+    assert result.denied?
+    assert_not_includes result.errors.join, "wrong"
+  end
+
+  test "a stored draft asked to publish, with a bad key, by someone who may edit and may not publish is denied, with one access.denied" do
+    record = create_post(title: "Kept", published: false)
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.edit", scope: {})
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+
+    result = nil
+    assert_difference -> { denials.count }, 1 do
+      result = Posts::Save.call(record, attributes: { published: true }, translations: { "en" => { title: "Changed", wrong: "x" } }, actor: users(:editor_branch))
+    end
+
+    assert result.denied?
+    assert_not_includes result.errors.join, "wrong"
+    assert_equal "Kept", record.title, "the refused value is dropped"
+    assert_nil record.reload.published_at
+    assert_equal "Kept", denials.order(:id).last.subject_label
+  end
+
+  test "someone with the right and a bad key gets the refusal, and neither the publish nor the title is written, on the object either" do
+    record = create_post(title: "Kept", published: false)
+    updated_at = record.reload.updated_at
+
+    result = nil
+    assert_no_difference -> { Audit::Event.count } do
+      result = Posts::Save.call(record, attributes: { published: true }, translations: { "en" => { title: "Changed", wrong: "x" } })
+    end
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_match(/wrong/, result.errors.join)
+    assert_equal "Kept", record.title
+    assert_nil record.published_at
+    assert_equal updated_at, record.reload.updated_at
+    assert_nil record.published_at
+    assert_not Publishing::Version.where(record: record).exists?
+  end
 end

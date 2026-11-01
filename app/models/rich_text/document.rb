@@ -166,8 +166,8 @@ module RichText
     #
     # Caching lives here rather than inside `RichText::HtmlRenderer` itself,
     # because the cache key (`RichText::Schema.version`, spec §3.3) needs
-    # this document's own `#digest` plus the locale/preview it's being
-    # rendered for -- all of which this method already has -- while the
+    # this document's own `#digest` plus the locale it's being rendered for
+    # -- all of which this method already has -- while the
     # renderer itself has no reason to know its own output is cacheable at
     # all; it just walks a document and returns HTML every time it's asked.
     # `RichText::Schema.version` is folded in so that a schema change (a new
@@ -191,7 +191,9 @@ module RichText
     # the trash moves the version. Keyed on it, a preview would keep an old
     # href until some published change; rendered every time, it is what the
     # editor just saved. Only signed-in editors pay for it (`/preview` and
-    # CS Studio's own reference renders).
+    # CS Studio's own reference renders). It is also what lets a preview's
+    # link depend on who is looking (`PublicSite::Urls#drawn_target_path`, #152):
+    # this key holds no actor, so an answer that does must never meet it.
     #
     # `RichText.code_revision` (final fix wave, C) covers the last input:
     # the code itself. `Schema.version` only changes when a type's
@@ -416,12 +418,13 @@ module RichText
 
     private
 
-    # The render cache's key (`#to_html`): what a render is drawn from, each
-    # part's reason in `#to_html`'s comment. `kind` keeps a body's render and
+    # The render cache's key (`#to_html`): what a public render is drawn from,
+    # each part's reason in `#to_html`'s comment. It names no preview and no
+    # actor, because neither ever reaches it: a preview is drawn every time. `kind` keeps a body's render and
     # a table's cells (`#table_cells_html`) apart, since both are drawn from
     # one document.
     def render_cache_key(kind, locale, context)
-      [ kind, digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]
+      [ kind, digest, RichText::Schema.version, locale, context.content_version, RichText.code_revision ]
     end
 
     # Every cell drawn in one pass, then put back into its rows. Plain Strings,

@@ -85,6 +85,7 @@ module Pages
       return hero_refusal if hero_refusal
 
       refused = nil
+      unknown_keys = nil
       # `requires_new`: a nested call (starter content) gets its own
       # savepoint, so the FK refusal rescued below can't leave a caller's
       # transaction aborted.
@@ -93,6 +94,12 @@ module Pages
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
+
+        # What `#assign` reads under a language is `TRANSLATED`; any other key is
+        # refused by name, after the second pass of rights: a person without them
+        # is denied, not told about keys.
+        unknown_keys = unknown_language_keys_refusal(@page, @translations, TRANSLATED)
+        raise ActiveRecord::Rollback if unknown_keys
 
         # Captured before saving: closure_tree's own `after_save` reloads
         # the page, clearing `saved_changes` and `previously_new_record?`
@@ -115,7 +122,14 @@ module Pages
         true
       end
 
-      return denied(refused, @page) if refused
+      if refused
+        discard_refused_changes
+        return denied(refused, @page)
+      end
+      if unknown_keys
+        discard_refused_changes
+        return unknown_keys
+      end
       return failure(@page) unless saved
 
       success(@page)
@@ -140,6 +154,14 @@ module Pages
     end
 
     private
+
+    # After a refusal the transaction has rolled back and the object still holds
+    # the refused values (`Posts::Save#discard_refused_changes`): a stored page
+    # goes back to what is stored, so they do not become the `access.denied`
+    # row's label. A new page has nothing stored to go back to and is no subject.
+    def discard_refused_changes
+      @page.reload if @page.persisted?
+    end
 
     # Publishing, unpublishing and scheduling need `pages.publish` (design
     # spec §3.3), not `pages.edit` as well (final fix wave, Important 1):

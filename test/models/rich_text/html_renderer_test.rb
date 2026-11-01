@@ -171,9 +171,10 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
   # Same document, three renders differing only in
   # locale/preview -- with a real cache store (the test suite otherwise
   # runs on :null_store, which would never expose a cache key collision)
-  # the render cache key has to fold in both, or the second and third
-  # renders here would wrongly return the first render's cached HTML.
-  test "the render cache key varies by locale and by preview" do
+  # the key has to fold in the locale, and a preview must not use the cache,
+  # or the second and third renders here would wrongly return the first
+  # render's cached HTML.
+  test "the render cache key varies by locale, and a preview does not share a public render" do
     original_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
 

@@ -324,6 +324,17 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    centred; a shorter one only grows downwards. `test/system/admin/dialogs_
    hang_test.rb` pins it. */
 .admin-dialog[data-dialog-hang] { margin-top: 7.5vh; }
+/* A fixed height for the publish dialog (`Admin::Ui::DialogComponent`'s
+   `steady:`): its overview arrives after it opens, and a dialog sized by its
+   content moved "Publish changes" down as it grew, 46px for one row and off the
+   screen's own place for a long one, under a click already on its way. `hang`
+   would not do: it keeps the top edge and moves the foot, which is what is aimed
+   at. Header and footer stay where they are from the first paint, the body takes
+   what is between them and scrolls when it needs to. 36rem holds the "When" form
+   and a few rows of overview; 85vh above still wins on a short screen.
+   `test/system/admin/publish_dialog_steady_test.rb` measures it. */
+.admin-dialog[data-dialog-steady] { height: 36rem; }
+.admin-dialog[data-dialog-steady] > .admin-dialog__body { flex: 1 1 auto; min-height: 0; }
 
 /* The busy button's spinner (`admin--ui--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }

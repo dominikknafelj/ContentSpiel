@@ -29,7 +29,8 @@ module PublicSite
 
     # Whether this instance builds preview URLs -- read back by
     # `RichText::RenderContext` (design spec §3.3), which needs to know
-    # (for the HTML render cache key) whether the `urls` it was handed
+    # (a preview render skips the render cache, `RichText::Document#to_html`)
+    # whether the `urls` it was handed
     # resolves internal links under `/preview` or not, without duplicating
     # the `preview:` flag as a second constructor argument that could drift
     # out of sync with this instance's own.
@@ -70,15 +71,39 @@ module PublicSite
     # (`PublicSite`, "WHO BUMPS"; `Paths.write_all` for an address, `Publishable`
     # for a state, the clock for a time that passes).
     #
-    # NO ACTOR, on purpose: a rich-text render is cached with no actor in its
-    # key. What only some people may see is decided above this (`link_for`).
+    # NO ACTOR, on purpose: this is the rule for a visitor, whom nothing tells
+    # apart. What only some people may see is decided above this
+    # (`drawn_target_path`).
     def target_path(type, id, locale = I18n.locale)
-      # Base 10 from a string: a stored "010" is not octal 8, another page.
-      id = Integer(id.to_s, 10, exception: false)
+      id = target_id(id)
       return nil if id.nil? || LinkTargets.model(type).nil?
 
       read_targets([ [ type, id ] ], locale)
       path_for(@targets[[ type, id ]], locale)
+    end
+
+    # The address a link to that record is drawn with, for whoever is looking
+    # (#152): `target_path`, and in the preview, where its gate is off, the
+    # reader's own rights in the gate's place. Someone previewing a page they may
+    # read is told nothing of a draft outside their read scope, a slug usually
+    # being the title; that is the same answer as no such record, as
+    # `PreviewController#readable?` says.
+    #
+    # ASKING THE ACTOR HERE IS SAFE BECAUSE A PREVIEW RENDER IS NEVER CACHED:
+    # `RichText::Document#to_html` and `#table_cells_html` draw it every time, and
+    # that cache's key holds no actor. A cache put in front of a preview render
+    # has to carry the actor in its key first. A public render never reaches
+    # `LinkTargets.readable`, so its statements and its cached answer are one for
+    # everybody. In the preview it costs one read per link, as `target_path`'s
+    # own reads do there.
+    def drawn_target_path(type, id, locale = I18n.locale)
+      return target_path(type, id, locale) unless @preview
+
+      id = target_id(id)
+      return nil if id.nil? || LinkTargets.model(type).nil?
+      return nil unless LinkTargets.readable(ContentModel::LinkReference.new(type: type, id: id))
+
+      target_path(type, id, locale)
     end
 
     # What a stored `:link` value is to a browser, or nil for no link: the
@@ -88,16 +113,13 @@ module PublicSite
     # address or nil, never the reference, so the theme contract's `link` means
     # what it always did.
     #
-    # In the preview the gate is off, so the reader's own rights stand in for it:
-    # someone previewing a page they may read is told nothing of a draft outside
-    # their read scope. Nothing renders a card under a cache, so the actor can be
-    # asked here.
+    # In the preview the reader's own rights stand in for the gate
+    # (`drawn_target_path`, which a rich-text link asks too).
     def link_for(value, locale = I18n.locale)
       reference = ContentModel::LinkReference.parse(value)
       return (value if ContentModel::FieldTypes.link?(value)) unless reference
-      return nil if @preview && !LinkTargets.readable(reference)
 
-      target_path(reference.type, reference.id, locale)
+      drawn_target_path(reference.type, reference.id, locale)
     end
 
     # Reads what `target_path` needs for all of `references` at once, so that a
@@ -148,6 +170,9 @@ module PublicSite
     end
 
     private
+
+    # Base 10 from a string: a stored "010" is not octal 8, another page.
+    def target_id(value) = Integer(value.to_s, 10, exception: false)
 
     def read_targets(wanted, locale)
       wanted = wanted.uniq.reject { |key| @targets.key?(key) }

@@ -59,6 +59,10 @@ module Posts
     include Media::Choosing
 
     TRANSLATED = %i[title slug excerpt body].freeze
+    # What `#assign` reads under a language: the translated columns and `fields`,
+    # the type's translated fields. Any other key is refused by name
+    # (`ApplicationService#unknown_language_keys_refusal`).
+    LANGUAGE_KEYS = (TRANSLATED + %i[fields]).freeze
     # Everything `attributes:` may carry. `content_type` and `author_id` are
     # the two columns assigned as they are -- both scope-changing, and both
     # re-checked in pass 2 (the class comment above; a new post without an
@@ -90,6 +94,7 @@ module Posts
       end
 
       refused = nil
+      unknown_keys = nil
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = Post.transaction(requires_new: true) do
@@ -98,6 +103,10 @@ module Posts
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
+
+        # After the second pass of rights: a person without them is denied, not told about keys.
+        unknown_keys = unknown_language_keys_refusal(@post, @translations, LANGUAGE_KEYS, hint: "A post type's own fields go in fields.")
+        raise ActiveRecord::Rollback if unknown_keys
 
         (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
         touch_for_join_rows(related_before)
@@ -118,6 +127,10 @@ module Posts
       if refused
         discard_refused_changes
         return denied(refused, @post)
+      end
+      if unknown_keys
+        discard_refused_changes
+        return unknown_keys
       end
       return failure(@post) unless saved
 

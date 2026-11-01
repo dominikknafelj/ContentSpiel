@@ -13,30 +13,34 @@
   <% end %>
 </div>
 
-<% if @types.size > 1 %>
+<%# Spec §4: "Clear" only when a filter is active. The only other way back from
+    a language card was clicking the highlighted card again. It is a control of
+    the bar, so the bar is drawn for it too where there is one type and so no
+    segments: a language can be chosen with one type. %>
+<% filtered = @language || @type.present? %>
+<% if @types.size > 1 || filtered %>
   <%= form_with(**filter_form_options(admin_translations_path)) do %>
     <% if @language %><%= hidden_field_tag :language, @language, id: nil %><% end %>
-    <fieldset class="m-0 min-w-0 border-0 p-0">
-      <legend class="sr-only">Type</legend>
-      <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
-        <% all_count = @counts.values.sum %>
-        <% [ [ "", "All", all_count ] ].concat(@types.map { |type| [ type, Admin::TranslationsController::TYPES.dig(type, :label), @counts.fetch(type) ] }).each do |value, label, count| %>
-          <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
-            <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
-            <span><%= label %></span>
-            <span class="font-cs-mono text-label"><%= count %></span>
-          </label>
-        <% end %>
-      </div>
-    </fieldset>
-    <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+    <% if @types.size > 1 %>
+      <fieldset class="m-0 min-w-0 border-0 p-0">
+        <legend class="sr-only">Type</legend>
+        <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
+          <% all_count = @counts.values.sum %>
+          <% [ [ "", "All", all_count ] ].concat(@types.map { |type| [ type, Admin::TranslationsController::TYPES.dig(type, :label), @counts.fetch(type) ] }).each do |value, label, count| %>
+            <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
+              <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
+              <span><%= label %></span>
+              <span class="font-cs-mono text-label"><%= count %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+      <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+    <% end %>
+    <% if filtered %>
+      <%= link_to "Clear", admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+    <% end %>
   <% end %>
-<% end %>
-
-<%# Spec §4: "Clear" only when a filter is active. The only other way back from
-    a language card was clicking the highlighted card again. %>
-<% if @language || @type.present? %>
-  <p class="mb-3 mt-2 text-sm"><%= link_to "Clear", admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %></p>
 <% end %>
 
 <% page_url = ->(page) { admin_translations_path(list_params(:type, :language).merge("page" => page)) } %>
