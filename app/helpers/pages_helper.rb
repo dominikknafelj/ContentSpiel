@@ -65,6 +65,11 @@ module PagesHelper
   # `&#39;`), `squish` only removes white space and hands back a plain
   # String, and escaping that again would print `&amp;#39;`.
   def themed_title(page_title:, site_title:)
-    render("layouts/public/title", page_title: page_title, site_title: site_title).to_str.squish.html_safe
+    # <title> is raw text: in development Action View wraps a partial in
+    # BEGIN/END comments, which a browser would show in the tab. Only those
+    # two annotations are taken out, and only here: the rest of the page
+    # keeps its own.
+    text = render("layouts/public/title", page_title: page_title, site_title: site_title).to_str
+    text.gsub(/<!-- (?:BEGIN|END) [^>]*?-->/m, "").squish.html_safe
   end
 end

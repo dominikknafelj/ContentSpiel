@@ -452,6 +452,32 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "<title>Dana&#39;s Notes</title>"
   end
 
+  # Development annotates every rendered template with BEGIN/END comments;
+  # inside <title> (raw text) a browser would show them in the tab. The
+  # title is the partial's text and nothing else, under either theme.
+  test "the title holds only the title text when views are annotated, under the default theme and a theme that replaces _title" do
+    was = ActionView::Base.annotate_rendered_view_with_filenames
+    ActionView::Base.annotate_rendered_view_with_filenames = true
+    # A compiled template carries the setting it was compiled under.
+    ActionView::LookupContext::DetailsKey.clear
+    begin
+      get "/about"
+      assert_includes response.body, "<title>About – Dana&#39;s Notes</title>"
+      assert_includes response.body, "<!-- BEGIN", "annotations stay on for the rest of the page"
+
+      with_theme_copy do |dir|
+        dir.join("views/layouts/public/_title.html.erb").write("<%= site_title %> / <%= page_title %>\n")
+        Theme.with(Theme.load(ThemeFolder.new(dir.to_s))) do
+          get "/about"
+          assert_includes response.body, "<title>Dana&#39;s Notes / About</title>"
+        end
+      end
+    ensure
+      ActionView::Base.annotate_rendered_view_with_filenames = was
+      ActionView::LookupContext::DetailsKey.clear
+    end
+  end
+
   test "a meta title an editor typed is taken as written, whatever the theme's pattern" do
     assert Pages::Save.call(@about, translations: { "en" => { meta_title: "About us & them" } }).ok?
     publish_changes(@about)
