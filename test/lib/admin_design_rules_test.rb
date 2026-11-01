@@ -232,6 +232,21 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
   end
 
+  # Design System: a filter bar is 38px, set by the bar, never by a control.
+  test "the filter bar's height is a token written once, and the bar sets it as a minimum, never a group height" do
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
+    assert_equal 1, tokens.scan("--cs-control-compact: 2.375rem;").size
+
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-filter-bar input:not\(\.sr-only\),.*?min-height:\s*var\(--cs-control-compact\);\s*padding-block:\s*0;/m, css)
+    assert_match(/\.admin-filter-bar fieldset label\s*\{\s*min-height:\s*calc\(var\(--cs-control-compact\) - 2px\);/m, css)
+    assert_no_match(/\b38px|2\.375rem/, css)
+
+    assert_includes File.read(Rails.root.join("app/helpers/admin/filter_helper.rb")), "admin-filter-bar mb-4 flex flex-wrap items-start gap-3"
+    public_css = Dir[Rails.root.join("app/assets/tailwind/themes/**/*.css")].sum("") { |f| File.read(f) }
+    assert_no_match(/cs-control-compact|admin-filter-bar/, public_css, "nothing of CS Studio's reaches the public stylesheet")
+  end
+
   # Layout points spec, decision 13: at most three cards in a row, by the
   # dashboard's own width, never `auto-fit`.
   test "the dashboard's grid is one, two or three columns by its container, and never auto-fit" do

@@ -10,7 +10,7 @@
 
   <fieldset class="m-0 min-w-0 border-0 p-0">
     <legend class="sr-only">Show</legend>
-    <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+    <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
       <% SCOPES.each do |name, label| %>
         <label for="posts-scope-<%= name %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag :scope, name, scope == name, id: "posts-scope-#{name}", class: "sr-only" %>
