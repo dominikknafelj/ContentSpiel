@@ -455,4 +455,35 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert result.ok?, result.errors.inspect
     assert_empty statements.grep(/FROM "pages".*FOR UPDATE/m)
   end
+
+  # #147: a key under a language that the save would drop is refused, and
+  # named, before anything is assigned.
+  test "a key under a language that is no translated column or settings is refused by name, and nothing is written or audited" do
+    page = create_page(title: "Page")
+    block = ContentBlock.new(owner: page)
+
+    result = nil
+    assert_no_difference [ -> { ContentBlock.count }, -> { Audit::Event.count } ] do
+      result = ContentBlocks::Save.call(block, attributes: { block_type: "card" },
+        translations: { "en" => { title: "T", text: "X" } })
+    end
+
+    assert_not result.ok?
+    assert_match(/title/, result.errors.join)
+    assert_match(/text/, result.errors.join)
+  end
+
+  test "caption, alt, body and settings under a language still save, and an unknown language and unknown settings keys behave as before" do
+    page = create_page(title: "Page")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "card" },
+      translations: { "en" => { caption: "C", alt: "A", body: rich_doc("B"), settings: { title: "T", nonsense: "x" } } })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "C", Mobility.with_locale(:en) { result.record.reload.caption }
+
+    assert_raises(Mobility::InvalidLocale) do
+      ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
+        translations: { "xx" => { caption: "C" } })
+    end
+  end
 end
