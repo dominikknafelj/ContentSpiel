@@ -132,6 +132,16 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_no_selector attention
   end
 
+  test "an image's thumbnail is never the original" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_summary block("image", media_asset: asset.reload)
+
+    assert_selector "[data-image-empty]"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
+
   test "an image block without an image needs attention" do
     render_summary block("image")
 

@@ -182,6 +182,9 @@ class Media::Asset < ApplicationRecord
     (made_files.find { |_url, width| width >= min_width } || made_files.last).first
   end
 
+  # True for the `data:` URI the preview is drawn as (never an address).
+  def self.preview_url?(url) = url.to_s.start_with?("data:")
+
   # CS Studio's thumbnail (the Media grid, the picker, an image field).
   def thumbnail_url = display_url(min_width: 480)
 

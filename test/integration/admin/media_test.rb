@@ -134,7 +134,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       assert_select "a[href*='selected=#{asset.id}']", count: 0
     end
     payload = JSON.parse(css_select(PICK).first["data-admin--media--select-asset-param"])
-    assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
+    assert_equal({ "id" => asset.id, "url" => asset.src, "width" => asset.width, "height" => asset.height, "preview" => true, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
   end
 
   test "picker mode searches and paginates like the grid, staying in picker mode" do

@@ -4,8 +4,11 @@
   <%= tag.input type: "hidden", name: html_name, id: id, value: asset&.id.to_s, data: { "admin--media--field-target": "input" } %>
 
   <div class="mb-2 flex items-center gap-3">
-    <%= tag.img src: thumbnail_url, alt: "", width: asset&.width, height: asset&.height, hidden: !thumbnail_url, class: "max-h-32 w-auto rounded-cs border border-line object-cover #{"blur-sm" if thumbnail_url&.start_with?("data:")}",
+    <%= tag.img src: thumbnail_url, alt: "", width: asset&.width, height: asset&.height, hidden: !thumbnail_url, class: class_names("max-h-32 w-auto rounded-cs border border-line object-cover", "blur-sm": Media::Asset.preview_url?(thumbnail_url)),
           data: { "admin--media--field-target": "thumbnail" } %>
+    <%# No width and no preview: the box of the image's size, as the library draws it. The script shows it in place of the img. %>
+    <%= tag.span hidden: !(chosen? && thumbnail_url.nil?), aria: { hidden: true }, data: { image_empty: true, "admin--media--field-target": "box" },
+          class: "block h-24 bg-sunken rounded-cs border border-line", style: ("aspect-ratio: #{asset.width} / #{asset.height}" if asset&.width && asset&.height) %>
     <%= tag.span(chosen? ? asset.title : "No image chosen", class: "text-sm text-meta", data: { "admin--media--field-target": "title" }) %>
   </div>
 

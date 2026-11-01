@@ -59,6 +59,18 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_text asset.title
     assert_button "Change image"
     assert_button "Remove image"
+    assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  test "a chosen image with neither a width nor a preview is a box, and the img is hidden" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
+
+    render_column(asset.reload)
+
+    assert_selector "[data-image-empty]:not([hidden])"
+    assert_selector "img[hidden]:not([src])", visible: :all
+    assert_no_match %r{/blobs/}, rendered_content
   end
 
   # Same thumbnail rule as the Media module's grid: the `w480` variant once

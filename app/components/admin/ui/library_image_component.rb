@@ -39,7 +39,7 @@ module Admin
           data: { image_empty: true })
       end
 
-      def preview? = url.start_with?("data:")
+      def preview? = Media::Asset.preview_url?(url)
     end
   end
 end

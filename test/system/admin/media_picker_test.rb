@@ -33,6 +33,26 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert Pages::Save.call(@landing, attributes: { page_type: "landing" }).ok?
   end
 
+  test "picking an image sets the field's width, height and blur, and the next pick replaces them" do
+    bare = create_media_asset(filename: "tiny.png") # its widths are not made: the preview stands in
+    @asset.update_columns(width: 3000, height: 2000) # version: none (a test's own size)
+
+    visit_editor
+    within("#page-hero-image-section") { click_on "Choose image" }
+    pick_from_library(bare)
+    thumb = "#page-hero-image-section img[data-admin--media--field-target=thumbnail]"
+    assert_selector "#{thumb}[src^='data:'][width='#{bare.width}'][height='#{bare.height}'].blur-sm"
+
+    within("#page-hero-image-section") { click_on "Change image" }
+    pick_from_library(@asset)
+    assert_selector "#{thumb}[width='3000'][height='2000']:not([src^='data:']):not(.blur-sm)"
+
+    # The pick's autosave answer replaces the section: wait for it before pressing Remove.
+    assert_eventually(wait: 10, message: "the pick was saved") { @landing.reload.hero_media_asset_id == @asset.id }
+    within("#page-hero-image-section") { click_on "Remove image" }
+    assert_selector "#{thumb}[hidden]:not([width]):not([height])", visible: :all
+  end
+
   test "one library image as hero, image block and rich text is listed under Used on, and removing the hero drops its usage" do
     block = @landing.content_blocks.create!(block_type: "image", position: 0)
     post = create_post(title: "Notes")

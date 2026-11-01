@@ -73,6 +73,7 @@ module Admin
         {
           id: asset.id,
           url: thumbnail_url,
+          width: asset.width, height: asset.height, preview: Media::Asset.preview_url?(thumbnail_url),
           title: asset.title,
           alt: asset.alt_text(override: nil, locale: locale).to_s,
           caption: asset.caption_text(override: nil, locale: locale).to_s

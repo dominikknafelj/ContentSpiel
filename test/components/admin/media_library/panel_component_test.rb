@@ -251,16 +251,6 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_selector "#media-notes"
   end
 
-  private
-
-  def media_only_viewer
-    group = AccessControl::Group.create!(name: "Media only #{SecureRandom.hex(4)}")
-    group.grants.create!(permission: "media.upload")
-    User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password12345", password_confirmation: "password12345").tap do |viewer|
-      AccessControl::Membership.create!(user: viewer, group: group)
-    end
-  end
-
   test "the panel shows a width or the preview or a box, never the original" do
     asset = create_media_asset
     asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
@@ -270,5 +260,15 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_no_selector "img[src*='/blobs/']"
     assert_selector "[data-image-empty]"
     assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  private
+
+  def media_only_viewer
+    group = AccessControl::Group.create!(name: "Media only #{SecureRandom.hex(4)}")
+    group.grants.create!(permission: "media.upload")
+    User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password12345", password_confirmation: "password12345").tap do |viewer|
+      AccessControl::Membership.create!(user: viewer, group: group)
+    end
   end
 end

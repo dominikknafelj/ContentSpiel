@@ -12,7 +12,7 @@ import { Controller } from "@hotwired/stimulus"
 // form's `admin--saving--autosave` already listens for: this controller never
 // saves anything itself.
 export default class extends Controller {
-  static targets = [ "input", "thumbnail", "title", "choose", "remove" ]
+  static targets = [ "input", "thumbnail", "box", "title", "choose", "remove" ]
   static values = { placeholderIds: Object, defaults: Object }
 
   // The override fields' placeholders follow the image this field was
@@ -34,12 +34,11 @@ export default class extends Controller {
   }
 
   picked(event) {
-    const { id, url, title, alt, caption } = event.detail || {}
+    const { id, url, title, alt, caption, width, height, preview } = event.detail || {}
     if (!Number.isInteger(id)) return
 
     this.write(String(id))
-    this.thumbnailTarget.src = url || ""
-    this.thumbnailTarget.hidden = !url
+    this.showImage({ url, width, height, preview })
     this.titleTarget.textContent = title || ""
     this.setPlaceholders({ alt, caption })
     this.showChosen(true)
@@ -47,8 +46,8 @@ export default class extends Controller {
 
   remove() {
     this.write("")
-    this.thumbnailTarget.removeAttribute("src")
-    this.thumbnailTarget.hidden = true
+    this.showImage({})
+    this.boxTarget.hidden = true
     this.titleTarget.textContent = this.constructor.texts.empty
     this.setPlaceholders({})
     this.showChosen(false)
@@ -61,6 +60,28 @@ export default class extends Controller {
     } else {
       this.element.focus()
     }
+  }
+
+  // The image as the library draws it: a width (sharp), the preview (blurred
+  // -- it is a placeholder, not the picture), or, with neither, a box of the
+  // image's size. `width`/`height` follow the pick, or are taken off.
+  showImage({ url, width, height, preview }) {
+    const img = this.thumbnailTarget
+    if (url) img.src = url
+    else img.removeAttribute("src")
+    img.hidden = !url
+    this.setSize(img, "width", width)
+    this.setSize(img, "height", height)
+    img.classList.toggle("blur-sm", Boolean(url && preview))
+    if (this.hasBoxTarget) {
+      this.boxTarget.hidden = Boolean(url)
+      this.boxTarget.style.aspectRatio = width && height ? `${width} / ${height}` : ""
+    }
+  }
+
+  setSize(element, name, value) {
+    if (value) element.setAttribute(name, value)
+    else element.removeAttribute(name)
   }
 
   write(value) {

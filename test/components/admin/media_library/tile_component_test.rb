@@ -71,7 +71,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_includes button["data-action"], "click->admin--media--select#select"
     assert_includes button["data-action"], "dblclick->admin--media--select#choose"
     assert_includes button["data-action"], "keydown->admin--media--select#key"
-    assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
+    assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "width" => asset.width, "height" => asset.height, "preview" => true, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
       JSON.parse(button["data-admin--media--select-asset-param"]))
     assert_text "UNUSED"
   end
