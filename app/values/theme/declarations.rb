@@ -59,6 +59,12 @@ class Theme
           next
         end
         lists[key] = entries_of(key, entries, file, against, folder, problems)
+        # A theme with no page template could draw no page: an empty list is
+        # not "none", it is a mistake (the omitted list is the default's).
+        if key == "page_templates" && entries == []
+          problems << "#{file}: `page_templates` is an empty list, so no page could be drawn: " \
+                      "omit the list to use the default theme's, or declare at least one."
+        end
       end
       [ lists, problems ]
     end

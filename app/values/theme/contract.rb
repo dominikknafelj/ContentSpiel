@@ -89,6 +89,15 @@ class Theme
       "pages/not_found.html.erb" => "the page for an address that is nobody's"
     }.freeze
 
+    # A page template: `views/pages/templates/_<name>.html.erb` for each name
+    # the theme's `page_templates` list declares (a name the default also has
+    # may leave the file out and is drawn by the default's). `pages/show`
+    # renders it with exactly these locals: `post` and `list_block` are nil
+    # but on a post's own detail view. Names of the contract: a change is a
+    # release note.
+    PAGE_TEMPLATES = "pages/templates/".freeze
+    PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze
+
     # A theme's own partials, under any name: `views/theme/_anything.html.erb`,
     # rendered as `render "theme/anything"`.
     OWN_PARTIALS = "theme/".freeze

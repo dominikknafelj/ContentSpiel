@@ -32,6 +32,11 @@ module ContractLedger
     "content-section--style-<name>" => "on the section, for a style the theme declares"
   }.freeze
 
+  # The locals every page template is handed, and the folder of the templates
+  # (`Theme::Contract::PAGE_TEMPLATE_LOCALS`, `PAGE_TEMPLATES`).
+  PAGE_TEMPLATE_LOCALS = %w[page post list_block].freeze
+  PAGE_TEMPLATES = "pages/templates/".freeze
+
   THEMED_TOKENS = %w[
     paper surface sunken ink dim meta line line-strong
     accent accent-hover accent-tint on-accent

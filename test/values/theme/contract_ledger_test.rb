@@ -27,6 +27,11 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
     assert_ledger
   end
 
+  test "the page templates' locals are the ledger's" do
+    assert_equal PAGE_TEMPLATE_LOCALS, Theme::Contract::PAGE_TEMPLATE_LOCALS, "a local a page template is handed added, renamed or removed is a release note"
+    assert_equal PAGE_TEMPLATES, Theme::Contract::PAGE_TEMPLATES
+  end
+
   test "the ledger can fail: a method dropped from a built-in's line, and a token renamed, are each named" do
     # The ledger's own components, so a built-in added since (the moment the
     # test above goes red) does not make this one red too, with a message

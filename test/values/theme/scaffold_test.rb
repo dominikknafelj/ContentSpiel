@@ -82,14 +82,48 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       assert target.join("README.md").file?
 
       assert_equal ThemeFolder.new(target).files.sort, (written - [ "README.md" ]).sort, "it says what it wrote, and wrote nothing the folder does not count"
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size + 1, ThemeFolder.new(target).files.size
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size + 2 + 2, ThemeFolder.new(target).files.size, "templates, components, two page templates, theme.yml and the stylesheet"
     end
   end
 
   test "the folder it writes has no problem, checked deeply, and loads" do
     scaffolded do |target, _written|
       assert_empty Theme::Check.problems(ThemeFolder.new(target), deep: true)
-      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size, Theme.load(ThemeFolder.new(target)).template_count
+      assert_equal Theme::Contract::TEMPLATES.size + Theme::Contract.components.size + 2, Theme.load(ThemeFolder.new(target)).template_count
+    end
+  end
+
+  test "the folder it writes holds the two page templates and a theme.yml of comments only, has no problem checked deeply, and draws byte for byte" do
+    scaffolded do |target, written|
+      names = Theme::Declarations.default.fetch("page_templates").map(&:name)
+      assert_equal %w[standard landing], names
+      names.each do |name|
+        file = "pages/templates/_#{name}.html.erb"
+        assert_equal Rails.root.join("app/views", file).read, target.join("views", file).read, file
+        assert_includes written, "views/#{file}"
+      end
+      source = target.join("theme.yml").read
+      assert_includes written, "theme.yml"
+      assert_nil YAML.safe_load(source), "theme.yml holds comments and nothing else"
+      Theme::Contract::CHOICE_LISTS.each { |list| assert_includes source, "# #{list}:" }
+      assert_includes source, "#   - name: landing"
+      assert_includes source, "#     fields: [hero]"
+      assert_empty Theme::Check.problems(ThemeFolder.new(target), deep: true)
+
+      # The two lists drawn from a copy of the default are the default's.
+      theme = Theme.load(ThemeFolder.new(target))
+      assert_equal Theme::Declarations.default.fetch("page_templates"), theme.choices(:page_templates)
+
+      # A page drawn by each, under the default and under the copy.
+      home = root_page
+      home.update!(subtitle: "A line under the title")
+      %w[standard landing].each do |name|
+        home.update!(template: name)
+        publish_changes(home)
+        default = body_of("/")
+        assert_equal name == "landing", default.include?("A line under the title"), "#{name}: the landing template is the one that draws the subtitle"
+        Theme.with(theme) { assert_equal default, body_of("/"), "#{name} differs under the copied theme" }
+      end
     end
   end
 

@@ -11,6 +11,9 @@ page_templates:
   - name: landing
     label: Landing
     fields: [hero]
+  - name: project
+    label: Project
+    fields: [hero]
 icons:
   - name: brush
     label: Design

@@ -43,7 +43,11 @@ class ThemingReferenceTest < ActiveSupport::TestCase
   end
 
   test "the templates table names exactly the contract's templates" do
-    assert_equal Theme::Contract::TEMPLATES.keys.sort, rows("Templates").keys.sort
+    assert_equal (Theme::Contract::TEMPLATES.keys + [ "#{ContractLedger::PAGE_TEMPLATES}_<name>.html.erb" ]).sort, rows("Templates").keys.sort
+  end
+
+  test "the page templates table names exactly the locals of the ledger" do
+    assert_equal ContractLedger::PAGE_TEMPLATE_LOCALS.sort, rows("Page templates").keys.sort
   end
 
   test "the components table names exactly the contract's components, each with the methods its template may call" do

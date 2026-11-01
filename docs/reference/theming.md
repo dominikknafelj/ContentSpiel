@@ -365,8 +365,21 @@ Under the theme's `views/`. The default is the file of the same path under `app/
 | `layouts/public/_theme_toggle.html.erb` | the light/dark switch; its script is the CMS's `theme` controller |
 | `pages/show.html.erb` | a page: its heading, hero and blocks, and the list of its subpages |
 | `pages/not_found.html.erb` | the page for an address that is nobody's |
+| `pages/templates/_<name>.html.erb` | a page template: the page drawn inside `pages/show`, one file for each name of `page_templates` in `theme.yml` (a name the default theme also has may leave its file out) |
 
 A theme's own partials go under `views/theme/`, by any name ending in `.html.erb`, at any depth (`Theme::Contract::OWN_PARTIALS`). Not replaceable: the layout, `pages/_seo_meta`, `shared/_theme_head`, `layouts/public/_preview_banner`.
+
+### Page templates
+
+`pages/show.html.erb` renders `pages/templates/_<name>.html.erb`, `<name>` being what the helper `page_template` answers, with three locals and nothing else: a template reads them and the Helpers table's names, never an instance variable (`theme:check` says so: `@page`, `@post` and `@post_list_block` are refused in a template of this folder, with the local to write instead). A page's `landing?` and `page_type` are gone: a template writes `page_template == "landing"`, and the deep check refuses the old calls with that sentence.
+
+| Local | Is |
+|---|---|
+| `page` | the shown page |
+| `post` | the post on a post's own detail view, otherwise nil |
+| `list_block` | the list block the post was found under, otherwise nil; `render_block` compares against it |
+
+Declarations and files agree both ways: a file with no entry in `page_templates` is refused, and so is a declared name the default theme lacks with no file. A list that is declared empty is refused (omit the list to use the default's). `theme:new` copies the default's two templates (`standard`, `landing`) and writes a `theme.yml` that is comments only.
 
 ### Components
 

@@ -7,7 +7,10 @@ class Theme
   # example to copy". WHAT IS COPIED IS THE CONTRACT: every template of
   # `Contract::TEMPLATES` and every component template of
   # `Contract.components`, so a line added to either is copied from that
-  # day on, and nothing the contract does not name can be. A site under the
+  # day on, and nothing the contract does not name can be; so are the default
+  # theme's page templates (`config/theme/default.yml`), and a `theme.yml`
+  # of comments only that shows the three lists with the default's entries.
+  # A site under the
   # written folder is drawn byte for byte as before
   # (`test/values/theme/scaffold_test.rb`); its author then deletes what
   # they do not want to own, because a file the folder does not hold comes
@@ -31,6 +34,11 @@ class Theme
 
       written = Contract::TEMPLATES.keys.map { |path| copy(Pathname(root).join("app/views", path), target, "views/#{path}") }
       written += Contract.components.keys.map { |path| copy(Contract.template_for(path, root: root), target, "components/#{path}.html.erb") }
+      written += Declarations.default.fetch("page_templates").map do |entry|
+        file = "#{Contract::PAGE_TEMPLATES}_#{entry.name}.html.erb"
+        copy(Pathname(root).join("app/views", file), target, "views/#{file}")
+      end
+      written << put(target, Declarations::FILE, declarations)
       written << put(target, "assets/stylesheets/theme.css", stylesheet)
       EMPTY.each { |folder| put(target, "#{folder}/.keep", "") }
       written << put(target, "README.md", readme) unless own_readme
@@ -56,6 +64,53 @@ class Theme
       file.dirname.mkpath
       file.write(content)
       relative
+    end
+
+    # The three lists of choices as comments and nothing else: the theme
+    # inherits every list it does not declare, so declaring none leaves the
+    # default's (the page templates) and offers nothing more. A list the
+    # default leaves empty is shown with an example entry.
+    def declarations
+      defaults = Declarations.default
+      lists = Contract::CHOICE_LISTS.map do |list|
+        entries = defaults.fetch(list)
+        body = entries.empty? ? example_of(list) : entries.flat_map { |entry| entry_lines(list, entry) }
+        ([ "#{list}:" ] + body).map { |line| "# #{line}".rstrip }.join("\n")
+      end
+      <<~YAML
+        # This theme's choices. Every line below is a comment: a list this file
+        # does not declare is the default theme's, and a list it declares
+        # replaces it whole. Remove the `# ` of a list to declare it.
+        #
+        # section_styles: styles an editor picks for a section; the stylesheet
+        #   styles `.content-section--style-<name>`.
+        # page_templates: templates an editor picks for a page; each is a file
+        #   `views/pages/templates/_<name>.html.erb` (a name the default has may
+        #   leave its file out). Never declare none: omit the list instead.
+        #   `fields: [hero]` shows the page's hero fields in the editor.
+        # icons: icons a card shows; `file` is an SVG under assets/images.
+        #
+        # A name is lowercase letters, digits and underscores, a letter first.
+        # A label is a text, or a mapping of language codes to texts.
+
+      YAML
+        .then { |header| header + lists.join("\n\n") + "\n" }
+    end
+
+    def entry_lines(list, entry)
+      labels = entry.labels
+      lines = [ "  - name: #{entry.name}" ]
+      lines += labels.keys == [ "en" ] ? [ "    label: #{labels["en"]}" ] : [ "    label:" ] + labels.map { |locale, text| "      #{locale}: #{text}" }
+      lines << "    fields: [#{entry.fields.join(", ")}]" if list == "page_templates" && entry.fields.present?
+      lines
+    end
+
+    def example_of(list)
+      case list
+      when "section_styles" then [ "  - name: services", "    label: Services" ]
+      when "icons" then [ "  - name: brush", "    label: Design", "    file: icons/brush.svg" ]
+      else []
+      end
     end
 
     # A comment and nothing else, so the site looks as before; it names

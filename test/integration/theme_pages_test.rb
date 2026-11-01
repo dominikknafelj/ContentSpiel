@@ -558,6 +558,52 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     section
   end
 
+  test "a theme's own template, written from the locals' table alone, draws a page and a post's detail under it" do
+    folder = ThemeFolder.new(ThemeTestHelper::CHOICES)
+    template = folder.read("views/pages/templates/_project.html.erb")
+    Theme::Contract::PAGE_TEMPLATE_LOCALS.each { |name| assert_match(/\b#{name}\b/, template, "the template reads the local #{name}") }
+    assert_no_match(/@page|@post/, template, "no instance variable: the locals alone")
+    assert_empty Theme::Check.problems(folder, deep: true)
+
+    blog = create_page(title: "Projects")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert result.ok?, result.errors.to_sentence
+    with_choices_theme { blog.update!(template: "project") }
+    create_post(title: "First post")
+    publish_changes(blog)
+
+    with_choices_theme { get "/projects" }
+
+    assert_response :success
+    assert_select "div.project-page h1", text: "Projects"
+    assert_select "div.project-page a[href='/projects/first-post']", text: "First post"
+
+    with_choices_theme { get "/projects/first-post" }
+
+    assert_response :success
+    assert_select "div.project-page", count: 1
+    assert_select "div.project-page h1", count: 1, text: "First post"
+    assert_select "div.project-page h1", text: "Projects", count: 0
+
+    with_choices_theme { get "/about" }
+
+    assert_select "div.project-page", count: 0
+  end
+
+  test "a page whose stored template the theme does not know is drawn by the first template" do
+    @about.update_columns(settings: { "template" => "retired" }) # version: none (a test's row, written around the services) # changes: none (a test's row)
+    publish_changes(@about)
+
+    with_choices_theme { get "/about" }
+
+    assert_response :success
+    assert_select "div.project-page", count: 0
+    assert_select "h1", text: "About"
+    assert_select "p.subtitle", count: 0
+    assert_equal "standard", with_choices_theme { Theme.current.page_template("retired") }
+    assert_equal "retired", @about.reload.template, "nothing stored changes"
+  end
+
   test "a theme that declares styles and writes CSS styles a section by its class alone" do
     styled_section("services")
     folder = ThemeFolder.new(ThemeTestHelper::CHOICES)
@@ -567,7 +613,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "section.content-section.content-section--style-services", text: /Styled words/
     assert_includes folder.read("assets/stylesheets/theme.css"), ".content-section--style-services"
-    assert_empty folder.files.grep(%r{\Acomponents/|\Aviews/}), "the theme replaces no template: the class is all it asks for"
+    assert_equal [ "views/pages/templates/_project.html.erb" ], folder.files.grep(%r{\Acomponents/|\Aviews/}), "the theme replaces no template of the CMS: the class is all it asks for"
     assert_empty Theme::Check.problems(folder, deep: true)
   end
 
@@ -886,6 +932,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
     with_theme_copy do |dir|
       FileUtils.cp_r("#{ThemeTestHelper::CHOICES}/.", dir)
+      FileUtils.rm_rf(dir.join("views/pages/templates")) # the theme.yml below declares no `project` for it
       dir.join("theme.yml").write(<<~YAML)
         section_styles:
           - name: odd
