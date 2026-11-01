@@ -18,7 +18,7 @@ module ContractLedger
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
-    "blocks/card_component" => %w[block page title text link icon icon_name],
+    "blocks/card_component" => %w[block page title text link icon icon_name image],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width style anchor],
     "posts/blog_list_component" => %w[posts page],

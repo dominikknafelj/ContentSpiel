@@ -124,6 +124,11 @@
       <%= fields do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
+        <%# See `#leading_columns`. %>
+        <% leading_columns.each do |column| %>
+          <%= render(column == "image" ? image_column : alt_column) %>
+        <% end %>
+
         <% if settings_row? %>
           <%# A post list's three settings in one row (handoff B22): Type, Tag, Limit (72px). %>
           <% type_field, tag_field, limit_field = settings_row_fields %>
@@ -158,7 +163,7 @@
         <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>
         <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields, primary_url: primary_url) %>
 
-        <% uses_columns.each do |column| %>
+        <% trailing_columns.each do |column| %>
           <% case column
              when "body" %>
             <% body_column = Admin::Columns::RichTextColumnComponent.new(
@@ -182,19 +187,9 @@
                   **caption_options, **translation("caption")
                 ) %>
           <% when "alt" %>
-            <%= render Admin::Columns::PlainColumnComponent.new(
-                  name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
-                  value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale,
-                  placeholder: column_placeholder("alt"), override: "alt text", **translation("alt")
-                ) %>
+            <%= render alt_column %>
           <% when "image" %>
-            <%# A library image, chosen through the picker (media library
-                Task 8) into a hidden `media_asset_id` the card's own
-                autosave sends -- see `Admin::Columns::MediaColumnComponent`.
-                Its id is `<prefix>-image` so a refused choice lands in
-                this column's error slot (`ContentBlocks::Save` reports it
-                under `image`). %>
-            <%= render self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image")) %>
+            <%= render image_column %>
           <% end %>
         <% end %>
       <% end %>

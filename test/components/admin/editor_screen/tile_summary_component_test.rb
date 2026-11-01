@@ -342,4 +342,28 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
 
     assert_equal "Note · Empty", page.find(line).text
   end
+
+  test "a card's image is optional: no mark without one, its words as they were, the image's title when it has none" do
+    render_summary block("card")
+    assert_no_selector attention
+    assert_selector line, text: "Empty"
+
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update!(title: "Harbour photo")
+    pictured = block("card", media_asset_id: asset.id)
+    render_summary pictured
+    assert_no_selector attention
+    assert_equal "Harbour photo", page.find(line).text
+    assert_selector ".admin-block-tile__summary img", count: 1
+
+    pictured.assign_settings({ "title" => "Our services" }, locale: "en")
+    pictured.save!
+    render_summary pictured
+    assert_equal "Our services", page.find(line).text
+  end
+
+  test "an image block without an image is still marked: it is all the block is" do
+    render_summary block("image")
+    assert_selector attention
+  end
 end

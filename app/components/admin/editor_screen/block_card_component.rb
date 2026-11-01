@@ -371,6 +371,31 @@ module Admin
 
       def uses_columns = definition.uses_columns
 
+      # A library image heads a form that also has schema fields, with its alt
+      # override under it: it is what a visitor sees first (a Card's image
+      # stands above its icon). A type with no fields keeps its declared order
+      # below, so an Image block still reads image, caption, alt.
+      IMAGE_COLUMNS = %w[image alt].freeze
+
+      def leading_columns = definition.fields.any? ? uses_columns & IMAGE_COLUMNS : []
+
+      def trailing_columns = uses_columns - leading_columns
+
+      def alt_column
+        Admin::Columns::PlainColumnComponent.new(
+          name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
+          value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale,
+          placeholder: column_placeholder("alt"), override: "alt text", **translation("alt")
+        )
+      end
+
+      # A library image, chosen through the picker (media library Task 8) into
+      # a hidden `media_asset_id` the card's own autosave sends -- see
+      # `Admin::Columns::MediaColumnComponent`. Its id is `<prefix>-image` so a
+      # refused choice lands in this column's error slot (`ContentBlocks::Save`
+      # reports it under `image`).
+      def image_column = self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image"))
+
       # `"body"` is the rich-text JSON document (tiptap spec §3.1), read
       # through `body_document` (a `RichText::Document`) rather than the raw
       # Mobility accessor.

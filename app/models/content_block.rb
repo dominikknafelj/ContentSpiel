@@ -7,7 +7,8 @@
 # spec §3). Which columns matter depends on the type: `body` (per-locale JSON
 # documents, see `HasRichTextBody`) for rich_text,
 # `media_asset` + `caption`/`alt` for image, `settings`/`translated_settings` for
-# post_list, `settings` + `caption` for code.
+# post_list, `settings` + `caption` for code, and for a card `settings`/
+# `translated_settings` + `media_asset`/`alt`.
 class ContentBlock < ApplicationRecord
   extend Mobility
 
@@ -15,7 +16,7 @@ class ContentBlock < ApplicationRecord
   # them goes through the current Mobility.locale. (`backend: :jsonb` is the
   # app-wide default set in config/initializers/mobility.rb, so it isn't
   # repeated here -- same as Post's and Page's translated plain-text
-  # attributes.) `alt` only makes sense for `image` blocks, but it's declared
+  # attributes.) `alt` only makes sense for a type that uses an image, but it's declared
   # unconditionally since Mobility attributes are defined at class-load time.
   translates :caption, :alt
 
@@ -32,12 +33,12 @@ class ContentBlock < ApplicationRecord
 
   belongs_to :owner, polymorphic: true
 
-  # An `image` block's image (design spec §3.3): a reference to a library
+  # The image of a type that `uses :image` (design spec §3.3): a reference to a library
   # `Media::Asset` -- Task 4's data migration moved every former
   # `has_one_attached :image` onto this column, re-using the same blobs.
   # The block keeps its own per-use `alt`/`caption` overrides (translated,
-  # above). `optional: true` here too: only an `image` block ever sets it,
-  # and even that block type can be created before an image is chosen (the
+  # above). `optional: true` here too: only such a type ever sets it,
+  # and even an Image block can be created before an image is chosen (the
   # block picker adds an empty card first).
   belongs_to :media_asset, class_name: "Media::Asset", optional: true
 

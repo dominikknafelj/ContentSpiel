@@ -448,7 +448,7 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/code_component` | `block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`, `string` |
 | `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 | `blocks/table_component` | `block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption` |
-| `blocks/card_component` | `block`, `page`, `title`, `text`, `link`, `icon`, `icon_name` |
+| `blocks/card_component` | `block`, `page`, `title`, `text`, `link`, `icon`, `icon_name`, `image` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
 | `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style`, `anchor` |
 | `posts/blog_list_component` | `posts`, `page` |
@@ -642,14 +642,14 @@ The fourth theme (`test/fixtures/themes/note`, "In tests") is a template written
 
 ### The Card block
 
-A tile of an icon, a title, a short plain text and a link (theme choices spec, "The Card block"; the block itself is in `docs/reference/content-blocks-and-types.md`). What a theme can do with it, from the least work to the most:
+A tile of an image, an icon, a title, a short plain text and a link (theme choices spec, "The Card block"; the block itself is in `docs/reference/content-blocks-and-types.md`). What a theme can do with it, from the least work to the most:
 
 1. **Re-colour it: re-colour the base tokens**, or declare the three `--th-card-*` tokens again under both selectors (`:root, [data-theme="light"]` and `[data-theme="dark"]`). `--th-card-ground` is the card's ground (the accent at 5% over the page in the default theme), `--th-card-line` its frame (`--th-meta` in the default theme today; the default's value may change, the token's name is what is promised) and `--th-card-icon` the icon's colour (`--th-accent`). The title is `--th-ink` and the text `--th-dim`.
 2. **Restyle it: rules of its own** under `.content-block--card`. The default template's class names (`content-block--card__icon`, `__title`, `__text`) are the default theme's own, not on a list.
 3. **Bring icons of its own**: a `theme.yml` `icons` list whose entries have a `file` under `assets/images` (below), which replaces the twelve default icons as the card's choices.
 4. **Replace its template**: `components/blocks/card_component.html.erb`.
 
-**What the template is handed** (`Theme::Contract.components`). The component draws nothing unless the card has a title or a text in the language shown (`render?`), so a template never meets a card with neither, and each method answers for an absent value all the same.
+**What the template is handed** (`Theme::Contract.components`). The component draws nothing unless the card has a title or a text in the language shown or an image (`render?`), so a template that does not draw `image` can meet a card with no words and draws an empty frame for it, and each method answers for an absent value all the same.
 
 | Method | What it answers |
 |---|---|
@@ -660,8 +660,9 @@ A tile of an icon, a title, a short plain text and a link (theme choices spec, "
 | `link` | the address, nil when there is none or the stored one is no longer accepted; `http`, `https`, `mailto`, a site-relative address or a same-page anchor (`#team`) |
 | `icon` | the chosen icon's SVG, inlined as the theme's file has it (marked safe, so `<%= icon %>`), or nil: no icon chosen, a name the theme does not declare, a file that is gone or no longer passes the check |
 | `icon_name` | the chosen icon's name when the theme declares it, otherwise nil; a name of the name rule, so it is safe as a class suffix or a `data-` value |
+| `image` | nil for no image (none chosen, a file that is gone), otherwise a Hash of what the one picture takes: `<%= render Media::PictureComponent.new(**image, css_class: "…") if image %>`. `image[:asset]` is the library image (`width`, `height`), `image[:alt]` the block's override else the library's in the language shown, possibly empty, `image[:sizes]` the width it is drawn at, its column's in a section |
 
-**What a template should keep.** Print `title` and `text` through ERB's escaping (`<%= title %>`) and never mark them safe: both are what an editor typed. Print `icon` as it is, and nothing else marked safe. Put the link on the title, and on the text when there is no title (a card with a link and no words has none to carry it): the default does, so a card is one link and not two. The icon is decoration: wrap it in an element with `aria-hidden="true"` as the default does (the root of the inlined SVG already carries `aria-hidden="true"` and `focusable="false"`, added where the file does not write them). The word beside the icon says what the card is.
+**What a template should keep.** Print `title` and `text` through ERB's escaping (`<%= title %>`) and never mark them safe: both are what an editor typed. Print `icon` as it is, and nothing else marked safe. Put the link on the title, on the text when there is no title, and on the image when there is neither (its alt is then the link's name; a card with a link and nothing else draws nothing): the default does, so a card is one link and not two. The icon is decoration: wrap it in an element with `aria-hidden="true"` as the default does (the root of the inlined SVG already carries `aria-hidden="true"` and `focusable="false"`, added where the file does not write them). The word beside the icon says what the card is.
 
 **How an icon is coloured.** The file is inlined, so the page's stylesheet reaches it. The default set strokes with `currentColor`, which is the `color` of the element around it; the default draws it in `--th-card-icon` by setting `color` on the wrapper. A theme does the same, or ignores the token and colours the shapes with classes of its own. `icon_name` is there so a theme can style one icon differently (`.tile[data-icon="ribbon"]`).
 

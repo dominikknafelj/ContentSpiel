@@ -18,6 +18,18 @@ module Blocks
     # its column's width instead (`#sizes`).
     SIZES = "(min-width: 768px) 768px, 100vw"
 
+    # The width a picture of `block` is drawn at, for any type that draws one
+    # at its block's full width (this one, the Card, whose inner width is a
+    # few pixels under it: asking for those pixels more costs nothing).
+    # `block.section` is the object the page's outline handed over
+    # (`BlockOutline`), so reading it is no query. A section whose type is
+    # gone draws no columns -- its blocks are stacked at the content width
+    # (`ThemeHelper#render_block`) -- so its images ask for that.
+    def self.sizes_for(block)
+      section = block.section if block.section_id
+      section&.container? ? Blocks::SectionComponent.image_sizes(section, block.section_column) : SIZES
+    end
+
     def initialize(block:, page:)
       @block = block
       @page = page
@@ -38,15 +50,8 @@ module Blocks
 
     # The one thing a block's component knows about where it sits (sections
     # spec §5.4): an image in a column asks for a picture as wide as its
-    # column, not as wide as the page. `block.section` is the object the
-    # page's outline handed over (`BlockOutline`), so reading it is no query.
-    # A section whose type is gone draws no columns -- its blocks are stacked
-    # at the content width (`ThemeHelper#render_block`) -- so its images ask
-    # for that.
-    def sizes
-      section = block.section if block.section_id
-      section&.container? ? Blocks::SectionComponent.image_sizes(section, block.section_column) : SIZES
-    end
+    # column, not as wide as the page.
+    def sizes = self.class.sizes_for(block)
 
     # The block's overrides go in whole, as their `{locale => value}` jsonb
     # (final fix wave, I1): `Media::Asset#alt_text` interleaves them with the

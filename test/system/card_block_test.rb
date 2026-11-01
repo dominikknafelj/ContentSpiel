@@ -98,4 +98,31 @@ class CardBlockSystemTest < ApplicationSystemTestCase
       end
     end
   end
+
+  test "an image fills the card's inner width at its own proportions, cropped by nothing, above the title" do
+    asset = create_media_asset(filename: "wide.png")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: @page),
+      attributes: { block_type: "card", media_asset_id: asset.id, settings: { "title" => "Card title en" } })
+    assert result.ok?, result.errors.to_sentence
+    open_page
+
+    box = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.querySelector(".content-block--card")
+        // The layout's box, not the drawn one: an image whose widths are not made yet is a preview scaled to hide its blur's edge.
+        const img = card.querySelector("img")
+        const style = getComputedStyle(card)
+        return {
+          imageWidth: img.offsetWidth, imageHeight: img.offsetHeight,
+          innerWidth: card.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+          imageAboveTitle: img.offsetTop + img.offsetHeight <= card.querySelector("h3").offsetTop,
+          objectFit: getComputedStyle(card.querySelector("img")).objectFit
+        }
+      })()
+    JS
+    assert_in_delta box["innerWidth"], box["imageWidth"], 1
+    assert_in_delta box["imageWidth"] * asset.height / asset.width, box["imageHeight"], 1
+    assert box["imageAboveTitle"]
+    assert_equal "fill", box["objectFit"]
+  end
 end

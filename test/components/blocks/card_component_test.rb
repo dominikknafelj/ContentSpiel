@@ -82,4 +82,90 @@ class Blocks::CardComponentTest < ActiveSupport::TestCase
     assert_selector "p a[href='/about']", text: "Only text"
     assert_no_selector "h3"
   end
+
+  # --- The image (#144) -------------------------------------------------
+
+  def asset_with_alt(words = "Library words")
+    create_media_asset(filename: "tiny.png").tap { |asset| asset.update!(alt: words) }
+  end
+
+  def imaged(settings = {}, asset: asset_with_alt, alt: nil, **words)
+    block_with(settings, **words).tap do |block|
+      block.media_asset = asset
+      block.alt = alt if alt
+    end
+  end
+
+  test "an image alone draws a card, an icon or a link alone still does not, and an image that is gone draws nothing" do
+    draw imaged
+    assert_selector ".content-block--card img[alt='Library words']", count: 1
+
+    with_choices_theme do
+      draw block_with({ "icon" => "brush", "link" => "/about" })
+      assert_no_selector ".content-block--card"
+    end
+
+    gone = imaged(asset: create_media_asset.tap { |asset| asset.file.detach })
+    draw gone
+    assert_no_selector ".content-block--card"
+  end
+
+  test "the image stands above the icon and the title, one img with no wrapper, its size reserved and no ratio forced" do
+    with_choices_theme do
+      asset = asset_with_alt
+      draw imaged({ "icon" => "brush" }, asset: asset, title: "T", text: "W")
+      root = Nokogiri::HTML5.fragment(rendered_content).at_css(".content-block--card")
+      assert_equal %w[img span h3 p], root.element_children.map(&:name)
+      img = root.at_css("img")
+      assert_equal [ asset.width.to_s, asset.height.to_s ], [ img["width"], img["height"] ]
+      assert_includes img["class"], "content-block--card__image"
+    end
+  end
+
+  test "one link per card: on the title, else on the text, else on the image, whose alt names it" do
+    link = { "link" => "/about" }
+
+    draw imaged(link, title: "T", text: "W")
+    assert_selector "a", count: 1
+    assert_selector "h3 a[href='/about']", text: "T"
+    assert_no_selector "a img"
+
+    draw imaged(link, text: "W")
+    assert_selector "a", count: 1
+    assert_selector "p a[href='/about']", text: "W"
+    assert_no_selector "a img"
+
+    draw imaged(link)
+    assert_selector "a", count: 1
+    assert_selector "a[href='/about'] img[alt='Library words']", count: 1
+
+    draw imaged({ "link" => "javascript:alert(1)" })
+    assert_no_selector "a"
+    assert_selector "img", count: 1
+  end
+
+  test "the alt is the block's override, else the library's, and an image with neither has an empty alt" do
+    draw imaged(alt: "My words")
+    assert_selector "img[alt='My words']"
+
+    draw imaged
+    assert_selector "img[alt='Library words']"
+
+    draw imaged(asset: asset_with_alt(""))
+    assert_selector "img[alt='']"
+  end
+
+  test "image is nil without one, and otherwise the words the Image block's picture takes, in a column as wide as its column" do
+    assert_nil Blocks::CardComponent.new(block: block_with(title: "T"), page: root_page).send(:image)
+
+    asset = asset_with_alt
+    image = Blocks::CardComponent.new(block: imaged(asset: asset), page: root_page).send(:image)
+    assert_equal %i[alt asset sizes], image.keys.sort
+    assert_equal [ asset, "Library words", Blocks::ImageComponent::SIZES ], image.values_at(:asset, :alt, :sizes)
+
+    section = root_page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    in_column = root_page.content_blocks.create!(block_type: "card", position: 0, section: section, section_column: 2, media_asset: asset)
+    image = Blocks::CardComponent.new(block: in_column, page: root_page).send(:image)
+    assert_equal Blocks::SectionComponent.image_sizes(section, 2), image[:sizes]
+  end
 end

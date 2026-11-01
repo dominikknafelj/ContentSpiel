@@ -1,7 +1,12 @@
 <%# A theme's own Card, written from what `Theme::Contract` gives the template (`block`, `page`, `title`, `text`,
-    `link`, `icon`, `icon_name`; docs/reference/theming.md, "The Card block"): the words through ERB's escaping,
-    the link on the title or, without one, on the text, the icon as handed over inside an aria-hidden wrapper. %>
+    `link`, `icon`, `icon_name`, `image`; docs/reference/theming.md, "The Card block"): the words through ERB's escaping,
+    the link on the title, else the text, else the image, the icon as handed over inside an aria-hidden wrapper,
+    the image through the one picture. %>
 <article class="tile" data-icon="<%= icon_name %>" data-block="<%= block.id %>" data-page="<%= page.id %>">
+  <% if image %>
+    <% picture = render(Media::PictureComponent.new(**image, css_class: "tile__picture")) %>
+    <% if link && !title && !text %><a class="tile__picture-link" href="<%= link %>"><%= picture %></a><% else %><%= picture %><% end %>
+  <% end %>
   <% if icon %><span class="tile__icon" aria-hidden="true"><%= icon %></span><% end %>
   <% if title %>
     <h3 class="tile__title"><% if link %><a href="<%= link %>"><%= title %></a><% else %><%= title %><% end %></h3>
