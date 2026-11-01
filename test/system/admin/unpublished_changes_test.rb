@@ -38,7 +38,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_equal "Live page", Publishing.current(@live).snapshot.dig("fields", "title", "en"), "the site still shows what was published"
 
     press "Publish changes…"
-    # The overview's answer grows the dialog and moves its button down; aim after it.
+    # What is pressed is judged on what the dialog has been told; press after the answer.
     within("dialog[open]") do
       assert_selector "[data-publishing-overview]"
       press "Publish changes"

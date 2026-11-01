@@ -33,7 +33,14 @@ module Admin
       # (`.admin-media-picker`) instead of being centred, because a centred dialog
       # moves its own header, and whatever is under the pointer, with every such
       # change. See the comment on `.admin-dialog[data-dialog-hang]`.
-      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false)
+      #
+      # `steady: true` is for a dialog whose content changes while it is open and
+      # whose FOOTER is what a person is aiming at (the publish dialog: "Publish
+      # changes" and an overview that arrives a moment later). `hang:` keeps the
+      # top edge and lets the foot move; this fixes the height, so nothing of the
+      # frame moves, and what is longer scrolls in the body. See the comment on
+      # `.admin-dialog[data-dialog-steady]`.
+      def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false, steady: false)
         raise ArgumentError, "unknown dialog width #{width.inspect}" unless WIDTHS.key?(width)
 
         @id = id
@@ -42,11 +49,12 @@ module Admin
         @destructive = destructive
         @open_on_load = open_on_load
         @hang = hang
+        @steady = steady
       end
 
       private
 
-      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang
+      attr_reader :id, :title, :width, :destructive, :open_on_load, :hang, :steady
     end
   end
 end

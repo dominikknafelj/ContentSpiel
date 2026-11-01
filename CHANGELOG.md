@@ -33,3 +33,4 @@
 ### Fixed
 
 - A preview no longer prints the address of a draft outside the viewer's read scope for a rich-text link: the link is its words, as for a missing target (#152). A public page is unchanged.
+- "Publish changes" in the publish dialog no longer moves when the overview arrives: the dialog has a fixed height and a long overview scrolls inside it.
