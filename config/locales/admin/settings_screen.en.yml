@@ -72,7 +72,6 @@ en:
           progress:
             one: "%{count} image was made with other settings"
             other: "%{count} images were made with other settings"
-          running: "Regenerating: %{done} of %{of}"
           failed:
             one: "%{count} could not be made"
             other: "%{count} could not be made"

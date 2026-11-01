@@ -28,7 +28,6 @@
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
 <% images_fingerprint = (ImageSettings.current(SiteSetting.find(@site_setting.id)).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
-<% images_run = (Media::RegenerationRun.new(fingerprint: images_fingerprint).current if manage_settings) %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
@@ -71,7 +70,7 @@
           <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: MailSettings.current(@site_setting), values: values,
                 errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
           <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
-                errors: (@errors if @errors.respond_to?(:full_messages_for)), run: images_run, status_link: can?("system_status.view")) %>
+                errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>
         <% end %>
 
         <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
