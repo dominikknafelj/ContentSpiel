@@ -180,6 +180,8 @@ en:
             full: "Full width"
           # The theme's section style, drawn only when the theme declares one.
           style: "Style"
+          # Shown beside the selects for a style other than the default (issue 146).
+          style_note: "This style may set its own layout, background or width."
           # The section's anchor: what a link `#anchor` jumps to.
           anchor: "Anchor"
           anchor_help: "Lets a link jump here, as #anchor. Leave empty for none."

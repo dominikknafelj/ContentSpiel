@@ -66,9 +66,6 @@
       <% elsif other_settings.positive? %>
         <p class="text-sm text-ink" data-images-progress><%= t(".progress", count: other_settings) %></p>
       <% end %>
-      <% if run %>
-        <p class="text-sm text-ink" data-images-running><%= t(".running", done: run[:done], of: run[:of]) %></p>
-      <% end %>
       <% if failed.positive? %>
         <p class="text-sm text-danger-ink" data-images-failed>
           <% if status_link? %>

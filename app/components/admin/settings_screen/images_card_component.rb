@@ -12,9 +12,7 @@ module Admin
     # - Saving changes no image. The card says how many images were NOT made with
     #   the saved settings ("12 images were made with other settings", nothing
     #   when none) and how many could not be made (a link to System status for
-    #   `status_link`), and, while a regenerate runs (`run`, from
-    #   `Media::RegenerationRun`, as of the page's load: no live refresh),
-    #   "Regenerating: 5 of 12"; "Regenerate images..." is the press that makes
+    #   `status_link`); "Regenerate images..." is the press that makes
     #   the rest. It sits outside the form (a button of its own, opening the
     #   dialog `ImagesDialogComponent` renders after the form, which has the
     #   POST), so a press never counts as an unsaved change.
@@ -27,18 +25,13 @@ module Admin
       FIELDS = %i[image_format image_quality_webp image_quality_avif image_widths image_max_upload_mb].freeze
       DIALOG = "settings-images-regenerate-dialog".freeze
 
-      def initialize(values:, progress:, avif_available:, errors: nil, run: nil, status_link: false)
+      def initialize(values:, progress:, avif_available:, errors: nil, status_link: false)
         @values = values
         @progress = progress
         @avif_available = avif_available
         @errors = errors
-        @run = run
         @status_link = status_link
       end
-
-      # `{ done:, of: }` while a regenerate is running (`Media::RegenerationRun`),
-      # as of the page's load, or nil.
-      attr_reader :run
 
       # Whether the failed count links to System status: the viewer holds
       # `system_status.view` (the caller asks), else it is plain text.

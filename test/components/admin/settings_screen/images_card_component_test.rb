@@ -3,9 +3,9 @@ require "test_helper"
 class Admin::SettingsScreen::ImagesCardComponentTest < ViewComponent::TestCase
   PROGRESS = { total: 12, made: 5, failed: 0 }.freeze
 
-  def render_card(submitted: nil, progress: PROGRESS, avif: true, errors: nil, run: nil, status_link: false)
+  def render_card(submitted: nil, progress: PROGRESS, avif: true, errors: nil, status_link: false)
     values = Admin::SettingsScreen::Values.new(site: SiteSetting.instance, submitted: submitted)
-    render_inline Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: progress, avif_available: avif, errors: errors, run: run, status_link: status_link)
+    render_inline Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: progress, avif_available: avif, errors: errors, status_link: status_link)
   end
 
   test "format, a quality for each format, the widths as one field, the largest upload, and the stored values" do
@@ -64,14 +64,6 @@ class Admin::SettingsScreen::ImagesCardComponentTest < ViewComponent::TestCase
     render_card(progress: failing, status_link: false)
     assert_selector "[data-images-failed]", text: "2 could not be made"
     assert_no_selector "[data-images-failed] a"
-  end
-
-  test "a run in progress says how far it is, as of the page's load, and nothing says it otherwise" do
-    render_card
-    assert_no_selector "[data-images-running]"
-
-    render_card(run: { done: 5, of: 12 })
-    assert_selector "[data-images-running]", text: "Regenerating: 5 of 12"
   end
 
   test "Regenerate images opens a dialog and is no submit of the Settings form" do

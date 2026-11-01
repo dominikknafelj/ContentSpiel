@@ -149,14 +149,13 @@ class Admin::SettingsImagesTest < ActionDispatch::IntegrationTest
     assert_equal stale.id, enqueued_jobs.map { |job| ActiveJob::Arguments.deserialize(job["arguments"]).first }.compact.first.id
   end
 
-  test "after a press the card says how far the run is, and the failed count links to System status only for a viewer who may open it" do
+  test "the failed count links to System status only for a viewer who may open it" do
     stale = create_media_asset
     failed = create_media_asset(filename: "tiny.png")
     failed.update_columns(renditions_failed_at: Time.current) # version: none (a test records a failure)
     post "/cs-studio/settings/regenerate_images"
     follow_redirect!
 
-    assert_select "[data-images-running]", "Regenerating: 1 of 2"
     assert_select "[data-images-failed] a[href='/cs-studio/system_status']", "1 could not be made"
     assert_select "#settings-images-forms dialog", /Remake 2 images\? This runs in the background/
     assert_predicate stale, :persisted?
