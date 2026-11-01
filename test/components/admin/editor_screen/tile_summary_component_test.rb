@@ -362,6 +362,21 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_equal "Our services", page.find(line).text
   end
 
+  test "a card linked to a page counts as linked for the image's alt, and the tile never prints the reference" do
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update!(title: "Harbour photo", alt: "")
+    target = create_page(title: "Our services")
+
+    linked = block("card", media_asset_id: asset.id, settings: { "link" => "cs:page/#{target.id}" })
+    render_summary linked
+    assert_selector "#{line} .text-meta", exact_text: "Image link has no alt text"
+
+    linked.assign_settings({ "title" => "Card words" }, locale: "en")
+    linked.save!
+    render_summary linked
+    assert_equal "Card words", page.find(line).text
+  end
+
   test "a card whose image is its only link and has no alt says so; words, an alt or no link say nothing of it" do
     asset = create_media_asset(filename: "tiny.png")
     asset.update!(title: "Harbour photo", alt: "")

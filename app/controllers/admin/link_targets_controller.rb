@@ -3,7 +3,8 @@ module Admin
   # searches pages and posts by title, in one locale, and hands back just
   # enough to let the editor insert an `internalLink` mark
   # (`{type, id}`, `RichText::BuiltIns`) without a second round trip: the
-  # title to show in the picker, and the public path to preview.
+  # title to show in the picker, and the public path to preview. A `:link`
+  # field's search asks the same list (`admin--ui--link-target`).
   #
   # Unpublished pages/posts are included on purpose (the plan's own ruling):
   # an editor routinely links to something before publishing it, and the

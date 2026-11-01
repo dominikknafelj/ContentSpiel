@@ -185,4 +185,32 @@ class Blocks::CardComponentTest < ActiveSupport::TestCase
     image = Blocks::CardComponent.new(block: in_column, page: root_page).send(:image)
     assert_equal Blocks::SectionComponent.image_sizes(section, 2), image[:sizes]
   end
+
+  test "link hands a theme a String or nil, never a reference, whatever is stored" do
+    target = create_page(title: "Target")
+    { "cs:page/#{target.id}" => PublicSite::Urls.new.path_for(target, "en"), "cs:page/999999" => nil, "cs:post/999999" => nil, "/about" => "/about", "#team" => "#team" }.each do |stored, expected|
+      block = block_with({}, title: "T")
+      block.settings = block.settings.merge("link" => stored)
+      answer = with_rendered_component(block) { |component| component.send(:link) }
+      expected.nil? ? assert_nil(answer, stored) : assert_equal(expected, answer, stored)
+    end
+
+    block = block_with({}, title: "T")
+    block.settings = block.settings.merge("link" => "cs:page/999999")
+    draw block
+    assert_selector ".content-block--card h3", text: "T"
+    assert_no_selector "a"
+    assert_not_includes rendered_content, "cs:page"
+  end
+
+
+  # The component's private answers, asked inside a real render: `link` reads
+  # the controller's `public_urls` through `helpers`.
+  def with_rendered_component(block)
+    component = Blocks::CardComponent.new(block: block, page: root_page)
+    answer = nil
+    component.singleton_class.define_method(:before_render) { answer = yield(self) }
+    render_inline(component)
+    answer
+  end
 end

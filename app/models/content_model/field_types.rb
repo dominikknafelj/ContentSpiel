@@ -106,6 +106,12 @@ module ContentModel
         false
       end
 
+      # What a `:link` field may hold: an address `link?` accepts, or a
+      # reference to a page or a post (`LinkReference`). `link?` itself stays
+      # the rule for what a browser may follow, so nothing that asks it can be
+      # handed a reference to print.
+      def link_value?(value) = link?(value) || LinkReference.parse(value).present?
+
       # What every type refuses that only a select, a content type field or
       # a string takes: a group field refuses it too (`Definition#field`).
       def refuse_choice_and_string_options(options)
@@ -304,17 +310,29 @@ module ContentModel
 
       def tag = plain(:tag, translatable: false)
 
-      # An address a visitor follows; see `link?`. The same on every
-      # language, so never translated.
+      # An address a visitor follows (see `link?`), or a reference to a page or
+      # a post (`LinkReference`). The same on every language, so never
+      # translated.
+      #
+      # A NEW reference must name something the actor may read
+      # (`ContentModel.link_target_readable`), with one answer for what is
+      # outside their scope and what does not exist. One the record already
+      # stores, or carries (a duplicate, a discard), is not this save's to
+      # refuse: a target deleted since is left stored and draws nothing, and
+      # someone who can't read the target can still save the card's title.
       def link
         FieldType.new(
-          name: :link, cast: STRIPPED, translatable: false, audit: :value,
+          name: :link, cast: STRIPPED, translatable: false, audit: :reference,
           options: lambda { |options, _earlier|
             raise ArgumentError, "link fields can't be translated (the address is the same in every language)" if options[:translated]
             refuse_choice_and_string_options(options)
           },
           validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
-            errors.add(field.name, :invalid) if value && !link?(value)
+            next if value.nil? || value == stored
+
+            reference = LinkReference.parse(value)
+            valid = reference ? ContentModel.link_target_readable.call(reference) : link?(value)
+            errors.add(field.name, :invalid) unless valid
           }
         )
       end

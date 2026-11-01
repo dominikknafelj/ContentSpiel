@@ -1,0 +1,248 @@
+require "test_helper"
+
+# A Card whose link names a page or a post (#145): what a VISITOR gets, through
+# the real public page. Every case that changes the target asks twice: the page
+# answers a fresh request with the right markup, and the ETag taken BEFORE the
+# change is no longer confirmed. A card's link has no cache of its own, so the
+# 304 is the one way a dead or moved address could outlive the change: the
+# content version is what has to move, and it moves for the target's own write,
+# not for anything the card's page does.
+class CardLinkTargetTest < ActionDispatch::IntegrationTest
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    Locales::Enable.call("de") unless Locales.enabled?("de")
+    @root = root_page
+    @section = create_page(title: "Section", translations: { "de" => { title: "Bereich" } })
+    @target = create_page(title: "Services", parent: @section, translations: { "de" => { title: "Leistungen" } })
+    @holder = create_page(title: "Cards", translations: { "de" => { title: "Karten" } })
+  end
+
+  def reference(record) = "cs:#{record.model_name.element}/#{record.id}"
+
+  def add_card(link, page: @holder)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page),
+      attributes: { block_type: "card", settings: { "link" => link, "title" => "Card words" } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(page)
+    result.record
+  end
+
+  def holder_path(locale = "en") = PublicSite::Urls.new.path_for(@holder, locale)
+
+  def etag_of(path)
+    get path
+    assert_response :success
+    response.headers["ETag"]
+  end
+
+  def assert_not_confirmed(path, etag)
+    get path, headers: { "If-None-Match" => etag }
+    assert_response :success, "the ETag from before the change must not be confirmed with a 304"
+  end
+
+  def assert_links_to(address)
+    assert_select ".content-block--card h3 a[href=?]", address, text: "Card words"
+  end
+
+  def assert_words_without_link
+    assert_select ".content-block--card h3", text: "Card words"
+    assert_select ".content-block--card a", count: 0
+    assert_not_includes response.body, "cs:page"
+    assert_not_includes response.body, "cs:post"
+  end
+
+  test "a card follows its target's slug, in two languages, and no 304 confirms the old address" do
+    add_card(reference(@target))
+    before = { "en" => etag_of(holder_path("en")), "de" => etag_of(holder_path("de")) }
+    assert_links_to PublicSite::Urls.new.path_for(@target, "de")
+
+    result = Pages::Save.call(@target, attributes: {}, translations: { "en" => { slug: "our-services" }, "de" => { slug: "unsere-leistungen" } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(@target)
+
+    assert_not_confirmed holder_path("en"), before["en"]
+    assert_links_to "/section/our-services"
+    assert_not_confirmed holder_path("de"), before["de"]
+    assert_links_to "/de/bereich/unsere-leistungen"
+  end
+
+  test "a card follows its target to another parent, in two languages, and no 304 confirms the old address" do
+    # Made before the ETags are taken: a new live page moves the version by itself.
+    other = create_page(title: "Other", translations: { "de" => { title: "Anders" } })
+    add_card(reference(@target))
+    before = { "en" => etag_of(holder_path("en")), "de" => etag_of(holder_path("de")) }
+
+    result = Pages::Move.call(@target, parent: other, position: 0)
+    assert result.ok?, result.errors.to_sentence
+
+    assert_not_confirmed holder_path("en"), before["en"]
+    assert_links_to "/other/services"
+    assert_not_confirmed holder_path("de"), before["de"]
+    assert_links_to "/de/anders/leistungen"
+  end
+
+  test "a card follows a change of its target's ancestor" do
+    add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    result = Pages::Save.call(@section, attributes: {}, translations: { "en" => { slug: "renamed" } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(@section)
+
+    assert_not_confirmed holder_path, before
+    assert_links_to "/renamed/services"
+  end
+
+  test "a target moved to the trash draws no link and keeps the words, and restoring it brings the link back" do
+    add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    assert Trash::Move.call(@target).ok?
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+
+    trashed = response.headers["ETag"]
+    assert Trash::Restore.call(@target.reload).ok?
+    assert_not_confirmed holder_path, trashed
+    assert_links_to PublicSite::Urls.new.path_for(@target.reload, "en")
+  end
+
+  test "an ancestor moved to the trash takes the link with it" do
+    add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    assert Trash::Move.call(@section).ok?
+
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+  end
+
+  test "a target unpublished draws no link and keeps the words, and publishing it again brings the link back" do
+    add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    result = Pages::Save.call(@target, attributes: { published: false }, translations: {})
+    assert result.ok?, result.errors.to_sentence
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+
+    unpublished = response.headers["ETag"]
+    result = Pages::Save.call(@target.reload, attributes: { published: true }, translations: {})
+    assert result.ok?, result.errors.to_sentence
+    assert_not_confirmed holder_path, unpublished
+    assert_links_to PublicSite::Urls.new.path_for(@target.reload, "en")
+  end
+
+  test "an ancestor unpublished takes the link with it" do
+    add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    result = Pages::Save.call(@section, attributes: { published: false }, translations: {})
+    assert result.ok?, result.errors.to_sentence
+
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+  end
+
+  test "a draft never shows its title or address, and a scheduled target gets its link when its time comes, with no write" do
+    draft = create_page(title: "Secret draft", published: false)
+    add_card(reference(draft))
+    get holder_path
+    assert_words_without_link
+    assert_not_includes response.body, "Secret draft"
+    assert_not_includes response.body, "secret-draft"
+    ContentBlock.where(owner: @holder).destroy_all
+
+    scheduled = create_page(title: "Soon", published: false)
+    result = Pages::Save.call(scheduled, attributes: { published_at: 1.hour.from_now }, translations: {})
+    assert result.ok?, result.errors.to_sentence
+    add_card(reference(scheduled))
+    before = etag_of(holder_path)
+    assert_words_without_link
+    assert_not_includes response.body, "/soon"
+
+    travel 2.hours do
+      assert_not_confirmed holder_path, before
+      assert_links_to "/soon"
+    end
+  end
+
+  test "a target purged for good draws no link, keeps the words and leaves the reference stored" do
+    card = add_card(reference(@target))
+    before = etag_of(holder_path)
+
+    assert delete_for_good(@target)
+
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+    assert_equal reference(@target), card.reload.settings["link"]
+  end
+
+  test "a target with no address, a live post no page lists, draws no link" do
+    post = create_post(title: "Unlisted post")
+    add_card(reference(post))
+    assert_nil PublicSite::Urls.new.path_for(post, "en")
+
+    get holder_path
+    assert_words_without_link
+  end
+
+  test "a post's card follows the post: its address while a page lists it, and none once it is unpublished" do
+    listing = create_page(title: "Blog")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    assert result.ok?, result.errors.to_sentence
+    publish_changes(listing)
+    post = create_post(title: "Hello")
+    add_card(reference(post))
+    before = etag_of(holder_path)
+    assert_links_to "/blog/hello"
+
+    result = Posts::Save.call(post, attributes: { published: false }, translations: {})
+    assert result.ok?, result.errors.to_sentence
+
+    assert_not_confirmed holder_path, before
+    assert_words_without_link
+  end
+
+  test "a live card's reference is the copy's: pointing the rows elsewhere moves nothing until it is published" do
+    other = create_page(title: "Other target")
+    card = add_card(reference(@target))
+    published_address = PublicSite::Urls.new.path_for(@target, "en")
+    before = etag_of(holder_path)
+
+    result = ContentBlocks::Save.call(card, attributes: { settings: { "link" => reference(other), "title" => "Card words" } })
+    assert result.ok?, result.errors.to_sentence
+
+    get holder_path, headers: { "If-None-Match" => before }
+    assert_response :not_modified, "an edit of a live page's rows is nobody's news"
+    get holder_path
+    assert_links_to published_address
+
+    publish_changes(@holder)
+    assert_not_confirmed holder_path, before
+    assert_links_to "/other-target"
+  end
+
+  test "the preview draws a draft target's link under the preview, and a visitor gets none" do
+    sign_in_as(users(:one))
+    draft = create_page(title: "Draft target", published: false)
+    add_card(reference(draft))
+    get holder_path
+    assert_words_without_link
+
+    get "/preview#{holder_path}"
+    assert_response :success
+    address = PublicSite::Urls.new(preview: true).path_for(draft, "en")
+    assert address, "a draft page has an address in the preview"
+    assert_links_to address
+  end
+
+  test "old stored addresses and a bare anchor keep working" do
+    [ "/about", "https://example.org/a?b=1", "mailto:a@example.org", "#team" ].each do |address|
+      ContentBlock.where(owner: @holder).destroy_all
+      add_card(address)
+      get holder_path
+      assert_links_to address
+    end
+  end
+end

@@ -58,6 +58,38 @@ module PublicSite
       path_from(path, locale)
     end
 
+    # The address of a page or a post named by its type and id, for a link
+    # drawn in a body or on a card, or nil: no such record, one a visitor can't
+    # reach, or no address in this language. Nothing but a live target with an
+    # address gets one, so a draft's address never reaches a page. In the
+    # preview the gate is off, because editors are the audience that needs to
+    # follow links to what is not public yet (`Resolver` draws the same line).
+    # `Resolver.visible?` asks the tree and the publish state, which no copy
+    # holds, and nothing here is cached beyond this instance: what keeps a
+    # rendered link honest is the public content version, which every input of
+    # this answer moves (`PublicSite`, "WHO BUMPS"; `Paths.write_all` for an
+    # address, `Publishable` for a state, the clock for a time that passes).
+    def target_path(type, id, locale = I18n.locale)
+      record = LinkTargets.model(type)&.find_by(id: id) # public: rows (a link's target is judged by its state, and its address is the rows')
+      return nil if record.nil?
+      return nil if !@preview && !PublicSite::Resolver.visible?(record) # public: rows (visibility is the tree and publish state, which no copy holds)
+
+      path_for(record, locale)
+    end
+
+    # What a stored `:link` value is to a browser, or nil for no link: the
+    # current address of the page or post it names (`target_path`), or the typed
+    # address while `FieldTypes.link?` accepts it (a value accepted once and
+    # refused now, or written around the service, draws no link). Always an
+    # address or nil, never the reference, so the theme contract's `link` means
+    # what it always did.
+    def link_for(value, locale = I18n.locale)
+      reference = ContentModel::LinkReference.parse(value)
+      return target_path(reference.type, reference.id, locale) if reference
+
+      value if ContentModel::FieldTypes.link?(value)
+    end
+
     # Reads the current paths of `records` in `locale` in one statement and
     # keeps them for `path_for` (nil for a record that has none), so a list
     # drawn as links costs one read for its addresses and not one per link.

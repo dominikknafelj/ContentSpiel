@@ -92,11 +92,15 @@ module Audit
     # stored.
     def schema_fields(record) = record.respond_to?(:definition) ? record.definition&.fields.to_a : []
 
-    def code_in?(fields) = fields.any? { |field| digested?(field) || (field.group? && code_in?(group_fields(field))) }
+    def code_in?(fields) = fields.any? { |field| digested?(field) || field.field_type&.audit == :reference || (field.group? && code_in?(group_fields(field))) }
 
     # A field whose type is audited as two digests and two lengths
     # (`FieldType#audit`), the `:code` type's way.
     def digested?(field) = field.field_type&.audit == :digest
+
+    # A value a person must not read in a changes row: a reference in a field
+    # audited as `:reference` (`ContentModel::LinkReference`).
+    def reference_value?(field, value) = field.field_type&.audit == :reference && ContentModel::LinkReference.parse(value).present?
 
     def group_fields(field) = FieldGroups.find(field.options[:of])&.fields.to_a
 
@@ -110,7 +114,7 @@ module Audit
     end
 
     def summarised_value(field, value)
-      if digested?(field)
+      if digested?(field) || reference_value?(field, value)
         code_summary(value)
       elsif field.group?
         nested = group_fields(field)
@@ -305,7 +309,20 @@ module Audit
           "length_before" => was.is_a?(Hash) ? was["length"] : nil, "length_after" => now.is_a?(Hash) ? now["length"] : nil
         }
       end
-      rest = [ old, new ].map { |values| values.is_a?(Hash) ? summarised(values, fields).except(*codes) : values }
+      # A reference never reaches the row of the column's other values either,
+      # also when it did not change: that row prints the settings it holds. It
+      # is named on its own, as two digests, which the log words "Changed"
+      # (`Admin::AuditScreen::ChangesComponent`). A typed address on both sides
+      # stays where it was, because it is what the person typed.
+      references = fields.select { |field| [ old, new ].any? { |values| values.is_a?(Hash) && reference_value?(field, values[field.name]) } }.map(&:name)
+      references.each do |name|
+        before = old.is_a?(Hash) ? old[name] : nil
+        after = new.is_a?(Hash) ? new[name] : nil
+        next if before == after
+
+        result["#{column} #{name}"] = { "digest_before" => before && Digest::SHA256.hexdigest(before.to_s), "digest_after" => after && Digest::SHA256.hexdigest(after.to_s) }
+      end
+      rest = [ old, new ].map { |values| values.is_a?(Hash) ? summarised(values, fields).except(*codes, *references) : values }
       result[column] = rest unless rest.first == rest.last
       result
     end

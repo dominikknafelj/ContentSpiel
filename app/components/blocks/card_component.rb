@@ -26,12 +26,19 @@ module Blocks
 
     def text = settings&.text.to_s.strip.presence
 
-    # The stored address while the rule accepts it, else nil: a value that
-    # was accepted once and is refused now (the rule tightened, or a write
-    # around the service) draws no link.
+    # An address a browser may follow, or nil, and never anything else: this
+    # is a promise to themes (`Theme::Contract`). A stored address while the
+    # rule accepts it (a value accepted once and refused now draws no link); a
+    # stored reference to a page or a post as that target's current address in
+    # the visitor's language, or nil while a visitor can't reach it
+    # (`PublicSite::Urls#link_for`, the rule a body's internal link follows).
+    # The reference comes from the block handed in, so a live card's is its
+    # copy's, and the target's own state decides. Read once: a template asks up
+    # to four times, and a reference costs statements.
     def link
-      value = settings&.link
-      value if ContentModel::FieldTypes.link?(value)
+      return @link if defined?(@link)
+
+      @link = helpers.public_urls.link_for(settings&.link, I18n.locale)
     end
 
     # The stored icon's name while the theme declares it, else nil: the

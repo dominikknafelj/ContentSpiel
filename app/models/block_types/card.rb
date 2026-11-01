@@ -20,8 +20,8 @@ module BlockTypes
   #
   # THE ICON is a name from the theme's `icons` list (`:theme_choice`): a
   # name the theme does not declare is drawn as no icon and left as stored
-  # (the stored-name rule). THE LINK is a `:link`; the component draws it
-  # only while `ContentModel::FieldTypes.link?` accepts the stored value.
+  # (the stored-name rule). THE LINK is a `:link`, an address or a reference to a
+  # page or post; the component draws what `PublicSite::Urls#link_for` makes of it.
   module Card
     def self.register
       BlockTypes.register :card do |t|
@@ -78,7 +78,7 @@ module BlockTypes
       return false unless asset&.file&.attached?
 
       settings = block.settings_object(locale: locale, fallback: true)
-      ContentModel::FieldTypes.link?(settings&.link) && settings.title.to_s.strip.empty? && settings.text.to_s.strip.empty? &&
+      ContentModel::FieldTypes.link_value?(settings&.link) && settings.title.to_s.strip.empty? && settings.text.to_s.strip.empty? &&
         asset.alt_text(override: block.read_attribute(:alt), locale: locale).to_s.strip.empty?
     end
 

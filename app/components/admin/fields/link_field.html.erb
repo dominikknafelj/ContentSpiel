@@ -1,1 +1,24 @@
-<%= tag.input type: "text", inputmode: "url", name: input_name, id: input_id, value: value, class: setup_input_class, required: field.required? %>
+<div data-controller="admin--ui--link-target"
+     data-admin--ui--link-target-url-value="<%= search_url %>"
+     data-admin--ui--link-target-locale-value="<%= editing_locale %>"
+     data-admin--ui--link-target-untitled-value="<%= t(".untitled") %>"
+     data-action="input->admin--ui--link-target#swallow change->admin--ui--link-target#swallow">
+  <%= tag.input type: "text", inputmode: "url", name: input_name, id: input_id, value: value, class: setup_input_class, required: field.required?, hidden: reference.present?,
+        data: { admin__ui__link_target_target: "value" } %>
+  <%= tag.div id: group_id, role: "group", "aria-label": t(".chosen"), hidden: reference.nil?, class: "flex items-center gap-2 text-sm text-ink",
+        data: { admin__ui__link_target_target: "chip" } do %>
+    <span class="min-w-0 truncate" data-admin--ui--link-target-target="title"><%= chosen_title %></span>
+    <button type="button" class="shrink-0 rounded-cs px-1.5 py-0.5 text-meta underline hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:hidden"
+            data-admin--ui--link-target-target="clear"
+            data-action="click->admin--ui--link-target#clear"><%= t(".clear") %></button>
+  <% end %>
+  <%= tag.p t(".not_public"), hidden: !not_public?, class: "mt-1 text-sm text-meta", data: { admin__ui__link_target_target: "note" } %>
+  <%= tag.div hidden: reference.present?, class: "relative mt-2", data: { admin__ui__link_target_target: "searchBox" } do %>
+    <input type="text" autocomplete="off" spellcheck="false" aria-label="<%= t(".search") %>" placeholder="<%= t(".search") %>"
+           class="<%= setup_input_class %> peer read-only:hidden disabled:hidden"
+           data-admin--ui--link-target-target="search"
+           data-action="keydown.enter->admin--ui--link-target#holdEnter">
+    <p class="mt-1 text-sm text-meta peer-read-only:hidden peer-disabled:hidden" data-admin--ui--link-target-target="message"></p>
+    <ul class="mt-1 max-h-56 overflow-y-auto rounded-cs border border-line bg-surface p-1 shadow-sm" hidden data-admin--ui--link-target-target="listbox"></ul>
+  <% end %>
+</div>

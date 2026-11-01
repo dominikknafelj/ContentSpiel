@@ -558,17 +558,11 @@ module RichText
     # `PublicSite::Resolver` draws the same distinction for its own
     # `:preview` scope, and reusing its `visible?` here (rather than
     # re-deriving "published, with every ancestor also published" from
-    # scratch) is what keeps the two rules from drifting apart.
+    # scratch) is what keeps the two rules from drifting apart. The rule is
+    # `PublicSite::Urls#target_path`, which a Card's link asks too.
     def self.render_internal_link(mark_data, content, ctx)
       attrs = mark_data["attrs"] || {}
-      record = case attrs["type"]
-      when "page" then Page.find_by(id: attrs["id"])
-      when "post" then Post.find_by(id: attrs["id"])
-      end
-      return content if record.nil?
-      return content if !ctx.preview && !PublicSite::Resolver.visible?(record)
-
-      path = ctx.urls.path_for(record, ctx.locale)
+      path = ctx.urls.target_path(attrs["type"], attrs["id"], ctx.locale)
       path ? TAG.tag.a(content, href: path) : content
     end
   end

@@ -7,7 +7,15 @@ module ContentModel
   class NoThemeChoices < StandardError; end
 
   class << self
-    attr_writer :theme_choices
+    attr_writer :theme_choices, :link_target_readable
+
+    # `->(reference) { truthy when the acting person may read its target }`,
+    # for a `:link` field's new reference, assigned in
+    # `config/initializers/types.rb`: the content model sits below the access
+    # rules and the records.
+    def link_target_readable
+      @link_target_readable || raise(ArgumentError, "ContentModel.link_target_readable is not set: config/initializers/types.rb assigns it in to_prepare")
+    end
 
     # `->(list) { Array of objects answering name and label_for(locale) }`,
     # assigned in `config/initializers/types.rb`. Asked at each validation
