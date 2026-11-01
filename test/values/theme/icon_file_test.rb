@@ -119,6 +119,27 @@ class Theme::IconFileTest < ActiveSupport::TestCase
     one_problem(%(<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="urn:not-xlink"><use xlink:href="javascript:alert(1)"/></svg>), "href")
   end
 
+  # libxml says a prefix nobody declared and goes on, naming the attribute
+  # `xlink:href` in no namespace; the page's HTML parser reads it as XLink's
+  # href all the same.
+  test "a prefix the file never declares is refused: an undeclared xlink:href and an undeclared x:onload" do
+    one_problem(%(<svg xmlns="http://www.w3.org/2000/svg"><use xlink:href="/evil.svg#a"/></svg>), "not well-formed", "xlink")
+    one_problem(%(<svg xmlns="http://www.w3.org/2000/svg"><use xlink:href="#a"/></svg>), "not well-formed", "xlink")
+    one_problem(%(<svg xmlns="http://www.w3.org/2000/svg" x:onload="alert(1)"/>), "not well-formed", "onload")
+    one_problem(%(<svg xmlns="http://www.w3.org/2000/svg"><x:script>alert(1)</x:script></svg>), "not well-formed")
+    one_problem(%(<svg xmlns="http://www.w3.org/2000/svg" xmlns:q="urn:other"><use q:href="/evil.svg#a"/></svg>), "href")
+  end
+
+  test "an attribute is judged by its local part after the last colon, whatever the parser called it" do
+    document = Nokogiri::XML(%(<svg xmlns="http://www.w3.org/2000/svg"><use xlink:href="/evil.svg#a" x:onclick="alert(1)"/></svg>))
+    use = document.root.element_children.first
+    found = use.attribute_nodes.map { |attribute| Theme::IconFile.attribute_problem(attribute, use, "a.svg") }
+
+    assert_equal [ "xlink:href", "x:onclick" ], use.attribute_nodes.map(&:name), "libxml names an undeclared prefix's attribute whole"
+    assert_includes found.first, "an address outside the icon"
+    assert_includes found.last, "event handler"
+  end
+
   # Inlined, the file is read again by the page's HTML parser, which takes a
   # paragraph out of the drawing and reads a comment, a CDATA section and a
   # processing instruction by rules of its own: each of these is a script
@@ -134,6 +155,9 @@ class Theme::IconFileTest < ActiveSupport::TestCase
     one_problem(svg("<?x ><script>alert(1)</script>?>"), "processing instruction")
     one_problem(svg(%(<a href="#g"><path d="M0 0"/></a>)), "<a>")
     one_problem(svg(%(<set attributeName="href" to="javascript:alert(1)"/>)), "<set>")
+    one_problem(svg(%(<animate attributeName="href" values="javascript:alert(1)"/>)), "<animate>")
+    one_problem(svg(%(<image href="#g" width="4" height="4"/>)), "<image>")
+    one_problem(svg(%(<filter><feImage href="#g"/></filter>)), "<feImage>")
 
     assert_empty problems(svg(%(<!-- a note --><title>Arrow</title><g><path d="M0 0"/></g>))),
                  "a plain comment and a title are fine"

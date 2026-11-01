@@ -216,7 +216,9 @@ class Theme
     @icons.compute_if_absent(icon.name) do
       source = icon_path(icon).binread
       IconFile.problems_in(source, file: icon.file).empty? ? IconFile.inline(source).html_safe : nil
-    rescue SystemCallError
+    rescue SystemCallError, IOError, EncodingError, ArgumentError, Nokogiri::SyntaxError
+      # A file gone or unreadable since the check, or one `inline` cannot
+      # take apart: the card draws no icon rather than the page a 500.
       nil
     end
   end

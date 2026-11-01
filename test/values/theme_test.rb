@@ -269,6 +269,19 @@ class ThemeTest < ActiveSupport::TestCase
     own&.delete if own&.exist?
   end
 
+  test "icon_svg draws no icon, and raises nothing, when the file cannot be read or taken apart" do
+    # The suite has no minitest/mock: the module's own method is put back.
+    inline = Theme::IconFile.method(:inline)
+    [ Errno::EACCES, IOError, ArgumentError ].each do |error|
+      theme = choices_theme
+      Theme::IconFile.define_singleton_method(:inline) { |_| raise error }
+
+      assert_nil theme.icon_svg("brush"), error.name
+    end
+  ensure
+    Theme::IconFile.define_singleton_method(:inline, inline)
+  end
+
   test "icon_asset is the served path of the theme's file" do
     theme = choices_theme
 

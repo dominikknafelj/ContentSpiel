@@ -42,3 +42,7 @@
 
 # SimpleCov reports (COVERAGE=1 bin/rails test)
 /coverage/
+
+# A default-theme icon a test of Theme#icon_svg writes for its own length
+# (test/values/theme_test.rb); left behind only by a killed run.
+/app/assets/images/theme-test-*.svg

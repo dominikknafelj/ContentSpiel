@@ -127,16 +127,31 @@ class Theme
       body.sub(/\A<svg/, "<svg#{added}")
     end
 
+    # `strict` raises on a fatal error only. libxml says a prefix nobody
+    # declared (`xlink:href` without `xmlns:xlink`) as an error it goes on
+    # after, naming the attribute `xlink:href` in no namespace, while the
+    # page's HTML parser reads it as XLink's href: so any error is a file
+    # that is not well-formed.
     def parse(text, file)
-      Nokogiri::XML(text) { |config| config.strict.nonet }
+      document = Nokogiri::XML(text) { |config| config.strict.nonet }
+      error = document.errors.first
+      return document unless error
+
+      "#{file} is not well-formed XML (#{said(error)}). Correct it, or export the icon again."
     rescue Nokogiri::XML::SyntaxError => error
       if text.match?(/<!DOCTYPE/i)
         "#{file} has a DOCTYPE, which an icon may not: a DOCTYPE can declare entities. Take it out."
       elsif (entity = text.scan(ENTITY).flatten.find { |name| !PREDEFINED.include?(name) })
         "#{file} uses the entity &#{entity};, which an icon may not. Write the character itself, or a character reference (&#x2014;)."
       else
-        "#{file} is not well-formed XML (line #{error.line}: #{error.message.strip.split("\n").first}). Correct it, or export the icon again."
+        "#{file} is not well-formed XML (#{said(error)}). Correct it, or export the icon again."
       end
+    end
+
+    # libxml's sentence without its own place and level ("1:70: ERROR: ").
+    def said(error)
+      words = error.message.strip.split("\n").first.to_s.sub(/\A\d+:\d+:\s*(?:FATAL|ERROR|WARNING):\s*/, "")
+      error.line.to_i.positive? ? "line #{error.line}: #{words}" : words
     end
 
     # Every node, without recursion. One problem per node and per
@@ -186,8 +201,10 @@ class Theme
       end
     end
 
+    # Judged by the local part after the last colon, whatever the parser
+    # called the attribute, as the page's HTML parser reads `xlink:href`.
     def attribute_problem(attribute, node, file)
-      name = attribute.name.downcase
+      name = attribute.name.split(":").last.to_s.downcase
       value = attribute.value
       where = "#{file}: the attribute #{qualified(attribute)} on <#{qualified(node)}>"
       if name.start_with?("on")
