@@ -456,6 +456,14 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   # inside <title> (raw text) a browser would show them in the tab. The
   # title is the partial's text and nothing else, under either theme.
   test "the title holds only the title text when views are annotated, under the default theme and a theme that replaces _title" do
+    # A ViewComponent class compiles once per class, for the worker's life, so
+    # a component first drawn under the flag would keep its comments and draw
+    # them in every later test (the scaffold's "byte for byte" failed on them,
+    # by order). Everything is compiled first, as ViewComponent's engine does
+    # at boot where eager loading is on; only that eager load here makes the
+    # descendants known where it is off.
+    Rails.application.eager_load!
+    ViewComponent::Base.descendants.reject(&:anonymous?).each(&:__vc_compile)
     was = ActionView::Base.annotate_rendered_view_with_filenames
     ActionView::Base.annotate_rendered_view_with_filenames = true
     # A compiled template carries the setting it was compiled under.
