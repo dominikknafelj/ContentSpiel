@@ -32,7 +32,7 @@ class Theme
     # The file at a theme folder's top that declares its choices, the three
     # lists it may hold and the page fields a page template may draw
     # (`Theme::Declarations`). Names of the contract: a change is a release note.
-    DECLARATIONS = "theme.yml".freeze
+    DECLARATIONS = ThemeFolder::DECLARATIONS
     CHOICE_LISTS = %w[section_styles page_templates icons].freeze
     PAGE_FIELDS = %w[hero].freeze
 

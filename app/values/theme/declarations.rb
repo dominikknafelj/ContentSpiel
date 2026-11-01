@@ -16,7 +16,10 @@ class Theme
   # of a folder that passed. Loaded with `safe_load` and no aliases: no
   # class, no symbol, no anchor.
   module Declarations
-    FILE = "theme.yml".freeze
+    FILE = Contract::DECLARATIONS
+    MAX_BYTES = 64 * 1024
+    MAX_DEPTH = 16
+    LOCALE = /\A[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]+)*\z/
     DEFAULT_FILE = "config/theme/default.yml".freeze
     NAME = /\A[a-z][a-z0-9_]{0,39}\z/
 
@@ -45,7 +48,7 @@ class Theme
       lists = {}
       data.each do |key, entries|
         unless key.is_a?(String) && (Contract::CHOICE_LISTS.include?(key) || key == "settings")
-          problems << "#{file}: `#{key}` is not a list a theme may declare: #{Contract::CHOICE_LISTS.join(", ")}. " \
+          problems << "#{file}: `#{key.nil? ? "empty key" : key}` is not a list a theme may declare: #{Contract::CHOICE_LISTS.join(", ")}. " \
                       "Rename it to one of them, or remove it."
           next
         end
@@ -91,31 +94,74 @@ class Theme
 
     def load_yaml(source, file, problems)
       text = source.to_s.dup.force_encoding(Encoding::UTF_8)
+      if text.bytesize > MAX_BYTES
+        problems << "#{file} is larger than #{MAX_BYTES / 1024} KB, which is more than a list of choices needs. Cut it down."
+        return nil
+      end
       unless text.valid_encoding?
         problems << "#{file} is not UTF-8 text, so it cannot be read. Save the file as UTF-8."
         return nil
       end
 
-      YAML.safe_load(text.delete_prefix("﻿"), permitted_classes: [], aliases: false, filename: file)
+      text = text.delete_prefix("\uFEFF")
+      return nil if refused_in_tree?(text, file, problems)
+
+      YAML.safe_load(text, permitted_classes: [ Date, Time, Symbol ], aliases: false, filename: file)
     rescue Psych::SyntaxError => error
       problems << "#{file}: line #{error.line} is not valid YAML (#{error.problem}). Correct it."
       nil
     rescue Psych::DisallowedClass, Psych::BadAlias => error
-      problems << "#{file}: it uses a YAML alias, anchor or tag (#{error.message}), which a theme may not. " \
+      problems << "#{file}: it uses a YAML alias or tag (#{error.message}), which a theme may not. " \
                   "Write the value out, with plain text, numbers and lists only."
       nil
+    rescue SystemStackError
+      problems << "#{file} is nested deeper than a list of choices is. Flatten it to lists of entries."
+      nil
+    end
+
+    # The parsed tree, walked without recursion before anything is built from
+    # it: an explicit tag (`!!binary`, `!!str`, `!ruby/object`), an anchor, an
+    # alias, a mapping that repeats a key, and nesting past MAX_DEPTH are each
+    # one problem. Returns whether it found one.
+    def refused_in_tree?(text, file, problems)
+      root = Psych.parse(text, filename: file)
+      return false unless root.is_a?(Psych::Nodes::Node)
+
+      found = []
+      stack = [ [ root, 0 ] ]
+      until stack.empty?
+        node, depth = stack.pop
+        if depth > MAX_DEPTH
+          problems << "#{file} is nested deeper than a list of choices is. Flatten it to lists of entries."
+          return true
+        end
+        found << "an alias" if node.is_a?(Psych::Nodes::Alias)
+        found << "a tag (#{node.tag})" if node.respond_to?(:tag) && node.tag
+        found << "an anchor" if node.respond_to?(:anchor) && node.anchor
+        if node.is_a?(Psych::Nodes::Mapping)
+          keys = node.children.each_slice(2).filter_map { |key, _| key.value if key.is_a?(Psych::Nodes::Scalar) }
+          keys.tally.each { |key, count| problems << "#{file}: the key `#{key}` is written #{count} times in one mapping. Keep one." if count > 1 }
+        end
+        node.children&.each { |child| stack << [ child, depth + 1 ] }
+      end
+      if found.any?
+        problems << "#{file}: it uses #{found.uniq.join(" and ")}, which a theme may not. " \
+                    "Write the value out, with plain text, numbers and lists only."
+      end
+      problems.any?
     end
 
     def entries_of(list, entries, file, against, problems)
       unless entries.is_a?(Array)
-        problems << "#{file}: #{list} must be a list of entries, not #{kind(entries)}. Write each entry as `- name: …` with a `label:`."
+        problems << "#{file}: #{list} must be a list of entries, not #{kind(entries)}. Write each entry as `- name: …` with a `label:`, " \
+                    "or `#{list}: []` for none."
         return []
       end
 
-      seen = []
+      seen = Set.new
       entries.each_with_index.filter_map do |entry, index|
         choice = entry_of(list, entry, index, file, against, seen, problems)
-        seen << choice.name if choice
+        seen.add(choice.name) if choice
         choice
       end
     end
@@ -148,7 +194,7 @@ class Theme
       where += " (#{name})" if name
 
       labels = labels_of(entry["label"], where, problems)
-      fields = fields_of(list, entry["fields"], where, problems)
+      fields = fields_of(list, entry["fields"], entry.key?("fields"), where, problems)
       file_name, from = file_of(list, entry, name, against, where, problems)
 
       return nil if problems.size > before
@@ -163,10 +209,10 @@ class Theme
 
         problems << "#{where}: `label` is empty. Say what a person sees in CS Studio."
       when Hash
-        words = label.select { |key, value| key.is_a?(String) && value.is_a?(String) && !value.strip.empty? }
+        words = label.select { |key, value| key.is_a?(String) && key.match?(LOCALE) && value.is_a?(String) && !value.strip.empty? }
         return words if words.size == label.size && !label.empty?
 
-        problems << "#{where}: `label` as a mapping must give each language code a text (en: Services), not #{kind(label)} with other keys or values. Correct it."
+        problems << "#{where}: `label` as a mapping must give each language code (en, de, pt-BR) a text (en: Services), not #{kind(label)} with other keys or values. Correct it."
       when nil
         problems << "#{where}: `label` is missing. Add what a person sees in CS Studio, as a text or as a mapping of languages."
       else
@@ -175,8 +221,8 @@ class Theme
       nil
     end
 
-    def fields_of(list, fields, where, problems)
-      return [] unless list == "page_templates" && !fields.nil?
+    def fields_of(list, fields, present, where, problems)
+      return [] unless list == "page_templates" && present
 
       unless fields.is_a?(Array)
         problems << "#{where}: `fields` must be a list (fields: [hero]), not #{kind(fields)}. Write it as a list."

@@ -101,9 +101,8 @@ class Theme::DeclarationsTest < ActiveSupport::TestCase
 
   test "a YAML error is one problem with its line, an alias and a tag are refused, and a file that is not UTF-8 is one problem" do
     one_problem("section_styles:\n  - name: a\n   label: [\n", "line 2")
-    one_problem("a: &x\n  - 1\nsection_styles: *x\n", "alias, anchor or tag")
-    one_problem("section_styles: !ruby/object:OpenStruct {}\n", "alias, anchor or tag")
-    one_problem("section_styles:\n  - name: :sym\n    label: A\n", "alias, anchor or tag")
+    one_problem("a: &x\n  - 1\nsection_styles: *x\n", "an alias and an anchor")
+    one_problem("section_styles: !ruby/object:OpenStruct {}\n", "a tag")
     one_problem("section_styles:\n  - name: a\n    label: A\n".dup.force_encoding("ASCII-8BIT") + "\xE9".b, "not UTF-8")
   end
 
@@ -124,5 +123,67 @@ class Theme::DeclarationsTest < ActiveSupport::TestCase
     assert_equal [ [], [ "hero" ] ], lists["page_templates"].map(&:fields)
     assert_empty lists["section_styles"]
     assert_equal Theme::Contract::CHOICE_LISTS, lists.keys
+  end
+  test "every explicit tag is refused, standard ones too: !!binary, !!str, !!int and !ruby/object" do
+    [ "!!binary 6Q==", "!!str A", "!!int 3", "!ruby/object:OpenStruct {}" ].each do |tagged|
+      one_problem("section_styles:\n  - name: a\n    label: #{tagged}\n", "a tag")
+    end
+    one_problem("section_styles:\n  - name: !!str a\n    label: A\n", "a tag")
+  end
+
+  test "an anchor with no alias is refused too" do
+    one_problem("section_styles:\n  - &first\n    name: a\n    label: A\n", "an anchor")
+  end
+
+  test "deep nesting is one problem on a thread as a request runs on, and a stack that overflows in the parse is one problem too" do
+    deep = ("[" * 2000) + ("]" * 2000)
+    found = Thread.new { problems("section_styles: #{deep}\n") }.value
+
+    assert_equal 1, found.size, found.inspect
+    assert found.first.start_with?("theme.yml"), found.first
+    assert_includes found.first, "nested deeper"
+
+    stack = ->(*) { raise SystemStackError }
+    found = with_singleton_override(YAML, :safe_load, stack) { Thread.new { problems("section_styles: []\n") }.value }
+
+    assert_equal 1, found.size
+    assert_includes found.first, "nested deeper"
+  end
+
+  test "a file over 64 KB is refused with one sentence that starts with the file and says what to do" do
+    found = problems("# #{"x" * Theme::Declarations::MAX_BYTES}\n")
+
+    assert_equal 1, found.size
+    assert found.first.start_with?("theme.yml is larger than 64 KB"), found.first
+    assert found.first.end_with?("Cut it down."), found.first
+  end
+
+  test "a date or a symbol is a value of the wrong kind, named by list, place and key" do
+    one_problem("section_styles:\n  - name: a\n    label: 2024-01-01\n", "section_styles, entry 1 (a)", "`label`", "date")
+    one_problem("section_styles:\n  - name: :sym\n    label: A\n", "section_styles, entry 1", "`name`", "symbol")
+  end
+
+  test "a key written twice in one mapping is one problem naming the key" do
+    one_problem("section_styles:\n  - name: a\n    name: b\n    label: A\n", "`name` is written 2 times")
+    one_problem("section_styles: []\nsection_styles: []\n", "`section_styles` is written 2 times")
+  end
+
+  test "fields left empty is a problem like an empty list, and an empty list says how to declare none" do
+    one_problem("page_templates:\n  - name: a\n    label: A\n    fields:\n", "`fields`", "must be a list")
+    one_problem("icons:\n", "`icons: []` for none")
+  end
+
+  test "many entries are read in linear time and a repeated name is still found" do
+    yaml = "section_styles:\n" + (1..1200).map { |n| "  - name: n#{n}\n    label: L\n" }.join
+    lists, found = read(yaml)
+
+    assert_empty found
+    assert_equal 1200, lists["section_styles"].size
+    assert_equal 1, problems(yaml + "  - name: n7\n    label: L\n").size
+  end
+
+  test "a label's language keys are language codes" do
+    one_problem("section_styles:\n  - name: a\n    label: { not a code: A }\n", "`label`")
+    assert_empty problems("section_styles:\n  - name: a\n    label: { pt-BR: A, de: B }\n")
   end
 end

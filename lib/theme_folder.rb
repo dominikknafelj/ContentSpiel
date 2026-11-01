@@ -69,7 +69,8 @@ class ThemeFolder
   # The one file a theme holds at its top: the choices it declares
   # (`Theme::Declarations`). It is a file of the folder like any other, so
   # `files` and `fingerprint` include it.
-  FILES = %w[theme.yml].freeze
+  DECLARATIONS = "theme.yml".freeze
+  FILES = [ DECLARATIONS ].freeze
 
   # What is said of an entry at the top that is none of them, after its
   # name: here with the variable and the whole path (the boot's refusal),
@@ -284,7 +285,7 @@ class ThemeFolder
   end
 
   # The theme's `theme.yml`, or nil.
-  def declarations_file = existing_file("theme.yml")
+  def declarations_file = existing_file(DECLARATIONS)
 
   # The theme's one stylesheet, imported after the default theme's by the
   # build (`ThemeCss`), or nil: a theme of templates alone has none.
