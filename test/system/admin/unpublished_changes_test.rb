@@ -38,7 +38,11 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_equal "Live page", Publishing.current(@live).snapshot.dig("fields", "title", "en"), "the site still shows what was published"
 
     press "Publish changes…"
-    within("dialog[open]") { press "Publish changes" }
+    # The overview's answer grows the dialog and moves its button down; aim after it.
+    within("dialog[open]") do
+      assert_selector "[data-publishing-overview]"
+      press "Publish changes"
+    end
 
     assert_no_selector "#{HEADER} [data-unpublished-changes]", wait: 10
     assert_no_selector "#{HEADER} #publishing-actions button"
@@ -157,7 +161,10 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
 
     assert_writes_settled
     press "Publish changes…"
-    within("dialog[open]") { press "Publish changes" }
+    within("dialog[open]") do
+      assert_selector "[data-publishing-overview]"
+      press "Publish changes"
+    end
     assert_no_selector "#{HEADER} [data-unpublished-changes]", wait: 10
 
     using_session(:dana) do

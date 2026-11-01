@@ -440,6 +440,8 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     # Trashed after the page loaded: the request is now a 404 page, not a
     # stream, so the box is filled by `admin--translation--translate` itself.
     assert Trash::Move.call(post).ok?
+    # `gone` draws a notice above Translate and pushes it down; press after it.
+    assert_selector "[data-editing-missing]"
 
     press_within slot("title"), "Translate"
     assert_selector "#translation-suggestion-post-title [role='alert']", text: "Couldn't get a suggestion"
