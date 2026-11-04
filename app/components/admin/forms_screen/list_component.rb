@@ -9,9 +9,9 @@ module Admin
     #
     # WHO SEES WHAT. Both rights open the screen (the controller's gate).
     # `forms.manage` gets "+ New form", the link to the builder and the ⋯
-    # menu; a holder of `form_submissions.view` the submission counts. The
-    # link to a form's submissions, and the name's link for a viewer with
-    # that right alone, are Task 5's, with the submissions screen.
+    # menu; a holder of `form_submissions.view` the submission counts, each
+    # a link to the form's submissions (Task 5), "Submissions" in the menu,
+    # and, for a viewer with that right alone, the name's link to them.
     #
     # THE WARNINGS (design.md 1), once above the table: mail that is not set
     # up, only when a listed form has a mail destination (`MailSettings
@@ -55,6 +55,8 @@ module Admin
       def new_form_path = helpers.new_admin_form_path(**url_options)
 
       def form_path(form) = helpers.admin_form_path(form, **url_options)
+
+      def submissions_path(form) = helpers.admin_form_submissions_path(form, **url_options)
 
       def mail_settings_path = helpers.admin_settings_path(anchor: "mail", **url_options)
 

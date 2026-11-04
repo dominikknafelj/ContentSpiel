@@ -180,11 +180,13 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a viewer with only form_submissions.view can't open the builder or change a form" do
+  # Ruling R7: the builder's door for a viewer with `form_submissions.view`
+  # alone is the form's submissions, not a 403 (Task 5).
+  test "a viewer with only form_submissions.view is sent to the submissions and can't change a form" do
     viewer = submissions_viewer
     sign_in_as viewer
     get admin_form_path(forms(:contact))
-    assert_response :forbidden
+    assert_redirected_to admin_form_submissions_path(forms(:contact))
     patch admin_form_path(forms(:contact)), params: { form: contact_params(name: "Taken") }
     assert_response :forbidden
     delete admin_form_path(forms(:contact))

@@ -93,6 +93,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/forms_screen/trash_zone_component.rb
     app/components/admin/forms_screen/trash_zone_component.html.erb
     app/components/admin/forms_screen/draft.rb
+    app/components/admin/forms_screen/tabs_component.rb
+    app/components/admin/forms_screen/tabs_component.html.erb
+    app/components/admin/forms_screen/submissions_list_component.rb
+    app/components/admin/forms_screen/submissions_list_component.html.erb
+    app/components/admin/forms_screen/submission_component.rb
+    app/components/admin/forms_screen/submission_component.html.erb
+    app/controllers/admin/form_submissions_controller.rb
+    app/controllers/admin/form_deliveries_controller.rb
+    app/views/admin/form_submissions/index.html.erb
+    app/views/admin/form_submissions/show.html.erb
     app/controllers/admin/forms_controller.rb
     app/views/admin/forms/index.html.erb
     app/views/admin/forms/new.html.erb

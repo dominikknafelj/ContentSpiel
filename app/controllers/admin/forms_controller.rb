@@ -11,9 +11,10 @@ module Admin
   # or `form_submissions.view` (the rights are site-wide, as the library's
   # is: a 403 without both); everything that builds or changes a form needs
   # `forms.manage`. The builder needs it too: for a viewer with
-  # `form_submissions.view` alone a form opens on its submissions, which
-  # Task 5 builds (until then it is the 403). A trashed form is not found
-  # here: it is the Trash screen's.
+  # `form_submissions.view` alone a form opens on its submissions
+  # (`Admin::FormSubmissionsController`, pre-flight ruling R7), a redirect
+  # rather than a 403, so a link to a form works for both. A trashed form
+  # is not found here: it is the Trash screen's.
   #
   # SAVING is explicit, through the save bar (configuration screens save
   # explicitly, docs/reference/save-rule-and-write-queue.md), with the
@@ -30,9 +31,10 @@ module Admin
 
     PER_PAGE = 50
 
-    before_action -> { forbidden! unless holds_any?(%w[forms.manage form_submissions.view]) }, only: :index
-    before_action -> { require_permission("forms.manage") }, except: :index
+    before_action -> { forbidden! unless holds_any?(%w[forms.manage form_submissions.view]) }, only: %i[index show]
+    before_action -> { require_permission("forms.manage") }, except: %i[index show]
     before_action :set_form, only: %i[show update destroy]
+    before_action :open_submissions_instead, only: :show
 
     def index
       relation = Forms::Form.kept.order(:name, :id)
@@ -108,6 +110,12 @@ module Admin
     end
 
     private
+
+    # The builder is `forms.manage`'s; a viewer who reads submissions only
+    # is sent to the form's (the gate above lets no one else this far).
+    def open_submissions_instead
+      redirect_to admin_form_submissions_path(@form, **admin_url_options) unless can?("forms.manage")
+    end
 
     # A kept form; a trashed or missing one is the 404.
     def set_form

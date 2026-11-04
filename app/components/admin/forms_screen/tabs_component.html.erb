@@ -1,0 +1,5 @@
+<nav aria-label="<%= t(".label") %>" class="inline-flex self-start overflow-hidden rounded-cs border border-field-line bg-surface">
+  <% tabs.each do |tab| %>
+    <%= link_to tab[:label], tab[:href], class: link_class(tab[:key]), aria: { current: (tab[:key] == @current ? "page" : nil) }, data: { turbo_frame: "content" } %>
+  <% end %>
+</nav>

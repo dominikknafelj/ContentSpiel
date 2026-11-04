@@ -1,7 +1,8 @@
 # The Forms screen's components (forms plan, Task 4; the words are
 # .superpowers/sdd/2026-11-03-forms/design.md, sections 1 and 2): the list,
 # New form, the builder and its rows, where submissions go, Placed on and
-# the trash zone. The controller's toasts and the views' titles are
+# the trash zone; the tabs, the submissions list and one submission (Task 5,
+# design.md 3). The controller's toasts and the views' titles are
 # `admin.forms.*` (`forms.en.yml`), beside the save's refusals.
 en:
   admin:
@@ -32,6 +33,10 @@ en:
           not_placed: "Not placed"
           actions_for: "Actions for %{name}"
           open: "Open"
+          submissions: "Submissions"
+          submissions_of:
+            one: "%{count} submission of %{name}"
+            other: "%{count} submissions of %{name}"
           move_to_trash: "Move to trash…"
           empty:
             title: "No forms yet."
@@ -142,3 +147,71 @@ en:
             one: "It is placed on %{count} page you can't open."
             other: "It is placed on %{count} pages you can't open."
           confirm: "Move to trash"
+        tabs:
+          label: "Form screens"
+          form: "Form"
+          submissions: "Submissions"
+        submissions_list:
+          kept:
+            one: "Kept for %{count} day, then deleted."
+            other: "Kept for %{count} days, then deleted."
+          not_kept: "Not kept: each is deleted once it is delivered. One that can't be delivered waits here for at most 30 days."
+          delete_all: "Delete all…"
+          columns:
+            received: "Received"
+            summary: "Summary"
+            language: "Language"
+            page: "Page"
+            state: "State"
+          unreadable: "Can't be read"
+          page_trashed: "A page in the trash"
+          page_gone: "A page that's gone"
+          not_delivered: "Not delivered"
+          empty:
+            title: "No submissions yet."
+            description: "They appear here when a visitor sends the form."
+          empty_not_kept:
+            title: "No submissions waiting."
+            description: "This form doesn't keep submissions. One that can't be delivered waits here."
+          dialog:
+            title:
+              one: "Delete the submission of “%{name}”?"
+              other: "Delete all %{count} submissions of “%{name}”?"
+            body: "Their answers are deleted for good, those not yet delivered too. This can't be undone."
+            confirm:
+              one: "Delete 1 submission"
+              other: "Delete %{count} submissions"
+        submission:
+          back: "← All submissions"
+          title: "Submission"
+          meta: "Received %{time} · %{language} · from %{page}"
+          meta_no_page: "Received %{time} · %{language}"
+          answers: "Answers"
+          not_answered: "Not answered"
+          unreadable: "This submission can't be read: the site's encryption keys have changed since it was sent. It can still be deleted."
+          delivery: "Delivery"
+          mail_to: "Mail to %{recipients}"
+          removed_destination: "A destination that's been removed"
+          sent: "Sent"
+          waiting: "Waiting"
+          failed: "Failed"
+          # Why a delivery failed, by its stored key (`Forms::DeliveryJob`,
+          # `Forms::Destinations::Mail`): never the other side's line, a
+          # secret or an answer. A mail's own keys are said in Settings →
+          # Mail's short words (`admin.mail.reasons`).
+          reasons:
+            mail: "Not sent: %{reason}."
+            not_ready: "Not sent: mail isn't set up."
+            gave_up: "Not sent: it was tried %{count} times without getting through."
+            no_destination: "Not sent: this destination was removed from the form."
+            unknown_destination: "Not sent: this kind of destination is no longer part of the site."
+            error: "Not sent: something went wrong on this site while sending it."
+            unknown: "Not sent: the destination didn't take it."
+          open_mail_settings: "Open Mail settings →"
+          send_again: "Send again"
+          delete_title: "Delete this submission"
+          delete_body: "Its answers are deleted for good."
+          delete_button: "Delete submission…"
+          dialog_title: "Delete this submission?"
+          dialog_body: "Its answers are deleted for good. This can't be undone."
+          confirm: "Delete submission"

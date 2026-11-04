@@ -1,5 +1,6 @@
 <%= tag.div class: "admin-form-column flex flex-col gap-4", data: { controller: "admin--forms--builder", messages: messages, "admin--forms--builder-max-fields-value": max_fields } do %>
   <h1 class="text-h1 text-ink"><%= heading %></h1>
+  <%= render Admin::FormsScreen::TabsComponent.new(form: form, current: :form, url_options: url_options) %>
 
   <% if languages? %>
     <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, url: tab_url) %>

@@ -43,3 +43,24 @@ en:
       destroy:
         moved: "“%{name}” moved to the trash."
         undo: "Undo"
+      # Send again (`Forms::Resend`, forms plan Task 5): the one refusal.
+      resend:
+        not_failed: "This delivery hasn't failed, so there is nothing to send again."
+    # A form's submissions (forms plan, Task 5; design.md 3): the titles and
+    # toasts of `Admin::FormSubmissionsController` and
+    # `Admin::FormDeliveriesController`; what their components draw is
+    # `admin.components.forms_screen` (`forms_screen.en.yml`).
+    form_submissions:
+      index:
+        title: "Submissions of %{name}"
+      show:
+        title: "Submission"
+      destroy:
+        deleted: "Submission deleted."
+      destroy_all:
+        deleted:
+          one: "%{count} submission deleted."
+          other: "%{count} submissions deleted."
+    form_deliveries:
+      resend:
+        sending: "Sending again."

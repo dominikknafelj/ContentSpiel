@@ -1,0 +1,10 @@
+<%# A form's submissions (forms plan, Task 5; design.md 3):
+    `Admin::FormsScreen::SubmissionsListComponent`, 50 a page. %>
+<% content_for :title, t(".title", name: @form.name) %>
+<% page_url = ->(page) { admin_form_submissions_path(@form, page: page, **admin_url_options) } %>
+<% if @pagination.out_of_range? %>
+  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+<% else %>
+  <%= render Admin::FormsScreen::SubmissionsListComponent.new(form: @form, submissions: @submissions, pagination: @pagination,
+        total: @total, page_url: page_url, url_options: admin_url_options) %>
+<% end %>

@@ -458,6 +458,15 @@ module ServiceCalls
       { call: -> { Forms::DeleteSubmissions.call(form, ids: [ submission.id ]) }, permission: "forms.manage", on: form }
     },
 
+    # Sends a failed delivery again: it goes back to waiting.
+    "Forms::Resend" => lambda {
+      form = forms(:contact)
+      submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
+      delivery = submission.deliveries.create!(kind: "mail", destination: form_destinations(:contact_mail))
+      delivery.record_failed!(key: "login", line: nil, at: Time.current)
+      { call: -> { Forms::Resend.call(delivery) }, permission: "form_submissions.view", on: form }
+    },
+
     "Posts::Save" => lambda {
       post = create_post(title: "Edit me", published: false, tags: [ "kept" ])
       { call: -> { Posts::Save.call(post, attributes: { published: true, tag_names: [ "other" ] }, translations: { "en" => { title: "Edited" } }) },

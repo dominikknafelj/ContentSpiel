@@ -111,8 +111,10 @@ module Audit
     # is a visitor's (`Audit::VISITOR_LABEL`, no actor row), and every
     # visitor's sentence reads "A visitor <verb>"; `form_submissions.deleted`
     # is an editor's or, with a reason, the jobs' ("System deleted 3
-    # submissions of “Contact” after they were delivered").
-    SUBMISSION_ACTIONS = %w[form_submission.received form_submissions.deleted].freeze
+    # submissions of “Contact” after they were delivered");
+    # `form_submission.resent` is an editor's Send again (Task 5), "sent a
+    # submission of “Contact” again".
+    SUBMISSION_ACTIONS = %w[form_submission.received form_submission.resent form_submissions.deleted].freeze
 
     # The jobs' reasons, singular and plural; an editor's (`editor`) and a
     # reason this code no longer knows say none.
@@ -376,6 +378,7 @@ module Audit
 
       def submission_parts
         return subject_parts("sent the form ") if @action == "form_submission.received"
+        return subject_parts("sent a submission of ", " again") if @action == "form_submission.resent"
 
         metadata = event.metadata.is_a?(Hash) ? event.metadata : {}
         count = metadata["count"].to_i

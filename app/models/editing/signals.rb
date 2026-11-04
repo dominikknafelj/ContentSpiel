@@ -70,7 +70,10 @@ module Editing
       **%w[form.created form.updated form.trashed form.restored form.purged]
         .index_with { "a form is saved explicitly on its own screen and has no live editor" },
       **Audit::Sentence::SUBMISSION_ACTIONS
-        .index_with { "a form's submission is no content: a visitor's send, or a deletion, changes nothing an editor has open" }
+        .index_with { "a form's submission is no content: a visitor's send, or a deletion, changes nothing an editor has open" },
+      # Named on its own as well (forms pre-flight ruling R8), though the
+      # line above already holds it.
+      "form_submission.resent" => "sending a failed delivery again writes only the delivery's state, which no editor has open"
     ).freeze
 
     module_function

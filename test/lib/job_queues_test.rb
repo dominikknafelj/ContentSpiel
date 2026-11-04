@@ -40,4 +40,17 @@ class JobQueuesTest < ActiveSupport::TestCase
     assert_equal 1, images["threads"]
     assert_equal 1, images["processes"]
   end
+
+  # Forms plan, Task 5: the submissions' clean-up runs daily wherever the
+  # trash's does, half an hour after it, on `default`.
+  test "the forms clean-up is scheduled in every environment that schedules the trash's" do
+    recurring = YAML.safe_load(ERB.new(File.read(Rails.root.join("config/recurring.yml"))).result, aliases: true)
+    environments = recurring.select { |_, tasks| tasks.is_a?(Hash) && tasks.key?("trash_purge_expired") }.keys
+
+    assert_equal %w[development production test], environments.sort
+    environments.each do |name|
+      assert_equal({ "class" => "Forms::PurgeExpiredJob", "queue" => "default", "schedule" => "every day at 3:30am" },
+        recurring.dig(name, "forms_purge_expired"), name)
+    end
+  end
 end

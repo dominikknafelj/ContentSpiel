@@ -163,6 +163,9 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert received.actor.none, "a visitor is nobody the log can name"
     assert_equal "A visitor sent the form “Contact”", read(received)
 
+    resent = Audit::Event.new(on_form.merge(action: "form_submission.resent", channel: "admin", user_id: @me.id, metadata: { "submission_id" => 4, "destination" => "mail" }))
+    assert_equal "You sent a submission of “Contact” again", read(sentence_for(resent))
+
     deleted = ->(metadata, **attributes) { read(sentence_for(Audit::Event.new(on_form.merge(action: "form_submissions.deleted", channel: "system", metadata: metadata, **attributes)))) }
     assert_equal "You deleted 3 submissions of “Contact”", deleted.call({ "count" => 3, "reason" => "editor" }, user_id: @me.id)
     assert_equal "You deleted 1 submission of “Contact”", deleted.call({ "count" => 1, "reason" => "editor" }, user_id: @me.id)

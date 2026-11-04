@@ -11,12 +11,15 @@ module Forms
   #   - nil: delivered. The delivery is recorded `sent`, and for a form that
   #     keeps nothing a submission whose every delivery is now sent is
   #     deleted (`Forms::DeleteSubmissions`, reason `delivered`). Each job
-  #     reads the deliveries again after its own `sent` has committed (the
-  #     job runs in no transaction), and nothing puts a sent delivery back to
+  #     decides after its own `sent` has committed (the job runs in no
+  #     transaction), from the submission's row locked and its deliveries
+  #     read after the lock, and nothing puts a sent delivery back to
   #     waiting (`Delivery#resend!` takes only a failed one), so of two
-  #     deliveries finishing at once the later read sees both sent: one
-  #     deletes, or both do and the second finds nothing and records
-  #     nothing. None is left behind.
+  #     deliveries finishing at once the second to take the lock sees both
+  #     sent, or finds the row already gone and records nothing. A job that
+  #     dies between its `sent` and that decision leaves one behind, which
+  #     the daily sweep deletes (`Forms::PurgeExpiredJob`, under the same
+  #     lock).
   #   - `Retry`: a failure worth another attempt (the mail's connection
   #     failure). Retried with backoff, `ATTEMPTS` in all; the deliverer is
   #     told which attempt is the last (`final_attempt:`), so it can record
@@ -94,12 +97,22 @@ module Forms
       forget_delivered(delivery.submission)
     end
 
-    # A submission a form that keeps nothing has delivered everywhere.
+    # A submission a form that keeps nothing has delivered everywhere,
+    # decided from its LOCKED row and the deliveries read after the lock
+    # (forms plan, Task 5): of two jobs finishing at once, and of a job and
+    # the daily sweep (`Forms::PurgeExpiredJob`, which locks the same rows),
+    # the second waits for the first, then finds the row gone (and records
+    # nothing) or decides from what the first committed.
     def forget_delivered(submission)
-      return if submission.form.keeps? || !submission.deliveries.reload.all?(&:sent?)
+      return if submission.form.keeps?
 
-      result = DeleteSubmissions.call(submission.form, ids: [ submission.id ], reason: :delivered)
-      logger.warn "[ContentSpiel] A delivered submission of form #{submission.form_id} was not deleted: #{result.errors.to_sentence}" unless result.ok?
+      ActiveRecord::Base.transaction do
+        locked = Submission.lock.find_by(id: submission.id)
+        next unless locked&.deliveries&.reload&.all?(&:sent?)
+
+        result = DeleteSubmissions.call(submission.form, ids: [ locked.id ], reason: :delivered)
+        logger.warn "[ContentSpiel] A delivered submission of form #{submission.form_id} was not deleted: #{result.errors.to_sentence}" unless result.ok?
+      end
     end
 
     # The line with every secret of the destination and every answer of the

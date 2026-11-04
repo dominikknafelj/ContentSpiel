@@ -293,7 +293,19 @@ Rails.application.routes.draw do
     # with `new` its page without JavaScript), the builder (`show`, saved
     # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
     # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
-    resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ }
+    resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ } do
+      # A form's submissions (forms plan, Task 5; design.md 3): the list
+      # (`?page=`), one submission, deleting one and deleting all. A
+      # submission is found among its form's, by its id: no answer is ever
+      # part of an address.
+      resources :submissions, controller: "form_submissions", only: %i[index show destroy], constraints: { id: /\d+/ } do
+        delete :destroy_all, on: :collection
+      end
+    end
+    # Send again, for one failed delivery (`Forms::Resend`), by its id.
+    resources :form_deliveries, only: [], constraints: { id: /\d+/ } do
+      post :resend, on: :member
+    end
 
     # "Your account" (access-control design spec §5; the notes handoff's
     # decisions 25 and 38): the signed-in user's own account, open to every
