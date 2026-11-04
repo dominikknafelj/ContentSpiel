@@ -48,11 +48,17 @@ module Forms
       update_columns(state: "failed", failure: { "key" => key.to_s, "line" => line }, failed_at: at, updated_at: at) # version: none (a delivery's state is not content)
     end
 
-    # Back to waiting, to be queued again (`Forms::Resend`), under the mail
-    # settings as they are now.
+    # A FAILED delivery back to waiting, to be queued again (`Forms::Resend`),
+    # under the mail settings as they are now; answers whether it was. Only a
+    # failed one, decided in the statement itself (`state = 'failed'`), so a
+    # sent delivery is never put back: a job that has just sent its
+    # delivery can trust that it stays sent (`Forms::DeliveryJob`).
     def resend!
-      update_columns(state: "waiting", failure: nil, failed_at: nil, attempts: 0, # version: none (a delivery's state is not content)
-        queued_fingerprint: MailSettings.current.fingerprint, updated_at: Time.current)
+      now = Time.current
+      columns = { state: "waiting", failure: nil, failed_at: nil, attempts: 0, queued_fingerprint: MailSettings.current.fingerprint, updated_at: now }
+      changed = self.class.where(id: id, state: "failed").update_all(columns) == 1 # version: none (a delivery's state is not content)
+      reload if changed
+      changed
     end
   end
 end

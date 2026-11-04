@@ -53,9 +53,19 @@ class Forms::SubmissionTest < ActiveSupport::TestCase
     assert_raises(ActiveRecord::RecordInvalid) { submission.deliveries.create!(kind: "mail", state: "lost") }
   end
 
-  test "the answers are filtered from a request's logged parameters" do
+  test "the answers are filtered from a request's logged parameters to the forms endpoint, and nowhere else" do
     filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
-    filtered = filter.filter("form_id" => "4", "answers" => { "f_name0001" => "Ada Lovelace" })
-    assert_equal({ "form_id" => "4", "answers" => "[FILTERED]" }, filtered)
+    sent = { "controller" => "form_sends", "action" => "create", "form_id" => "4", "website" => "",
+             "answers" => { "f_name0001" => "Ada Lovelace", "f_mail0001" => "ada@example.com" } }
+    filtered = filter.filter(sent)
+    assert_equal({ "f_name0001" => "[FILTERED]", "f_mail0001" => "[FILTERED]" }, filtered["answers"])
+    assert_equal [ "4", "" ], filtered.values_at("form_id", "website")
+    assert_equal "Ada Lovelace", sent.dig("answers", "f_name0001"), "the request's own parameters keep the answers"
+    assert_equal "[FILTERED]", filter.filter("controller" => "form_sends", "answers" => "Ada")["answers"]
+
+    snapshot = { "faq_answers" => "Yes, we ship", "answers" => "plain" }
+    assert_equal snapshot, Audit::Snapshot.scrub(snapshot), "an audit snapshot keeps a key called answers, or containing it"
+    assert_equal({ "controller" => "admin/forms", "answers" => { "f_name0001" => "Kept" } },
+      filter.filter("controller" => "admin/forms", "answers" => { "f_name0001" => "Kept" }), "another controller's answers are its own business")
   end
 end

@@ -1,9 +1,13 @@
+<%# The mailer layout's own colours and nothing else: named, not hex (a mail
+    has no tokens, and CS Studio's sources carry no literal), inline (a mail
+    client reads no stylesheet): whitesmoke, the layout's ground, as a rule
+    between the answers, and dimgray, its footer's, for the lines after them. %>
 <p><%= t("mail.forms.submission.intro", form: @form.name) %></p>
 <table style="width:100%;border-collapse:collapse;margin:0 0 24px;">
   <% answers.each do |answer| %>
     <tr>
-      <th style="text-align:left;vertical-align:top;padding:8px 16px 8px 0;border-top:1px solid gainsboro;font-weight:600;"><%= answer["label"] %></th>
-      <td style="vertical-align:top;padding:8px 0;border-top:1px solid gainsboro;white-space:pre-wrap;"><%= answer["display"].presence || t("mail.forms.submission.no_answer") %></td>
+      <th style="text-align:left;vertical-align:top;padding:8px 16px 8px 0;border-top:1px solid whitesmoke;font-weight:600;"><%= answer["label"] %></th>
+      <td style="vertical-align:top;padding:8px 0;border-top:1px solid whitesmoke;white-space:pre-wrap;"><%= answer["display"].presence || t("mail.forms.submission.no_answer") %></td>
     </tr>
   <% end %>
 </table>

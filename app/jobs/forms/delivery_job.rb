@@ -10,9 +10,13 @@ module Forms
   # THE DELIVERER'S ANSWER (the contract of `Forms::DestinationTypes`):
   #   - nil: delivered. The delivery is recorded `sent`, and for a form that
   #     keeps nothing a submission whose every delivery is now sent is
-  #     deleted (`Forms::DeleteSubmissions`, reason `delivered`). Two
-  #     deliveries finishing at the same moment can each see the other still
-  #     waiting; the daily clean-up deletes what that leaves behind.
+  #     deleted (`Forms::DeleteSubmissions`, reason `delivered`). Each job
+  #     reads the deliveries again after its own `sent` has committed (the
+  #     job runs in no transaction), and nothing puts a sent delivery back to
+  #     waiting (`Delivery#resend!` takes only a failed one), so of two
+  #     deliveries finishing at once the later read sees both sent: one
+  #     deletes, or both do and the second finds nothing and records
+  #     nothing. None is left behind.
   #   - `Retry`: a failure worth another attempt (the mail's connection
   #     failure). Retried with backoff, `ATTEMPTS` in all; the deliverer is
   #     told which attempt is the last (`final_attempt:`), so it can record
@@ -21,11 +25,18 @@ module Forms
   #     (`gave_up`).
   #   - `Failed`: final. Recorded `failed` with its key and its line, the
   #     line scrubbed of every secret value of the destination (a server
-  #     that echoes a key must not put it on a screen) and cut to
-  #     `MailFailure::LINE_LIMIT` characters.
-  #   - Anything else is a bug: raised on, so the job fails as Active Job's
-  #     jobs do and the delivery stays `waiting`, and the screens are told
-  #     nothing they would wrongly blame on the settings.
+  #     that echoes a key must not put it on a screen) and of every answer
+  #     of the submission (a CRM that says "ada@example.com already exists"
+  #     must not put a visitor's answer on a screen, a log or a span), and
+  #     cut to `MailFailure::LINE_LIMIT` characters.
+  #   - Anything else is a bug (a deliverer's own error, a template, answers
+  #     the keys can no longer read): the delivery is recorded `failed` with
+  #     the key `error` and no line, so it is listed as not delivered, can
+  #     be sent again and is swept after `Forms::UNDELIVERED_DAYS` rather
+  #     than waiting for ever, and the error is raised on, so the job fails
+  #     as Active Job's jobs do. The site's mail state is not touched: an
+  #     error that is no failed delivery blames no setting
+  #     (`ApplicationMailer.deliver_in_job`).
   #
   # A delivery that is no longer `waiting` (sent by an earlier run, failed
   # and not sent again) is left alone. One whose destination was removed
@@ -39,6 +50,7 @@ module Forms
   # the deletion of a delivered submission reads "System" in the log.
   class DeliveryJob < ApplicationJob
     ATTEMPTS = 4
+    ERROR = "error"
 
     queue_as :default
 
@@ -70,7 +82,12 @@ module Forms
       begin
         type.deliverer.deliver(delivery, final_attempt: executions >= ATTEMPTS)
       rescue DestinationTypes::Failed => failure
-        return delivery.record_failed!(key: failure.key, line: scrubbed(failure.line, destination, type), at: Time.current)
+        return delivery.record_failed!(key: failure.key, line: scrubbed(failure.line, delivery, destination, type), at: Time.current)
+      rescue DestinationTypes::Retry
+        raise
+      rescue StandardError
+        delivery.record_failed!(key: ERROR, line: nil, at: Time.current)
+        raise
       end
 
       delivery.record_sent!(at: Time.current)
@@ -85,10 +102,12 @@ module Forms
       logger.warn "[ContentSpiel] A delivered submission of form #{submission.form_id} was not deleted: #{result.errors.to_sentence}" unless result.ok?
     end
 
-    # The line with every secret of the destination replaced by "…", in any
-    # case, the longest first; a secret the keys can no longer read is one
-    # the deliverer could not have sent either.
-    def scrubbed(line, destination, type)
+    # The line with every secret of the destination and every answer of the
+    # submission (each non-blank value and display) replaced by "…", in any
+    # case, the longest first, so an answer that holds another is not half
+    # replaced. A secret or answers the keys can no longer read are ones the
+    # deliverer could not have sent either.
+    def scrubbed(line, delivery, destination, type)
       return nil if line.blank?
 
       secrets = type.secrets.filter_map do |name|
@@ -96,10 +115,17 @@ module Forms
       rescue ActiveRecord::Encryption::Errors::Base
         nil
       end
-      clean = secrets.uniq.sort_by { -it.length }.reduce(line.to_s) do |text, secret|
+      clean = (secrets + answer_texts(delivery)).uniq.sort_by { -it.length }.reduce(line.to_s) do |text, secret|
         text.gsub(Regexp.new(Regexp.escape(secret), Regexp::IGNORECASE), MailFailure::HIDDEN)
       end
       clean.lines.first.to_s.strip.truncate(MailFailure::LINE_LIMIT, omission: MailFailure::HIDDEN)
+    end
+
+    def answer_texts(delivery)
+      Array(delivery.submission.answers).flat_map { |row| [ row["value"], row["display"] ] }
+        .filter_map { |text| text.strip.presence if text.is_a?(String) }
+    rescue ActiveRecord::Encryption::Errors::Base
+      []
     end
   end
 end

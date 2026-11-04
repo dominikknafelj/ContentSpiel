@@ -37,13 +37,16 @@ module Forms
       # other failure is recorded once and answered `Failed` with the
       # failure's key and its line, the login scrubbed out.
       #
-      # While mail is not ready (`MailSettings#ready?`: not set up, or saved
-      # and never tested) nothing is tried: `Failed` with the key
-      # `not_ready`, at once and not retried, since waiting does not set
-      # mail up. The delivery is then failed, so the submission is kept and
-      # listed as not delivered, with Send again (plan decision 6).
+      # Tried whenever mail is set up (`MailSettings#complete?`: any state but
+      # not set up; ruling R18), a site whose settings were saved and never
+      # tested included: a form mail that gets through verifies them, under
+      # the fingerprint it was queued with (R9), as a test mail would. Only
+      # while mail is NOT SET UP is nothing tried: `Failed` with the key
+      # `not_ready`, at once and not retried, since waiting does not set mail
+      # up. The delivery is then failed, so the submission is kept and listed
+      # as not delivered, with Send again (plan decision 6).
       def deliver(delivery, final_attempt:)
-        raise DestinationTypes::Failed.new(key: NOT_READY) unless MailSettings.current.ready?
+        raise DestinationTypes::Failed.new(key: NOT_READY) unless MailSettings.current.complete?
 
         ApplicationMailer.deliver_in_job(FormsMailer.submission(delivery), final_attempt: final_attempt,
           fingerprint: delivery.queued_fingerprint)

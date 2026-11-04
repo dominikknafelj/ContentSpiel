@@ -33,15 +33,20 @@ class FormsMailerTest < ActionMailer::TestCase
     end
   end
 
-  test "without an email answer there is no Reply-To" do
+  test "Reply-To is the first email answer of whatever form" do
     with_mail_state(:working) do
       form = forms(:newsletter)
       form.destinations.create!(kind: "mail", settings: { "recipients" => "office@example.com" })
       delivery = submission(form, { "f_mail0002" => "bea@example.com", "f_okay0002" => "1" })
       assert_equal [ "bea@example.com" ], FormsMailer.submission(delivery).reply_to
+    end
+  end
 
+  test "without an email answer there is no Reply-To" do
+    with_mail_state(:working) do
       record = Forms::Submission.create!(form: forms(:contact), locale: "en",
-        answers: [ { "key" => "f_name0001", "type" => "short_text", "label" => "Your name", "value" => "Ada", "display" => "Ada" } ])
+        answers: [ { "key" => "f_name0001", "type" => "short_text", "label" => "Your name", "value" => "Ada", "display" => "Ada" },
+                   { "key" => "f_mail0001", "type" => "email", "label" => "Email address", "value" => nil, "display" => "" } ])
       delivery = record.deliveries.create!(kind: "mail", destination: form_destinations(:contact_mail))
       mail = FormsMailer.submission(delivery)
       assert_empty Array(mail.reply_to)

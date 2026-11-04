@@ -16,9 +16,21 @@ module AccessControl
   #
   # The audit log stores a visitor as no actor, `actor_label` "visitor", no
   # IP (`Audit.record`).
+  #
+  # ONE INSTANCE. `Visitor::ONE`, which `AccessControl::VISITOR` names, is
+  # built here and then `new` and `[]` are made private, so no other code
+  # can make a second visitor; the checker and the audit log also ask for
+  # THE instance (`equal?`), not the class, so a copy (`dup`, `clone`) is
+  # no visitor either. test/lib/visitor_actor_test.rb fails on a
+  # construction written anywhere else.
   Visitor = Data.define
 
   class Visitor
+    ONE = new.freeze
+    private_class_method :new, :[]
+
+    def self.one?(actor) = actor.equal?(ONE)
+
     def to_s = "visitor"
   end
 end

@@ -92,7 +92,8 @@ module AccessControl
       # The bent rule (forms plan, decision 8; `AccessControl::Visitor`): a
       # visitor may send a form on the public site, and nothing else on any
       # channel. `forms.submit` is not grantable, so no grant matches it.
-      when Visitor then @channel.to_s == "public" && @permission.key == "forms.submit"
+      # The one instance only (`Visitor.one?`): a copy is no visitor.
+      when Visitor then Visitor.one?(@actor) && @channel.to_s == "public" && @permission.key == "forms.submit"
       else false # nil actor on :admin/:mcp, a Session, anything else
       end
     end

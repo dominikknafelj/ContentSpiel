@@ -136,7 +136,8 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
         end
 
         delivery = submission.deliveries.sole.reload
-        assert_equal [ Forms::DeliveryJob::ATTEMPTS, 4 ], [ performs, 4 ]
+        assert_equal 4, Forms::DeliveryJob::ATTEMPTS, "three retries"
+        assert_equal Forms::DeliveryJob::ATTEMPTS, performs
         assert_equal [ "connect" ], recorded, "the site's mail state is told once, after the last attempt"
         assert_equal [ "failed", "connect", 4 ], [ delivery.state, delivery.failure["key"], delivery.attempts ]
         assert_not_nil delivery.failed_at
@@ -164,8 +165,8 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
     end
   end
 
-  test "while mail is not ready the delivery fails with not_ready and is not retried" do
-    with_mail_state(:untested) do
+  test "while mail is not set up the delivery fails with not_ready and is not retried" do
+    with_mail_state(:not_set_up) do
       submission = nil
       performs = nil
       assert_no_emails { performs = performs_of { perform_enqueued_jobs(only: Forms::DeliveryJob) { submission = send_form } } }
@@ -175,6 +176,73 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
       assert_nil site.mail_failed_at, "a mail not set up is no failed send"
       assert Forms::Submission.exists?(submission.id)
     end
+  end
+
+  test "with mail saved and never tested a form mail is sent, and verifies the settings it was queued under" do
+    with_mail_state(:untested) do
+      submission = nil
+      assert_emails(1) { perform_enqueued_jobs(only: Forms::DeliveryJob) { submission = send_form(forms(:newsletter).tap { |form| form.destinations.create!(kind: "mail", settings: { "recipients" => "office@example.com" }) }, { "f_mail0002" => "bea@example.com", "f_okay0002" => "1" }) } }
+
+      assert_equal "sent", submission.deliveries.reload.sole.state
+      assert_equal :working, MailSettings.current(site).state
+    end
+  end
+
+  test "a failure's line holds no answer of the submission" do
+    register_hook { |_delivery, _final| raise Forms::DestinationTypes::Failed.new(key: "refused", line: "409 contact ADA@example.com (Ada Lovelace, Ada) already exists") }
+    form = forms(:contact)
+    form.destinations.destroy_all
+    form.destinations.create!(kind: "acme/hook", position: 0, settings: { "list" => "news" })
+
+    submission = nil
+    perform_enqueued_jobs(only: Forms::DeliveryJob) { submission = send_form(form, ANSWERS.merge("f_name0001" => "Ada Lovelace")) }
+
+    line = submission.deliveries.reload.sole.failure["line"]
+    assert_equal "409 contact … (…, Ada) already exists", line, "every answer, the longest first, in any case; a part of one is not an answer"
+  end
+
+  test "an error that is no failed delivery fails the delivery with the key error and the job, and blames no setting" do
+    register_hook { |_delivery, _final| raise NoMethodError, "undefined method 'name' for nil" }
+    form = forms(:contact)
+    form.destinations.destroy_all
+    form.destinations.create!(kind: "acme/hook", position: 0, settings: { "list" => "news" })
+
+    with_mail_state(:working) do
+      submission = send_form(form)
+      assert_raises(NoMethodError) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+
+      delivery = submission.deliveries.reload.sole
+      assert_equal [ "failed", "error", nil ], [ delivery.state, delivery.failure["key"], delivery.failure["line"] ]
+      assert_predicate submission.reload, :undelivered?
+      assert_nil site.mail_failed_at
+      assert_equal :working, MailSettings.current(site).state
+    end
+  end
+
+  test "a mail whose answers the keys can no longer read fails with the key error, and blames no setting" do
+    with_mail_state(:working) do
+      submission = send_form
+      other = ActiveRecord::Encryption::DerivedSecretKeyProvider.new("keys that are not the site's")
+      ActiveRecord::Encryption.with_encryption_context(key_provider: other) do
+        assert_raises(ActiveRecord::Encryption::Errors::Decryption) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+      end
+
+      delivery = submission.deliveries.reload.sole
+      assert_equal [ "failed", "error" ], [ delivery.state, delivery.failure["key"] ]
+      assert_nil site.mail_failed_at
+    end
+  end
+
+  test "only a failed delivery is sent again: a sent or waiting one is left as it is" do
+    delivery = send_form.deliveries.sole
+    assert_not delivery.resend!, "a waiting one"
+    delivery.record_sent!(at: Time.current)
+    assert_not delivery.resend!, "a sent one"
+    assert_equal "sent", delivery.reload.state
+
+    delivery.record_failed!(key: "login", line: "535", at: Time.current)
+    assert delivery.resend!
+    assert_equal [ "waiting", nil, 0 ], [ delivery.state, delivery.failure, delivery.attempts ]
   end
 
   test "a failure's line holds no secret value of the destination" do

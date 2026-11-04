@@ -41,6 +41,34 @@ class VisitorActorTest < ActiveSupport::TestCase
     assert_empty tests - TEST_NAMERS, "a test that acts as the visitor is about the visitor or the send"
   end
 
+  # A second visitor would be a second way to act as one: `Visitor.new` and
+  # `Visitor[]` are private, and nothing outside the class's own file
+  # writes either (or `allocate`), in the application or in a test.
+  CONSTRUCTION = /\bVisitor\s*(?:\.\s*(?:new|allocate|send|public_send|__send__)\b|\[)/
+  CLASS_FILE = "app/models/access_control/visitor.rb"
+
+  test "the visitor is one instance: nothing else constructs one, and new and [] are private" do
+    constructors = %w[app lib test].flat_map { |root| Rails.root.glob("#{root}/**/*.{rb,erb}") }.filter_map do |path|
+      relative = path.to_s.delete_prefix("#{Rails.root}/")
+      next if [ CLASS_FILE, "test/lib/visitor_actor_test.rb" ].include?(relative)
+
+      code = path.read.lines.reject { |line| line.strip.start_with?("#", "<%#") }.join
+      relative if code.match?(CONSTRUCTION)
+    end
+    assert_empty constructors, "only #{CLASS_FILE} makes the visitor"
+
+    assert_raises(NoMethodError) { AccessControl::Visitor.new }
+    assert_raises(NoMethodError) { AccessControl::Visitor[] }
+    assert_same AccessControl::VISITOR, AccessControl::Visitor::ONE
+  end
+
+  test "a copy of the visitor is no visitor" do
+    copy = AccessControl::VISITOR.dup
+    assert_kind_of AccessControl::Visitor, copy
+    assert_not AccessControl.allowed?(copy, "forms.submit", forms(:contact), channel: :public)
+    assert AccessControl.allowed?(AccessControl::VISITOR, "forms.submit", forms(:contact), channel: :public)
+  end
+
   test "the definition is where the guard looks for it" do
     assert_includes namers("app"), DEFINITION
   end

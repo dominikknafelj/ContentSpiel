@@ -10,12 +10,27 @@ Rails.application.config.filter_parameters += [
   :lookup_digest,
   # The mail login's username (docs/reference/mail.md): a credential for several providers (Postmark's
   # server token, SES's access key id). Its password is :passw's.
-  :mail_username,
-  # A visitor's answers to a form (forms plan, Global Constraints: personal data reaches no log). The
-  # endpoint takes them as `answers[<field key>]`, and a matched key masks its whole value, the hash
-  # of every field. No model attribute is called that (a submission's column is encrypted and never a
-  # request's parameter), so no audit snapshot loses a key to it.
-  :answers
+  :mail_username
+]
+
+# A visitor's answers to a form (forms plan, Global Constraints: personal data
+# reaches no log). The endpoint (`FormSendsController`, controller
+# `form_sends`) takes them as `answers[<field key>]`. Not a bare `:answers`
+# here: an entry matches by substring and `Audit::Snapshot.scrub` drops every
+# snapshot key this list matches, so a later field such as `faq_answers` would
+# vanish from the audit log. So, as the notes' `body` and `quote` below, they
+# are filtered BY WHERE THEY ARRIVE: in a request to that controller, every
+# String under the key `answers` or a field's key (`f_` and eight lowercase
+# letters or digits, `Forms::Field::KEY_FORMAT`, written out because an
+# initializer names no reloadable constant). The filter recurses into
+# `answers` and asks this lambda of each field's value, which it masks in
+# place (it is handed a copy).
+Rails.application.config.filter_parameters += [
+  lambda do |key, value, params = nil|
+    next unless params.is_a?(Hash) && params["controller"].to_s == "form_sends"
+
+    value.replace("[FILTERED]") if value.is_a?(String) && key.to_s.match?(/\A(?:answers|f_[a-z0-9]{8})\z/)
+  end
 ]
 
 # A note's text (notes spec, decision D14: it reaches no log). The notes forms

@@ -26,7 +26,7 @@ module AccessControl
   # decision 8): allowed `forms.submit` on `:public` and nothing else.
   # Only the endpoint that takes a visitor's send acts as it
   # (test/lib/visitor_actor_test.rb).
-  VISITOR = Visitor.new.freeze
+  VISITOR = Visitor::ONE
 
   class << self
     # Design spec §3.3 -- see `AccessControl::Checker` for the rules.
