@@ -33,7 +33,6 @@ module Admin
       CARD_CLASS = "admin-settings-card rounded-cs border border-line bg-surface".freeze
       CARD_HEAD_CLASS = "border-b border-line px-4 py-3.5".freeze
 
-
       def initialize(form:, draft:, locale:, placements:, errors: [], mail_settings: nil, keys: nil, dirty: false,
         stale: false, stale_change: nil, base: nil, url_options: {})
         @form = form

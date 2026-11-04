@@ -1,4 +1,4 @@
-<%# locals: message, lead, change, reload_path -- the 409 banner of an
+<%# locals: message, lead, change, reload_path, and optionally reload_label (a converted screen's own word) -- the 409 banner of an
     explicit-save screen (`Admin::StaleForm`). `change` is who changed the record
     since the form loaded (`Audit::ChangeSince`, nil when the audit log names
     nobody): "<lead> by <name> <time ago>." for someone else, "<lead> in another
@@ -14,5 +14,5 @@
   <% else %>
     <%= message %>
   <% end %>
-  <%= link_to "Reload", reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
+  <%= link_to local_assigns.fetch(:reload_label, "Reload"), reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
 </div>

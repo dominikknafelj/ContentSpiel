@@ -110,7 +110,8 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     end
     assert_response :conflict
     assert_equal "Contact us", form.reload.name
-    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale"))}/
+    # Named where the audit log says who (here the viewer's own other save), the plain sentence otherwise.
+    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))} in another tab or window|#{Regexp.escape(t("builder.stale"))}/
     assert_select "input[name='form[name]'][value='Stale name']", 1, "the typed value stays in the form"
   end
 
@@ -234,5 +235,28 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "h1", text: t("new_form_dialog.title")
     assert_select "[role=alert]", text: Forms::Save.sentence(:name_blank)
+  end
+  test "a save that changes only the destinations moves the base, so a save from the older copy is the 409" do
+    form = forms(:contact)
+    sign_in_as users(:two)
+    get admin_form_path(form)
+    base = css_select("input[name='base_updated_at']").first["value"]
+    stored = contact_params[:destinations]
+
+    travel 1.minute do
+      changed = stored.transform_values { |section| section.merge(settings: { recipients: "second@example.com" }) }
+      patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(destinations: changed) }
+      assert_redirected_to admin_form_path(form)
+    end
+    assert_equal [ "second@example.com" ], form.reload.destinations.map(&:recipients).flatten
+    assert_operator Time.iso8601(base), :<, form.updated_at
+
+    assert_no_difference -> { Audit::Event.count } do
+      patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(destinations: stored) }
+    end
+    assert_response :conflict
+    assert_equal [ "second@example.com" ], form.reload.destinations.map(&:recipients).flatten, "the older copy undid nothing"
+    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))}/
+    assert_select "[role=alert] a", text: t("builder.reload")
   end
 end

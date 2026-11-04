@@ -38,7 +38,7 @@ module Forms
       readable = readable_pages(viewer, page_ids.values.flatten.uniq).index_by(&:id)
       forms.to_h do |form|
         placed = page_ids.fetch(form.id, [])
-        [ form.id, new(form, viewer: viewer, page_ids: placed, pages: placed.sort.filter_map { |id| readable[id] }) ]
+        [ form.id, new(form, viewer: viewer, page_ids: placed, pages: TreeOrder.sort(placed.filter_map { |id| readable[id] })) ]
       end
     end
 
@@ -50,9 +50,10 @@ module Forms
       @pages = pages
     end
 
-    # The readable kept pages, each once, oldest first.
+    # The readable kept pages, each once, in the tree's order of siblings
+    # (`TreeOrder`: by position, then id).
     def pages
-      @pages ||= self.class.readable_pages(@viewer, page_ids).to_a
+      @pages ||= TreeOrder.sort(self.class.readable_pages(@viewer, page_ids).to_a)
     end
 
     # How many kept pages place the form that the viewer can't read.
@@ -76,9 +77,10 @@ module Forms
       # A block's `settings ->> 'form_id'`, the form it names.
       def form_id = SqlNodes.json_text(ContentBlock.arel_table[:settings], "form_id")
 
-      # The kept pages among `ids` the viewer may read, oldest first.
+      # The kept pages among `ids` the viewer may read (callers put them in
+      # `TreeOrder`).
       def readable_pages(viewer, ids)
-        AccessControl.scope(viewer, "pages.read", Page.where(id: ids), channel: :admin).order(:id)
+        AccessControl.scope(viewer, "pages.read", Page.where(id: ids), channel: :admin)
       end
     end
   end

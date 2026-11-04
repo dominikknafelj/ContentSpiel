@@ -59,7 +59,9 @@ module Forms
   # without their secrets, and per destination whose secrets were written
   # whether they were set before), and `PublicSite.bump_version!` in the
   # transaction when the form's row changed: a form has no published copy,
-  # so what a placed form draws is its rows (decision 9). A save that
+  # so what a placed form draws is its rows (decision 9). A change of the
+  # destinations alone (or a secret written) touches the form, so the
+  # builder's stale base moves, and moves no content version. A save that
   # changes nothing records nothing and moves nothing.
   class Save < ApplicationService
     ATTRIBUTES = %i[name keep_submissions keep_days submit_label thank_you].freeze
@@ -106,8 +108,18 @@ module Forms
         # whether it had any set before and that it has now. The label
         # matches no `filter_parameters` entry, as the mail login's does not.
         changes.merge!(credentials)
+        # What a placed form draws is its own row: a change of the
+        # destinations alone moves no content version. Asked before the
+        # touch below, which is a saved change of its own.
+        drawn_changed = @form.saved_changes.any?
+        # The base of the builder (`Admin::StaleForm`) is the form's
+        # `updated_at`, so a save that changed only the destinations, or wrote
+        # a secret, moves it too: otherwise a Save from an older copy would
+        # not be stale and would put the old destinations back, deleting a
+        # row added since with its secret.
+        @form.touch if !created && !@form.saved_changes.any? && (before != after || credentials.any?)
         record_event(created ? "form.created" : "form.updated", subject: @form, field_changes: changes) if created || changes.any?
-        PublicSite.bump_version! if @form.saved_changes.any?
+        PublicSite.bump_version! if drawn_changed
         true
       end
       return refused(refusals) unless saved

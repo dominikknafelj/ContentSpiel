@@ -34,10 +34,15 @@ module Admin
         hidden = placements.count_hidden
         return t(".not_placed") if pages.empty? && hidden.zero?
 
-        names = pages.map { |page| page.title.presence || page.slug.to_s }
-        names << t(".hidden", count: hidden) if hidden.positive?
-        titles = names.to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
-        "#{t(".placed", count: pages.size + hidden, titles: titles)} #{t(".placed_effect")}"
+        # One key per case, so a language can put the pages it names and the
+        # ones it can't open in its own order.
+        titles = pages.map { |page| page.title.presence || page.slug.to_s }.to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
+        sentence =
+          if pages.empty? then t(".placed_hidden_only", count: hidden)
+          elsif hidden.positive? then t(".placed_with_hidden", count: hidden, titles: titles)
+          else t(".placed", count: pages.size, titles: titles)
+          end
+        "#{sentence} #{t(".placed_effect")}"
       end
 
       def destroy_path = helpers.admin_form_path(form, **url_options)

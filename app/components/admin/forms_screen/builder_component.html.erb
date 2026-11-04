@@ -6,7 +6,8 @@
   <% end %>
 
   <% if stale? %>
-    <%= helpers.render "admin/shared/stale_banner", message: t(".stale"), lead: nil, change: nil, reload_path: update_path %>
+    <%= helpers.render "admin/shared/stale_banner", message: t(".stale"), lead: t(".stale_lead"), change: stale_change,
+          reload_path: update_path, reload_label: t(".reload") %>
   <% end %>
 
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_places, field_ids: summary_ids) %>

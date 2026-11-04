@@ -56,6 +56,7 @@ en:
             message: "Message"
         builder:
           stale: "Someone changed this form since you opened it. Your changes are not saved."
+          stale_lead: "This form was changed"
           reload: "Reload"
           form_card: "Form"
           name: "Name"
@@ -134,7 +135,10 @@ en:
             other: "It is placed on %{count} pages: %{titles}."
           placed_effect: "They show nothing in its place until it is restored."
           not_placed: "It isn't placed on any page."
-          hidden:
-            one: "and %{count} page you can't open"
-            other: "and %{count} pages you can't open"
+          placed_with_hidden:
+            one: "It is placed on %{titles}, and on %{count} page you can't open."
+            other: "It is placed on %{titles}, and on %{count} pages you can't open."
+          placed_hidden_only:
+            one: "It is placed on %{count} page you can't open."
+            other: "It is placed on %{count} pages you can't open."
           confirm: "Move to trash"

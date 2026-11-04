@@ -83,7 +83,7 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     assert_equal [ "Events", "Offers" ], field.choices.map { |choice| choice.label_in("en") }
     assert_equal "c_offr0001", field.choices.last.key, "a kept choice keeps its key"
 
-    # A new choice field starts with two empty choices and is refused until they say something.
+    # A new choice field starts with two empty choices to fill in.
     add_field "Choice", "Colour"
     new_row = rows.last
     assert_equal 2, new_row.all("[data-admin--forms--builder-target=choice]").size

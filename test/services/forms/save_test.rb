@@ -322,4 +322,17 @@ class Forms::SaveTest < ActiveSupport::TestCase
     denial = Audit::Event.order(:id).last
     assert_equal [ "access.denied", "forms.manage" ], [ denial.action, denial.metadata["permission"] ]
   end
+  test "a save that changes only the destinations moves the form's updated_at and not the content version" do
+    form = forms(:contact)
+    before = form.updated_at
+    version = PublicSite::Version.current
+    travel 1.minute do
+      result = save(form, attributes: {}, fields: form.fields.map(&:to_h),
+        destinations: [ mail_to("office@example.com").merge(id: form_destinations(:contact_mail).id), mail_to("second@example.com") ])
+      assert result.ok?, result.errors.to_sentence
+    end
+    assert_operator form.reload.updated_at, :>, before, "the builder's stale base moves"
+    assert_equal version, PublicSite::Version.current, "a destination is on no public page"
+    assert_equal 2, form.destinations.count
+  end
 end
