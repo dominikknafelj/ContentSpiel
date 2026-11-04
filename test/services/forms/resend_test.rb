@@ -44,6 +44,20 @@ class Forms::ResendTest < ActiveSupport::TestCase
     assert_not_includes event.attributes.to_json, "ada@example.com", "no answer is in the event"
   end
 
+  test "a delivery of a trashed form is refused, and nothing is written or queued" do
+    failed = delivery
+    assert Trash::Move.call(forms(:contact)).ok?
+
+    assert_no_difference -> { Audit::Event.where(action: "form_submission.resent").count } do
+      result = Forms::Resend.call(failed)
+      assert_not result.ok?
+      assert_not result.denied?
+      assert_equal [ Forms::Resend.sentence(:trashed) ], result.errors
+    end
+    assert failed.reload.failed?
+    assert_no_enqueued_jobs(only: Forms::DeliveryJob)
+  end
+
   test "a sent or waiting delivery is refused" do
     [ delivery(:sent), delivery(:waiting) ].each do |record|
       state = record.state

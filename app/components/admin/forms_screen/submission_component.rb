@@ -22,7 +22,9 @@ module Admin
     # (`REASONS`; a mail's own keys in Settings → Mail's short words), never
     # the other side's line, which Settings → Mail shows for mail and which
     # could quote anything; then Send again (`Forms::Resend`), for a holder
-    # of `form_submissions.view`. Failed is warn, not danger: the submission
+    # of `form_submissions.view`, unless the destination is gone
+    # (`no_destination`, `unknown_destination`), where it would only fail
+    # again. Failed is warn, not danger: the submission
     # is kept and nothing typed is lost.
     #
     # "Mail to …" lists the destination's recipients as they are NOW: a
@@ -35,6 +37,10 @@ module Admin
       # beside a mail's own (`MailFailure::KEYS`); anything else (a gem's
       # destination's own key) reads as `unknown`.
       REASONS = %w[not_ready gave_up no_destination unknown_destination error].freeze
+      # Send again would fail the same way at once for a delivery whose
+      # destination was removed or whose type is no longer registered, so
+      # it is not offered for those two.
+      NOT_RESENDABLE = %w[no_destination unknown_destination].freeze
       CHIP_CLASS = "inline-flex items-center gap-1.5 rounded-cs border px-2 py-0.5 font-cs-mono text-label uppercase tracking-mono text-ink".freeze
 
       def initialize(submission:, url_options: {})
@@ -71,13 +77,12 @@ module Admin
         page ? t(".meta", time: time, language: language, page: page) : t(".meta_no_page", time: time, language: language)
       end
 
-      # The page's title from its rows, or what became of it; nil when none
-      # was stored. The list's words (`SubmissionsListComponent`).
+      # The page's title from its rows, or the list's words for one in the
+      # trash (`SubmissionsListComponent`); nil when none was stored or the
+      # page was purged (the foreign key nulls `page_id`).
       def page_words
-        return nil if submission.page_id.nil?
-
         page = submission.page
-        return t("admin.components.forms_screen.submissions_list.page_gone") if page.nil?
+        return nil if page.nil?
         return t("admin.components.forms_screen.submissions_list.page_trashed") if page.trashed?
 
         page.title.presence || page.slug.to_s
@@ -123,6 +128,8 @@ module Admin
       end
 
       def mail_settings_hint?(delivery) = failure_key(delivery) == "not_ready" && settings_link?
+
+      def resendable?(delivery) = view? && !NOT_RESENDABLE.include?(failure_key(delivery))
     end
   end
 end

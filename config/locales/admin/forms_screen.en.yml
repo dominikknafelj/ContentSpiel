@@ -165,7 +165,6 @@ en:
             state: "State"
           unreadable: "Can't be read"
           page_trashed: "A page in the trash"
-          page_gone: "A page that's gone"
           not_delivered: "Not delivered"
           empty:
             title: "No submissions yet."

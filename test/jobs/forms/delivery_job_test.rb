@@ -113,6 +113,26 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
     end
   end
 
+  # Task 5, fix round 1: the decision to delete is made from the
+  # submission's locked row, its deliveries read after the lock.
+  test "the delivered submission is locked before its deliveries are read and it is deleted" do
+    register_hook { nil }
+    form = forms(:contact)
+    destination = form.destinations.create!(kind: "acme/hook", position: 1, settings: { "list" => "main" })
+    submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
+    delivery = submission.deliveries.create!(kind: "acme/hook", destination: destination)
+
+    statements = capture_sql { Forms::DeliveryJob.perform_now(delivery) }
+
+    locking = statements.index { |sql| sql.include?("form_submissions") && sql.include?("FOR UPDATE") }
+    assert locking, "the submission is locked: #{statements.join("\n")}"
+    reading = statements.each_index.find { |index| index > locking && statements[index].match?(/SELECT .*form_deliveries/) }
+    deleting = statements.index { |sql| sql.start_with?("DELETE FROM \"form_submissions\"") }
+    assert reading, "its deliveries are read after the lock"
+    assert deleting && deleting > reading, "and it is deleted after that read"
+    assert_not Forms::Submission.exists?(submission.id)
+  end
+
   test "a form that keeps keeps the submission once it is delivered" do
     form = forms(:newsletter)
     form.destinations.create!(kind: "mail", position: 0, settings: { "recipients" => "office@example.com" })

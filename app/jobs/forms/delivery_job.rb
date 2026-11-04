@@ -104,7 +104,7 @@ module Forms
     # the second waits for the first, then finds the row gone (and records
     # nothing) or decides from what the first committed.
     def forget_delivered(submission)
-      return if submission.form.keeps?
+      return if submission.form.keep_submissions
 
       ActiveRecord::Base.transaction do
         locked = Submission.lock.find_by(id: submission.id)

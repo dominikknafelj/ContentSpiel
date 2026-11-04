@@ -5,7 +5,8 @@ module Forms
   # the right that reads submissions: whoever may read why a delivery failed
   # may try it again, and nothing of the submission changes.
   #
-  # Refused, writing and queueing nothing, unless the delivery is failed:
+  # Refused, writing and queueing nothing, when the delivery's form is in
+  # the trash (`sentence(:trashed)`), and unless the delivery is failed:
   # `Delivery#resend!` decides that in its own statement (`state =
   # 'failed'`), so a delivery that a job has just sent, or that another
   # editor has already sent again, is never put back (`sentence(:not_failed)`).
@@ -18,12 +19,16 @@ module Forms
 
     def initialize(delivery, actor: Current.actor)
       @delivery = delivery
-      @form = delivery.submission.form
+      # Only a kept form's: a trashed form's submissions stay with it, out
+      # of sight, and nothing of them is sent until it is restored.
+      @form = Form.kept.find_by(id: delivery.submission.form_id)
       @actor = actor
     end
 
     def call
-      return denied("form_submissions.view", @form) unless authorize!("form_submissions.view", @form)
+      subject = @form || @delivery.submission.form
+      return denied("form_submissions.view", subject) unless authorize!("form_submissions.view", subject)
+      return failure(@delivery, [ self.class.sentence(:trashed) ]) unless @form
 
       resent = ActiveRecord::Base.transaction do
         next false unless @delivery.resend!

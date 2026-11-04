@@ -5,10 +5,14 @@ module Forms
   # but they still expire). Every deletion is `Forms::DeleteSubmissions`, one
   # event per form and reason:
   #
-  #   - a form that keeps (`Form#keeps?`): submissions older than
-  #     `effective_keep_days` go, `expired`. A form on the site's default
-  #     reads the default as it is at this run (`Current.site` is read fresh
-  #     for the run), so a changed default applies at the next one.
+  #   - a form that keeps (its STORED setting, `keep_submissions`): the
+  #     submissions older than its days (its own `keep_days`, else the
+  #     site's default) go, `expired`, and nothing else does. A form on the
+  #     site's default reads the default as it is at this run (`Current.site`
+  #     is read fresh for the run), so a changed default applies at the next
+  #     one. Never `Form#keeps?`, which is also false while the site has no
+  #     encryption keys: a site that lost its keys (a deploy without them)
+  #     must not lose its kept submissions as if they had been delivered.
   #   - a form that keeps nothing: those whose every delivery was sent and
   #     that are still here go, `delivered` (below), and those older than
   #     `Forms::UNDELIVERED_DAYS` that never were, `undelivered`.
@@ -44,8 +48,9 @@ module Forms
     private
 
     def sweep(form, now)
-      if form.keeps?
-        delete(form, form.submissions.where(created_at: ...(now - form.effective_keep_days.days)).pluck(:id), :expired)
+      if form.keep_submissions
+        days = form.keep_days || Current.site.form_keep_days
+        delete(form, form.submissions.where(created_at: ...(now - days.days)).pluck(:id), :expired)
       else
         delete(form, delivered_ids(form), :delivered)
         delete(form, form.submissions.where(created_at: ...(now - UNDELIVERED_DAYS.days)).pluck(:id), :undelivered)

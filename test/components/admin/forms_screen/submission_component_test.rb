@@ -56,6 +56,23 @@ class Admin::FormsScreen::SubmissionComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: t("send_again"), wait: 0
   end
 
+  # Fix round 1: where the destination is gone Send again would only fail
+  # again, so it is not offered; a delivery that gave up still gets it.
+  test "Send again is hidden for a removed destination and an unknown type, and shown for one that gave up" do
+    Current.actor = users(:one)
+    record = submission(row("f_name0001", "short_text", "Your name", "Ada"))
+    deliveries = %w[no_destination unknown_destination gave_up].map do |key|
+      record.deliveries.create!(kind: "mail", destination: form_destinations(:contact_mail)).tap { it.record_failed!(key: key, line: nil, at: Time.current) }
+    end
+    draw(record)
+
+    removed, unknown, gave_up = deliveries
+    assert_no_selector "form[action$='/form_deliveries/#{removed.id}/resend']", wait: 0
+    assert_no_selector "form[action$='/form_deliveries/#{unknown.id}/resend']", wait: 0
+    assert_selector "form[action$='/form_deliveries/#{gave_up.id}/resend'] button", text: t("send_again")
+    assert_selector "button", text: t("send_again"), count: 1
+  end
+
   test "each failure key has its sentence, and a key this code doesn't know reads as the plain one" do
     Current.actor = users(:one)
     record = submission(row("f_name0001", "short_text", "Your name", "Ada"))

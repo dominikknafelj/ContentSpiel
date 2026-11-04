@@ -107,11 +107,15 @@ class Admin::FormSubmissionsTest < ActionDispatch::IntegrationTest
     get admin_form_submission_path(forms(:contact), record)
     assert_response :ok
 
+    failed = delivery(record, :failed)
     Current.set(actor: users(:one)) { assert Trash::Move.call(forms(:contact)).ok? }
     get admin_form_submissions_path(forms(:contact))
     assert_response :not_found
     get admin_form_submission_path(forms(:contact), record)
     assert_response :not_found
+    post resend_admin_form_delivery_path(failed)
+    assert_response :not_found
+    assert failed.reload.failed?
   end
 
   test "a viewer with only form_submissions.view who opens a form lands on its submissions, with no tabs" do

@@ -16,8 +16,6 @@ module Admin
         [ "Forms", "forms", "form" ]
       ].freeze
 
-      LINK_CLASS = "inline-flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm last:border-r-0".freeze
-
       # `counts` is `{ "page" => n, "post" => n, "media" => n }`; `current` the
       # tab key ("pages", ...) or nil for All; `url` turns a tab key (or nil)
       # into its path.
@@ -34,10 +32,6 @@ module Admin
         TABS.select { |_, _, model| model.nil? || @counts.key?(model) }.map do |label, key, model|
           { label:, key:, count: model ? @counts.fetch(model, 0) : @counts.values.sum, current: key == @current, href: @url.call(key) }
         end
-      end
-
-      def link_class(current)
-        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper" : "text-meta hover:bg-sunken"}"
       end
     end
   end

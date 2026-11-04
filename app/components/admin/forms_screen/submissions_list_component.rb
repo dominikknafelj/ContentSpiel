@@ -9,7 +9,7 @@ module Admin
     # the row, the users list's), its summary (`Forms::Summary.of`, computed
     # from the decrypted answers of this page's rows alone, decision 7), its
     # language's code, the page it came from (the page's title from its rows;
-    # "A page in the trash"; "A page that's gone"; "—" when none was stored)
+    # "A page in the trash"; "—" when none was stored or the page was purged)
     # and "Not delivered" when a delivery failed. A row whose answers the
     # site's keys can't read says "Can't be read" and still opens, to be
     # deleted. The rows' deliveries and pages are loaded with them by the
@@ -54,12 +54,12 @@ module Admin
       def language(submission) = submission.locale.to_s.upcase
 
       # The page's words, and whether they are a title (`cs-dim`) or a
-      # placeholder (`cs-meta`).
+      # placeholder (`cs-meta`). A purged page nulls the submission's
+      # `page_id` (the foreign key), so a page that's gone reads "—", as
+      # one that was never stored does.
       def page_text(submission)
-        return [ "—", false ] if submission.page_id.nil?
-
         page = submission.page
-        return [ t(".page_gone"), false ] if page.nil?
+        return [ "—", false ] if page.nil?
         return [ t(".page_trashed"), false ] if page.trashed?
 
         [ page.title.presence || page.slug.to_s, true ]

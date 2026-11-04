@@ -46,6 +46,7 @@ en:
       # Send again (`Forms::Resend`, forms plan Task 5): the one refusal.
       resend:
         not_failed: "This delivery hasn't failed, so there is nothing to send again."
+        trashed: "This form is in the trash. Restore it to send its submissions again."
     # A form's submissions (forms plan, Task 5; design.md 3): the titles and
     # toasts of `Admin::FormSubmissionsController` and
     # `Admin::FormDeliveriesController`; what their components draw is

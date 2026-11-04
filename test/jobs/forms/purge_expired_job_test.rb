@@ -79,6 +79,26 @@ class Forms::PurgeExpiredJobTest < ActiveJob::TestCase
     assert reading && reading > locking, "their deliveries are read after the lock"
   end
 
+  # Fix round 1: the sweep decides from the stored setting, never from the
+  # keys being there, so a site that lost its keys loses no kept submission
+  # before its time, a keeping form with no destination included.
+  test "without encryption keys a keeping form is swept by age only" do
+    form = forms(:newsletter)
+    within = submission(form, age: 29.days)
+    delivered = submission(form, age: 1.hour, states: %i[sent])
+    stuck = submission(form, age: 29.days, states: %i[failed])
+    old = submission(form, age: 31.days)
+    assert_empty form.destinations, "the fixture keeps and mails nowhere"
+
+    without_encryption_keys { Forms::PurgeExpiredJob.perform_now }
+
+    assert_not gone?(within)
+    assert_not gone?(delivered)
+    assert_not gone?(stuck)
+    assert gone?(old)
+    assert_equal [ "expired" ], events.map { |event| event.metadata["reason"] }
+  end
+
   test "a trashed form's submissions expire too" do
     form = forms(:newsletter)
     Current.set(actor: users(:one)) { assert Trash::Move.call(form).ok? }

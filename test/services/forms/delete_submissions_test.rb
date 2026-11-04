@@ -57,6 +57,18 @@ class Forms::DeleteSubmissionsTest < ActiveSupport::TestCase
     assert_equal({ "count" => 51, "reason" => "expired" }, event.metadata)
   end
 
+  test "the service says which ids it deleted, and none when it deleted nothing" do
+    form = forms(:newsletter)
+    first, second = Array.new(2) { submission(form) }
+    service = Forms::DeleteSubmissions.new(form, all: true)
+    assert service.call.ok?
+    assert_equal [ first.id, second.id ].sort, service.deleted.sort
+
+    again = Forms::DeleteSubmissions.new(form, all: true)
+    assert again.call.ok?
+    assert_empty again.deleted
+  end
+
   test "deleting nothing records nothing" do
     before = Audit::Event.count
     result = Forms::DeleteSubmissions.call(forms(:newsletter), ids: [ submission(forms(:contact)).id ])

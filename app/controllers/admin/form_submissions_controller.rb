@@ -41,10 +41,12 @@ module Admin
       answer(result, notice: t(".deleted"), back: admin_form_submission_path(@form, submission, **admin_url_options))
     end
 
+    # The toast counts what the service deleted, not what the list showed:
+    # a visitor's send can land between the two.
     def destroy_all
-      count = @form.submissions.count
-      result = Forms::DeleteSubmissions.call(@form, all: true)
-      answer(result, notice: t(".deleted", count: count), back: admin_form_submissions_path(@form, **admin_url_options))
+      service = Forms::DeleteSubmissions.new(@form, all: true)
+      result = service.call
+      answer(result, notice: t(".deleted", count: service.deleted.size), back: admin_form_submissions_path(@form, **admin_url_options))
     end
 
     private

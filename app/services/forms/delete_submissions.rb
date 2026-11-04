@@ -17,6 +17,11 @@ module Forms
     REASONS = %i[editor expired delivered undelivered].freeze
     IDS_IN_EVENT = 50
 
+    # The ids this call deleted, once it has run (empty when it deleted
+    # nothing or was refused): what a caller says it deleted, rather than a
+    # count it took before the call (a send can land in between).
+    attr_reader :deleted
+
     def initialize(form, ids: nil, all: false, reason: :editor, actor: Current.actor)
       raise ArgumentError, "reason is one of #{REASONS.join(", ")}, not #{reason.inspect}" unless REASONS.include?(reason&.to_sym)
       raise ArgumentError, "name the submissions to delete (ids:) or ask for all: true" if ids.nil? && !all
@@ -26,6 +31,7 @@ module Forms
       @all = all
       @reason = reason.to_sym
       @actor = actor
+      @deleted = []
     end
 
     def call
@@ -38,6 +44,7 @@ module Forms
         next if deleted.empty?
 
         Submission.where(id: deleted).delete_all # version: none (a submission is on no public page)
+        @deleted = deleted
         metadata = { "count" => deleted.size, "reason" => @reason.to_s }
         metadata["submission_ids"] = deleted if deleted.size <= IDS_IN_EVENT
         record_event("form_submissions.deleted", subject: @form, snapshot: nil, metadata: metadata, coalesce: false)

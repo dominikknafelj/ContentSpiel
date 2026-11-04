@@ -42,7 +42,7 @@
           <% if delivery.failed? %>
             <div class="flex flex-wrap items-center justify-between gap-3">
               <p class="text-[13px] text-warn-ink" data-failure><%= reason(delivery) %></p>
-              <% if view? %>
+              <% if resendable?(delivery) %>
                 <%= form_with url: resend_path(delivery), method: :post, data: { turbo_frame: "_top" } do %>
                   <%= render Admin::Ui::ButtonComponent.new(label: t(".send_again"), variant: :secondary, size: :small, type: "submit") %>
                 <% end %>
