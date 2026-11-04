@@ -36,7 +36,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
       # opens for any one of the rights that act on a trashed item, so
       # `author`'s `media.upload` is enough -- its own trashed images.
-      users(:two) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Tags", "Mind graph", "Trash", "Users", "Groups", "Settings", "AI assistant", "System status", "Audit log" ],
+      users(:two) => [ "Dashboard", "Pages", "Posts", "Media", "Forms", "Translations", "Tags", "Mind graph", "Trash", "Users", "Groups", "Settings", "AI assistant", "System status", "Audit log" ],
       users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Mind graph", "Trash", "AI assistant" ],
       users(:reader) => [ "Dashboard", "Pages", "Posts", "Translations", "Mind graph", "AI assistant" ]
     }

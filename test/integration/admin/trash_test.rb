@@ -319,4 +319,53 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_equal Trash::Restore::UNKNOWN_PARENT, flash[:alert]
     assert page.reload.trashed?
   end
+  test "the Forms tab lists a trashed form, restores it, and the badge counts it" do
+    form = forms(:contact)
+    Current.set(actor: users(:one)) do
+      travel 4.seconds
+      Trash::Move.call(form)
+    end
+    sign_in_as users(:two)
+
+    get admin_trash_path(type: "forms")
+    assert_response :ok
+    assert_select "nav[aria-label='Filter by type'] a[aria-current=page]", text: /Forms\s*1/
+    assert_select "tbody tr", 1
+    assert_select "tr#trash-form-#{form.id}", text: /Contact/
+    assert_select "tr#trash-form-#{form.id}", text: /Form/
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "4"
+
+    get admin_trash_path
+    assert_select "tr#trash-form-#{form.id}"
+
+    post admin_restore_trash_item_path("form", form), params: { tab: "forms" }
+    assert_redirected_to admin_trash_path(type: "forms")
+    assert_not form.reload.trashed?
+    follow_redirect!
+    assert_select "tbody tr", 0
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "3"
+  end
+
+  test "a trashed form is listed for forms.manage alone, and deleted for good only with trash.empty" do
+    form = forms(:contact)
+    Current.set(actor: users(:one)) { Trash::Move.call(form) }
+    manager = users(:author)
+    group = AccessControl::Group.create!(name: "Form managers")
+    group.grants.create!(permission: "forms.manage", scope: {})
+    AccessControl::Membership.create!(user: manager, group: group)
+    sign_in_as manager
+
+    get admin_trash_path
+    assert_response :ok
+    assert_select "tr#trash-form-#{form.id}"
+    assert_select "tr#trash-form-#{form.id} button", text: "Delete now…", count: 0
+    delete admin_trash_item_path("form", form)
+    assert_response :forbidden
+    assert Forms::Form.exists?(form.id)
+
+    sign_in_as users(:two)
+    delete admin_trash_item_path("form", form)
+    assert_redirected_to admin_trash_path
+    assert_not Forms::Form.exists?(form.id)
+  end
 end

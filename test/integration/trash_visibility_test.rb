@@ -307,6 +307,35 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert @gone_asset.reload.trashed?
   end
 
+  test "the Forms list, the builder and a save leave out a trashed form, and its placements a trashed page" do
+    kept = forms(:contact)
+    gone = forms(:newsletter)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test's row)
+    [ @kept_page, @gone_page ].each do |page|
+      block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+      block.update_columns(block_type: "form", settings: { "form_id" => kept.id.to_s })
+    end
+
+    sign_in_as users(:one)
+    get "/cs-studio/forms"
+    assert_select "table tbody tr", 1
+    assert_select "table", text: /Newsletter/, count: 0
+    assert_select "table tbody tr", text: /1 page/
+
+    get "/cs-studio/forms/#{gone.id}"
+    assert_response :not_found
+    patch "/cs-studio/forms/#{gone.id}", params: { form: { name: "Revived?", tab: "en" } }
+    assert_response :not_found
+    delete "/cs-studio/forms/#{gone.id}"
+    assert_response :not_found
+    assert_equal "Newsletter", gone.reload.name
+
+    get "/cs-studio/forms/#{kept.id}"
+    assert_select "a[href='/cs-studio/pages/#{@kept_page.id}']", text: "Kept page"
+    assert_select "a[href='/cs-studio/pages/#{@gone_page.id}']", count: 0
+    assert_select "body", text: /Gone page/, count: 0
+  end
+
   test "the media grid's Missing alt and Untranslated segments and every segment count hide a trashed image" do
     with_locales(%w[en de], default: "en")
     # Both images are missing alt AND, once given an English alt, untranslated:

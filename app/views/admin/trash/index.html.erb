@@ -27,7 +27,7 @@
 </div>
 
 <div class="mb-4 flex">
-  <%= render Admin::TrashScreen::TabsComponent.new(counts: @counts, current: @tab,
+  <%= render Admin::TrashScreen::TabsComponent.new(counts: (can?("forms.manage") ? @counts : @counts.except("form")), current: @tab,
         url: ->(tab) { admin_trash_path(**{ type: tab }.compact, **admin_url_options) }) %>
 </div>
 

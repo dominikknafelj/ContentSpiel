@@ -1,0 +1,68 @@
+<section class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="form-destinations">
+  <div class="border-b border-line px-4 py-3.5"><h2 id="form-destinations" class="text-h2 text-ink"><%= t(".title") %></h2></div>
+  <div class="flex flex-col gap-5 p-4">
+    <%= helpers.render "admin/shared/field_errors", id: "form-destinations-errors", messages: errors %>
+
+    <div data-forms-section="keep">
+      <% if keys? %>
+        <%= render Admin::Ui::CheckboxComponent.new(name: "form[keep_submissions]", value: "1", checked: draft.keep_submissions, id: "form-keep",
+              label: t(".keep"), data: { action: "change->admin--forms--builder#toggle", "admin--forms--builder-target": "keep" }) %>
+        <div class="<%= INDENT %> mt-2" data-when-checked <%= "hidden" unless draft.keep_submissions %>>
+          <div class="flex flex-wrap items-center gap-2 text-ink">
+            <label for="form-keep-days"><%= t(".for") %></label>
+            <%= number_field_tag "form[keep_days]", draft.keep_days, id: "form-keep-days", min: Forms::Form::KEEP_DAYS.min, max: Forms::Form::KEEP_DAYS.max, step: 1,
+                  placeholder: site_days, class: "#{setup_input_class} !mt-0 !w-18", aria: { describedby: "form-keep-days-help" } %>
+            <span><%= t(".days") %></span>
+          </div>
+          <p id="form-keep-days-help" class="mt-1.5 text-sm text-meta"><%= t(".keep_days_help", days: site_days) %></p>
+        </div>
+        <p class="<%= INDENT %> mt-2 text-sm text-meta" data-when-unchecked <%= "hidden" if draft.keep_submissions %>><%= t(".not_kept") %></p>
+      <% else %>
+        <div class="<%= WARN_CLASS %>" data-forms-warning="keys"><p><%= t(".no_keys") %></p></div>
+      <% end %>
+    </div>
+
+    <% types.each_with_index do |type, index| %>
+      <% current = section(type) %>
+      <div id="<%= section_id(type) %>" data-forms-section="<%= type.name %>">
+        <%= hidden_field_tag "#{prefix(index)}[kind]", type.name, id: nil %>
+        <% if current.id %><%= hidden_field_tag "#{prefix(index)}[id]", current.id, id: nil %><% end %>
+        <%= render Admin::Ui::CheckboxComponent.new(name: "#{prefix(index)}[enabled]", value: "1", checked: current.enabled, id: "#{section_id(type)}-enabled",
+              label: (mail?(type) ? t(".mail") : type.label), data: { action: "change->admin--forms--builder#toggle" }) %>
+        <div class="<%= INDENT %> mt-2 flex flex-col gap-3" data-when-checked <%= "hidden" unless current.enabled %>>
+          <% if mail?(type) %>
+            <% if mail_warning? %>
+              <div class="<%= WARN_CLASS %>" data-forms-warning="mail">
+                <p><%= t(".mail_not_ready") %><span data-unless-kept <%= "hidden" if keeping? %>> <%= t(".wait_days") %></span></p>
+                <% if settings_link? %>
+                  <p class="mt-1"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
+                <% end %>
+              </div>
+            <% end %>
+            <div data-field-name="recipients">
+              <%= label_tag RECIPIENTS_ID, t(".recipients"), class: "#{setup_label_class} mb-1" %>
+              <%= text_area_tag "#{prefix(index)}[settings][recipients]", recipients(current), id: RECIPIENTS_ID, rows: 3, autocomplete: "off",
+                    aria: { describedby: "#{RECIPIENTS_ID}-help #{RECIPIENTS_ID}-errors", invalid: ("true" if mail_errors.any?) }.compact,
+                    class: [ setup_input_class, ("!border-danger" if mail_errors.any?) ] %>
+              <p id="<%= RECIPIENTS_ID %>-help" class="mt-1 text-sm text-meta"><%= t(".recipients_help") %></p>
+              <%= helpers.render "admin/shared/field_errors", id: "#{RECIPIENTS_ID}-errors", messages: mail_errors %>
+            </div>
+          <% else %>
+            <% type.fields.each do |field| %>
+              <%= render Admin::Ui::FieldComponent.new(field: field, form_name: "#{prefix(index)}[settings]", value: current.settings[field.name],
+                    locale: locale, id_prefix: section_id(type)) %>
+            <% end %>
+            <% type.secrets.each do |secret| %>
+              <div>
+                <%= label_tag "#{section_id(type)}-secret-#{secret}", secret.humanize, class: "#{setup_label_class} mb-1" %><%# i18n-ok: a gem's secret is named by its gem, as its fields are %>
+                <%= password_field_tag "#{prefix(index)}[secrets][#{secret}]", nil, id: "#{section_id(type)}-secret-#{secret}", autocomplete: "new-password",
+                      class: setup_input_class, aria: { describedby: "#{section_id(type)}-secret-#{secret}-state" } %>
+                <p id="<%= section_id(type) %>-secret-<%= secret %>-state" class="mt-1 text-sm text-meta"><%= set_on(current, secret) %></p>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</section>

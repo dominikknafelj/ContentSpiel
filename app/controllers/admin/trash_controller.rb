@@ -24,12 +24,12 @@ module Admin
   # refusal, the ordinary alert otherwise).
   class TrashController < BaseController
     PER_PAGE = 50
-    MODELS = { "page" => Page, "post" => Post, "media" => Media::Asset }.freeze
+    MODELS = { "page" => Page, "post" => Post, "media" => Media::Asset, "form" => Forms::Form }.freeze
 
     # The tabs' `?type=` values (plural, as the tabs name themselves) and the
     # model key each one lists. The singular keys the screen used before are
     # still read, so an old bookmark keeps its tab; anything else is "All".
-    TABS = { "pages" => "page", "posts" => "post", "images" => "media" }.freeze
+    TABS = { "pages" => "page", "posts" => "post", "images" => "media", "forms" => "form" }.freeze
 
     # Trashed items of `type` ("page"/"post"/"media") that `actor` may act
     # on, as a relation -- the one place that rule lives, shared by this
@@ -40,12 +40,16 @@ module Admin
     # images are `Trash::ItemPermissions`' rule as a relation:
     # `media.manage` sees every trashed image, an uploader with
     # `media.upload` only their own (both admin-area keys, so holding one
-    # anywhere is holding it).
+    # anywhere is holding it). A form is `Trash::ItemPermissions`' rule too:
+    # `forms.manage` (site-wide) restores every trashed form; deleting one
+    # for good is `trash.empty`'s alone, which the row asks
+    # (`Admin::TrashScreen::RowComponent#purgeable?`).
     def self.visible(type, actor)
       case type
       when "page" then AccessControl.scope(actor, "pages.delete", Page.all, trashed: true)
       when "post" then AccessControl.scope(actor, "posts.delete", Post.all, trashed: true)
       when "media" then visible_assets(actor)
+      when "form" then AccessControl.holds?(actor, "forms.manage") ? Forms::Form.trashed : Forms::Form.none
       end
     end
 
@@ -221,7 +225,7 @@ module Admin
       roots = Trash.roots
       pages = roots[:pages].count
       members = Page.trashed.trash_branch_members.count
-      { pages:, subpages: members, posts: roots[:posts].count, images: roots[:assets].count }
+      { pages:, subpages: members, posts: roots[:posts].count, images: roots[:assets].count, forms: roots[:forms].count }
     end
 
     # Whether the tab's kind is in the trash at all while this viewer's list
@@ -231,7 +235,7 @@ module Admin
     def hidden_items?
       return false unless @everything
 
-      kinds = { "page" => :pages, "post" => :posts, "media" => :images }
+      kinds = { "page" => :pages, "post" => :posts, "media" => :images, "form" => :forms }
       types.any? { |type| @everything.fetch(kinds.fetch(type)).positive? }
     end
 
@@ -268,6 +272,7 @@ module Admin
       when "page" then admin_page_path(@item, **admin_url_options)
       when "post" then admin_post_path(@item, **admin_url_options)
       when "media" then admin_media_path(selected: @item.id, **admin_url_options)
+      when "form" then admin_form_path(@item, **admin_url_options)
       end
     end
 
@@ -317,6 +322,7 @@ module Admin
       back.slice(*keys).select { |_, value| value.is_a?(String) }.symbolize_keys.merge(admin_url_options)
     end
 
-    def title_of(item) = item.title.presence || "(untitled)"
+    # A form is named by its `name`, the others by their title.
+    def title_of(item) = Admin::TrashScreen::RowComponent.title_of(item)
   end
 end

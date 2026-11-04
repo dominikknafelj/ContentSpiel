@@ -27,3 +27,19 @@ en:
         mail:
           not_an_address: "“%{address}” is not one mail address."
           too_many: "A form mails at most %{count} addresses."
+      # The screen's titles and toasts (`Admin::FormsController`, the views
+      # `admin/forms/*`); everything drawn by a component is
+      # `admin.components.forms_screen` (`forms_screen.en.yml`).
+      index:
+        title: "Forms"
+      new:
+        title: "New form"
+      show:
+        title: "Form"
+      create:
+        created: "Form created."
+      update:
+        saved: "Form saved."
+      destroy:
+        moved: "“%{name}” moved to the trash."
+        undo: "Undo"

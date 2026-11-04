@@ -21,8 +21,12 @@ module Admin
     # Everything beyond the item itself is looked up once for the whole page
     # by `ListComponent` and handed in: nothing here queries.
     class RowComponent < Admin::AdminComponent
-      TYPE_KEYS = { Page => "page", Post => "post", Media::Asset => "media" }.freeze
-      TYPE_LABELS = { "page" => "Page", "post" => "Post", "media" => "Image" }.freeze
+      TYPE_KEYS = { Page => "page", Post => "post", Media::Asset => "media", Forms::Form => "form" }.freeze
+      TYPE_LABELS = { "page" => "Page", "post" => "Post", "media" => "Image", "form" => "Form" }.freeze
+
+      # What an item is called on the screen: a form by its name (it has no
+      # title), anything else by its title.
+      def self.title_of(item) = (item.is_a?(Forms::Form) ? item.name : item.title).presence || "(untitled)"
 
       # A page restores in place only when it's the root of its own trash
       # branch and its parent is a kept page; a member of another page's
@@ -66,7 +70,12 @@ module Admin
 
       def purge_dialog_id = "purge-#{type_key}-#{item.id}"
 
-      def title = item.title.presence || "(untitled)"
+      def title = self.class.title_of(item)
+
+      # Whether "Delete now…" is offered: a form is deleted for good with
+      # `trash.empty` alone (`Trash::Purge`: it takes its submissions with
+      # it), so a `forms.manage` holder may restore one and nothing more.
+      def purgeable? = !item.is_a?(Forms::Form) || can?("trash.empty")
 
       def image? = item.is_a?(Media::Asset)
 

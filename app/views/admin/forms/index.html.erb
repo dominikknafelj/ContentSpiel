@@ -1,0 +1,15 @@
+<%# The Forms screen (forms plan, Task 4; design.md 1): the list
+    (`Admin::FormsScreen::ListComponent`) and, for `forms.manage`, the New form
+    dialog, which `Admin::FormsController#create` draws open again with what was
+    typed when the save is refused. %>
+<% content_for :title, t(".title") %>
+<% page_url = ->(page) { admin_forms_path(page: page, **admin_url_options) } %>
+<% if @pagination.out_of_range? %>
+  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+<% else %>
+  <%= render Admin::FormsScreen::ListComponent.new(forms: @forms, pagination: @pagination, page_url: page_url, mail_settings: MailSettings.current,
+        keys: Forms::Encryption.available?, viewer: Current.actor, url_options: admin_url_options) %>
+<% end %>
+<% if can?("forms.manage") %>
+  <%= render @dialog || Admin::FormsScreen::NewFormDialogComponent.new(url_options: admin_url_options) %>
+<% end %>

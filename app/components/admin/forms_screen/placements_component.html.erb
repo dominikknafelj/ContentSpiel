@@ -1,0 +1,21 @@
+<section class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="form-placements">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="form-placements" class="text-h2 text-ink"><%= t(".title") %></h2>
+  </div>
+  <div class="p-4 text-sm">
+    <% if pages.empty? && hidden.zero? %>
+      <p class="text-dim"><%= t(".none") %></p>
+    <% else %>
+      <% if pages.any? %>
+        <ul class="flex flex-col gap-1.5">
+          <% pages.each do |page| %>
+            <li><%= link_to title_of(page), page_path(page), class: "text-accent underline-offset-2 hover:text-accent-hover hover:underline", data: { turbo_frame: "content" } %></li>
+          <% end %>
+        </ul>
+      <% end %>
+      <% if hidden.positive? %>
+        <p class="<%= "mt-2 " if pages.any? %>text-meta"><%= t(".hidden", count: hidden) %></p>
+      <% end %>
+    <% end %>
+  </div>
+</section>

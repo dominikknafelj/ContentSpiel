@@ -1,0 +1,86 @@
+<%= tag.div id: id("row"), class: "admin-form-field-row rounded-cs border border-line bg-surface",
+      data: { "admin--forms--builder-target": "row", row: row.row, key: row.key.presence } do %>
+  <div class="flex flex-wrap items-center gap-2 border-b border-line p-3">
+    <%= render Admin::Ui::BadgeComponent.new(label: type_label, class: "uppercase") %>
+    <%= tag.button type: "button", class: "min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-semibold text-ink",
+          aria: { expanded: "true", controls: body_id }, data: { action: "admin--forms--builder#fold", "admin--forms--builder-target": "heading" } do %><% if head_label %><%= head_label %><% else %><span class="font-normal text-meta"><%= t(".no_label") %></span><% end %><% end %>
+    <span class="text-xs text-meta" data-admin--forms--builder-target="requiredMark" <%= "hidden" unless row.required %>><%= t(".required") %></span>
+    <% if structure? %>
+      <span class="ml-auto flex items-center gap-1">
+        <%= render Admin::Ui::ButtonComponent.new(label: "↑", variant: :ghost, size: BUTTON_SIZE, disabled: first?, aria: { label: t(".up", label: spoken_label) },
+              data: { action: "admin--forms--builder#up", "admin--forms--builder-target": "up" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "↓", variant: :ghost, size: BUTTON_SIZE, disabled: last?, aria: { label: t(".down", label: spoken_label) },
+              data: { action: "admin--forms--builder#down", "admin--forms--builder-target": "down" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: BUTTON_SIZE, aria: { label: t(".remove_label", label: spoken_label) },
+              data: { action: "admin--forms--builder#remove" }) %>
+      </span>
+    <% end %>
+  </div>
+
+  <div id="<%= body_id %>" class="flex flex-col gap-4 p-3" data-admin--forms--builder-target="body">
+    <% if structure? %>
+      <%= hidden_field_tag name(:key), row.key, id: nil %>
+      <%= hidden_field_tag name(:type), row.type, id: nil %>
+    <% end %>
+
+    <div>
+      <%= label_tag id("label"), t(".label"), class: "#{setup_label_class} mb-1" %>
+      <% if (line = reference(row.label)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+      <%= text_field_tag name(:label, locale), row.label[locale], id: id("label"), autocomplete: "off",
+            aria: { describedby: id("errors"), invalid: ("true" if errors.any?) }.compact,
+            data: { action: "input->admin--forms--builder#relabel" },
+            class: [ setup_input_class, ("!border-danger" if errors.any?) ] %>
+      <%= helpers.render "admin/shared/field_errors", id: id("errors"), messages: errors %>
+    </div>
+
+    <div>
+      <%= label_tag id("help"), t(".help"), class: "#{setup_label_class} mb-1" %>
+      <% if (line = reference(row.help)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+      <%= text_field_tag name(:help, locale), row.help[locale], id: id("help"), autocomplete: "off",
+            aria: { describedby: id("help-help") }, class: setup_input_class %>
+      <p id="<%= id("help-help") %>" class="mt-1 text-sm text-meta"><%= t(".help_help") %></p>
+    </div>
+
+    <% if structure? %>
+      <%= render Admin::Ui::CheckboxComponent.new(name: name(:required), value: "1", checked: row.required, id: id("required"), label: required_text,
+            data: { action: "change->admin--forms--builder#required" }) %>
+
+      <% if display? %>
+        <fieldset class="m-0 min-w-0 border-0 p-0">
+          <legend class="<%= setup_label_class %> mb-1"><%= t(".shown_as") %></legend>
+          <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+            <% display_options.each do |value, label| %>
+              <label for="<%= id("display-#{value}") %>" class="<%= Admin::Fields::SelectField::SEGMENT_CLASS %>">
+                <%= radio_button_tag name(:display), value, row.display == value, id: id("display-#{value}"), class: "sr-only" %>
+                <span><%= label %></span>
+              </label>
+            <% end %>
+          </div>
+        </fieldset>
+      <% end %>
+    <% end %>
+
+    <% if choices? %>
+      <fieldset class="m-0 min-w-0 border-0 p-0">
+        <legend class="<%= setup_label_class %> mb-1"><%= t(".choices") %></legend>
+        <% if structure? %>
+          <%= hidden_field_tag name(:choice_order), choice_order, id: id("choice-order"),
+                data: { save_bar_track: true, "admin--forms--builder-target": "choiceOrder" } %>
+        <% end %>
+        <ol class="flex flex-col gap-2" data-admin--forms--builder-target="choices">
+          <% row.choices.each_with_index do |choice, index| %>
+            <%= render Admin::FormsScreen::ChoiceRowComponent.new(field_row: row.row, choice: choice, number: index + 1, locale: locale, structure: structure?,
+                  first: index.zero?, last: index == row.choices.size - 1) %>
+          <% end %>
+        </ol>
+        <% if structure? %>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".add_choice"), variant: :secondary, size: BUTTON_SIZE, disabled: full_choices?,
+                  data: { action: "admin--forms--builder#addChoice", "admin--forms--builder-target": "addChoice" }) %>
+            <p class="text-[13px] text-meta" data-admin--forms--builder-target="choicesFull" <%= "hidden" unless full_choices? %>><%= t(".max_choices") %></p>
+          </div>
+        <% end %>
+      </fieldset>
+    <% end %>
+  </div>
+<% end %>

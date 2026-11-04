@@ -139,16 +139,16 @@ Rails.application.routes.draw do
     # (config/initializers/active_storage_access.rb).
     get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
 
-    # Trash (trash spec §7). `:type` is page|post|media -- one screen for
-    # three models, so the item is addressed by type and id rather than by a
+    # Trash (trash spec §7). `:type` is page|post|media|form -- one screen for
+    # four models, so the item is addressed by type and id rather than by a
     # resource per model. The constraint is what turns any other `:type`
     # into a routing 404 before `Admin::TrashController` is ever reached.
     get "trash", to: "trash#index", as: :trash
     delete "trash", to: "trash#empty", as: :empty_trash
     # A bulk trash's Undo: restores exactly the posts it names.
     post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
-    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
-    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
+    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media|form/ }
+    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media|form/ }
 
     # "Still correct — mark up to date" for an outdated translation (translation helpers
     # spec §3.4/§4): one endpoint for every translatable record kind, named
@@ -288,6 +288,12 @@ Rails.application.routes.draw do
     # delete (`Groups::Destroy`, which revokes the group's tokens). No
     # `:show` -- the editor is the group's page.
     resources :groups, only: %i[index new create edit update destroy]
+
+    # The Forms screen (forms plan, Task 4): the list, New form (a dialog,
+    # with `new` its page without JavaScript), the builder (`show`, saved
+    # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
+    # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
+    resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ }
 
     # "Your account" (access-control design spec §5; the notes handoff's
     # decisions 25 and 38): the signed-in user's own account, open to every

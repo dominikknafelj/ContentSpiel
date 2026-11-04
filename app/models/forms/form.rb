@@ -15,8 +15,8 @@ module Forms
   #
   # TRASHABLE, as a post is (`Trashable`, `Trash::Move`/`Restore`/`Purge`).
   # A trashed form draws nothing and its endpoint answers "no longer
-  # available" (Tasks 6 and 7). It joins `Trash.roots` with the Trash
-  # screen (Task 4).
+  # available" (Tasks 6 and 7). It is one of `Trash.roots`, and the Trash
+  # screen has a Forms tab (Task 4).
   #
   # TEXTS. `submit_label` and `thank_you` are translated with Mobility's
   # jsonb backend, and the fields' labels, help lines and choices are

@@ -1,5 +1,6 @@
 # What's in the trash, as the purgeable top-level items (trash spec §4.4):
-# page branches by their root, then posts, then images -- images last, so
+# page branches by their root, then posts, then forms (forms plan, Task 4:
+# a form takes its submissions with it), then images -- images last, so
 # the usages their trashed owners held are gone by the time they're tried.
 #
 # `Trash` is both this module and the namespace of the `Trash::` services
@@ -15,6 +16,7 @@ module Trash
     {
       pages: Page.trashed.trash_roots.order(:trashed_at, :id),
       posts: Post.trashed.order(:trashed_at, :id),
+      forms: Forms::Form.trashed.order(:trashed_at, :id),
       assets: Media::Asset.trashed.order(:trashed_at, :id)
     }
   end

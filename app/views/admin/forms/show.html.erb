@@ -1,0 +1,8 @@
+<%# The builder (forms plan, Task 4; design.md 2): `Admin::FormsScreen::
+    BuilderComponent`, drawn from the stored form or, after a refused (422) or
+    stale (409) Save, from what was posted (`@draft`). %>
+<% content_for :title, @form.name_was.presence || t(".title") %>
+<%= render Admin::FormsScreen::BuilderComponent.new(form: @form, draft: @draft, locale: admin_locale,
+      placements: Forms::Placements.new(@form, viewer: Current.actor), errors: @errors || [],
+      mail_settings: MailSettings.current, keys: Forms::Encryption.available?,
+      stale: @stale_form.present?, stale_change: @stale_change, base: params[:base_updated_at], url_options: admin_url_options) %>

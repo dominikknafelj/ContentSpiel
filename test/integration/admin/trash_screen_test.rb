@@ -32,10 +32,10 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
   test "the tabs carry the counts the sidebar badge sums" do
     sign_in_as users(:one)
     get admin_trash_path
-    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1" ], tab_texts
+    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1", "Forms 0" ], tab_texts
 
     counts = Admin::TrashController.counts(users(:one))
-    assert_equal({ "page" => 1, "post" => 1, "media" => 1 }, counts)
+    assert_equal({ "page" => 1, "post" => 1, "media" => 1, "form" => 0 }, counts)
     assert_equal Admin::TrashController.badge_count(users(:one)), counts.values.sum
   end
 
@@ -73,7 +73,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
     get admin_trash_path(page: 2, type: "posts")
     assert_select "nav[aria-label='Filter by type'] a[href*='type=images']"
-    assert_select "nav[aria-label='Filter by type'] a:not([href*='page='])", count: 4
+    assert_select "nav[aria-label='Filter by type'] a:not([href*='page='])", count: 5
   end
 
   # Final fix wave (I2): the list, the tabs and the badge are the page roots
@@ -86,7 +86,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
 
     get admin_trash_path
-    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1" ], tab_texts
+    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1", "Forms 0" ], tab_texts
     assert_select "#trash-page-#{@child.id}", count: 0
     assert_equal Trash.roots[:pages].pluck(:id), Admin::TrashController.roots("page", users(:one)).order(:trashed_at, :id).pluck(:id)
     assert_equal 3, Admin::TrashController.badge_count(users(:one))

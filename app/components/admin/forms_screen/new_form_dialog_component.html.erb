@@ -1,0 +1,54 @@
+<% fields = capture do %>
+  <% if refused? %>
+    <div class="mb-4 rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] text-danger-ink" role="alert">
+      <% errors.each do |error| %><p><%= error %></p><% end %>
+    </div>
+  <% end %>
+  <%= form_with url: create_path, method: :post, id: FORM_ID, class: "flex flex-col gap-4", data: { turbo_frame: "_top" }, html: { novalidate: true } do %>
+    <% if page? %><%= hidden_field_tag :from, "page", id: nil %><% end %>
+    <div>
+      <%= label_tag "new_form_name", t(".name"), class: setup_label_class %>
+      <%= text_field_tag "form[name]", name, id: "new_form_name", required: true, maxlength: Forms::Form::NAME_MAX, autofocus: true, autocomplete: "off",
+            aria: { describedby: "new_form_name_help" }, class: setup_input_class %>
+      <p id="new_form_name_help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
+    </div>
+    <fieldset class="m-0 min-w-0 border-0 p-0">
+      <legend class="<%= setup_label_class %> mb-1"><%= t(".start") %></legend>
+      <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+        <% STARTS.each do |value| %>
+          <label for="<%= start_id(value) %>" class="<%= Admin::Fields::SelectField::SEGMENT_CLASS %>">
+            <%= radio_button_tag "form[start]", value, start == value, id: start_id(value), class: "sr-only" %>
+            <span><%= t(".#{value}") %></span>
+          </label>
+        <% end %>
+      </div>
+    </fieldset>
+    <div>
+      <%= label_tag "new_form_recipients", t(".mail_to"), class: setup_label_class %>
+      <%= text_area_tag "form[recipients]", recipients, id: "new_form_recipients", rows: 2, autocomplete: "off",
+            aria: { describedby: "new_form_recipients_help" }, class: setup_input_class %>
+      <p id="new_form_recipients_help" class="mt-1 text-sm text-meta"><%= t(".mail_to_help") %></p>
+    </div>
+  <% end %>
+<% end %>
+
+<% if page? %>
+  <div class="max-w-md">
+    <h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
+    <%= fields %>
+    <div class="mt-4 flex gap-2">
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
+      <%= link_to t(".cancel"), cancel_path, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+    </div>
+  </div>
+<% else %>
+  <%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: t(".title"), width: :form_narrow, open_on_load: refused?) do |dialog| %>
+    <%= fields %>
+    <% dialog.with_footer do %>
+      <%= tag.form method: "dialog" do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+      <% end %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
+    <% end %>
+  <% end %>
+<% end %>
