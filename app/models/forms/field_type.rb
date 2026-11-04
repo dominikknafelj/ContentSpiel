@@ -17,12 +17,16 @@ module Forms
   # - `input`: the public component, `(field:, value:, error:)`.
   # - `display`: `->(value, field, locale:) { String }`, how a value reads
   #   where it is not edited (a submission).
-  FieldType = Data.define(:name, :value_type, :label, :options, :max_length, :summary, :input, :display)
+  # - `unsent`: what the value is when the browser sends nothing for the
+  #   field, nil by default; a checkbox's is `false` (an unticked box sends
+  #   nothing, and is an answer of "no"). `Forms::Answers` reads it and names
+  #   no type.
+  FieldType = Data.define(:name, :value_type, :label, :options, :max_length, :summary, :input, :display, :unsent)
 
   class FieldType
     OPTIONS = %i[choices display].freeze
 
-    def initialize(name:, value_type:, label:, options:, max_length:, summary:, input:, display:)
+    def initialize(name:, value_type:, label:, options:, max_length:, summary:, input:, display:, unsent: nil)
       raise ArgumentError, "a form field type is named by a String, not #{name.inspect}" unless name.is_a?(String) && name.present?
       raise ArgumentError, "#{name}: value_type #{value_type.inspect} is not a registered ContentModel field type (known: #{ContentModel::FieldTypes.names.join(", ")})" unless ContentModel::FieldTypes.find(value_type)
       raise ArgumentError, "#{name}: label is the builder's word for the type, a String" unless label.is_a?(String) && label.present?

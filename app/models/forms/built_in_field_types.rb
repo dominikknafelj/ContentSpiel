@@ -47,6 +47,7 @@ module Forms
     def checkbox
       FieldType.new(name: "checkbox", value_type: :boolean, label: "Checkbox", options: [], max_length: nil,
         summary: false, input: Blocks::FormFields::CheckboxComponent,
+        unsent: false,
         display: ->(value, _field, locale:) { PublicStrings.read(value ? "public.forms.yes" : "public.forms.no", locale: locale) })
     end
   end
