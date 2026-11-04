@@ -51,3 +51,28 @@ en:
         invalid: "Please check this entry."
         inclusion: "Please choose one of the options."
         too_long: "This is too long."
+      # What the endpoint a form posts to answers (`FormSendsController`,
+      # forms plan Task 6; design.md 4 and 5): the same words in the JSON
+      # the script writes in place and on the plain pages without it.
+      # `submit` is the button's word where the form has no submit label,
+      # `sent` the thank-you where it has none of its own. `error_item` is
+      # one link of the error summary, so a language orders the two parts.
+      # `back` is the link to the page the form came from (the "← " is the
+      # template's, not the key's).
+      submit: "Send"
+      sent: "Thank you. Your answers have been sent."
+      error_summary:
+        one: "Please correct 1 answer."
+        other: "Please correct %{count} answers."
+      error_item: "%{label}: %{message}"
+      gone: "This form is no longer available."
+      unavailable: "This form can't take answers at the moment. Please try again later."
+      rate_limited: "Too many messages. Please try again in a few minutes."
+      back: "Back to the page"
+      # The plain pages' headings (and titles), without JavaScript.
+      pages:
+        sent: "Sent"
+        invalid: "Check your answers"
+        gone: "Form not available"
+        unavailable: "Form not available right now"
+        rate_limited: "Too many messages"

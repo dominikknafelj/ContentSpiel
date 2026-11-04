@@ -478,6 +478,16 @@ Rails.application.routes.draw do
   # catch-all below, or "/mcp" would be swallowed as a page path instead.
   post "mcp", to: "mcp#create"
 
+  # A visitor's send of a form (forms plan, Task 6; spec "Sending"): the form
+  # posts to its own endpoint, never to the page, so a public page stays a
+  # GET that is the same for everyone. POST only: a GET of this address is
+  # the public catch-all's below, a page path like any other (and a 404
+  # unless a page is called "forms"). Declared before the catch-alls, which
+  # are GETs and could not take it anyway, as `mcp` is. `format: false`, as
+  # the public routes have it: JSON or a plain page is chosen by the
+  # `Accept` header (`FormSendsController#json?`), never by a suffix.
+  post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
+
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check

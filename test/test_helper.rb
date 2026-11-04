@@ -53,6 +53,7 @@ require_relative "support/mail_state"
 require_relative "support/invites"
 require_relative "support/smtp_stub"
 require_relative "support/encryption_keys"
+require_relative "support/form_sends"
 require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
@@ -128,6 +129,9 @@ module ActiveSupport
     # `without_encryption_keys { ... }`: a site with no Active Record
     # encryption keys -- see test/support/encryption_keys.rb.
     include EncryptionKeys
+    # `aged_drawn(form)`, `clear_form_send_limits`, `place_form(page, form)`:
+    # a visitor's send -- see test/support/form_sends.rb.
+    include FormSends
 
     # `with_plain_theme { ... }`: the second theme for a block -- see
     # test/support/theme_test_helper.rb.

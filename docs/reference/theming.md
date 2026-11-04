@@ -249,20 +249,22 @@ The body's classes are the default theme's and read tokens only, so a theme chan
 
 `PublicController` always answered the same cookie-less response to every visitor, and that was a convention while every public template was the CMS's own. A theme's templates are not, and there are two ways one sets a cookie on a response that says `Cache-Control: public` (which a shared cache may keep and hand to the next visitor). Both did, in the tests that now pin this.
 
+The wall below is the concern `Cookieless` (`app/controllers/concerns/cookieless.rb`), included first in `PublicController` and in `FormSendsController`, the endpoint a visitor's form posts to (forms plan, Task 6), which is no `PublicController` (never cached, no theme) but leaves the browser's cookies as the public pages do.
+
 **The session and the token.** A `form_with` or a `button_to` in a theme's footer, `csrf_meta_tags` in its head or a `form_authenticity_token` anywhere asks Rails for the token, and Rails reads the session to mint it. Three lines:
 
 - the session of a public request is never committed (`request.session_options[:skip] = true`, which the session middleware asks before it writes the cookie), whatever a template read or wrote in it. A write to the flash is a write to the session and goes with it;
 - `protect_against_forgery?` answers false, which is what `csrf_meta_tags` and every form helper ask before they print a token;
 - `form_authenticity_token`, which mints one without asking, answers nil.
 
-**The cookie jar, which is not the session.** `cookies[:seen] = "1"` in a template (a consent banner, an A/B flag: honest mistakes), `cookies.signed`, `.encrypted` and `.permanent`, and `cookies.delete` are kept in the request's jar and written into the response by `ActionDispatch::Cookies`, a middleware of its own that never asks the session's `:skip`. So `PublicController#leave_no_cookie`, an `around_action` declared first in the class and therefore around every callback and action of it and of its subclasses (one that answers early included), does two things once the action and its templates are done:
+**The cookie jar, which is not the session.** `cookies[:seen] = "1"` in a template (a consent banner, an A/B flag: honest mistakes), `cookies.signed`, `.encrypted` and `.permanent`, and `cookies.delete` are kept in the request's jar and written into the response by `ActionDispatch::Cookies`, a middleware of its own that never asks the session's `:skip`. So `Cookieless#leave_no_cookie`, an `around_action` declared first in the class and therefore around every callback and action of it and of its subclasses (one that answers early included), does two things once the action and its templates are done:
 
 - the request gets a NEW jar, built from the cookies the browser sent and holding no write and no delete, which is the one the middleware then finds and writes nothing from (actionpack 8.1.4, `ActionDispatch::Cookies#call`). Nothing is sent to delete a cookie either;
 - a `Set-Cookie` put on the response by hand (`response.set_cookie`, `response.headers["Set-Cookie"] = …`) is taken off.
 
 **What is promised, exactly: no `Set-Cookie` leaves a response of `PublicController` or of a subclass, whatever a theme's template calls in the view, and a signed-in editor's cookies are neither changed nor taken away by reading a public page.** What is not: an action that raises is answered by the exceptions application, outside this controller (the cookie middleware writes nothing then, being passed by the exception), and a cookie a script sets in the browser (`document.cookie`) is the browser's and never this response's.
 
-The overrides and the callback are private, so none is an action. Nothing public needs any of it: every public route is a GET to `pages#show` and no action reads the session. A theme's GET form (a search box) works, and a plain `<form method="post">` to another service posts without a token of this application, which that service could not have checked anyway. **`PreviewController` is not a `PublicController` and keeps all three** (session, token, cookies): it is signed in, private and never cached.
+The overrides and the callback are private, so none is an action. Nothing public needs any of it: every public page route is a GET to `pages#show`, the one POST, a visitor's send of a form, takes no token by design (`FormSendsController` says why), and no action reads the session. A theme's GET form (a search box) works, and a plain `<form method="post">` to another service posts without a token of this application, which that service could not have checked anyway. **`PreviewController` is not a `PublicController` and keeps all three** (session, token, cookies): it is signed in, private and never cached.
 
 `Theme::Check` refuses the same words when the application starts, with a sentence that says why (below, "The plain depth"); the wall is what holds for a spelling the check does not see.
 

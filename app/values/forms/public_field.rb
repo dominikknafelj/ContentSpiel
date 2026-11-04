@@ -5,6 +5,9 @@ module Forms
   # not repeat an id, a `for`, or an error link (forms plan, Review Focus 4).
   # `form_id` is carried for the callers that need the form.
   class PublicField
+    # The errors `Forms::Answers` reports, each a key of `public.forms.errors`.
+    ERRORS = %i[blank invalid inclusion too_long].freeze
+
     attr_reader :field, :locale, :form_id, :place
 
     delegate :key, :choices, to: :field
@@ -24,6 +27,16 @@ module Forms
 
     def help_id = "#{id}-help"
 
+    # A radio's id: the field's and the choice's key.
+    def choice_id(choice) = "#{id}-#{choice.key}"
+
+    # What an error summary links to: the control, or for radios the first
+    # radio, since a fieldset takes no focus.
+    def target_id
+      first = labelled_choices.first if display == "radios"
+      first ? choice_id(first) : id
+    end
+
     def label = field.label_in(locale)
 
     def help = field.help_in(locale)
@@ -40,7 +53,13 @@ module Forms
 
     # A word a visitor reads that no editor typed, in the form's language
     # (English where it has none): `public.forms.<key>`.
-    def word(key) = PublicStrings.read("public.forms.#{key}", locale: locale)
+    def word(key, **options) = PublicStrings.read("public.forms.#{key}", locale: locale, **options)
+
+    # The sentence of an error `Forms::Answers` found (`:blank`, `:invalid`,
+    # `:inclusion`, `:too_long`), in the form's language; one it does not
+    # know reads as `invalid`. The input components and the endpoint's JSON
+    # answer say the same words through this.
+    def error_text(error) = word("errors.#{ERRORS.include?(error&.to_sym) ? error.to_sym : :invalid}")
 
     # The choices a visitor is shown: those with a label in the form's
     # language or the default's. A choice with none is left out rather than

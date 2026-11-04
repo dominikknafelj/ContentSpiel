@@ -42,6 +42,24 @@ module Forms
       end
     end
 
+    # The page a visitor's send names (`page_id`, the visitor's to name), or
+    # nil (pre-flight ruling R10): believed only when it is a page the public
+    # can see (kept, published, its ancestors too: `PublicSite::Resolver
+    # .visible_among`) whose PUBLISHED copy holds a Form block of this form,
+    # since that is what the visitor was shown. A draft, a page that does not
+    # place the form, or one whose Form block is still only in its rows is
+    # nil: the submission stores no page and the link back goes home.
+    # Unlike the rest of this class it reads what the public sees, not the
+    # rows, which are CS Studio's view.
+    def self.live_page(form, page_id)
+      id = Integer(page_id.to_s, 10, exception: false)
+      page = id && Page.kept.find_by(id: id)
+      return nil unless page && PublicSite::Resolver.visible_among([ page ]).any?
+
+      shown = Publishing.published(page).content_blocks
+      page if shown.any? { |block| block.block_type == BLOCK_TYPE && block.settings["form_id"].to_s == form.id.to_s }
+    end
+
     # `page_ids:` and `pages:` are what `for_forms` read already.
     def initialize(form, viewer:, page_ids: nil, pages: nil)
       @form = form

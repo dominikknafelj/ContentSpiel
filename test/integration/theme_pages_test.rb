@@ -957,7 +957,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   PRIVATE_VIEWS = %w[
     layouts/admin layouts/product layouts/setup layouts/mailer
     admin/dashboard/show admin/sessions/new admin/passwords/new admin/passwords/edit setup/token setup/system_check
-    passwords_mailer/reset
+    passwords_mailer/reset layouts/form_send form_sends/sent form_sends/invalid
   ].freeze
   # A mail has a text part with a template and a layout of its own.
   PRIVATE_TEXT_VIEWS = %w[layouts/mailer passwords_mailer/reset].freeze
@@ -1099,6 +1099,35 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         assert_includes part.body.to_s, "/password/edit#"
       end
       assert_not_includes PasswordsMailer.view_paths.map(&:to_s), @leaking_views
+    end
+  end
+
+  # The endpoint a visitor's form posts to (forms plan, Task 6; spec
+  # decision 7): its thank-you and its error page are plain pages of the
+  # CMS's own, in a layout of their own (`layouts/form_send`), and the error
+  # page redraws the fields with the CMS's input components, never a
+  # theme's template of them.
+  test "nothing of a theme reaches the form's plain pages" do
+    clear_form_send_limits
+    form = forms(:contact)
+    answers = { "f_name0001" => "Ada", "f_mail0001" => "ada@example.com" }
+    with_leaking_theme do
+      dir = Pathname(@leaking_views).dirname
+      component = dir.join("components/blocks/form_fields/short_text_component.html.erb")
+      component.dirname.mkpath
+      component.write("#{LEAK}-FIELD\n")
+      assert_theme_reached_the_public_page
+
+      post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) }
+      assert_no_theme_here
+      assert_equal "FormSendsController", controller.class.name
+      assert_select "[role=status]"
+
+      post form_send_path(form), params: { answers: answers.merge("f_name0001" => ""), drawn: aged_drawn(form) }
+      assert_response :unprocessable_content
+      assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
+      assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
+      assert_select "input#form-send-f_name0001[aria-invalid=true]"
     end
   end
 

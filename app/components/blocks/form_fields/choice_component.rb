@@ -10,7 +10,7 @@ module Blocks
 
       def chosen?(choice) = value.to_s == choice.key
 
-      def radio_id(choice) = "#{field.id}-#{choice.key}"
+      def radio_id(choice) = field.choice_id(choice)
 
       # The fieldset carries the description (help and error); the invalid
       # mark is on each radio, as `aria-invalid` is not for a group.

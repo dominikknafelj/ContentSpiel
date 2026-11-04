@@ -13,8 +13,6 @@ module Blocks
     # `field` is a `Forms::PublicField`, `value` what the visitor typed (a
     # String, or true for a ticked box), `error` a key of `public.forms.errors`.
     class Base < ApplicationComponent
-      ERRORS = %i[blank invalid inclusion too_long].freeze
-
       def initialize(field:, value: nil, error: nil)
         @field = field
         @value = value
@@ -28,7 +26,7 @@ module Blocks
       # The control's aria: help and error, in that order, when there are any.
       def described_by = [ (field.help_id if field.help.present?), (field.error_id if error) ].compact.join(" ").presence
 
-      def error_text = field.word("errors.#{ERRORS.include?(error) ? error : :invalid}")
+      def error_text = field.error_text(error)
 
       def required_word = field.word(:required)
 
