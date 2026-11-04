@@ -199,9 +199,12 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
   # A PAGE THAT STAYS. Turbo takes a copy of the page it is on when the
   # browser itself goes to an anchor in it (`historyPoppedWithEmptyState`: a
-  # link Turbo does not drive, a typed fragment, Back between two anchors).
-  # Nothing of a code block may move then: no `hidden` is touched, by the
-  # event or after it, and the page ends at the anchor.
+  # typed fragment, Back between two anchors, and a link to an anchor of the
+  # page, which Turbo would draw again and the site's entry point gives back
+  # to the browser: `site.js`, the `turbo:click` listener). The link here is
+  # a plain `#` link Turbo would drive. Nothing of a code block may move
+  # then: no `hidden` is touched, by the event or after it, and the page ends
+  # at the anchor.
   test "when the browser goes to an anchor in a page that stays, Turbo copies the page and no strip or button is touched, and the page ends at the anchor" do
     add_code(CODE, settings: { "code" => CODE })
     add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
@@ -210,7 +213,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     reconnect
     page.execute_script(<<~JS)
       const main = document.querySelector("main")
-      main.insertAdjacentHTML("afterbegin", '<a id="to-foot" href="#foot" data-turbo="false">To the foot</a>')
+      main.insertAdjacentHTML("afterbegin", '<a id="to-foot" href="#foot">To the foot</a>')
       main.insertAdjacentHTML("beforeend", '<div style="height: 3000px"></div><h2 id="foot">Foot</h2><div style="height: 3000px"></div>')
       window.__hidden = []
       window.__caches = 0
@@ -235,11 +238,12 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     page.execute_script("window.__watch?.disconnect(); document.removeEventListener('turbo:before-cache', window.__count); delete window.__watch; delete window.__hidden; delete window.__caches; delete window.__count")
   end
 
-  # A LINK TO AN ANCHOR that Turbo drives is a visit: Turbo 8 fetches the
-  # page and draws it again (`locationWithActionIsSamePage` is false), so the
-  # script connects to new elements. The strips above the anchor are the
-  # script's to reveal, and the page must still end at the anchor: they are
-  # revealed before Turbo scrolls, not after.
+  # A LINK TO AN ANCHOR THAT IS A VISIT: this path with another query (as
+  # an anchor of another page is), which Turbo fetches and draws again, so
+  # the script connects to new elements. (A link to an anchor of the page
+  # itself is no visit any more: the test above.) The strips above the
+  # anchor are the script's to reveal, and the page must still end at the
+  # anchor: they are revealed before Turbo scrolls, not after.
   #
   # Scroll anchoring is switched off for the test: Chrome keeps what is in
   # view where it is when something above it grows, so with it a strip
@@ -250,14 +254,14 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   # document adopts (which a Turbo visit keeps): `overflow-anchor: none` on
   # the root alone left Chrome compensating. Safari has no scroll anchoring,
   # which is who the order is for.
-  test "a link to an anchor in the page, which Turbo draws again, ends at the anchor with every strip and button shown" do
+  test "a link to an anchor that Turbo draws again ends at the anchor with every strip and button shown" do
     8.times { add_code(CODE, settings: { "code" => CODE }) }
     target = add_code(CODE, settings: { "filename" => "greet.rb", "code" => CODE })
     8.times { add_code(CODE, settings: { "code" => CODE }) }
     open_page
     assert_selector "#{FIGURE} .code-head button", exact_text: "Copy", count: 17
     page.execute_script("const sheet = new CSSStyleSheet(); sheet.replaceSync('* { overflow-anchor: none !important }'); document.adoptedStyleSheets = [sheet]")
-    page.execute_script(%(document.querySelector("main").insertAdjacentHTML("afterbegin", '<a id="to-file" href="#code-#{target.id}-file">To the file</a>')))
+    page.execute_script(%(document.querySelector("main").insertAdjacentHTML("afterbegin", '<a id="to-file" href="#{PublicSite::Urls.new.path_for(@page, "en")}?from=toc#code-#{target.id}-file">To the file</a>')))
 
     find("#to-file").click
     # wait: the link goes when Turbo has fetched and drawn the page again, seventeen blocks of it.

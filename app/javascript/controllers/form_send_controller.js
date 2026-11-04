@@ -52,10 +52,12 @@ import { Controller } from "@hotwired/stimulus"
 // WHAT IS TAKEN BACK, AND WHEN (the Code block's incident,
 // code_copy_controller.js). Turbo copies a page at `turbo:before-cache`,
 // and it does that also for a page that is NOT left: following an anchor of
-// the page (a table of contents, a heading's link) or Back between two
-// anchors is a popstate that caches a snapshot. So nothing visible is taken
-// back there: a thank-you or errors taken back at that moment would vanish
-// under a visitor who never left. Instead
+// the page (a table of contents, a heading's link, which the site's entry
+// point gives to the browser instead of a Turbo visit: `site.js`), a typed
+// fragment or Back between two anchors is a popstate that caches a
+// snapshot and draws nothing. So nothing visible is taken back there: a
+// thank-you or errors taken back at that moment would vanish under a
+// visitor who never left. Instead
 //   - `connect` puts the form back to how the server drew it: a copy Turbo
 //     shows again on Back is put into the document, and `connect` runs on
 //     it before a frame is drawn, so a copy that holds a thank-you or errors

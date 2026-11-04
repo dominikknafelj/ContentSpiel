@@ -100,29 +100,36 @@ class FormBlockSystemTest < ApplicationSystemTestCase
     assert_selector "#{FORM} button[type=submit]:not([disabled])", text: "Send"
   end
 
-  # A PAGE THAT STAYS. Turbo copies the page it is on, firing
-  # `turbo:before-cache`, when the browser itself goes to an anchor in it
-  # (`historyPoppedWithEmptyState`: a link Turbo does not drive, a typed
-  # fragment, Back between two anchors). The script takes nothing back
-  # there, or the thank-you and the errors would vanish under a visitor who
-  # never left (the Code block's incident, test/system/code_block_test.rb).
-  # A link Turbo drives draws the page again from the server, which is a new
-  # form and no case of this script's.
-  def add_anchor
-    page.execute_script(<<~JS)
+  # A PAGE THAT STAYS. A link to an anchor of the page, which Turbo would
+  # otherwise draw again from the server (Turbo 8 has no same-page shortcut),
+  # is given back to the browser by the site's entry point (`site.js`, the
+  # `turbo:click` listener): the browser goes to the fragment and Turbo
+  # copies the page at `turbo:before-cache` (`historyPoppedWithEmptyState`)
+  # and draws nothing. The script takes nothing back there, or the thank-you
+  # and the errors would vanish under a visitor who never left (the Code
+  # block's incident, test/system/code_block_test.rb). The link is a plain
+  # `#` link with no data-turbo attribute: an editor's section anchor, a
+  # theme's table of contents.
+  def add_link(href, id: "jump")
+    page.execute_script(<<~JS, href, id)
+      const [href, id] = arguments
       const main = document.querySelector("main")
-      main.insertAdjacentHTML("afterbegin", '<a id="jump" href="#further-down" data-turbo="false">Jump</a>')
-      main.insertAdjacentHTML("beforeend", '<h2 id="further-down">Further down</h2>')
+      main.insertAdjacentHTML("afterbegin", `<a id="${id}" href="${href}">Go</a>`)
+      if (!document.getElementById("further-down")) main.insertAdjacentHTML("beforeend", '<h2 id="further-down">Further down</h2>')
       window.__caches = 0
+      window.__visits = 0
       document.addEventListener("turbo:before-cache", () => { window.__caches += 1 })
+      document.addEventListener("turbo:visit", () => { window.__visits += 1 })
     JS
   end
+
+  def add_anchor = add_link("#further-down")
 
   def follow_anchor
     find("a#jump").click
     await_js("window.__caches > 0 && location.hash === '#further-down'")
     await_frames
-    assert page.evaluate_script("document.getElementById('jump') !== null"), "the page stayed: it was not drawn again"
+    assert page.evaluate_script("document.getElementById('jump') !== null && window.__visits === 0"), "the page stayed: Turbo made no visit and drew nothing"
   end
 
   test "after a send, following an anchor of the page leaves the thank-you where it is" do
@@ -153,6 +160,28 @@ class FormBlockSystemTest < ApplicationSystemTestCase
     assert_selector "##{id_of("f_name0001")}-error", text: "Please fill in this field."
     assert_equal "true", find("##{id_of("f_name0001")}")["aria-invalid"]
     assert_equal "ada@example.com", find_field("Email address").value
+  end
+
+  # The rule gives back only a fragment of this very page: another page,
+  # and this path with another query, are still Turbo visits.
+  test "a link to another page is still a Turbo visit" do
+    open_page
+    add_link("/")
+    find("a#jump").click
+    assert_no_selector "a#jump"
+    assert_equal "/", page.current_path
+    assert page.evaluate_script("window.__visits >= 1"), "Turbo made the visit (a load by the browser would have no count left)"
+  end
+
+  test "a link to this path with another query, and a fragment, is still a Turbo visit" do
+    open_page
+    path = PublicSite::Urls.new.path_for(@page, "en")
+    add_link("#{path}?from=menu#further-down")
+    find("a#jump").click
+    assert_no_selector "a#jump", wait: 8
+    assert_equal "from=menu", URI(page.current_url).query
+    assert page.evaluate_script("window.__visits >= 1"), "Turbo made the visit"
+    assert_selector FORM
   end
 
   test "an answer for a field the page does not know is an item of the summary with no link, so the list says as many as the line" do
