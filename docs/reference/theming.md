@@ -142,7 +142,7 @@ Three things the subclass has to say because it is anonymous, each read from vie
 
 The subclasses live as long as their `Theme` does (`@components`, a `Concurrent::Map`); a reload builds a new `Theme`. ViewComponent's `CompileCache` holds every compiled class strongly, which is nothing for one theme per process and leaves a class behind for each `plain_theme` a test draws with.
 
-So the replaceable components are exactly those the type registries hand out, each one line of `Theme::Contract.components`. `Media::PictureComponent` is called by templates and is not replaceable; `RichText::ImageComponent` and `RichText::YoutubeComponent` are rich text ("Rich text", below). An outside type's component (a type registered under a name with a slash) is replaceable when its definition declares `theme_methods`, and its line is its gem's promise, not the CMS's: it is in no table here and not in the ledger.
+So the replaceable components are exactly those the type registries hand out, each one line of `Theme::Contract.components`: the block types' components, the form field types' inputs (`Forms::FieldTypes`, each `input`, which the Form block draws through `component_for(type, :input)`; "The Form block", below) and the content types' list and detail components. `Media::PictureComponent` is called by templates and is not replaceable; `RichText::ImageComponent` and `RichText::YoutubeComponent` are rich text ("Rich text", below). An outside type's component (a type registered under a name with a slash) is replaceable when its definition declares `theme_methods`, and its line is its gem's promise, not the CMS's: it is in no table here and not in the ledger.
 
 ### The stylesheet: `ThemeCss`
 
@@ -361,6 +361,12 @@ Declared in `app/assets/tailwind/themes/default/tokens.css`, which imports nothi
 | `--th-table-head` | a table's header text |
 | `--th-table-caption` | a table's caption |
 | `--th-table-ground` | what a table stands on: its sticky header column's ground and its edge fade |
+| `--th-form-field-ground` | a form's control: its ground |
+| `--th-form-field-line` | a form's control: its outline (3:1) |
+| `--th-form-field-focus` | a form's focus ring, and a checkbox's and a radio's tint |
+| `--th-form-error` | a form's error: its words, the summary's rule and an invalid control's edge |
+| `--th-form-done-ground` | a form's thank-you: its ground |
+| `--th-form-done-line` | a form's thank-you: its rule on the left |
 | `--th-card-ground` | a Card's ground |
 | `--th-card-line` | a Card's frame |
 | `--th-card-icon` | a Card's icon |
@@ -450,9 +456,15 @@ Under the theme's `components/`, as `<path>.html.erb`. The methods are what the 
 | `blocks/code_component` | `block`, `page`, `lines`, `code`, `language`, `language_label`, `filename`, `caption`, `string` |
 | `blocks/note_component` | `block`, `page`, `kind`, `heading`, `titled?`, `word`, `icon`, `body` |
 | `blocks/table_component` | `block`, `page`, `rows`, `header_row?`, `header_column?`, `column_count`, `caption` |
+| `blocks/form_component` | `block`, `page`, `form_name`, `fields`, `action`, `locale`, `page_id`, `drawn`, `honeypot`, `submit_label`, `thank_you`, `unavailable`, `string` |
 | `blocks/card_component` | `block`, `page`, `title`, `text`, `link`, `icon`, `icon_name`, `image` |
 | `blocks/post_list_component` | `block`, `page`, `list_component` |
 | `blocks/section_component` | `block`, `page`, `columns`, `layout`, `background`, `width`, `style`, `anchor` |
+| `blocks/form_fields/short_text_component` | `field`, `value`, `error` |
+| `blocks/form_fields/long_text_component` | `field`, `value`, `error` |
+| `blocks/form_fields/email_component` | `field`, `value`, `error` |
+| `blocks/form_fields/choice_component` | `field`, `value`, `error` |
+| `blocks/form_fields/checkbox_component` | `field`, `value`, `error` |
 | `posts/blog_list_component` | `posts`, `page` |
 | `posts/resume_list_component` | `posts`, `page` |
 | `posts/now_list_component` | `posts`, `page` |
@@ -711,6 +723,99 @@ The fifth theme (`test/fixtures/themes/table`, "In tests") is a template written
 
 **Release note:** Added the Table block: `blocks/table_component` and five themed tokens, `--th-table-rule`, `--th-table-line`, `--th-table-head`, `--th-table-caption` and `--th-table-ground`.
 
+### The Form block
+
+A visitor's form placed on a page: the fields an editor built on the Forms screen, sent to the form's own endpoint and answered in place where the CMS's script runs (forms spec, "Placing it" and "Sending"; forms plan, Task 7; the look is the design lead's, `.superpowers/sdd/2026-11-03-forms/design.md` 4). What a theme can do with it, from the least work to the most:
+
+1. **Re-colour it: re-colour the base tokens**, or declare the six `--th-form-*` again under both selectors. Each is defined from the base in the default theme: `--th-form-field-ground` (a control's ground) is `--th-surface`, `--th-form-field-line` (its outline) `--th-meta`, the site's control outline at 3:1, `--th-form-field-focus` (the focus ring, and the checkbox's and radio's tint) `--th-accent`, `--th-form-error` (an error's words, the summary's rule and an invalid control's edge, in one) `--th-danger-ink`, `--th-form-done-ground` (the thank-you's ground) `--th-ok` at 8% over `--th-paper` (12% in dark), and `--th-form-done-line` (its rule) `--th-ok`. A control's text is `--th-ink`, a label `--th-ink`, the required word `--th-meta`, a help line `--th-dim`, the summary's links `--th-accent`, the button `--th-accent` with `--th-on-accent`.
+2. **Restyle it: rules of its own** under `.content-block--form`. The default template's and the inputs' class names (`form-unavailable`, `form-summary`, `form-body`, `form-submit`, `form-status`, `form-done`, `form-field`, `form-field--<type>`, `form-field__label`, `form-field__required`, `form-field__help`, `form-field__row`, `form-field__error`) are the default theme's own, not on a list; the states are keyed on attributes (`hidden`, `aria-invalid="true"`, `aria-busy="true"`, `data-notice` on the summary, `disabled` on the fieldset).
+3. **Replace its template**: `components/blocks/form_component.html.erb`, and any of the five inputs' (`components/blocks/form_fields/<type>_component.html.erb`), each on its own.
+
+**What the template is handed** (`Theme::Contract.components`). The component draws nothing for a block with no form chosen, a form in the trash or gone, or a form with no field (`render?`), so a template never meets one; each method answers for such a block all the same (nil, or an empty list).
+
+| Method | What it answers |
+|---|---|
+| `block` | the block: a published view on the site, the rows in a preview. `block.id` is what the fields' ids are made of, so two placements of one form on a page never share an id |
+| `page` | the page the block is drawn on |
+| `form_name` | the editor's name for the form. The default draws it nowhere: it is for editors, and a theme that shows it to visitors does so knowingly |
+| `fields` | the form's fields in their order, each a field a visitor's form draws (the table below), with the theme's input where the theme replaces one |
+| `action` | the endpoint's path (`/forms/<id>`): the form's `action`, posted to with `method="post"` |
+| `locale` | the visitor's language, the value of the hidden `locale` |
+| `page_id` | the page's id, the value of the hidden `page_id` (the endpoint believes it only for a live page whose published copy places the form) |
+| `drawn` | the signed draw time, the value of the hidden `drawn`: a send sooner than three seconds after it is taken for a script's and dropped. It is the draw's time, so a page served from a cache hands an older one, which only makes a send look slower |
+| `honeypot` | the name of the hidden field only a script fills (`"website"`); a send with anything in it is dropped |
+| `submit_label` | the button's word: the form's own in the visitor's language, else the default language's, else the CMS's "Send" |
+| `thank_you` | the form's thank-you in the same way, else "Thank you. Your answers have been sent." |
+| `unavailable` | the sentence a form says when the site has no encryption keys and so takes no answers ("This form can't take answers at the moment. Please try again later."), else nil. With it the default disables every field and the button (`<fieldset disabled>`) |
+| `string(key)` | one of the six words below, in the language shown, in English where that language has no `config/locales/public.<locale>.yml`; `string(:error_summary, count: 2)` |
+
+**What `string` is asked for.** These six keys and no other (`Blocks::FormComponent::STRINGS`). Any other key raises in development and test, naming the six, and is an empty string in production with one log line, as the Code block's `string` is.
+
+| Word | What it is |
+|---|---|
+| `string(:required)` | the word said in a required field's label: "required" |
+| `string(:choose)` | a select's empty first choice: "Choose" |
+| `string(:sending)` | the button's word while a send is on its way: "Sending…" |
+| `string(:sent)` | the thank-you of a form that has none: "Thank you. Your answers have been sent." |
+| `string(:error_summary)` | the summary's line, with `count:`: "Please correct 2 answers." |
+| `string(:network)` | what the script says when a send had no answer: "Your answers couldn't be sent. Please check your connection and try again." |
+
+**What a field answers** (`Forms::PublicField`, each of `fields`, and the `field` an input's template is handed). Everything a person typed is answered as text: print it through ERB's escaping and never mark it safe.
+
+| Reader | What it answers |
+|---|---|
+| `key` | the field's stable key (`f_…`): what the endpoint's answer names an error by |
+| `name` | the control's `name`, `answers[<key>]` |
+| `id` | the control's id, `form-<block id>-<key>` |
+| `label` | the editor's label in the visitor's language, else the default language's |
+| `help` | the help line in the same way, or blank |
+| `help_id` | the help line's id, for `aria-describedby` |
+| `error_id` | the error element's id: every input draws one, empty and hidden, for the script to fill |
+| `required?` | whether the field must be answered: say it in words ("required") and set `required` |
+| `max_length` | the type's limit in characters, for `maxlength`, or nil |
+| `display` | a choice's `"radios"` or `"dropdown"` |
+| `labelled_choices` | a choice's choices that have a label in the visitor's language or the default's |
+| `choice_label(choice)` | a choice's words |
+| `choice_id(choice)` | a radio's id |
+| `target_id` | what an error's link goes to: the control, or a radio group's first radio |
+| `described_by(error)` | the ids the control is described by: the help line, and the error element only while it holds a message |
+| `error_text(error)` | an error's sentence in the visitor's language |
+| `word(key)` | one of the CMS's form words (`required`, `choose`) in the visitor's language |
+| `input` | the component that draws the field: `render field.input.new(field: field)` |
+
+An input's template is handed `field`, `value` (what the visitor typed: a String, or true or `"1"` for a ticked box; nil on the site, where nothing is typed yet) and `error` (an error's key, nil on the site). The default inputs set `aria-invalid` and name the error element in `aria-describedby` only with an error.
+
+**The send script's markup.** Sending in place is the CMS's script, `form-send` (`app/javascript/controllers/form_send_controller.js`), registered on every public page as `code-copy` is. A template that wants it writes this; one that leaves it out still has a form that works, posting to the endpoint and landing on its plain page:
+
+| Markup | Where, and what the script does with it |
+|---|---|
+| `data-controller="form-send"` | on the `<form>` |
+| `data-action="form-send#send"` | on the `<form>`: the script stops the browser's send and posts the same fields itself, asking for JSON |
+| `data-turbo="false"` | on the `<form>`: Turbo leaves the form, and the links the script writes inside it, to the browser and to the script. Required: without it Turbo sends the form without the script, and its answer, a page, is refused |
+| `name="locale"` | a hidden input holding `locale` |
+| `name="page_id"` | a hidden input holding `page_id` |
+| `name="drawn"` | a hidden input holding `drawn`. Required: a send without it is dropped |
+| `data-form-send-target="summary"` | an element **rendered `hidden`** and empty, with `role="alert"` and `tabindex="-1"`, above the fields. On errors the script writes the summary's line and one link per answer into it and focuses it; for a refusal that is no answer's (the form is gone or cannot take answers, too many sends, no answer at all) only the sentence, with `data-notice` set. Required |
+| `data-form-send-target="body"` | the element that holds the fields and the button. The script hides it once the form is sent. Required |
+| `data-form-send-target="button"` | the submit button: disabled, `aria-busy="true"` and given the sending word while a send is on its way. Required |
+| `data-form-send-target="status"` | optional: an empty element with `role="status"`, which says the sending word while a send is on its way; the default hides it from sight |
+| `data-form-send-target="done"` | an element **rendered `hidden`**, with `role="status"` and `tabindex="-1"`, holding `thank_you`. The script writes the endpoint's words into it as text, shows it and focuses it once the form is sent. Required |
+| `data-form-send-sending-value` | the button's word while sending (`string(:sending)`) |
+| `data-form-send-network-value` | what the summary says when a send had no answer (`string(:network)`) |
+| `data-form-send-fields-value` | a JSON object of each field's `key` to `{ "error": error_id, "target": target_id }`, the only way the script finds a field's error element and what its link goes to |
+
+The script writes each error as text into the element whose id is the field's `error_id`, and never builds one, so the template decides where an error stands; it sets `aria-invalid="true"` on the controls named `answers[<key>]` and adds the error to their `aria-describedby`. Every refusal keeps what the visitor typed, and the browser is never made to send the form itself. What the script writes into the page it takes back itself (at `turbo:before-cache` and when it is disconnected, `hidden` included), so a page left and come back to shows the form as it was drawn. A theme that wants another behaviour writes a controller of its own (`controllers/theme/…`) and leaves this markup out.
+
+**What a template should keep.** A real `<label for>` for every control, a radio group as a `fieldset` with its `legend`; "required" in words inside the label and the `required` attribute; the honeypot inside an element that is `hidden` and `aria-hidden="true"`, with `tabindex="-1"` and `autocomplete="off"`, so no person sees it and no screen reader says it; `method="post"`, `action`, and no token of the application's (the endpoint takes none: a send can do nothing but be a submission, `FormSendsController`); and the three hidden values. A template caches nothing (the draw time would then be the cache's) and reads no request, as every public template.
+
+**On a section's bands** (`sections.css`): a tinted band changes nothing of a form (the field's ground is the surface, lighter than the band, and the outline is still 3:1 against it). **A strong band re-values all six**: the field's ground the band's text at 6% over the band, its outline the band's dim, the focus ring the band's accent, the error the danger hue mixed 60% with the band's text, the thank-you's ground the band's and its rule the ok hue mixed 60% with the band's text. The block is also `color-scheme: dark` there in both schemes, so the browser draws its native controls for a dark ground. A theme's own `--th-form-*` therefore do not reach a form in a strong band; a theme that wants other colours there declares them in a rule of its own for `.content-section--strong` and answers for their contrast.
+
+**Contrast is computed, for the default theme's values only.** `test/integration/design_tokens_test.rb` holds 60 pairs ("a form's field text, line, focus ring, error and thank-you are readable on the page, a tinted band and a strong band, in both themes"): a control's text on its ground, the error, the help line, the required word and the summary's links on what the form stands on, and the thank-you's text on its ground at 4.5:1; the outline, the focus ring and the error's edge against what the form stands on, and the thank-you's rule against its ground, at 3:1. Nothing measures a theme's values.
+
+The ninth theme (`test/fixtures/themes/form`, "In tests") is a template written from this section alone: `test/integration/theme_pages_test.rb` ("a theme replaces the Form block's template from the contract's names alone, and a theme that does not is drawn the default one", "the ninth theme is sound, checked deeply too: a Form template of the contract's names").
+
+**Release note:** Added the Form block: `blocks/form_component` and the five inputs it draws through the theme (`blocks/form_fields/short_text_component`, `long_text_component`, `email_component`, `choice_component`, `checkbox_component`, each with `field`, `value` and `error`), six themed tokens (`--th-form-field-ground`, `--th-form-field-line`, `--th-form-field-focus`, `--th-form-error`, `--th-form-done-ground`, `--th-form-done-line`), and the markup the `form-send` script reads (its targets, its action and its three values). A public page's ETag now also names whether the site has encryption keys.
+
 ### The default theme's captions, subpages list and tags
 
 How the default theme draws three things, for a theme author who copies it (all by value and class: no token, template path or component method changed).
@@ -925,6 +1030,7 @@ A change to a file of the theme reloads the application at the next request, as 
 - **A fifth theme, `test/fixtures/themes/table`** (`with_table_theme`), is a Table template written from "The Table block" alone and a stylesheet for it.
 - **A sixth theme, `test/fixtures/themes/choices`** (`with_choices_theme`), is a `theme.yml` of two section styles (one labelled in two languages), the two page templates and a third of its own (`project`, with its file), and one icon of its own; **a seventh, `test/fixtures/themes/section_grid`** (`with_section_grid_theme`), declares one style and replaces the Section's template to draw that style's blocks as a grid of its own, written from the Section's row alone. `with_page_templates(*names)` is the default theme with other page templates, for a test of a dropped or added name. `docs/reference/theme-choices.md`, "In tests", says what each is for.
 - **An eighth theme, `test/fixtures/themes/card`** (`with_card_theme`), is a Card template written from "The Card block" alone, one icon of its own drawn with classes, a filled dot, its own size and a gradient its `_frame` defines, and a stylesheet that declares the Card's tokens for both schemes.
+- **A ninth theme, `test/fixtures/themes/form`** (`with_form_theme`), is a Form template and a short text input's written from "The Form block" alone, and a stylesheet for them.
 - **The second theme, `test/fixtures/themes/plain`**: plain CSS, no utilities but one. It replaces `_frame`, `_title`, `_icons`, `_head`, `pages/show`, the Rich text block's template and one post list (`posts/blog_list_component`); it changes `--th-accent` for both schemes; it brings two partials under `views/theme/`, one controller (`hello_controller.js`) and one image. Its frame and page draw the section's tree, the crumbs, a table of contents and previous and next on every page, which is why the canary and the trash test can ask it. **It deliberately does not replace the header, the footer, the Image block, the Code block or the 404**, so every test of it is also a test of the fallback. Any file added to it changes its fingerprint; no test pins the value.
 - **The second theme's assets and controller are on the test environment's paths from the start** (`config/environments/test.rb`, `test/fixtures/themes/importmap.rb`): Propshaft's load path and the import map are fixed when the application starts and the suite swaps themes in-process. So `image_path("plain-mark.svg")` resolves under the default theme too, and "the default theme has no theme controller in its map" cannot be shown in the suite; the browser test shows the other half, that it is not REGISTERED off the public site.
 - **The suite's stylesheet is the default theme's.** System status' Theme row therefore WARNS under `with_plain_theme` (the stamp is `default`): a test that wants the OK row under a theme hands `stylesheet_probe: -> { true }` to `Setup::SystemCheck`.

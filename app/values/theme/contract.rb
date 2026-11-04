@@ -122,13 +122,21 @@ class Theme
       "posts/detail_component" => %w[post]
     }.freeze
 
+    # What the template of a visitor's form input may call (forms plan,
+    # Task 7): the three keywords every input is drawn with
+    # (`Blocks::FormFields::Base`). The same for every form field type, a
+    # gem's included, so a type declares no line of its own.
+    FORM_INPUT_METHODS = %w[field value error].freeze
+
     def self.path_of(component) = component.name.underscore
 
     # Every component whose template a theme may replace, with the methods
     # it may call: each registered block type's line (its `theme_methods`),
-    # in registration order, then the post components. Read on every call,
-    # never kept in a constant: a constant is read when this file loads,
-    # before `to_prepare` has registered anything.
+    # in registration order, then each form field type's input (the Form
+    # block draws them through the theme: `Theme#component_for(type,
+    # :input)`), then the post components. Read on every call, never kept in
+    # a constant: a constant is read when this file loads, before
+    # `to_prepare` has registered anything.
     def self.components
       blocks = ::BlockTypes.all.filter_map do |definition|
         next unless definition.component
@@ -136,7 +144,8 @@ class Theme
         path = path_of(definition.component)
         [ path, definition.theme_methods ]
       end
-      blocks.to_h.merge(POST_COMPONENTS).freeze
+      inputs = ::Forms::FieldTypes.all.map { |type| [ path_of(type.input), FORM_INPUT_METHODS ] }
+      blocks.to_h.merge(inputs.to_h).merge(POST_COMPONENTS).freeze
     end
 
     def self.themed_tokens = SHARED_THEMED_TOKENS + ::BlockTypes.all.flat_map(&:themed_tokens)
@@ -153,7 +162,19 @@ class Theme
       return file if file.file?
 
       definition = ::BlockTypes.all.find { |each| each.component && path_of(each.component) == path }
-      definition&.component_template || file
+      return definition.component_template || file if definition
+
+      # A gem's form input keeps its template beside its class, as an
+      # outside block type's component does.
+      input = ::Forms::FieldTypes.all.map(&:input).find { |component| path_of(component) == path }
+      input ? component_template_of(input) || file : file
+    end
+
+    # The `.html.erb` beside a component's source file, or nil.
+    def self.component_template_of(component)
+      source, = Object.const_source_location(component.name)
+      template = source && Pathname(source).sub_ext(".html.erb")
+      template if template&.file?
     end
 
     # What every component's template may call beside its own methods

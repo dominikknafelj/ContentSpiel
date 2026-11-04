@@ -26,8 +26,9 @@ class Theme::ContractTest < ActiveSupport::TestCase
   # declaration as a built-in's is.
   def registry_components
     blocks = BlockTypes.all.map(&:component)
+    inputs = Forms::FieldTypes.all.map(&:input)
     posts = ContentTypes.all.flat_map { |definition| [ definition.list_component, definition.detail_component ] }
-    (blocks + posts).compact.uniq.map { |component| component.name.underscore }.sort
+    (blocks + inputs + posts).compact.uniq.map { |component| component.name.underscore }.sort
   end
 
   # The one comparison of the registries with the list, as an assertion of
@@ -49,7 +50,7 @@ class Theme::ContractTest < ActiveSupport::TestCase
     assert_every_registered_component_is_listed
 
     left_over = Theme::Contract.components.keys - registry_components
-    assert_empty left_over, "Theme::Contract.components lists #{left_over.inspect}, which no block or content type hands out"
+    assert_empty left_over, "Theme::Contract.components lists #{left_over.inspect}, which no block, form field or content type hands out"
   end
 
   # Departure 6 (block types plan): with `theme_methods` required, a type

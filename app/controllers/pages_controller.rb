@@ -82,7 +82,11 @@ class PagesController < PublicController
       #   production ETag is what it was);
       # - with no site address configured, the request's origin
       #   (`origin_etag_key`): the head's addresses then follow the host the
-      #   request named, and nothing else here does.
+      #   request named, and nothing else here does;
+      # - whether the site has encryption keys (`Forms::Encryption.available?`,
+      #   forms pre-flight R3): without them a Form block is drawn disabled
+      #   under a line that it cannot take answers, and keys added or lost
+      #   are a restart that moves no content version.
       #
       # What the ETag says of the record is its copy's id (`etag_key_of`): the
       # copy never changes once taken, so the id names its content, and a
@@ -92,7 +96,7 @@ class PagesController < PublicController
       # is actually rendered.
       expires_in 0, public: true, must_revalidate: true
       keys = light ? [ etag_key_of(result.record) ] : [ @page, @post ].map { |record| etag_key_of(record) } # public: rows (the ETag names the copy's id, not content)
-      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
+      if stale?(etag: [ *keys, PublicSite.current_content_version, Current.site, RichText.code_revision, Theme.current.fingerprint, Time.current.year, Forms::Encryption.available?, *origin_etag_key, *stale_stylesheet_etag_key ], public: true)
         assign_record(result.record) if light # public: rows (assign_record reads the copy through as_published)
         preload_page_images(@page)
         render :show

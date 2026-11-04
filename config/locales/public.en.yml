@@ -68,6 +68,12 @@ en:
       gone: "This form is no longer available."
       unavailable: "This form can't take answers at the moment. Please try again later."
       rate_limited: "Too many messages. Please try again in a few minutes."
+      # What the Form block's script says when a send had no answer, or one
+      # that was not the endpoint's (pre-flight R16): the typed answers stay,
+      # and the browser is never made to send the form itself.
+      network: "Your answers couldn't be sent. Please check your connection and try again."
+      # The button's word while a send is on its way (the script's value).
+      sending: "Sending…"
       back: "Back to the page"
       # The plain pages' headings (and titles), without JavaScript.
       pages:

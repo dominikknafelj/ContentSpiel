@@ -32,10 +32,14 @@
 # status, each with a link back to the page the form came from:
 #
 #   sent          200  { "status": "sent", "message" }        the form's thank-you, else `public.forms.sent`
-#   invalid       422  { "status": "invalid", "summary", "errors": [{ "key", "message" }] }
+#   invalid       422  { "status": "invalid", "summary", "errors": [{ "key", "message", "item" }] }
 #   gone          404  { "status": "gone", "message" }        no such form, or in the trash
 #   rate_limited  429  { "status": "rate_limited", "message" } owner's ruling 1
 #   unavailable   503  { "status": "unavailable", "message" }  no encryption keys (ruling 2)
+#
+# An error's `item` is its summary link's words, "<label>: <message>"
+# (`public.forms.error_item`, so a language orders the two parts), written
+# here because the script holds no words of its own (forms plan, Task 7).
 #
 # Every status is its own word, so the script tells a success, field errors,
 # a refusal and a failure of the network (no answer at all, pre-flight R16)
@@ -118,7 +122,11 @@ class FormSendsController < ActionController::Base
     case kind
     when :sent then { status: "sent", message: thank_you }
     when :invalid
-      errors = checked.errors.map { |key, error| { key: key, message: field_for(key).error_text(error) } }
+      errors = checked.errors.map do |key, error|
+        field = field_for(key)
+        message = field.error_text(error)
+        { key: key, message: message, item: word(:error_item, label: field.label, message: message) }
+      end
       { status: "invalid", summary: word(:error_summary, count: errors.size), errors: errors }
     else { status: kind.to_s, message: word(kind) }
     end

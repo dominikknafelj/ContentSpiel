@@ -123,6 +123,36 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The plain pages a form's send answers without JavaScript (forms plan,
+  # Tasks 6 and 7; design.md 5.1): drawn by the CMS in CS Studio's tokens,
+  # never a theme's (spec decision 7), so they are measured here. The
+  # words on the page (`bg-paper`): the label and the answers' text
+  # (`--cs-ink`), the required word and the help line (`--cs-meta`), the
+  # error under a control (`--cs-danger-ink`) and the back link
+  # (`--cs-accent`); a control's text on its fill (`--cs-surface`); the
+  # summary's words on its tint and the thank-you's on its own. A control's
+  # outline and the invalid control's edge (`--cs-danger`) at 3:1 against
+  # the page and the fill. The stylesheet's block is `.form-send-page`.
+  test "a form's plain pages are readable in both schemes: their words, a control's text and outline, the invalid edge, the summary and the thank-you" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    { "label" => "--cs-ink", "required" => "--cs-meta", "help" => "--cs-meta", "error" => "--cs-danger-ink" }.each do |part, token|
+      assert_match(/\.form-send-page \.form-field__#{part} \{[^}]*color: var\(#{token}\)/, css, "the #{part} is drawn in #{token}")
+    end
+    assert_match(/\[aria-invalid="true"\] \{ border-color: var\(--cs-danger\); \}/, css)
+    assert_match(/border: 1px solid var\(--cs-field-line\)[^}]*background: var\(--cs-surface\)/m, css)
+
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-meta --cs-danger-ink --cs-accent].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-paper"), "#{ink} on the plain page (#{scheme})") }
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-surface"), "an answer on its control's fill (#{scheme})")
+      %w[--cs-paper --cs-surface].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "a control's outline on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-danger"), colour.(ground), "the invalid control's edge on #{ground} (#{scheme})")
+      end
+      assert_ratio(4.5, colour.("--cs-danger-ink"), colour.("--cs-danger-tint"), "the error summary's words on its tint (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "the thank-you's words on its tint (#{scheme})")
+    end
+  end
+
   test "the measuring can fail: the grouping line is no outline, a translucent colour needs a ground, and an unread notation is refused" do
     tokens = { "--cs-surface" => "#ffffff", "--cs-line" => "rgba(20,20,23,0.14)", "--cs-odd" => "hsl(0 0% 50%)" }
     surface = resolve_colour(tokens, "--cs-surface")

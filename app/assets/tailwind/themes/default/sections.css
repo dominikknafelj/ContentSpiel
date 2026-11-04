@@ -167,8 +167,25 @@
   --th-card-ground: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
   --th-card-line: var(--th-on-band-strong-dim);
   --th-card-icon: var(--th-on-band-strong-accent);
+  /* A form on this band (design.md 4.1): its field ground the band's text
+     at 6% over the band (the Card's), its outline the band's dim, its focus
+     ring the band's accent, its error the danger hue mixed with the band's
+     text and its thank-you the band's own ground with the ok hue mixed the
+     same way for its rule (the Note's recipe). The computed tokens would
+     otherwise keep the page's light field ground under the band's light
+     text. The tinted band re-values none: the field ground is the surface,
+     lighter than the band, and the outline is still 3:1 against it. */
+  --th-form-field-ground: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
+  --th-form-field-line: var(--th-on-band-strong-dim);
+  --th-form-field-focus: var(--th-on-band-strong-accent);
+  --th-form-error: color-mix(in srgb, var(--th-danger) 60%, var(--th-on-band-strong));
+  --th-form-done-ground: var(--th-band-strong);
+  --th-form-done-line: color-mix(in srgb, var(--th-ok) 60%, var(--th-on-band-strong));
 }
 .content-section--strong .content-block--code { color-scheme: dark; }
+/* A form's native controls (the select's list, the checkbox, the radio)
+   drawn for the band's dark ground, in both schemes, as a code block's. */
+.content-section--strong .content-block--form { color-scheme: dark; }
 
 /* `content` keeps the band inside the content column; `full` runs it edge to
    edge and puts the content back on the page's content width. The content

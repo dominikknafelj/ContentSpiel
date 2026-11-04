@@ -647,6 +647,91 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal "var(--th-band-strong)", strong["--th-table-ground"]
   end
 
+  FORM_TOKENS = %w[--th-form-field-ground --th-form-field-line --th-form-field-focus --th-form-error --th-form-done-ground --th-form-done-line].freeze
+
+  # Design.md 4.1: the six from the base, in both schemes; the field's
+  # outline is --th-meta (pre-flight R11: 3:1, the site's control outline),
+  # never a hairline; the done ground is the ok hue, never the grey band.
+  test "the six form tokens are defined from the theme's base tokens in both schemes, never a literal, the outline the faint text colour" do
+    theme_tokens.each do |theme, tokens|
+      FORM_TOKENS.each do |name|
+        value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
+        assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} #{name} is #{value}")
+      end
+      assert_equal "var(--th-meta)", tokens.fetch("--th-form-field-line"), "#{theme}: the outline is 3:1 (R11), not --th-line-strong"
+      assert_equal "var(--th-surface)", tokens.fetch("--th-form-field-ground")
+      assert_equal "var(--th-accent)", tokens.fetch("--th-form-field-focus")
+      assert_equal "var(--th-danger-ink)", tokens.fetch("--th-form-error")
+      assert_equal "var(--th-ok)", tokens.fetch("--th-form-done-line")
+      assert_match(/\Acolor-mix\(in srgb, var\(--th-ok\) \d+%, var\(--th-paper\)\)\z/, tokens.fetch("--th-form-done-ground"))
+    end
+    assert_equal FORM_TOKENS.map { |name| name.delete_prefix("--th-") }, BlockTypes.fetch(:form).themed_tokens
+  end
+
+  test "the form's stylesheet is declared by the type, holds no colour of its own and draws with its six tokens" do
+    css = Rails.root.join("app/assets/tailwind/themes/default/form.css").read
+    bare = css.gsub(%r{/\*.*?\*/}m, "")
+
+    assert_equal Rails.root.join("app/assets/tailwind/themes/default/form.css"), BlockTypes.fetch(:form).stylesheet_path
+    refute_match(/#\h{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/, bare)
+    FORM_TOKENS.each { |name| assert_includes bare, "var(#{name})", "form.css draws with #{name}" }
+    assert_match(/font-size:\s*1rem/, bare, "a control's text is 16px: below it a phone zooms the page on focus")
+    assert_match(/\[aria-invalid="true"\]/, bare, "an invalid control is marked by the attribute the script and the server set")
+    assert_no_match(/data-theme/, bare, "nothing in form.css names a scheme: the tokens follow it")
+  end
+
+  # Design.md 4.1's pairs: the field's text on its ground, the error, the
+  # help (--th-dim), the required word (--th-meta) and the summary's links
+  # (--th-accent) on what the form stands on, and the thank-you's text on
+  # its ground, at 4.5:1; the outline, the focus ring and the error's edge
+  # against what the form stands on, and the thank-you's rule against its
+  # ground, at 3:1. On the page, a tinted band and a strong band, in both
+  # schemes: (6 + 4) x 3 x 2 = 60.
+  test "a form's field text, line, focus ring, error and thank-you are readable on the page, a tinted band and a strong band, in both themes" do
+    pairs = 0
+    theme_tokens.each do |theme, tokens|
+      { "the page" => [ {}, "--th-paper" ], "a tinted band" => [ band_values("tinted"), "--th-band-tinted" ],
+        "a strong band" => [ band_values("strong"), "--th-band-strong" ] }.each do |place, (inside, around)|
+        outside = resolve_colour(tokens, around, inside: inside)
+        field = resolve_colour(tokens, "--th-form-field-ground", inside: inside, under: outside)
+        done = resolve_colour(tokens, "--th-form-done-ground", inside: inside, under: outside)
+        texts = { "--th-ink on the field" => [ "--th-ink", field ], "--th-form-error" => [ "--th-form-error", outside ],
+                  "--th-dim (help)" => [ "--th-dim", outside ], "--th-meta (required)" => [ "--th-meta", outside ],
+                  "--th-accent (a summary's link)" => [ "--th-accent", outside ], "--th-ink on the thank-you" => [ "--th-ink", done ] }
+        lines = { "--th-form-field-line" => [ "--th-form-field-line", outside ], "--th-form-field-focus" => [ "--th-form-field-focus", outside ],
+                  "--th-form-error (the edge)" => [ "--th-form-error", outside ], "--th-form-done-line" => [ "--th-form-done-line", done ] }
+        [ [ texts, 4.5 ], [ lines, 3.0 ] ].each do |set, least|
+          set.each do |what, (token, ground)|
+            ratio = contrast(ground, resolve_colour(tokens, token, inside: inside, under: ground))
+            puts "form #{theme} #{place} #{what}: #{ratio.round(2)}" if ENV["SHOW_RATIOS"]
+            assert_operator ratio, :>=, least, "#{what} in #{place} (#{theme}) is #{ratio.round(2)}:1"
+            pairs += 1
+          end
+        end
+      end
+    end
+    assert_equal 60, pairs
+  end
+
+  # Design.md 4.1: a strong band re-values all six, as the Note's and the
+  # Card's (a token is computed where it is declared, so the page's light
+  # field ground would stay under the band's light text), and the block is
+  # drawn for a dark ground in both schemes; a tinted band leaves them alone.
+  test "a strong band re-values the six form tokens and draws the form's controls for a dark ground; a tinted band leaves them alone" do
+    strong = band_values("strong")
+
+    assert_equal FORM_TOKENS.sort, strong.keys.grep(/--th-form-/).sort
+    assert_equal "color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong))", strong["--th-form-field-ground"]
+    assert_equal "var(--th-on-band-strong-dim)", strong["--th-form-field-line"]
+    assert_equal "var(--th-on-band-strong-accent)", strong["--th-form-field-focus"]
+    assert_match(/\Acolor-mix\(in srgb, var\(--th-danger\) \d+%, var\(--th-on-band-strong\)\)\z/, strong["--th-form-error"])
+    assert_equal "var(--th-band-strong)", strong["--th-form-done-ground"]
+    assert_match(/\Acolor-mix\(in srgb, var\(--th-ok\) \d+%, var\(--th-on-band-strong\)\)\z/, strong["--th-form-done-line"])
+    assert_empty band_values("tinted").keys.grep(/--th-form-/)
+    sections = Rails.root.join("app/assets/tailwind/themes/default/sections.css").read
+    assert_match(/\.content-section--strong \.content-block--form \{ color-scheme: dark; \}/, sections)
+  end
+
   private
     def helpers = ActionController::Base.helpers
 

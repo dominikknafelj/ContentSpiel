@@ -8,10 +8,10 @@
 #   (`Forms::SendLimit.store`, a memory store of the process in test), which
 #   every test that sends calls first, or the sixth send of a worker from
 #   127.0.0.1 is answered 429.
-# - `place_form(page, form)`: a Form block naming `form` on `page`, as rows.
-#   The block type is the plan's Task 7; until it is registered the row is
-#   written as the placements' tests write it (`update_columns`), and a
-#   publish takes it into the page's copy.
+# - `place_form(page, form)`: a Form block naming `form` on `page`, as rows,
+#   written as the placements' tests write it (`update_columns`, from before
+#   the type was registered in Task 7), and a publish takes it into the
+#   page's copy.
 module FormSends
   def aged_drawn(form, age: 1.minute) = Forms::Drawn.token(form, at: Time.current - age)
 

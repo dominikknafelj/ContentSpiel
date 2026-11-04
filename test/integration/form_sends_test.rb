@@ -136,7 +136,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     send_form(answers: ANSWERS.merge("f_name0001" => ""), json: true)
     assert_response :unprocessable_content
     assert_equal({ "status" => "invalid", "summary" => "Please correct 1 answer.",
-                   "errors" => [ { "key" => "f_name0001", "message" => "Please fill in this field." } ] }, answer)
+                   "errors" => [ { "key" => "f_name0001", "message" => "Please fill in this field.", "item" => "Your name: Please fill in this field." } ] }, answer)
   end
 
   # Review Focus 1: the redrawn page hands back the token the visitor sent,

@@ -250,6 +250,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/editor/section_controller.js
     app/components/admin/fields/code_field.rb
     app/components/admin/fields/code_field.html.erb
+    app/components/admin/fields/form_field.rb
+    app/components/admin/fields/form_field.html.erb
     app/javascript/controllers/admin/editor/code_limit_controller.js
     app/components/admin/notes_screen/avatar_component.rb
     app/components/admin/notes_screen/body_component.rb

@@ -98,7 +98,9 @@ class BlockSamplesTest < ActionDispatch::IntegrationTest
 
         excused = UNFILLED_FIELDS.fetch(definition.name, {})
         definition.fields.reject(&:group?).each do |field|
-          filled = sample.settings.key?(field.name) || english[field.name].present?
+          # A `:form` field is filled by `form: true`, as the image column is
+          # by `image: true` (test/support/block_samples.rb makes the form).
+          filled = sample.settings.key?(field.name) || english[field.name].present? || (sample.form && field.type == :form)
           if excused.key?(field.name)
             assert_not filled, "#{definition.name}'s sample fills #{field.name} now: take it out of UNFILLED_FIELDS"
           else

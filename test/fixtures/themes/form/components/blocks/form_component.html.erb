@@ -1,0 +1,23 @@
+<%# A theme's own Form block, written from what `Theme::Contract` gives the template (`block`, `page`,
+    `form_name`, `fields`, `action`, `locale`, `page_id`, `drawn`, `honeypot`, `submit_label`, `thank_you`,
+    `unavailable`, `string`) and the send script's markup (docs/reference/theming.md, "The Form block"): a
+    plain post to `action`, the summary, the body, the button and the thank-you as the script's targets, its
+    three values, the three hidden values and the honeypot hidden from people and screen readers. %>
+<form class="plain-form" method="post" action="<%= action %>" data-turbo="false" data-controller="form-send" data-action="form-send#send"
+      data-form-send-sending-value="<%= string(:sending) %>" data-form-send-network-value="<%= string(:network) %>"
+      data-form-send-fields-value="<%= fields.to_h { |field| [ field.key, { error: field.error_id, target: field.target_id } ] }.to_json %>"
+      data-block="<%= block.id %>" data-page="<%= page.id %>">
+  <% if unavailable %><p class="plain-form__closed"><%= unavailable %></p><% end %>
+  <div class="plain-form__summary" role="alert" tabindex="-1" hidden data-form-send-target="summary"></div>
+  <fieldset class="plain-form__body" data-form-send-target="body"<% if unavailable %> disabled<% end %>>
+    <% fields.each do |field| %>
+      <%= render field.input.new(field: field) %>
+    <% end %>
+    <input type="hidden" name="locale" value="<%= locale %>">
+    <input type="hidden" name="page_id" value="<%= page_id %>">
+    <input type="hidden" name="drawn" value="<%= drawn %>">
+    <div hidden aria-hidden="true"><input type="text" name="<%= honeypot %>" value="" tabindex="-1" autocomplete="off"></div>
+    <button type="submit" class="plain-form__send" data-form-send-target="button"><%= submit_label %></button>
+  </fieldset>
+  <p class="plain-form__thanks" role="status" tabindex="-1" hidden data-form-send-target="done"><%= thank_you %></p>
+</form>

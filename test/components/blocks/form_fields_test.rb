@@ -38,10 +38,13 @@ class Blocks::FormFieldsTest < ViewComponent::TestCase
     assert_selector "#form-11-f_abcd1234-help", text: "As on your passport"
     assert_selector "input[value='x']"
 
+    # Without an error the element is there, empty and hidden, for the Form
+    # block's script to fill (pre-flight R15), and nothing names it yet.
     draw(field_of("short_text"))
     assert_no_selector "[aria-invalid]"
     assert_no_selector "[aria-describedby]"
     assert_no_selector "#form-11-f_abcd1234-error"
+    assert_selector "p#form-11-f_abcd1234-error.form-field__error[hidden]", text: "", visible: :all
 
     { blank: "Please fill in this field.", invalid: "Please check this entry.", inclusion: "Please choose one of the options.", too_long: "This is too long." }.each do |error, words|
       draw(field_of("short_text"), error: error)

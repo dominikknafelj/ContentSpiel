@@ -152,6 +152,11 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
     # in a column of each container (test/support/block_samples.rb), with an
     # outside type registered (test/support/gallery_album.rb): a type's
     # template is compared byte for byte the day the type is registered.
+    # Under a frozen clock: a Form block carries its signed draw time
+    # (`Forms::Drawn.token`, to the second), which is the same in both draws
+    # only when the second is. With the microseconds, so a copy published a
+    # moment ago is not put in the future.
+    freeze_time(with_usec: true)
     with_gallery_album do
       samples = create_page(title: "Samples")
       sample_every_type(samples)
@@ -171,6 +176,7 @@ class Theme::ScaffoldTest < ActionDispatch::IntegrationTest
       scaffolded do |target, _written|
         theme = Theme.load(ThemeFolder.new(target))
         definitions = BlockTypes.all.map { |definition| [ definition, :component ] } +
+          Forms::FieldTypes.all.map { |type| [ type, :input ] } +
           ContentTypes.all.flat_map { |definition| [ [ definition, :list_component ], [ definition, :detail_component ] ] }
         own = definitions.map { |definition, role| theme.component_for(definition, role) }.select { |component| component.sidecar_files([ "erb" ]).first.to_s.start_with?(target.to_s) }
         assert_equal Theme::Contract.components.keys.sort, own.map { |component| component.name.underscore }.uniq.sort, "every component is drawn by the copy's template"

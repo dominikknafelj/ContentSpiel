@@ -1,0 +1,231 @@
+/* The Form block on the public site (forms plan, Task 7; design.md 4.2, the
+   design lead's answer, recorded for the owner to overrule). Plain rules on
+   tokens: every colour is a --th- token, the block's six declared by the
+   type (`t.tokens`), defined from the base tokens in tokens.css and
+   re-valued by a strong band in sections.css; nothing here names a scheme.
+   The class names are the default theme's own (the default template's and
+   the five inputs'), not a promise; the attributes the script sets
+   (`hidden`, `aria-invalid`, `aria-busy`, `data-notice`) are what the
+   states are keyed on. */
+.content-block--form {
+  display: block;
+  margin-block: 2rem;
+  max-width: 36rem;
+  container-type: inline-size;
+}
+/* In a section the lane's width (a form line longer than 36rem is hard to
+   scan at the top level; a lane is narrower already). */
+.content-section__column .content-block--form { max-width: none; }
+
+.content-block--form .form-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--th-sp-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.content-block--form .form-body[hidden] { display: none; }
+
+/* A field: its label, the help line, the control, the error. */
+.content-block--form .form-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.content-block--form .form-field__label {
+  display: block;
+  margin-bottom: 0.25rem;
+  padding: 0;
+  font-size: var(--th-t-body);
+  font-weight: 500;
+  color: var(--th-ink);
+}
+/* "required" said in words, as a mono label; the source stays lowercase so
+   a screen reader says the word. No asterisk anywhere. */
+.content-block--form .form-field__required {
+  margin-left: 0.5rem;
+  font-family: var(--th-mono);
+  font-size: var(--th-t-label);
+  font-weight: 500;
+  letter-spacing: var(--th-track-mono);
+  text-transform: uppercase;
+  color: var(--th-meta);
+}
+.content-block--form .form-field__help {
+  margin: 0 0 0.5rem;
+  font-size: var(--th-t-small);
+  color: var(--th-dim);
+}
+
+/* The control: full width, a 44px target, 16px text (below 16px a phone
+   zooms the page on focus), the browser's own arrow on a select (a drawn
+   chevron would need a colour in a data URI). */
+.content-block--form .form-field :is(input:not([type="checkbox"], [type="radio"]), textarea, select) {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  font-family: var(--th-font);
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--th-ink);
+  background: var(--th-form-field-ground);
+  border: 1px solid var(--th-form-field-line);
+  border-radius: var(--th-radius);
+  appearance: auto;
+}
+.content-block--form .form-field textarea { resize: vertical; }
+.content-block--form .form-field :is(input, textarea, select):focus-visible,
+.content-block--form .form-field :is(input:not([type="checkbox"], [type="radio"]), textarea):focus {
+  outline: 2px solid var(--th-form-field-focus);
+  outline-offset: 2px;
+}
+
+/* Checkbox and radios: native, 20px, tinted; the whole row a 44px target.
+   A radio group is the fieldset, whose legend takes the label's look. */
+.content-block--form .form-field__row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+}
+.content-block--form .form-field__row label {
+  margin: 0;
+  font-size: var(--th-t-body);
+  font-weight: 400;
+  color: var(--th-ink);
+}
+.content-block--form .form-field :is([type="checkbox"], [type="radio"]) {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--th-form-field-focus);
+}
+
+/* An error: under the control, after a "!" a screen reader does not say;
+   the control's edge two pixels that move nothing. */
+.content-block--form .form-field__error {
+  margin: 0.375rem 0 0;
+  font-size: var(--th-t-small);
+  font-weight: 500;
+  color: var(--th-form-error);
+}
+.content-block--form .form-field__error[hidden] { display: none; }
+.content-block--form .form-field__error::before {
+  content: "!";
+  content: "!" / "";
+  font-family: var(--th-mono);
+  margin-right: 0.375rem;
+}
+.content-block--form .form-field [aria-invalid="true"]:not([type="checkbox"], [type="radio"]) {
+  border-color: var(--th-form-error);
+  box-shadow: inset 0 0 0 1px var(--th-form-error);
+}
+.content-block--form .form-field [aria-invalid="true"]:is([type="checkbox"], [type="radio"]) {
+  outline: 2px solid var(--th-form-error);
+  outline-offset: 1px;
+}
+
+/* The summary above the fields: a rule and a frame in the error colour, no
+   ground; its line, then one link per answer. A sentence that is no
+   field's (`data-notice`: gone, unavailable, too many, no answer) is the
+   line alone in the text colour: it is no mistake of the visitor's. */
+.content-block--form .form-summary {
+  margin-bottom: var(--th-sp-4);
+  padding: 14px 22px;
+  border: 1px solid var(--th-form-error);
+  border-left-width: 3px;
+  border-radius: var(--th-radius);
+}
+.content-block--form .form-summary[hidden] { display: none; }
+.content-block--form .form-summary:focus-visible { outline: 2px solid var(--th-form-field-focus); outline-offset: 2px; }
+.content-block--form .form-summary > p { margin: 0; font-weight: 600; color: var(--th-form-error); }
+.content-block--form .form-summary[data-notice] > p { font-weight: 500; color: var(--th-ink); }
+.content-block--form .form-summary ul {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.content-block--form .form-summary a { color: var(--th-accent); text-decoration: underline; }
+
+/* The button: the accent, a 44px target; full width below a 30rem
+   container (the section's own breakpoint). While sending it is disabled
+   and busy, its look unchanged. */
+.content-block--form .form-submit {
+  align-self: flex-start;
+  min-height: 2.75rem;
+  margin-top: var(--th-sp-2);
+  padding: 0 1.25rem;
+  font-family: var(--th-font);
+  font-size: var(--th-t-body);
+  font-weight: 600;
+  color: var(--th-on-accent);
+  background: var(--th-accent);
+  border: 0;
+  border-radius: var(--th-radius);
+  cursor: pointer;
+}
+.content-block--form .form-submit:hover { background: var(--th-accent-hover); }
+.content-block--form .form-submit:focus-visible { outline: 2px solid var(--th-form-field-focus); outline-offset: 2px; }
+.content-block--form .form-submit[aria-busy="true"] { cursor: progress; }
+@container (max-width: 30rem) {
+  .content-block--form .form-submit { align-self: stretch; }
+}
+
+/* Heard, not seen: "Sending…" while a send is on its way. */
+.content-block--form .form-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The thank-you, where the fields stood: the ok tint, a 3px rule, the
+   editor's line breaks kept. */
+.content-block--form .form-done {
+  margin: 0;
+  padding: 14px 22px;
+  font-size: var(--th-t-body);
+  color: var(--th-ink);
+  white-space: pre-line;
+  background: var(--th-form-done-ground);
+  border-left: 3px solid var(--th-form-done-line);
+  border-radius: var(--th-radius);
+}
+.content-block--form .form-done[hidden] { display: none; }
+.content-block--form .form-done:focus-visible { outline: 2px solid var(--th-form-field-focus); outline-offset: 2px; }
+
+/* A site that takes no answers (no encryption keys): the line above the
+   fields, and every field and the button in the one disabled look, no
+   opacity. */
+.content-block--form .form-unavailable {
+  margin: 0 0 var(--th-sp-4);
+  padding-left: 14px;
+  font-size: var(--th-t-body);
+  color: var(--th-dim);
+  border-left: 3px solid var(--th-line-strong);
+}
+.content-block--form .form-body:disabled :is(input:not([type="checkbox"], [type="radio"]), textarea, select) {
+  color: var(--th-meta);
+  background: var(--th-sunken);
+  border-color: var(--th-meta);
+}
+.content-block--form .form-body:disabled .form-submit {
+  color: var(--th-meta);
+  background: var(--th-sunken);
+  cursor: not-allowed;
+}

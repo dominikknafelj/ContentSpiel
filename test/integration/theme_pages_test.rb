@@ -818,6 +818,66 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
   end
 
+  # The ninth theme (test/fixtures/themes/form): a Form template and a short
+  # text answer's, written from docs/reference/theming.md, "The Form block"
+  # alone. Its form posts to the endpoint as the default's does, carries the
+  # script's markup, and draws its fields with its own short text input and
+  # the default's other inputs; a theme that replaces neither is drawn the
+  # default ones.
+  test "a theme replaces the Form block's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    form = forms(:contact)
+    contact = create_page(title: "Write to us")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: contact), attributes: { block_type: "form", settings: { "form_id" => form.id.to_s } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(contact)
+
+    with_form_theme { get "/write-to-us" }
+
+    assert_response :success
+    assert_select "form.plain-form[method=post][action='/forms/#{form.id}'][data-controller=form-send][data-turbo=false][data-block='#{block.id}'][data-page='#{contact.id}']" do |element|
+      fields = JSON.parse(element.first["data-form-send-fields-value"])
+      assert_equal({ "error" => "form-#{block.id}-f_name0001-error", "target" => "form-#{block.id}-f_name0001" }, fields.fetch("f_name0001"))
+      assert_select "[data-form-send-target=summary][role=alert][hidden]"
+      assert_select "fieldset[data-form-send-target=body]:not([disabled])"
+      assert_select "p.plain-field label[for='form-#{block.id}-f_name0001']", text: /Your name/
+      assert_select "p.plain-field em.plain-field__required", text: "required"
+      assert_select "p.plain-field strong#form-#{block.id}-f_name0001-error[hidden]"
+      assert_select "div.form-field--email input[type=email]#form-#{block.id}-f_mail0001", 1, "the default's email input, which the theme does not replace"
+      assert_select "input[type=hidden][name=drawn]"
+      assert_select "div[hidden][aria-hidden=true] input[name=website][tabindex='-1'][autocomplete=off]"
+      assert_select "button[data-form-send-target=button]", text: "Send"
+      assert_select "[data-form-send-target=done][role=status][hidden]", text: "Thank you, we'll be in touch."
+    end
+    assert_select "form.content-block--form", count: 0
+
+    without_encryption_keys { with_form_theme { get "/write-to-us" } }
+    assert_select "p.plain-form__closed", text: I18n.t("public.forms.unavailable")
+    assert_select "fieldset[data-form-send-target=body][disabled]"
+
+    with_plain_theme { get "/write-to-us" }
+
+    assert_response :success
+    assert_select "div.plain-frame form.content-block--form div.form-field--short_text input#form-#{block.id}-f_name0001"
+    assert_select "form.plain-form", count: 0
+    assert_select "p.plain-field", count: 0
+  end
+
+  test "the ninth theme is sound, checked deeply too: a Form template of the contract's names" do
+    folder = ThemeFolder.new(ThemeTestHelper::FORM)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/form_component.html.erb components/blocks/form_fields/short_text_component.html.erb], folder.files
+    template = folder.read("components/blocks/form_component.html.erb")
+    Theme::Contract.components.fetch("blocks/form_component").each { |name| assert_match(/\b#{Regexp.escape(name)}\b/, template, "the template calls #{name}") }
+    input = folder.read("components/blocks/form_fields/short_text_component.html.erb")
+    %w[field value error].each { |name| assert_match(/\b#{name}\b/, input, "the input's template calls #{name}") }
+    [ template, input ].each do |code|
+      assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==|authenticity|csrf/, code, "nothing the contract does not name, no token and no string marked safe")
+    end
+  end
+
   test "the preview reads the rows' anchors for a heading's id, and the public page the copy's" do
     sign_in_as users(:one)
     ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 0 },

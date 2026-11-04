@@ -71,9 +71,9 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The thirteen built-ins, in this order (it is `names`' order).
+      # The fourteen built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email ].each { |type| register(type) }
+        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email, form ].each { |type| register(type) }
       end
 
       # The one rule for a link a visitor follows (the Card's address): an
@@ -218,6 +218,27 @@ module ContentModel
               errors.add(field.name, :invalid)
             end
           }
+        )
+      end
+
+      # A visitor's form, named by its id (the Form block's one field, forms
+      # plan Task 7): a String of digits, as `Forms::Placements` compares it
+      # with `settings ->> 'form_id'`, else nothing. Which form that is, and
+      # whether it is kept, is asked where the block is drawn (a trashed or
+      # missing form draws nothing) and in CS Studio's select, which names a
+      # stored form that is gone; it is not refused here, because the content
+      # model sits below the forms and knows none of them, and a form trashed
+      # after it was placed must not make the page's other blocks unsaveable.
+      # The same in every language, so never translated.
+      def form
+        FieldType.new(
+          name: :form, translatable: false, audit: :value,
+          cast: ->(value) { value.to_s.strip.then { |text| text.match?(/\A[1-9]\d*\z/) ? text : nil } },
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "form fields can't be translated (a form is the same in every language)" if options[:translated]
+            refuse_choice_and_string_options(options)
+          },
+          validate: NOTHING
         )
       end
 

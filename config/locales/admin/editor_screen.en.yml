@@ -37,6 +37,11 @@ en:
           # answers (block types spec, decision 8).
           types:
             # bin/rails generate block_type adds a type's scope below this line.
+            # A Form block's tile: no form chosen, or the one it names is
+            # in the trash or purged (`BlockTypes::Form.summary`).
+            form:
+              no_form: "No form chosen"
+              gone: "The form is gone"
             card:
               empty: "Empty"
               image_link_without_alt: "Image link has no alt text"

@@ -36,6 +36,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal({ "en" => { caption: "A caption" } }, d.sample.translations)
     assert_equal "Some **words**", d.sample.body
     assert_equal true, d.sample.image
+    assert_equal false, d.sample.form, "a form is made only for a sample that says form: true"
     assert_equal [ "A caption" ], d.sample.shows
   end
 
@@ -45,7 +46,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_match(/without the --th- prefix/, assert_raises(ArgumentError) { definition.tokens fixed: %w[Shape_gap] }.message)
     assert_match(/identifier#method/, assert_raises(ArgumentError) { definition.read_only_actions "update" }.message)
     assert_match(/callable/, assert_raises(ArgumentError) { definition.summary "words" }.message)
-    assert_match(/settings, translations, body, image, shows/, assert_raises(ArgumentError) { definition.sample shows: [ "x" ], blocks: [] }.message)
+    assert_match(/settings, translations, body, image, form, shows/, assert_raises(ArgumentError) { definition.sample shows: [ "x" ], blocks: [] }.message)
     assert_match(/at least one text/, assert_raises(ArgumentError) { definition.sample settings: {} }.message)
     assert_match(/at least one text/, assert_raises(ArgumentError) { definition.sample shows: [] }.message)
     assert_match(/"en" at least/, assert_raises(ArgumentError) { definition.sample translations: { "de" => { caption: "x" } }, shows: [ "x" ] }.message)
@@ -68,6 +69,7 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
   test "shapes the first test did not reach are refused too" do
     assert_match(/none of them blank/, assert_raises(ArgumentError) { definition.sample shows: [ " " ] }.message)
     assert_match(/image is true or false/, assert_raises(ArgumentError) { definition.sample image: "yes", shows: [ "x" ] }.message)
+    assert_match(/form is true or false/, assert_raises(ArgumentError) { definition.sample form: 3, shows: [ "x" ] }.message)
     assert_match(/settings are a Hash/, assert_raises(ArgumentError) { definition.sample settings: [], shows: [ "x" ] }.message)
     assert_match(/body is a Markdown String/, assert_raises(ArgumentError) { definition.sample body: 1, shows: [ "x" ] }.message)
     assert_match(/Hash of locale/, assert_raises(ArgumentError) { definition.sample translations: { "en" => "x" }, shows: [ "x" ] }.message)

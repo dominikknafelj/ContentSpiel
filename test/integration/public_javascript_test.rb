@@ -286,6 +286,25 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='admin--']", count: 0
   end
 
+  # Forms plan, Task 7: the Form block's send in place is a controller of
+  # the site's own, at the top level like `code-copy`; nothing of CS
+  # Studio's editor reaches the page.
+  test "a public page with a Form block carries the send controller and no admin script" do
+    page = create_page(title: "Write")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "form", settings: { "form_id" => forms(:contact).id.to_s } }).ok?
+    publish_changes(page)
+
+    get PublicSite::Urls.new.path_for(page, "en")
+
+    assert_response :success
+    assert_select "form.content-block--form[data-controller='form-send'][data-action='form-send#send'][data-turbo=false]"
+    assert modulepreloads.any? { |href| href.include?("controllers/form_send_controller") }, "the send controller is preloaded with the site's own"
+    ADMIN_ONLY.each do |name|
+      assert modulepreloads.none? { |href| href.include?(name) }, "#{name} is modulepreloaded on a page with a Form block"
+    end
+    assert_select "[data-controller*='admin--']", count: 0
+  end
+
   test "a public page with a Note block needs no script: it carries no controller of its own and no admin script" do
     page = create_page(title: "Guide")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "note", settings: { "kind" => "tip" } },
