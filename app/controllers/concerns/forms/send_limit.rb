@@ -25,6 +25,22 @@ module Forms
   # (Solid Cache, a table of the database) holds no IP for its ten minutes.
   # The form's key is its id.
   #
+  # AN IPv6 VISITOR IS THEIR /64. One household or phone is handed a whole
+  # /64 and may send from any address in it, so counting the full address
+  # would give one person 2^64 counters. An IPv4 visitor is the full address
+  # (a /24 would hold many households behind one provider). An address that
+  # does not parse is counted as written.
+  #
+  # WHO THE VISITOR IS rests on `request.remote_ip`, which is right only
+  # behind proxies Rails trusts: Rails skips private and loopback hops in
+  # `X-Forwarded-For`, so kamal-proxy on the same host is fine as it is. A
+  # CDN in front (Cloudflare, which `config/deploy.yml` plans for) is a
+  # public address Rails does not trust: every visitor then arrives "from"
+  # the CDN's edge, shares one counter, and the sixth visitor of ten minutes
+  # is refused. Such a site must add the CDN's published ranges to
+  # `config.action_dispatch.trusted_proxies`. Nothing here detects the
+  # mistake; the per-form limit is unaffected by it.
+  #
   # THE STORE follows `MailTestLimit.store`'s rule: `Rails.cache`, unless it
   # is a `NullStore` (the test environment's), whose every write is a no-op
   # and whose limit could never trip; there it is one memory store of the
@@ -42,10 +58,20 @@ module Forms
       @store ||= Rails.cache.is_a?(ActiveSupport::Cache::NullStore) ? ActiveSupport::Cache::MemoryStore.new : Rails.cache
     end
 
-    # The visitor as the cache knows them: a hex HMAC-SHA256 of the address.
+    # The visitor as the cache knows them: a hex HMAC-SHA256 of the address,
+    # an IPv6 one cut to its /64 first (above).
     def self.visitor_key(ip)
       @key ||= Rails.application.key_generator.generate_key(KEY_PURPOSE)
-      OpenSSL::HMAC.hexdigest("SHA256", @key, ip.to_s)
+      OpenSSL::HMAC.hexdigest("SHA256", @key, visitor(ip))
+    end
+
+    # What is counted: an IPv4 address whole, an IPv6 one as its /64
+    # ("2001:db8:1:2::/64"), and anything that is no address as written.
+    def self.visitor(ip)
+      address = IPAddr.new(ip.to_s)
+      address.ipv6? && !address.ipv4_mapped? ? "#{address.mask(64)}/64" : address.native.to_s
+    rescue IPAddr::Error
+      ip.to_s
     end
 
     included do

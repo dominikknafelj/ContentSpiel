@@ -78,4 +78,23 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     assert_match(/\A\h{64}\z/, Forms::SendLimit.visitor_key("203.0.113.7"))
     assert_not_equal Forms::SendLimit.visitor_key("203.0.113.7"), Forms::SendLimit.visitor_key("203.0.113.8")
   end
+
+  # One IPv6 visitor holds a whole /64 and may send from any address in it:
+  # they are one counter. An IPv4 address is counted whole.
+  test "two IPv6 addresses in one /64 share a counter, and the cache key still holds no address" do
+    3.times { send_form(from: "2001:db8:1:2::a") }
+    2.times { send_form(from: "2001:db8:1:2:ffff::b") }
+    assert_response :ok
+    send_form(from: "2001:db8:1:2:abcd:ef01:2345:6789")
+    assert_response :too_many_requests
+
+    send_form(from: "2001:db8:1:3::a")
+    assert_response :ok, "the next /64 is another visitor"
+
+    assert_equal Forms::SendLimit.visitor_key("2001:db8:1:2::a"), Forms::SendLimit.visitor_key("2001:db8:1:2:ffff::b")
+    assert_not_equal Forms::SendLimit.visitor_key("203.0.113.7"), Forms::SendLimit.visitor_key("203.0.113.8")
+    keys = store_keys
+    assert_equal 3, keys.size, keys.inspect # the form, and two visitors
+    keys.each { |key| assert_no_match(/2001|db8|:1:2|::/i, key.delete_prefix("rate-limit:form_sends:")) }
+  end
 end

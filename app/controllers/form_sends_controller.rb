@@ -48,8 +48,12 @@
 # they arrive (`config/initializers/filter_parameter_logging.rb`, which
 # names this controller's path, `form_sends`); spans carry no body and no
 # query string (`Telemetry::PathScrubber`); nothing of them is in a URL.
-# `Current.ip_address` is never set here, and the visitor's event has no IP
-# (`Audit.record`).
+# THE VISITOR'S ADDRESS: `Current.ip_address` is never set here, so the
+# visitor's event has no IP (`Audit.record`); the rate limit's cache key is
+# an HMAC of it (`Forms::SendLimit.visitor_key`); no span of ours names it.
+# Rails' own request line ("Started POST "/forms/1" for <address> at …")
+# still does, as for every request of the site: that is the request log's,
+# not this endpoint's, and it holds no answer.
 #
 # THE PAGE a send names (`page_id`) is the visitor's to name, so it is
 # believed only when it is a live page whose published copy places this form
@@ -124,7 +128,7 @@ class FormSendsController < ActionController::Base
 
   # The one actor of a send (test/lib/visitor_actor_test.rb: this is the
   # only file that names it). No `Current.ip_address`: a visitor's event
-  # carries no IP, and none is kept anywhere.
+  # carries no IP (the request log's own line still does; see the head).
   def act_as_visitor
     Current.actor = AccessControl::VISITOR
     Current.channel = :public

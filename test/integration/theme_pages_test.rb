@@ -957,7 +957,8 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   PRIVATE_VIEWS = %w[
     layouts/admin layouts/product layouts/setup layouts/mailer
     admin/dashboard/show admin/sessions/new admin/passwords/new admin/passwords/edit setup/token setup/system_check
-    passwords_mailer/reset layouts/form_send form_sends/sent form_sends/invalid
+    passwords_mailer/reset layouts/form_send form_sends/sent form_sends/invalid form_sends/gone form_sends/unavailable
+    form_sends/rate_limited form_sends/_heading form_sends/_notice form_sends/_back
   ].freeze
   # A mail has a text part with a template and a layout of its own.
   PRIVATE_TEXT_VIEWS = %w[layouts/mailer passwords_mailer/reset].freeze
@@ -1128,6 +1129,22 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
       assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
       assert_select "input#form-send-f_name0001[aria-invalid=true]"
+
+      # The three refusals, each drawn by the CMS's view and partials.
+      refusal = lambda do |status, words|
+        assert_response status
+        assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
+        assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
+        assert_select "h1", text: I18n.t("public.forms.pages.#{words}")
+        assert_select "main a", text: "← #{I18n.t("public.forms.back")}"
+      end
+      post form_send_path(form_id: 0), params: { answers: answers }
+      refusal.call(:not_found, :gone)
+      without_encryption_keys { post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) } }
+      refusal.call(:service_unavailable, :unavailable)
+      # Four sends so far from this address: the fifth is taken, the sixth refused.
+      2.times { post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) } }
+      refusal.call(:too_many_requests, :rate_limited)
     end
   end
 
