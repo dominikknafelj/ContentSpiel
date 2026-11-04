@@ -145,6 +145,23 @@ class Forms::SaveTest < ActiveSupport::TestCase
     assert_equal [ mail.id ], form.reload.destinations.pluck(:id)
   end
 
+  test "removing a dormant destination is audited as a change of the form's destinations" do
+    form = forms(:contact)
+    dormant = form.destinations.new(kind: "acme/crm", position: 1, settings: {}, secrets: { "api_key" => "sealed" })
+    dormant.save!(validate: false)
+    mail = form_destinations(:contact_mail)
+    given = [ { id: mail.id, kind: "mail", settings: mail.settings, secrets: {} } ]
+
+    result = save(form.reload, attributes: { name: "Contact us" }, fields: form.fields.map(&:to_h), destinations: given)
+    assert result.ok?, result.errors.to_sentence
+    assert_not Forms::Destination.exists?(dormant.id)
+    event = Audit::Event.where(subject: form, action: "form.updated").order(:id).last
+    before, after = event.field_changes.fetch("destinations")
+    assert_not_equal before, after
+    assert_match(/acme\/crm/, before.to_json)
+    assert_no_match(/acme\/crm/, after.to_json)
+  end
+
   test "a stored field of a type no longer registered is carried through a save, settings and all" do
     form = forms(:contact)
     stored = { "key" => "f_star0001", "type" => "acme/rating", "required" => true, "label" => { "en" => "Stars" }, "help" => {}, "settings" => { "max" => 5 } }

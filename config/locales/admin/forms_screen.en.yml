@@ -114,7 +114,7 @@ en:
           for: "for"
           days: "days"
           keep_days_help: "Leave it empty to use the site's %{days} days (Settings → Forms). Changing it applies to submissions already kept."
-          not_kept: "Submissions are mailed and not kept. If a mail fails, the submission is kept until it is sent again, for at most %{days} days."
+          not_kept: "Submissions are mailed and not kept. If a mail fails, the submission is kept until it is sent again, for at most %{days} days once mail is set up. While mail isn't set up, one that waits for it is kept with no time limit."
           # A placeholder for the Design System (forms final review): one
           # line, drawn only while the box is unticked on a form that keeps
           # submissions now. The nightly clean-up then deletes them.
@@ -161,7 +161,7 @@ en:
           kept:
             one: "Kept for %{count} day, then deleted."
             other: "Kept for %{count} days, then deleted."
-          not_kept: "Not kept: each is deleted once it is delivered. One that can't be delivered waits here for at most %{days} days."
+          not_kept: "Not kept: each is deleted once it is delivered. One that can't be delivered waits here for at most %{days} days once mail is set up. While mail isn't set up, one that waits for it is kept with no time limit."
           delete_all: "Delete all…"
           columns:
             received: "Received"
