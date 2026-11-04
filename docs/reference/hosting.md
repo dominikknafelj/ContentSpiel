@@ -287,6 +287,16 @@ Outside development the seed file does nothing else: no account, no content. The
 
 **A site that was set up before the groups were made this way** (its Groups screen is empty, or a built-in group is missing): run `bin/rails db:seed` once on the server (with Kamal: `bin/kamal app exec "bin/rails db:seed"`). It makes the missing built-in groups and nothing else, and running it again writes nothing. `db:prepare` will not do it: the database exists, so it is not seeded.
 
+## Forms
+
+A site's forms ask three things of its host (`docs/reference/forms.md`).
+
+**Active Record encryption keys.** A visitor's answers are stored encrypted, and nothing else may hold them, so **a site without the keys takes no answers at all** (owner's ruling 2 on the forms plan, which bends the spec's "a site without keys can only mail submissions"): there is no mail-only path and no sealed copy in a job. Without them every form on the site is drawn with "This form can't take answers at the moment. Please try again later." and its fields disabled, a send is answered 503 and nothing is written or queued, keeping cannot be switched on, a gem destination's secret cannot be stored, and System status's Forms row says "This site has no encryption keys, so its forms can't take answers." The keys are the same three the AI key and the mail login need, provided in one place (`docs/reference/translations.md`, "Active Record encryption keys"). `Forms::Encryption.available?` is asked once per process outside test, so keys added to a running site take effect at the next start. **Keys that change after submissions were kept** make those unreadable ("Can't be read", deletable), and **keys that go** make no kept submission disappear: the daily clean-up decides from each form's stored setting, never from whether the keys are there.
+
+**The answers are filtered from the request log by where they arrive**: a lambda in `config/initializers/filter_parameter_logging.rb` masks every String under `answers` or a field's key in a request to the controller `form_sends`, and nowhere else (not a bare `:answers`, which would match by substring and drop a snapshot key such as `faq_answers` from the audit log). Spans hold no body and no query string (Telemetry, above). Rails' own first request line still names the visitor's address ("Started POST "/forms/1" for <address>"), as for every request; it holds no answer.
+
+**Forms behind a CDN.** The per-visitor rate limit (5 sends in 10 minutes) counts `request.remote_ip`, an IPv6 address by its /64, which is right only behind proxies Rails trusts. Rails skips private and loopback hops in `X-Forwarded-For`, so kamal-proxy on the same host needs nothing. **A CDN in front (Cloudflare, which `config/deploy.yml` plans for) is a public address Rails does not trust**: every visitor then arrives "from" the CDN's edge, they all share one counter, and the sixth visitor in ten minutes is refused with "Too many messages". Such a site adds the CDN's published ranges to `config.action_dispatch.trusted_proxies` (in an initializer of the site's image, or `config/environments/production.rb`; Rails' own defaults are kept by adding to `ActionDispatch::RemoteIp::TRUSTED_PROXIES`). Nothing detects the mistake (`Forms::SendLimit`'s comment, "WHO THE VISITOR IS"); the per-form limit (30 in 10 minutes) is unaffected.
+
 ## What a change can break silently
 
 - **A `..._url` helper or `request.base_url` in a public view** prints the host the client sent into a cacheable page. The guard refuses the line; it does not see an address handed in from a controller outside the scanned set or a `PublicSite::Urls` built with another host.
@@ -304,6 +314,8 @@ Outside development the seed file does nothing else: no account, no content. The
 - **`includeSubDomains` or `preload` added to HSTS** cannot be taken back for a browser that has seen it.
 - **A site image whose last stage leaves `app/assets/builds` behind**, or whose `assets:precompile` ran without `THEME_PATH`, does not start, and says so; one that mounts its theme as a volume is refused at the first start after the volume's content differs from what the stylesheet was built with. A theme is a layer.
 - **`theme:check` moved after `assets:precompile`** in a site's Dockerfile still fails a refused theme's build, with a trace in place of the list. Nothing fails here: the order is a comment in the `Dockerfile` and the paragraph above.
+- **A CDN in front of the site without its ranges in `config.action_dispatch.trusted_proxies`** makes every visitor one visitor to the forms' rate limit: the sixth send in ten minutes, from anyone, is refused. Nothing fails ("Forms behind a CDN", above).
+- **A site deployed without its Active Record encryption keys** takes no form answers, and says so on every form and in System status; a deploy that drops them keeps every kept submission, unreadable until the keys are back ("Forms", above).
 
 ## Rules a change can break silently
 

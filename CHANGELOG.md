@@ -17,6 +17,11 @@
 - An icon file is checked by a fence when the application starts: at most 32 KB, well-formed SVG, SVG's drawing elements only, no `script`, `foreignObject` or `style` element, no `style` or `on…` attribute, no address but `#…`, no `DOCTYPE` or entity, and no `id`.
 - Added the attributes `img[data-image-preview]` and `img[data-image-empty]`, the two loading states of a library image's `<img>`, as names a theme's stylesheet may select.
 - `theme:new` also writes a `theme.yml` of comments only and copies the two page templates.
+- Added the Form block: `blocks/form_component` with thirteen names (`block page form_name fields action locale page_id drawn honeypot submit_label thank_you unavailable string`), and the five inputs it draws through the theme, each its own line with `field`, `value` and `error`: `blocks/form_fields/short_text_component`, `long_text_component`, `email_component`, `choice_component` and `checkbox_component`. `string` answers six keys (`required`, `choose`, `sending`, `sent`, `error_summary` with `count:`, `network`) and no other.
+- Added six themed tokens: `--th-form-field-ground`, `--th-form-field-line`, `--th-form-field-focus`, `--th-form-error`, `--th-form-done-ground` and `--th-form-done-line` (a light and a dark value, re-valued in a strong band).
+- Added the markup the `form-send` script reads, a promise to a theme's Form template: `data-controller="form-send"` and `data-action="form-send#send"` on the `<form>`, with `data-turbo="false"`; the hidden inputs `locale`, `page_id` and `drawn`; the targets `summary`, `body`, `button`, `status` (optional) and `done`; the values `sending`, `network` and `fields`; and, optional, `data-action="click->form-send#follow"` on the summary. A template without it still posts to the endpoint and lands on its plain page.
+- A public page's ETag now also names whether the site has Active Record encryption keys, which decide whether its forms take answers.
+- A link to an anchor of the same page (the same origin, path and query, with a fragment) is now the browser's on every public page, not a Turbo visit: the page is not drawn again, so what a theme's script wrote into it stays. Another page, or the same path with another query, is still a visit.
 
 ### Environment
 
@@ -24,6 +29,9 @@
 
 ### Migrations needing action
 
+- `db:migrate` adds the forms' four tables (`forms`, `form_destinations`, `form_submissions`, `form_deliveries`) and `site_settings.form_keep_days` (90), and `20261104090300_grant_forms_permissions_to_admin_group` gives the built-in Admin group "Manage forms" and "View form submissions"; any other group gets them by hand on the Groups screen.
+- **A site without Active Record encryption keys takes no form answers**: every form says it can't take answers, a send is refused, and System status's Forms row says so. Set the three keys (`docs/reference/translations.md`, "Active Record encryption keys") before placing a form.
+- A site behind a CDN adds the CDN's ranges to `config.action_dispatch.trusted_proxies`, or the forms' per-visitor rate limit counts every visitor as one (`docs/reference/hosting.md`, "Forms").
 - None beyond `db:migrate`. `20261101100000_replace_page_type_with_page_settings` moves every page's type into `pages.settings` and rewrites every page's published copies (current, pending and superseded) the same way; nothing is drawn differently and the content version does not move. A unique index on a section's anchor is added (no anchor exists before it).
 
 ### Removed
@@ -32,4 +40,7 @@
 
 ### For a gem or an outside caller
 
+- Added two hooks beside `ContentSpiel::Plugins.block_types`: `form_field_types` (a form field type's members, `owner/name`) and `form_destinations` (a destination's label, deliverer and settings block, `owner/name`), with the block types' owner rules and replayed after them (`docs/reference/content-blocks-and-types.md`, "Form field types and destinations from outside"). A destination's deliverer answers `deliver(delivery, final_attempt:)`.
+- `AccessControl::Permissions.register` takes `grantable:` (default true); `Permissions.grantable` is what a group may hold. A caller that listed `Permissions.all` to offer or seed grants now reads `grantable`.
+- `ContentModel::FieldTypes` has two more built-ins, `email` and `form`, and `text` takes `max:`.
 - `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.
