@@ -29,8 +29,8 @@ module AccessControl
     READ_ONLY_NAME = "Read only"
 
     # The §5 table as data. `grants: :all` (Admin only) means "every
-    # built-in permission, unscoped" -- resolved live against
-    # `AccessControl::Permissions.keys` in `ensure_built_in_groups!` below,
+    # grantable permission, unscoped" -- resolved live against
+    # `AccessControl::Permissions.grantable` in `ensure_built_in_groups!` below,
     # rather than listed out by hand, so Admin never drifts out of sync
     # with whatever the registry currently holds. Every other group's
     # grants are listed explicitly: unlike Admin they're a deliberate
@@ -138,7 +138,8 @@ module AccessControl
       def grants_for(definition)
         return definition[:grants] unless definition[:grants] == :all
 
-        Permissions.keys.map { |key| { permission: key, scope: {} } }
+        # Every GRANTABLE key: `forms.submit` is registered and no group's.
+        Permissions.grantable.map { |permission| { permission: permission.key, scope: {} } }
       end
     end
   end

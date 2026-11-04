@@ -24,10 +24,12 @@ module Audit
     # likewise: its username is a credential for several providers, and
     # leaving the columns out also means a snapshot never decrypts them. The
     # mail settings' fingerprint is an HMAC of the delivery settings, login
-    # included: never shown, logged or audited.
+    # included: never shown, logged or audited. `secrets` is a form
+    # destination's sealed credentials (`Forms::Destination`): not even the
+    # ciphertext is audited.
     NEVER_STORED = %w[
       password password_confirmation password_digest token token_digest lookup_digest ai_api_key
-      mail_username mail_password mail_verified_fingerprint preview renditions
+      mail_username mail_password mail_verified_fingerprint preview renditions secrets
     ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
@@ -197,6 +199,7 @@ module Audit
       when Media::Asset then record.title.presence || "Image ##{record.id}"
       when ApiToken then record.name.presence || "API token ##{record.id}"
       when SiteSetting then "Site settings"
+      when Forms::Form then record.name
       else "#{record.model_name.human} ##{record.id}"
       end
     end
@@ -283,6 +286,18 @@ module Audit
           "content_type" => record.content_type, "byte_size" => record.byte_size,
           "width" => record.width, "height" => record.height, "created_by_id" => record.created_by_id
         }
+      when Forms::Form
+        # The form's own columns (its fields, texts and keeping), and its
+        # destinations by kind and settings with the NAMES of the secrets
+        # that are set, never a secret's value or its ciphertext. Read
+        # afresh, not through the association, so a snapshot taken after a
+        # save sees the rows that save wrote and loads nothing onto the
+        # caller's record.
+        destinations = Forms::Destination.where(form_id: record.id).order(:position, :id).map do |destination|
+          secrets = destination.destination_type&.secrets.to_a.select { |name| destination.secret_set?(name) }
+          { "kind" => destination.kind, "position" => destination.position, "settings" => destination.settings, "secrets_set" => secrets }
+        end
+        record.attributes.merge("destinations" => destinations)
       else
         # The site settings, and anything a later task audits before it gets its own
         # serializer here -- still scrubbed by `.for`. Columns `.scrub` would

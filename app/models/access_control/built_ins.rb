@@ -19,6 +19,7 @@ module AccessControl
       register_content
       register_administration
       register_trash
+      register_forms
     end
 
     def self.register_posts
@@ -91,6 +92,22 @@ module AccessControl
     # permissions above, since holding it is all-or-nothing.
     def self.register_trash
       Permissions.register "trash.empty", label: "Empty trash", area: "Trash", action: :empty
+    end
+
+    # Forms (forms spec, decision 10): site-wide rights with no per-form
+    # scope yet, in an area of their own, held by the Admin group. `forms.manage`
+    # builds and changes forms and deletes submissions; `form_submissions.view`
+    # reads them and sends a failed destination again. Placing a Form block
+    # needs `pages.edit` only.
+    #
+    # `forms.submit` is the one right a visitor's send is authorized with
+    # (plan decision 8): registered so `Forms::Submit` can ask for it like any
+    # service asks for its key, and `grantable: false`, so no group, token,
+    # matrix or seed ever holds it.
+    def self.register_forms
+      Permissions.register "forms.manage", label: "Manage forms", area: "Forms", action: :manage
+      Permissions.register "form_submissions.view", label: "View form submissions", area: "Forms", action: :view
+      Permissions.register "forms.submit", label: "Send a form", area: "Forms", action: :submit, grantable: false
     end
   end
 end

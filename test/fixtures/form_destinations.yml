@@ -1,0 +1,11 @@
+# Contact's one destination: a mail to the office. A file of its own, not
+# `forms/destinations.yml`: the `forms` fixture set would read every file
+# under a `forms/` folder as its own rows.
+_fixture:
+  model_class: Forms::Destination
+
+contact_mail:
+  form: contact
+  kind: mail
+  position: 0
+  settings: { "recipients": "office@example.com" }

@@ -37,10 +37,10 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     "app/services/posts/save.rb" => %w[post.unpublished post.scheduled post.published],
     # `action` = Pages::Save#publish_action
     "app/services/pages/save.rb" => %w[page.unpublished page.published],
-    # "#{event_prefix}.trashed" / ".restored" / ".purged": page, post or media
-    "app/services/trash/move.rb" => %w[page.trashed post.trashed media.trashed],
-    "app/services/trash/restore.rb" => %w[page.restored post.restored media.restored],
-    "app/services/trash/purge.rb" => %w[page.purged post.purged media.purged],
+    # "#{event_prefix}.trashed" / ".restored" / ".purged": page, post, media or form
+    "app/services/trash/move.rb" => %w[page.trashed post.trashed media.trashed form.trashed],
+    "app/services/trash/restore.rb" => %w[page.restored post.restored media.restored form.restored],
+    "app/services/trash/purge.rb" => %w[page.purged post.purged media.purged form.purged],
     # "#{EVENT.fetch(record class)}.translation_confirmed": page post block media settings
     "app/services/translations/confirm.rb" => %w[page.translation_confirmed post.translation_confirmed block.translation_confirmed
       media.translation_confirmed settings.translation_confirmed],
@@ -135,6 +135,23 @@ class Audit::SentenceTest < ActiveSupport::TestCase
         user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current)))
       assert_equal "You #{expected}", read, action
     end
+  end
+
+  # Forms plan, Task 2: a form's five actions, its name quoted as a subject.
+  test "a form's actions" do
+    cases = {
+      "form.created" => "created the form “Contact”",
+      "form.updated" => "changed the form “Contact”",
+      "form.trashed" => "moved the form “Contact” to the trash",
+      "form.restored" => "restored the form “Contact”",
+      "form.purged" => "deleted the form “Contact” for good"
+    }
+    cases.each do |action, expected|
+      read = read(sentence_for(Audit::Event.new(action:, channel: "admin", subject_type: "Forms::Form", subject_id: 999_999, subject_label: "Contact",
+        user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current)))
+      assert_equal "You #{expected}", read, action
+    end
+    assert_equal "Form", Audit::Filter::SUBJECT_TYPES.fetch("Forms::Form"), "the log's Type filter names it"
   end
 
   test "sentences with no subject" do

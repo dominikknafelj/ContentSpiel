@@ -60,7 +60,10 @@ module Trash
     end
 
     def call
-      refused = item_refusal(@record) { |key| authorize!(key, @record) }
+      # A form is deleted for good with `trash.empty` alone, not with
+      # `forms.manage` (forms plan, Task 2): its submissions, personal data
+      # someone kept, go with it.
+      refused = @record.is_a?(Forms::Form) ? "trash.empty" : item_refusal(@record) { |key| authorize!(key, @record) }
       # `trash.empty` is an admin-area key: no subject, so a nil record.
       return denied(refused, @record) if refused && !authorize!("trash.empty", nil)
       return failure(@record, [ "Only items in the trash can be deleted permanently" ]) unless @record.trashed?
@@ -80,6 +83,7 @@ module Trash
         when Page then purge_branch(branch)
         when Post then purge_post
         when Media::Asset then purge_asset
+        when Forms::Form then purge_form
         end
       end
 
@@ -213,6 +217,16 @@ module Trash
       true
     end
 
+    # A form has no notes, no usages and no translation states. Its
+    # destinations (and, from Task 3, its submissions and their deliveries)
+    # go with it by the foreign keys' cascade. It has no published copy, so
+    # the public content version is moved here (forms plan, decision 9).
+    def purge_form
+      @record.destroy || raise(ActiveRecord::Rollback)
+      PublicSite.bump_version!
+      true
+    end
+
     # The threads on `@record` and on what goes with it, through
     # `Notes::Remove`. A refusal there (none is expected: it asks the right
     # this purge was just given) rolls the whole purge back, like any refusal
@@ -253,8 +267,8 @@ module Trash
       Notes::Remove.call(@record, with: with, actor: actor).ok? || raise(ActiveRecord::Rollback)
     end
 
-    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)
+    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media", Forms::Form => "form" }.fetch(@record.class)
 
-    def noun = { Page => "page", Post => "post", Media::Asset => "image" }.fetch(@record.class)
+    def noun = { Page => "page", Post => "post", Media::Asset => "image", Forms::Form => "form" }.fetch(@record.class)
   end
 end

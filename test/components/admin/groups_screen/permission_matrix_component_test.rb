@@ -11,7 +11,7 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_equal %w[Posts Pages], page.all(".admin-area-heading").map { |heading| heading.text.strip }
     assert_selector "h2", text: "Content permissions"
     assert_selector "h2", text: "Other permissions"
-    assert_selector "section h3", count: 3
+    assert_selector "section h3", count: 4
   end
 
   test "ticked grants tick their rows and toggles, and a stale grant keeps its note" do

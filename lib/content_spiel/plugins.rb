@@ -29,10 +29,13 @@ module ContentSpiel
     #
     # `kind` says what is being registered, for the message ("a block type
     # from outside"), and `build` how one is made of a name and what the hook
-    # gave: a block type's definition block, a form field type's attributes.
+    # gave: a block type's definition block, a form field type's attributes,
+    # a form destination's attributes and its block. `takes` is which of the
+    # two the kind takes (`:block`, `:attributes`); the other is refused.
     class Registrar
-      def initialize(registry, location, owners = {}, kind: "block type", build: nil)
+      def initialize(registry, location, owners = {}, kind: "block type", build: nil, takes: %i[block])
         @kind = kind
+        @takes = takes
         @build = build || ->(name, attributes, definition) { registry.register(name, &definition) }
         @registry = registry
         @location = location
@@ -41,8 +44,9 @@ module ContentSpiel
       end
 
       # A block type's hook passes a block and nothing else; a form field
-      # type's passes the type's members and no block. What the kind does not
-      # take is refused here, not ignored.
+      # type's passes the type's members and no block; a form destination's
+      # passes its label and deliverer, and a block for its settings. What
+      # the kind does not take is refused here, not ignored.
       def register(name, **attributes, &definition)
         name = name.to_s
         owner, rest = name.split("/", 2)
@@ -56,8 +60,8 @@ module ContentSpiel
           raise ArgumentError, "#{name.inspect}: the owner #{owner.inspect} is another hook's, called at #{taken}; one owner is one gem's"
         end
         @owners[owner] = @location
-        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no block" if definition && @kind != "block type"
-        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no attributes, only its block" if attributes.any? && @kind == "block type"
+        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no block" if definition && !@takes.include?(:block)
+        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no attributes, only its block" if attributes.any? && !@takes.include?(:attributes)
 
         @build.call(name, attributes, definition)
       end
@@ -68,12 +72,13 @@ module ContentSpiel
     REPLAYED = "ContentSpiel::Plugins.block_types, called at".freeze
 
     REPLAYED_FORM_FIELD_TYPES = "ContentSpiel::Plugins.form_field_types, called at".freeze
+    REPLAYED_FORM_DESTINATIONS = "ContentSpiel::Plugins.form_destinations, called at".freeze
     # The words a replayed hook's error can carry.
-    REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES ].freeze
+    REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES, REPLAYED_FORM_DESTINATIONS ].freeze
 
     # One hook list per registry: a hook is replayed into its own registry
     # only, in the order it was called.
-    @hooks = { block_types: [], form_field_types: [] }
+    @hooks = { block_types: [], form_field_types: [], form_destinations: [] }
 
     class << self
       def block_types(&block)
@@ -97,6 +102,24 @@ module ContentSpiel
         keep(:form_field_types, block, caller_locations(1, 1).first)
       end
 
+      # Where a form's submissions go, from a gem (forms plan, Task 2):
+      #
+      #   ContentSpiel::Plugins.form_destinations do |destinations|
+      #     destinations.register "acme/crm", label: "Acme CRM", deliverer: Acme::Crm do |d|
+      #       d.field :list, :string, required: true
+      #       d.secret :api_key
+      #     end
+      #   end
+      #
+      # The owner rules are the block types'; the arguments are
+      # `Forms::DestinationTypes.register`'s, and the deliverer's contract is
+      # in `Forms::DestinationType`'s comment.
+      def form_destinations(&block)
+        raise ArgumentError, "ContentSpiel::Plugins.form_destinations takes a block" unless block
+
+        keep(:form_destinations, block, caller_locations(1, 1).first)
+      end
+
       # Every kept block, in the order the hooks were called (the Gemfile's
       # order), each with a registrar of its own. Whatever a block raises is
       # raised again, as the same class, with the place of the hook's call in
@@ -109,8 +132,17 @@ module ContentSpiel
       # `Forms::FieldTypes` (the registry takes a built `Forms::FieldType`).
       def register_form_field_types(registry)
         replay(:form_field_types, REPLAYED_FORM_FIELD_TYPES) do |location, owners|
-          Registrar.new(registry, location, owners, kind: "form field type",
+          Registrar.new(registry, location, owners, kind: "form field type", takes: %i[attributes],
             build: ->(name, attributes, _definition) { registry.register(Forms::FieldType.new(name: name, **attributes)) })
+        end
+      end
+
+      # Every kept form destination hook, replayed the same way into
+      # `Forms::DestinationTypes`.
+      def register_form_destinations(registry)
+        replay(:form_destinations, REPLAYED_FORM_DESTINATIONS) do |location, owners|
+          Registrar.new(registry, location, owners, kind: "form destination", takes: %i[attributes block],
+            build: ->(name, attributes, definition) { registry.register(name, **attributes, &definition) })
         end
       end
 

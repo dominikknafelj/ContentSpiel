@@ -1,0 +1,63 @@
+# Two generic forms (forms plan, Global Constraints: nothing of any client
+# site). "Contact" mails its submissions and keeps none; "Newsletter" keeps
+# them for 30 days and has no destination. Field and choice keys are fixed
+# here so a test can name them.
+_fixture:
+  model_class: Forms::Form
+
+contact:
+  name: Contact
+  keep_submissions: false
+  submit_label: { "en": "Send" }
+  thank_you: { "en": "Thank you, we'll be in touch." }
+  fields:
+    - key: f_name0001
+      type: short_text
+      required: true
+      label: { "en": "Your name" }
+      help: {}
+      settings: {}
+    - key: f_mail0001
+      type: email
+      required: true
+      label: { "en": "Email address" }
+      help: { "en": "We answer to this address." }
+      settings: {}
+    - key: f_text0001
+      type: long_text
+      required: false
+      label: { "en": "Message" }
+      help: {}
+      settings: {}
+
+newsletter:
+  name: Newsletter
+  keep_submissions: true
+  keep_days: 30
+  submit_label: { "en": "Subscribe" }
+  thank_you: {}
+  fields:
+    - key: f_mail0002
+      type: email
+      required: true
+      label: { "en": "Email address" }
+      help: {}
+      settings: {}
+    - key: f_topic002
+      type: choice
+      required: false
+      label: { "en": "Topic" }
+      help: {}
+      settings:
+        display: radios
+        choices:
+          - key: c_news0001
+            label: { "en": "News" }
+          - key: c_offr0001
+            label: { "en": "Offers" }
+    - key: f_okay0002
+      type: checkbox
+      required: true
+      label: { "en": "I agree to receive the newsletter" }
+      help: {}
+      settings: {}

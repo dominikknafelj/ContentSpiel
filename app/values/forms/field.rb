@@ -12,6 +12,10 @@ module Forms
   class Field
     KEY_FORMAT = /\Af_[a-z0-9]{8}\z/
 
+    # How a type that offers `:display` (`FieldType#options`) draws its
+    # choices, the first the default (`Forms::Save` stores no other).
+    DISPLAYS = %w[dropdown radios].freeze
+
     # A key is made once, when the field is added, and kept for the life of
     # the field: submissions are stored under it.
     def self.new_key = "f_#{SecureRandom.alphanumeric(8).downcase}"

@@ -71,7 +71,7 @@ class SeedsTest < ActiveSupport::TestCase
         TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
       assert_equal [ "Admin", "Author", "Editor", "Read only" ], AccessControl::Group.where(built_in: true).order(:name).pluck(:name)
-      assert_equal AccessControl::Permissions.keys.sort, AccessControl::Group.find_by!(name: "Admin").grants.pluck(:permission).sort
+      assert_equal AccessControl::Permissions.grantable.map(&:key).sort, AccessControl::Group.find_by!(name: "Admin").grants.pluck(:permission).sort
 
       before = ServiceCalls.digests(except: [])
       TestOutput.quietly { load Rails.root.join("db/seeds.rb") }

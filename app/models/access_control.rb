@@ -164,8 +164,12 @@ module AccessControl
     # they allow exactly that. Refusing a grant the user could split into
     # two is safe; merging scopes across grants (and across dimensions)
     # correctly isn't worth the risk here.
+    #
+    # A permission registered `grantable: false` (`forms.submit`) is handed
+    # out by nobody, an owner included.
     def can_grant?(actor, key, scope = {})
       permission = Permissions.fetch(key)
+      return false unless permission.grantable
       return true if owner?(actor)
 
       requested = scope.to_h.stringify_keys

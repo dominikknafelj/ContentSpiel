@@ -9,6 +9,13 @@
 # accumulate through a DSL block. `AccessControl::Permissions.register`
 # takes every field as a keyword argument and builds the finished, frozen
 # value directly.
+#
+# `grantable` (forms plan, decision 8) is false for a permission no group,
+# token, matrix or seed may hold: `forms.submit`, which only the visitor
+# actor is allowed (`AccessControl::Permissions.grantable` is every
+# registered permission but those). Every other permission is grantable.
 module AccessControl
-  Permission = Data.define(:key, :label, :area, :subject, :action, :scopes)
+  Permission = Data.define(:key, :label, :area, :subject, :action, :scopes, :grantable) do
+    def initialize(key:, label:, area:, subject:, action:, scopes:, grantable: true) = super
+  end
 end

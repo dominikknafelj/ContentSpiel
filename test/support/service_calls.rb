@@ -434,6 +434,13 @@ module ServiceCalls
       { call: -> { Publishing::CancelScheduledChange.call(page) }, permission: "pages.publish", on: page }
     },
 
+    # Renames the form and changes its mail: a form row and a destination row.
+    "Forms::Save" => lambda {
+      form = forms(:contact)
+      { call: -> { Forms::Save.call(form, attributes: { name: "Renamed" }, fields: form.fields.map(&:to_h), destinations: [ { kind: "mail", settings: { recipients: "else@example.com" }, secrets: {} } ]) },
+        permission: "forms.manage", on: form }
+    },
+
     "Posts::Save" => lambda {
       post = create_post(title: "Edit me", published: false, tags: [ "kept" ])
       { call: -> { Posts::Save.call(post, attributes: { published: true, tag_names: [ "other" ] }, translations: { "en" => { title: "Edited" } }) },
@@ -643,6 +650,12 @@ module ServiceCalls
         page, section, (block,) = draft_page_with_section
         { call: -> { ContentBlocks::Reorder.call(page, [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 3 } }) },
           permission: "pages.edit", on: page }
+      }
+    },
+    "Forms::Save" => {
+      "creating" => lambda {
+        { call: -> { Forms::Save.call(Forms::Form.new, attributes: { name: "New form" }, fields: [], destinations: [ { kind: "mail", settings: { recipients: "office@example.com" }, secrets: {} } ]) },
+          permission: "forms.manage", on: Forms::Form }
       }
     },
     "Groups::Save" => {

@@ -85,6 +85,10 @@ module Audit
       "group.deleted" => [ "deleted the group ", "" ],
       "token.issued" => [ "created the API token ", "" ], "token.revoked" => [ "revoked the API token ", "" ],
       "settings.updated" => [ "edited ", "" ],
+      # Forms (forms plan, Task 2): a form is named as one, with its name.
+      "form.created" => [ "created the form ", "" ], "form.updated" => [ "changed the form ", "" ],
+      "form.trashed" => [ "moved the form ", " to the trash" ], "form.restored" => [ "restored the form ", "" ],
+      "form.purged" => [ "deleted the form ", " for good" ],
       "ai.translated" => [ "asked the AI for translation suggestions for ", "" ]
     }.freeze
 

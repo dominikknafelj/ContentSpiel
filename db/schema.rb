@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_01_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_090300) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -151,6 +151,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_110000) do
     t.datetime "requested_at"
     t.index ["record_type", "record_id"], name: "index_edit_reservations_on_record"
     t.index ["subject_type", "subject_id"], name: "index_edit_reservations_on_subject", unique: true
+  end
+
+  create_table "form_destinations", force: :cascade do |t|
+    t.bigint "form_id", null: false
+    t.string "kind", null: false
+    t.integer "position", default: 0, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.text "secrets"
+    t.datetime "secrets_saved_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["form_id"], name: "index_form_destinations_on_form_id"
+  end
+
+  create_table "forms", force: :cascade do |t|
+    t.string "name", null: false
+    t.jsonb "fields", default: [], null: false
+    t.jsonb "submit_label", default: {}, null: false
+    t.jsonb "thank_you", default: {}, null: false
+    t.boolean "keep_submissions", default: false, null: false
+    t.integer "keep_days"
+    t.datetime "trashed_at"
+    t.bigint "trashed_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["trashed_at"], name: "index_forms_on_trashed_at"
+    t.index ["trashed_by_id"], name: "index_forms_on_trashed_by_id"
   end
 
   create_table "invitation_groups", force: :cascade do |t|
@@ -472,6 +499,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_110000) do
     t.integer "image_quality_avif", default: 50, null: false
     t.jsonb "image_widths", default: [480, 960, 1600, 2400], null: false
     t.integer "image_max_upload_mb", default: 10, null: false
+    t.integer "form_keep_days", default: 90, null: false
   end
 
   create_table "tags", force: :cascade do |t|
@@ -517,6 +545,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_110000) do
   add_foreign_key "content_blocks", "media_assets"
   add_foreign_key "edit_reservations", "users", column: "requested_by_id", on_delete: :nullify
   add_foreign_key "edit_reservations", "users", on_delete: :cascade
+  add_foreign_key "form_destinations", "forms", on_delete: :cascade
+  add_foreign_key "forms", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "invitation_groups", "access_control_groups", column: "group_id", on_delete: :cascade
   add_foreign_key "invitation_groups", "invitations", on_delete: :cascade
   add_foreign_key "invitations", "users", column: "inviter_id", on_delete: :nullify

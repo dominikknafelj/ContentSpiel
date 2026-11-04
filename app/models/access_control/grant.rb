@@ -56,10 +56,13 @@ module AccessControl
 
     private
 
+    # A permission registered `grantable: false` (`forms.submit`, the
+    # visitor's alone) is refused too: no group may hold it, whoever saves.
     def permission_is_registered
-      return if permission.blank? || permission_definition
+      return if permission.blank?
+      return errors.add(:permission, "isn't a registered permission") unless permission_definition
 
-      errors.add(:permission, "isn't a registered permission")
+      errors.add(:permission, "can't be granted") unless permission_definition.grantable
     end
 
     def scope_keys_are_allowed_by_the_permission

@@ -52,7 +52,8 @@ class BuiltInDataTest < ActiveSupport::TestCase
     "20261004110000_create_translation_states" => { derived: "translation states of the pages, posts and blocks that existed" },
     "20261005150000_create_public_site_versions" => { lazy: "the counter's row: no row reads as 0 and the first PublicSite.bump_version! upserts it" },
     "20261011120000_create_published_versions" => { derived: "a first copy of each page and post that was published" },
-    "20261031120000_adopt_existing_image_variants" => { derived: "the widths images already had" }
+    "20261031120000_adopt_existing_image_variants" => { derived: "the widths images already had" },
+    "20261104090300_grant_forms_permissions_to_admin_group" => { built_in: "Groups::EnsureBuiltIns" }
   }.freeze
 
   # What each `built_in:` migration gave a group, as it is written in the
@@ -61,7 +62,8 @@ class BuiltInDataTest < ActiveSupport::TestCase
   GRANTED_BY_MIGRATION = {
     "20260929060000_grant_media_manage_to_built_in_groups" => { "media.manage" => %w[Admin Editor] },
     "20260929090100_grant_trash_empty_to_admin" => { "trash.empty" => %w[Admin] },
-    "20261002120100_grant_ai_translate_to_built_in_groups" => { "ai.translate" => %w[Admin Editor] }
+    "20261002120100_grant_ai_translate_to_built_in_groups" => { "ai.translate" => %w[Admin Editor] },
+    "20261104090300_grant_forms_permissions_to_admin_group" => { "forms.manage" => %w[Admin], "form_submissions.view" => %w[Admin] }
   }.freeze
 
   def self.code(source) = source.lines.reject { |line| line.lstrip.start_with?("#") }.map { |line| line.sub(/\s#\s.*$/, "") }.join

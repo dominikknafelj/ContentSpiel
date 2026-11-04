@@ -3,7 +3,8 @@ module Trash
   # §6): its ordinary delete right -- scopes included, so a branch-scoped
   # `pages.delete` only reaches that branch -- or, for an image,
   # `media.manage` / being its uploader with `media.upload` (`Media::
-  # Ownership`, the same rule `Media::Destroy` used). `trash.empty` also
+  # Ownership`, the same rule `Media::Destroy` used), or, for a form,
+  # `forms.manage`. `trash.empty` also
   # allows purging (see `Trash::Purge`), never moving or restoring.
   #
   # Returns the permission key to hand `denied`, or nil when allowed -- an
@@ -23,6 +24,10 @@ module Trash
       when Page then "pages.delete" unless yield("pages.delete")
       when Post then "posts.delete" unless yield("posts.delete")
       when Media::Asset then "media.manage" unless yield("media.manage") || uploader_may_manage?(record)
+      # Forms plan, Task 2: a form is trashed and restored with the right to
+      # manage forms. Deleting one for good is `trash.empty` alone
+      # (`Trash::Purge`): it takes the form's submissions with it.
+      when Forms::Form then "forms.manage" unless yield("forms.manage")
       else raise ArgumentError, "#{record.class} can't go to the trash"
       end
     end

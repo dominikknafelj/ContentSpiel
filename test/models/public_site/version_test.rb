@@ -221,6 +221,21 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_moves("purging a live page") { ok(Trash::Purge.call(page.reload)) }
   end
 
+  # A form has no published copy (forms plan, decision 9): every write that
+  # changes what a placed form draws moves the version, a save that changes
+  # nothing does not.
+  test "saving, trashing, restoring and purging a form each move" do
+    form = forms(:contact)
+    mail = [ { kind: "mail", settings: { recipients: "office@example.com" }, secrets: {} } ]
+
+    assert_moves("saving a form") { ok(Forms::Save.call(form, attributes: { name: "Contact us" }, fields: form.fields.map(&:to_h), destinations: mail)) }
+    assert_stays("saving a form unchanged") { ok(Forms::Save.call(form.reload, attributes: { name: "Contact us" }, fields: form.fields.map(&:to_h), destinations: mail)) }
+    assert_moves("trashing a form") { ok(Trash::Move.call(form.reload)) }
+    assert_moves("restoring a form") { ok(Trash::Restore.call(form.reload)) }
+    ok(Trash::Move.call(form.reload))
+    assert_moves("purging a form") { ok(Trash::Purge.call(form.reload)) }
+  end
+
   # The members of a branch are flagged with `update_all`, around their own
   # callbacks, and the root here is a draft whose own save bumps nothing.
   test "a draft branch with a live page inside moves on its way to the trash and back" do

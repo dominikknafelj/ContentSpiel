@@ -37,10 +37,10 @@ class AccessControlSeedMigrationTest < ActiveSupport::TestCase
     assert result.values.all? { |group| group.is_a?(AccessControl::Group) }
   end
 
-  test "ensure_built_in_groups! grants Admin every registered permission, unscoped" do
+  test "ensure_built_in_groups! grants Admin every grantable permission, unscoped" do
     admin = AccessControl::Seeds.ensure_built_in_groups!.fetch("Admin")
 
-    assert_equal AccessControl::Permissions.keys.sort, admin.grants.pluck(:permission).sort
+    assert_equal AccessControl::Permissions.grantable.map(&:key).sort, admin.grants.pluck(:permission).sort
     assert admin.grants.all? { |grant| grant.scope == {} }
   end
 
