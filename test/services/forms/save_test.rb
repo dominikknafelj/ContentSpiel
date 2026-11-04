@@ -243,16 +243,24 @@ class Forms::SaveTest < ActiveSupport::TestCase
     assert_equal({ "Destination 1 credentials" => [ "not set", "set" ] }, Audit::Event.find_by!(action: "form.created", subject: result.record).field_changes.slice("Destination 1 credentials"))
     crm = crm.merge(id: destination.id)
 
+    updated_at = result.record.reload.updated_at
+    version = PublicSite::Version.current
     travel 1.minute do
-      again = save(result.record, attributes: { name: "Enquiry" }, destinations: [ crm.merge(secrets: { api_key: "" }) ])
+      again = save(result.record, attributes: { name: "Enquiry" }, fields: result.record.fields.map(&:to_h), destinations: [ crm.merge(secrets: { api_key: "" }) ])
       assert again.ok?, again.errors.to_sentence
     end
     destination = result.record.reload.destinations.sole
     assert_equal "s3cret-value", destination.secret(:api_key), "a blank secret keeps the stored one"
     assert_equal first_saved_at, destination.secrets_saved_at
+    assert_equal updated_at, result.record.updated_at, "a blank secret is no change: nothing is touched"
+    assert_equal version, PublicSite::Version.current
 
-    save(result.record, attributes: { name: "Enquiry" }, destinations: [ crm.merge(secrets: { api_key: "n3w-value" }) ])
+    travel 2.minutes do
+      save(result.record, attributes: { name: "Enquiry" }, fields: result.record.fields.map(&:to_h), destinations: [ crm.merge(secrets: { api_key: "n3w-value" }) ])
+    end
     assert_equal "n3w-value", result.record.reload.destinations.sole.secret(:api_key)
+    assert_operator result.record.updated_at, :>, updated_at, "a secret written moves the builder's stale base"
+    assert_equal version, PublicSite::Version.current, "and moves no content version: a secret is on no public page"
     assert_equal [ "set", "set" ], Audit::Event.where(subject: result.record).order(:id).last.field_changes["Destination 1 credentials"]
 
     events = Audit::Event.where(subject: result.record)

@@ -19,11 +19,12 @@ module Admin
   # explicitly, docs/reference/save-rule-and-write-queue.md), with the
   # stale-save rule of `Admin::StaleForm`: a Save whose base is older than
   # the form is the 409 with what was typed still in the form, before
-  # `Forms::Save` is called, so nothing is written. The form's
-  # `updated_at` moves with every save that changes it (`Forms::Save`
-  # writes the row; a destination's own change touches nothing, which is
-  # why a destination-only change is not seen as stale: noted in the
-  # report of Task 4).
+  # `Forms::Save` is called, so nothing is written. The base is the form's
+  # `updated_at`, which moves with every save that changes anything the
+  # builder shows: `Forms::Save` writes the row, and touches it when only
+  # the destinations changed or a secret was written (moving no content
+  # version then), so a Save from an older copy can't put old destinations
+  # back.
   class FormsController < BaseController
     include StaleForm
 

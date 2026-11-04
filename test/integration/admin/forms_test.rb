@@ -99,7 +99,11 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     assert_response :ok
     base = css_select("input[name='base_updated_at']").first["value"]
 
-    patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(name: "Contact us") }
+    # A minute on: `Audit::ChangeSince` names only an event more than its
+    # slack after the base, and the base is the fixture's own time.
+    travel 1.minute do
+      patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(name: "Contact us") }
+    end
     assert_redirected_to admin_form_path(form)
     assert_equal "Contact us", form.reload.name
     assert_equal %w[f_name0001 f_mail0001 f_text0001], form.fields.map(&:key), "the keys are kept"
@@ -110,9 +114,23 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     end
     assert_response :conflict
     assert_equal "Contact us", form.reload.name
-    # Named where the audit log says who (here the viewer's own other save), the plain sentence otherwise.
-    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))} in another tab or window|#{Regexp.escape(t("builder.stale"))}/
+    # The audit log names the viewer's own save from another tab.
+    assert_select "[role=alert]", text: /\A\s*#{Regexp.escape(t("builder.stale_lead"))}\s+in another tab or window/
     assert_select "input[name='form[name]'][value='Stale name']", 1, "the typed value stays in the form"
+  end
+
+  test "a stale base the audit log names no change for gets the plain sentence" do
+    form = forms(:contact)
+    sign_in_as users(:two)
+    get admin_form_path(form)
+    base = css_select("input[name='base_updated_at']").first["value"]
+    form.update_columns(updated_at: 1.minute.from_now) # version: none (a test's row: moved with no event)
+
+    patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(form, name: "Stale name") }
+    assert_response :conflict
+    assert_select "[role=alert]", text: /\A\s*#{Regexp.escape(t("builder.stale"))}/
+    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))}/, count: 0
+    assert_equal "Contact", form.reload.name
   end
 
   test "a refused save draws the builder again with what was typed and the summary" do
