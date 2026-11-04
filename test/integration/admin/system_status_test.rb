@@ -148,6 +148,19 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a viewer of System status without the Forms rights sees the undelivered warning and no link" do
+    submission = Forms::Submission.create!(form: forms(:contact), locale: "en", answers: [])
+    Forms::Delivery.create!(submission: submission, kind: "mail", state: "failed")
+    access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})
+    sign_in_as(users(:reader))
+
+    with_mail_state(:working) do
+      get "/cs-studio/system_status"
+      assert_select "li[data-status=warning]", text: /1 submission wasn't delivered\./
+      assert_select "a", text: "Open Forms →", count: 0
+    end
+  end
+
   test "someone who may view System status but not manage Settings is shown the state and no link" do
     viewer = users(:reader)
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})

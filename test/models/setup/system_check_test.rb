@@ -492,6 +492,15 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
   end
 
+  test "a submission with one failed and one waiting delivery counts once as undelivered" do
+    failed_submission(forms(:contact))
+    submission = Forms::Submission.last
+    Forms::Delivery.create!(submission: submission, kind: "mail", state: "waiting")
+    with_mail_state(:working) do
+      assert_equal "1 submission wasn't delivered.", result("Forms", run_check).message
+    end
+  end
+
   test "when several warnings hold they are one row, the keys first, then mail, then undelivered submissions" do
     failed_submission(forms(:contact))
     without_encryption_keys do
