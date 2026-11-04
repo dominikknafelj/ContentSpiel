@@ -173,8 +173,63 @@ class Forms::SaveTest < ActiveSupport::TestCase
     end
   end
 
-  test "a text in a language the site does not have is refused" do
-    assert_refused sentence(:unknown_languages, codes: "fr"), attributes: { name: "Enquiry", submit_label: { "fr" => "Envoyer" } }
+  test "a text under a code that is no language this CMS serves is refused" do
+    assert_refused sentence(:unknown_languages, codes: "xx"), attributes: { name: "Enquiry", submit_label: { "xx" => "Envoyer" } }
+  end
+
+  # Fix round 1: a language turned off keeps its texts for the day it is
+  # turned on again, as `Locales::Disable` keeps content's; a save in between
+  # must neither be refused nor lose them.
+  test "a form's texts in a language that was turned off survive a save and are back when it is turned on" do
+    with_locales(%w[en de], default: "en") do
+      topic = { key: nil, type: "choice", required: false, label: { "en" => "Topic", "de" => "Thema" }, help: { "de" => "Bitte wählen" },
+        settings: { choices: [ { key: nil, label: { "en" => "News", "de" => "Neues" } } ] } }
+      result = save(attributes: { name: "Enquiry", submit_label: { "en" => "Send", "de" => "Senden" } }, fields: [ topic ])
+      assert result.ok?, result.errors.to_sentence
+    end
+    form = result_form = Forms::Form.order(:id).last
+    stored = form.fields.sole
+
+    assert Locales::Disable.call("de").ok?
+    # What the screen sends with German off: the English texts alone, and a
+    # German text it no longer shows, which is dropped rather than refused.
+    edited = { key: stored.key, type: "choice", required: true, label: { "en" => "Subject", "de" => "Betreff" }, help: {},
+      settings: { choices: [ { key: stored.choices.sole.key, label: { "en" => "Updates" } } ] } }
+    again = save(form.reload, attributes: { name: "Enquiry", submit_label: { "en" => "Send it", "de" => "Los" } }, fields: [ edited ])
+    assert again.ok?, again.errors.to_sentence
+
+    assert Locales::Enable.call("de").ok?
+    result_form.reload
+    field = result_form.fields.sole
+    assert_equal [ "Subject", "Thema" ], [ field.label_in("en"), field.label_in("de") ], "the German label is the stored one, not the dropped one"
+    assert_equal "Bitte wählen", field.help_in("de")
+    assert_equal [ "Updates", "Neues" ], [ field.choices.sole.label_in("en"), field.choices.sole.label_in("de") ]
+    assert_equal [ "Send it", "Senden" ], [ result_form.submit_label_in("en"), result_form.submit_label_in("de") ]
+  end
+
+  # Fix round 1: a destination is matched by its id alone, so a stored
+  # secret stays with its own row.
+  test "removing the first of two destinations of one kind leaves the second its own secret" do
+    register_crm
+    first = { kind: "acme/crm", settings: { list: "first" }, secrets: { api_key: "first-secret" } }
+    second = { kind: "acme/crm", settings: { list: "second" }, secrets: { api_key: "second-secret" } }
+    result = save(destinations: [ first, second ])
+    assert result.ok?, result.errors.to_sentence
+    form = result.record
+    kept = form.destinations.find_by!(position: 1)
+
+    again = save(form.reload, attributes: { name: "Enquiry" }, destinations: [ second.merge(id: kept.id, secrets: { api_key: "" }) ])
+    assert again.ok?, again.errors.to_sentence
+    remaining = form.reload.destinations.sole
+    assert_equal [ kept.id, "second", "second-secret" ], [ remaining.id, remaining.settings["list"], remaining.secret(:api_key) ]
+
+    without_id = save(form.reload, attributes: { name: "Enquiry" }, destinations: [ second.merge(secrets: { api_key: "" }) ])
+    assert without_id.ok?, without_id.errors.to_sentence
+    fresh = form.reload.destinations.sole
+    assert_not_equal kept.id, fresh.id, "a destination given without an id is a new row"
+    assert_not fresh.secret_set?(:api_key), "and holds no other row's secret"
+  ensure
+    Rails.application.reloader.prepare!
   end
 
   test "a blank secret keeps the stored one, and the audit snapshot holds no secret" do
@@ -185,6 +240,8 @@ class Forms::SaveTest < ActiveSupport::TestCase
     destination = result.record.destinations.sole
     assert_equal "s3cret-value", destination.secret(:api_key)
     first_saved_at = destination.secrets_saved_at
+    assert_equal({ "Destination 1 credentials" => [ "not set", "set" ] }, Audit::Event.find_by!(action: "form.created", subject: result.record).field_changes.slice("Destination 1 credentials"))
+    crm = crm.merge(id: destination.id)
 
     travel 1.minute do
       again = save(result.record, attributes: { name: "Enquiry" }, destinations: [ crm.merge(secrets: { api_key: "" }) ])
@@ -196,6 +253,7 @@ class Forms::SaveTest < ActiveSupport::TestCase
 
     save(result.record, attributes: { name: "Enquiry" }, destinations: [ crm.merge(secrets: { api_key: "n3w-value" }) ])
     assert_equal "n3w-value", result.record.reload.destinations.sole.secret(:api_key)
+    assert_equal [ "set", "set" ], Audit::Event.where(subject: result.record).order(:id).last.field_changes["Destination 1 credentials"]
 
     events = Audit::Event.where(subject: result.record)
     assert_operator events.count, :>=, 2

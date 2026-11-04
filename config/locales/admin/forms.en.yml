@@ -20,7 +20,7 @@ en:
         no_encryption_keys: "This site has no encryption keys, so submissions can't be kept. See Hosting: encryption keys."
         no_encryption_keys_for_secret: "This site has no encryption keys, so a destination's password or key can't be stored. See Hosting: encryption keys."
         keep_days: "Submissions are kept for %{min} to %{max} days."
-        unknown_languages: "Not saved: %{codes} is not a language of this site."
+        unknown_languages: "Not saved: %{codes} is not a language this site can have."
         trashed: "This form is in the trash. Restore it to change it."
       destinations:
         blank: "%{field} can't be blank."
