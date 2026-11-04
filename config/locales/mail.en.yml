@@ -26,3 +26,15 @@ en:
     test:
       subject: "Test mail from %{site}"
       body: "Mail from Content Spiel works."
+    # A form's submission, mailed to its recipients (forms plan, Task 3):
+    # %{form} is the form's name, which editors give it and visitors never
+    # see. The answers are listed between the intro and the three lines.
+    forms:
+      submission:
+        subject: "New submission: %{form}"
+        intro: "Someone sent the form “%{form}”:"
+        no_answer: "(no answer)"
+        sent_at: "Sent: %{time}"
+        language: "Language: %{language}"
+        page: "From the page: %{page}"
+        no_page: "From no page that still exists."

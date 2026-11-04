@@ -68,7 +68,9 @@ module Editing
         .index_with { "an account, an invitation, a group or a token is not content" },
       "media.regenerated" => "regenerating images changes no content an editor has open",
       **%w[form.created form.updated form.trashed form.restored form.purged]
-        .index_with { "a form is saved explicitly on its own screen and has no live editor" }
+        .index_with { "a form is saved explicitly on its own screen and has no live editor" },
+      **Audit::Sentence::SUBMISSION_ACTIONS
+        .index_with { "a form's submission is no content: a visitor's send, or a deletion, changes nothing an editor has open" }
     ).freeze
 
     module_function

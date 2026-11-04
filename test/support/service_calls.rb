@@ -441,6 +441,23 @@ module ServiceCalls
         permission: "forms.manage", on: form }
     },
 
+    # A visitor's send: a submission and a delivery. Refused for anyone who is
+    # not the visitor (nobody can be granted `forms.submit`); the control run's
+    # trusted actor passes, as every trusted code path does.
+    "Forms::Submit" => lambda {
+      form = forms(:contact)
+      { call: -> { Forms::Submit.call(form, answers: { "f_name0001" => "Ada", "f_mail0001" => "ada@example.com" }, locale: "en") },
+        permission: "forms.submit", on: form }
+    },
+
+    # Deletes a kept submission and its delivery.
+    "Forms::DeleteSubmissions" => lambda {
+      form = forms(:newsletter)
+      submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
+      submission.deliveries.create!(kind: "mail")
+      { call: -> { Forms::DeleteSubmissions.call(form, ids: [ submission.id ]) }, permission: "forms.manage", on: form }
+    },
+
     "Posts::Save" => lambda {
       post = create_post(title: "Edit me", published: false, tags: [ "kept" ])
       { call: -> { Posts::Save.call(post, attributes: { published: true, tag_names: [ "other" ] }, translations: { "en" => { title: "Edited" } }) },

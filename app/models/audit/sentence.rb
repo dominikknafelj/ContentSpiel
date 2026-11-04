@@ -106,6 +106,22 @@ module Audit
       "notes.removed" => [ "removed the notes on ", "" ]
     }.freeze
 
+    # A form's submissions (forms plan, Task 3). Their subject is the FORM, and
+    # they carry ids and a count, never an answer. `form_submission.received`
+    # is a visitor's (`Audit::VISITOR_LABEL`, no actor row), and every
+    # visitor's sentence reads "A visitor <verb>"; `form_submissions.deleted`
+    # is an editor's or, with a reason, the jobs' ("System deleted 3
+    # submissions of “Contact” after they were delivered").
+    SUBMISSION_ACTIONS = %w[form_submission.received form_submissions.deleted].freeze
+
+    # The jobs' reasons, singular and plural; an editor's (`editor`) and a
+    # reason this code no longer knows say none.
+    DELETION_REASONS = {
+      "expired" => [ " at the end of its keeping time", " at the end of their keeping time" ],
+      "delivered" => [ " after it was delivered", " after they were delivered" ],
+      "undelivered" => [ " that couldn't be delivered in #{Forms::UNDELIVERED_DAYS} days" ] * 2
+    }.freeze
+
     # Sentences with no subject or their own shape (`#special`).
     SPECIAL_ACTIONS = %w[
       starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
@@ -115,7 +131,7 @@ module Audit
 
     ACTIONS = (
       CONTENT_ACTIONS.flat_map { |prefix, verbs| verbs.map { |verb| "#{prefix}.#{verb}" } } +
-      BLOCK_ACTIONS + OTHER_VERBS.keys + NOTE_VERBS.keys + SPECIAL_ACTIONS
+      BLOCK_ACTIONS + OTHER_VERBS.keys + NOTE_VERBS.keys + SUBMISSION_ACTIONS + SPECIAL_ACTIONS
     ).uniq.freeze
 
     SECURITY_ACTIONS = %w[session.failed access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
@@ -147,8 +163,10 @@ module Audit
           raise ArgumentError, "a counted sentence needs a counted action (#{COUNTED.join(", ")}) and a target"
         end
         raise ArgumentError, "at_least is for a counted sentence (count above 1)" if at_least && count <= 1
-        actor = actor_for(event, viewer, none: action == "session.failed")
+        visitor = visitor?(event)
+        actor = actor_for(event, viewer, none: action == "session.failed" || visitor)
         parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:, at_least:).parts
+        parts = [ Wording.visitor_part ] + parts if visitor
         new(
           actor:,
           parts:,
@@ -170,6 +188,11 @@ module Audit
       end
 
       def known?(action) = ACTIONS.include?(action)
+
+      # An event a visitor of the public site caused (`Audit.record`): no
+      # actor row and the visitor's label. Nobody the log can name or link,
+      # so the sentence says "A visitor" in the actor's place.
+      def visitor?(event) = event.actor_type.nil? && event.actor_label == Audit::VISITOR_LABEL
 
       private
 
@@ -204,6 +227,8 @@ module Audit
         nil
       end
 
+      def self.visitor_part = Part.new(:text, "A visitor ")
+
       def initialize(event, action, target, fallback_scheduled_at, you: false, count: 1, mixed: false, at_least: false)
         @you = you
         @number = at_least ? "#{count} or more" : count.to_s
@@ -222,6 +247,7 @@ module Audit
         if BLOCK_ACTIONS.include?(@action) then block_parts(verb)
         elsif SPECIAL_ACTIONS.include?(@action) then special_parts
         elsif NOTE_VERBS.key?(@action) then subject_parts(*NOTE_VERBS[@action])
+        elsif SUBMISSION_ACTIONS.include?(@action) then submission_parts
         elsif OTHER_VERBS.key?(@action) then subject_parts(*OTHER_VERBS[@action])
         elsif CONTENT_ACTIONS[prefix]&.include?(verb) || derived_schedule?(prefix, verb) then content_parts(verb)
         else generic_parts
@@ -346,6 +372,15 @@ module Audit
       # in the metadata's ids, never in the sentence.
       def handed_over?
         event.metadata.is_a?(Hash) && event.metadata["answered"] == true
+      end
+
+      def submission_parts
+        return subject_parts("sent the form ") if @action == "form_submission.received"
+
+        metadata = event.metadata.is_a?(Hash) ? event.metadata : {}
+        count = metadata["count"].to_i
+        reason = DELETION_REASONS[metadata["reason"].to_s]&.at(count == 1 ? 0 : 1).to_s
+        subject_parts("deleted #{count} #{count == 1 ? "submission" : "submissions"} of ", reason)
       end
 
       def block_type

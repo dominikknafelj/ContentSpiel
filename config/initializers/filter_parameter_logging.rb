@@ -10,7 +10,12 @@ Rails.application.config.filter_parameters += [
   :lookup_digest,
   # The mail login's username (docs/reference/mail.md): a credential for several providers (Postmark's
   # server token, SES's access key id). Its password is :passw's.
-  :mail_username
+  :mail_username,
+  # A visitor's answers to a form (forms plan, Global Constraints: personal data reaches no log). The
+  # endpoint takes them as `answers[<field key>]`, and a matched key masks its whole value, the hash
+  # of every field. No model attribute is called that (a submission's column is encrypted and never a
+  # request's parameter), so no audit snapshot loses a key to it.
+  :answers
 ]
 
 # A note's text (notes spec, decision D14: it reaches no log). The notes forms

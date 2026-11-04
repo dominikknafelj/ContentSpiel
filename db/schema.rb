@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_090300) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_100100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -153,6 +153,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_090300) do
     t.index ["subject_type", "subject_id"], name: "index_edit_reservations_on_subject", unique: true
   end
 
+  create_table "form_deliveries", force: :cascade do |t|
+    t.bigint "submission_id", null: false
+    t.bigint "destination_id"
+    t.string "kind", null: false
+    t.string "state", default: "waiting", null: false
+    t.integer "attempts", default: 0, null: false
+    t.jsonb "failure"
+    t.string "queued_fingerprint"
+    t.datetime "sent_at"
+    t.datetime "failed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["destination_id"], name: "index_form_deliveries_on_destination_id"
+    t.index ["state"], name: "index_form_deliveries_on_state"
+    t.index ["submission_id"], name: "index_form_deliveries_on_submission_id"
+    t.check_constraint "state::text = ANY (ARRAY['waiting'::text, 'sent'::text, 'failed'::text])", name: "form_deliveries_state_known"
+  end
+
   create_table "form_destinations", force: :cascade do |t|
     t.bigint "form_id", null: false
     t.string "kind", null: false
@@ -163,6 +181,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_090300) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["form_id"], name: "index_form_destinations_on_form_id"
+  end
+
+  create_table "form_submissions", force: :cascade do |t|
+    t.bigint "form_id", null: false
+    t.bigint "page_id"
+    t.string "locale", null: false
+    t.text "answers", null: false
+    t.datetime "created_at", null: false
+    t.index ["form_id", "created_at"], name: "index_form_submissions_on_form_id_and_created_at"
+    t.index ["page_id"], name: "index_form_submissions_on_page_id"
   end
 
   create_table "forms", force: :cascade do |t|
@@ -545,7 +573,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_090300) do
   add_foreign_key "content_blocks", "media_assets"
   add_foreign_key "edit_reservations", "users", column: "requested_by_id", on_delete: :nullify
   add_foreign_key "edit_reservations", "users", on_delete: :cascade
+  add_foreign_key "form_deliveries", "form_destinations", column: "destination_id", on_delete: :nullify
+  add_foreign_key "form_deliveries", "form_submissions", column: "submission_id", on_delete: :cascade
   add_foreign_key "form_destinations", "forms", on_delete: :cascade
+  add_foreign_key "form_submissions", "forms", on_delete: :cascade
+  add_foreign_key "form_submissions", "pages", on_delete: :nullify
   add_foreign_key "forms", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "invitation_groups", "access_control_groups", column: "group_id", on_delete: :cascade
   add_foreign_key "invitation_groups", "invitations", on_delete: :cascade

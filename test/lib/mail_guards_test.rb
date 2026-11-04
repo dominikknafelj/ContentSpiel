@@ -90,6 +90,21 @@ class MailGuardsTest < ActiveSupport::TestCase
     assert_empty offenders, "a mail action's arguments go into the queue's row and Active Job's log: hand it a record and make the token in the mailer"
   end
 
+  # A form's mail carries a visitor's answers, which are in no job's
+  # arguments (forms plan, owner's ruling 2): `FormsMailer` is handed the
+  # delivery, as its Global ID, and reads the answers from it in the job.
+  # Every action of it takes one argument, and only `Forms::Destinations::Mail`
+  # builds it, from inside `Forms::DeliveryJob`, never through a queue.
+  test "a form's mail is built from its delivery alone, in the delivery's job" do
+    actions = ROOT.join("app/mailers/forms_mailer.rb").read.scan(/^\s*def (?!self\.)(\w+)\(([^)]*)\)/)
+    assert_not_empty actions
+    actions.each { |name, params| assert_equal "delivery", params.strip, "FormsMailer##{name} takes the delivery and nothing else" }
+
+    callers = sources("app", "lib").select { |path, source| path != "app/mailers/forms_mailer.rb" && code_lines(source).any? { |line| line.include?("FormsMailer") } }
+    assert_equal %w[app/models/forms/destinations/mail.rb], callers.keys
+    assert_no_match(/FormsMailer.*deliver_later|queue\(FormsMailer/, callers.values.join)
+  end
+
   # ---- an invitation is not a user -----------------------------------------
 
   # An invitation lives in its own table and accepting it creates the user

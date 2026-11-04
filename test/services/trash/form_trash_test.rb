@@ -3,7 +3,7 @@ require "test_helper"
 # A form goes to the trash, comes back and is deleted for good through the
 # trash's three services, as a post does (forms plan, decision 3): trashing
 # and restoring need `forms.manage`, deleting for good `trash.empty` (it
-# takes the form's submissions with it, Task 3). Each moves the public
+# takes the form's submissions and their deliveries with it). Each moves the public
 # content version (a form has no published copy, decision 9) and is
 # recorded. Forms join `Trash.roots` with the Trash screen (Task 4).
 class Trash::FormTrashTest < ActiveSupport::TestCase
@@ -35,6 +35,20 @@ class Trash::FormTrashTest < ActiveSupport::TestCase
     assert_not Forms::Form.exists?(form.id)
     assert_not Forms::Destination.exists?(destination.id), "its destinations go with it"
     assert Audit::Event.exists?(action: "form.purged", subject_type: "Forms::Form", subject_id: form.id)
+  end
+
+  test "a form purged with its submissions takes them and their deliveries with it" do
+    form = forms(:contact)
+    submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
+    delivery = submission.deliveries.create!(kind: "mail", destination: form_destinations(:contact_mail))
+    other = Forms::Submission.create!(form: forms(:newsletter), locale: "en", answers: [])
+
+    assert Trash::Move.call(form).ok?
+    assert Trash::Purge.call(form.reload).ok?
+
+    assert_not Forms::Submission.exists?(submission.id)
+    assert_not Forms::Delivery.exists?(delivery.id)
+    assert Forms::Submission.exists?(other.id), "another form's submissions stay"
   end
 
   test "a kept form can't be purged" do

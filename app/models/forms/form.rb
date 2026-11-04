@@ -44,6 +44,9 @@ module Forms
 
     # In their order; the rows go with the form (the foreign key cascades).
     has_many :destinations, -> { order(:position, :id) }, class_name: "Forms::Destination", inverse_of: :form
+    # A visitor's sends, with their deliveries; they go with the form too
+    # (`Trash::Purge`), and otherwise only through `Forms::DeleteSubmissions`.
+    has_many :submissions, class_name: "Forms::Submission", inverse_of: :form
 
     # A backstop for a write that goes around `Forms::Save`, which refuses
     # each of these first with a sentence of its own.

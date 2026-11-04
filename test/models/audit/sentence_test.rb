@@ -154,6 +154,26 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "Form", Audit::Filter::SUBJECT_TYPES.fetch("Forms::Form"), "the log's Type filter names it"
   end
 
+  # Forms plan, Task 3: a visitor's send has no actor row and reads as a
+  # visitor's; a deletion says how many and, for the jobs', why.
+  test "a form's submissions: a visitor sent it, and how many were deleted and why" do
+    on_form = { channel: "public", subject_type: "Forms::Form", subject_id: 999_999, subject_label: "Contact",
+      occurred_at: Time.current, last_occurred_at: Time.current }
+    received = sentence_for(Audit::Event.new(on_form.merge(action: "form_submission.received", actor_label: "visitor", metadata: { "submission_id" => 4 })))
+    assert received.actor.none, "a visitor is nobody the log can name"
+    assert_equal "A visitor sent the form “Contact”", read(received)
+
+    deleted = ->(metadata, **attributes) { read(sentence_for(Audit::Event.new(on_form.merge(action: "form_submissions.deleted", channel: "system", metadata: metadata, **attributes)))) }
+    assert_equal "You deleted 3 submissions of “Contact”", deleted.call({ "count" => 3, "reason" => "editor" }, user_id: @me.id)
+    assert_equal "You deleted 1 submission of “Contact”", deleted.call({ "count" => 1, "reason" => "editor" }, user_id: @me.id)
+    assert_equal "System deleted 3 submissions of “Contact” at the end of their keeping time", deleted.call({ "count" => 3, "reason" => "expired" })
+    assert_equal "System deleted 1 submission of “Contact” at the end of its keeping time", deleted.call({ "count" => 1, "reason" => "expired" })
+    assert_equal "System deleted 3 submissions of “Contact” after they were delivered", deleted.call({ "count" => 3, "reason" => "delivered" })
+    assert_equal "System deleted 1 submission of “Contact” after it was delivered", deleted.call({ "count" => 1, "reason" => "delivered" })
+    assert_equal "System deleted 2 submissions of “Contact” that couldn't be delivered in 30 days", deleted.call({ "count" => 2, "reason" => "undelivered" })
+    assert_equal "System deleted 2 submissions of “Contact”", deleted.call({ "count" => 2, "reason" => "a reason this code no longer knows" })
+  end
+
   test "sentences with no subject" do
     base = { channel: "admin", user_id: @me.id, occurred_at: Time.current, last_occurred_at: Time.current }
     assert_equal "You signed in", read(sentence_for(Audit::Event.new(base.merge(action: "session.created"))))

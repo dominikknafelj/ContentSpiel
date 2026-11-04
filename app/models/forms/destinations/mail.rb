@@ -3,9 +3,8 @@ module Forms
     # The mail destination (forms spec, "Destinations: Mail"): one mail per
     # submission to the form's recipients. This is its SETTINGS half: the
     # recipients a destination's `recipients` text names, and what is wrong
-    # with them. The delivery half (`deliver`, inside `Forms::DeliveryJob`
-    # through `ApplicationMailer.deliver_in_job`, plan decision 11) comes with
-    # submissions, Task 3.
+    # with them; and the DELIVERER, which sends one submission's mail from
+    # inside `Forms::DeliveryJob` (`deliver`, plan decision 11).
     #
     # Recipients are typed one per line or comma-separated, at most
     # `MAX_RECIPIENTS`, each ONE plain address by the sender address's own
@@ -13,6 +12,7 @@ module Forms
     # brackets), so what is stored is exactly what a mail is sent to.
     module Mail
       MAX_RECIPIENTS = 10
+      NOT_READY = "not_ready"
 
       module_function
 
@@ -29,8 +29,24 @@ module Forms
         errors
       end
 
-      def deliver(_delivery, final_attempt:)
-        raise NotImplementedError, "the mail destination delivers from Forms::DeliveryJob (forms plan, Task 3)"
+      # The submission's mail (`FormsMailer#submission`), sent now, in the
+      # job, through `ApplicationMailer.deliver_in_job`, which keeps mail's
+      # rules: the site's mail state records the send under the fingerprint
+      # the delivery was queued with (`Forms::Delivery#queued_fingerprint`),
+      # a connection failure is a `Retry` until the last attempt, and every
+      # other failure is recorded once and answered `Failed` with the
+      # failure's key and its line, the login scrubbed out.
+      #
+      # While mail is not ready (`MailSettings#ready?`: not set up, or saved
+      # and never tested) nothing is tried: `Failed` with the key
+      # `not_ready`, at once and not retried, since waiting does not set
+      # mail up. The delivery is then failed, so the submission is kept and
+      # listed as not delivered, with Send again (plan decision 6).
+      def deliver(delivery, final_attempt:)
+        raise DestinationTypes::Failed.new(key: NOT_READY) unless MailSettings.current.ready?
+
+        ApplicationMailer.deliver_in_job(FormsMailer.submission(delivery), final_attempt: final_attempt,
+          fingerprint: delivery.queued_fingerprint)
       end
     end
   end

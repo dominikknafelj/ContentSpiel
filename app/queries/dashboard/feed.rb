@@ -32,9 +32,13 @@ module Dashboard
     # never lists the action either: it only lists content events.) A note's
     # events have the page, post or block as their subject too, and are no
     # change to it either (notes spec §3.5): "Mine" and "Changed by"
-    # (`Audit::ChangeSince` reads this list) ignore them.
+    # (`Audit::ChangeSince` reads this list) ignore them. Nor is a form's
+    # submission arriving or being deleted (forms plan, Task 3): its subject
+    # is the form, never a page or a post, and a visitor or the system is
+    # nobody's "by"; listed so no reader of this list ever counts one.
     NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over
-                       page.scheduled_change_cancelled post.scheduled_change_cancelled] + Audit::Sentence::NOTE_VERBS.keys).freeze
+                       page.scheduled_change_cancelled post.scheduled_change_cancelled] +
+                    Audit::Sentence::NOTE_VERBS.keys + Audit::Sentence::SUBMISSION_ACTIONS).freeze
 
     # The LATERAL subquery `#with_newest_event` joins, as a table to read its
     # columns from: `newest.newest_user_id`, `newest.newest_at`.
