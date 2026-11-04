@@ -42,6 +42,11 @@ module Forms
     # (English where it has none): `public.forms.<key>`.
     def word(key) = PublicStrings.read("public.forms.#{key}", locale: locale)
 
-    def choice_label(choice) = choice.label_in(locale) || choice.key
+    # The choices a visitor is shown: those with a label in the form's
+    # language or the default's. A choice with none is left out rather than
+    # shown as its key, which is an id and no word.
+    def labelled_choices = choices.select { |choice| choice.label_in(locale).present? }
+
+    def choice_label(choice) = choice.label_in(locale)
   end
 end

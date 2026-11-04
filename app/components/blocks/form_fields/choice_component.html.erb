@@ -2,7 +2,7 @@
   <%= tag.fieldset class: "form-field form-field--choice", **group_attributes do %>
     <%= tag.legend label_content, class: "form-field__label" %>
     <%= help_html %>
-    <% field.choices.each do |choice| %>
+    <% field.labelled_choices.each do |choice| %>
       <div class="form-field__row">
         <%= tag.input **radio_attributes(choice) %>
         <%= tag.label field.choice_label(choice), for: radio_id(choice) %>
@@ -16,7 +16,7 @@
     <%= help_html %>
     <%= tag.select **select_attributes do %>
       <%= tag.option field.word(:choose), value: "" %>
-      <% field.choices.each do |choice| %>
+      <% field.labelled_choices.each do |choice| %>
         <%= tag.option field.choice_label(choice), value: choice.key, selected: chosen?(choice) %>
       <% end %>
     <% end %>

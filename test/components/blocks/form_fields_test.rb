@@ -64,6 +64,8 @@ class Blocks::FormFieldsTest < ViewComponent::TestCase
 
     assert_selector "fieldset[aria-describedby='form-11-f_abcd1234-error'] legend", text: "Topic"
     assert_selector "legend", text: "required"
+    assert_no_selector "fieldset[aria-invalid]"
+    assert_selector "input[type=radio][aria-invalid='true']", count: 2
     assert_selector "input[type=radio][name='answers[f_abcd1234]']", count: 2
     assert_selector "input[type=radio][value='c_bbbbbbbb'][checked]"
     assert_selector "input[type=radio][value='c_aaaaaaaa']:not([checked])"
@@ -109,5 +111,29 @@ class Blocks::FormFieldsTest < ViewComponent::TestCase
   test "two placements of one form have distinct ids" do
     ids = [ 11, 12 ].map { |place| draw(field_of("short_text"), place: place); page.find("input")[:id] }
     assert_equal 2, ids.uniq.size
+  end
+
+  test "a choice label and a typed value that look like markup are escaped, and a choice with no label is left out" do
+    choices = [ { "key" => "c_aaaaaaaa", "label" => { "en" => "<img src=x onerror=alert(1)>" } }, { "key" => "c_bbbbbbbb", "label" => {} } ]
+    [ "radios", "dropdown" ].each do |display|
+      draw(field_of("choice", display: display, choices: choices))
+      assert_no_selector "img"
+      assert_text "<img src=x onerror=alert(1)>"
+      assert_no_selector "[value='c_bbbbbbbb']"
+      assert_no_text "c_bbbbbbbb"
+    end
+
+    draw(field_of("short_text"), value: %("><script>alert(1)</script>))
+    assert_no_selector "script"
+    assert_equal %("><script>alert(1)</script>), page.find("input").value
+    draw(field_of("long_text"), value: "</textarea><script>alert(1)</script>")
+    assert_no_selector "script"
+  end
+
+  test "only the email input asks for autocomplete email" do
+    draw(field_of("email"))
+    assert_selector "input[autocomplete='email']"
+    draw(field_of("short_text"))
+    assert_no_selector "[autocomplete]"
   end
 end

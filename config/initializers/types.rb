@@ -28,10 +28,9 @@ Rails.application.config.to_prepare do
 
     # The form field types, right after the content model's (a form type
     # names its value type), before the block types; a gem's are replayed
-    # after the built-ins (`ContentSpiel::Plugins.form_field_types`).
+    # after everything else, with the block types' (below).
     Forms::FieldTypes.reset!
     Forms::FieldTypes.register_built_ins
-    ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes)
 
     [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
@@ -81,6 +80,10 @@ Rails.application.config.to_prepare do
     # development reload then leaves every registry of the CMS filled, and
     # only its own block types (and those of the hooks after it) missing.
     ContentSpiel::Plugins.register_block_types(BlockTypes)
+    # The form field types of outside hooks (`ContentSpiel::Plugins
+    # .form_field_types`) are replayed after the block types', for the same
+    # reason: the last registration of the block.
+    ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes)
   rescue StandardError => error
     raise unless ThemeFolder.booted?
 

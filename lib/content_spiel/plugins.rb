@@ -33,14 +33,17 @@ module ContentSpiel
     class Registrar
       def initialize(registry, location, owners = {}, kind: "block type", build: nil)
         @kind = kind
-        @build = build || ->(name, arguments, definition) { registry.register(name, &definition) }
+        @build = build || ->(name, attributes, definition) { registry.register(name, &definition) }
         @registry = registry
         @location = location
         @owners = owners
         @owner = nil
       end
 
-      def register(name, *arguments, **keywords, &definition)
+      # A block type's hook passes a block and nothing else; a form field
+      # type's passes the type's members and no block. What the kind does not
+      # take is refused here, not ignored.
+      def register(name, **attributes, &definition)
         name = name.to_s
         owner, rest = name.split("/", 2)
         raise ArgumentError, "#{name.inspect}: a #{@kind} from outside is named owner/name (gallery/album); a bare name is a built-in's" if rest.nil?
@@ -53,14 +56,20 @@ module ContentSpiel
           raise ArgumentError, "#{name.inspect}: the owner #{owner.inspect} is another hook's, called at #{taken}; one owner is one gem's"
         end
         @owners[owner] = @location
+        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no block" if definition && @kind != "block type"
+        raise ArgumentError, "#{name.inspect}: a #{@kind} takes no attributes, only its block" if attributes.any? && @kind == "block type"
 
-        @build.call(name, keywords, definition)
+        @build.call(name, attributes, definition)
       end
     end
 
     # The words a hook's error is given (`register_block_types`), which the
     # theme's refusal on a reload looks for (`Theme.not_registered`).
     REPLAYED = "ContentSpiel::Plugins.block_types, called at".freeze
+
+    REPLAYED_FORM_FIELD_TYPES = "ContentSpiel::Plugins.form_field_types, called at".freeze
+    # The words a replayed hook's error can carry.
+    REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES ].freeze
 
     # One hook list per registry: a hook is replayed into its own registry
     # only, in the order it was called.
@@ -99,7 +108,7 @@ module ContentSpiel
       # Every kept form field type hook, replayed the same way into
       # `Forms::FieldTypes` (the registry takes a built `Forms::FieldType`).
       def register_form_field_types(registry)
-        replay(:form_field_types, "ContentSpiel::Plugins.form_field_types, called at") do |location, owners|
+        replay(:form_field_types, REPLAYED_FORM_FIELD_TYPES) do |location, owners|
           Registrar.new(registry, location, owners, kind: "form field type",
             build: ->(name, attributes, _definition) { registry.register(Forms::FieldType.new(name: name, **attributes)) })
         end

@@ -85,4 +85,22 @@ class Forms::AnswersTest < ActiveSupport::TestCase
 
     assert_empty Forms::Answers.clean(fields, params, locale: "en").errors
   end
+
+  test "an optional checkbox left unticked is stored as false and reads No, so a declined consent is not an absent one" do
+    optional = Forms::Field.from_h("key" => "f_news0006", "type" => "checkbox", "label" => { "en" => "Newsletter" })
+    result = Forms::Answers.clean([ optional ], {}, locale: "en")
+
+    assert_empty result.errors
+    assert_equal [ false, "No" ], result.values.first.values_at("value", "display")
+    ticked = Forms::Answers.clean([ optional ], { "f_news0006" => "1" }, locale: "en")
+    assert_equal [ true, "Yes" ], ticked.values.first.values_at("value", "display")
+  end
+
+  test "a choice label with markup is stored as the text it is" do
+    markup = Forms::Field.from_h("key" => "f_pick0007", "type" => "choice", "label" => { "en" => "<b>Topic</b>" },
+      "settings" => { "choices" => [ { "key" => "c_aaaaaaaa", "label" => { "en" => "<i>Press</i>" } } ] })
+    row = Forms::Answers.clean([ markup ], { "f_pick0007" => "c_aaaaaaaa" }, locale: "en").values.first
+
+    assert_equal [ "<b>Topic</b>", "<i>Press</i>" ], row.values_at("label", "display")
+  end
 end

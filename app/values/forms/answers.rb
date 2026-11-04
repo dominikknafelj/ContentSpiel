@@ -33,7 +33,7 @@ module Forms
         value, error = answer(field, sent)
         errors[field.key] = error if error
         values << { "key" => field.key, "type" => field.type, "label" => field.label_in(default) || field.key, "value" => value,
-                    "display" => value.nil? ? "" : field.field_type.display.call(value, field, locale: default) }
+                    "display" => field.field_type.display.call(value, field, locale: default) }
       end
 
       Result.new(values: values, errors: errors, typed: typed)
@@ -43,9 +43,12 @@ module Forms
     def answer(field, sent)
       value_type = ContentModel::FieldTypes.fetch(field.field_type.value_type)
       value = sent.blank? ? nil : value_type.cast.call(sent)
-      # A checkbox is true or false; unticked is an answer of "no", which a
-      # required one refuses. The type is asked what an absent value is by
-      # its value type, not by its name.
+      # A box that is not ticked sends nothing, and is an answer of "no"
+      # (stored false, so a consent box tells a declined box from a field
+      # that was never there); a required one refuses it. This is the content
+      # model's value type that says so, as it is the one whose value is
+      # true or false, and no form field type is named here.
+      value = false if value.nil? && sent.blank? && value_type.name == :boolean
       return [ value, (:blank if field.required) ] if value.nil? && sent.blank?
       return [ nil, :invalid ] if value.nil?
       return [ value, :blank ] if field.required && value == false

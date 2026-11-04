@@ -288,4 +288,42 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     ContentSpiel::Plugins.remove(hook) if hook
     Rails.application.reloader.prepare!
   end
+
+  test "a form field type hook that raises on a reload leaves every registry filled and is the theme's refusal, naming the place of the call" do
+    attributes = rating_type
+    line = __LINE__ + 1
+    bare = ContentSpiel::Plugins.form_field_types { |types| types.register("rating", **attributes) }
+    Rails.application.reloader.prepare!
+    assert Theme.current.refusal, "the reload is refused"
+    assert_includes Theme.current.refusal.message, "#{__FILE__}:#{line}"
+    assert_includes Theme.current.refusal.message, "restart the server", "a gem's files are not reloaded"
+    assert_equal BUILT_INS, BlockTypes.names, "the block types are registered"
+    assert_includes ContentTypes.names, "blog"
+    assert_not_empty AccessControl::Permissions.all
+    assert_not_empty AI::Providers.names
+    assert_equal %w[short_text long_text email choice checkbox], Forms::FieldTypes.names
+  ensure
+    ContentSpiel::Plugins.remove(bare) if bare
+    Rails.application.reloader.prepare!
+    assert_nil Theme.current.refusal
+  end
+
+  test "a form field type hook that passes a block, or a member the type does not have, is refused rather than ignored" do
+    attributes = rating_type
+    one = ContentSpiel::Plugins.form_field_types { |types| types.register("acme/rating", **attributes) { |t| t } }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes) }.message, "takes no block"
+    ContentSpiel::Plugins.remove(one)
+    Rails.application.reloader.prepare!
+
+    two = ContentSpiel::Plugins.form_field_types { |types| types.register("acme/rating", **attributes, colour: "red") }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes) }.message, "colour"
+    ContentSpiel::Plugins.remove(two)
+    Rails.application.reloader.prepare!
+
+    three = ContentSpiel::Plugins.block_types { |types| types.register("gallery/album", colour: "red") { |t| TestTypes.declare(t) } }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_block_types(BlockTypes) }.message, "takes no attributes"
+  ensure
+    [ one, two, three ].compact.each { |hook| ContentSpiel::Plugins.remove(hook) }
+    Rails.application.reloader.prepare!
+  end
 end
