@@ -30,6 +30,9 @@ module ContentModel
     # A link longer than this is refused, never cut.
     LINK_MAX = 2048
 
+    # An address longer than this is refused, never cut (RFC 5321: 254).
+    EMAIL_MAX = 254
+
     # What no link holds, wherever it stands: white space (Unicode's too),
     # a control or invisible format character, a backslash.
     # The fragment of a same-page link (`#team`): what an element id the CMS
@@ -68,9 +71,9 @@ module ContentModel
 
       def reset! = types.clear
 
-      # The twelve built-ins, in this order (it is `names`' order).
+      # The thirteen built-ins, in this order (it is `names`' order).
       def register_built_ins
-        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice ].each { |type| register(type) }
+        [ string, text, code, integer, boolean, date, url, select, content_type, tag, link, theme_choice, email ].each { |type| register(type) }
       end
 
       # The one rule for a link a visitor follows (the Card's address): an
@@ -171,7 +174,52 @@ module ContentModel
         )
       end
 
-      def text = plain(:text, translatable: true)
+      # Stripped prose. `max:` (a positive Integer) counts characters and is
+      # refused in the words of the code field's limit (`errors.messages
+      # .code_too_long`), `:too_long` with its `count`: a form's long text
+      # (`Forms::BuiltInFieldTypes`) is limited, and the editors' own text
+      # fields are not unless they say so. A translated text's other
+      # languages are not looked at: the one caller with a limit is untranslated.
+      def text
+        FieldType.new(
+          name: :text, cast: STRIPPED, translatable: true, audit: :value,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "`max:` on a text field is a number of characters, a positive Integer" if options.key?(:max) && !(options[:max].is_a?(Integer) && options[:max].positive?)
+            refuse_choice_and_string_options(options.except(:max))
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            max = field.options[:max]
+            next unless value && max && value.length > max
+
+            errors.add(field.name, :too_long, count: max, message: :code_too_long, limit: ActiveSupport::NumberHelper.number_to_delimited(max))
+          }
+        )
+      end
+
+      # One plain address (`MailSettings.one_address?`, the rule the sender
+      # address is held to: no name, no list, no angle brackets), at most
+      # `EMAIL_MAX` characters. The same on every language, so never
+      # translated. A form's email field (`Forms::BuiltInFieldTypes`) is the
+      # first user; the address reaches a mail's Reply-To, which the mail gem
+      # raises on when it is not one address.
+      def email
+        FieldType.new(
+          name: :email, cast: STRIPPED, translatable: false, audit: :value,
+          options: lambda { |options, _earlier|
+            raise ArgumentError, "email fields can't be translated (an address is the same in every language)" if options[:translated]
+            refuse_choice_and_string_options(options)
+          },
+          validate: lambda { |field:, value:, raw:, errors:, stored:, translations:|
+            next unless value
+
+            if value.length > EMAIL_MAX
+              errors.add(field.name, :too_long, count: EMAIL_MAX)
+            elsif !MailSettings.one_address?(value)
+              errors.add(field.name, :invalid)
+            end
+          }
+        )
+      end
 
       # Source code (code block spec §1) is kept as typed: the first line's
       # indentation, tabs, inner blank lines and trailing spaces. Two things

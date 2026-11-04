@@ -26,6 +26,13 @@ Rails.application.config.to_prepare do
     ContentModel::FieldTypes.reset!
     ContentModel::FieldTypes.register_built_ins
 
+    # The form field types, right after the content model's (a form type
+    # names its value type), before the block types; a gem's are replayed
+    # after the built-ins (`ContentSpiel::Plugins.form_field_types`).
+    Forms::FieldTypes.reset!
+    Forms::FieldTypes.register_built_ins
+    ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes)
+
     [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
     BlockTypes::RichText.register

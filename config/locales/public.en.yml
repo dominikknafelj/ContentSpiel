@@ -37,3 +37,17 @@ en:
         copy_code: "Copy code"
         copied: "Copied"
         failed: "Not copied"
+    # A form's own words (forms plan): what a visitor reads that no editor
+    # typed, read through `PublicStrings.read` (`Forms::PublicField#word`,
+    # `Forms::BuiltInFieldTypes`). `yes` and `no` are what a checkbox answer
+    # reads as in a submission (in the site's default language).
+    forms:
+      required: "required"
+      choose: "Choose"
+      "yes": "Yes"
+      "no": "No"
+      errors:
+        blank: "Please fill in this field."
+        invalid: "Please check this entry."
+        inclusion: "Please choose one of the options."
+        too_long: "This is too long."

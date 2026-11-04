@@ -52,6 +52,8 @@ class DependencyDirectionTest < ActiveSupport::TestCase
       reason: "a content type registers the components that render it (`t.list_component`, `t.detail_component`); the registration is the plugin seam" },
     { path: "app/models/block_types/*.rb", pattern: :component,
       reason: "a block type registers the component that renders it (`t.component`); the registration is the plugin seam" },
+    { path: "app/models/forms/built_in_field_types.rb", pattern: :component,
+      reason: "a form field type registers the component that draws its input (`input:`); the registration is the plugin seam, as a block type's `t.component` is" },
     { path: "app/models/rich_text/html_renderer.rb", pattern: :action_controller, matching: /\AActionController::Base\.helpers\z/,
       reason: "building HTML strings is this class's job, and Action View's tag helpers (`ActionController::Base.helpers`) are how; it renders no component and names no controller to do it" },
     { path: "app/models/rich_text/built_ins.rb", pattern: :action_controller, matching: /\AActionController::Base\.helpers\z/,
