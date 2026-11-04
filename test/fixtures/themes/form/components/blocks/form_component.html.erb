@@ -8,7 +8,7 @@
       data-form-send-fields-value="<%= fields.to_h { |field| [ field.key, { error: field.error_id, target: field.target_id } ] }.to_json %>"
       data-block="<%= block.id %>" data-page="<%= page.id %>">
   <% if unavailable %><p class="plain-form__closed"><%= unavailable %></p><% end %>
-  <div class="plain-form__summary" role="alert" tabindex="-1" hidden data-form-send-target="summary"></div>
+  <div class="plain-form__summary" role="alert" tabindex="-1" hidden data-form-send-target="summary" data-action="click->form-send#follow"></div>
   <fieldset class="plain-form__body" data-form-send-target="body"<% if unavailable %> disabled<% end %>>
     <% fields.each do |field| %>
       <%= render field.input.new(field: field) %>

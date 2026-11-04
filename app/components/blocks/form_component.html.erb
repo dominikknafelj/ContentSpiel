@@ -17,7 +17,7 @@
   <% if unavailable %>
     <p class="form-unavailable"><%= unavailable %></p>
   <% end %>
-  <div class="form-summary" role="alert" tabindex="-1" hidden data-form-send-target="summary"></div>
+  <div class="form-summary" role="alert" tabindex="-1" hidden data-form-send-target="summary" data-action="click->form-send#follow"></div>
   <%= tag.fieldset class: "form-body", disabled: unavailable.present?, data: { form_send_target: "body" } do %>
     <% fields.each do |field| %>
       <%= render field.input.new(field: field) %>

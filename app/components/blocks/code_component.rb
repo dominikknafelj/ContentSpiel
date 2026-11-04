@@ -27,6 +27,8 @@ module Blocks
   # (`test/values/theme/contract_test.rb`), and a theme's bar is not this
   # one (docs/reference/theming.md, "The Code block").
   class CodeComponent < ApplicationComponent
+    include Blocks::FixedWords
+
     # The block's public strings, the keys of `public.blocks.code`
     # (`config/locales/public.en.yml`): what `string` answers, and nothing
     # else.
@@ -38,15 +40,6 @@ module Blocks
     end
 
     def render? = code.present?
-
-    # Whether this is the first time the process meets `key`, which is what
-    # keeps an unknown key in a theme's template to one log line and not
-    # one per visitor.
-    UNKNOWN_STRINGS_LOCK = Mutex.new
-
-    def self.first_unknown_string?(key)
-      UNKNOWN_STRINGS_LOCK.synchronize { (@unknown_strings ||= Set.new).add?(key).present? }
-    end
 
     private
 
@@ -77,25 +70,13 @@ module Blocks
     # the page), in the visitor's language where
     # `config/locales/public.<locale>.yml` has it, in English otherwise.
     #
-    # ONLY THOSE FOUR. A theme's template calls this with a key its author
-    # typed, and I18n's answer for a key that does not exist is a sentence
-    # ("Translation missing: en.public.blocks.code.copy_all") that would be
-    # the button's word on a public page. Where a theme is written
-    # (development, test) another key raises and names the four; in
+    # ONLY THOSE FOUR (`Blocks::FixedWords`): a theme's template calls this
+    # with a key its author typed, and I18n's answer for a key that does not
+    # exist is a sentence ("Translation missing: en.public.blocks.code.copy_all")
+    # that would be the button's word on a public page. Where a theme is
+    # written (development, test) another key raises and names the four; in
     # production it is no word, and one line in the log per key for the
     # life of the process.
-    def string(key)
-      return unknown_string(key) unless STRINGS.include?(key.to_s.to_sym)
-
-      PublicStrings.read("public.blocks.code.#{key}")
-    end
-
-    def unknown_string(key)
-      message = "Blocks::CodeComponent#string has no #{key.to_s.to_sym.inspect}: the Code block's words are #{STRINGS.map(&:inspect).join(", ")}"
-      raise ArgumentError, message if Rails.env.local?
-
-      Rails.logger.warn(message) if self.class.first_unknown_string?(key.to_s)
-      ""
-    end
+    def string(key) = fixed_word(key, scope: "public.blocks.code", owner: "the Code block's")
   end
 end

@@ -5,8 +5,8 @@ import { Controller } from "@hotwired/stimulus"
 // page loads it, and a theme that replaces the block's template keeps the
 // send in place by writing the same markup (the identifier, the `send`
 // action on the form, the `summary`, `body`, `button` and `done` targets,
-// the optional `status` target and the three values; docs/reference/
-// theming.md, "The Form block").
+// the optional `status` target, the optional `follow` action on the summary
+// and the three values; docs/reference/theming.md, "The Form block").
 //
 // PROGRESSIVE ENHANCEMENT. The form is whole without this script: a plain
 // `<form method="post">` to the form's endpoint (`FormSendsController`),
@@ -25,7 +25,9 @@ import { Controller } from "@hotwired/stimulus"
 //                                where an error stands), the control
 //                                `aria-invalid` and described by it, and the
 //                                summary filled with the server's line and
-//                                one link per answer, then focused
+//                                one item per answer (a link to its field;
+//                                an answer of no field the page knows is the
+//                                item's words alone), then focused
 //   gone, unavailable,           the server's sentence alone in the summary,
 //   rate_limited                 which is no mistake of the visitor's
 //                                (`data-notice`), focused
@@ -36,7 +38,9 @@ import { Controller } from "@hotwired/stimulus"
 //                                visitor's answers would be lost on the
 //                                browser's error page.
 // Every refusal keeps what the visitor typed, and the button is enabled
-// again.
+// again. A press on a summary's link (`click->form-send#follow` on the
+// summary, optional) moves the focus to the field it names, where an anchor
+// alone only scrolls.
 //
 // THE WORDS ARE THE SERVER'S: every message comes in the answer, the
 // button's word while sending and the network sentence are values, so this
@@ -45,19 +49,27 @@ import { Controller } from "@hotwired/stimulus"
 // link goes to (a radio group's first radio), so the script finds nothing
 // by a naming rule of the template's.
 //
-// WHAT IS TAKEN BACK, AND WHEN. Turbo keeps a copy of a page and shows it
-// again on Back. At `turbo:before-cache` and at `disconnect` everything this
-// script wrote is taken back, `hidden` included: the errors emptied and
-// hidden, the controls' marks as drawn, the summary emptied and hidden, the
-// button's word and state, the status line, and the body shown and the
-// thank-you hidden again with its drawn words. So a page left and come back
-// to shows the form as it was drawn. (The Code block keeps `hidden` alone at
-// `turbo:before-cache` because Turbo also copies a page an anchor link does
-// not leave; the summary's links go nowhere through Turbo: the form is
-// `data-turbo="false"`, which covers the links inside it, and a press on one
-// moves the focus here.) The elements are kept as fields at `connect`: a
-// controller taken off its element finds no target any more, and
-// `disconnect` has to reach them.
+// WHAT IS TAKEN BACK, AND WHEN (the Code block's incident,
+// code_copy_controller.js). Turbo copies a page at `turbo:before-cache`,
+// and it does that also for a page that is NOT left: following an anchor of
+// the page (a table of contents, a heading's link) or Back between two
+// anchors is a popstate that caches a snapshot. So nothing visible is taken
+// back there: a thank-you or errors taken back at that moment would vanish
+// under a visitor who never left. Instead
+//   - `connect` puts the form back to how the server drew it: a copy Turbo
+//     shows again on Back is put into the document, and `connect` runs on
+//     it before a frame is drawn, so a copy that holds a thank-you or errors
+//     is never shown with them. Every error element emptied and hidden,
+//     `aria-invalid` and the error ids taken off the `answers[…]` controls,
+//     the summary emptied and hidden, the body shown, the thank-you hidden
+//     with its drawn words (kept on it by this script, in
+//     `data-form-send-drawn`, before it first writes the server's), the
+//     button's word (kept in `data-form-send-word` while sending) and state,
+//     and the status line;
+//   - `disconnect` takes all of it back too, for a page whose script is
+//     taken off and the form left in the document.
+// The elements are kept as fields at `connect`: a controller taken off its
+// element finds no target any more, and `disconnect` has to reach them.
 export default class extends Controller {
   static targets = [ "summary", "body", "button", "status", "done" ]
   static values = { sending: String, network: String, fields: Object }
@@ -68,23 +80,14 @@ export default class extends Controller {
     this.button = this.buttonTarget
     this.status = this.hasStatusTarget ? this.statusTarget : null
     this.done = this.doneTarget
-    this.word = this.button.textContent
-    this.thanks = this.done.textContent
-    this.marked = []
     this.sending = false
-
-    this.rest = () => this.takeBack()
-    this.jump = (event) => this.follow(event)
-    document.addEventListener("turbo:before-cache", this.rest)
-    this.summary.addEventListener("click", this.jump)
+    this.restore()
     this.live = true
   }
 
   disconnect() {
     this.live = false
-    document.removeEventListener("turbo:before-cache", this.rest)
-    this.summary.removeEventListener("click", this.jump)
-    this.takeBack()
+    this.restore()
   }
 
   async send(event) {
@@ -115,6 +118,19 @@ export default class extends Controller {
     this.answer(answer)
   }
 
+  // A press in the summary: a link's field is focused and brought into view.
+  follow(event) {
+    const link = event.target.closest("a[href^='#']")
+    if (!link) return
+
+    const target = this.byId(link.getAttribute("href").slice(1))
+    if (!target) return
+
+    event.preventDefault()
+    target.focus()
+    target.scrollIntoView({ block: "center" })
+  }
+
   // The answer's JSON, or null for one that is not JSON.
   async read(response) {
     if (!(response.headers.get("Content-Type") || "").includes("application/json")) return null
@@ -140,7 +156,8 @@ export default class extends Controller {
     this.element.reset()
     this.body.hidden = true
     this.summary.hidden = true
-    this.done.textContent = message || this.thanks
+    if (!this.done.hasAttribute("data-form-send-drawn")) this.done.setAttribute("data-form-send-drawn", this.done.textContent)
+    if (message) this.done.textContent = message
     this.done.hidden = false
     this.done.focus()
   }
@@ -149,7 +166,15 @@ export default class extends Controller {
     const list = document.createElement("ul")
     for (const error of answer.errors || []) {
       const ids = this.fieldsValue[error.key]
-      if (!ids) continue
+      const item = document.createElement("li")
+      list.append(item)
+      // An answer of a field this page does not know (the form changed
+      // since the page was drawn): its words, with nothing to link to, so
+      // the list says as many as the line counts.
+      if (!ids) {
+        item.textContent = error.item || error.message
+        continue
+      }
 
       const element = this.byId(ids.error)
       if (element) {
@@ -161,9 +186,7 @@ export default class extends Controller {
       const link = document.createElement("a")
       link.href = `#${ids.target}`
       link.textContent = error.item || error.message
-      const item = document.createElement("li")
       item.append(link)
-      list.append(item)
     }
     const line = document.createElement("p")
     line.textContent = answer.summary
@@ -187,20 +210,6 @@ export default class extends Controller {
     element.focus()
   }
 
-  // A press on one of the summary's links: the control it names is focused
-  // (an anchor alone scrolls to it and leaves the focus where it was).
-  follow(event) {
-    const link = event.target.closest("a[href^='#']")
-    if (!link) return
-
-    const target = this.byId(link.getAttribute("href").slice(1))
-    if (!target) return
-
-    event.preventDefault()
-    target.focus()
-    target.scrollIntoView({ block: "center" })
-  }
-
   // An element of this form by its id: never another placement's, and found
   // also once the form has been taken out of the document.
   byId(id) {
@@ -211,40 +220,61 @@ export default class extends Controller {
     return Array.from(this.element.elements).filter((control) => control.name === `answers[${key}]`)
   }
 
+  answerControls() {
+    return Array.from(this.element.elements).filter((control) => control.name?.startsWith("answers["))
+  }
+
+  errorIds() {
+    return new Set(Object.values(this.fieldsValue).map((ids) => ids.error).filter(Boolean))
+  }
+
   // An invalid control: `aria-invalid`, and its error after whatever it was
-  // described by; what it was is remembered, to be given back.
+  // described by (`clear` takes the error's id off again, and only it).
   mark(control, errorId) {
-    const described = control.getAttribute("aria-describedby")
-    this.marked.push({ control, invalid: control.getAttribute("aria-invalid"), described })
+    const described = (control.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean)
     control.setAttribute("aria-invalid", "true")
-    control.setAttribute("aria-describedby", [ described, errorId ].filter(Boolean).join(" "))
+    control.setAttribute("aria-describedby", [ ...described.filter((id) => id !== errorId), errorId ].join(" "))
   }
 
   busy(busy) {
     this.button.disabled = busy
     if (busy) {
+      if (!this.button.hasAttribute("data-form-send-word")) this.button.setAttribute("data-form-send-word", this.button.textContent)
       this.button.setAttribute("aria-busy", "true")
-      this.button.textContent = this.sendingValue || this.word
+      if (this.sendingValue) this.button.textContent = this.sendingValue
     } else {
-      this.button.removeAttribute("aria-busy")
-      this.button.textContent = this.word
+      this.restoreWord()
     }
     if (this.status) this.status.textContent = busy ? this.sendingValue : ""
   }
 
-  // Everything an earlier answer wrote, taken back before the next one.
-  clear() {
-    for (const { control, invalid, described } of this.marked.reverse()) {
-      invalid === null ? control.removeAttribute("aria-invalid") : control.setAttribute("aria-invalid", invalid)
-      described === null ? control.removeAttribute("aria-describedby") : control.setAttribute("aria-describedby", described)
+  restoreWord() {
+    this.button.removeAttribute("aria-busy")
+    const word = this.button.getAttribute("data-form-send-word")
+    if (word !== null) {
+      this.button.textContent = word
+      this.button.removeAttribute("data-form-send-word")
     }
-    this.marked = []
-    for (const ids of Object.values(this.fieldsValue)) {
-      const element = this.byId(ids.error)
+  }
+
+  // Every error the form shows, from this script or from a copy of the page
+  // it wrote: read from the page, never from what this instance remembers.
+  clear() {
+    const errors = this.errorIds()
+    for (const id of errors) {
+      const element = this.byId(id)
       if (element) {
         element.textContent = ""
         element.hidden = true
       }
+    }
+    for (const control of this.answerControls()) {
+      if (control.getAttribute("aria-invalid") === "true") control.removeAttribute("aria-invalid")
+      const described = control.getAttribute("aria-describedby")
+      if (described === null) continue
+
+      const kept = described.split(/\s+/).filter((id) => id && !errors.has(id))
+      kept.length ? control.setAttribute("aria-describedby", kept.join(" ")) : control.removeAttribute("aria-describedby")
     }
     this.summary.replaceChildren()
     this.summary.removeAttribute("data-notice")
@@ -252,12 +282,17 @@ export default class extends Controller {
   }
 
   // The form as the server drew it.
-  takeBack() {
+  restore() {
     this.clear()
-    this.busy(false)
     this.button.disabled = false
+    this.restoreWord()
+    if (this.status) this.status.textContent = ""
     this.body.hidden = false
-    this.done.textContent = this.thanks
+    const drawn = this.done.getAttribute("data-form-send-drawn")
+    if (drawn !== null) {
+      this.done.textContent = drawn
+      this.done.removeAttribute("data-form-send-drawn")
+    }
     this.done.hidden = true
   }
 }

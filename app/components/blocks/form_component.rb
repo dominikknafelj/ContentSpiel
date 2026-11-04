@@ -32,6 +32,8 @@ module Blocks
   # Its template is promised the names of `theme_methods` and no other; the
   # private readers below the line are help for those and no promise.
   class FormComponent < ApplicationComponent
+    include Blocks::FixedWords
+
     # The CMS's words a template may ask for (`string`), all of
     # `public.forms` (config/locales/public.en.yml): the required word, a
     # select's empty choice, the button's word while sending, the thank-you
@@ -39,11 +41,9 @@ module Blocks
     # script says when a send had no answer.
     STRINGS = %i[required choose sending sent error_summary network].freeze
 
-    UNKNOWN_STRINGS_LOCK = Mutex.new
-
-    def self.first_unknown_string?(key)
-      UNKNOWN_STRINGS_LOCK.synchronize { (@unknown_strings ||= Set.new).add?(key).present? }
-    end
+    # The words that are a plural, which I18n answers as a Hash of its
+    # forms when no `count:` is given.
+    COUNTED = %i[error_summary].freeze
 
     def initialize(block:, page:)
       @block = block
@@ -106,23 +106,16 @@ module Blocks
     # One of the six words of `STRINGS` in the visitor's language, English
     # where that language has none; `options` are I18n's (`count:`).
     #
-    # ONLY THOSE SIX, as the Code block's `string`: a theme's template calls
-    # this with a key its author typed, and I18n's answer for a missing key
-    # is a sentence. Where a theme is written (development, test) another
-    # key raises and names the six; in production it is no word, and one
-    # line in the log per key for the life of the process.
+    # ONLY THOSE SIX, as the Code block's (`Blocks::FixedWords`): another key
+    # raises where a theme is written, naming the six, and is no word in
+    # production. So is `string(:error_summary)` without `count:`: I18n would
+    # answer the plural's forms as a Hash, printed on the page.
     def string(key, **options)
-      return unknown_string(key) unless STRINGS.include?(key.to_s.to_sym)
+      if COUNTED.include?(key.to_s.to_sym) && !options.key?(:count)
+        return refused_word(key, "Blocks::FormComponent#string(#{key.to_s.to_sym.inspect}) is a plural and needs count: (string(#{key.to_s.to_sym.inspect}, count: 2))")
+      end
 
-      PublicStrings.read("public.forms.#{key}", **options)
-    end
-
-    def unknown_string(key)
-      message = "Blocks::FormComponent#string has no #{key.to_s.to_sym.inspect}: the Form block's words are #{STRINGS.map(&:inspect).join(", ")}"
-      raise ArgumentError, message if Rails.env.local?
-
-      Rails.logger.warn(message) if self.class.first_unknown_string?(key.to_s)
-      ""
+      fixed_word(key, scope: "public.forms", owner: "the Form block's", **options)
     end
   end
 end

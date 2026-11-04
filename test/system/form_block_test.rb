@@ -100,6 +100,78 @@ class FormBlockSystemTest < ApplicationSystemTestCase
     assert_selector "#{FORM} button[type=submit]:not([disabled])", text: "Send"
   end
 
+  # A PAGE THAT STAYS. Turbo copies the page it is on, firing
+  # `turbo:before-cache`, when the browser itself goes to an anchor in it
+  # (`historyPoppedWithEmptyState`: a link Turbo does not drive, a typed
+  # fragment, Back between two anchors). The script takes nothing back
+  # there, or the thank-you and the errors would vanish under a visitor who
+  # never left (the Code block's incident, test/system/code_block_test.rb).
+  # A link Turbo drives draws the page again from the server, which is a new
+  # form and no case of this script's.
+  def add_anchor
+    page.execute_script(<<~JS)
+      const main = document.querySelector("main")
+      main.insertAdjacentHTML("afterbegin", '<a id="jump" href="#further-down" data-turbo="false">Jump</a>')
+      main.insertAdjacentHTML("beforeend", '<h2 id="further-down">Further down</h2>')
+      window.__caches = 0
+      document.addEventListener("turbo:before-cache", () => { window.__caches += 1 })
+    JS
+  end
+
+  def follow_anchor
+    find("a#jump").click
+    await_js("window.__caches > 0 && location.hash === '#further-down'")
+    await_frames
+    assert page.evaluate_script("document.getElementById('jump') !== null"), "the page stayed: it was not drawn again"
+  end
+
+  test "after a send, following an anchor of the page leaves the thank-you where it is" do
+    open_page
+    add_anchor
+    fill_in "Your name", with: "Ada"
+    fill_in "Email address", with: "ada@example.com"
+    click_button "Send"
+    assert_selector "#{FORM} [data-form-send-target=done]", text: "Thank you, we'll be in touch."
+
+    follow_anchor
+
+    assert_selector "#{FORM} [data-form-send-target=done]", text: "Thank you, we'll be in touch."
+    assert_no_selector "#{FORM} [data-form-send-target=body]"
+  end
+
+  test "after errors, following an anchor of the page leaves the errors and the summary where they are" do
+    open_page
+    add_anchor
+    page.execute_script("document.querySelector('#{FORM}').noValidate = true")
+    fill_in "Email address", with: "ada@example.com"
+    click_button "Send"
+    assert_selector "#{FORM} [role=alert]", text: "Please correct 1 answer."
+
+    follow_anchor
+
+    assert_selector "#{FORM} [role=alert]", text: "Please correct 1 answer."
+    assert_selector "##{id_of("f_name0001")}-error", text: "Please fill in this field."
+    assert_equal "true", find("##{id_of("f_name0001")}")["aria-invalid"]
+    assert_equal "ada@example.com", find_field("Email address").value
+  end
+
+  test "an answer for a field the page does not know is an item of the summary with no link, so the list says as many as the line" do
+    open_page
+    page.execute_script(<<~JS)
+      window.fetch = () => Promise.resolve(new Response(JSON.stringify({ status: "invalid", summary: "Please correct 2 answers.",
+        errors: [ { key: "f_name0001", message: "Please fill in this field.", item: "Your name: Please fill in this field." },
+                  { key: "f_gone0001", message: "Please check this entry.", item: "Old field: Please check this entry." } ] }),
+        { status: 422, headers: { "Content-Type": "application/json" } }))
+    JS
+    fill_in "Your name", with: "Ada"
+    fill_in "Email address", with: "ada@example.com"
+    click_button "Send"
+
+    assert_selector "#{FORM} [role=alert] li", count: 2
+    assert_selector "#{FORM} [role=alert] li a", count: 1, text: "Your name: Please fill in this field."
+    assert_selector "#{FORM} [role=alert] li", text: "Old field: Please check this entry."
+  end
+
   test "a page left and come back to by Back shows the form as drawn, nothing written left in it" do
     open_page
     page.execute_script("document.querySelector('#{FORM}').noValidate = true")

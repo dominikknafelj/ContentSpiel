@@ -155,9 +155,14 @@ class Blocks::FormComponentTest < ActiveSupport::TestCase
     error = assert_raises(ArgumentError) { subject.send(:string, :gone) }
     assert_includes error.message, ":required, :choose, :sending, :sent, :error_summary, :network"
 
+    error = assert_raises(ArgumentError) { subject.send(:string, :error_summary) }
+    assert_includes error.message, ":error_summary", "the plural's key is named"
+    assert_includes error.message, "count:"
+
     Blocks::FormComponent.instance_variable_set(:@unknown_strings, nil)
     with_singleton_override(Rails, :env, -> { ActiveSupport::EnvironmentInquirer.new("production") }) do
       assert_equal "", subject.send(:string, :gone), "in production no word, never a sentence of I18n's"
+      assert_equal "", subject.send(:string, :error_summary), "and no Hash of the plural's forms"
     end
   end
 

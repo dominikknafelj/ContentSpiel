@@ -4,6 +4,10 @@ module Blocks
   # `Blocks::FormComponent`: a form the preview makes, with a field of
   # each of the five types, named by the block as the type's sample's is.
   class FormComponentPreview < ViewComponent::Preview
+    # Found again by this name in a developer's database, not made anew on
+    # every view of the preview.
+    NAME = "Preview form".freeze
+
     FIELDS = [
       { "key" => "f_prevname", "type" => "short_text", "required" => true, "label" => { "en" => "Your name" }, "help" => {}, "settings" => {} },
       { "key" => "f_prevmail", "type" => "email", "required" => true, "label" => { "en" => "Email address" },
@@ -16,7 +20,7 @@ module Blocks
 
     def default
       page = PreviewFixtures.page(title: "Form preview")
-      form = Forms::Form.create!(name: "Preview form #{SecureRandom.hex(4)}", keep_submissions: false, fields: FIELDS)
+      form = Forms::Form.kept.find_by(name: NAME) || Forms::Form.create!(name: NAME, keep_submissions: false, fields: FIELDS)
       block = page.content_blocks.create!(block_type: :form, position: 0, settings: { "form_id" => form.id.to_s })
 
       render Blocks::FormComponent.new(block: block, page: page)

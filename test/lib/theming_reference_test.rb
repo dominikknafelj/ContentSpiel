@@ -146,7 +146,8 @@ class ThemingReferenceTest < ActiveSupport::TestCase
       name = reader[/\A[a-z_?]+/]
       assert Forms::PublicField.method_defined?(name), "a field answers #{name}"
     end
-    markup = [ %(data-controller="form-send"), %(data-action="form-send#send"), %(data-turbo="false"),
+    assert_includes script, "follow(event)", "the summary's action is a method of the script"
+    markup = [ %(data-controller="form-send"), %(data-action="form-send#send"), %(data-action="click->form-send#follow"), %(data-turbo="false"),
                %(name="locale"), %(name="page_id"), %(name="drawn") ] +
       targets.map { |name| %(data-form-send-target="#{name}") } + values.map { |name| "data-form-send-#{name}-value" }
 
