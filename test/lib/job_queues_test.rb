@@ -53,4 +53,18 @@ class JobQueuesTest < ActiveSupport::TestCase
         recurring.dig(name, "forms_purge_expired"), name)
     end
   end
+
+  # Forms final review, Important 2: the mails that failed because mail was
+  # not set up are sent again once it is, every 15 minutes, wherever the
+  # clean-up runs.
+  test "the forms' resend of mails that waited for mail is scheduled in every environment that schedules the trash's" do
+    recurring = YAML.safe_load(ERB.new(File.read(Rails.root.join("config/recurring.yml"))).result, aliases: true)
+    environments = recurring.select { |_, tasks| tasks.is_a?(Hash) && tasks.key?("trash_purge_expired") }.keys
+
+    assert_equal %w[development production test], environments.sort
+    environments.each do |name|
+      assert_equal({ "class" => "Forms::ResendNotReadyJob", "queue" => "default", "schedule" => "every 15 minutes" },
+        recurring.dig(name, "forms_resend_not_ready"), name)
+    end
+  end
 end

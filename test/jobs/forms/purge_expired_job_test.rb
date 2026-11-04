@@ -15,6 +15,7 @@ class Forms::PurgeExpiredJobTest < ActiveJob::TestCase
       delivery = record.deliveries.create!(kind: "mail", destination: form.destinations.first)
       delivery.record_sent!(at: Time.current) if state == :sent
       delivery.record_failed!(key: "login", line: nil, at: Time.current) if state == :failed
+      delivery.record_failed!(key: Forms::Destinations::Mail::NOT_READY, line: nil, at: Time.current) if state == :not_ready
     end
     record
   end
@@ -66,6 +67,24 @@ class Forms::PurgeExpiredJobTest < ActiveJob::TestCase
     assert gone?(failed_long_ago)
     assert_equal [ [ "delivered", [ delivered.id ] ], [ "undelivered", [ failed_long_ago.id ] ] ],
       events.map { |event| [ event.metadata["reason"], event.metadata["submission_ids"] ] }
+  end
+
+  # Forms final review, Important 2: the builder says a form's submissions
+  # are sent once mail is set up, so the clean-up does not delete, as
+  # undelivered, one that is only waiting for mail while mail is still not
+  # set up. Once it is, the plain rule applies again.
+  test "while mail is not set up a keep-nothing form's submissions waiting for mail are not swept as undelivered" do
+    form = forms(:contact)
+    old = (Forms::UNDELIVERED_DAYS + 1).days
+    waiting_for_mail = submission(form, age: old, states: %i[not_ready])
+    failed_otherwise = submission(form, age: old, states: %i[failed])
+
+    with_mail_state(:not_set_up) { Forms::PurgeExpiredJob.perform_now }
+    assert_not gone?(waiting_for_mail), "it waits for mail, as the builder says"
+    assert gone?(failed_otherwise), "a mail that failed for another reason still goes after its days"
+
+    with_mail_state(:untested) { Forms::PurgeExpiredJob.perform_now }
+    assert gone?(waiting_for_mail), "with mail set up the rule is the plain one"
   end
 
   test "the delivered ones are decided under a lock on their rows" do

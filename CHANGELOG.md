@@ -25,7 +25,8 @@
 
 ### Environment
 
-- None.
+- A form's submission mail is in no log at any level: at `RAILS_LOG_LEVEL=debug` Action Mailer's line for it is a placeholder, where every other mail is still logged whole.
+- A new recurring task, `forms_resend_not_ready` (every 15 minutes, in `config/recurring.yml` for every environment): once mail is set up, by Settings or by `MAIL_*` variables, the form mails that failed because it was not are sent again, each recorded as System's "sent a submission again".
 
 ### Migrations needing action
 
@@ -43,4 +44,5 @@
 - Added two hooks beside `ContentSpiel::Plugins.block_types`: `form_field_types` (a form field type's members, `owner/name`) and `form_destinations` (a destination's label, deliverer and settings block, `owner/name`), with the block types' owner rules and replayed after them (`docs/reference/content-blocks-and-types.md`, "Form field types and destinations from outside"). A destination's deliverer answers `deliver(delivery, final_attempt:)`.
 - `AccessControl::Permissions.register` takes `grantable:` (default true); `Permissions.grantable` is what a group may hold. A caller that listed `Permissions.all` to offer or seed grants now reads `grantable`.
 - `ContentModel::FieldTypes` has two more built-ins, `email` and `form`, and `text` takes `max:`.
+- A form field type or destination that a gem no longer registers is dormant, not gone: a stored field of it is left out of a send and carried through a save, and a stored destination of it is carried through a save (its deliveries fail `unknown_destination`) and drawn in the builder with a box that removes it. Only one given anew under an unknown name is refused.
 - `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.

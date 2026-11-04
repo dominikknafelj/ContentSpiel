@@ -5,6 +5,7 @@ require "test_helper"
 # and from which page; Reply-To the visitor's email answer; built in the job
 # from the delivery, whose Global ID is all the job carries.
 class FormsMailerTest < ActionMailer::TestCase
+  include LogCapture
   def submission(form, answers, page: nil, locale: "en")
     clean = Forms::Answers.clean(form.fields, answers, locale: locale)
     assert_empty clean.errors
@@ -62,6 +63,26 @@ class FormsMailerTest < ActionMailer::TestCase
       assert_not_includes html, "<script>"
       assert_not_includes html, "<b>bold</b>"
       assert_includes html, "&lt;script&gt;alert(1)&lt;/script&gt;"
+    end
+  end
+
+  # Action Mailer writes a delivered mail whole at debug; this mailer's is
+  # replaced by a placeholder, so not even `RAILS_LOG_LEVEL=debug` puts a
+  # visitor's answers or address into the log.
+  test "a form's mail is in no log line, at debug either" do
+    log = nil
+    with_mail_state(:working) do
+      delivery = submission(forms(:contact), { "f_name0001" => "Ada Lovelace", "f_mail0001" => "ada@example.com", "f_text0001" => "Hello there" })
+      log = capture_log do
+        Rails.logger.level = Logger::DEBUG # the capture's own logger, put back with it
+        assert_emails(1) { FormsMailer.submission(delivery).deliver_now }
+      end
+    end
+
+    assert_includes log, "Delivered mail", "the delivery's own line is still written"
+    assert_includes log, FormsMailer::NOT_LOGGED, "the debug line ran, with the placeholder in place of the mail"
+    [ "Ada Lovelace", "ada@example.com", "Hello there", "office@example.com", "New submission" ].each do |personal|
+      assert_not_includes log, personal
     end
   end
 

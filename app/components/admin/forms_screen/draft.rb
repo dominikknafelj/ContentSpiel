@@ -37,12 +37,21 @@ module Admin
     # builder draws no section for (a second of one kind, which only a
     # script makes, or one of a type no longer registered) is carried as it
     # is stored.
+    #
+    # A DORMANT destination, one of a type no longer registered (a gem taken
+    # out), is drawn by its stored kind with a Remove box
+    # (`DestinationsComponent`), posted as `form[remove_destinations][]`
+    # with its id: ticked on the default language's tab, the Save leaves it
+    # out and `Forms::Save` deletes it; otherwise it is carried as stored
+    # (CLAUDE.md: removed from its registry is dormant, not gone).
     class Draft
       Row = Data.define(:row, :key, :type, :required, :label, :help, :display, :choices)
       ChoiceRow = Data.define(:row, :key, :label)
       Section = Data.define(:kind, :id, :enabled, :settings, :secrets_set, :secrets_saved_at)
 
-      attr_reader :name, :keep_submissions, :keep_days, :submit_label, :thank_you, :rows, :sections, :carried
+      Dormant = Data.define(:id, :kind, :removed)
+
+      attr_reader :name, :keep_submissions, :keep_days, :submit_label, :thank_you, :rows, :sections, :carried, :removed
 
       def self.from_form(form)
         new(form: form, name: form.name, keep_submissions: form.keep_submissions, keep_days: form.keep_days,
@@ -66,7 +75,8 @@ module Admin
           thank_you: texts.(stored.thank_you, posted["thank_you"]),
           rows: rows,
           sections: default_tab ? posted_sections(form, posted) : stored.sections,
-          carried: stored.carried)
+          carried: stored.carried,
+          removed: default_tab ? removed_ids(posted, stored.carried) : [])
       end
 
       # The secrets typed into the builder, `{ kind => { name => value } }`,
@@ -82,7 +92,7 @@ module Admin
         end
       end
 
-      def initialize(form:, name:, keep_submissions:, keep_days:, submit_label:, thank_you:, rows:, sections:, carried:)
+      def initialize(form:, name:, keep_submissions:, keep_days:, submit_label:, thank_you:, rows:, sections:, carried:, removed: [])
         @form = form
         @name = name
         @keep_submissions = keep_submissions
@@ -92,6 +102,15 @@ module Admin
         @rows = rows
         @sections = sections
         @carried = carried
+        @removed = removed
+      end
+
+      # The carried destinations of a type no longer registered, each with
+      # whether this page asks to remove it.
+      def dormant
+        carried.reject { |destination| Forms::DestinationTypes.find(destination[:kind]) }.map do |destination|
+          Dormant.new(id: destination[:id], kind: destination[:kind], removed: removed.include?(destination[:id]))
+        end
       end
 
       # The section drawn for a destination type (a blank one when the form
@@ -111,7 +130,8 @@ module Admin
         destinations = sections.select(&:enabled).map do |section|
           { id: section.id, kind: section.kind, settings: section.settings, secrets: secrets.fetch(section.kind, {}) }
         end
-        { attributes: attributes, fields: fields, destinations: destinations + carried }
+        kept = carried.reject { |destination| removed.include?(destination[:id]) }
+        { attributes: attributes, fields: fields, destinations: destinations + kept }
       end
 
       class << self
@@ -187,6 +207,15 @@ module Admin
             settings = type.fields.to_h { |field| [ field.name, plain(section["settings"])[field.name].to_s ] }.reject { |_, value| value.empty? }
             Section.new(kind: type.name, id: row&.id, enabled: section["enabled"] == "1", settings: settings,
               secrets_set: row ? type.secrets.select { |name| row.secret_set?(name) } : [], secrets_saved_at: row&.secrets_saved_at)
+          end
+        end
+
+        # The ids of the dormant carried destinations the page asks to remove
+        # (only those: a second destination of a registered kind has no box).
+        def removed_ids(posted, carried)
+          asked = Array(posted["remove_destinations"]).map(&:to_s)
+          carried.filter_map do |destination|
+            destination[:id] if asked.include?(destination[:id].to_s) && !Forms::DestinationTypes.find(destination[:kind])
           end
         end
 

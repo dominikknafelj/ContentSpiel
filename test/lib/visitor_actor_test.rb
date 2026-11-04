@@ -67,6 +67,13 @@ class VisitorActorTest < ActiveSupport::TestCase
     assert_kind_of AccessControl::Visitor, copy
     assert_not AccessControl.allowed?(copy, "forms.submit", forms(:contact), channel: :public)
     assert AccessControl.allowed?(AccessControl::VISITOR, "forms.submit", forms(:contact), channel: :public)
+
+    # The audit log asks for the instance too (`Visitor.one?`): a copy is
+    # not written as the visitor, nor as anybody.
+    assert_not AccessControl::Visitor.one?(copy)
+    assert_raises(ArgumentError) { Current.set(actor: copy, channel: :public) { Audit.record("form_submission.received", subject: forms(:contact)) } }
+    event = Current.set(actor: AccessControl::VISITOR, channel: :public) { Audit.record("form_submission.received", subject: forms(:contact), coalesce: false) }
+    assert_equal [ nil, Audit::VISITOR_LABEL ], [ event.actor, event.actor_label ]
   end
 
   test "the definition is where the guard looks for it" do

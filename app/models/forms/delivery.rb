@@ -32,6 +32,15 @@ module Forms
 
     before_create { self.queued_fingerprint ||= MailSettings.current.fingerprint }
 
+    # The mail deliveries that failed because mail was not set up
+    # (`Destinations::Mail::NOT_READY`) and are still failed: what is sent
+    # again once it is (`Forms::ResendNotReadyJob`), and what the clean-up
+    # spares while it is not (`Forms::PurgeExpiredJob`).
+    scope :waiting_for_mail, -> {
+      where(state: "failed", kind: Destinations::Mail::KIND)
+        .where(SqlNodes.json_text(arel_table[:failure], "key").eq(Destinations::Mail::NOT_READY))
+    }
+
     STATES.each { |name| define_method(:"#{name}?") { state == name } }
 
     def record_attempt!

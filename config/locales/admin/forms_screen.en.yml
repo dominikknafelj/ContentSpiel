@@ -41,7 +41,7 @@ en:
           empty:
             title: "No forms yet."
             description: "Make one, then place it on a page with a Form block."
-          mail_not_ready: "Mail isn't set up, so forms' mails aren't sent. Submissions wait until it is."
+          mail_not_ready: "Mail isn't set up, so forms' mails aren't sent. Submissions are sent once it is."
           open_mail_settings: "Open Mail settings →"
           no_keys: "This site has no encryption keys, so forms can't take answers. See Hosting: encryption keys."
         new_form_dialog:
@@ -114,16 +114,22 @@ en:
           for: "for"
           days: "days"
           keep_days_help: "Leave it empty to use the site's %{days} days (Settings → Forms). Changing it applies to submissions already kept."
-          not_kept: "Submissions are mailed and not kept. If a mail fails, the submission is kept until it is sent again, for at most 30 days."
+          not_kept: "Submissions are mailed and not kept. If a mail fails, the submission is kept until it is sent again, for at most %{days} days."
+          # A placeholder for the Design System (forms final review): one
+          # line, drawn only while the box is unticked on a form that keeps
+          # submissions now. The nightly clean-up then deletes them.
+          unkeep: "Turning this off deletes the submissions already kept tonight."
           no_keys: "This site has no encryption keys, so this form can't take answers: a submission can't be kept, even for a moment. See Hosting: encryption keys."
           mail: "Mail each submission"
           recipients: "Recipients"
           recipients_help: "One address per line, or separated by commas. At most 10."
-          mail_not_ready: "Mail isn't set up, so this form's mail isn't sent. Submissions wait until it is."
-          wait_days: "They wait for at most 30 days."
+          mail_not_ready: "Mail isn't set up, so this form's mail isn't sent. Submissions are sent once it is."
+          wait_unkept: "Until then they wait here, though this form doesn't keep submissions."
           open_mail_settings: "Open Mail settings →"
           set_on: "Set on %{date}"
           not_set: "Not set"
+          dormant: "This destination's type isn't installed."
+          remove_dormant: "Remove it when the form is saved"
         placements:
           title: "Placed on"
           hidden:
@@ -155,7 +161,7 @@ en:
           kept:
             one: "Kept for %{count} day, then deleted."
             other: "Kept for %{count} days, then deleted."
-          not_kept: "Not kept: each is deleted once it is delivered. One that can't be delivered waits here for at most 30 days."
+          not_kept: "Not kept: each is deleted once it is delivered. One that can't be delivered waits here for at most %{days} days."
           delete_all: "Delete all…"
           columns:
             received: "Received"

@@ -61,6 +61,19 @@ class Forms::AnswersTest < ActiveSupport::TestCase
     assert_not_includes result.values.to_s, "sneaky"
   end
 
+  # A gem taken out leaves its fields dormant: the Form block draws nothing
+  # for one, so the send leaves it out too, a required one included, and
+  # keeps the answers to the fields the visitor was shown.
+  test "a field of a type no longer registered is left out, and the other answers are kept" do
+    dormant = Forms::Field.from_h("key" => "f_star0006", "type" => "acme/rating", "required" => true, "label" => { "en" => "Stars" })
+    result = Forms::Answers.clean(fields + [ dormant ], { "f_name0001" => "Ada", "f_okay0005" => "1", "f_star0006" => "5" }, locale: "en")
+
+    assert_empty result.errors
+    assert_equal fields.map(&:key), result.values.map { |value| value["key"] }
+    assert_equal "Ada", result.values.first["value"]
+    assert_not_includes result.typed.keys, "f_star0006"
+  end
+
   test "values carry the default-language label and display, whatever language the visitor sent in" do
     result = clean({ "f_name0001" => "Ada", "f_pick0004" => "c_aaaaaaaa" }, locale: "de")
 

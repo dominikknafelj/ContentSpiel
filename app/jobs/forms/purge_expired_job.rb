@@ -15,7 +15,14 @@ module Forms
   #     must not lose its kept submissions as if they had been delivered.
   #   - a form that keeps nothing: those whose every delivery was sent and
   #     that are still here go, `delivered` (below), and those older than
-  #     `Forms::UNDELIVERED_DAYS` that never were, `undelivered`.
+  #     `Forms::UNDELIVERED_DAYS` that never were, `undelivered`, except,
+  #     while mail is NOT SET UP (`MailSettings#complete?`), one whose mail
+  #     failed for that reason (`Delivery.waiting_for_mail`): the builder
+  #     says such submissions are sent once mail is set up, which
+  #     `Forms::ResendNotReadyJob` does, so they wait for it however long
+  #     that takes. Once mail is set up the rule is the plain one again: a
+  #     resend that fails for another reason leaves a submission past its
+  #     days to go at the next run.
   #
   # DELIVERED, LEFT BEHIND. `Forms::DeliveryJob` deletes a submission of
   # such a form once its last delivery is sent; this sweep is the backstop
@@ -37,6 +44,7 @@ module Forms
 
     def perform(now: Time.current)
       Current.set(actor: nil, channel: :system, site: SiteSetting.instance) do
+        @mail_complete = MailSettings.current.complete?
         Form.find_each do |form|
           ActiveRecord::Base.transaction { sweep(form, now) }
         rescue StandardError => error
@@ -53,7 +61,9 @@ module Forms
         delete(form, form.submissions.where(created_at: ...(now - days.days)).pluck(:id), :expired)
       else
         delete(form, delivered_ids(form), :delivered)
-        delete(form, form.submissions.where(created_at: ...(now - UNDELIVERED_DAYS.days)).pluck(:id), :undelivered)
+        undelivered = form.submissions.where(created_at: ...(now - UNDELIVERED_DAYS.days))
+        undelivered = undelivered.where.not(id: Delivery.waiting_for_mail.select(:submission_id)) unless @mail_complete
+        delete(form, undelivered.pluck(:id), :undelivered)
       end
     end
 

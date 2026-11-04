@@ -86,7 +86,7 @@ class Admin::FormSubmissionsTest < ActionDispatch::IntegrationTest
     assert_select "button", text: t("submissions_list.delete_all"), count: 0
 
     get admin_form_submissions_path(forms(:contact))
-    assert_select "p", text: t("submissions_list.not_kept")
+    assert_select "p", text: t("submissions_list.not_kept", days: Forms::UNDELIVERED_DAYS)
     assert_select "[data-empty-state-title]", text: t("submissions_list.empty_not_kept.title")
   end
 

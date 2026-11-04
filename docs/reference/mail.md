@@ -85,7 +85,7 @@ Four: the reset (`PasswordsMailer#reset`), the invite (`InvitesMailer#invite`), 
 
 **No credential in a job's arguments.** The job's row and Active Job's log lines hold its arguments, so a mail is handed records (as Global IDs), an origin and the fingerprint, never a setting and never a token: the invite token is made IN the mailer, when the job builds the mail (`user.generate_token_for(:invite)`), as the reset's is (ruling T3a: the plan had passed it in, which put a credential at rest in the queue). `test/lib/mail_guards_test.rb`: "no mail action takes a token or a password: a mailer's arguments are the job's, and a token is made in the mailer"; `test/mailers/invites_mailer_test.rb`: "the queued job holds no token: its arguments are the two users' Global IDs and an origin"; `test/jobs/mail_delivery_job_test.rb`: "the job's arguments hold no setting and no credential".
 
-At `RAILS_LOG_LEVEL=debug` Action Mailer logs every mail whole, a reset or an invite link included; the boot's warning names both (`HostSettings.log_level_warning`).
+At `RAILS_LOG_LEVEL=debug` Action Mailer logs every mail whole, a reset or an invite link included; the boot's warning names both (`HostSettings.log_level_warning`). A form's submission mail is not: `FormsMailer` logs a placeholder in its place (`docs/reference/forms.md`, "Personal data").
 
 ## Settings → Mail
 

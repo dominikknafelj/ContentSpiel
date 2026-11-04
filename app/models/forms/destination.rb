@@ -70,7 +70,14 @@ module Forms
     # whole sentences on `:base` (`Forms::Save` hands them on as they are).
     def settings_follow_their_type
       type = destination_type
-      return errors.add(:base, I18n.t("admin.forms.save.unknown_destination", kind: kind)) unless type
+      unless type
+        # A stored row of a type no longer registered is dormant: kept as it
+        # is (`Forms::Save`), with nothing left to judge its settings by. A
+        # new row, or a row given another kind, of an unknown type is refused.
+        return if persisted? && !will_save_change_to_kind?
+
+        return errors.add(:base, I18n.t("admin.forms.save.unknown_destination", kind: kind))
+      end
 
       values = settings.to_h.stringify_keys
       scratch = ActiveModel::Errors.new(self)

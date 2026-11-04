@@ -13,6 +13,12 @@ module Forms
   # A key the form does not have is ignored, and a value that is not a String
   # (a list or a hash sent for a field) is no answer. The value's cast and
   # validation are the content model's (`Forms::Field#definition_field`).
+  #
+  # A field whose type is no longer registered (a gem taken out) is DORMANT:
+  # the Form block draws nothing for it (`Blocks::FormComponent`), so it is
+  # left out here too, neither asked for nor stored, and the answers to the
+  # fields the visitor was shown are kept. It is still the form's, carried
+  # through every save until an editor removes it (`Forms::Save`).
   module Answers
     Result = Data.define(:values, :errors, :typed)
 
@@ -27,6 +33,8 @@ module Forms
       typed = {}
 
       fields.each do |field|
+        next unless FieldTypes.find(field.type)
+
         sent = raw[field.key]
         sent = nil unless sent.is_a?(String)
         typed[field.key] = sent.to_s

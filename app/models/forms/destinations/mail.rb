@@ -11,6 +11,7 @@ module Forms
     # rule (`MailSettings.one_address?`: no name, no list, no angle
     # brackets), so what is stored is exactly what a mail is sent to.
     module Mail
+      KIND = "mail"
       MAX_RECIPIENTS = 10
       NOT_READY = "not_ready"
 
@@ -44,7 +45,10 @@ module Forms
       # while mail is NOT SET UP is nothing tried: `Failed` with the key
       # `not_ready`, at once and not retried, since waiting does not set mail
       # up. The delivery is then failed, so the submission is kept and listed
-      # as not delivered, with Send again (plan decision 6).
+      # as not delivered, with Send again (plan decision 6), and it is sent
+      # again by itself once mail is set up (`Forms::ResendNotReadyJob`,
+      # every 15 minutes: mail can be set up by host variables, with no save
+      # to hook).
       def deliver(delivery, final_attempt:)
         raise DestinationTypes::Failed.new(key: NOT_READY) unless MailSettings.current.complete?
 

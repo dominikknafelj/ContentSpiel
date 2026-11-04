@@ -17,8 +17,29 @@
 # address (`MailSettings.one_address?`, the sender's own rule, so a header
 # can never carry a list or a name the visitor typed). A form with no such
 # answer has none, and a reply goes to the sender address.
+#
+# NEVER LOGGED WHOLE. Action Mailer's log subscriber writes every delivered
+# mail in full at debug (`ActionMailer::LogSubscriber#deliver`, from the
+# `deliver.action_mailer` payload's `:mail`), which for this mailer is the
+# answers and the visitor's address. The payload is filled by the mailer
+# class's `set_payload_for_mail`, so this mailer puts a placeholder in the
+# place of the encoded mail: the debug line says the mail is not logged,
+# whatever `RAILS_LOG_LEVEL` says, and the info line ("Delivered mail
+# <id>") stays (test/mailers/forms_mailer_test.rb: "a form's mail is in no
+# log line, at debug either"). The other mailers are logged as Rails logs
+# them (docs/reference/hosting.md).
 class FormsMailer < ApplicationMailer
+  NOT_LOGGED = "(a form's mail is not logged: it holds a visitor's answers)".freeze
+
   helper_method :answers, :sent_at, :language_name, :page_title
+
+  # Rails' private class hook that fills the delivery's payload; the
+  # payload's `:mail` is the one member that holds the body.
+  def self.set_payload_for_mail(payload, mail)
+    super
+    payload[:mail] = NOT_LOGGED
+  end
+  private_class_method :set_payload_for_mail
 
   def submission(delivery)
     @submission = delivery.submission

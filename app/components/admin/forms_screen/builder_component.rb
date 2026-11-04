@@ -69,6 +69,9 @@ module Admin
 
       def stale? = @stale
 
+      # The form keeps submissions as stored, and holds some.
+      def kept_submissions? = form.persisted? && form.keep_submissions_in_database && form.submissions.exists?
+
       def dirty? = @dirty || stale? || errors.any?
 
       def heading = form.name_was.presence || form.name

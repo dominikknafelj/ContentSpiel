@@ -42,14 +42,25 @@ module Forms
   # (`Forms::Destination#write_secrets!` says how a secret is sealed and
   # written). A stored row no id named is deleted.
   #
+  # DORMANT (CLAUDE.md: removed from its registry is dormant, not gone). A
+  # stored field or destination whose type is no longer registered (a gem
+  # taken out) is carried through the save as it is stored, settings and
+  # secrets untouched, until the editor removes it: the field by its key and
+  # type, the destination by its id and kind (the builder carries it and
+  # draws a Remove, `Admin::FormsScreen::Draft`). Only one GIVEN anew under
+  # an unknown type is refused. Its deliveries fail `unknown_destination`
+  # (`Forms::DeliveryJob`); its field is left out of a send
+  # (`Forms::Answers`).
+  #
   # REFUSALS, each a sentence of `config/locales/admin/forms.en.yml`, checked
   # before anything is written (under the form's row lock, so the stored
   # keys a refusal or a kept key reads are the stored ones): a blank or too
   # long name; more than `Form::MAX_FIELDS` fields; a field with no label in
-  # the default language; an unknown field type; a choice field with no
-  # choices, more than `Form::MAX_CHOICES` or a choice with no label in the
-  # default language; an unknown destination or one whose settings its type
-  # refuses; a form that neither keeps nor has a destination; keeping
+  # the default language; an unknown field type (not a dormant one); a
+  # choice field with no choices, more than `Form::MAX_CHOICES` or a choice
+  # with no label in the default language; an unknown destination (not a
+  # dormant one) or one whose settings its type refuses; a form that
+  # neither keeps nor has a destination; keeping
   # without encryption keys (owner's ruling 2); `keep_days` outside
   # `Form::KEEP_DAYS`; a text under a code that is no language this CMS
   # serves; a trashed form.
@@ -191,10 +202,14 @@ module Forms
         key = kept_key(input["key"], stored.keys, used) { Field.new_key }
         label = texts(input["label"], kept: stored[key]&.label)
         name = label[Locales.default] || sentence(:field_at, position: index + 1)
-        refusals << sentence(:unknown_field_type, type: input["type"].to_s) unless type
+        dormant = type.nil? && stored[key]&.type == input["type"].to_s
+        refusals << sentence(:unknown_field_type, type: input["type"].to_s) unless type || dormant
         refusals << sentence(:label_missing, position: index + 1, language: default_language) unless label.key?(Locales.default)
 
-        settings = type ? field_settings(type, input, stored[key], name, refusals) : {}
+        settings = if type then field_settings(type, input, stored[key], name, refusals)
+        elsif dormant then stored[key].settings.deep_dup
+        else {}
+        end
         { "key" => key, "type" => input["type"].to_s, "required" => ActiveModel::Type::Boolean.new.cast(input["required"]) == true,
           "label" => label, "help" => texts(input["help"], kept: stored[key]&.help), "settings" => settings }
       end
@@ -256,6 +271,13 @@ module Forms
         destination = matched(existing, input, taken) || Destination.new(form: @form)
         taken << destination.id if destination.persisted?
         type = DestinationTypes.find(input["kind"])
+        # DORMANT: a stored row of a type no longer registered, named by its
+        # id, keeps its settings and secrets as they are and only takes its
+        # place in the list (`Forms::Destination` lets such a row be).
+        if type.nil? && destination.persisted?
+          destination.position = index
+          next [ destination, {} ]
+        end
         destination.assign_attributes(kind: input["kind"].to_s, position: index, settings: settings_of(type, input["settings"]))
         secrets = type ? input["secrets"].to_h.slice(*type.secrets).transform_values(&:to_s).reject { |_, value| value.strip.empty? } : {}
         [ destination, secrets ]

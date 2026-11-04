@@ -124,6 +124,40 @@ class Forms::SaveTest < ActiveSupport::TestCase
     assert_refused sentence(:unknown_destination, kind: "acme/crm"), destinations: [ { kind: "acme/crm", settings: {}, secrets: {} } ]
   end
 
+  # CLAUDE.md: removed from its registry is dormant, not gone. A gem taken
+  # out leaves its stored destination and field types unregistered: a save
+  # carries them as stored until they are removed; only one given anew is
+  # refused (above).
+  test "a stored destination of a type no longer registered is carried through a save, and removed by leaving it out" do
+    form = forms(:contact)
+    dormant = form.destinations.new(kind: "acme/crm", position: 1, settings: { "list" => "subscribers" }, secrets: { "api_key" => "sealed" })
+    dormant.save!(validate: false)
+    mail = form_destinations(:contact_mail)
+    given = [ { id: mail.id, kind: "mail", settings: mail.settings, secrets: {} }, { id: dormant.id, kind: "acme/crm", settings: {}, secrets: { api_key: "new" } } ]
+
+    result = save(form, attributes: { name: "Contact us" }, fields: form.fields.map(&:to_h), destinations: given.reverse)
+    assert result.ok?, result.errors.to_sentence
+    dormant.reload
+    assert_equal [ 0, { "list" => "subscribers" }, { "api_key" => "sealed" } ], [ dormant.position, dormant.settings, dormant.secrets ], "kept as stored, in its new place"
+
+    result = save(form.reload, attributes: { name: "Contact us" }, fields: form.fields.map(&:to_h), destinations: given.first(1))
+    assert result.ok?, result.errors.to_sentence
+    assert_equal [ mail.id ], form.reload.destinations.pluck(:id)
+  end
+
+  test "a stored field of a type no longer registered is carried through a save, settings and all" do
+    form = forms(:contact)
+    stored = { "key" => "f_star0001", "type" => "acme/rating", "required" => true, "label" => { "en" => "Stars" }, "help" => {}, "settings" => { "max" => 5 } }
+    form.update_columns(fields: form.fields.map(&:to_h) + [ stored ]) # version: none (a test's row)
+
+    result = save(form.reload, attributes: { name: "Contact" }, fields: form.fields.map(&:to_h), destinations: [ mail_to.merge(id: form_destinations(:contact_mail).id) ])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal stored, form.reload.fields.last.to_h
+
+    assert_refused sentence(:unknown_field_type, type: "acme/rating"), form: form,
+      attributes: { name: "Contact" }, fields: form.fields.map(&:to_h) + [ field("More", type: "acme/rating") ]
+  end
+
   test "a destination whose settings are wrong is refused with the type's sentence" do
     assert_refused "“nobody” is not one mail address.", destinations: [ mail_to("nobody") ]
   end

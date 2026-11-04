@@ -96,7 +96,7 @@
 
     <% if default_tab? %>
       <%= render Admin::FormsScreen::DestinationsComponent.new(draft: draft, locale: locale, keys: keys?, mail_settings: mail_settings,
-            errors: errors_at("destinations"), mail_errors: errors_at("mail")) %>
+            errors: errors_at("destinations"), mail_errors: errors_at("mail"), kept_submissions: kept_submissions?) %>
     <% end %>
 
     <%= render Admin::FormsScreen::PlacementsComponent.new(placements: placements, url_options: url_options) %>

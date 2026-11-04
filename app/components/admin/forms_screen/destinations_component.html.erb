@@ -16,7 +16,11 @@
           </div>
           <p id="form-keep-days-help" class="mt-1.5 text-sm text-meta"><%= t(".keep_days_help", days: site_days) %></p>
         </div>
-        <p class="<%= INDENT %> mt-2 text-sm text-meta" data-when-unchecked <%= "hidden" if draft.keep_submissions %>><%= t(".not_kept") %></p>
+        <p class="<%= INDENT %> mt-2 text-sm text-meta" data-when-unchecked <%= "hidden" if draft.keep_submissions %>><%= t(".not_kept", days: undelivered_days) %></p>
+        <% if kept_submissions? %>
+          <%# A placeholder of the forms work for the Design System: one warn line, only while the box is unticked on a form that keeps submissions now. %>
+          <p class="<%= INDENT %> mt-1.5 text-sm font-medium text-warn-ink" data-when-unchecked data-forms-warning="unkeep" <%= "hidden" if draft.keep_submissions %>><%= t(".unkeep") %></p>
+        <% end %>
       <% else %>
         <div class="<%= WARN_CLASS %>" data-forms-warning="keys"><p><%= t(".no_keys") %></p></div>
       <% end %>
@@ -33,7 +37,7 @@
           <% if mail?(type) %>
             <% if mail_warning? %>
               <div class="<%= WARN_CLASS %>" data-forms-warning="mail">
-                <p><%= t(".mail_not_ready") %><span data-unless-kept <%= "hidden" if keeping? %>> <%= t(".wait_days") %></span></p>
+                <p><%= t(".mail_not_ready") %><span data-unless-kept <%= "hidden" if keeping? %>> <%= t(".wait_unkept") %></span></p>
                 <% if settings_link? %>
                   <p class="mt-1"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
                 <% end %>
@@ -61,6 +65,18 @@
               </div>
             <% end %>
           <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <% draft.dormant.each do |dormant| %>
+      <%# A destination of a type no longer registered (a gem taken out): its stored kind, why it does nothing, and a box that removes it at the Save (`Draft#dormant`). %>
+      <div id="form-destination-dormant-<%= dormant.id %>" data-forms-section="dormant">
+        <p class="text-sm font-semibold text-ink"><%= dormant.kind %></p>
+        <div class="<%= WARN_CLASS %> mt-2" data-forms-warning="dormant"><p><%= t(".dormant") %></p></div>
+        <div class="mt-2">
+          <%= render Admin::Ui::CheckboxComponent.new(name: "form[remove_destinations][]", value: dormant.id, checked: dormant.removed,
+                id: "form-destination-dormant-#{dormant.id}-remove", label: t(".remove_dormant")) %>
         </div>
       </div>
     <% end %>

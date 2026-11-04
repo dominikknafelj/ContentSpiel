@@ -67,8 +67,13 @@ module Forms
       submission = nil
       ActiveRecord::Base.transaction do
         # The early answer above came from the copy the caller holds; this
-        # one, under the lock, is the one that counts.
-        @form.lock!
+        # one, under the lock, is the one that counts. `lock!` reads the row
+        # again, so a form purged since raises `RecordNotFound`: GONE too.
+        begin
+          @form.lock!
+        rescue ActiveRecord::RecordNotFound
+          raise ActiveRecord::Rollback
+        end
         raise ActiveRecord::Rollback if @form.trashed?
 
         submission = Submission.create!(form: @form, page: @page, locale: @locale, answers: cleaned.values)

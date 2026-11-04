@@ -80,6 +80,33 @@ class Forms::SubmitTest < ActiveSupport::TestCase
     assert_no_enqueued_jobs
   end
 
+  # The race the lock is there for: the endpoint read the form, then it was
+  # purged before `Submit` locked it. `lock!` reloads, and a row that is gone
+  # is GONE, never a 500.
+  test "a form purged between the endpoint's read and the lock answers GONE and writes nothing" do
+    form = forms(:contact)
+    Forms::Form.where(id: form.id).delete_all # version: none (a test removes the row under a copy it holds)
+    before = counts
+
+    result = send_as_visitor(form)
+
+    assert_equal [ Forms::Submit::GONE ], result.errors
+    assert_equal before, counts
+    assert_no_enqueued_jobs
+  end
+
+  # A gem taken out leaves its field types dormant: the block draws no such
+  # field, so a send of the form is stored with the answers it was shown.
+  test "a form holding a field of a type no longer registered still takes a send" do
+    form = forms(:contact)
+    form.update_columns(fields: form.fields.map(&:to_h) + [ { "key" => "f_star0001", "type" => "acme/rating", "required" => true, "label" => { "en" => "Stars" } } ]) # version: none (a test's row)
+
+    result = send_as_visitor(form.reload)
+
+    assert result.ok?, result.errors.inspect
+    assert_equal ANSWERS.keys, result.record.reload.answers.map { |row| row["key"] }
+  end
+
   test "the event is the form's, names the submission by id, holds no answer, no actor row, no IP, and its channel is public" do
     form = forms(:contact)
     result = Current.set(ip_address: "203.0.113.7", request_id: "req-1") { send_as_visitor(form) }

@@ -11,10 +11,19 @@ module Admin
     # the warn box says the form takes no answers (owner's ruling 2): a
     # submission can't be kept, even for a moment.
     #
+    # Unticking the box on a form that keeps submissions now draws one warn
+    # line under it: tonight's clean-up deletes those already kept.
+    #
     # MAIL. The recipients while ticked; first in the section, while mail is
     # not set up (`MailSettings#complete?`: a form mail is tried in every
-    # other state, ruling R18), the warn box, adding that submissions wait
-    # at most 30 days when the form keeps nothing.
+    # other state, ruling R18), the warn box: submissions are sent once it is
+    # (`Forms::ResendNotReadyJob`), and on a form that keeps nothing they
+    # wait until then (`Forms::PurgeExpiredJob` spares them while mail is
+    # not set up).
+    #
+    # A DORMANT destination (a type no longer registered) after the rest:
+    # its stored kind, the line saying its type isn't installed, and the box
+    # that removes it at the Save (`Draft#dormant`).
     #
     # A GEM'S DESTINATION: its fields through `Admin::Ui::FieldComponent`,
     # and each secret as the mail login is shown: "Set on <date>" or "Not
@@ -31,8 +40,9 @@ module Admin
       WARN_CLASS = ListComponent::WARN_CLASS
       INDENT = "pl-[26px]".freeze
 
-      def initialize(draft:, locale:, keys:, mail_settings:, errors: [], mail_errors: [])
+      def initialize(draft:, locale:, keys:, mail_settings:, errors: [], mail_errors: [], kept_submissions: false)
         @draft = draft
+        @kept_submissions = kept_submissions
         @locale = locale
         @keys = keys
         @mail_settings = mail_settings
@@ -45,6 +55,13 @@ module Admin
       attr_reader :draft, :locale, :mail_settings, :errors, :mail_errors
 
       def keys? = @keys
+
+      # Whether the form keeps submissions as STORED and has some: then
+      # unticking the box warns that tonight's clean-up deletes them
+      # (`Forms::PurgeExpiredJob` treats the form as keeping nothing).
+      def kept_submissions? = keys? && @kept_submissions
+
+      def undelivered_days = Forms::UNDELIVERED_DAYS
 
       def keeping? = keys? && draft.keep_submissions
 

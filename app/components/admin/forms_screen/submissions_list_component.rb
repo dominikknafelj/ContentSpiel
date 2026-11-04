@@ -39,7 +39,7 @@ module Admin
 
       def keeps? = form.keeps?
 
-      def keeping_line = keeps? ? t(".kept", count: form.effective_keep_days) : t(".not_kept")
+      def keeping_line = keeps? ? t(".kept", count: form.effective_keep_days) : t(".not_kept", days: Forms::UNDELIVERED_DAYS)
 
       def empty_key = keeps? ? "empty" : "empty_not_kept"
 

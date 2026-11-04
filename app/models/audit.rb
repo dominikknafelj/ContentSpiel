@@ -56,7 +56,11 @@ module Audit
     # the one thing about a visitor the log would otherwise keep. Its events
     # never coalesce: each send is its own moment, and an open row of a
     # "nil actor" would be the system's.
-    visitor = actor.is_a?(AccessControl::Visitor)
+    # THE instance (`Visitor.one?`, `equal?`), as the checker asks: a copy
+    # (`dup`, `clone`) is no visitor, and no actor the log can name either,
+    # so it is refused here rather than written as somebody.
+    visitor = AccessControl::Visitor.one?(actor)
+    raise ArgumentError, "a copy of the visitor is no actor: the visitor is one instance (Visitor::ONE)" if !visitor && actor.is_a?(AccessControl::Visitor)
     coalesce = false if visitor
     actor = nil if visitor
     attributes = {

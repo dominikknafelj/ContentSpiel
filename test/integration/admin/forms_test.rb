@@ -155,18 +155,18 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
 
     with_mail_state(:working) do
       get admin_form_path(contact)
-      assert_select "p:not([hidden])", text: t("destinations.not_kept")
+      assert_select "p:not([hidden])", text: t("destinations.not_kept", days: Forms::UNDELIVERED_DAYS)
       assert_select "*", text: /#{Regexp.escape(t("destinations.mail_not_ready"))}/, count: 0
       assert_select "*", text: /#{Regexp.escape(t("destinations.no_keys"))}/, count: 0
       assert_select "input[type=checkbox][name='form[keep_submissions]']"
 
       get admin_form_path(newsletter)
-      assert_select "p:not([hidden])", text: t("destinations.not_kept"), count: 0
+      assert_select "p:not([hidden])", text: t("destinations.not_kept", days: Forms::UNDELIVERED_DAYS), count: 0
     end
 
     with_mail_state(:not_set_up) do
       get admin_form_path(contact)
-      assert_select "div", text: /#{Regexp.escape(t("destinations.mail_not_ready"))}.*#{Regexp.escape(t("destinations.wait_days"))}/
+      assert_select "div", text: /#{Regexp.escape(t("destinations.mail_not_ready"))}.*#{Regexp.escape(t("destinations.wait_unkept"))}/
       get admin_forms_path
       assert_select "div", text: /#{Regexp.escape(t("list.mail_not_ready"))}/
     end
@@ -178,6 +178,56 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
       get admin_forms_path
       assert_select "div", text: /#{Regexp.escape(t("list.no_keys"))}/
     end
+  end
+
+  # Forms final review, Minor 6: unticking "Keep" on a form that keeps
+  # submissions deletes them at the next nightly clean-up, so the builder
+  # says so under the box, drawn hidden while it is ticked (the script shows
+  # it as the box is unticked), and only on a form that holds some.
+  test "the builder warns that turning keeping off deletes the kept submissions, only on a form that keeps some" do
+    newsletter = forms(:newsletter)
+    sign_in_as users(:two)
+
+    get admin_form_path(newsletter)
+    assert_select "[data-forms-warning=unkeep]", count: 0
+
+    Forms::Submission.create!(form: newsletter, locale: "en", answers: [])
+    get admin_form_path(newsletter)
+    assert_select "[data-forms-section=keep] p[data-when-unchecked][data-forms-warning=unkeep][hidden]", text: t("destinations.unkeep")
+    assert_equal "Turning this off deletes the submissions already kept tonight.", t("destinations.unkeep")
+
+    get admin_form_path(forms(:contact))
+    assert_select "[data-forms-warning=unkeep]", count: 0
+  end
+
+  # Forms final review, Important 1: a destination of a type no longer
+  # registered is dormant: the builder draws its stored kind and says its
+  # type isn't installed, a save carries it as it is, and its Remove box
+  # takes it out at the Save.
+  test "a destination whose type isn't installed is drawn with Remove, carried through a save, and removed by Remove" do
+    form = forms(:contact)
+    dormant = form.destinations.new(kind: "acme/crm", position: 1, settings: { "list" => "subscribers" })
+    dormant.save!(validate: false)
+    mail = form_destinations(:contact_mail)
+    sign_in_as users(:two)
+
+    get admin_form_path(form)
+    assert_response :ok
+    assert_select "#form-destination-dormant-#{dormant.id}" do
+      assert_select "p", text: "acme/crm"
+      assert_select "[data-forms-warning=dormant]", text: t("destinations.dormant")
+      assert_select "input[type=checkbox][name='form[remove_destinations][]'][value='#{dormant.id}']:not([checked])"
+    end
+
+    sections = { "0" => { kind: "mail", id: mail.id, enabled: "1", settings: mail.settings } }
+    patch admin_form_path(form), params: { form: contact_params(name: "Contact us", destinations: sections) }
+    assert_response :redirect
+    assert_equal [ "Contact us", [ mail.id, dormant.id ] ], [ form.reload.name, form.destinations.order(:position).pluck(:id) ]
+    assert_equal({ "list" => "subscribers" }, dormant.reload.settings, "carried as stored")
+
+    patch admin_form_path(form), params: { form: contact_params(destinations: sections, remove_destinations: [ dormant.id.to_s ]) }
+    assert_response :redirect
+    assert_equal [ mail.id ], form.reload.destinations.pluck(:id)
   end
 
   # Ruling R7: the builder's door for a viewer with `form_submissions.view`
