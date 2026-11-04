@@ -105,7 +105,7 @@ module Setup
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
       reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil,
-      mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false)
+      mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false)
       @storage_probe = storage_probe
       @image_probe = image_probe
       @worker_alive_probe = worker_alive_probe
@@ -114,6 +114,7 @@ module Setup
       @mail_settings_link = mail_settings_link
       @image_progress = image_progress
       @image_settings_link = image_settings_link
+      @forms_link = forms_link
       @address = address
       @request_ssl = request_ssl
       @production = production
@@ -134,7 +135,7 @@ module Setup
     end
 
     def run
-      [ site_address, https, theme, storage, image_processing, images, background_jobs, mail ].compact
+      [ site_address, https, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
     end
 
     private
@@ -348,6 +349,27 @@ module Setup
         else
           Result.new(label: "Mail", status: :warning, message: "#{message} #{MAIL_FALLBACK_MESSAGE}", command: MAIL_FALLBACK_COMMAND, link:)
         end
+      end
+
+      # Forms (forms plan, Task 8): one row, its warnings in sentence order --
+      # no encryption keys (a form then takes no answers at all,
+      # `Forms::Submit`), mail not set up while a form mails (the very test a
+      # delivery's `not_ready` failure uses, `MailSettings#complete?`: form
+      # mail is tried whenever mail is set up, ruling R18), then submissions
+      # whose delivery failed (a link to the Forms screen). Only kept (not
+      # trashed) forms count.
+      def forms
+        return ok("Forms", I18n.t("admin.system_status.forms.none")) unless Forms::Form.kept.exists?
+
+        sentences = []
+        sentences << I18n.t("admin.system_status.forms.no_keys") unless Forms::Encryption.available?
+        mailing = Forms::Form.mailing.count
+        sentences << I18n.t("admin.system_status.forms.mail_not_set_up", count: mailing) if mailing.positive? && !(@mail_settings || MailSettings.current).complete?
+        undelivered = Forms::SubmissionCounts.undelivered_in_kept_forms
+        sentences << I18n.t("admin.system_status.forms.undelivered", count: undelivered) if undelivered.positive?
+        return ok("Forms", I18n.t("admin.system_status.forms.working")) if sentences.empty?
+
+        Result.new(label: "Forms", status: :warning, message: sentences.join(" "), link: (:forms if undelivered.positive? && @forms_link))
       end
 
       def probe(callable)

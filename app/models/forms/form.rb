@@ -57,6 +57,10 @@ module Forms
     # by `Forms::Save` (`fields=` takes the list of hashes it stores).
     def fields = Array(super).map { |field| Field.from_h(field) }
 
+    # Kept forms with a mail destination: the ones a site without mail set up
+    # leaves unable to send (System status's Forms row).
+    scope :mailing, -> { kept.where(id: Destination.where(kind: "mail").select(:form_id)) }
+
     def keeps? = keep_submissions && Encryption.available?
 
     # Days a submission is kept: the form's own, else the site's default

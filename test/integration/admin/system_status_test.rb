@@ -132,6 +132,22 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     assert_select "a", text: "Open Image settings →", count: 0
   end
 
+  test "the Forms row is on the screen, with its link when submissions weren't delivered" do
+    sign_in_as(users(:one))
+    with_mail_state(:working) do
+      get "/cs-studio/system_status"
+      assert_select "li[data-status=ok]", text: /Forms.*Forms are working\./m
+      assert_select "a", text: "Open Forms →", count: 0
+
+      submission = Forms::Submission.create!(form: forms(:contact), locale: "en", answers: [])
+      Forms::Delivery.create!(submission: submission, kind: "mail", state: "failed")
+      get "/cs-studio/system_status"
+      assert_select "li[data-status=warning]", text: /Forms.*1 submission wasn't delivered\./m do
+        assert_select "a[href=?]", "/cs-studio/forms", text: "Open Forms →"
+      end
+    end
+  end
+
   test "someone who may view System status but not manage Settings is shown the state and no link" do
     viewer = users(:reader)
     access_control_groups(:read_only).grants.create!(permission: "system_status.view", scope: {})

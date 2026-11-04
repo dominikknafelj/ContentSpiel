@@ -8,7 +8,8 @@ module Admin
 
     def show
       @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?,
-        mail_settings_link: can?("settings.manage"), image_settings_link: can?("settings.manage"))
+        mail_settings_link: can?("settings.manage"), image_settings_link: can?("settings.manage"),
+        forms_link: holds_any?(%w[forms.manage form_submissions.view]))
     end
   end
 end

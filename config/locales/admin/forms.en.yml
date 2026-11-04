@@ -4,6 +4,19 @@
 # Forms screen's own words are `admin.components.forms_screen` (Task 4).
 en:
   admin:
+    # System status's Forms row (`Setup::SystemCheck#forms`): its sentences
+    # are joined into the one row, in this order when several hold.
+    system_status:
+      forms:
+        none: "No forms yet."
+        working: "Forms are working."
+        no_keys: "This site has no encryption keys, so its forms can't take answers."
+        mail_not_set_up:
+          one: "Mail isn't set up, so %{count} form doesn't send its mail."
+          other: "Mail isn't set up, so %{count} forms don't send their mail."
+        undelivered:
+          one: "%{count} submission wasn't delivered."
+          other: "%{count} submissions weren't delivered."
     forms:
       save:
         name_blank: "A form needs a name."

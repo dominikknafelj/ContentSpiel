@@ -34,6 +34,8 @@ module Admin
 
       def trash_retention_days = field(:trash_retention_days) { site.trash_retention_days }
 
+      def form_keep_days = field(:form_keep_days) { site.form_keep_days }
+
       def ai_provider = field(:ai_provider) { site.ai_provider }
 
       def ai_model = field(:ai_model) { site.ai_model }

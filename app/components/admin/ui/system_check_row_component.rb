@@ -23,11 +23,12 @@ module Admin
     # `settings.manage`); without an address there is no link, whatever the
     # result says.
     class SystemCheckRowComponent < AdminComponent
-      def initialize(result:, copyable: true, mail_settings_href: nil, image_settings_href: nil)
+      def initialize(result:, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil)
         @result = result
         @copyable = copyable
         @mail_settings_href = mail_settings_href
         @image_settings_href = image_settings_href
+        @forms_href = forms_href
       end
 
       private
@@ -37,6 +38,8 @@ module Admin
       def mail_settings_link? = result.link == :mail_settings && @mail_settings_href.present?
 
       def image_settings_link? = result.link == :image_settings && @image_settings_href.present?
+
+      def forms_link? = result.link == :forms && @forms_href.present?
 
       def copyable? = @copyable && result.command.present?
 
