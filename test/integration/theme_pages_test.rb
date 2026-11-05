@@ -1170,6 +1170,8 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   test "nothing of a theme reaches the form's plain pages" do
     clear_form_send_limits
     form = forms(:contact)
+    # A form takes sends only from a live page that places it.
+    page = Current.set(actor: users(:one)) { place_form(create_page(title: "Contact us"), form) }
     answers = { "f_name0001" => "Ada", "f_mail0001" => "ada@example.com" }
     with_leaking_theme do
       dir = Pathname(@leaking_views).dirname
@@ -1178,12 +1180,12 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       component.write("#{LEAK}-FIELD\n")
       assert_theme_reached_the_public_page
 
-      post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) }
+      post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) }
       assert_no_theme_here
       assert_equal "FormSendsController", controller.class.name
       assert_select "[role=status]"
 
-      post form_send_path(form), params: { answers: answers.merge("f_name0001" => ""), drawn: aged_drawn(form) }
+      post form_send_path(form), params: { answers: answers.merge("f_name0001" => ""), page_id: page.id, drawn: aged_drawn(form) }
       assert_response :unprocessable_content
       assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
       assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
@@ -1199,10 +1201,10 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
       end
       post form_send_path(form_id: 0), params: { answers: answers }
       refusal.call(:not_found, :gone)
-      without_encryption_keys { post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) } }
+      without_encryption_keys { post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) } }
       refusal.call(:service_unavailable, :unavailable)
       # Four sends so far from this address: the fifth is taken, the sixth refused.
-      2.times { post form_send_path(form), params: { answers: answers, drawn: aged_drawn(form) } }
+      2.times { post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) } }
       refusal.call(:too_many_requests, :rate_limited)
     end
   end

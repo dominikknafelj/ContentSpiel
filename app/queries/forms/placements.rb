@@ -48,7 +48,8 @@ module Forms
     # .visible_among`) whose PUBLISHED copy holds a Form block of this form,
     # since that is what the visitor was shown. A draft, a page that does not
     # place the form, or one whose Form block is still only in its rows is
-    # nil: the submission stores no page and the link back goes home.
+    # nil: the endpoint then takes no send for the form at all, and answers
+    # it as an unknown form (`FormSendsController`, the owner's rule).
     # Unlike the rest of this class it reads what the public sees, not the
     # rows, which are CS Studio's view.
     def self.live_page(form, page_id)

@@ -6,7 +6,8 @@
     fields, and the draw token the visitor SENT (`drawn_token`), so a
     quick correction is not dropped as too fast. No token of the
     application's: the send takes none (`FormSendsController`). The page
-    the form came from is carried only when it was believed
+    the form came from is carried as it was believed: a send reaches this
+    page only from a live page that places the form
     (`Forms::Placements.live_page`). %>
 <%= render "form_sends/heading", key: :invalid %>
 

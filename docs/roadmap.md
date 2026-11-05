@@ -869,13 +869,13 @@ Left by Forms (spec "As built"; `docs/reference/forms.md`). Each line ends with 
 
 - **The starter form's labels are English on a non-English site**: New form writes "Name", "Email" and "Message" from admin keys into the form's default-language texts, so a German site's starter reads English until renamed. An open question for the owner: acceptable, or offer the starter only when the default language is English.
 - **The CMS's words to a visitor are English** (`public.forms`: the required word, the errors, the thank-you a form has none of, the plain pages): read in the visitor's language with English as the explicit fallback, and no `public.de.yml` exists ("Next", item 7).
-- **A send from `/preview` is a real submission**, stored with no page: the endpoint cannot tell. The guide says so; close it if editors ask for a test mode.
+- **A send from `/preview` is a real submission** when the previewed page is live and places the form (the endpoint cannot tell), and refused from a draft page's preview (the owner's decision on M-2: a form takes sends only from a live page that places it). The guide says so; close it if editors ask for a test mode.
 - **The clean-up locks every submission of a keep-nothing form for that form's transaction** (`Forms::PurgeExpiredJob#delivered_ids`): such a form holds a few undelivered submissions; batch the locks if one ever holds a backlog.
 - **The two rate limits' stores are one rule written twice** (`Forms::SendLimit.store`, `MailTestLimit.store`): a shared helper when a third limit comes.
 - **Behind a CDN every visitor is one visitor to the rate limit** unless the CDN's ranges are in `config.action_dispatch.trusted_proxies` (`docs/reference/hosting.md`, "Forms"); nothing detects it. Close it with a System status check, or a boot warning, when a site's requests all arrive from one public address.
 - **A failure after a real send marks the delivery failed**, and Send again may send the mail twice; a transient error is a permanent failure that waits for Send again. Look again if a destination's errors after a send prove common.
 - **"Mail to …" lists the recipients as they are now**, not as they were at the send: a delivery stores no address.
-- **A submission from a purged page reads "—"**, as one that stored no page: `page_id` nullifies. A column of its own would tell them apart.
+- **A submission from a purged page reads "—"**: `page_id` nullifies (every submission is made with its page). A column of its own would tell them apart.
 - **No selection column** to delete several submissions: one and all only. The posts list's bulk bar is the pattern if editors clean up spam by hand.
 - **Fields are reordered with ↑ and ↓, with no drag**, and a field's type cannot be changed once added; no per-field length limit beyond the type's (500, 5,000). Each is a design question left for editors to ask.
 - **Nothing reads a theme's own Form template** for the honeypot's hiding, `data-turbo="false"` or the labels (`docs/reference/theming.md`, "Rules a change can break silently").

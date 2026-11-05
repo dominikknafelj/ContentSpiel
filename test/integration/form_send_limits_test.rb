@@ -12,10 +12,15 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
   setup do
     clear_form_send_limits
     @form = forms(:contact)
+    # A form takes sends only from a live page that places it.
+    @pages = Current.set(actor: users(:one)) do
+      { @form => place_form(create_page(title: "Contact us"), @form),
+        forms(:newsletter) => place_form(create_page(title: "Sign up"), forms(:newsletter)) }
+    end
   end
 
   def send_form(form = @form, from: "203.0.113.1", json: false, **extra)
-    post form_send_path(form), params: { answers: ANSWERS, locale: "en", drawn: aged_drawn(form), website: "" }.merge(extra),
+    post form_send_path(form), params: { answers: ANSWERS, locale: "en", page_id: @pages[form]&.id, drawn: aged_drawn(form), website: "" }.merge(extra),
       env: { "REMOTE_ADDR" => from }, headers: json ? { "Accept" => "application/json" } : {}
   end
 
@@ -34,7 +39,7 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
       assert_nil response.headers["Set-Cookie"]
       assert_select "h1", text: "Too many messages"
       assert_select "main p", text: TOO_MANY
-      assert_select "main a[href='/']"
+      assert_select "main a[href='/sign-up']", nil, "the link goes back to the page the send named"
 
       send_form(json: true)
       assert_response :too_many_requests
@@ -67,13 +72,31 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
+  # A send refused because it names no live page placing the form is
+  # answered as an unknown id is, and counts as one: in the visitor's limit
+  # and in the form's, which keys on the id as sent.
+  test "a refused send counts in both limits, as a send to an unknown form does" do
+    5.times { send_form(page_id: nil) }
+    assert_response :not_found
+    send_form
+    assert_response :too_many_requests, "the visitor's five were spent on refused sends"
+
+    clear_form_send_limits
+    30.times { |index| send_form(from: "198.51.100.#{index + 1}", page_id: nil) }
+    assert_response :not_found
+    assert_no_difference "Forms::Submission.count" do
+      send_form(from: "198.51.100.200")
+      assert_response :too_many_requests, "the form's thirty were spent on refused sends"
+    end
+  end
+
   # The route takes `007` as form 7, so the count is keyed on the number:
   # leading zeros do not give a flood a fresh counter per address.
   test "sends to one form under addresses with leading zeros share the form's count" do
-    30.times { |index| post "/forms/#{"0" * (index % 3)}#{@form.id}", params: { answers: ANSWERS, locale: "en", drawn: aged_drawn(@form), website: "filled" }, env: { "REMOTE_ADDR" => "198.51.100.#{index + 1}" } }
+    30.times { |index| post "/forms/#{"0" * (index % 3)}#{@form.id}", params: { answers: ANSWERS, locale: "en", page_id: @pages[@form].id, drawn: aged_drawn(@form), website: "filled" }, env: { "REMOTE_ADDR" => "198.51.100.#{index + 1}" } }
     assert_response :ok
 
-    post "/forms/00#{@form.id}", params: { answers: ANSWERS, locale: "en", drawn: aged_drawn(@form), website: "" }, env: { "REMOTE_ADDR" => "198.51.100.200" }
+    post "/forms/00#{@form.id}", params: { answers: ANSWERS, locale: "en", page_id: @pages[@form].id, drawn: aged_drawn(@form), website: "" }, env: { "REMOTE_ADDR" => "198.51.100.200" }
     assert_response :too_many_requests
     assert_includes store_keys, "rate-limit:form_sends:form_send_form:#{@form.id}"
   end

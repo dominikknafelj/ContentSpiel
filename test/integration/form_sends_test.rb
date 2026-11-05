@@ -121,7 +121,9 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     # A radio group is linked at its first radio (a fieldset takes no
     # focus), the box unticked and the choice not one of the choices.
     newsletter = forms(:newsletter)
-    send_form(newsletter, answers: { "f_mail0002" => "ada@example.com", "f_topic002" => "c_bogus0001" }, page: nil)
+    signup = Current.set(actor: users(:one)) { create_page(title: "Sign up") }
+    place_form(signup, newsletter)
+    send_form(newsletter, answers: { "f_mail0002" => "ada@example.com", "f_topic002" => "c_bogus0001" }, page: signup)
     assert_response :unprocessable_content
     assert_select "[role=alert]" do
       assert_select "a[href='#form-send-f_topic002-c_news0001']", text: "Topic: Please choose one of the options."
@@ -130,7 +132,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_select "fieldset input[type=radio][aria-invalid=true]", count: 2
     assert_select "input[type=checkbox]#form-send-f_okay0002:not([checked])"
     assert_select "button[type=submit]", text: "Subscribe"
-    assert_back_link "/"
+    assert_back_link "/sign-up"
 
     send_form(answers: ANSWERS.merge("f_name0001" => ""), json: true)
     assert_response :unprocessable_content
@@ -218,29 +220,78 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The page a send names is the visitor's to name,
-  # so it is believed only when the public can see it and it places this
-  # form; otherwise nothing is stored for it and the link goes home.
-  test "a page that is not live, or does not place the form, is not stored and the link back goes home" do
+  # What an unknown form answers, by `Accept`: the reference a refused send
+  # is held to, status, type and body alike, so a probe learns nothing from
+  # the answer about a form that exists but takes no sends.
+  def unknown_form_answer(json:, locale: "en")
+    post form_send_path(form_id: 0), params: { answers: ANSWERS, locale: locale, page_id: @page.id, drawn: aged_drawn(@form), website: "" },
+      headers: json ? { "Accept" => "application/json" } : {}
+    assert_response :not_found
+    [ response.status, response.media_type, response.body ]
+  end
+
+  def assert_refused_as_unknown(label, form: @form, **send)
+    expected = [ unknown_form_answer(json: false), unknown_form_answer(json: true) ]
+    assert_nothing_written do
+      actual = [ false, true ].map do |json|
+        send_form(form, json: json, **send)
+        [ response.status, response.media_type, response.body ]
+      end
+      assert_equal expected, actual, label
+    end
+    assert_includes response.headers["Cache-Control"], "no-store"
+    assert_nil response.headers["Set-Cookie"]
+  end
+
+  # The owner's rule (2026-11-05, review M-2): a form takes a send only when
+  # it has a field a visitor is drawn AND the send names a live page whose
+  # published copy places it (`Forms::Placements.live_page`). Anything else
+  # is answered as a form that does not exist and stores, mails and records
+  # nothing; so every submission is made with its page.
+  test "a form with no field a visitor is drawn is refused as an unknown form is" do
+    @form.update_columns(fields: []) # version: none (a test's row)
+    assert_refused_as_unknown("no fields")
+
+    # Only a dormant field (a gem taken out): the block draws nothing either.
+    clear_form_send_limits # four sends a case: six from one address at most
+    @form.update_columns(fields: [ { "key" => "f_star0001", "type" => "acme/gone", "required" => false, "label" => { "en" => "Stars" } } ]) # version: none (a test's row)
+    assert_refused_as_unknown("only a dormant field")
+  end
+
+  test "a send that names no live page placing the form is refused as an unknown form is" do
+    clear_form_send_limits
     draft = Current.set(actor: users(:one)) { create_page(title: "Draft contact", published: false) }
     place_form(draft, @form, publish: false)
     elsewhere = Current.set(actor: users(:one)) { create_page(title: "Elsewhere") }
     unpublished_block = Current.set(actor: users(:one)) { create_page(title: "Not yet") }
     place_form(unpublished_block, @form, publish: false)
 
-    [ draft, elsewhere, unpublished_block ].each do |page|
-      send_form(page: page)
-      assert_response :ok
-      assert_nil Forms::Submission.last.page, page.title
-      assert_back_link "/"
+    { "a draft page" => { page: draft }, "a live page that does not place it" => { page: elsewhere },
+      "a live page with the form only in its unpublished changes" => { page: unpublished_block },
+      "no page" => { page: nil }, "a page id that is no number" => { page: nil, page_id: "not-a-number" },
+      "no page, the honeypot filled: refused before the spam measures" => { page: nil, website: "https://spam.example" } }.each do |label, send|
+      clear_form_send_limits # four sends a case: six from one address at most
+      assert_refused_as_unknown(label, **send)
     end
+  end
 
-    send_form(page_id: "not-a-number")
-    assert_nil Forms::Submission.last.page
-    assert_back_link "/"
+  test "a send from a page in the trash, or for a form placed on no page at all, is refused as an unknown form is" do
+    unplaced = forms(:newsletter)
+    newsletter = { "f_mail0002" => "ada@example.com", "f_okay0002" => "1" }
+    assert_refused_as_unknown("a form placed nowhere, naming no page", form: unplaced, answers: newsletter, page: nil)
+    clear_form_send_limits
+    assert_refused_as_unknown("a form placed nowhere, naming a live page of another form", form: unplaced, answers: newsletter)
 
+    clear_form_send_limits
+    assert Current.set(actor: users(:one), channel: :admin) { Trash::Move.call(@page) }.ok?
+    assert_refused_as_unknown("a trashed page")
+  end
+
+  test "every stored submission carries the live page it was sent from" do
     send_form(locale: "de")
-    assert_equal @page, Forms::Submission.last.page
+    assert_response :ok
+    submission = Forms::Submission.last
+    assert_equal @page.id, submission.page_id
     assert_select "html[lang=de]"
   end
 

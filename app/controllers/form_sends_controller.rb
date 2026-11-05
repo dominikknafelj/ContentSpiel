@@ -32,7 +32,7 @@
 #
 #   sent          200  { "status": "sent", "message" }        the form's thank-you, else `public.forms.sent`
 #   invalid       422  { "status": "invalid", "summary", "errors": [{ "key", "message", "item" }] }
-#   gone          404  { "status": "gone", "message" }        no such form, or in the trash
+#   gone          404  { "status": "gone", "message" }        no such form, one that takes no sends (below), or in the trash
 #   rate_limited  429  { "status": "rate_limited", "message" } over a rate limit, told, never answered as sent
 #   unavailable   503  { "status": "unavailable", "message" }  no encryption keys
 #
@@ -58,10 +58,21 @@
 # still does, as for every request of the site: that is the request log's,
 # not this endpoint's, and it holds no answer.
 #
-# THE PAGE a send names (`page_id`) is the visitor's to name, so it is
-# believed only when it is a live page whose published copy places this form
-# (`Forms::Placements.live_page`); otherwise the submission
-# stores no page and the link goes to the site's home.
+# A FORM TAKES A SEND ONLY FROM A LIVE PAGE THAT PLACES IT (the owner's
+# rule, 2026-11-05): it must have a field a visitor is drawn
+# (`Forms::Form#drawn_fields`), and the page the send names (`page_id`, the
+# visitor's to name) must be a live page whose published copy places this
+# form (`Forms::Placements.live_page`). A form that fails either, a form
+# being built and placed nowhere, one placed only on a draft or a trashed
+# page, one with no fields, is NO FORM to this endpoint: `form_record` is
+# nil for it, so it is answered exactly as an unknown id is (`gone`, 404,
+# the link back to the site's home), ahead of the spam measures, and stores,
+# mails and records nothing. It counts in the rate limits as an unknown id
+# does, since they run before the action and key on the id as sent. A probe
+# of the sequential ids therefore learns nothing it could not learn from the
+# public pages, and every submission is made with its page (`page_id` goes
+# nil later only when that page is purged). Its cost: a send from `/preview`
+# of a draft page, or of a form not yet published on its page, is refused.
 class FormSendsController < ActionController::Base
   include Cookieless
 
@@ -143,12 +154,16 @@ class FormSendsController < ActionController::Base
     Current.request_id = request.request_id
   end
 
+  # The form a send is for, or nil: no such id, or a form that takes no
+  # sends (the head's rule), which is then answered as no such id is.
   # Found in the trash too: `Forms::Submit` answers a trashed form GONE under
   # the form's lock, and the page then still links back where it came from.
   def form_record
     return @form_record if defined?(@form_record)
 
-    @form_record = Forms::Form.find_by(id: params[:form_id])
+    form = Forms::Form.find_by(id: params[:form_id])
+    @trusted_page = form && form.drawn_fields.any? ? Forms::Placements.live_page(form, params[:page_id]) : nil
+    @form_record = @trusted_page ? form : nil
   end
 
   # The language the visitor sent in, if the site has it on, else the default.
@@ -159,10 +174,11 @@ class FormSendsController < ActionController::Base
   # Only a Hash is answers; anything else is none (every field blank).
   def answers_param = params[:answers].is_a?(ActionController::Parameters) ? params[:answers] : {}
 
+  # The live page the send came from, set with `form_record`: never nil for
+  # a form this endpoint takes a send for.
   def trusted_page
-    return @trusted_page if defined?(@trusted_page)
-
-    @trusted_page = form_record && Forms::Placements.live_page(form_record, params[:page_id])
+    form_record
+    @trusted_page
   end
 
   # The page's address in the visitor's language, else the site's home there.
