@@ -872,7 +872,6 @@ Left by Forms (spec "As built"; `docs/reference/forms.md`). Each line ends with 
 - **A send from `/preview` is a real submission**, stored with no page: the endpoint cannot tell. The guide says so; close it if editors ask for a test mode.
 - **The clean-up locks every submission of a keep-nothing form for that form's transaction** (`Forms::PurgeExpiredJob#delivered_ids`): such a form holds a few undelivered submissions; batch the locks if one ever holds a backlog.
 - **The two rate limits' stores are one rule written twice** (`Forms::SendLimit.store`, `MailTestLimit.store`): a shared helper when a third limit comes.
-- **No test pins the per-form counter's key** (the per-visitor key is pinned to hold no address).
 - **Behind a CDN every visitor is one visitor to the rate limit** unless the CDN's ranges are in `config.action_dispatch.trusted_proxies` (`docs/reference/hosting.md`, "Forms"); nothing detects it. Close it with a System status check, or a boot warning, when a site's requests all arrive from one public address.
 - **A failure after a real send marks the delivery failed**, and Send again may send the mail twice; a transient error is a permanent failure that waits for Send again. Look again if a destination's errors after a send prove common.
 - **"Mail to …" lists the recipients as they are now**, not as they were at the send: a delivery stores no address.

@@ -190,7 +190,7 @@ Built by `docs/superpowers/plans/2026-11-03-forms.md` in ten tasks on the branch
 
 - The clean-up locks every submission of a keep-nothing form for that form's transaction; batching the locks is left until a form has a backlog large enough to matter.
 - `Forms::SendLimit.store` and `MailTestLimit.store` follow one rule written twice; a shared helper is left.
-- No test pins the per-form counter's key (the per-visitor one is pinned).
+- No test pins the per-form counter's key (the per-visitor one is pinned). Since closed: the key is the form's number, so `/forms/007` counts as `/forms/7` (`test/integration/form_send_limits_test.rb`: "sends to one form under addresses with leading zeros share the form's count").
 - When mail first becomes set up shortly before the 3:30 clean-up, that run applies the plain 30-day rule: a keep-nothing form's submissions older than 30 days can then be deleted before the 15-minute resend sends them.
 - A failure after a real send (a template error after the server took the mail) marks the delivery failed, and Send again could send the mail twice; a transient error is a permanent failure that needs Send again.
 
