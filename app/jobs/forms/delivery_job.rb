@@ -36,8 +36,10 @@ module Forms
   #     the keys can no longer read): the delivery is recorded `failed` with
   #     the key `error` and no line, so it is listed as not delivered, can
   #     be sent again and is swept after `Forms::UNDELIVERED_DAYS` rather
-  #     than waiting for ever, and the error is raised on, so the job fails
-  #     as Active Job's jobs do. The site's mail state is not touched: an
+  #     than waiting for ever, and the job fails as Active Job's jobs do,
+  #     with `Error`: the error's class and backtrace, never its message or
+  #     the error as its cause, since Solid Queue stores and logs both and a
+  #     message can hold an answer. The site's mail state is not touched: an
   #     error that is no failed delivery blames no setting
   #     (`ApplicationMailer.deliver_in_job`).
   #
@@ -54,6 +56,9 @@ module Forms
   class DeliveryJob < ApplicationJob
     ATTEMPTS = 4
     ERROR = "error"
+
+    # What a deliverer's own error is raised on as: its class, no message.
+    class Error < StandardError; end
 
     queue_as :default
 
@@ -88,9 +93,9 @@ module Forms
         return delivery.record_failed!(key: failure.key, line: scrubbed(failure.line, delivery, destination, type), at: Time.current)
       rescue DestinationTypes::Retry
         raise
-      rescue StandardError
+      rescue StandardError => error
         delivery.record_failed!(key: ERROR, line: nil, at: Time.current)
-        raise
+        raise Error.new("a form's delivery failed with #{error.class}").tap { it.set_backtrace(error.backtrace) }, cause: nil
       end
 
       delivery.record_sent!(at: Time.current)

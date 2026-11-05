@@ -222,14 +222,21 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
   end
 
   test "an error that is no failed delivery fails the delivery with the key error and the job, and blames no setting" do
-    register_hook { |_delivery, _final| raise NoMethodError, "undefined method 'name' for nil" }
+    register_hook { |_delivery, _final| raise NoMethodError, "undefined method 'name' for \"ada@example.com\"" }
     form = forms(:contact)
     form.destinations.destroy_all
     form.destinations.create!(kind: "acme/hook", position: 0, settings: { "list" => "news" })
 
     with_mail_state(:working) do
       submission = send_form(form)
-      assert_raises(NoMethodError) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+      # Raised on as an error that names the class and keeps the backtrace,
+      # but not the message or a cause: Solid Queue stores and logs both, and
+      # a message can hold an answer.
+      error = assert_raises(Forms::DeliveryJob::Error) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+      assert_includes error.message, "NoMethodError"
+      assert_not_includes error.message, "ada@example.com"
+      assert_nil error.cause
+      assert_predicate error.backtrace, :present?
 
       delivery = submission.deliveries.reload.sole
       assert_equal [ "failed", "error", nil ], [ delivery.state, delivery.failure["key"], delivery.failure["line"] ]
@@ -244,7 +251,8 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
       submission = send_form
       other = ActiveRecord::Encryption::DerivedSecretKeyProvider.new("keys that are not the site's")
       ActiveRecord::Encryption.with_encryption_context(key_provider: other) do
-        assert_raises(ActiveRecord::Encryption::Errors::Decryption) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+        error = assert_raises(Forms::DeliveryJob::Error) { perform_enqueued_jobs(only: Forms::DeliveryJob) }
+        assert_includes error.message, "ActiveRecord::Encryption::Errors::Decryption"
       end
 
       delivery = submission.deliveries.reload.sole
