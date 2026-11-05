@@ -69,6 +69,17 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
+  # The route takes `007` as form 7, so the count is keyed on the number:
+  # leading zeros do not give a flood a fresh counter per address.
+  test "sends to one form under addresses with leading zeros share the form's count" do
+    30.times { |index| post "/forms/#{"0" * (index % 3)}#{@form.id}", params: { answers: ANSWERS, locale: "en", drawn: aged_drawn(@form), website: "filled" }, env: { "REMOTE_ADDR" => "198.51.100.#{index + 1}" } }
+    assert_response :ok
+
+    post "/forms/00#{@form.id}", params: { answers: ANSWERS, locale: "en", drawn: aged_drawn(@form), website: "" }, env: { "REMOTE_ADDR" => "198.51.100.200" }
+    assert_response :too_many_requests
+    assert_includes store_keys, "rate-limit:form_sends:form_send_form:#{@form.id}"
+  end
+
   test "the cache key holds no address" do
     send_form(from: "203.0.113.7")
 

@@ -23,7 +23,9 @@ module Forms
   # THE VISITOR IS NOT AN ADDRESS IN THE CACHE: the key is an HMAC of the
   # address (`visitor_key`), keyed from `secret_key_base`, so the store
   # (Solid Cache, a table of the database) holds no IP for its ten minutes.
-  # The form's key is its id.
+  # The form's key is its id as a number: the route takes `/forms/007` as
+  # form 7, and keying on the text as sent would give each spelling with
+  # leading zeros a counter of its own.
   #
   # AN IPv6 VISITOR IS THEIR /64. One household or phone is handed a whole
   # /64 and may send from any address in it, so counting the full address
@@ -78,7 +80,7 @@ module Forms
       rate_limit to: VISITOR_LIMIT, within: WITHIN, name: "form_send_visitor", store: SendLimit.store,
         by: -> { Forms::SendLimit.visitor_key(request.remote_ip) }, with: -> { answer_rate_limited }
       rate_limit to: FORM_LIMIT, within: WITHIN, name: "form_send_form", store: SendLimit.store,
-        by: -> { params[:form_id].to_s }, with: -> { answer_rate_limited }
+        by: -> { params[:form_id].to_i.to_s }, with: -> { answer_rate_limited }
     end
   end
 end
