@@ -1,6 +1,5 @@
 module Forms
-  # A form's own spam measures (forms spec, "Sending"; no third-party
-  # captcha), asked of a visitor's send before anything is cleaned or
+  # A form's own spam measures (no third-party captcha), asked of a visitor's send before anything is cleaned or
   # written:
   #
   #   Forms::SpamCheck.call(params, form: form, now: Time.current)
@@ -20,7 +19,7 @@ module Forms
   # form's thank-you, stored nowhere, no event, one log line naming the form
   # and the measure, so a bot learns nothing from the answer. The rate limit
   # is the controller's (`Forms::SendLimit`) and is said to the visitor
-  # (owner's ruling 1).
+  # (a 429, never answered as a success).
   module SpamCheck
     HONEYPOT = "website".freeze
 

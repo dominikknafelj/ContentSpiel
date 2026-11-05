@@ -478,7 +478,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     end
 
     with_mail_state(:untested) do
-      assert_equal :ok, result("Forms", run_check).status, "mail that is set up is tried, tested or not (R18)"
+      assert_equal :ok, result("Forms", run_check).status, "mail that is set up is tried, tested or not"
     end
 
     with_mail_state(:working) do

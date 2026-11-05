@@ -1,13 +1,12 @@
 module Forms
-  # A visitor's send of a form (forms plan, decisions 1 and 6; owner's ruling
-  # 2): when, in which language, from which page, and the answers.
+  # A visitor's send of a form: when, in which language, from which page, and the answers.
   #
   # THE ANSWERS ARE ENCRYPTED at rest (`encrypts :answers`, Active Record
   # encryption with the site's keys), as JSON: the stored shape of
   # `Forms::Answers` (`[{ "key", "type", "label", "value", "display" }]`),
   # whose labels and displays are the default language's as the form said
   # them at the send, so an edit of the form changes no old submission
-  # (Review Focus 3). Nothing else holds an answer: not the audit log (its
+  # Nothing else holds an answer: not the audit log (its
   # events name the submission by id), not a job's arguments (a delivery's
   # Global ID), not a log line, not a URL. Without encryption keys no
   # submission is written at all (`Forms::Submit` answers UNAVAILABLE).
@@ -21,7 +20,7 @@ module Forms
   #
   # Keys that changed or went since a submission was written make its
   # answers unreadable: `#readable?` says so without raising, so a list
-  # can say "Can't be read" and still offer Delete (Review Focus 2).
+  # can say "Can't be read" and still offer Delete.
   class Submission < ApplicationRecord
     self.table_name = "form_submissions"
 

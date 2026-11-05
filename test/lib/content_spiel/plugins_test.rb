@@ -230,7 +230,7 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
       assert_includes entry, %(@source "#{relative.(GalleryAlbum::ROOT)}";)
     end
   end
-  # Forms plan, Task 1: the form field registry has its own hook, replayed on
+  # The form field registry has its own hook, replayed on
   # every prepare after the built-ins, with the owner rules of the block types'.
   def rating_type(**changes)
     { value_type: :integer, label: "Rating", options: [], max_length: nil, summary: false,

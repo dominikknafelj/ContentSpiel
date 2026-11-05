@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # The Forms screen (forms plan, Task 4; design.md 1): the heading and its
+    # The Forms screen: the heading and its
     # line, "+ New form" for `forms.manage`, the two site-wide warnings, and
     # the forms as the card table of the Tags and Trash screens, by name, 50
     # a page. Every number on a row is read once for the whole page here
@@ -10,12 +10,12 @@ module Admin
     # WHO SEES WHAT. Both rights open the screen (the controller's gate).
     # `forms.manage` gets "+ New form", the link to the builder and the ⋯
     # menu; a holder of `form_submissions.view` the submission counts, each
-    # a link to the form's submissions (Task 5), "Submissions" in the menu,
+    # a link to the form's submissions, "Submissions" in the menu,
     # and, for a viewer with that right alone, the name's link to them.
     #
-    # THE WARNINGS (design.md 1), once above the table: mail that is not set
+    # THE WARNINGS, once above the table: mail that is not set
     # up, only when a listed form has a mail destination (`MailSettings
-    # #complete?`: a form mail is tried in every other state, ruling R18);
+    # #complete?`: a form mail is tried in every other state);
     # no encryption keys, for every form. They are warn boxes with no live
     # role: they are there when the page arrives.
     class ListComponent < Admin::AdminComponent

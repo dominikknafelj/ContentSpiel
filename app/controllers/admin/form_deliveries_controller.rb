@@ -1,5 +1,5 @@
 module Admin
-  # Send again (forms plan, Task 5; design.md 3): one failed delivery of a
+  # Send again: one failed delivery of a
   # submission back to waiting and queued again, through `Forms::Resend`
   # (`form_submissions.view`, audited by ids). The answer goes back to the
   # submission with the toast "Sending again.", where the row now reads

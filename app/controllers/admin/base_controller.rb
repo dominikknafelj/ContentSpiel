@@ -55,7 +55,7 @@ module Admin
       { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read", group: :content },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read", group: :content },
       { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload", group: :content },
-      # Either right (forms plan, Task 4; design.md 1): the list opens for a
+      # Either right: the list opens for a
       # holder of `form_submissions.view` as well as `forms.manage`.
       { label: "Forms", icon: :clipboard_list, path: :admin_forms_path, permission: %w[forms.manage form_submissions.view], group: :content },
       { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],

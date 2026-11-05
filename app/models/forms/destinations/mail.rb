@@ -1,10 +1,10 @@
 module Forms
   module Destinations
-    # The mail destination (forms spec, "Destinations: Mail"): one mail per
+    # The mail destination: one mail per
     # submission to the form's recipients. This is its SETTINGS half: the
     # recipients a destination's `recipients` text names, and what is wrong
     # with them; and the DELIVERER, which sends one submission's mail from
-    # inside `Forms::DeliveryJob` (`deliver`, plan decision 11).
+    # inside `Forms::DeliveryJob` (`deliver`).
     #
     # Recipients are typed one per line or comma-separated, at most
     # `MAX_RECIPIENTS`, each ONE plain address by the sender address's own
@@ -39,13 +39,13 @@ module Forms
       # failure's key and its line, the login scrubbed out.
       #
       # Tried whenever mail is set up (`MailSettings#complete?`: any state but
-      # not set up; ruling R18), a site whose settings were saved and never
+      # not set up), a site whose settings were saved and never
       # tested included: a form mail that gets through verifies them, under
-      # the fingerprint it was queued with (R9), as a test mail would. Only
+      # the fingerprint it was queued with, as a test mail would. Only
       # while mail is NOT SET UP is nothing tried: `Failed` with the key
       # `not_ready`, at once and not retried, since waiting does not set mail
       # up. The delivery is then failed, so the submission is kept and listed
-      # as not delivered, with Send again (plan decision 6), and it is sent
+      # as not delivered, with Send again, and it is sent
       # again by itself once mail is set up (`Forms::ResendNotReadyJob`,
       # every 15 minutes: mail can be set up by host variables, with no save
       # to hook).

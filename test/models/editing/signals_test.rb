@@ -27,7 +27,7 @@ class Editing::SignalsTest < ActiveSupport::TestCase
     assert_empty Editing::Signals::MAP.values.uniq - %w[saved structure gone]
   end
 
-  # Forms pre-flight ruling R8: Send again is silent, as every submission
+  # Send again is silent, as every submission
   # event is.
   test "a form's submission events are silent" do
     assert_equal Audit::Sentence::SUBMISSION_ACTIONS.sort, Audit::Sentence::SUBMISSION_ACTIONS.select { |action| Editing::Signals::SILENT.key?(action) }.sort

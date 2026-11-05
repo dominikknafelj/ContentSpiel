@@ -13,8 +13,7 @@ Rails.application.config.filter_parameters += [
   :mail_username
 ]
 
-# A visitor's answers to a form (forms plan, Global Constraints: personal data
-# reaches no log). The endpoint (`FormSendsController`, controller
+# A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller
 # `form_sends`) takes them as `answers[<field key>]`. Not a bare `:answers`
 # here: an entry matches by substring and `Audit::Snapshot.scrub` drops every
 # snapshot key this list matches, so a later field such as `faq_answers` would

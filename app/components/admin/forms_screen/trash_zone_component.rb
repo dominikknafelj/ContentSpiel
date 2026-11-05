@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # Moving a form to the trash (design.md 2.8): the zone after the
+    # Moving a form to the trash: the zone after the
     # builder's save bar, in the group editor's delete zone shape, and the
     # confirmation it opens, which names the pages the form is placed on
     # (`Forms::Placements`: the readable ones by title, the others as a

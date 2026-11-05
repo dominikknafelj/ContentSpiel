@@ -1,5 +1,5 @@
 module AccessControl
-  # A visitor of the public site (forms plan, decision 8): nobody signed in,
+  # A visitor of the public site: nobody signed in,
   # sending a form. A value with nothing in it, used through the one instance
   # `AccessControl::VISITOR`: there is no visitor record, no id and nothing
   # about the person, because a visitor is nobody the CMS knows.

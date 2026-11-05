@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A visitor's send (forms plan, Task 3; owner's ruling 2): the answers are
+# A visitor's send: the answers are
 # cleaned against the form's fields and written as ONE encrypted submission
 # with a waiting delivery per destination, each delivered by a job queued
 # after the commit. The visitor (`AccessControl::VISITOR`) is allowed exactly

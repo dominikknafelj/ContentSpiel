@@ -1,6 +1,5 @@
 module Forms
-  # Deletes submissions of one form, with their deliveries (forms plan, Task
-  # 3): those of `ids` that are the form's (an id of another form's is not
+  # Deletes submissions of one form, with their deliveries: those of `ids` that are the form's (an id of another form's is not
   # found here, never deleted), or `all: true` of them. An editor deletes
   # (`reason: :editor`, `forms.manage`, from the submissions list); the jobs
   # delete as the trusted nil actor on `:system`: `:delivered` (a form that

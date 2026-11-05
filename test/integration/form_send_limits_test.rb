@@ -1,9 +1,7 @@
 require "test_helper"
 
-# The rate limit on a visitor's sends (forms plan, decision 5;
-# `Forms::SendLimit`): 5 per visitor in ten minutes, across every form, and
-# 30 per form in ten minutes, from anyone. Owner's ruling 1 (pre-flight R1):
-# a send over either is told so, a 429 with "Too many messages. Please try
+# The rate limit on a visitor's sends (`Forms::SendLimit`): 5 per visitor in ten minutes, across every form, and
+# 30 per form in ten minutes, from anyone. A send over either is told so, a 429 with "Too many messages. Please try
 # again in a few minutes." on the plain page and as `rate_limited` in the
 # JSON, and stored nowhere. The visitor is counted by an HMAC of the
 # address, so the cache holds no address.

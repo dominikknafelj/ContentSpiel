@@ -1,6 +1,6 @@
 module Forms
-  # One kind of destination a form's submissions go to (forms spec,
-  # "Destinations"), as `Forms::DestinationTypes` holds it:
+  # One kind of destination a form's submissions go to, as
+  # `Forms::DestinationTypes` holds it:
   #
   # - `name`: `"mail"` for the built-in, `"owner/name"` for a gem's
   #   (`ContentSpiel::Plugins.form_destinations`).
@@ -11,7 +11,7 @@ module Forms
   #   per destination in `form_destinations.settings`.
   # - `secrets`: the names of the settings that are credentials, stored
   #   sealed and never shown again (`Forms::Destination#write_secrets!`).
-  # - `deliverer`: what delivers one submission, from a job (Task 3):
+  # - `deliverer`: what delivers one submission, from a job:
   #   `deliverer.deliver(delivery, final_attempt:)` answers nil when it was
   #   delivered, raises `Forms::DestinationTypes::Retry` for a failure worth
   #   another attempt and `Forms::DestinationTypes::Failed.new(key:, line:)`

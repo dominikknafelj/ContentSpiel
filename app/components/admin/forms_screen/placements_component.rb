@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # "Placed on" (design.md 2.7): the pages whose rows hold a Form block of
+    # "Placed on": the pages whose rows hold a Form block of
     # this form (`Forms::Placements`), each its title as a link to its
     # editor; the ones the viewer can't read only as a number. A card with no
     # field, after the form's four cards and before the save bar, so its

@@ -24,7 +24,7 @@ module Trash
       when Page then "pages.delete" unless yield("pages.delete")
       when Post then "posts.delete" unless yield("posts.delete")
       when Media::Asset then "media.manage" unless yield("media.manage") || uploader_may_manage?(record)
-      # Forms plan, Task 2: a form is trashed and restored with the right to
+      # A form is trashed and restored with the right to
       # manage forms. Deleting one for good is `trash.empty` alone
       # (`Trash::Purge`): it takes the form's submissions with it.
       when Forms::Form then "forms.manage" unless yield("forms.manage")

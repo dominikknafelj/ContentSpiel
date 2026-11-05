@@ -15,9 +15,8 @@ module Admin
     # `group[grants][<key>][enabled]`, and its label is the registry's, whole.
     class ToggleListComponent < AdminComponent
       OVERSIGHT = %w[system_status.view audit.view trash.empty].freeze
-      # Forms (forms plan, Task 2) is the registry's own area, a card of its own
-      # after Oversight, ahead of a plugin's: a placeholder until the Design
-      # System places it (Task 9 lists it).
+      # Forms is the registry's own area, a card of its own after Oversight,
+      # ahead of a plugin's: a placeholder until the Design System places it.
       CARDS = %w[Content Administration Oversight Forms].freeze
 
       # A LOCKED toggle (`locked:`, the keys of ticked permissions the viewer couldn't

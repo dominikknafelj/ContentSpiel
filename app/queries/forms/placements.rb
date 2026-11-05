@@ -1,5 +1,5 @@
 module Forms
-  # Where a form is placed (forms plan, Task 4; design.md 2.7 and 2.8): the
+  # Where a form is placed: the
   # pages whose ROWS hold a Form block naming the form, for the builder's
   # "Placed on" card, the list's "Placed on" column and the trash
   # confirmation's sentence.
@@ -43,7 +43,7 @@ module Forms
     end
 
     # The page a visitor's send names (`page_id`, the visitor's to name), or
-    # nil (pre-flight ruling R10): believed only when it is a page the public
+    # nil: believed only when it is a page the public
     # can see (kept, published, its ancestors too: `PublicSite::Resolver
     # .visible_among`) whose PUBLISHED copy holds a Form block of this form,
     # since that is what the visitor was shown. A draft, a page that does not

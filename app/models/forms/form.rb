@@ -1,6 +1,5 @@
 module Forms
-  # A form a visitor fills in (forms spec, "The form"; plan decisions 1, 3,
-  # 13): its own record, reusable on many pages through a Form block, with
+  # A form a visitor fills in: its own record, reusable on many pages through a Form block, with
   # its submissions in one place. `Forms::Form`, not `Form`, so the block
   # type `form` stays a name the generator takes (`BlockTypes::Form` would
   # shadow a top-level `Form`), as the library image is `Media::Asset`.
@@ -8,25 +7,25 @@ module Forms
   # NO DRAFTS. A change is live at its Save, an explicit one (`Forms::Save`),
   # never autosave, so a half-typed field is never live: that is what drafts
   # would have given a form. Every write that changes what a placed form
-  # draws moves the public content version (decision 9): a form has no
+  # draws moves the public content version: a form has no
   # published copy, so its rows are what the site shows. The services that
   # write it call `PublicSite.bump_version!` themselves; this model has no
   # callback that does.
   #
   # TRASHABLE, as a post is (`Trashable`, `Trash::Move`/`Restore`/`Purge`).
   # A trashed form draws nothing and its endpoint answers "no longer
-  # available" (Tasks 6 and 7). It is one of `Trash.roots`, and the Trash
-  # screen has a Forms tab (Task 4).
+  # available". It is one of `Trash.roots`, and the Trash screen has a
+  # Forms tab.
   #
   # TEXTS. `submit_label` and `thank_you` are translated with Mobility's
   # jsonb backend, and the fields' labels, help lines and choices are
   # language => text hashes inside `fields`; all of them fall back to the
   # default language and join no translation tracking: no
   # `Translations::Tracker`, no `translation_states` row, nothing in the
-  # Translations matrix or AI translation (Global Constraints).
+  # Translations matrix or AI translation.
   #
   # KEEPING. A form keeps its submissions only where it says so AND the site
-  # has encryption keys (`#keeps?`, owner's ruling 2); `Forms::Save` refuses
+  # has encryption keys (`#keeps?`); `Forms::Save` refuses
   # keeping without them, and a site that loses its keys afterwards keeps
   # nothing more.
   class Form < ApplicationRecord

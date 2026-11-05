@@ -1,7 +1,6 @@
 module Forms
-  # The rate limit on a visitor's sends (forms spec, "Spam measures": "a rate
-  # limit per visitor and per form"; plan decision 5), the third measure
-  # beside the honeypot and the draw time (`Forms::SpamCheck`):
+  # The rate limit on a visitor's sends, per visitor and per form, the
+  # third measure beside the honeypot and the draw time (`Forms::SpamCheck`):
   #
   # - 5 sends per visitor in ten minutes, across every form: a person sends
   #   a contact form once or twice;
@@ -12,13 +11,13 @@ module Forms
   # Every send counts, a spam trip and a refused one too (Rails' `rate_limit`
   # counts before the action runs).
   #
-  # SAID TO THE VISITOR (owner's ruling 1, pre-flight R1): a send over either
+  # SAID TO THE VISITOR: a send over either
   # is answered 429 with "Too many messages. Please try again in a few
   # minutes." (`public.forms.rate_limited`), as JSON `rate_limited` to the
   # script and as a plain page without it, and is stored nowhere. The
-  # includer answers it: `answer_rate_limited`. (The plan had it answered as
-  # a success, as a honeypot is; a person who is refused must be told, or
-  # they think their message went.)
+  # includer answers it: `answer_rate_limited`. It is not answered as a
+  # success, as a honeypot is: a person who is refused must be told, or
+  # they think their message went.
   #
   # THE VISITOR IS NOT AN ADDRESS IN THE CACHE: the key is an HMAC of the
   # address (`visitor_key`), keyed from `secret_key_base`, so the store

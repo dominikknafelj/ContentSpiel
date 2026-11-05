@@ -1,7 +1,7 @@
 module Forms
-  # The signed draw time a Form block carries (forms plan, decision 10; the
-  # spec's "minimum time between the page being drawn and the send, carried
-  # in the form and signed so it cannot be faked"), without a session: the
+  # The signed draw time a Form block carries (a minimum time between the
+  # page being drawn and the send, carried in the form and signed so it
+  # cannot be faked), without a session: the
   # page holds the token, the send hands it back.
   #
   #   Forms::Drawn.token(form)                # => "eyJ…--…", in the form's hidden `drawn`
@@ -19,8 +19,7 @@ module Forms
   #
   # The no-JavaScript error page hands back the token the visitor SENT, never
   # a fresh one (`form_sends/invalid`), or a correction sent within three
-  # seconds of that page would be dropped as too fast (the plan's Review
-  # Focus 1).
+  # seconds of that page would be dropped as too fast.
   module Drawn
     MIN_SECONDS = 3
     PURPOSE = "content_spiel forms drawn".freeze

@@ -1,4 +1,4 @@
-# A visitor's send of a form (forms plan, decision 1; owner's ruling 2): one
+# A visitor's send of a form: one
 # row per send, its `answers` ENCRYPTED with Active Record encryption
 # (`Forms::Submission`), so the table holds no answer a database dump or a
 # backup could read without the site's keys. Without keys no row is written

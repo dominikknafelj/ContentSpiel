@@ -83,8 +83,8 @@ class PagesController < PublicController
       # - with no site address configured, the request's origin
       #   (`origin_etag_key`): the head's addresses then follow the host the
       #   request named, and nothing else here does;
-      # - whether the site has encryption keys (`Forms::Encryption.available?`,
-      #   forms pre-flight R3): without them a Form block is drawn disabled
+      # - whether the site has encryption keys (`Forms::Encryption.available?`):
+      #   without them a Form block is drawn disabled
       #   under a line that it cannot take answers, and keys added or lost
       #   are a restart that moves no content version.
       #

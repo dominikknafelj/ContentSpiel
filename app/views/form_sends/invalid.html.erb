@@ -1,12 +1,13 @@
-<%# Answers that need correcting (422; design.md 5.1). The summary in the
+<%# Answers that need correcting (422). The summary in the
     error summary's look, `role="alert"` and focused, each item a link to
     its field (a radio group's first radio); then the form drawn again by
-    the Form block's own input components (Task 1), never a theme's
+    the Form block's own input components, never a theme's
     template of them, with what the visitor typed, the errors beside the
-    fields, and the draw token the visitor SENT (`drawn_token`, decision
-    10), so a quick correction is not dropped as too fast. No token of the
+    fields, and the draw token the visitor SENT (`drawn_token`), so a
+    quick correction is not dropped as too fast. No token of the
     application's: the send takes none (`FormSendsController`). The page
-    the form came from is carried only when it was believed (R10). %>
+    the form came from is carried only when it was believed
+    (`Forms::Placements.live_page`). %>
 <%= render "form_sends/heading", key: :invalid %>
 
 <div class="rounded-cs border border-danger bg-danger-tint px-4 py-3 text-danger-ink" role="alert" tabindex="-1" autofocus>

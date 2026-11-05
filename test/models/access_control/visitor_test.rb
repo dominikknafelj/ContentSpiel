@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The one new actor (forms plan, decision 8): a visitor on the public site,
+# The one new actor: a visitor on the public site,
 # `AccessControl::VISITOR`, may send a form and do nothing else, anywhere.
 # This is the bent rule "a nil or unknown actor on :public is denied
 # everything", now "everything but forms.submit for the visitor"; this test

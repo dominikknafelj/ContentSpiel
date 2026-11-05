@@ -1,5 +1,4 @@
-# Two generic forms (forms plan, Global Constraints: nothing of any client
-# site). "Contact" mails its submissions and keeps none; "Newsletter" keeps
+# Two generic forms (nothing of any client site). "Contact" mails its submissions and keeps none; "Newsletter" keeps
 # them for 30 days and has no destination. Field and choice keys are fixed
 # here so a test can name them.
 _fixture:

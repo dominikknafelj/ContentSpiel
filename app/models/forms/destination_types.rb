@@ -94,7 +94,7 @@ module Forms
 
       def reset! = types.clear
 
-      # Mail, the one built-in (forms spec, "Destinations"): the form's
+      # Mail, the one built-in: the form's
       # recipients, one address per line or comma-separated
       # (`Forms::Destinations::Mail`).
       def register_built_ins

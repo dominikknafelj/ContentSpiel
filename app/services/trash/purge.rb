@@ -61,7 +61,7 @@ module Trash
 
     def call
       # A form is deleted for good with `trash.empty` alone, not with
-      # `forms.manage` (forms plan, Task 2): its submissions, personal data
+      # `forms.manage`: its submissions, personal data
       # someone kept, go with it.
       refused = @record.is_a?(Forms::Form) ? "trash.empty" : item_refusal(@record) { |key| authorize!(key, @record) }
       # `trash.empty` is an admin-area key: no subject, so a nil record.
@@ -218,9 +218,9 @@ module Trash
     end
 
     # A form has no notes, no usages and no translation states. Its
-    # destinations (and, from Task 3, its submissions and their deliveries)
+    # destinations, its submissions and their deliveries
     # go with it by the foreign keys' cascade. It has no published copy, so
-    # the public content version is moved here (forms plan, decision 9).
+    # the public content version is moved here.
     def purge_form
       @record.destroy || raise(ActiveRecord::Rollback)
       PublicSite.bump_version!

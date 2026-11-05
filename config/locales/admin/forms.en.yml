@@ -1,7 +1,7 @@
-# A form's write in CS Studio's words (forms plan, Task 2): the sentences
+# A form's write in CS Studio's words: the sentences
 # `Forms::Save` refuses a save with, and those a destination's settings are
 # refused with (`Forms::Destination`, `Forms::Destinations::Mail`). The
-# Forms screen's own words are `admin.components.forms_screen` (Task 4).
+# Forms screen's own words are `admin.components.forms_screen`.
 en:
   admin:
     # System status's Forms row (`Setup::SystemCheck#forms`): its sentences
@@ -56,11 +56,11 @@ en:
       destroy:
         moved: "“%{name}” moved to the trash."
         undo: "Undo"
-      # Send again (`Forms::Resend`, forms plan Task 5): the one refusal.
+      # Send again (`Forms::Resend`): the one refusal.
       resend:
         not_failed: "This delivery hasn't failed, so there is nothing to send again."
         trashed: "This form is in the trash. Restore it to send its submissions again."
-    # A form's submissions (forms plan, Task 5; design.md 3): the titles and
+    # A form's submissions: the titles and
     # toasts of `Admin::FormSubmissionsController` and
     # `Admin::FormDeliveriesController`; what their components draw is
     # `admin.components.forms_screen` (`forms_screen.en.yml`).

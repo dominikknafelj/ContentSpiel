@@ -1,13 +1,13 @@
 module Admin
   module FormsScreen
-    # One submission (forms plan, Task 5; design.md 3): "← All submissions",
+    # One submission: "← All submissions",
     # the heading and when, in which language and from which page it came,
     # then two cards in the form column: ANSWERS, a definition list of every
     # answer under its label as it was sent (`Forms::Answers`' stored shape:
     # the default language's words at the send, so a later edit of the form
     # changes no old one), and DELIVERY, one row per destination with its
     # state; then, for `forms.manage`, the delete zone and its confirmation.
-    # A placeholder look: Task 9 lists it for the design pass.
+    # A placeholder look until the Design System's pass.
     #
     # AN ANSWER IS TEXT. Every label and answer is drawn through ERB's
     # escaping (nothing here is `raw` or `html_safe`), in
@@ -28,7 +28,7 @@ module Admin
     # is kept and nothing typed is lost.
     #
     # "Mail to …" lists the destination's recipients as they are NOW: a
-    # delivery stores no address (design.md 3, open question).
+    # delivery stores no address (an open question, `docs/roadmap.md`).
     class SubmissionComponent < Admin::AdminComponent
       CARD_CLASS = BuilderComponent::CARD_CLASS
       CARD_HEAD_CLASS = BuilderComponent::CARD_HEAD_CLASS

@@ -1,7 +1,6 @@
 module BlockTypes
-  # A visitor's form placed on a page (forms spec, "Placing it"; forms plan,
-  # Task 7; design.md 4). The form itself is its own record, `Forms::Form`
-  # (decision 13: not `Form`, so this module shadows nothing), built on the
+  # A visitor's form placed on a page. The form itself is its own record,
+  # `Forms::Form` (not `Form`, so this module shadows nothing), built on the
   # Forms screen and reusable on many pages; the block only names it.
   #
   # WHERE EACH VALUE LIVES. The block's one value is the form's id, the same
@@ -12,12 +11,11 @@ module BlockTypes
   # component draws nothing until a kept form with a field is chosen.
   # Everything the form says (its fields, its submit label, its thank-you)
   # is the form's, in its languages, read from its rows when the page is
-  # drawn: a form has no published copy and is live at its Save (spec
-  # decision 3), which moves the public content version, so the page's ETag
+  # drawn: a form has no published copy and is live at its Save, which moves the public content version, so the page's ETag
   # follows it.
   #
   # Placing a form needs only the right to edit the page, and the select
-  # lists every kept form by name (spec decision 10; `Admin::Fields::FormField`).
+  # lists every kept form by name (`Admin::Fields::FormField`).
   module Form
     # The block's tile in a section: the form's name, or why there is none.
     # Read from the rows, as CS Studio reads them.
@@ -43,15 +41,14 @@ module BlockTypes
         # signed draw time); `honeypot` the hidden field's name;
         # `submit_label` and `thank_you` the form's words in the visitor's
         # language with fallbacks; `unavailable` the line said when the site
-        # cannot take answers (no encryption keys, owner's ruling 2;
-        # pre-flight R3), else nil; `string(key)` one of the CMS's six words.
+        # cannot take answers (no encryption keys), else nil; `string(key)` one of the CMS's six words.
         # The markup the `form-send` script asks of any template is in
         # docs/reference/theming.md, "The Form block".
         t.theme_methods :block, :page, :form_name, :fields, :action, :locale, :page_id, :drawn, :honeypot,
                         :submit_label, :thank_you, :unavailable, :string
-        # From the base tokens in `tokens.css` (design.md 4.1), re-valued by
-        # a strong band in `sections.css`; their values are what the
-        # contrast test holds (pre-flight R17).
+        # From the base tokens in `tokens.css`, re-valued by a strong band
+        # in `sections.css`; their values are what the contrast test holds
+        # (test/integration/design_tokens_test.rb).
         t.tokens themed: %w[form-field-ground form-field-line form-field-focus form-error form-done-ground form-done-line]
         t.stylesheet "form.css"
         t.summary ->(block, locale:) { Form.summary(block, locale: locale) }

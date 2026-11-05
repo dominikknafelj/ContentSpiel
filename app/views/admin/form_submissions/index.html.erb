@@ -1,4 +1,4 @@
-<%# A form's submissions (forms plan, Task 5; design.md 3):
+<%# A form's submissions:
     `Admin::FormsScreen::SubmissionsListComponent`, 50 a page. %>
 <% content_for :title, t(".title", name: @form.name) %>
 <% page_url = ->(page) { admin_form_submissions_path(@form, page: page, **admin_url_options) } %>

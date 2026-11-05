@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The signed draw time a Form block carries (forms plan, decision 10): a
+# The signed draw time a Form block carries: a
 # send under `MIN_SECONDS` after the form was drawn is too soon, a token of
 # another form or one tampered with is no token, and there is no expiry,
 # because a cached page keeps an old token, which only makes it older.

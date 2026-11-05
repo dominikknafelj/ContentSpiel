@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The form builder in a browser (forms plan, Task 4; design.md 2.2 to 2.4):
+# The form builder in a browser:
 # fields added from the picker, moved with ↑ and ↓, removed, and saved
 # explicitly through the save bar; a choice field's choices added and
 # removed; and leaving with unsaved changes asks, as on every save-bar
@@ -26,7 +26,7 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
 
   def add_field(type_label, label)
     within(".admin-block-picker") { press type_label }
-    # The new row's Label input takes the focus (design.md 2.3).
+    # The new row's Label input takes the focus.
     assert_equal rows.size, page.evaluate_script("[...document.querySelectorAll('[data-admin--forms--builder-target=row]:not([hidden])')].indexOf(document.activeElement.closest('[data-admin--forms--builder-target=row]')) + 1")
     page.driver.browser.keyboard.type(label)
   end

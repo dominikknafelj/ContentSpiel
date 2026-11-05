@@ -5,7 +5,7 @@ module Forms
   # What a value IS (its cast, its validation, whether it is text) stays
   # `ContentModel::FieldTypes`', named by `value_type`; the form adds only
   # what a visitor's form needs. Folding the two later would be one member
-  # each (forms plan, decision 2).
+  # each.
   #
   # - `name`: a String, `"short_text"` for a built-in and `"owner/name"` for
   #   a gem's (`ContentSpiel::Plugins.form_field_types`).

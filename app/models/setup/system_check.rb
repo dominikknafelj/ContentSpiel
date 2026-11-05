@@ -351,11 +351,11 @@ module Setup
         end
       end
 
-      # Forms (forms plan, Task 8): one row, its warnings in sentence order --
+      # Forms: one row, its warnings in sentence order --
       # no encryption keys (a form then takes no answers at all,
       # `Forms::Submit`), mail not set up while a form mails (the very test a
       # delivery's `not_ready` failure uses, `MailSettings#complete?`: form
-      # mail is tried whenever mail is set up, ruling R18), then submissions
+      # mail is tried whenever mail is set up), then submissions
       # whose delivery failed (a link to the Forms screen). Only kept (not
       # trashed) forms count.
       def forms

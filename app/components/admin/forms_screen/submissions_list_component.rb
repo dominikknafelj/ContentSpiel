@@ -1,13 +1,13 @@
 module Admin
   module FormsScreen
-    # A form's submissions (forms plan, Task 5; design.md 3): the form's
+    # A form's submissions: the form's
     # heading and tabs, one line on what happens to its submissions, "Delete
     # all…" for `forms.manage`, then the card table, newest first, 50 a page.
-    # A placeholder look: Task 9 lists it for the design pass.
+    # A placeholder look until the Design System's pass.
     #
     # EACH ROW is its received time (a link to the submission stretched over
     # the row, the users list's), its summary (`Forms::Summary.of`, computed
-    # from the decrypted answers of this page's rows alone, decision 7), its
+    # from the decrypted answers of this page's rows alone), its
     # language's code, the page it came from (the page's title from its rows;
     # "A page in the trash"; "—" when none was stored or the page was purged)
     # and "Not delivered" when a delivery failed. A row whose answers the

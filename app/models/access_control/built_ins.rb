@@ -94,14 +94,14 @@ module AccessControl
       Permissions.register "trash.empty", label: "Empty trash", area: "Trash", action: :empty
     end
 
-    # Forms (forms spec, decision 10): site-wide rights with no per-form
+    # Forms: site-wide rights with no per-form
     # scope yet, in an area of their own, held by the Admin group. `forms.manage`
     # builds and changes forms and deletes submissions; `form_submissions.view`
     # reads them and sends a failed destination again. Placing a Form block
     # needs `pages.edit` only.
     #
     # `forms.submit` is the one right a visitor's send is authorized with
-    # (plan decision 8): registered so `Forms::Submit` can ask for it like any
+    # (`AccessControl::Visitor`): registered so `Forms::Submit` can ask for it like any
     # service asks for its key, and `grantable: false`, so no group, token,
     # matrix or seed ever holds it.
     def self.register_forms

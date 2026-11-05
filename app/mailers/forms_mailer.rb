@@ -1,5 +1,5 @@
-# A submission's mail to a form's recipients (forms plan, Task 3; the mail
-# destination, `Forms::Destinations::Mail`): built and sent in
+# A submission's mail to a form's recipients (the mail destination,
+# `Forms::Destinations::Mail`): built and sent in
 # `Forms::DeliveryJob` from the delivery, whose Global ID is the only thing
 # the job carries. The answers are read from the submission here, in the
 # job, decrypted: never handed in, so they are in no queue row and no log

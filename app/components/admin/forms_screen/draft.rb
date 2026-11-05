@@ -1,7 +1,7 @@
 module Admin
   module FormsScreen
-    # What the builder shows and what its Save hands `Forms::Save` (forms
-    # plan, Task 4; design.md 2): one value for both, so the screen drawn
+    # What the builder shows and what its Save hands `Forms::Save`: one
+    # value for both, so the screen drawn
     # again after a refusal (422) or a stale base (409) shows exactly what
     # was typed, unsaved rows included, and the save is built from the same
     # reading. `Admin::SettingsScreen::Values` is the same idea for Settings.
@@ -16,7 +16,7 @@ module Admin
     # and dropped here; its inputs may still be posted. A choice is the same
     # inside its field (`choice_order`, `choices[<row>]`).
     #
-    # LANGUAGES (design.md 2.5). The builder shows one language at a time,
+    # LANGUAGES. The builder shows one language at a time,
     # and `Forms::Save` takes every enabled language's texts whole (it keeps
     # only the texts of languages that are switched OFF). So a text the page
     # did not post is the stored one: every text is the stored form's,
@@ -26,10 +26,10 @@ module Admin
     # posts only that language's texts, and the structure is the stored
     # form's.
     #
-    # A field's TYPE is fixed once added (design.md 2.2): a posted type is
+    # A field's TYPE is fixed once added: a posted type is
     # read only for a row with no stored field behind it.
     #
-    # DESTINATIONS (design.md 2.6). The builder draws one section per
+    # DESTINATIONS. The builder draws one section per
     # registered destination type, holding a kind's first stored
     # destination; each is sent with its stored row's id, because
     # `Forms::Save` matches destinations by id only, and one sent without it

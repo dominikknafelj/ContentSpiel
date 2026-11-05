@@ -122,8 +122,7 @@ class Theme
       "posts/detail_component" => %w[post]
     }.freeze
 
-    # What the template of a visitor's form input may call (forms plan,
-    # Task 7): the three keywords every input is drawn with
+    # What the template of a visitor's form input may call: the three keywords every input is drawn with
     # (`Blocks::FormFields::Base`). The same for every form field type, a
     # gem's included, so a type declares no line of its own.
     FORM_INPUT_METHODS = %w[field value error].freeze

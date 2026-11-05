@@ -17,7 +17,7 @@ module AccessControl
   # 4. Owners are allowed; users need a matching grant; tokens need a
   #    matching grant in their group *and* their user must be allowed.
   # 5. The visitor (`AccessControl::VISITOR`) is allowed `forms.submit` on
-  #    `:public` and nothing else (forms plan, decision 8).
+  #    `:public` and nothing else (`AccessControl::Visitor`).
   class Checker
     # A nil channel counts as trusted too (a console or rake task where
     # nothing set one); any other value, a blank string included, doesn't.
@@ -89,7 +89,7 @@ module AccessControl
       case @actor
       when User then user_allowed?(@actor)
       when ApiToken then token_allowed?(@actor)
-      # The bent rule (forms plan, decision 8; `AccessControl::Visitor`): a
+      # The bent rule (`AccessControl::Visitor`): a
       # visitor may send a form on the public site, and nothing else on any
       # channel. `forms.submit` is not grantable, so no grant matches it.
       # The one instance only (`Visitor.one?`): a copy is no visitor.

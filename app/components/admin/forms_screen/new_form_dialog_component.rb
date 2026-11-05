@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # New form (design.md 1): a name, what to start with, and where its mail
+    # New form: a name, what to start with, and where its mail
     # goes. "Contact form" makes three required fields (Name, Email,
     # Message, the starter's labels written in the default language) and
     # "No fields" none; "Mail to" is prefilled with the signed-in person's

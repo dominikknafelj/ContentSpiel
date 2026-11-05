@@ -41,7 +41,7 @@ class JobQueuesTest < ActiveSupport::TestCase
     assert_equal 1, images["processes"]
   end
 
-  # Forms plan, Task 5: the submissions' clean-up runs daily wherever the
+  # The submissions' clean-up runs daily wherever the
   # trash's does, half an hour after it, on `default`.
   test "the forms clean-up is scheduled in every environment that schedules the trash's" do
     recurring = YAML.safe_load(ERB.new(File.read(Rails.root.join("config/recurring.yml"))).result, aliases: true)
@@ -54,7 +54,7 @@ class JobQueuesTest < ActiveSupport::TestCase
     end
   end
 
-  # Forms final review, Important 2: the mails that failed because mail was
+  # The mails that failed because mail was
   # not set up are sent again once it is, every 15 minutes, wherever the
   # clean-up runs.
   test "the forms' resend of mails that waited for mail is scheduled in every environment that schedules the trash's" do

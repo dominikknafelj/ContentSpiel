@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A visitor's send as it is stored (forms plan, Task 3): the answers
+# A visitor's send as it is stored: the answers
 # encrypted, readable only with the keys they were written with, and a
 # submission's deliveries saying whether it has gone everywhere.
 class Forms::SubmissionTest < ActiveSupport::TestCase

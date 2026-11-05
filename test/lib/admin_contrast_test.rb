@@ -123,9 +123,8 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The plain pages a form's send answers without JavaScript (forms plan,
-  # Tasks 6 and 7; design.md 5.1): drawn by the CMS in CS Studio's tokens,
-  # never a theme's (spec decision 7), so they are measured here. The
+  # The plain pages a form's send answers without JavaScript: drawn by the
+  # CMS in CS Studio's tokens, never a theme's, so they are measured here. The
   # words on the page (`bg-paper`): the label and the answers' text
   # (`--cs-ink`), the required word and the help line (`--cs-meta`), the
   # error under a control (`--cs-danger-ink`) and the back link

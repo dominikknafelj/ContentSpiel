@@ -1,6 +1,6 @@
 require "test_helper"
 
-# One submission (forms plan, Task 5; design.md 3): every answer as text
+# One submission: every answer as text
 # under its label as sent, then each destination's result, with Send again
 # for a failed one to a holder of `form_submissions.view`.
 class Admin::FormsScreen::SubmissionComponentTest < ViewComponent::TestCase
@@ -56,7 +56,7 @@ class Admin::FormsScreen::SubmissionComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: t("send_again"), wait: 0
   end
 
-  # Fix round 1: where the destination is gone Send again would only fail
+  # Where the destination is gone Send again would only fail
   # again, so it is not offered; a delivery that gave up still gets it.
   test "Send again is hidden for a removed destination and an unknown type, and shown for one that gave up" do
     Current.actor = users(:one)

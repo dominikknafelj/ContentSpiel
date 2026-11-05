@@ -1,6 +1,6 @@
 module Forms
   # Daily (config/recurring.yml, `forms_purge_expired`): the clean-up of
-  # submissions (forms plan, Task 5; decision 6), for EVERY form, kept or in
+  # submissions, for EVERY form, kept or in
   # the trash (a trashed form's submissions stay with it until it is purged,
   # but they still expire). Every deletion is `Forms::DeleteSubmissions`, one
   # event per form and reason:

@@ -649,8 +649,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   FORM_TOKENS = %w[--th-form-field-ground --th-form-field-line --th-form-field-focus --th-form-error --th-form-done-ground --th-form-done-line].freeze
 
-  # Design.md 4.1: the six from the base, in both schemes; the field's
-  # outline is --th-meta (pre-flight R11: 3:1, the site's control outline),
+  # The six from the base, in both schemes; the field's outline is
+  # --th-meta (3:1, the site's control outline),
   # never a hairline; the done ground is the ok hue, never the grey band.
   test "the six form tokens are defined from the theme's base tokens in both schemes, never a literal, the outline the faint text colour" do
     theme_tokens.each do |theme, tokens|
@@ -658,7 +658,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
         value = tokens.fetch(name) { flunk("#{name} is not defined for #{theme}") }
         assert_match(/\A(?:var\(--th-[\w-]+\)|color-mix\(in srgb, var\(--th-[\w-]+\) \d+%, var\(--th-[\w-]+\)\))\z/, value, "#{theme} #{name} is #{value}")
       end
-      assert_equal "var(--th-meta)", tokens.fetch("--th-form-field-line"), "#{theme}: the outline is 3:1 (R11), not --th-line-strong"
+      assert_equal "var(--th-meta)", tokens.fetch("--th-form-field-line"), "#{theme}: the outline is 3:1, not --th-line-strong"
       assert_equal "var(--th-surface)", tokens.fetch("--th-form-field-ground")
       assert_equal "var(--th-accent)", tokens.fetch("--th-form-field-focus")
       assert_equal "var(--th-danger-ink)", tokens.fetch("--th-form-error")
@@ -680,7 +680,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_no_match(/data-theme/, bare, "nothing in form.css names a scheme: the tokens follow it")
   end
 
-  # Design.md 4.1's pairs: the field's text on its ground, the error, the
+  # The form's pairs: the field's text on its ground, the error, the
   # help (--th-dim), the required word (--th-meta) and the summary's links
   # (--th-accent) on what the form stands on, and the thank-you's text on
   # its ground, at 4.5:1; the outline, the focus ring and the error's edge
@@ -713,7 +713,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal 60, pairs
   end
 
-  # Design.md 4.1: a strong band re-values all six, as the Note's and the
+  # A strong band re-values all six, as the Note's and the
   # Card's (a token is computed where it is declared, so the page's light
   # field ground would stay under the band's light text), and the block is
   # drawn for a dark ground in both schemes; a tinted band leaves them alone.

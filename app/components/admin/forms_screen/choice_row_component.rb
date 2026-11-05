@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # One choice of a choice field (design.md 2.4): its number, visible in
+    # One choice of a choice field: its number, visible in
     # mono before the input (so the list reads as numbered), the input,
     # labelled "Choice N" for a screen reader, and ↑, ↓ and Remove as on a
     # field's row. Named by the field's row and the choice's own row

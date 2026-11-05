@@ -1,6 +1,6 @@
 module Blocks
   module FormFields
-    # What every public form input shares (forms plan, Tasks 1 and 7): a real
+    # What every public form input shares: a real
     # `<label for>` with the label as TEXT (an editor typed it), "required"
     # in words inside the label (never a colour or an asterisk alone), the
     # help line under it, and an error that the control is tied to with
@@ -8,7 +8,7 @@ module Blocks
     # `Forms::PublicField`, which carries the Form block's id, so one form
     # placed twice on a page keeps its ids apart.
     #
-    # THE ERROR ELEMENT IS ALWAYS DRAWN (pre-flight R15; design.md 4.3):
+    # THE ERROR ELEMENT IS ALWAYS DRAWN:
     # empty and `hidden` without an error, and named by `aria-describedby`
     # only while it holds one (`PublicField#described_by`), so the Form
     # block's script writes a message into the element the template drew and

@@ -1,5 +1,5 @@
 module Forms
-  # A form's one write (forms plan, Task 2; decision 3): its name, its
+  # A form's one write: its name, its
   # fields, its submit label and thank-you, its keeping and its destinations,
   # saved WHOLE by an explicit Save (a half-typed field is never live, which
   # is what drafts would have given a form). Creating and changing are the
@@ -31,7 +31,7 @@ module Forms
   # changes: a key the form already has is kept, a blank or unknown one (or
   # one given twice) gets `Forms::Field.new_key`. The same for a choice's key
   # within its field. Reordering and relabelling therefore keep every key,
-  # and an old submission still reads as it was sent (Review Focus 3).
+  # and an old submission still reads as it was sent.
   #
   # DESTINATIONS are matched to the stored rows by `id` alone, and only to a
   # row of the same kind: a destination given without an id (or with one of
@@ -61,7 +61,7 @@ module Forms
   # with no label in the default language; an unknown destination (not a
   # dormant one) or one whose settings its type refuses; a form that
   # neither keeps nor has a destination; keeping
-  # without encryption keys (owner's ruling 2); `keep_days` outside
+  # without encryption keys; `keep_days` outside
   # `Form::KEEP_DAYS`; a text under a code that is no language this CMS
   # serves; a trashed form.
   #
@@ -70,7 +70,7 @@ module Forms
   # without their secrets, and per destination whose secrets were written
   # whether they were set before), and `PublicSite.bump_version!` in the
   # transaction when the form's row changed: a form has no published copy,
-  # so what a placed form draws is its rows (decision 9). A change of the
+  # so what a placed form draws is its rows. A change of the
   # destinations alone (or a secret written) touches the form, so the
   # builder's stale base moves, and moves no content version. A save that
   # changes nothing records nothing and moves nothing.

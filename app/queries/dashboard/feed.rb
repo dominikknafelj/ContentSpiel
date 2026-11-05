@@ -33,7 +33,7 @@ module Dashboard
     # events have the page, post or block as their subject too, and are no
     # change to it either (notes spec §3.5): "Mine" and "Changed by"
     # (`Audit::ChangeSince` reads this list) ignore them. Nor is a form's
-    # submission arriving or being deleted (forms plan, Task 3): its subject
+    # submission arriving or being deleted: its subject
     # is the form, never a page or a post, and a visitor or the system is
     # nobody's "by"; listed so no reader of this list ever counts one.
     NOT_A_CHANGE = (%w[access.denied page.taken_over post.taken_over block.taken_over

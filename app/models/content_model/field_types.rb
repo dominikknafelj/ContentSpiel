@@ -221,8 +221,7 @@ module ContentModel
         )
       end
 
-      # A visitor's form, named by its id (the Form block's one field, forms
-      # plan Task 7): a String of digits, as `Forms::Placements` compares it
+      # A visitor's form, named by its id (the Form block's one field): a String of digits, as `Forms::Placements` compares it
       # with `settings ->> 'form_id'`, else nothing. Which form that is, and
       # whether it is kept, is asked where the block is drawn (a trashed or
       # missing form draws nothing) and in CS Studio's select, which names a

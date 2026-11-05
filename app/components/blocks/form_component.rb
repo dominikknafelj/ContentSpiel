@@ -1,17 +1,17 @@
 module Blocks
-  # The Form block on the public site (`BlockTypes::Form`, forms plan Task 7;
-  # design.md 4): the form the block names, drawn by the theme, posting to
+  # The Form block on the public site (`BlockTypes::Form`): the form the
+  # block names, drawn by the theme, posting to
   # its own endpoint (`FormSendsController`, `POST /forms/:id`) and sent in
   # place by `form-send` where the script runs.
   #
   # THE FORM IS READ FROM ITS ROWS: a form has no published copy and is live
-  # at its Save (spec decision 3; forms plan decision 9), which moves the
+  # at its Save, which moves the
   # public content version, so the page's ETag moves with it. The BLOCK is
   # the page's, read as every block is (a published view on the site, the
   # rows in a preview). A missing form, one in the trash, and one with no
   # field draw nothing (`render?`).
   #
-  # THE PAGE STAYS ONE ANSWER FOR EVERY VISITOR (spec, anti-goals): nothing
+  # THE PAGE STAYS ONE ANSWER FOR EVERY VISITOR: nothing
   # here reads the request, a session or a cookie, and the form carries no
   # token of this application (the endpoint takes none: its head comment
   # says why that is safe). What it does carry beside the answers is the
@@ -24,9 +24,9 @@ module Blocks
   # token has no expiry, so an old one is still taken. The ETag does not
   # name the token for that reason, and is right without it.
   #
-  # WITHOUT ENCRYPTION KEYS the site takes no answers (owner's ruling 2):
-  # the form is drawn with its fields disabled under the line `unavailable`
-  # (pre-flight R3), and `Forms::Encryption.available?` is a key of the
+  # WITHOUT ENCRYPTION KEYS the site takes no answers (`Forms::Encryption`):
+  # the form is drawn with its fields disabled under the line `unavailable`,
+  # and `Forms::Encryption.available?` is a key of the
   # public ETag (`PagesController#show`).
   #
   # Its template is promised the names of `theme_methods` and no other; the
@@ -61,11 +61,11 @@ module Blocks
       return @form if defined?(@form)
 
       id = block.settings.to_h["form_id"].presence
-      @form = id && ::Forms::Form.kept.find_by(id: id) # public: rows (a form has no published copy: it is live at its Save, spec decision 3)
+      @form = id && ::Forms::Form.kept.find_by(id: id) # public: rows (a form has no published copy: it is live at its Save)
     end
 
     # The editor's name for the form. The default template draws it
-    # nowhere: it is for editors (spec, "The form"), and a theme that shows
+    # nowhere: it is for editors, and a theme that shows
     # it does so knowingly.
     def form_name = form&.name
 

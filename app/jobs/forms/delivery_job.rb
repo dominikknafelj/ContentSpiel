@@ -1,6 +1,6 @@
 module Forms
-  # Delivers one submission to one destination (forms plan, decisions 6 and
-  # 11): `Forms::DeliveryJob.perform_later(delivery)`, queued after the
+  # Delivers one submission to one destination:
+  # `Forms::DeliveryJob.perform_later(delivery)`, queued after the
   # commit of the send (`Forms::Submit`) or of a Send again
   # (`Forms::Resend`). Its one argument is the delivery, as its Global ID:
   # never an answer, a setting or a secret (the queue's row and Active Job's
@@ -48,8 +48,7 @@ module Forms
   # from the form fails `no_destination`; one whose type is no longer
   # registered (a gem removed) `unknown_destination`. One whose submission
   # was deleted before the job ran (an editor, a purge) cannot be found:
-  # the job is discarded with one line that names no address (pre-flight
-  # ruling R9).
+  # the job is discarded with one line that names no address.
   #
   # Runs as the trusted nil actor on `:system`, like the trash's clean-up:
   # the deletion of a delivered submission reads "System" in the log.
@@ -103,8 +102,8 @@ module Forms
     end
 
     # A submission a form that keeps nothing has delivered everywhere,
-    # decided from its LOCKED row and the deliveries read after the lock
-    # (forms plan, Task 5): of two jobs finishing at once, and of a job and
+    # decided from its LOCKED row and the deliveries read after the lock:
+    # of two jobs finishing at once, and of a job and
     # the daily sweep (`Forms::PurgeExpiredJob`, which locks the same rows),
     # the second waits for the first, then finds the row gone (and records
     # nothing) or decides from what the first committed.

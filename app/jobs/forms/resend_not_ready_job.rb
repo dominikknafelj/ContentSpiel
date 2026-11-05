@@ -2,13 +2,12 @@ module Forms
   # Every 15 minutes (config/recurring.yml, `forms_resend_not_ready`): once
   # mail is set up, the mails of forms that failed because it was not
   # (`Destinations::Mail::NOT_READY`) are sent again, so the builder's and
-  # the Forms list's "Submissions are sent once it is" holds (forms final
-  # review, Important 2).
+  # the Forms list's "Submissions are sent once it is" holds.
   #
   # WHY A RECURRING JOB, not a hook on the mail settings' save: mail can be
   # set up by host variables alone (`MAIL_SMTP_*`, `docs/reference/mail.md`),
   # which no save sees, so the job asks `MailSettings#complete?` itself, the
-  # deliverer's own predicate (ruling R18), and does nothing while it is
+  # deliverer's own predicate, and does nothing while it is
   # false. It also does nothing without encryption keys: the answers could
   # not be read, and the delivery would only fail again with `error`.
   #

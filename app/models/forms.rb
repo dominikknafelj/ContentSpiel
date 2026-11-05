@@ -1,5 +1,4 @@
-# The `Forms::` namespace (docs/superpowers/specs/2026-11-03-forms-design.md;
-# docs/superpowers/plans/2026-11-03-forms.md): the form a visitor fills in
+# The `Forms::` namespace (docs/reference/forms.md): the form a visitor fills in
 # (`Forms::Form`), its fields' types (`Forms::FieldTypes`, the values in
 # `app/values/forms/`), where its submissions go (`Forms::DestinationTypes`,
 # `Forms::Destination`) and whether the site can keep them
@@ -12,6 +11,6 @@
 module Forms
   # How long a submission of a form that keeps nothing waits for a delivery
   # that failed, to be sent again from CS Studio, before it is deleted
-  # (plan decision 6, reason `undelivered`).
+  # (`Forms::DeleteSubmissions`, reason `undelivered`).
   UNDELIVERED_DAYS = 30
 end

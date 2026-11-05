@@ -1163,8 +1163,7 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The endpoint a visitor's form posts to (forms plan, Task 6; spec
-  # decision 7): its thank-you and its error page are plain pages of the
+  # The endpoint a visitor's form posts to: its thank-you and its error page are plain pages of the
   # CMS's own, in a layout of their own (`layouts/form_send`), and the error
   # page redraws the fields with the CMS's input components, never a
   # theme's template of them.

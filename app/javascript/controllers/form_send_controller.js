@@ -1,7 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The Form block's send in place (`Blocks::FormComponent`, forms plan Task 7;
-// design.md 4.2). A controller of the site's own, like `code-copy`: a public
+// The Form block's send in place (`Blocks::FormComponent`). A controller of the site's own, like `code-copy`: a public
 // page loads it, and a theme that replaces the block's template keeps the
 // send in place by writing the same markup (the identifier, the `send`
 // action on the form, the `summary`, `body`, `button` and `done` targets,
@@ -31,8 +30,8 @@ import { Controller } from "@hotwired/stimulus"
 //   gone, unavailable,           the server's sentence alone in the summary,
 //   rate_limited                 which is no mistake of the visitor's
 //                                (`data-notice`), focused
-//   no answer at all, or one     the `network` value in the summary
-//   that is not JSON of a        (pre-flight R16). The browser is NEVER made
+//   no answer at all, or one     the `network` value in the summary.
+//   that is not JSON of a        The browser is NEVER made
 //   known status                 to send the form itself: where the network
 //                                failed that send fails too, and the
 //                                visitor's answers would be lost on the

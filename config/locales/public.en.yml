@@ -37,7 +37,7 @@ en:
         copy_code: "Copy code"
         copied: "Copied"
         failed: "Not copied"
-    # A form's own words (forms plan): what a visitor reads that no editor
+    # A form's own words: what a visitor reads that no editor
     # typed, read through `PublicStrings.read` (`Forms::PublicField#word`,
     # `Forms::BuiltInFieldTypes`). `yes` and `no` are what a checkbox answer
     # reads as in a submission (in the site's default language).
@@ -51,8 +51,8 @@ en:
         invalid: "Please check this entry."
         inclusion: "Please choose one of the options."
         too_long: "This is too long."
-      # What the endpoint a form posts to answers (`FormSendsController`,
-      # forms plan Task 6; design.md 4 and 5): the same words in the JSON
+      # What the endpoint a form posts to answers (`FormSendsController`):
+      # the same words in the JSON
       # the script writes in place and on the plain pages without it.
       # `submit` is the button's word where the form has no submit label,
       # `sent` the thank-you where it has none of its own. `error_item` is
@@ -69,7 +69,7 @@ en:
       unavailable: "This form can't take answers at the moment. Please try again later."
       rate_limited: "Too many messages. Please try again in a few minutes."
       # What the Form block's script says when a send had no answer, or one
-      # that was not the endpoint's (pre-flight R16): the typed answers stay,
+      # that was not the endpoint's: the typed answers stay,
       # and the browser is never made to send the form itself.
       network: "Your answers couldn't be sent. Please check your connection and try again."
       # The button's word while a send is on its way (the script's value).

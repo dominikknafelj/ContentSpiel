@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The daily clean-up of submissions (forms plan, Task 5; decision 6), every
+# The daily clean-up of submissions, every
 # form's, kept or in the trash, as the trusted nil actor on :system: a form
 # that keeps loses what is older than its keeping time (`expired`); one that
 # keeps nothing loses what was delivered everywhere and was left behind
@@ -69,7 +69,7 @@ class Forms::PurgeExpiredJobTest < ActiveJob::TestCase
       events.map { |event| [ event.metadata["reason"], event.metadata["submission_ids"] ] }
   end
 
-  # Forms final review, Important 2: the builder says a form's submissions
+  # The builder says a form's submissions
   # are sent once mail is set up, so the clean-up does not delete, as
   # undelivered, one that is only waiting for mail while mail is still not
   # set up. Once it is, the plain rule applies again.
@@ -98,7 +98,7 @@ class Forms::PurgeExpiredJobTest < ActiveJob::TestCase
     assert reading && reading > locking, "their deliveries are read after the lock"
   end
 
-  # Fix round 1: the sweep decides from the stored setting, never from the
+  # The sweep decides from the stored setting, never from the
   # keys being there, so a site that lost its keys loses no kept submission
   # before its time, a keeping form with no destination included.
   test "without encryption keys a keeping form is swept by age only" do

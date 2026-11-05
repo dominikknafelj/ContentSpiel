@@ -1,11 +1,11 @@
 require "test_helper"
 
 # A form goes to the trash, comes back and is deleted for good through the
-# trash's three services, as a post does (forms plan, decision 3): trashing
+# trash's three services, as a post does: trashing
 # and restoring need `forms.manage`, deleting for good `trash.empty` (it
 # takes the form's submissions and their deliveries with it). Each moves the public
-# content version (a form has no published copy, decision 9) and is
-# recorded. Forms join `Trash.roots` with the Trash screen (Task 4).
+# content version (a form has no published copy) and is recorded. Forms
+# are among `Trash.roots`, on the Trash screen.
 class Trash::FormTrashTest < ActiveSupport::TestCase
   setup { Current.actor = users(:one) }
 

@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The submissions list's one line about a submission (forms plan, decision
-# 7): computed from the decrypted answers, never stored. The first two
+# The submissions list's one line about a submission: computed from the decrypted answers, never stored. The first two
 # answers of the types that say `summary` (short text and email), joined
 # and cut at 80 characters; nil for none and for a submission the keys can
 # no longer read.

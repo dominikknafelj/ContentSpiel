@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The trash confirmation names the pages a form is placed on (design.md
-# 2.8): the readable ones by title, the others as a number, each case one
+# The trash confirmation names the pages a form is placed on: the readable ones by title, the others as a number, each case one
 # sentence of its own.
 class Admin::FormsScreen::TrashZoneComponentTest < ViewComponent::TestCase
   Placed = Struct.new(:pages, :count_hidden)

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A form's submissions in CS Studio (forms plan, Task 5; design.md 3): the
+# A form's submissions in CS Studio: the
 # list, one submission, Send again, delete one and delete all. Reading and
 # sending again need `form_submissions.view`, deleting `forms.manage`; a
 # submission is found among its form's only, and only ids reach a URL.

@@ -1,6 +1,6 @@
 module Trash
   # Brings a trashed page (with the pages trashed together with it), post,
-  # image or form back (trash spec §4.2; forms plan, decision 3). A form has
+  # image or form back (trash spec §4.2). A form has
   # no slug, no image and no branch: it is the column update alone, and the
   # public content version moved by hand (it has no published copy and no
   # callback that would). Clearing `trashed_at` and saving is what

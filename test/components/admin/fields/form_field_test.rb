@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The Form block's one field in CS Studio (forms plan, Task 7; spec
-# decision 10): a select of every kept form by name, which placing a form
+# The Form block's one field in CS Studio: a select of every kept form by name, which placing a form
 # needs nothing but the right to edit the page for.
 class Admin::Fields::FormFieldTest < ViewComponent::TestCase
   Field = ContentModel::Definition::Field

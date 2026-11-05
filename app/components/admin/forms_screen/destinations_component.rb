@@ -1,14 +1,14 @@
 module Admin
   module FormsScreen
-    # "Where submissions go" (design.md 2.6): keeping, the mail, and each
+    # "Where submissions go": keeping, the mail, and each
     # destination a gem registered, in that order, each a checkbox heading
     # its section with its settings under it.
     #
     # KEEPING. With encryption keys: the checkbox, then "for [ N ] days"
     # while it is ticked, and the plain line on what happens to a submission
-    # while it is not (under R2 nothing is lost while keys exist, so it is a
-    # help line, not a warning). WITHOUT keys the checkbox is not drawn and
-    # the warn box says the form takes no answers (owner's ruling 2): a
+    # while it is not (while keys exist nothing is lost, so it is a help
+    # line, not a warning). WITHOUT keys the checkbox is not drawn and the
+    # warn box says the form takes no answers (`Forms::Encryption`): a
     # submission can't be kept, even for a moment.
     #
     # Unticking the box on a form that keeps submissions now draws one warn
@@ -16,7 +16,7 @@ module Admin
     #
     # MAIL. The recipients while ticked; first in the section, while mail is
     # not set up (`MailSettings#complete?`: a form mail is tried in every
-    # other state, ruling R18), the warn box: submissions are sent once it is
+    # other state), the warn box: submissions are sent once it is
     # (`Forms::ResendNotReadyJob`), and on a form that keeps nothing they
     # wait until then (`Forms::PurgeExpiredJob` spares them while mail is
     # not set up).

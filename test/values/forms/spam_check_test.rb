@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The two spam measures that are a form's own (forms spec, "Sending"): the
+# The two spam measures that are a form's own: the
 # honeypot `website`, which a person never sees, and the signed draw time.
 # A trip is named; a clean send is nil. The rate limit is the controller's
 # (`Forms::SendLimit`).

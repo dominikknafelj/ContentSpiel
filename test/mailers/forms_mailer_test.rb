@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A submission's mail to a form's recipients (forms plan, Task 3): every
+# A submission's mail to a form's recipients: every
 # label with its answer in the form's order, then when, in which language
 # and from which page; Reply-To the visitor's email answer; built in the job
 # from the delivery, whose Global ID is all the job carries.

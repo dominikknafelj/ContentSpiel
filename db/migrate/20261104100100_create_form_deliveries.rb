@@ -1,4 +1,4 @@
-# One destination's delivery of one submission (forms plan, decision 1): its
+# One destination's delivery of one submission: its
 # state (`waiting`, `sent`, `failed`), its attempts and, for a failure, the
 # deliverer's key and the other side's line with every secret scrubbed out
 # (`Forms::DeliveryJob`). Written by the job, not a service: a delivery's
@@ -9,7 +9,7 @@
 # where it was meant to go. `queued_fingerprint` is the mail settings'
 # fingerprint when it was queued (an HMAC, `MailSettings#fingerprint`): a
 # mail sent under it verifies the settings only while it is still the
-# current one, as `ApplicationMailer.queue` has it (pre-flight ruling R9).
+# current one, as `ApplicationMailer.queue` has it.
 class CreateFormDeliveries < ActiveRecord::Migration[8.1]
   def change
     create_table :form_deliveries do |t|

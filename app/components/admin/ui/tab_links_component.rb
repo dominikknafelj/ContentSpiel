@@ -1,10 +1,10 @@
 module Admin
   module Ui
     # A row of tabs that are plain links, drawn as the posts list's
-    # segmented control (design pass round 3, handoff §4.9): the current one
+    # segmented control: the current one
     # inverted and `aria-current="page"`, the others meta words. A tab change
     # is a navigation. Used by the Trash screen's type tabs (each with its
-    # count) and a form's Form | Submissions (forms plan, Task 5).
+    # count) and a form's Form | Submissions.
     #
     # `tabs` is a list of `{ label:, href:, current:, count: nil }`; `label`
     # the `<nav>`'s accessible name. Anything else for the links (`data`)

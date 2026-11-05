@@ -2,7 +2,7 @@ module Forms
   # A field as a visitor's form draws it: its words in the form's language
   # and its ids. `place` is the id of the Form block the field is drawn in,
   # not the form's: one form placed twice on a page (or in a section) must
-  # not repeat an id, a `for`, or an error link (forms plan, Review Focus 4).
+  # not repeat an id, a `for`, or an error link.
   # `form_id` is carried for the callers that need the form.
   #
   # `input:` is the component that draws the field: the type's own by
@@ -67,7 +67,7 @@ module Forms
     # What the control is described by: the help line when there is one, and
     # the error element while it holds a message (`error`, a key of
     # `public.forms.errors`, or nil). The error element itself is always
-    # drawn, empty and hidden without an error (pre-flight R15), for the
+    # drawn, empty and hidden without an error, for the
     # Form block's script to fill; naming it while it is empty would make a
     # screen reader read nothing after the control.
     def described_by(error = nil) = [ (help_id if help.present?), (error_id if error) ].compact.join(" ").presence

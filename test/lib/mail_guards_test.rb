@@ -91,7 +91,7 @@ class MailGuardsTest < ActiveSupport::TestCase
   end
 
   # A form's mail carries a visitor's answers, which are in no job's
-  # arguments (forms plan, owner's ruling 2): `FormsMailer` is handed the
+  # arguments: `FormsMailer` is handed the
   # delivery, as its Global ID, and reads the answers from it in the job.
   # Every action of it takes one argument, and only `Forms::Destinations::Mail`
   # builds it, from inside `Forms::DeliveryJob`, never through a queue.

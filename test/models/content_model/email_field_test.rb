@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The `:email` field type (forms plan, Task 1): one plain address, the rule
+# The `:email` field type: one plain address, the rule
 # mail's sender address is held to (`MailSettings.one_address?`), at most 254
 # characters (RFC 5321's path limit). `:text` takes `max:` as `:code` does.
 class ContentModel::EmailFieldTest < ActiveSupport::TestCase

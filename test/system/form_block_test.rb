@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# The Form block on the public site, in a browser (forms plan, Task 7;
-# design.md 4): sent in place by `form-send` with errors beside their
+# The Form block on the public site, in a browser: sent in place by `form-send` with errors beside their
 # fields and a thank-you where the form stood, and without the script a
 # plain post that lands on the endpoint's own page.
 #

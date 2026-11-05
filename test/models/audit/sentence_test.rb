@@ -137,7 +137,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     end
   end
 
-  # Forms plan, Task 2: a form's five actions, its name quoted as a subject.
+  # A form's five actions, its name quoted as a subject.
   test "a form's actions" do
     cases = {
       "form.created" => "created the form “Contact”",
@@ -154,7 +154,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "Form", Audit::Filter::SUBJECT_TYPES.fetch("Forms::Form"), "the log's Type filter names it"
   end
 
-  # Forms plan, Task 3: a visitor's send has no actor row and reads as a
+  # A visitor's send has no actor row and reads as a
   # visitor's; a deletion says how many and, for the jobs', why.
   test "a form's submissions: a visitor sent it, and how many were deleted and why" do
     on_form = { channel: "public", subject_type: "Forms::Form", subject_id: 999_999, subject_label: "Contact",

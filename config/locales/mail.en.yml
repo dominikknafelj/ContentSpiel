@@ -26,7 +26,7 @@ en:
     test:
       subject: "Test mail from %{site}"
       body: "Mail from Content Spiel works."
-    # A form's submission, mailed to its recipients (forms plan, Task 3):
+    # A form's submission, mailed to its recipients:
     # %{form} is the form's name, which editors give it and visitors never
     # see. The answers are listed between the intro and the three lines.
     forms:

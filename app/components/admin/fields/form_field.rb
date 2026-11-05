@@ -1,8 +1,8 @@
 module Admin
   module Fields
-    # A `<select>` of the forms, for the Form block's `:form` field (forms
-    # plan, Task 7; spec decision 10: placing a form needs only the right to
-    # edit the page, and the picker lists every form by name). The choices
+    # A `<select>` of the forms, for the Form block's `:form` field (placing
+    # a form needs only the right to edit the page, and the picker lists
+    # every form by name). The choices
     # are every KEPT form by name, each drawn as escaped text, after "Choose
     # a form", which stores nothing. A stored id that no kept form has (the
     # form was trashed or purged after it was placed) is drawn first,

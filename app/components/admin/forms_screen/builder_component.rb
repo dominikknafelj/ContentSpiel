@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # The builder (forms plan, Task 4; design.md 2): one column of cards in
+    # The builder: one column of cards in
     # the Settings card shape, ONE form with ONE explicit Save
     # (`Admin::Ui::SaveBarComponent`), then the trash zone outside it.
     #
@@ -19,7 +19,7 @@ module Admin
     # value and every unsaved row. Nothing of a destination's secret is
     # drawn, and nothing here reads a submission.
     #
-    # LANGUAGES (design.md 2.5): `locale` is the tab. On the default
+    # LANGUAGES: `locale` is the tab. On the default
     # language's tab everything is drawn; on another, only the texts a
     # visitor reads, each with the default language's text above it as a
     # reference line, and the structure is the stored form's (`Draft`).
@@ -114,7 +114,7 @@ module Admin
 
       # A blank row of each type, for its `<template>`: the script replaces
       # `__ROW__` with the new row's name. A choice starts with two empty
-      # choices (design.md 2.3).
+      # choices.
       def template_row(type)
         choices = (Array.new(2) { |index| Draft::ChoiceRow.new(row: "__CHOICE#{index}__", key: "", label: {}) } if type.options.include?(:choices))
         Draft::Row.new(row: "__ROW__", key: "", type: type.name, required: false, label: {}, help: {},

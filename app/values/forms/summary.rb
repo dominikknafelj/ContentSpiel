@@ -1,6 +1,5 @@
 module Forms
-  # The submissions list's one line about a submission (forms plan, decision
-  # 7). COMPUTED, NEVER STORED: an unencrypted copy of answers would be the
+  # The submissions list's one line about a submission. COMPUTED, NEVER STORED: an unencrypted copy of answers would be the
   # very thing encryption keeps out of the table, so the list decrypts the
   # rows of the page it shows (50 at most) and asks this for each.
   #

@@ -1,5 +1,4 @@
-# Forms (docs/superpowers/specs/2026-11-03-forms-design.md; plan decisions 1
-# and 3): a form is its own trashable record, with no drafts. Its fields are a
+# Forms (docs/reference/forms.md): a form is its own trashable record, with no drafts. Its fields are a
 # jsonb list saved whole by one explicit Save (`Forms::Save`), each with a key
 # that never changes, so there is no row per field. `submit_label` and
 # `thank_you` are Mobility's jsonb columns, translated values that fall back

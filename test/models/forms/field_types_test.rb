@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The form registry (forms plan, Task 1): the half of a form field's type
+# The form registry: the half of a form field's type
 # that is a visitor's form's own. What a value IS stays `ContentModel::
 # FieldTypes`' (`value_type`).
 class Forms::FieldTypesTest < ActiveSupport::TestCase

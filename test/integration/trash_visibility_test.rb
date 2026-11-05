@@ -336,7 +336,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "body", text: /Gone page/, count: 0
   end
 
-  # Forms plan, Task 5: a trashed form's submissions are out of sight until
+  # A trashed form's submissions are out of sight until
   # it is restored, and a submission from a trashed page names no title.
   test "a trashed form's submissions list, submission and Send again are not found, and a trashed page's title is not shown" do
     kept = forms(:contact)

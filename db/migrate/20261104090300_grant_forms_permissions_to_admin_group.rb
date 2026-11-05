@@ -1,5 +1,5 @@
-# Grants the two new forms rights (forms spec, decision 10: "both new
-# permissions held by the Admin group by default") to an Admin group seeded
+# Grants the two new forms rights (held by the Admin group by default) to
+# an Admin group seeded
 # before they existed. A fresh install gets them from `AccessControl::Seeds`
 # itself (Admin's `grants: :all` resolves against the grantable part of the
 # live registry). `forms.submit` is not granted: it is the visitor's alone

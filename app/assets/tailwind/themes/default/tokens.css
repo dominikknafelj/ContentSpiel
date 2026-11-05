@@ -118,15 +118,15 @@
   --th-table-caption: var(--th-meta);
   --th-table-ground: var(--th-paper);
 
-  /* The Form block's six (forms plan, Task 7; design.md 4.1), from the base
+  /* The Form block's six, from the base
      so a re-coloured base re-colours a form: the field's ground is the
      raised surface; its outline --th-meta, the site's control outline at
-     3:1 (pre-flight R11; --th-line-strong is a hairline); the focus ring
+     3:1 (--th-line-strong is a hairline); the focus ring
      the accent; the error --th-danger-ink, text and edge in one (the ink is
      the darker, so the edge clears 3:1 where the text clears 4.5:1); the
      thank-you the ok hue at 8% over the page with an ok rule (not the
      tinted band's grey, which reads as disabled). Values set by the
-     contrast test (pre-flight R17): test/integration/design_tokens_test.rb
+     contrast test: test/integration/design_tokens_test.rb
      holds every pair, on the page, a tinted band and a strong band. */
   --th-form-field-ground: var(--th-surface);
   --th-form-field-line: var(--th-meta);

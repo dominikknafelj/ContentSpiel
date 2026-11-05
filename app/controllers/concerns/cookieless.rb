@@ -1,6 +1,6 @@
-# NO SESSION, NO TOKEN AND NO COOKIE, AS A WALL (theming spec §2: "no CSRF
-# token on a public page, which is the same cookie-less answer for every
-# visitor"). It was `PublicController`'s own until the forms plan (Task 6)
+# NO SESSION, NO TOKEN AND NO COOKIE, AS A WALL: no CSRF token on a public
+# page, which is the same cookie-less answer for every visitor
+# (`docs/reference/theming.md`). It was `PublicController`'s own until forms
 # gave a visitor a second door, the endpoint a form posts to
 # (`FormSendsController`), which is no `PublicController` (it is never
 # cached and draws no theme) and must leave the browser's cookies exactly as

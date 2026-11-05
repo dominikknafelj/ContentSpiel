@@ -1,6 +1,5 @@
 module Forms
-  # One destination's delivery of one submission (forms plan, decisions 1
-  # and 6): `waiting` until `Forms::DeliveryJob` has delivered it (`sent`)
+  # One destination's delivery of one submission: `waiting` until `Forms::DeliveryJob` has delivered it (`sent`)
   # or given up (`failed`, with the deliverer's `key` and the other side's
   # `line`, scrubbed of every secret of the destination by the job).
   #
@@ -17,8 +16,7 @@ module Forms
   # `queued_fingerprint` is the mail settings' fingerprint when it was
   # queued (an HMAC that holds no setting, `MailSettings#fingerprint`): the
   # mail destination's send verifies the settings only while it is still
-  # the current one, as a mail queued through `ApplicationMailer.queue` does
-  # (pre-flight ruling R9).
+  # the current one, as a mail queued through `ApplicationMailer.queue` does.
   class Delivery < ApplicationRecord
     self.table_name = "form_deliveries"
 

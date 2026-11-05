@@ -289,12 +289,12 @@ Rails.application.routes.draw do
     # `:show` -- the editor is the group's page.
     resources :groups, only: %i[index new create edit update destroy]
 
-    # The Forms screen (forms plan, Task 4): the list, New form (a dialog,
+    # The Forms screen: the list, New form (a dialog,
     # with `new` its page without JavaScript), the builder (`show`, saved
     # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
     # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
     resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ } do
-      # A form's submissions (forms plan, Task 5; design.md 3): the list
+      # A form's submissions: the list
       # (`?page=`), one submission, deleting one and deleting all. A
       # submission is found among its form's, by its id: no answer is ever
       # part of an address.
@@ -478,7 +478,7 @@ Rails.application.routes.draw do
   # catch-all below, or "/mcp" would be swallowed as a page path instead.
   post "mcp", to: "mcp#create"
 
-  # A visitor's send of a form (forms plan, Task 6; spec "Sending"): the form
+  # A visitor's send of a form: the form
   # posts to its own endpoint, never to the page, so a public page stays a
   # GET that is the same for everyone. POST only: a GET of this address is
   # the public catch-all's below, a page path like any other (and a 404

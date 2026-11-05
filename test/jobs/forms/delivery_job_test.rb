@@ -1,7 +1,6 @@
 require "test_helper"
 
-# One delivery of one submission to one destination (forms plan, Task 3,
-# decisions 6 and 11): the job asks the destination's deliverer, records the
+# One delivery of one submission to one destination: the job asks the destination's deliverer, records the
 # delivery sent or failed, and retries what is worth retrying. The mail
 # destination delivers through `ApplicationMailer.deliver_in_job`, which keeps
 # mail's rules: the site's mail state records the send (verifying the
@@ -113,7 +112,7 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
     end
   end
 
-  # Task 5, fix round 1: the decision to delete is made from the
+  # The decision to delete is made from the
   # submission's locked row, its deliveries read after the lock.
   test "the delivered submission is locked before its deliveries are read and it is deleted" do
     register_hook { nil }
@@ -349,8 +348,7 @@ class Forms::DeliveryJobTest < ActiveJob::TestCase
     end
   end
 
-  # Personal data reaches no log line and no span (forms plan, Global
-  # Constraints): not the answers, not the visitor's address, not the
+  # Personal data reaches no log line and no span: not the answers, not the visitor's address, not the
   # recipients'. The send is traced (the job's consumer root and Action
   # Mailer's delivery), and everything the job and the mailer log at info
   # and above is read: at debug Action Mailer logs every mail it delivers in

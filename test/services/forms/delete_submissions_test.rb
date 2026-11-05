@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Deleting submissions (forms plan, Task 3): one, several or all of a form's,
+# Deleting submissions: one, several or all of a form's,
 # with their deliveries, by an editor with `forms.manage` or by the jobs as
 # the trusted actor (the reasons `expired`, `delivered`, `undelivered`).
 # One event on the form says how many and why, and never what was in them.

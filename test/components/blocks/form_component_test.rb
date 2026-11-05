@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `Blocks::FormComponent` (forms plan, Task 7; design.md 4): an editor's
+# `Blocks::FormComponent`: an editor's
 # form drawn by the theme, which posts to the form's own endpoint
 # (`FormSendsController`) and is sent in place by `form-send`.
 class Blocks::FormComponentTest < ActiveSupport::TestCase
@@ -37,7 +37,7 @@ class Blocks::FormComponentTest < ActiveSupport::TestCase
       assert_selector "[role=alert][tabindex='-1'][hidden][data-form-send-target=summary]", visible: :all
       assert_selector "[role=status][tabindex='-1'][hidden][data-form-send-target=done]", text: "Thank you, we'll be in touch.", visible: :all
       # Every field's error element is drawn, empty and hidden, for the
-      # script to fill (R15), and the control names it only once it holds a
+      # script to fill, and the control names it only once it holds a
       # message.
       %w[f_name0001 f_mail0001 f_text0001].each do |key|
         assert_selector "p#form-#{block.id}-#{key}-error[hidden]", text: "", visible: :all

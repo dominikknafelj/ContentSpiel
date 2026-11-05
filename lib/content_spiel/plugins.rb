@@ -87,7 +87,7 @@ module ContentSpiel
         keep(:block_types, block, caller_locations(1, 1).first)
       end
 
-      # The same for the form field types (forms plan, Task 1):
+      # The same for the form field types:
       #
       #   ContentSpiel::Plugins.form_field_types do |types|
       #     types.register "acme/rating", value_type: :integer, label: "Rating", options: [],
@@ -102,7 +102,7 @@ module ContentSpiel
         keep(:form_field_types, block, caller_locations(1, 1).first)
       end
 
-      # Where a form's submissions go, from a gem (forms plan, Task 2):
+      # Where a form's submissions go, from a gem:
       #
       #   ContentSpiel::Plugins.form_destinations do |destinations|
       #     destinations.register "acme/crm", label: "Acme CRM", deliverer: Acme::Crm do |d|

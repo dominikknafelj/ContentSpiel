@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The endpoint a visitor's form posts to (forms plan, Task 6; spec
-# "Sending", decision 7; design.md 4 and 5): with JavaScript it answers
+# The endpoint a visitor's form posts to: with JavaScript it answers
 # JSON for the script to write in place, without it a plain page of the
 # CMS's own (`layouts/form_send`), never the theme's. It is no
 # `PublicController` and is never cached, but it keeps the public wall
@@ -139,7 +138,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
                    "errors" => [ { "key" => "f_name0001", "message" => "Please fill in this field.", "item" => "Your name: Please fill in this field." } ] }, answer)
   end
 
-  # Review Focus 1: the redrawn page hands back the token the visitor sent,
+  # The redrawn page hands back the token the visitor sent,
   # so a correction sent within three seconds of that page is not dropped as
   # too fast. A fresh token would make this send `:too_soon`: answered as a
   # success and stored nowhere.
@@ -210,7 +209,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
       end
     end
 
-    # Owner's ruling 2: without keys there are no answers whatever mail does.
+    # Without keys there are no answers whatever mail does.
     with_mail_state(:working) do
       without_encryption_keys do
         assert_nothing_written { send_form(json: true) }
@@ -219,7 +218,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Pre-flight ruling R10: the page a send names is the visitor's to name,
+  # The page a send names is the visitor's to name,
   # so it is believed only when the public can see it and it places this
   # form; otherwise nothing is stored for it and the link goes home.
   test "a page that is not live, or does not place the form, is not stored and the link back goes home" do

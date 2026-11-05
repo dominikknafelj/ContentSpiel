@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
-// The form builder (forms plan, Task 4; design.md 2.2 to 2.4): adds a field
+// The form builder: adds a field
 // from the `<template>` of its type, moves a field up or down, removes one,
 // folds a row, and does the same for the choices of a choice field. It writes
 // nothing but the form's own inputs, and nothing to the server: the save bar
@@ -11,15 +11,15 @@ import { messages } from "i18n/messages"
 // (`form[fields][<row>][...]`), a name that does not move, and the order is
 // one tracked hidden input (`form[field_order]`, the rows' names, and inside
 // a field `choice_order`). A move rewrites that one input and dispatches a
-// bubbling `input` on it, so the bar counts one change, as design.md 2.8
-// asks; renumbered names would have counted every input below the move.
+// bubbling `input` on it, so the bar counts one change for one move;
+// renumbered names would have counted every input below the move.
 //
 // A REMOVED ROW STAYS IN THE PAGE, hidden, and leaves the order: the server
 // reads the rows the order names and drops the rest (`Admin::FormsScreen::
 // Draft`), and its inputs, unchanged, count nothing, so a removal is one
 // change too. The save bar's Cancel, which reloads, brings it back.
 //
-// FOCUS AND WORDS (design.md 2.4). The focus stays on the arrow pressed; at
+// FOCUS AND WORDS. The focus stays on the arrow pressed; at
 // the end of the list it goes to the row's other arrow. After a removal it
 // goes to the next row's heading, else the previous one's, else the picker's
 // first button. Each move, removal and addition is said in the polite live

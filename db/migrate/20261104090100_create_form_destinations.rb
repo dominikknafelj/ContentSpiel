@@ -1,4 +1,4 @@
-# Where a form's submissions go (plan decision 1): one row per destination of
+# Where a form's submissions go: one row per destination of
 # a form, in its order. `kind` names a `Forms::DestinationTypes` entry (mail
 # built in, a gem's `owner/name`); `settings` are its fields' values;
 # `secrets` holds the type's secrets, each sealed on its own with Active

@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # A form's two screens, Form | Submissions (design.md 2.1 and 3), drawn
+    # A form's two screens, Form | Submissions, drawn
     # as the Trash screen's tabs are (`Admin::Ui::TabLinksComponent`): plain
     # links, the current one inverted and `aria-current`. Each tab is drawn only for a viewer who may open it
     # (the builder `forms.manage`, the submissions `form_submissions.view`),

@@ -50,8 +50,7 @@ module Audit
     action = action.to_s
     now = Time.current
     actor = Current.actor
-    # A visitor of the public site (`AccessControl::VISITOR`, forms plan
-    # decision 8) is nobody the CMS knows: no actor row, the label
+    # A visitor of the public site (`AccessControl::VISITOR`) is nobody the CMS knows: no actor row, the label
     # "visitor", and no IP, whatever the request set, since an address is
     # the one thing about a visitor the log would otherwise keep. Its events
     # never coalesce: each send is its own moment, and an open row of a

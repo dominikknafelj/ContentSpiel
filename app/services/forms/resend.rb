@@ -1,5 +1,5 @@
 module Forms
-  # Send again (forms plan, Task 5; design.md 3): a delivery that FAILED goes
+  # Send again: a delivery that FAILED goes
   # back to waiting, under the mail settings as they are now, and is queued
   # again after the commit (`Forms::DeliveryJob`). `form_submissions.view`,
   # the right that reads submissions: whoever may read why a delivery failed

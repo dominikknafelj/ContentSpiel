@@ -43,7 +43,7 @@ module AccessControl
       # `register` call resolves is always the just-reloaded class, never
       # one left over from before the reload.
       #
-      # `grantable: false` (forms plan, decision 8) registers a permission that
+      # `grantable: false` registers a permission that
       # no group, token, matrix or seed may hold (see `.grantable`).
       def register(key, label:, area:, action:, subject: nil, scopes: [], grantable: true)
         key = key.to_s

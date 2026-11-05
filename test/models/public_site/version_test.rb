@@ -221,7 +221,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_moves("purging a live page") { ok(Trash::Purge.call(page.reload)) }
   end
 
-  # A form has no published copy (forms plan, decision 9): every write that
+  # A form has no published copy: every write that
   # changes what a placed form draws moves the version, a save that changes
   # nothing does not.
   test "saving, trashing, restoring and purging a form each move" do

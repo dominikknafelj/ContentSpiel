@@ -1,5 +1,5 @@
 module Admin
-  # The Forms screen (forms plan, Task 4; design.md 1 and 2): the list of
+  # The Forms screen: the list of
   # kept forms, New form (a dialog on the list, `new` its page without
   # JavaScript), the builder (`show`), its explicit Save (`update`) and Move
   # to trash (`destroy`). Every write is a service: `Forms::Save` and
@@ -12,7 +12,7 @@ module Admin
   # is: a 403 without both); everything that builds or changes a form needs
   # `forms.manage`. The builder needs it too: for a viewer with
   # `form_submissions.view` alone a form opens on its submissions
-  # (`Admin::FormSubmissionsController`, pre-flight ruling R7), a redirect
+  # (`Admin::FormSubmissionsController`), a redirect
   # rather than a 403, so a link to a form works for both. A trashed form
   # is not found here: it is the Trash screen's.
   #
@@ -46,7 +46,7 @@ module Admin
       @dialog = new_dialog
     end
 
-    # New form (design.md 1): a name, a start ("contact": three required
+    # New form: a name, a start ("contact": three required
     # fields; "blank": none) and the recipients of its mail, prefilled with
     # the person's own address. With no recipient the form keeps its
     # submissions instead, where the site can (`Forms::Save` refuses a form
@@ -131,7 +131,7 @@ module Admin
       Admin::FormsScreen::NewFormDialogComponent.new(**values, page: action_name.in?(%w[new]) || params[:from] == "page", url_options: admin_url_options)
     end
 
-    # The starter's three fields (design.md 1), labelled in the default
+    # The starter's three fields, labelled in the default
     # language with CS Studio's words; "blank" is none. Each type is the
     # registered one whose value is of that kind (a line, an address, a
     # text), so nothing here names a form field type.

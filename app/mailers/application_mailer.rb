@@ -79,7 +79,7 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   # Delivers now, from inside a job of its own, and records the outcome as
-  # `MailDeliveryJob` would (plan decision 11; pre-flight ruling R9), for a
+  # `MailDeliveryJob` would, for a
   # job that must learn the result itself: `Forms::DeliveryJob`, through the
   # mail destination. Answers nil when the mail was sent.
   #
@@ -97,7 +97,7 @@ class ApplicationMailer < ActionMailer::Base
   #     raised as `Failed` with the failure's key and its line, already
   #     scrubbed of the login (`MailFailure.from`).
   #   - An error raised before the delivery (the mailer, a template, a
-  #     record gone) is a bug and is raised as it is (ruling T2b).
+  #     record gone) is a bug and is raised as it is.
   #
   # Both are raised with no `cause`, so the original reply, which may echo
   # the login, is not reachable from them either.

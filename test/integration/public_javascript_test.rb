@@ -286,7 +286,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller*='admin--']", count: 0
   end
 
-  # Forms plan, Task 7: the Form block's send in place is a controller of
+  # The Form block's send in place is a controller of
   # the site's own, at the top level like `code-copy`; nothing of CS
   # Studio's editor reaches the page.
   test "a public page with a Form block carries the send controller and no admin script" do

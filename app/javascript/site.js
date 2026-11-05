@@ -10,8 +10,7 @@ import { registerControllers } from "controllers"
 
 registerControllers((path) => path.startsWith("controllers/theme/"))
 
-// A LINK TO AN ANCHOR OF THE PAGE IS THE BROWSER'S, NOT A TURBO VISIT (forms
-// plan, Task 7, fix round 2). Turbo 8 (turbo-rails 2.0.23) draws such a link
+// A LINK TO AN ANCHOR OF THE PAGE IS THE BROWSER'S, NOT A TURBO VISIT. Turbo 8 (turbo-rails 2.0.23) draws such a link
 // again from the server: `findLinkFromClickTarget` skips a link whose
 // `link.href.startsWith("#")`, which never holds, since `href` is the
 // absolute address, and `Navigator#locationWithActionIsSamePage` answers

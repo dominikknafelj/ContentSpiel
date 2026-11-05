@@ -1,5 +1,5 @@
 module Admin
-  # A form's submissions (forms plan, Task 5; design.md 3): the list, newest
+  # A form's submissions: the list, newest
   # first and 50 a page (`index`), one submission (`show`), deleting one
   # (`destroy`) and deleting all of the form's (`destroy_all`). Send again
   # is `Admin::FormDeliveriesController`.

@@ -1,5 +1,5 @@
 module Forms
-  # One place a form's submissions go (forms spec, "Destinations"): a kind
+  # One place a form's submissions go: a kind
   # (`Forms::DestinationTypes`), its settings, and its secrets. Written only
   # by `Forms::Save`, which replaces a form's list whole.
   #
@@ -20,7 +20,7 @@ module Forms
   #   still be replaced, the reason the mail login is written this way);
   # - a blank secret keeps the stored one (`Forms::Save`).
   #
-  # Only the deliverer reads a secret's value (`#secret`, Task 3), in a job.
+  # Only the deliverer reads a secret's value (`#secret`), in a job.
   # A secret's name is no secret; its value never reaches an audit snapshot
   # (`Audit::Snapshot` names a form's destinations without it, and
   # `secrets` is in `NEVER_STORED`), a log line or a page.

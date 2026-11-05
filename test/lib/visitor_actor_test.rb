@@ -1,10 +1,10 @@
 require "test_helper"
 
-# The visitor (`AccessControl::VISITOR`, forms plan decision 8) may send a
+# The visitor (`AccessControl::VISITOR`) may send a
 # form, which no group, token or user may be given. What keeps that right
 # from leaking is who may ACT as the visitor: in the application, the one
-# controller that takes a visitor's send (`FormSendsController`, the plan's
-# Task 6) and nothing else, so no other door of the site can authorize a
+# controller that takes a visitor's send (`FormSendsController`) and nothing
+# else, so no other door of the site can authorize a
 # write as somebody nobody signed in as. The visitor's other guard is
 # test/models/access_control/visitor_test.rb (every key on every channel).
 #

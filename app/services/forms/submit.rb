@@ -1,6 +1,5 @@
 module Forms
-  # A visitor's send of a form (forms plan, Task 3; decisions 6 and 8;
-  # owner's ruling 2). The endpoint that takes it (`FormSendsController`)
+  # A visitor's send of a form. The endpoint that takes it (`FormSendsController`)
   # calls
   #
   #   Forms::Submit.call(form, answers: params[:answers], locale: "en", page: page, actor: AccessControl::VISITOR)
@@ -11,7 +10,7 @@ module Forms
   # errors and the typed values to draw again), `UNAVAILABLE` (the site has
   # no encryption keys) and `GONE` (the form is in the trash), or `denied?`.
   #
-  # THE BENT RULE (decision 8). Every write is a service that authorizes, and
+  # THE BENT RULE. Every write is a service that authorizes, and
   # a nil or unknown actor on `:public` used to be denied everything. A
   # visitor's send is a write, so it gets an actor of its own:
   # `AccessControl::VISITOR`, allowed `forms.submit` on `:public` and nothing
@@ -24,11 +23,11 @@ module Forms
   # session behind the send (a public page carries neither): what makes a
   # forged send harmless is that a send can do nothing but be a submission.
   #
-  # NO KEYS, NO ANSWERS (owner's ruling 2). A submission is stored encrypted
+  # NO KEYS, NO ANSWERS. A submission is stored encrypted
   # and nothing else may hold the answers: no sealed copy in a job, no plain
   # row. So without Active Record encryption keys the send is UNAVAILABLE
   # before anything is read or written, and the form says beforehand that
-  # it can't take answers (the plan's Task 7).
+  # it can't take answers (`Blocks::FormComponent`).
   #
   # WHAT IS WRITTEN, in one transaction under the form's row lock (so a form
   # trashed or purged meanwhile is answered GONE rather than half-written):

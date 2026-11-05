@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The five public inputs (forms plan, Task 1). Placeholder look: the default
+# The five public inputs. Placeholder look: the default
 # theme's field styles; what is held here is the markup's accessibility.
 class Blocks::FormFieldsTest < ViewComponent::TestCase
   def field_of(type, label: "Your name", required: false, help: nil, **settings)
@@ -39,7 +39,7 @@ class Blocks::FormFieldsTest < ViewComponent::TestCase
     assert_selector "input[value='x']"
 
     # Without an error the element is there, empty and hidden, for the Form
-    # block's script to fill (pre-flight R15), and nothing names it yet.
+    # block's script to fill, and nothing names it yet.
     draw(field_of("short_text"))
     assert_no_selector "[aria-invalid]"
     assert_no_selector "[aria-describedby]"

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Where a form's submissions go (forms plan, Task 2): a registry of
+# Where a form's submissions go: a registry of
 # destination types, mail built in, a gem's added through
 # `ContentSpiel::Plugins.form_destinations`. A destination's secrets are
 # sealed one by one and never shown again, as the mail login is.

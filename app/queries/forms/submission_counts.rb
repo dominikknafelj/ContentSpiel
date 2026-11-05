@@ -1,6 +1,5 @@
 module Forms
-  # The Forms list's numbers of submissions (design.md 1, the SUBMISSIONS
-  # column): how many each form holds, and how many of those have a delivery
+  # The Forms list's numbers of submissions (its SUBMISSIONS column): how many each form holds, and how many of those have a delivery
   # that failed ("2 NOT DELIVERED"). Two grouped statements for a page of
   # forms, never one per row; nothing here reads an answer.
   module SubmissionCounts

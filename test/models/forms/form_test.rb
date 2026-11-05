@@ -1,8 +1,8 @@
 require "test_helper"
 
-# A form (forms plan, Task 2): its own trashable record, whose texts are
+# A form: its own trashable record, whose texts are
 # translated values that fall back to the default language and whose keeping
-# depends on the site having encryption keys (owner's ruling 2).
+# depends on the site having encryption keys.
 class Forms::FormTest < ActiveSupport::TestCase
   test "a form keeps only where it says and where the site has encryption keys" do
     assert forms(:newsletter).keeps?

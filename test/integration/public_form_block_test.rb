@@ -1,7 +1,6 @@
 require "test_helper"
 
-# A Form block on a public page (forms plan, Task 7; spec "Sending" and its
-# anti-goals): the page stays one cookie-less, cacheable answer for every
+# A Form block on a public page: the page stays one cookie-less, cacheable answer for every
 # visitor, the form posts to its own endpoint with no token of this
 # application, and what the form draws follows its Save (a form has no
 # published copy) and the site's encryption keys.

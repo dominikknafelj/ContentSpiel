@@ -1,6 +1,6 @@
 module Admin
   module FormsScreen
-    # One field of the builder (design.md 2.2), in the block card's anatomy:
+    # One field of the builder, in the block card's anatomy:
     # a head (the type's badge, the label as the button that folds the body,
     # "Required", and ↑, ↓ and Remove) and a body (the label, the help line,
     # Required, and for a type that offers them "Shown as" and the choices).

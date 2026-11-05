@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The Forms screen in CS Studio (forms plan, Task 4; design.md 1 and 2): the
+# The Forms screen in CS Studio: the
 # list, New form, the builder with its explicit Save (the 409 of a stale
 # base), what the builder says about keeping, encryption keys and mail, and
 # moving a form to the trash. `forms.manage` builds; a holder of
@@ -180,7 +180,7 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Forms final review, Minor 6: unticking "Keep" on a form that keeps
+  # Unticking "Keep" on a form that keeps
   # submissions deletes them at the next nightly clean-up, so the builder
   # says so under the box, drawn hidden while it is ticked (the script shows
   # it as the box is unticked), and only on a form that holds some.
@@ -200,7 +200,7 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     assert_select "[data-forms-warning=unkeep]", count: 0
   end
 
-  # Forms final review, Important 1: a destination of a type no longer
+  # A destination of a type no longer
   # registered is dormant: the builder draws its stored kind and says its
   # type isn't installed, a save carries it as it is, and its Remove box
   # takes it out at the Save.
@@ -230,8 +230,8 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     assert_equal [ mail.id ], form.reload.destinations.pluck(:id)
   end
 
-  # Ruling R7: the builder's door for a viewer with `form_submissions.view`
-  # alone is the form's submissions, not a 403 (Task 5).
+  # The builder's door for a viewer with `form_submissions.view` alone is
+  # the form's submissions, not a 403.
   test "a viewer with only form_submissions.view is sent to the submissions and can't change a form" do
     viewer = submissions_viewer
     sign_in_as viewer

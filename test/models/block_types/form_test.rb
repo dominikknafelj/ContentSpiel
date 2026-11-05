@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The Form block's type (forms plan, Task 7): one field naming a form by its
+# The Form block's type: one field naming a form by its
 # id, its component, the methods its template may call and its six tokens.
 class BlockTypes::FormTest < ActiveSupport::TestCase
   test "the form type declares one form field, its component, theme methods and tokens" do

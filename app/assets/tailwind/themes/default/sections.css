@@ -167,7 +167,7 @@
   --th-card-ground: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
   --th-card-line: var(--th-on-band-strong-dim);
   --th-card-icon: var(--th-on-band-strong-accent);
-  /* A form on this band (design.md 4.1): its field ground the band's text
+  /* A form on this band: its field ground the band's text
      at 6% over the band (the Card's), its outline the band's dim, its focus
      ring the band's accent, its error the danger hue mixed with the band's
      text and its thank-you the band's own ground with the ok hue mixed the

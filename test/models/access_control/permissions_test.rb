@@ -41,7 +41,7 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     assert_equal "Trash", permission.area
   end
 
-  # Forms plan, Task 2: the two rights an editor is given, in their own
+  # The two rights an editor is given, in their own
   # area, unscoped like the Administration ones.
   test "the forms rights are registered in a Forms area, unscoped" do
     [ [ "forms.manage", "Manage forms" ], [ "form_submissions.view", "View form submissions" ], [ "forms.submit", "Send a form" ] ].each do |key, label|
@@ -50,7 +50,7 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     end
   end
 
-  # Forms plan, decision 8: `forms.submit` is the visitor's alone. No group,
+  # `forms.submit` is the visitor's alone. No group,
   # token, matrix or seed may hold it.
   test "forms.submit is registered but not grantable: the matrix, the built-in groups and Groups::Save never hold it" do
     assert AccessControl::Permissions.find("forms.submit")

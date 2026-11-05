@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Forms final review, Important 2: a form's mail that failed because mail
+# A form's mail that failed because mail
 # was not set up (`not_ready`) is sent again by itself once mail is set up,
 # through Send again's own path (`Forms::Resend`, then `Forms::DeliveryJob`),
 # as the trusted nil actor on :system, so each one is a `form_submission

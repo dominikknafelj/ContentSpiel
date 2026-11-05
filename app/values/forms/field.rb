@@ -5,7 +5,7 @@ module Forms
   # (a choice field's `choices` and `display`).
   #
   # The texts are translated values that fall back to the default language
-  # and join no translation state (forms plan, Global Constraints): a Hash of
+  # and join no translation state: a Hash of
   # language => text, a blank text counting as not written.
   Field = Data.define(:key, :type, :required, :label, :help, :settings)
 

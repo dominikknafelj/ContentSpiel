@@ -1,5 +1,4 @@
-# The endpoint a visitor's form posts to (forms plan, Task 6; spec
-# "Sending", decision 7; design.md 4 and 5): `POST /forms/:form_id`. The
+# The endpoint a visitor's form posts to: `POST /forms/:form_id`. The
 # form posts here, never to its page, so a public page stays a GET that is
 # the same cookie-less answer for everyone, and its ETag and caching are
 # untouched.
@@ -8,14 +7,14 @@
 # every answer, a refusal included), it draws no theme (the theme's views
 # are on the two public controllers' path only, `PublicPageRendering`), and
 # its plain pages are the CMS's own, in a layout of their own
-# (`layouts/form_send`, design.md 5.1: no CSRF tag, no script of CS Studio,
+# (`layouts/form_send`: no CSRF tag, no script of CS Studio,
 # the visitor's language, no sign-in link). But it keeps the public wall,
 # `Cookieless`, first: no session is committed, no token is minted and no
 # `Set-Cookie` leaves, so a signed-in editor who sends a form on their own
 # site keeps their cookies as they are.
 #
-# NO CSRF TOKEN, AND WHY THAT IS SAFE (spec "Sending"; the reason the
-# reference is to record, `docs/reference/forms.md`, Task 9). A public page
+# NO CSRF TOKEN, AND WHY THAT IS SAFE (`docs/reference/forms.md` keeps the
+# same reason). A public page
 # carries no token (it would need a session, and the page would no longer
 # be the same for everyone), so a send cannot be checked for one. What
 # forgery protects is a signed-in person's power: a forged request that
@@ -28,26 +27,26 @@
 # the rate limit per visitor and per form (`Forms::SendLimit`).
 #
 # WHAT IT ANSWERS, by `Accept`: JSON to the Form block's script, which
-# writes the words in place (Task 7), and otherwise a plain page of the same
+# writes the words in place, and otherwise a plain page of the same
 # status, each with a link back to the page the form came from:
 #
 #   sent          200  { "status": "sent", "message" }        the form's thank-you, else `public.forms.sent`
 #   invalid       422  { "status": "invalid", "summary", "errors": [{ "key", "message", "item" }] }
 #   gone          404  { "status": "gone", "message" }        no such form, or in the trash
-#   rate_limited  429  { "status": "rate_limited", "message" } owner's ruling 1
-#   unavailable   503  { "status": "unavailable", "message" }  no encryption keys (ruling 2)
+#   rate_limited  429  { "status": "rate_limited", "message" } over a rate limit, told, never answered as sent
+#   unavailable   503  { "status": "unavailable", "message" }  no encryption keys
 #
 # An error's `item` is its summary link's words, "<label>: <message>"
 # (`public.forms.error_item`, so a language orders the two parts), written
-# here because the script holds no words of its own (forms plan, Task 7).
+# here because the script holds no words of its own.
 #
 # Every status is its own word, so the script tells a success, field errors,
-# a refusal and a failure of the network (no answer at all, pre-flight R16)
+# a refusal and a failure of the network (no answer at all)
 # apart. A spam trip is answered exactly as `sent`, stores nothing and
 # records no event (`Forms::SpamCheck`), with one log line naming the form
 # and the measure.
 #
-# PERSONAL DATA (Global Constraints): the answers arrive as
+# PERSONAL DATA: the answers arrive as
 # `answers[<field key>]` and are filtered from the request's log by where
 # they arrive (`config/initializers/filter_parameter_logging.rb`, which
 # names this controller's path, `form_sends`); spans carry no body and no
@@ -61,7 +60,7 @@
 #
 # THE PAGE a send names (`page_id`) is the visitor's to name, so it is
 # believed only when it is a live page whose published copy places this form
-# (`Forms::Placements.live_page`, pre-flight R10); otherwise the submission
+# (`Forms::Placements.live_page`); otherwise the submission
 # stores no page and the link goes to the site's home.
 class FormSendsController < ActionController::Base
   include Cookieless
@@ -108,7 +107,8 @@ class FormSendsController < ActionController::Base
 
   private
 
-  # Owner's ruling 1: told, not swallowed (`Forms::SendLimit`).
+  # A send over a rate limit is told so, not answered as sent
+  # (`Forms::SendLimit`).
   def answer_rate_limited = answer(:rate_limited)
 
   def answer(kind)
@@ -192,8 +192,8 @@ class FormSendsController < ActionController::Base
 
   def field_for(key) = public_fields.find { |field| field.key == key }
 
-  # The token the visitor SENT, never a fresh one (decision 10; Review
-  # Focus 1): a correction sent within three seconds of this page is not
+  # The token the visitor SENT, never a fresh one: a correction sent within
+  # three seconds of this page is not
   # too soon, because the clock started when the form was first drawn.
   def drawn_token = params[:drawn].is_a?(String) ? params[:drawn] : nil
 end

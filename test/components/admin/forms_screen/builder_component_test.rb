@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The builder (forms plan, Task 4; design.md 2): one row per field with its
+# The builder: one row per field with its
 # label, its type's options and its key in a hidden input; destinations
 # whose secrets are never drawn; and every editor's text as text.
 class Admin::FormsScreen::BuilderComponentTest < ViewComponent::TestCase

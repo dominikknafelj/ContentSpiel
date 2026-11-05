@@ -1,6 +1,6 @@
 # What's in the trash, as the purgeable top-level items (trash spec §4.4):
-# page branches by their root, then posts, then forms (forms plan, Task 4:
-# a form takes its submissions with it), then images -- images last, so
+# page branches by their root, then posts, then forms (a form takes its
+# submissions with it), then images -- images last, so
 # the usages their trashed owners held are gone by the time they're tried.
 #
 # `Trash` is both this module and the namespace of the `Trash::` services

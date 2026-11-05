@@ -10,7 +10,7 @@
 # takes every field as a keyword argument and builds the finished, frozen
 # value directly.
 #
-# `grantable` (forms plan, decision 8) is false for a permission no group,
+# `grantable` is false for a permission no group,
 # token, matrix or seed may hold: `forms.submit`, which only the visitor
 # actor is allowed (`AccessControl::Permissions.grantable` is every
 # registered permission but those). Every other permission is grantable.

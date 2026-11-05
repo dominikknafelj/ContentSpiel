@@ -1,4 +1,4 @@
-<%# The builder (forms plan, Task 4; design.md 2): `Admin::FormsScreen::
+<%# The builder: `Admin::FormsScreen::
     BuilderComponent`, drawn from the stored form or, after a refused (422) or
     stale (409) Save, from what was posted (`@draft`). %>
 <% content_for :title, @form.name_was.presence || t(".title") %>

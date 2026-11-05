@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A form's one write (forms plan, Task 2): its name, fields, keeping and
+# A form's one write: its name, fields, keeping and
 # destinations saved whole by an explicit Save, authorized as `forms.manage`,
 # audited, and moving the public content version (a form has no published
 # copy: every write that changes what a placed form draws moves it).
@@ -228,7 +228,7 @@ class Forms::SaveTest < ActiveSupport::TestCase
     assert_refused sentence(:unknown_languages, codes: "xx"), attributes: { name: "Enquiry", submit_label: { "xx" => "Envoyer" } }
   end
 
-  # Fix round 1: a language turned off keeps its texts for the day it is
+  # A language turned off keeps its texts for the day it is
   # turned on again, as `Locales::Disable` keeps content's; a save in between
   # must neither be refused nor lose them.
   test "a form's texts in a language that was turned off survive a save and are back when it is turned on" do
@@ -258,7 +258,7 @@ class Forms::SaveTest < ActiveSupport::TestCase
     assert_equal [ "Send it", "Senden" ], [ result_form.submit_label_in("en"), result_form.submit_label_in("de") ]
   end
 
-  # Fix round 1: a destination is matched by its id alone, so a stored
+  # A destination is matched by its id alone, so a stored
   # secret stays with its own row.
   test "removing the first of two destinations of one kind leaves the second its own secret" do
     register_crm

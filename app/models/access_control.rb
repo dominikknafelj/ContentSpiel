@@ -22,8 +22,7 @@ module AccessControl
   # life to route around rather than a bug to raise on.
   class UnknownPermission < KeyError; end
 
-  # The one visitor of the public site (`AccessControl::Visitor`, forms plan
-  # decision 8): allowed `forms.submit` on `:public` and nothing else.
+  # The one visitor of the public site (`AccessControl::Visitor`): allowed `forms.submit` on `:public` and nothing else.
   # Only the endpoint that takes a visitor's send acts as it
   # (test/lib/visitor_actor_test.rb).
   VISITOR = Visitor::ONE

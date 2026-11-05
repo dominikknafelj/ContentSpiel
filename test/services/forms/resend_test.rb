@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Send again (forms plan, Task 5; design.md 3): a FAILED delivery goes back
+# Send again: a FAILED delivery goes back
 # to waiting under the mail settings as they are now and is queued again
 # after the commit, recorded as `form_submission.resent` on the form by ids
 # only. A delivery that is sent or still waiting is refused, and nothing is

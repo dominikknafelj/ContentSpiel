@@ -1,6 +1,5 @@
 module Forms
-  # Whether this site has Active Record encryption keys (owner's ruling 2 on
-  # the forms plan): without them a form keeps nothing and takes no answers,
+  # Whether this site has Active Record encryption keys: without them a form keeps nothing and takes no answers,
   # because a submission is stored encrypted and nothing else may hold the
   # answers (no sealed copy in a job, no plain row). The Forms screen and
   # System status say so; `Forms::Save` refuses keeping, `Forms::Form#keeps?`

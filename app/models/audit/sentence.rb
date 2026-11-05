@@ -85,7 +85,7 @@ module Audit
       "group.deleted" => [ "deleted the group ", "" ],
       "token.issued" => [ "created the API token ", "" ], "token.revoked" => [ "revoked the API token ", "" ],
       "settings.updated" => [ "edited ", "" ],
-      # Forms (forms plan, Task 2): a form is named as one, with its name.
+      # Forms: a form is named as one, with its name.
       "form.created" => [ "created the form ", "" ], "form.updated" => [ "changed the form ", "" ],
       "form.trashed" => [ "moved the form ", " to the trash" ], "form.restored" => [ "restored the form ", "" ],
       "form.purged" => [ "deleted the form ", " for good" ],
@@ -106,13 +106,13 @@ module Audit
       "notes.removed" => [ "removed the notes on ", "" ]
     }.freeze
 
-    # A form's submissions (forms plan, Task 3). Their subject is the FORM, and
+    # A form's submissions. Their subject is the FORM, and
     # they carry ids and a count, never an answer. `form_submission.received`
     # is a visitor's (`Audit::VISITOR_LABEL`, no actor row), and every
     # visitor's sentence reads "A visitor <verb>"; `form_submissions.deleted`
     # is an editor's or, with a reason, the jobs' ("System deleted 3
     # submissions of “Contact” after they were delivered");
-    # `form_submission.resent` is an editor's Send again (Task 5), "sent a
+    # `form_submission.resent` is an editor's Send again, "sent a
     # submission of “Contact” again".
     SUBMISSION_ACTIONS = %w[form_submission.received form_submission.resent form_submissions.deleted].freeze
 
