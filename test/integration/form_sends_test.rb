@@ -143,6 +143,21 @@ class FormSendsTest < ActionDispatch::IntegrationTest
   # so a correction sent within three seconds of that page is not dropped as
   # too fast. A fresh token would make this send `:too_soon`: answered as a
   # success and stored nowhere.
+  # A gem taken out leaves its field types dormant. The redrawn page shows
+  # what the Form block showed: the registered fields only, never a 500 for
+  # the dormant one.
+  test "an invalid send without JavaScript to a form holding a dormant field redraws the registered fields, 422" do
+    @form.update_columns(fields: @form.fields.map(&:to_h) + [ { "key" => "f_star0001", "type" => "acme/gone", "required" => true, "label" => { "en" => "Stars" } } ]) # version: none (a test's row)
+
+    send_form(answers: ANSWERS.merge("f_name0001" => ""))
+
+    assert_response :unprocessable_content
+    assert_select "form.form-send-page__form" do
+      assert_select "input#form-send-f_name0001[aria-invalid=true]"
+      assert_select "[id^='form-send-f_star0001']", count: 0
+    end
+  end
+
   test "the error page carries the first token: a correction sent a second later is kept" do
     first = Forms::Drawn.token(@form, at: Time.current - Forms::Drawn::MIN_SECONDS)
     send_form(answers: ANSWERS.merge("f_name0001" => ""), drawn: first)

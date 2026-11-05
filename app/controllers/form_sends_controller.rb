@@ -187,7 +187,7 @@ class FormSendsController < ActionController::Base
   # The form's fields as this page draws them. `place` names the ids: one
   # form on one page, so the place is the page's own word.
   def public_fields
-    @public_fields ||= form_record.fields.map { |field| Forms::PublicField.new(field: field, locale: locale, form_id: form_record.id, place: "send") }
+    @public_fields ||= form_record.drawn_fields.map { |field| Forms::PublicField.new(field: field, locale: locale, form_id: form_record.id, place: "send") }
   end
 
   def field_for(key) = public_fields.find { |field| field.key == key }

@@ -57,6 +57,13 @@ module Forms
     # by `Forms::Save` (`fields=` takes the list of hashes it stores).
     def fields = Array(super).map { |field| Field.from_h(field) }
 
+    # The fields a visitor is shown: those whose type is registered. A field
+    # of a type no longer registered (a gem taken out) is dormant: kept in
+    # `fields` and carried through every save, but drawn nowhere, by the Form
+    # block or the endpoint's own redraw, since drawing one raises in
+    # `FieldTypes.fetch`.
+    def drawn_fields = fields.select { |field| FieldTypes.find(field.type) }
+
     # Kept forms with a mail destination: the ones a site without mail set up
     # leaves unable to send (System status's Forms row).
     scope :mailing, -> { kept.where(id: Destination.where(kind: "mail").select(:form_id)) }

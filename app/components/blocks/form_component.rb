@@ -74,11 +74,10 @@ module Blocks
 
     # The form's fields as a visitor's form draws them, their ids this
     # block's own (`place`: two placements of one form never share an id),
-    # each drawn by the theme's input where the theme replaces it. A field
-    # of a type no longer registered (a gem taken out) is left out rather
-    # than raise on a public page.
+    # each drawn by the theme's input where the theme replaces it. A dormant
+    # field is left out (`Forms::Form#drawn_fields`).
     def fields
-      @fields ||= Array(form&.fields).select { |field| ::Forms::FieldTypes.find(field.type) }.map do |field|
+      @fields ||= Array(form&.drawn_fields).map do |field|
         ::Forms::PublicField.new(field: field, locale: locale, form_id: form.id, place: block.id,
           input: Theme.current.component_for(field.field_type, :input))
       end
