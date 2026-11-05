@@ -98,8 +98,8 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     # A hex digest can hold "db8" or "2001" by chance, so the shape is what is
     # asserted (a visitor key: no ':' after its own prefix and exactly 64 hex
     # characters), plus the literal addresses and prefixes the test used.
-    addresses = ["203.0.113.1", "203.0.113.7", "203.0.113.8", "2001:db8:1:2::a", "2001:db8:1:2:ffff::b",
-      "2001:db8:1:2:abcd:ef01:2345:6789", "2001:db8:1:3::a", "2001:db8:1:2", "2001:db8:1:3", "2001:db8", "2001:0db8"]
+    addresses = [ "203.0.113.1", "203.0.113.7", "203.0.113.8", "2001:db8:1:2::a", "2001:db8:1:2:ffff::b",
+      "2001:db8:1:2:abcd:ef01:2345:6789", "2001:db8:1:3::a", "2001:db8:1:2", "2001:db8:1:3", "2001:db8", "2001:0db8" ]
     keys.each { |key| addresses.each { |address| assert_not_includes key, address } }
     visitor_keys = keys.select { |key| key.include?("form_send_visitor") }
     assert_equal 2, visitor_keys.size, keys.inspect
