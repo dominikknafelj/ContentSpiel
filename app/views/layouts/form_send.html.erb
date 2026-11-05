@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="<%= locale %>">
+  <head>
+    <title><%= [ content_for(:title), site_title ].compact.join(" · ") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex">
+    <%= render "shared/theme_head" %>
+    <%= stylesheet_link_tag "tailwind" %>
+  </head>
+
+  <%# The plain pages a visitor's form send answers without JavaScript
+      CMS-drawn and nothing of the site's theme. Its own small layout and not
+      `product`: no CSRF tag (a send carries no token, and this page must
+      mint none), no import map and no script of CS Studio, the visitor's
+      language, and no CONTENT·SPIEL wordmark linking to the sign-in. The one
+      script is the stored light or dark (`shared/theme_head`). The header
+      is the site's name, in the visitor's language, as a link back to the
+      page the form came from; a site with no name has none, and the page's
+      own back link is below. The column is sign-in's, wider (the "simple
+      form" width). %>
+  <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <% if site_title %>
+      <header class="px-7 py-5">
+        <%= link_to site_title, back_path, class: "text-sm font-semibold text-ink" %>
+      </header>
+    <% end %>
+    <main class="px-[22px] pb-16 pt-16">
+      <div class="form-send-page mx-auto flex w-full max-w-[560px] flex-col gap-[18px]">
+        <%= yield %>
+      </div>
+    </main>
+  </body>
+</html>

@@ -29,7 +29,7 @@
 <% images_fingerprint = (ImageSettings.current(SiteSetting.find(@site_setting.id)).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
-     "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
+     "trash_retention_days" => "settings-trash_retention_days", "form_keep_days" => "settings-form_keep_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
      "mail_security" => "settings-mail_security", "mail_sender_name" => "settings-mail_sender_name",
      "mail_sender_address" => "settings-mail_sender_address", "image_format" => "settings-image_format",
@@ -65,6 +65,7 @@
           <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
                 errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
           <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
+          <%= render Admin::SettingsScreen::FormsCardComponent.new(values: values, errors: field_errors.call(:form_keep_days)) %>
           <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: @site_setting, values: values,
                 provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
           <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: MailSettings.current(@site_setting), values: values,

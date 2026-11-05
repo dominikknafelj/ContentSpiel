@@ -81,8 +81,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   test "the screen is a nav of anchors, one card per section, and one footer" do
     get "/cs-studio/settings"
 
-    assert_select "nav[aria-label='Settings sections'] a", 6
-    %w[site languages publishing ai mail images].each do |id|
+    assert_select "nav[aria-label='Settings sections'] a", 7
+    %w[site languages publishing forms ai mail images].each do |id|
       assert_select "nav[aria-label='Settings sections'] a[href='##{id}']"
       assert_select "##{id}"
     end
@@ -476,16 +476,16 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     user
   end
 
-  test "a settings.manage-only user sees the Site, Publishing, AI, Mail and Images cards and no Languages" do
+  test "a settings.manage-only user sees the Site, Publishing, Forms, AI, Mail and Images cards and no Languages" do
     sign_in_as(user_holding("settings.manage"))
 
     get "/cs-studio/settings"
 
     assert_response :success
-    assert_select "nav[aria-label='Settings sections'] a", 5
+    assert_select "nav[aria-label='Settings sections'] a", 6
     assert_select "nav[aria-label='Settings sections'] a[href='#languages']", count: 0
     assert_select "#languages", count: 0
-    %w[site publishing ai mail images].each { |id| assert_select "##{id}" }
+    %w[site publishing forms ai mail images].each { |id| assert_select "##{id}" }
     assert_select "form#settings-form"
   end
 

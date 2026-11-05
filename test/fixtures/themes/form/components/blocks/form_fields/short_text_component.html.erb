@@ -1,0 +1,10 @@
+<%# A theme's own short text answer, written from `field`, `value` and `error` and what a field answers
+    (docs/reference/theming.md, "The Form block"): a real label that says required in words, the help line,
+    the control described by them, and the error element always drawn, empty and hidden without an error. %>
+<p class="plain-field">
+  <label for="<%= field.id %>"><%= field.label %><% if field.required? %> <em class="plain-field__required"><%= field.word(:required) %></em><% end %></label>
+  <% if field.help.present? %><small id="<%= field.help_id %>"><%= field.help %></small><% end %>
+  <%= tag.input type: "text", name: field.name, id: field.id, value: value, required: field.required?, maxlength: field.max_length,
+        aria: { describedby: field.described_by(error), invalid: (true if error) } %>
+  <%= tag.strong(error && field.error_text(error), id: field.error_id, class: "plain-field__error", hidden: error.nil?) %>
+</p>

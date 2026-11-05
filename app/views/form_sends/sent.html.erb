@@ -1,0 +1,7 @@
+<%# A send taken (200), or a spam trip answered exactly as one
+    (`Forms::SpamCheck`): the form's thank-you in the visitor's language
+    (an editor's line breaks kept), else `public.forms.sent`, in sign-in's
+    ok box. %>
+<%= render "form_sends/heading", key: :sent %>
+<p class="whitespace-pre-line rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink" role="status"><%= thank_you %></p>
+<%= render "form_sends/back" %>

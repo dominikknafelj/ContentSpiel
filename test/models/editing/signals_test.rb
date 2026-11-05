@@ -27,6 +27,13 @@ class Editing::SignalsTest < ActiveSupport::TestCase
     assert_empty Editing::Signals::MAP.values.uniq - %w[saved structure gone]
   end
 
+  # Send again is silent, as every submission
+  # event is.
+  test "a form's submission events are silent" do
+    assert_equal Audit::Sentence::SUBMISSION_ACTIONS.sort, Audit::Sentence::SUBMISSION_ACTIONS.select { |action| Editing::Signals::SILENT.key?(action) }.sort
+    assert_includes Audit::Sentence::SUBMISSION_ACTIONS, "form_submission.resent"
+  end
+
   test "an action no list knows is reported and sends nothing" do
     event = Audit::Event.new(action: "block.exploded", subject_type: "ContentBlock", subject_id: @block.id)
     reported = []

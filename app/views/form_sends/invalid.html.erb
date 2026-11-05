@@ -1,0 +1,42 @@
+<%# Answers that need correcting (422). The summary in the
+    error summary's look, `role="alert"` and focused, each item a link to
+    its field (a radio group's first radio); then the form drawn again by
+    the Form block's own input components, never a theme's
+    template of them, with what the visitor typed, the errors beside the
+    fields, and the draw token the visitor SENT (`drawn_token`), so a
+    quick correction is not dropped as too fast. No token of the
+    application's: the send takes none (`FormSendsController`). The page
+    the form came from is carried as it was believed: a send reaches this
+    page only from a live page that places the form
+    (`Forms::Placements.live_page`). %>
+<%= render "form_sends/heading", key: :invalid %>
+
+<div class="rounded-cs border border-danger bg-danger-tint px-4 py-3 text-danger-ink" role="alert" tabindex="-1" autofocus>
+  <p class="font-semibold"><%= word(:error_summary, count: checked.errors.size) %></p>
+  <ul class="mt-1 list-disc space-y-0.5 pl-5">
+    <% public_fields.each do |field| %>
+      <% next unless (error = checked.errors[field.key]) %>
+      <li>
+        <%= link_to word(:error_item, label: field.label, message: field.error_text(error)), "##{field.target_id}", class: "underline hover:no-underline" %>
+      </li>
+    <% end %>
+  </ul>
+</div>
+
+<%= tag.form action: form_send_path(form_record), method: "post", "accept-charset": "UTF-8", class: "form-send-page__form flex flex-col gap-[22px]" do %>
+  <% public_fields.each do |field| %>
+    <%= render field.input.new(field: field, value: checked.typed[field.key], error: checked.errors[field.key]) %>
+  <% end %>
+  <%= hidden_field_tag :locale, locale, id: nil %>
+  <%= hidden_field_tag :page_id, trusted_page&.id, id: nil %>
+  <%= hidden_field_tag :drawn, drawn_token, id: nil %>
+  <%# The honeypot, hidden from people and from screen readers. %>
+  <div hidden aria-hidden="true">
+    <input type="text" name="website" value="" tabindex="-1" autocomplete="off">
+  </div>
+  <div>
+    <%= tag.button submit_label, type: "submit", class: setup_primary_button_class %>
+  </div>
+<% end %>
+
+<%= render "form_sends/back" %>

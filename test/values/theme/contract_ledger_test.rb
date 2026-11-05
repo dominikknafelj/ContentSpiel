@@ -7,8 +7,16 @@ class Theme::ContractLedgerTest < ActiveSupport::TestCase
 
   def outside = BlockTypes.all.select(&:owner)
 
+  # A gem's form field type's own input is its gem's promise too.
+  def outside_inputs
+    built_in = Forms::FieldTypes.all.reject { |type| type.name.include?("/") }.map(&:input)
+    Forms::FieldTypes.all.select { |type| type.name.include?("/") }.map(&:input) - built_in
+  end
+
   def built_in_components
-    Theme::Contract.components.except(*outside.filter_map { |definition| definition.component && Theme::Contract.path_of(definition.component) })
+    paths = outside.filter_map { |definition| definition.component && Theme::Contract.path_of(definition.component) } +
+      outside_inputs.map { |input| Theme::Contract.path_of(input) }
+    Theme::Contract.components.except(*paths)
   end
 
   def built_in(list, reader) = list - outside.flat_map(&reader)

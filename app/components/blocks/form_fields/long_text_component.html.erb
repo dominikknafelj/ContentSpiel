@@ -1,0 +1,8 @@
+<%# A multi-line answer, six rows. Written from `field`, `value` and `error` alone (`Base`). %>
+<div class="form-field form-field--long_text">
+  <%= tag.label for: field.id, class: "form-field__label" do %><%= field.label %><% if field.required? %> <%= tag.span field.word(:required), class: "form-field__required" %><% end %><% end %>
+  <%= tag.p field.help, id: field.help_id, class: "form-field__help" if field.help.present? %>
+  <%= tag.textarea value.to_s, rows: 6, name: field.name, id: field.id, required: field.required?, maxlength: field.max_length,
+        aria: { describedby: field.described_by(error), invalid: (true if error) } %>
+  <%= tag.p(error && field.error_text(error), id: field.error_id, class: "form-field__error", hidden: error.nil?) %>
+</div>

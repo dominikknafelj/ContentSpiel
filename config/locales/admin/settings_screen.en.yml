@@ -52,6 +52,11 @@ en:
           sent: "Test mail sent to %{address}. Check your inbox."
         mail_state:
           label: "Mail state"
+        forms_card:
+          title: "Forms"
+          keep_label: "Keep submissions for"
+          days: "days."
+          help: "Forms that keep submissions and don't set their own time keep them this long. A change applies to submissions already kept."
         images_card:
           title: "Images"
           intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."

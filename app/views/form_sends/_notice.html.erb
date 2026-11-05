@@ -1,0 +1,7 @@
+<%# locals: (key:) %>
+<%# a send that was not taken, and not for anything the
+    visitor typed: gone (404), unavailable (503), rate
+    limited (429). The heading, the one sentence and the link back. %>
+<%= render "form_sends/heading", key: key %>
+<p class="text-dim"><%= word(key) %></p>
+<%= render "form_sends/back" %>

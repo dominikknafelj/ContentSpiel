@@ -5,7 +5,9 @@
 # Written through `ContentBlocks::Save`, as an editor's save is: a translated
 # schema field goes in its language's `settings`, `caption` and `alt` are the
 # columns, `body` is Markdown written in the default language, `image: true`
-# attaches a new library image.
+# attaches a new library image, `form: true` makes a visitor's form (one
+# required short text, "Your name") and names it in the block's `:form`
+# field (the Form block's `form_id`).
 #
 # `assert_every_type_built` ends each shared test: it compares the types this
 # test built with the registry, in the test and not after the run, because
@@ -30,6 +32,10 @@ module BlockSamples
     attributes = { block_type: definition.name, settings: sample.settings.merge(own_default) }
     attributes.merge!(section_id: section.id, section_column: 1) if section
     attributes[:media_asset_id] = create_media_asset.id if sample.image
+    if sample.form
+      form_field = definition.fields.find { |field| field.type == :form } or flunk("#{definition.name}'s sample makes a form, and it has no :form field to name it in")
+      attributes[:settings] = attributes[:settings].merge(form_field.name => sample_form.id.to_s)
+    end
 
     translations = sample.translations.to_h do |locale, values|
       values = values.transform_keys(&:to_s)
@@ -42,6 +48,14 @@ module BlockSamples
     assert result.ok?, "the sample of #{definition.name} does not save: #{result.errors.to_sentence}"
     (@built_block_types ||= []) << definition.name
     result.record
+  end
+
+  # A form for a sample that says `form: true`, written as a row (a test's
+  # form, as the fixtures' are): one required short text, which is the word
+  # the Form block's sample shows.
+  def sample_form
+    Forms::Form.create!(name: "Sample form", keep_submissions: false,
+      fields: [ { "key" => "f_sample01", "type" => "short_text", "required" => true, "label" => { "en" => "Your name" }, "help" => {}, "settings" => {} } ])
   end
 
   def sample_every_type(page)

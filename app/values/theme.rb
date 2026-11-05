@@ -159,8 +159,8 @@ class Theme
     # no reload follows them.
     def not_registered(error)
       what =
-        if error.message.include?(ContentSpiel::Plugins::REPLAYED)
-          "Every registry of the CMS is filled; the block types from outside of this hook and of the hooks after it are missing. " \
+        if ContentSpiel::Plugins::REPLAYED_ALL.any? { |words| error.message.include?(words) }
+          "Every registry of the CMS is filled; the types from outside of this hook and of the hooks after it are missing. " \
             "A gem's own files are not reloaded: restart the server after correcting it."
         else
           "The registries after the one that raised are empty until a reload registers them: correct the definition and save it."

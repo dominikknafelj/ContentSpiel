@@ -818,6 +818,66 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
     assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==/, template, "nothing the contract does not name, and no string marked safe")
   end
 
+  # The ninth theme (test/fixtures/themes/form): a Form template and a short
+  # text answer's, written from docs/reference/theming.md, "The Form block"
+  # alone. Its form posts to the endpoint as the default's does, carries the
+  # script's markup, and draws its fields with its own short text input and
+  # the default's other inputs; a theme that replaces neither is drawn the
+  # default ones.
+  test "a theme replaces the Form block's template from the contract's names alone, and a theme that does not is drawn the default one" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    form = forms(:contact)
+    contact = create_page(title: "Write to us")
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: contact), attributes: { block_type: "form", settings: { "form_id" => form.id.to_s } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+    publish_changes(contact)
+
+    with_form_theme { get "/write-to-us" }
+
+    assert_response :success
+    assert_select "form.plain-form[method=post][action='/forms/#{form.id}'][data-controller=form-send][data-turbo=false][data-block='#{block.id}'][data-page='#{contact.id}']" do |element|
+      fields = JSON.parse(element.first["data-form-send-fields-value"])
+      assert_equal({ "error" => "form-#{block.id}-f_name0001-error", "target" => "form-#{block.id}-f_name0001" }, fields.fetch("f_name0001"))
+      assert_select "[data-form-send-target=summary][role=alert][hidden]"
+      assert_select "fieldset[data-form-send-target=body]:not([disabled])"
+      assert_select "p.plain-field label[for='form-#{block.id}-f_name0001']", text: /Your name/
+      assert_select "p.plain-field em.plain-field__required", text: "required"
+      assert_select "p.plain-field strong#form-#{block.id}-f_name0001-error[hidden]"
+      assert_select "div.form-field--email input[type=email]#form-#{block.id}-f_mail0001", 1, "the default's email input, which the theme does not replace"
+      assert_select "input[type=hidden][name=drawn]"
+      assert_select "div[hidden][aria-hidden=true] input[name=website][tabindex='-1'][autocomplete=off]"
+      assert_select "button[data-form-send-target=button]", text: "Send"
+      assert_select "[data-form-send-target=done][role=status][hidden]", text: "Thank you, we'll be in touch."
+    end
+    assert_select "form.content-block--form", count: 0
+
+    without_encryption_keys { with_form_theme { get "/write-to-us" } }
+    assert_select "p.plain-form__closed", text: I18n.t("public.forms.unavailable")
+    assert_select "fieldset[data-form-send-target=body][disabled]"
+
+    with_plain_theme { get "/write-to-us" }
+
+    assert_response :success
+    assert_select "div.plain-frame form.content-block--form div.form-field--short_text input#form-#{block.id}-f_name0001"
+    assert_select "form.plain-form", count: 0
+    assert_select "p.plain-field", count: 0
+  end
+
+  test "the ninth theme is sound, checked deeply too: a Form template of the contract's names" do
+    folder = ThemeFolder.new(ThemeTestHelper::FORM)
+
+    assert_empty Theme::Check.problems(folder, deep: true)
+    assert_equal %w[assets/stylesheets/theme.css components/blocks/form_component.html.erb components/blocks/form_fields/short_text_component.html.erb], folder.files
+    template = folder.read("components/blocks/form_component.html.erb")
+    Theme::Contract.components.fetch("blocks/form_component").each { |name| assert_match(/\b#{Regexp.escape(name)}\b/, template, "the template calls #{name}") }
+    input = folder.read("components/blocks/form_fields/short_text_component.html.erb")
+    %w[field value error].each { |name| assert_match(/\b#{name}\b/, input, "the input's template calls #{name}") }
+    [ template, input ].each do |code|
+      assert_no_match(/settings|I18n|\bt\(|PublicStrings|html_safe|raw\b|<%==|authenticity|csrf/, code, "nothing the contract does not name, no token and no string marked safe")
+    end
+  end
+
   test "the preview reads the rows' anchors for a heading's id, and the public page the copy's" do
     sign_in_as users(:one)
     ContentBlocks::Save.call(ContentBlock.new(owner: @about), attributes: { block_type: "rich_text", position: 0 },
@@ -957,7 +1017,8 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
   PRIVATE_VIEWS = %w[
     layouts/admin layouts/product layouts/setup layouts/mailer
     admin/dashboard/show admin/sessions/new admin/passwords/new admin/passwords/edit setup/token setup/system_check
-    passwords_mailer/reset
+    passwords_mailer/reset layouts/form_send form_sends/sent form_sends/invalid form_sends/gone form_sends/unavailable
+    form_sends/rate_limited form_sends/_heading form_sends/_notice form_sends/_back
   ].freeze
   # A mail has a text part with a template and a layout of its own.
   PRIVATE_TEXT_VIEWS = %w[layouts/mailer passwords_mailer/reset].freeze
@@ -1099,6 +1160,52 @@ class ThemePagesTest < ActionDispatch::IntegrationTest
         assert_includes part.body.to_s, "/password/edit#"
       end
       assert_not_includes PasswordsMailer.view_paths.map(&:to_s), @leaking_views
+    end
+  end
+
+  # The endpoint a visitor's form posts to: its thank-you and its error page are plain pages of the
+  # CMS's own, in a layout of their own (`layouts/form_send`), and the error
+  # page redraws the fields with the CMS's input components, never a
+  # theme's template of them.
+  test "nothing of a theme reaches the form's plain pages" do
+    clear_form_send_limits
+    form = forms(:contact)
+    # A form takes sends only from a live page that places it.
+    page = Current.set(actor: users(:one)) { place_form(create_page(title: "Contact us"), form) }
+    answers = { "f_name0001" => "Ada", "f_mail0001" => "ada@example.com" }
+    with_leaking_theme do
+      dir = Pathname(@leaking_views).dirname
+      component = dir.join("components/blocks/form_fields/short_text_component.html.erb")
+      component.dirname.mkpath
+      component.write("#{LEAK}-FIELD\n")
+      assert_theme_reached_the_public_page
+
+      post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) }
+      assert_no_theme_here
+      assert_equal "FormSendsController", controller.class.name
+      assert_select "[role=status]"
+
+      post form_send_path(form), params: { answers: answers.merge("f_name0001" => ""), page_id: page.id, drawn: aged_drawn(form) }
+      assert_response :unprocessable_content
+      assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
+      assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
+      assert_select "input#form-send-f_name0001[aria-invalid=true]"
+
+      # The three refusals, each drawn by the CMS's view and partials.
+      refusal = lambda do |status, words|
+        assert_response status
+        assert_no_match(/#{LEAK}|plain-frame|plain-mark|plain-page/, response.body)
+        assert_not_includes controller.lookup_context.view_paths.map(&:to_s), @leaking_views
+        assert_select "h1", text: I18n.t("public.forms.pages.#{words}")
+        assert_select "main a", text: "← #{I18n.t("public.forms.back")}"
+      end
+      post form_send_path(form_id: 0), params: { answers: answers }
+      refusal.call(:not_found, :gone)
+      without_encryption_keys { post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) } }
+      refusal.call(:service_unavailable, :unavailable)
+      # Four sends so far from this address: the fifth is taken, the sixth refused.
+      2.times { post form_send_path(form), params: { answers: answers, page_id: page.id, drawn: aged_drawn(form) } }
+      refusal.call(:too_many_requests, :rate_limited)
     end
   end
 

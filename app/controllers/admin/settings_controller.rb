@@ -72,7 +72,7 @@ module Admin
       posted = params[:site_setting]
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
-        :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
+        :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :language_order,
         *Admin::SettingsScreen::MailCardComponent::FIELDS, *Admin::SettingsScreen::ImagesCardComponent::FIELDS,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
@@ -165,7 +165,7 @@ module Admin
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS,
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS,
         *Admin::SettingsScreen::ImagesCardComponent::FIELDS).to_h
       attributes["image_widths"] = ImageSettings.parse_widths(attributes["image_widths"]) if attributes.key?("image_widths")
       attributes = drop_blank_file_params(attributes, fields: %w[logo])

@@ -39,7 +39,8 @@ module Audit
       "Invitation" => "Invitation",
       "SiteSetting" => "Settings",
       "ApiToken" => "API token",
-      "Media::Asset" => "Media asset"
+      "Media::Asset" => "Media asset",
+      "Forms::Form" => "Form"
     }.freeze
 
     # Years outside this are a typo or a probe, not a date anyone filters by.

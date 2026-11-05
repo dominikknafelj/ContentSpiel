@@ -25,9 +25,32 @@ class FieldTypeBranchesTest < ActiveSupport::TestCase
       reason: "`attribute_type_matches?` cases on a rich-text node attribute's type (`RichText::Schema::Attribute`), whose names `:string`, `:integer` and `:boolean` are not field types" },
     { path: "app/models/rich_text/schema.rb", pattern: :compare,
       reason: "`coerce_directive_value` compares a rich-text node attribute's type with `:integer`; it is no field type and never a field's" },
+    { path: "app/models/rich_text/content_expression.rb", pattern: :name_compare,
+      reason: "`inline?` compares a ProseMirror content-expression term's name with \"text\", the name of a rich-text node; it is no field type's and never a field's" },
     { path: "app/components/admin/ui/field_component.rb", pattern: :constant,
       reason: "`TRANSLATABLE_TYPES` is read by its name from outside (a component test); its value is derived from the registry, never written as a list, and nothing in app branches on it" }
   ].freeze
+
+  # The form registry's types (`Forms::FieldTypes`) are named by Strings, in a
+  # compare (`type == "choice"`, `field.type_name != "checkbox"`) or in a
+  # `case` on the type; `Forms::BuiltInFieldTypes` is where they are named,
+  # and nothing else asks which form field type a field is by its name.
+  def self.form_patterns(names)
+    alternatives = names.map { |name| Regexp.escape(name.to_s) }.join("|")
+    {
+      form_compare: /\b(?:type|type_name)\s*[!=]=\s*["'](?:#{alternatives})["']/,
+      form_include: /%w\[[^\]]*\b(?:#{alternatives})\b[^\]]*\]\.include\?\(\s*(?:field\.)?(?:type|type_name)\s*\)/,
+      form_when: /^[ \t]*when\b[^\n]*["'](?:#{alternatives})["']/
+    }
+  end
+
+  # A type's own name compared (`value_type.name == :boolean`, `type.name ==
+  # "choice"`): the same branch as `type == :boolean`, spelt with the name
+  # reader. Any registered name of either registry, as a symbol or a String.
+  def self.name_patterns(names)
+    alternatives = names.map { |name| Regexp.escape(name.to_s) }.join("|")
+    { name_compare: /\.name\s*(?:[!=]=|\.[!=]=\()\s*(?::|["'])(?:#{alternatives})\b/ }
+  end
 
   def self.patterns(names)
     alternatives = names.map { |name| Regexp.escape(name.to_s) }.join("|")
@@ -41,12 +64,12 @@ class FieldTypeBranchesTest < ActiveSupport::TestCase
 
   # A path and its offences, as hashes naming the path, the line, the pattern
   # and the matched text.
-  def self.offences(path, source, names: ContentModel::FieldTypes.names)
+  def self.offences(path, source, names: ContentModel::FieldTypes.names, form_names: Forms::FieldTypes.names)
     code = path.to_s.end_with?(".erb") ? source.gsub(/<%#.*?%>/m) { |comment| comment.gsub(/[^\n]/, "") } : without_comments(source)
     relative = path.to_s.delete_prefix("#{Rails.root}/")
 
-    patterns(names).flat_map do |name, pattern|
-      haystacks = name == :when ? case_bodies(code) : [ [ code, 0 ] ]
+    patterns(names).merge(form_patterns(form_names), name_patterns(names + form_names)).flat_map do |name, pattern|
+      haystacks = %i[when form_when].include?(name) ? case_bodies(code) : [ [ code, 0 ] ]
       haystacks.flat_map do |text, offset|
         text.to_enum(:scan, pattern).map { Regexp.last_match }.map do |match|
           start = offset + match.begin(0)
@@ -85,6 +108,7 @@ class FieldTypeBranchesTest < ActiveSupport::TestCase
   test "the guard is looking at the code" do
     assert_operator sources.size, :>, 100, "this guard is looking at too little"
     assert_operator ContentModel::FieldTypes.names.size, :>=, 10
+    assert_equal 5, Forms::FieldTypes.names.size
   end
 
   test "no file outside the field-type registry branches on a scalar field type's name" do
@@ -114,6 +138,23 @@ class FieldTypeBranchesTest < ActiveSupport::TestCase
     assert_equal [ :when ], flagged.call("case field.type\nwhen :date then 1\nend\n")
     assert_equal [ :when ], flagged.call("  x = case type\n  when :string, :text then 1\n  end\n")
     assert_equal [ :compare ], flagged.call("<% if field.type == :date %>", "app/components/x.html.erb")
+
+    form = ->(source) { self.class.offences("app/models/x.rb", source, names: [], form_names: %w[choice checkbox]).map { |offence| offence[:pattern] } }
+    assert_equal [ :form_compare ], form.call(%(x if field.type == "choice"))
+    assert_equal [ :form_compare ], form.call(%(x unless type_name != 'checkbox'))
+    assert_equal [ :form_include ], form.call(%(%w[choice checkbox].include?(type_name)))
+    assert_equal [ :form_when ], form.call("case field.type\nwhen \"choice\" then 1\nend\n")
+    assert_empty form.call(%(x if field.type == "short_text"))
+    assert_empty form.call(%(# x if type == "choice"))
+    assert_empty form.call("case node.type\nwhen \"choice\" then 1\nend\n")
+
+    named = ->(source) { self.class.offences("app/models/x.rb", source, names: %i[boolean date], form_names: %w[choice]).map { |offence| offence[:pattern] } }
+    assert_equal [ :name_compare ], named.call("x if value_type.name == :boolean")
+    assert_equal [ :name_compare ], named.call(%(x unless type.name != "choice"))
+    assert_equal [ :name_compare ], named.call("x if type.name.==(:date)")
+    assert_empty named.call("x if user.name == :admin")
+    assert_empty named.call("x if block.name == \"gallery\"")
+    assert_empty named.call("# x if value_type.name == :boolean")
 
     assert_empty flagged.call("# field.type == :date, SCALAR_TYPES\nx = 1 # when :date")
     assert_empty flagged.call("<%# field.type == :date %>", "app/components/x.html.erb")

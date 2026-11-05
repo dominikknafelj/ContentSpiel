@@ -17,6 +17,14 @@ production:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  forms_purge_expired:
+    class: Forms::PurgeExpiredJob
+    queue: default
+    schedule: every day at 3:30am
+  forms_resend_not_ready:
+    class: Forms::ResendNotReadyJob
+    queue: default
+    schedule: every 15 minutes
   public_paths_sync_went_live:
     class: PublicSite::SyncWentLiveJob
     queue: default
@@ -39,6 +47,14 @@ development:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  forms_purge_expired:
+    class: Forms::PurgeExpiredJob
+    queue: default
+    schedule: every day at 3:30am
+  forms_resend_not_ready:
+    class: Forms::ResendNotReadyJob
+    queue: default
+    schedule: every 15 minutes
   public_paths_sync_went_live:
     class: PublicSite::SyncWentLiveJob
     queue: default
@@ -61,6 +77,14 @@ test:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  forms_purge_expired:
+    class: Forms::PurgeExpiredJob
+    queue: default
+    schedule: every day at 3:30am
+  forms_resend_not_ready:
+    class: Forms::ResendNotReadyJob
+    queue: default
+    schedule: every 15 minutes
   public_paths_sync_went_live:
     class: PublicSite::SyncWentLiveJob
     queue: default

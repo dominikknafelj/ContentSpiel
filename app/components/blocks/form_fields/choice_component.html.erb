@@ -1,0 +1,28 @@
+<%# One of the editor's choices: radios in a fieldset named by its legend, or a select whose first option
+    is the "Choose" word and no value. Written from `field`, `value` and `error` alone (`Base`). %>
+<% if field.display == "radios" %>
+  <%= tag.fieldset class: "form-field form-field--choice", aria: { describedby: field.described_by(error) } do %>
+    <%= tag.legend class: "form-field__label" do %><%= field.label %><% if field.required? %> <%= tag.span field.word(:required), class: "form-field__required" %><% end %><% end %>
+    <%= tag.p field.help, id: field.help_id, class: "form-field__help" if field.help.present? %>
+    <% field.labelled_choices.each do |choice| %>
+      <div class="form-field__row">
+        <%= tag.input type: "radio", name: field.name, id: field.choice_id(choice), value: choice.key, checked: value.to_s == choice.key,
+              required: field.required?, aria: { invalid: (true if error) } %>
+        <%= tag.label field.choice_label(choice), for: field.choice_id(choice) %>
+      </div>
+    <% end %>
+    <%= tag.p(error && field.error_text(error), id: field.error_id, class: "form-field__error", hidden: error.nil?) %>
+  <% end %>
+<% else %>
+  <div class="form-field form-field--choice">
+    <%= tag.label for: field.id, class: "form-field__label" do %><%= field.label %><% if field.required? %> <%= tag.span field.word(:required), class: "form-field__required" %><% end %><% end %>
+    <%= tag.p field.help, id: field.help_id, class: "form-field__help" if field.help.present? %>
+    <%= tag.select name: field.name, id: field.id, required: field.required?, aria: { describedby: field.described_by(error), invalid: (true if error) } do %>
+      <%= tag.option field.word(:choose), value: "" %>
+      <% field.labelled_choices.each do |choice| %>
+        <%= tag.option field.choice_label(choice), value: choice.key, selected: value.to_s == choice.key %>
+      <% end %>
+    <% end %>
+    <%= tag.p(error && field.error_text(error), id: field.error_id, class: "form-field__error", hidden: error.nil?) %>
+  </div>
+<% end %>

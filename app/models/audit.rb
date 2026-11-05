@@ -18,6 +18,9 @@ module Audit
   # `{ event: }`.
   NOTIFICATION = "audit.content_spiel"
 
+  # `actor_label` of an event a visitor of the public site caused.
+  VISITOR_LABEL = "visitor"
+
   # Writes (or, for a coalescible action, extends) an event inside the
   # caller's transaction, if there is one -- so a save that rolls back
   # leaves no trace in the log (spec §4.2). Returns the `Audit::Event`.
@@ -47,6 +50,18 @@ module Audit
     action = action.to_s
     now = Time.current
     actor = Current.actor
+    # A visitor of the public site (`AccessControl::VISITOR`) is nobody the CMS knows: no actor row, the label
+    # "visitor", and no IP, whatever the request set, since an address is
+    # the one thing about a visitor the log would otherwise keep. Its events
+    # never coalesce: each send is its own moment, and an open row of a
+    # "nil actor" would be the system's.
+    # THE instance (`Visitor.one?`, `equal?`), as the checker asks: a copy
+    # (`dup`, `clone`) is no visitor, and no actor the log can name either,
+    # so it is refused here rather than written as somebody.
+    visitor = AccessControl::Visitor.one?(actor)
+    raise ArgumentError, "a copy of the visitor is no actor: the visitor is one instance (Visitor::ONE)" if !visitor && actor.is_a?(AccessControl::Visitor)
+    coalesce = false if visitor
+    actor = nil if visitor
     attributes = {
       action:,
       actor:,
@@ -56,7 +71,7 @@ module Audit
       # event must still say "via <name>". Written once, at INSERT; a
       # coalesced merge never changes it (the Coalescer matches on actor, so
       # the open row already carries the same token's name).
-      actor_label: actor.is_a?(ApiToken) ? actor.name : nil,
+      actor_label: visitor ? VISITOR_LABEL : (actor.is_a?(ApiToken) ? actor.name : nil),
       channel: (Current.channel || default_channel).to_s,
       subject:,
       subject_label: Snapshot.label_for(subject),
@@ -64,7 +79,7 @@ module Audit
       snapshot: snapshot.is_a?(Hash) ? Snapshot.scrub(snapshot.as_json) : snapshot&.as_json,
       metadata: metadata.to_h.as_json,
       request_id: Current.request_id,
-      ip: Current.ip_address
+      ip: visitor ? nil : Current.ip_address
     }
 
     event = Event.transaction do

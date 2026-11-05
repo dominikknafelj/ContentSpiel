@@ -125,6 +125,36 @@ class ThemingReferenceTest < ActiveSupport::TestCase
     CodeHighlight::ROLES.each { |role| assert_includes section, "`#{role}`" }
   end
 
+  # The Form block's own section: what its template is handed, its six
+  # words, what a field answers and the markup the send script reads, each
+  # held to the code it describes (the script's targets and values read
+  # from its file, as the Code block's are), and its six tokens named.
+  test "the Form block's tables name exactly the methods of its entry, its six words, what a field answers and what the send script reads" do
+    section = section("The Form block")
+    cells = section.scan(/^\| `([^`]+)` \|/).flatten
+    script = Rails.root.join("app/javascript/controllers/form_send_controller.js").read
+    targets = script[/static targets = \[(.*?)\]/m, 1].scan(/"(\w+)"/).flatten
+    values = script[/static values = \{(.*)\}\s*$/, 1].scan(/(\w+):\s*(?:String|Object|\{)/).flatten
+
+    assert_equal %w[body button done status summary], targets.sort, "the script's targets, as this test reads them"
+    assert_equal %w[fields network sending], values.sort, "the script's values, as this test reads them"
+    methods = ContractLedger::COMPONENTS.fetch("blocks/form_component").map { |name| name == "string" ? "string(key)" : name }
+    words = Blocks::FormComponent::STRINGS.map { |key| "string(:#{key})" }
+    readers = %w[key name id label help help_id error_id required? max_length display labelled_choices choice_label(choice) choice_id(choice)
+                 target_id described_by(error) error_text(error) word(key) input]
+    readers.each do |reader|
+      name = reader[/\A[a-z_?]+/]
+      assert Forms::PublicField.method_defined?(name), "a field answers #{name}"
+    end
+    assert_includes script, "follow(event)", "the summary's action is a method of the script"
+    markup = [ %(data-controller="form-send"), %(data-action="form-send#send"), %(data-action="click->form-send#follow"), %(data-turbo="false"),
+               %(name="locale"), %(name="page_id"), %(name="drawn") ] +
+      targets.map { |name| %(data-form-send-target="#{name}") } + values.map { |name| "data-form-send-#{name}-value" }
+
+    assert_equal (methods + words + readers + markup).sort, cells.sort
+    BlockTypes.fetch(:form).themed_tokens.each { |token| assert_includes section, "--th-#{token}" }
+  end
+
   test "CLAUDE.md's reference index points here" do
     assert Rails.root.join("CLAUDE.md").read.include?("docs/reference/theming.md"), "CLAUDE.md's reference index has no line for docs/reference/theming.md"
   end

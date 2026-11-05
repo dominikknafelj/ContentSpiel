@@ -14,7 +14,7 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     render_sidebar(labels: Admin::BaseController::MODULES.map { |entry| entry[:label] })
     assert_equal %w[Content People System], page.all("nav[aria-label='Modules'] h2").map(&:text)
     content = page.all("nav[aria-label='Modules'] section")[0].all("a").map(&:text).map(&:strip)
-    assert_equal [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Tags", "Mind graph", "Trash" ], content
+    assert_equal [ "Dashboard", "Pages", "Posts", "Media", "Forms", "Translations", "Tags", "Mind graph", "Trash" ], content
   end
 
   test "a group with no visible module disappears, heading and all" do

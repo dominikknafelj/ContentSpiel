@@ -22,6 +22,11 @@ module AccessControl
   # life to route around rather than a bug to raise on.
   class UnknownPermission < KeyError; end
 
+  # The one visitor of the public site (`AccessControl::Visitor`): allowed `forms.submit` on `:public` and nothing else.
+  # Only the endpoint that takes a visitor's send acts as it
+  # (test/lib/visitor_actor_test.rb).
+  VISITOR = Visitor::ONE
+
   class << self
     # Design spec §3.3 -- see `AccessControl::Checker` for the rules.
     # `key` is a registry key, a String or Symbol (`"posts.edit"`); an
@@ -164,8 +169,12 @@ module AccessControl
     # they allow exactly that. Refusing a grant the user could split into
     # two is safe; merging scopes across grants (and across dimensions)
     # correctly isn't worth the risk here.
+    #
+    # A permission registered `grantable: false` (`forms.submit`) is handed
+    # out by nobody, an owner included.
     def can_grant?(actor, key, scope = {})
       permission = Permissions.fetch(key)
+      return false unless permission.grantable
       return true if owner?(actor)
 
       requested = scope.to_h.stringify_keys

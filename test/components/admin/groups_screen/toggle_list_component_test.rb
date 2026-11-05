@@ -1,20 +1,21 @@
 require "test_helper"
 
 # The other permissions, as toggle cards (Task 10): Content, Administration,
-# Oversight -- and a plugin's permission in a card named by its own area.
+# Oversight, Forms -- and a plugin's permission in a card named by its own area.
 class Admin::GroupsScreen::ToggleListComponentTest < ViewComponent::TestCase
   def render_for(grants)
     render_inline Admin::GroupsScreen::ToggleListComponent.new(grants: grants)
   end
 
-  test "three cards, with the built-in permissions grouped as the design has them" do
+  test "four cards, with the built-in permissions grouped as the design has them" do
     render_for({ "tags.manage" => {}, "audit.view" => {} })
 
     cards = page.all("section").map { |card| card.find("h3").text }
-    assert_equal %w[Content Administration Oversight], cards
+    assert_equal %w[Content Administration Oversight Forms], cards
     assert_equal %w[tags.manage media.upload media.manage ai.translate], keys_in("Content")
     assert_equal %w[settings.manage languages.manage users.manage groups.manage tokens.manage], keys_in("Administration")
     assert_equal %w[system_status.view audit.view trash.empty], keys_in("Oversight")
+    assert_equal %w[forms.manage form_submissions.view], keys_in("Forms"), "forms.submit is no group's, so no toggle"
   end
 
   test "a toggle is a switch checkbox posting the permission's enabled key, ticked when held, with the registry label" do
@@ -27,12 +28,12 @@ class Admin::GroupsScreen::ToggleListComponentTest < ViewComponent::TestCase
     assert_selector "label", text: "View audit log (all content)"
   end
 
-  test "a plugin permission lands in a fourth card named by its own area" do
+  test "a plugin permission lands in a card of its own after the built-ins', named by its own area" do
     with_plugin_permission do
       render_for({ "acme/widgets.use" => {} })
 
       cards = page.all("section").map { |card| card.find("h3").text }
-      assert_equal %w[Content Administration Oversight Widgets], cards
+      assert_equal %w[Content Administration Oversight Forms Widgets], cards
       assert_equal [ "acme/widgets.use" ], keys_in("Widgets")
       assert_selector "input[name='group[grants][acme/widgets.use][enabled]'][checked]"
     end

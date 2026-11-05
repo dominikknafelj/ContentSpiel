@@ -139,16 +139,16 @@ Rails.application.routes.draw do
     # (config/initializers/active_storage_access.rb).
     get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
 
-    # Trash (trash spec §7). `:type` is page|post|media -- one screen for
-    # three models, so the item is addressed by type and id rather than by a
+    # Trash (trash spec §7). `:type` is page|post|media|form -- one screen for
+    # four models, so the item is addressed by type and id rather than by a
     # resource per model. The constraint is what turns any other `:type`
     # into a routing 404 before `Admin::TrashController` is ever reached.
     get "trash", to: "trash#index", as: :trash
     delete "trash", to: "trash#empty", as: :empty_trash
     # A bulk trash's Undo: restores exactly the posts it names.
     post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
-    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
-    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
+    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media|form/ }
+    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media|form/ }
 
     # "Still correct — mark up to date" for an outdated translation (translation helpers
     # spec §3.4/§4): one endpoint for every translatable record kind, named
@@ -288,6 +288,24 @@ Rails.application.routes.draw do
     # delete (`Groups::Destroy`, which revokes the group's tokens). No
     # `:show` -- the editor is the group's page.
     resources :groups, only: %i[index new create edit update destroy]
+
+    # The Forms screen: the list, New form (a dialog,
+    # with `new` its page without JavaScript), the builder (`show`, saved
+    # explicitly by `update`) and Move to trash (`destroy`, `Trash::Move`).
+    # Ids only: the form is `Forms::Form`, addressed as `forms/:id`.
+    resources :forms, only: %i[index new create show update destroy], constraints: { id: /\d+/ } do
+      # A form's submissions: the list
+      # (`?page=`), one submission, deleting one and deleting all. A
+      # submission is found among its form's, by its id: no answer is ever
+      # part of an address.
+      resources :submissions, controller: "form_submissions", only: %i[index show destroy], constraints: { id: /\d+/ } do
+        delete :destroy_all, on: :collection
+      end
+    end
+    # Send again, for one failed delivery (`Forms::Resend`), by its id.
+    resources :form_deliveries, only: [], constraints: { id: /\d+/ } do
+      post :resend, on: :member
+    end
 
     # "Your account" (access-control design spec §5; the notes handoff's
     # decisions 25 and 38): the signed-in user's own account, open to every
@@ -459,6 +477,16 @@ Rails.application.routes.draw do
   # (McpController#authenticate) -- declared here, before the public-site
   # catch-all below, or "/mcp" would be swallowed as a page path instead.
   post "mcp", to: "mcp#create"
+
+  # A visitor's send of a form: the form
+  # posts to its own endpoint, never to the page, so a public page stays a
+  # GET that is the same for everyone. POST only: a GET of this address is
+  # the public catch-all's below, a page path like any other (and a 404
+  # unless a page is called "forms"). Declared before the catch-alls, which
+  # are GETs and could not take it anyway, as `mcp` is. `format: false`, as
+  # the public routes have it: JSON or a plain page is chosen by the
+  # `Accept` header (`FormSendsController#json?`), never by a suffix.
+  post "forms/:form_id", to: "form_sends#create", as: :form_send, constraints: { form_id: /\d+/ }, format: false
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

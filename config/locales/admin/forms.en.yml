@@ -1,0 +1,80 @@
+# A form's write in CS Studio's words: the sentences
+# `Forms::Save` refuses a save with, and those a destination's settings are
+# refused with (`Forms::Destination`, `Forms::Destinations::Mail`). The
+# Forms screen's own words are `admin.components.forms_screen`.
+en:
+  admin:
+    # System status's Forms row (`Setup::SystemCheck#forms`): its sentences
+    # are joined into the one row, in this order when several hold.
+    system_status:
+      forms:
+        none: "No forms yet."
+        working: "Forms are working."
+        no_keys: "This site has no encryption keys, so its forms can't take answers."
+        mail_not_set_up:
+          one: "Mail isn't set up, so %{count} form doesn't send its mail."
+          other: "Mail isn't set up, so %{count} forms don't send their mail."
+        undelivered:
+          one: "%{count} submission wasn't delivered."
+          other: "%{count} submissions weren't delivered."
+    forms:
+      save:
+        name_blank: "A form needs a name."
+        name_too_long: "A form's name is at most %{count} characters."
+        too_many_fields: "A form has at most %{count} fields."
+        field_at: "Field %{position}"
+        label_missing: "Field %{position} needs a label in %{language}."
+        unknown_field_type: "“%{type}” is not a kind of field this site knows."
+        choices_missing: "“%{field}” needs at least one choice."
+        too_many_choices: "“%{field}” has at most %{count} choices."
+        choice_label_missing: "Every choice of “%{field}” needs a label in %{language}."
+        unknown_destination: "“%{kind}” is not a destination this site knows."
+        nowhere: "A form needs somewhere to send its submissions: keep them, or add a mail."
+        no_encryption_keys: "This site has no encryption keys, so submissions can't be kept. See Hosting: encryption keys."
+        no_encryption_keys_for_secret: "This site has no encryption keys, so a destination's password or key can't be stored. See Hosting: encryption keys."
+        keep_days: "Submissions are kept for %{min} to %{max} days."
+        unknown_languages: "Not saved: %{codes} is not a language this site can have."
+        trashed: "This form is in the trash. Restore it to change it."
+      destinations:
+        blank: "%{field} can't be blank."
+        mail:
+          not_an_address: "“%{address}” is not one mail address."
+          too_many: "A form mails at most %{count} addresses."
+      # The screen's titles and toasts (`Admin::FormsController`, the views
+      # `admin/forms/*`); everything drawn by a component is
+      # `admin.components.forms_screen` (`forms_screen.en.yml`).
+      index:
+        title: "Forms"
+      new:
+        title: "New form"
+      show:
+        title: "Form"
+      create:
+        created: "Form created."
+      update:
+        saved: "Form saved."
+      destroy:
+        moved: "“%{name}” moved to the trash."
+        undo: "Undo"
+      # Send again (`Forms::Resend`): the one refusal.
+      resend:
+        not_failed: "This delivery hasn't failed, so there is nothing to send again."
+        trashed: "This form is in the trash. Restore it to send its submissions again."
+    # A form's submissions: the titles and
+    # toasts of `Admin::FormSubmissionsController` and
+    # `Admin::FormDeliveriesController`; what their components draw is
+    # `admin.components.forms_screen` (`forms_screen.en.yml`).
+    form_submissions:
+      index:
+        title: "Submissions of %{name}"
+      show:
+        title: "Submission"
+      destroy:
+        deleted: "Submission deleted."
+      destroy_all:
+        deleted:
+          one: "%{count} submission deleted."
+          other: "%{count} submissions deleted."
+    form_deliveries:
+      resend:
+        sending: "Sending again."

@@ -18,9 +18,20 @@ module ContractLedger
     "blocks/code_component" => %w[block page lines code language language_label filename caption string],
     "blocks/note_component" => %w[block page kind heading titled? word icon body],
     "blocks/table_component" => %w[block page rows header_row? header_column? column_count caption],
+    # Release note (forms): added the Form block, its line and the five
+    # inputs it draws through the theme, each called with the field, the
+    # typed value and the error (`Theme::Contract::FORM_INPUT_METHODS`);
+    # six themed tokens below; and the markup the `form-send` script reads
+    # (docs/reference/theming.md, "The Form block").
+    "blocks/form_component" => %w[block page form_name fields action locale page_id drawn honeypot submit_label thank_you unavailable string],
     "blocks/card_component" => %w[block page title text link icon icon_name image],
     "blocks/post_list_component" => %w[block page list_component],
     "blocks/section_component" => %w[block page columns layout background width style anchor],
+    "blocks/form_fields/short_text_component" => %w[field value error],
+    "blocks/form_fields/long_text_component" => %w[field value error],
+    "blocks/form_fields/email_component" => %w[field value error],
+    "blocks/form_fields/choice_component" => %w[field value error],
+    "blocks/form_fields/checkbox_component" => %w[field value error],
     "posts/blog_list_component" => %w[posts page],
     "posts/resume_list_component" => %w[posts page],
     "posts/now_list_component" => %w[posts page],
@@ -57,6 +68,7 @@ module ContractLedger
     note-important-ground note-important-line note-important-ink note-important-border
     note-warning-ground note-warning-line note-warning-ink note-warning-border
     table-rule table-line table-head table-caption table-ground
+    form-field-ground form-field-line form-field-focus form-error form-done-ground form-done-line
     card-ground card-line card-icon
   ].freeze
 

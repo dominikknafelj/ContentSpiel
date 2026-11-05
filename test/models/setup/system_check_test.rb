@@ -6,13 +6,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "reports every check, in order" do
     labels = run_check.map(&:label)
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail" ], labels
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
   end
 
   test "in production with the request's facts, HTTPS comes second" do
     labels = run_check(production: true, request_ssl: true).map(&:label)
 
-    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail" ], labels
+    assert_equal [ "Site address", "HTTPS", "Theme", "File storage", "Image processing", "Images", "Background jobs", "Mail", "Forms" ], labels
   end
 
   test "a configured site address is named by its origin" do
@@ -415,7 +415,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     results = nil
     logged = capture_log { results = run_check(image_progress: failing) }
 
-    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail" ], results.map(&:label)
+    assert_equal [ "Site address", "Theme", "File storage", "Image processing", "Background jobs", "Mail", "Forms" ], results.map(&:label)
     assert_includes logged, "ActiveRecord::StatementInvalid"
     assert_not_includes logged, "PG::QueryCanceled"
   end
@@ -444,9 +444,11 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   # A command is shown to anyone who may view the status page and, in the
   # wizard, before anyone is signed in: each is a fixed string.
   test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
-    results = run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
-      storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
-      stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1))
+    results = with_mail_state(:not_set_up) do
+      run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
+        storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
+        stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1))
+    end
 
     # Every row that can warn does. The theme's carries no command in
     # production, where the build is the image's and no one command.
@@ -456,7 +458,85 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert Setup::SystemCheck::SITE_ADDRESS_COMMAND.frozen?
   end
 
+  test "the Forms row warns for missing keys, for mail that is not set up with a mailing form and for undelivered submissions, and is ok otherwise" do
+    with_mail_state(:working) do
+      assert_equal [ :ok, "Forms are working." ], result("Forms", run_check).then { |row| [ row.status, row.message ] }
+    end
+
+    without_encryption_keys do
+      check = result("Forms", run_check)
+      assert_equal :warning, check.status
+      assert_equal "This site has no encryption keys, so its forms can't take answers.", check.message
+    end
+
+    with_mail_state(:not_set_up) do
+      check = result("Forms", run_check)
+      assert_equal :warning, check.status
+      assert_equal "Mail isn't set up, so 1 form doesn't send its mail.", check.message
+      Forms::Destination.create!(form: forms(:newsletter), kind: "mail", settings: { "recipients" => "a@example.com" })
+      assert_equal "Mail isn't set up, so 2 forms don't send their mail.", result("Forms", run_check).message
+    end
+
+    with_mail_state(:untested) do
+      assert_equal :ok, result("Forms", run_check).status, "mail that is set up is tried, tested or not"
+    end
+
+    with_mail_state(:working) do
+      failed_submission(forms(:contact))
+      failed_submission(forms(:contact))
+      check = result("Forms", run_check(forms_link: true))
+      assert_equal :warning, check.status
+      assert_equal "2 submissions weren't delivered.", check.message
+      assert_equal :forms, check.link
+      assert_nil result("Forms", run_check).link
+    end
+  end
+
+  test "a submission with one failed and one waiting delivery counts once as undelivered" do
+    failed_submission(forms(:contact))
+    submission = Forms::Submission.last
+    Forms::Delivery.create!(submission: submission, kind: "mail", state: "waiting")
+    with_mail_state(:working) do
+      assert_equal "1 submission wasn't delivered.", result("Forms", run_check).message
+    end
+  end
+
+  test "when several warnings hold they are one row, the keys first, then mail, then undelivered submissions" do
+    failed_submission(forms(:contact))
+    without_encryption_keys do
+      with_mail_state(:not_set_up) do
+        assert_equal "This site has no encryption keys, so its forms can't take answers. " \
+          "Mail isn't set up, so 1 form doesn't send its mail. 1 submission wasn't delivered.", result("Forms", run_check).message
+      end
+    end
+  end
+
+  test "a trashed form's failed deliveries and mail destination are not counted" do
+    failed_submission(forms(:contact))
+    forms(:contact).update_columns(trashed_at: Time.current) # version: none (a test)
+
+    with_mail_state(:not_set_up) do
+      assert_equal [ :ok, "Forms are working." ], result("Forms", run_check).then { |row| [ row.status, row.message ] }
+    end
+  end
+
+  test "with no forms it says so and is ok" do
+    Forms::Form.update_all(trashed_at: Time.current) # version: none (a test)
+
+    without_encryption_keys do
+      with_mail_state(:not_set_up) do
+        check = result("Forms", run_check)
+        assert_equal [ :ok, "No forms yet." ], [ check.status, check.message ]
+      end
+    end
+  end
+
   private
+    def failed_submission(form)
+      submission = Forms::Submission.create!(form: form, locale: "en", answers: [])
+      Forms::Delivery.create!(submission: submission, kind: "mail", state: "failed")
+    end
+
     def progress(**counts) = Struct.new(:counts).new(counts)
 
     def capture_log

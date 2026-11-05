@@ -1,0 +1,4 @@
+<%# The link back to the page the form came from, else the site's home
+    (`FormSendsController#back_path`). The arrow is the template's, not the
+    key's. %>
+<p><%= link_to "← #{word(:back)}", back_path, class: "text-accent hover:text-accent-hover hover:underline" %></p>

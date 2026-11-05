@@ -307,6 +307,67 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert @gone_asset.reload.trashed?
   end
 
+  test "the Forms list, the builder and a save leave out a trashed form, and its placements a trashed page" do
+    kept = forms(:contact)
+    gone = forms(:newsletter)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test's row)
+    [ @kept_page, @gone_page ].each do |page|
+      block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+      block.update_columns(block_type: "form", settings: { "form_id" => kept.id.to_s })
+    end
+
+    sign_in_as users(:one)
+    get "/cs-studio/forms"
+    assert_select "table tbody tr", 1
+    assert_select "table", text: /Newsletter/, count: 0
+    assert_select "table tbody tr", text: /1 page/
+
+    get "/cs-studio/forms/#{gone.id}"
+    assert_response :not_found
+    patch "/cs-studio/forms/#{gone.id}", params: { form: { name: "Revived?", tab: "en" } }
+    assert_response :not_found
+    delete "/cs-studio/forms/#{gone.id}"
+    assert_response :not_found
+    assert_equal "Newsletter", gone.reload.name
+
+    get "/cs-studio/forms/#{kept.id}"
+    assert_select "a[href='/cs-studio/pages/#{@kept_page.id}']", text: "Kept page"
+    assert_select "a[href='/cs-studio/pages/#{@gone_page.id}']", count: 0
+    assert_select "body", text: /Gone page/, count: 0
+  end
+
+  # A trashed form's submissions are out of sight until
+  # it is restored, and a submission from a trashed page names no title.
+  test "a trashed form's submissions list, submission and Send again are not found, and a trashed page's title is not shown" do
+    kept = forms(:contact)
+    gone = forms(:newsletter)
+    from_kept = Forms::Submission.create!(form: kept, locale: "en", page: @kept_page, answers: [], created_at: 2.minutes.ago)
+    from_gone = Forms::Submission.create!(form: kept, locale: "en", page: @gone_page, answers: [])
+    of_gone = Forms::Submission.create!(form: gone, locale: "en", answers: [])
+    failed = of_gone.deliveries.create!(kind: "mail")
+    failed.record_failed!(key: "login", line: nil, at: Time.current)
+    gone.update_columns(trashed_at: Time.current) # version: none (a test's row)
+
+    sign_in_as users(:one)
+    get "/cs-studio/forms/#{kept.id}/submissions"
+    assert_response :ok
+    assert_select "table tbody tr", 2
+    assert_select "table tbody tr", text: /Kept page/, count: 1
+    assert_select "table tbody tr", text: /#{Regexp.escape(I18n.t("admin.components.forms_screen.submissions_list.page_trashed"))}/, count: 1
+    assert_select "body", text: /Gone page/, count: 0
+    get "/cs-studio/forms/#{kept.id}/submissions/#{from_gone.id}"
+    assert_select "body", text: /Gone page/, count: 0
+    assert from_kept.persisted?
+
+    get "/cs-studio/forms/#{gone.id}/submissions"
+    assert_response :not_found
+    get "/cs-studio/forms/#{gone.id}/submissions/#{of_gone.id}"
+    assert_response :not_found
+    post "/cs-studio/form_deliveries/#{failed.id}/resend"
+    assert_response :not_found
+    assert failed.reload.failed?
+  end
+
   test "the media grid's Missing alt and Untranslated segments and every segment count hide a trashed image" do
     with_locales(%w[en de], default: "en")
     # Both images are missing alt AND, once given an English alt, untranslated:

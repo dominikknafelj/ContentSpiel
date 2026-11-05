@@ -1,6 +1,6 @@
 module Trash
-  # Moves a page (with its whole branch), a post or a library image to the
-  # trash (trash spec §4.1). Nothing is deleted: the rows stay, flagged
+  # Moves a page (with its whole branch), a post, a library image or a form
+  # to the trash (trash spec §4.1). Nothing is deleted: the rows stay, flagged
   # `trashed_at`, so `Trash::Restore` is a column update. Saving the flag is
   # what frees the URLs -- `PublicSite::Paths` computes no path for a
   # trashed record, so the model callbacks delete its `public_paths` rows,
@@ -63,6 +63,10 @@ module Trash
         # full validation: what comes back to the live site must be valid.
         @record.save!(validate: false)
         record_event("#{event_prefix}.trashed", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})
+        # A form has no published copy and no callback that moves the public
+        # content version: a placed form that went
+        # to the trash draws nothing from now on.
+        PublicSite.bump_version! if @record.is_a?(Forms::Form)
       end
 
       success(@record)
@@ -98,6 +102,6 @@ module Trash
       PublicSite.bump_version! if ids.any? && Page.where(id: ids).published.exists?
     end
 
-    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)
+    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media", Forms::Form => "form" }.fetch(@record.class)
   end
 end

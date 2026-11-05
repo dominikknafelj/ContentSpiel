@@ -35,7 +35,7 @@ module Admin
     # for anyone holding one of the rights that act on a trashed item --
     # `Admin::TrashController#require_trash_access` gates on the very same
     # list (`TRASH_PERMISSIONS`).
-    TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload trash.empty].freeze
+    TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload forms.manage trash.empty].freeze
 
     # An entry's optional `if:` is a further condition, a lambda evaluated
     # per request (`admin_modules`) for what a static `permission` can't
@@ -55,6 +55,9 @@ module Admin
       { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read", group: :content },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read", group: :content },
       { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload", group: :content },
+      # Either right: the list opens for a
+      # holder of `form_submissions.view` as well as `forms.manage`.
+      { label: "Forms", icon: :clipboard_list, path: :admin_forms_path, permission: %w[forms.manage form_submissions.view], group: :content },
       { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],
         if: -> { Locales.enabled.size > 1 }, group: :content },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage", group: :content },

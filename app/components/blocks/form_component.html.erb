@@ -1,0 +1,35 @@
+<%# The Form block: a plain `<form method="post">` to the form's endpoint,
+    whole without a script, which Turbo leaves to the browser (`data-turbo="false"`), and which the CMS's
+    `form-send` controller sends in place where it runs (its markup: docs/reference/theming.md, "The Form
+    block"). No token of this application: the endpoint takes none. Above the fields the summary the script
+    fills (`role="alert"`, empty and hidden), and the line a site without encryption keys says (`unavailable`),
+    with every field and the button disabled under it; the fields, each by its input component (the theme's
+    where it replaces one), the three hidden values a send carries, the honeypot hidden from people and from
+    screen readers, and the button; then the thank-you the script shows in place of the body (`role="status"`,
+    hidden, holding the form's words). `form-status` is a line only a screen reader hears while sending. The
+    class names are the default theme's own (form.css), not a promise. Everything printed goes through ERB's
+    escaping; the fields' ids are this block's own (`fields`), so the `fields` value hands the script each
+    field's error element and the control its summary link goes to. %>
+<%= tag.form class: "content-block content-block--form", action: action, method: "post", "accept-charset": "UTF-8",
+      data: { turbo: "false", controller: "form-send", action: "form-send#send",
+              form_send_sending_value: string(:sending), form_send_network_value: string(:network),
+              form_send_fields_value: fields.to_h { |field| [ field.key, { error: field.error_id, target: field.target_id } ] }.to_json } do %>
+  <% if unavailable %>
+    <p class="form-unavailable"><%= unavailable %></p>
+  <% end %>
+  <div class="form-summary" role="alert" tabindex="-1" hidden data-form-send-target="summary" data-action="click->form-send#follow"></div>
+  <%= tag.fieldset class: "form-body", disabled: unavailable.present?, data: { form_send_target: "body" } do %>
+    <% fields.each do |field| %>
+      <%= render field.input.new(field: field) %>
+    <% end %>
+    <input type="hidden" name="locale" value="<%= locale %>">
+    <input type="hidden" name="page_id" value="<%= page_id %>">
+    <input type="hidden" name="drawn" value="<%= drawn %>">
+    <div hidden aria-hidden="true">
+      <input type="text" name="<%= honeypot %>" value="" tabindex="-1" autocomplete="off">
+    </div>
+    <button type="submit" class="form-submit" data-form-send-target="button"><%= submit_label %></button>
+    <span class="form-status" role="status" data-form-send-target="status"></span>
+  <% end %>
+  <p class="form-done" role="status" tabindex="-1" hidden data-form-send-target="done"><%= thank_you %></p>
+<% end %>

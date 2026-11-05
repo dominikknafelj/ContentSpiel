@@ -1,0 +1,110 @@
+<%= tag.div class: "admin-form-column flex flex-col gap-4", data: { controller: "admin--forms--builder", messages: messages, "admin--forms--builder-max-fields-value": max_fields } do %>
+  <h1 class="text-h1 text-ink"><%= heading %></h1>
+  <%= render Admin::FormsScreen::TabsComponent.new(form: form, current: :form, url_options: url_options) %>
+
+  <% if languages? %>
+    <%= render Admin::Ui::LanguageTabsComponent.new(current: locale, url: tab_url) %>
+  <% end %>
+
+  <% if stale? %>
+    <%= helpers.render "admin/shared/stale_banner", message: t(".stale"), lead: t(".stale_lead"), change: stale_change,
+          reload_path: update_path, reload_label: t(".reload") %>
+  <% end %>
+
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_places, field_ids: summary_ids) %>
+
+  <%= form_with url: update_path, method: :patch, id: FORM_ID, class: "flex flex-col gap-4", html: { novalidate: true },
+        data: helpers.save_bar_form_data(dirty: dirty?).merge("admin--forms--builder-target": "form") do %>
+    <%= helpers.render partial: "admin/shared/base_updated_at_field", locals: { id: "form-base-updated-at", value: base } %>
+    <%= hidden_field_tag "form[tab]", locale, id: nil %>
+
+    <% if default_tab? %>
+      <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-form">
+        <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-form" class="text-h2 text-ink"><%= t(".form_card") %></h2></div>
+        <div class="p-4" data-field-name="name">
+          <%= label_tag name_id, t(".name"), class: "#{setup_label_class} mb-1" %>
+          <%= text_field_tag "form[name]", draft.name, id: name_id, maxlength: Forms::Form::NAME_MAX, autocomplete: "off",
+                aria: { describedby: "#{name_id}-help #{name_id}-errors", invalid: ("true" if errors_at("name").any?) }.compact,
+                class: [ setup_input_class, ("!border-danger" if errors_at("name").any?) ] %>
+          <p id="<%= name_id %>-help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
+          <%= helpers.render "admin/shared/field_errors", id: "#{name_id}-errors", messages: errors_at("name") %>
+        </div>
+      </section>
+    <% end %>
+
+    <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-fields">
+      <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-fields" class="text-h2 text-ink"><%= t(".fields_card") %></h2></div>
+      <div class="flex flex-col gap-2 p-4">
+        <% if default_tab? %>
+          <%= hidden_field_tag "form[field_order]", draft.rows.map(&:row).join(" "), id: "form-field-order",
+                data: { save_bar_track: true, "admin--forms--builder-target": "order" } %>
+          <p class="text-sm text-dim" data-admin--forms--builder-target="empty" <%= "hidden" if draft.rows.any? %>><%= t(".no_fields") %></p>
+        <% else %>
+          <p class="text-sm text-meta"><%= t(".structure_elsewhere", language: default_language) %></p>
+          <p class="text-sm text-meta"><%= t(".falls_back", language: default_language) %></p>
+        <% end %>
+
+        <div class="flex flex-col gap-2" data-admin--forms--builder-target="list">
+          <% draft.rows.each_with_index do |row, index| %>
+            <%= render Admin::FormsScreen::FieldRowComponent.new(row: row, locale: locale, structure: default_tab?, first: index.zero?, last: index == draft.rows.size - 1,
+                  errors: errors_at("row-#{row.row}")) %>
+          <% end %>
+        </div>
+
+        <% if default_tab? %>
+          <div class="admin-block-picker flex flex-wrap items-center gap-2 rounded-cs border border-dashed border-line-strong px-3 py-2.5">
+            <span class="font-medium text-ink"><%= t(".add_field") %></span>
+            <% field_types.each do |type| %>
+              <%= render Admin::Ui::ButtonComponent.new(label: type.label, variant: :secondary, size: :small, disabled: full?,
+                    data: { action: "admin--forms--builder#add", "admin--forms--builder-type-param": type.name, "admin--forms--builder-target": "picker" }) %>
+            <% end %>
+            <p class="w-full text-[13px] text-meta" data-admin--forms--builder-target="full" <%= "hidden" unless full? %>><%= t(".max_fields") %></p>
+          </div>
+
+          <% field_types.each do |type| %>
+            <template data-type="<%= type.name %>" data-admin--forms--builder-target="template">
+              <%= render Admin::FormsScreen::FieldRowComponent.new(row: template_row(type), locale: locale, structure: true, first: false, last: true) %>
+            </template>
+          <% end %>
+          <template data-admin--forms--builder-target="choiceTemplate">
+            <%= render Admin::FormsScreen::ChoiceRowComponent.new(field_row: "__ROW__", choice: template_choice, number: 1, locale: locale, structure: true, first: false, last: true) %>
+          </template>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-after">
+      <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-after" class="text-h2 text-ink"><%= t(".after_card") %></h2></div>
+      <div class="flex flex-col gap-4 p-4">
+        <% unless default_tab? %><p class="text-sm text-meta"><%= t(".falls_back", language: default_language) %></p><% end %>
+        <div>
+          <%= label_tag text_id(:submit_label), t(".submit_label"), class: "#{setup_label_class} mb-1" %>
+          <% if (line = reference(:submit_label)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+          <%= text_field_tag "form[submit_label][#{locale}]", text_value(:submit_label), id: text_id(:submit_label), autocomplete: "off",
+                placeholder: t(".submit_label_placeholder"), aria: { describedby: "#{text_id(:submit_label)}-help" }, class: setup_input_class %>
+          <p id="<%= text_id(:submit_label) %>-help" class="mt-1 text-sm text-meta"><%= t(".submit_label_help") %></p>
+        </div>
+        <div>
+          <%= label_tag text_id(:thank_you), t(".thank_you"), class: "#{setup_label_class} mb-1" %>
+          <% if (line = reference(:thank_you)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+          <%= text_area_tag "form[thank_you][#{locale}]", text_value(:thank_you), id: text_id(:thank_you), rows: 3,
+                placeholder: t(".thank_you_placeholder"), aria: { describedby: "#{text_id(:thank_you)}-help" }, class: setup_input_class %>
+          <p id="<%= text_id(:thank_you) %>-help" class="mt-1 text-sm text-meta"><%= t(".thank_you_help") %></p>
+        </div>
+      </div>
+    </section>
+
+    <% if default_tab? %>
+      <%= render Admin::FormsScreen::DestinationsComponent.new(draft: draft, locale: locale, keys: keys?, mail_settings: mail_settings,
+            errors: errors_at("destinations"), mail_errors: errors_at("mail"), kept_submissions: kept_submissions?) %>
+    <% end %>
+
+    <%= render Admin::FormsScreen::PlacementsComponent.new(placements: placements, url_options: url_options) %>
+
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: FORM_ID, cancel_url: cancel_path, save_label: t(".save")) %>
+  <% end %>
+
+  <p class="sr-only" aria-live="polite" data-admin--forms--builder-target="status"></p>
+<% end %>
+
+<%= render Admin::FormsScreen::TrashZoneComponent.new(form: form, placements: placements, url_options: url_options) %>

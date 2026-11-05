@@ -30,13 +30,14 @@ module Admin
       NAMED_SUBPAGES = 3
 
       # The audit action each kind's trashing records (`#recorded_trashings`).
-      TRASHED_ACTIONS = { "Page" => "page.trashed", "Post" => "post.trashed", "Media::Asset" => "media.trashed" }.freeze
+      TRASHED_ACTIONS = { "Page" => "page.trashed", "Post" => "post.trashed", "Media::Asset" => "media.trashed", "Forms::Form" => "form.trashed" }.freeze
 
       EMPTY_STATES = {
         nil => [ "The trash is empty.", "Deleted pages, posts and images show up here until they're deleted for good." ],
         "pages" => [ "No pages in the trash.", "Deleted pages show up here until they're deleted for good." ],
         "posts" => [ "No posts in the trash.", "Deleted posts show up here until they're deleted for good." ],
-        "images" => [ "No images in the trash.", "Deleted images show up here until they're deleted for good." ]
+        "images" => [ "No images in the trash.", "Deleted images show up here until they're deleted for good." ],
+        "forms" => [ "No forms in the trash.", "Deleted forms show up here, with their submissions, until they're deleted for good." ]
       }.freeze
 
       # The empty state of a list that is empty only FOR THIS VIEWER: the

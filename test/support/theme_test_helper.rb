@@ -54,6 +54,16 @@ module ThemeTestHelper
 
   def with_card_theme(&block) = Theme.with(card_theme, &block)
 
+  # A ninth theme (`test/fixtures/themes/form`): its own template for the
+  # Form block and for a short text answer, written from the reference's
+  # section alone (docs/reference/theming.md, "The Form block"), and a
+  # stylesheet for them.
+  FORM = Rails.root.join("test/fixtures/themes/form")
+
+  def form_theme = Theme.load(ThemeFolder.new(FORM))
+
+  def with_form_theme(&block) = Theme.with(form_theme, &block)
+
   # A sixth theme (`test/fixtures/themes/choices`): a theme.yml declaring two
   # section styles (the second labelled in en and de), the two page
   # templates, and one icon of its own (`brush`, labelled Design, a 24-unit

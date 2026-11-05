@@ -26,6 +26,17 @@ Rails.application.config.to_prepare do
     ContentModel::FieldTypes.reset!
     ContentModel::FieldTypes.register_built_ins
 
+    # The form field types, right after the content model's (a form type
+    # names its value type), before the block types; a gem's are replayed
+    # after everything else, with the block types' (below).
+    Forms::FieldTypes.reset!
+    Forms::FieldTypes.register_built_ins
+    # Where a form's submissions go (mail built in), after the content
+    # model's field types, which a destination's settings are declared
+    # against; a gem's are replayed last, with the others (below).
+    Forms::DestinationTypes.reset!
+    Forms::DestinationTypes.register_built_ins
+
     [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
     BlockTypes::RichText.register
@@ -33,6 +44,7 @@ Rails.application.config.to_prepare do
     BlockTypes::Code.register
     BlockTypes::Note.register
     BlockTypes::Table.register
+    BlockTypes::Form.register
     BlockTypes::Card.register
     BlockTypes::PostList.register
     BlockTypes::Section.register
@@ -74,6 +86,12 @@ Rails.application.config.to_prepare do
     # development reload then leaves every registry of the CMS filled, and
     # only its own block types (and those of the hooks after it) missing.
     ContentSpiel::Plugins.register_block_types(BlockTypes)
+    # The form field types and form destinations of outside hooks
+    # (`ContentSpiel::Plugins.form_field_types`, `.form_destinations`) are
+    # replayed after the block types', for the same reason: the last
+    # registrations of the block.
+    ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes)
+    ContentSpiel::Plugins.register_form_destinations(Forms::DestinationTypes)
   rescue StandardError => error
     raise unless ThemeFolder.booted?
 

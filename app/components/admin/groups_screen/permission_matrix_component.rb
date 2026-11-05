@@ -83,7 +83,7 @@ module Admin
       attr_reader :form_name, :locale
 
       # The scoped permissions by area, in registry order.
-      def sections = AccessControl::Permissions.all.reject { |permission| permission.scopes.empty? }.group_by(&:area)
+      def sections = AccessControl::Permissions.grantable.reject { |permission| permission.scopes.empty? }.group_by(&:area)
 
       def tree = @tree ||= GroupsScreen::BranchTree.for(Current.actor, locale: locale)
 
@@ -101,9 +101,9 @@ module Admin
         @locked.fetch(permission.key) { @locked[permission.key] = !AccessControl.can_grant?(Current.actor, permission.key, @stored[permission.key]) }
       end
 
-      def any_locked? = AccessControl::Permissions.all.any? { |permission| locked?(permission) }
+      def any_locked? = AccessControl::Permissions.grantable.any? { |permission| locked?(permission) }
 
-      def locked_toggle_keys = AccessControl::Permissions.all.select { |permission| permission.scopes.empty? && locked?(permission) }.map(&:key)
+      def locked_toggle_keys = AccessControl::Permissions.grantable.select { |permission| permission.scopes.empty? && locked?(permission) }.map(&:key)
 
       # Notes about what saving will drop, for one permission. A removed content
       # type is not among them (it is a chip, `PermissionRowComponent`).
@@ -143,7 +143,7 @@ module Admin
           .map { |dead| "The permission “#{dead.permission}” no longer exists and will be removed when you save." }
       end
 
-      def toggle_grants = @grants.slice(*AccessControl::Permissions.all.select { |permission| permission.scopes.empty? }.map(&:key))
+      def toggle_grants = @grants.slice(*AccessControl::Permissions.grantable.select { |permission| permission.scopes.empty? }.map(&:key))
     end
   end
 end

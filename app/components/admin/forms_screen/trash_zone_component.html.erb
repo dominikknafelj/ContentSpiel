@@ -1,0 +1,17 @@
+<% if zone? %>
+  <section class="admin-delete-zone mt-6 flex max-w-[var(--cs-form-max)] flex-wrap items-center justify-between gap-3 rounded-cs border border-line px-3.5 py-3" aria-labelledby="form-trash-zone-title">
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <h2 id="form-trash-zone-title" class="text-base font-medium text-ink"><%= t(".title") %></h2>
+      <p class="text-sm text-dim"><%= t(".body") %></p>
+    </div>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
+  </section>
+<% end %>
+
+<%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".dialog_title", name: name), body: body) do |dialog| %>
+  <% dialog.with_confirm_action do %>
+    <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :danger, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>

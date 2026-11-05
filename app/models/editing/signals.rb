@@ -66,7 +66,11 @@ module Editing
       %w[user.created user.updated user.deleted invitation.created invitation.resent invitation.withdrawn
         group.created group.updated group.deleted token.issued token.revoked]
         .index_with { "an account, an invitation, a group or a token is not content" },
-      "media.regenerated" => "regenerating images changes no content an editor has open"
+      "media.regenerated" => "regenerating images changes no content an editor has open",
+      **%w[form.created form.updated form.trashed form.restored form.purged]
+        .index_with { "a form is saved explicitly on its own screen and has no live editor" },
+      **Audit::Sentence::SUBMISSION_ACTIONS
+        .index_with { "a form's submissions are no content: a visitor's send, sending one again or deleting them changes nothing an editor has open" }
     ).freeze
 
     module_function

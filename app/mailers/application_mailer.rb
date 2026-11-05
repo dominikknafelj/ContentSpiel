@@ -78,6 +78,46 @@ class ApplicationMailer < ActionMailer::Base
     record_failed(error)
   end
 
+  # Delivers now, from inside a job of its own, and records the outcome as
+  # `MailDeliveryJob` would, for a
+  # job that must learn the result itself: `Forms::DeliveryJob`, through the
+  # mail destination. Answers nil when the mail was sent.
+  #
+  #   - Sent: `record_sent` with `fingerprint`, the one the job's work was
+  #     queued under, so a send verifies the settings only while they are
+  #     still those (as `queue` has it).
+  #   - Not sent because the mailer built nothing or the settings are not
+  #     complete: `Forms::DestinationTypes::Failed` with the key `not_ready`,
+  #     since a send that did not happen is no success.
+  #   - A connection failure before the last attempt: re-raised as
+  #     `Forms::DestinationTypes::Retry` and recorded nowhere (one blip the
+  #     next attempt gets through must not say "Last send failed").
+  #   - Any other failure of the exchange, and a connection failure on the
+  #     last attempt: `record_failed` (the site's mail state, once) and
+  #     raised as `Failed` with the failure's key and its line, already
+  #     scrubbed of the login (`MailFailure.from`).
+  #   - An error raised before the delivery (the mailer, a template, a
+  #     record gone) is a bug and is raised as it is.
+  #
+  # Both are raised with no `cause`, so the original reply, which may echo
+  # the login, is not reachable from them either.
+  def self.deliver_in_job(delivery, final_attempt:, fingerprint:)
+    message = delivery.deliver_now
+    sent = message.is_a?(Mail::Message) && message.perform_deliveries
+    raise Forms::DestinationTypes::Failed.new(key: Forms::Destinations::Mail::NOT_READY), cause: nil unless sent
+
+    record_sent(message, fingerprint: fingerprint)
+    nil
+  rescue Forms::DestinationTypes::Failed
+    raise
+  rescue StandardError => error
+    raise unless MailFailure.delivery?(error)
+    raise Forms::DestinationTypes::Retry, cause: nil if !final_attempt && MailFailure::CONNECTION_ERRORS.any? { error.is_a?(it) }
+
+    failure = record_failed(error)
+    raise Forms::DestinationTypes::Failed.new(key: failure.key, line: failure.line), cause: nil
+  end
+
   # A delivery's answer is the message that was handed to its method, or
   # nil when the action built none (`PasswordsMailer#reset` without an
   # address); a message whose `perform_deliveries` is off was not sent.

@@ -40,7 +40,7 @@ module ContentModel
     # are the Note block's kinds (note block plan, rulings 11 and 12), which
     # its blocks' cards and tiles draw through `for_block:`; `table`
     # is the Table block's.
-    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card].freeze
+    ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
 
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
@@ -91,9 +91,11 @@ module ContentModel
     # One filled block of the type (decision 14): `settings` (string keys),
     # `translations` (locale => values: translated schema fields and the
     # `caption` / `alt` columns), `body` (Markdown, written in the default
-    # language), `image` (true: the test attaches a library image), `shows`
-    # (texts the public page holds for the block).
-    Sample = Data.define(:settings, :translations, :body, :image, :shows)
+    # language), `image` (true: the test attaches a library image), `form`
+    # (true: the test makes a visitor's form and names it in the block's
+    # `form_id`, the Form block's), `shows` (texts the public page holds for
+    # the block).
+    Sample = Data.define(:settings, :translations, :body, :image, :form, :shows)
 
     def initialize(name)
       super
@@ -231,7 +233,7 @@ module ContentModel
       return @sample if values.empty?
 
       unknown = values.keys - Sample.members
-      refuse "a sample holds settings, translations, body, image, shows; not #{unknown.join(", ")}" if unknown.any?
+      refuse "a sample holds settings, translations, body, image, form, shows; not #{unknown.join(", ")}" if unknown.any?
 
       shows = Array(values[:shows])
       refuse "a sample's `shows:` names at least one text the public page holds for it, none of them blank" if shows.empty? || !shows.all?(String) || shows.any? { |text| text.strip.empty? }
@@ -240,6 +242,7 @@ module ContentModel
       refuse "a sample's settings are a Hash" unless settings.is_a?(Hash)
       refuse "a sample's body is a Markdown String" unless values[:body].nil? || values[:body].is_a?(String)
       refuse "a sample's image is true or false" unless [ nil, true, false ].include?(values[:image])
+      refuse "a sample's form is true or false" unless [ nil, true, false ].include?(values[:form])
       translations = values[:translations] || {}
       refuse "a sample's translations are a Hash of locale => Hash of values" unless translations.is_a?(Hash) && translations.values.all?(Hash)
       translations = translations.transform_keys(&:to_s)
@@ -250,6 +253,7 @@ module ContentModel
         translations: translations.freeze,
         body: values[:body],
         image: values[:image] == true,
+        form: values[:form] == true,
         shows: shows.freeze
       )
     end

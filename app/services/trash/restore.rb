@@ -1,6 +1,9 @@
 module Trash
-  # Brings a trashed page (with the pages trashed together with it), post or
-  # image back (trash spec §4.2). Clearing `trashed_at` and saving is what
+  # Brings a trashed page (with the pages trashed together with it), post,
+  # image or form back (trash spec §4.2). A form has
+  # no slug, no image and no branch: it is the column update alone, and the
+  # public content version moved by hand (it has no published copy and no
+  # callback that would). Clearing `trashed_at` and saving is what
   # rebuilds URLs: `PublicSite::Paths` computes a path again, and the model
   # callbacks write it (a page resyncs its subtree and the posts its listing
   # blocks give URLs to).
@@ -79,6 +82,7 @@ module Trash
         @record.save!
         restore_referenced_assets(branch_ids)
         record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata(branch_ids))
+        PublicSite.bump_version! if @record.is_a?(Forms::Form)
         # Each image that came along gets its own event too, so an image's
         # history in the audit log shows it leaving the trash, not only its
         # owner's.
@@ -222,7 +226,7 @@ module Trash
       end
     end
 
-    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)
+    def event_prefix = { Page => "page", Post => "post", Media::Asset => "media", Forms::Form => "form" }.fetch(@record.class)
 
     # `restored_page_ids` mirrors `page.trashed`'s `descendant_ids`: the
     # branch members that came back with the page (empty, so dropped, for a

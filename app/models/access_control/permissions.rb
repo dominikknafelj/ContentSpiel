@@ -42,7 +42,10 @@ module AccessControl
       # (config/initializers/types.rb), so the constant a freshly-run
       # `register` call resolves is always the just-reloaded class, never
       # one left over from before the reload.
-      def register(key, label:, area:, action:, subject: nil, scopes: [])
+      #
+      # `grantable: false` registers a permission that
+      # no group, token, matrix or seed may hold (see `.grantable`).
+      def register(key, label:, area:, action:, subject: nil, scopes: [], grantable: true)
         key = key.to_s
         unless key.match?(KEY_FORMAT)
           raise ArgumentError, "#{key.inspect} isn't a valid permission key (expected key.action or owner/key.action)"
@@ -55,13 +58,24 @@ module AccessControl
           raise ArgumentError, "#{unknown_scopes.map(&:inspect).join(", ")} isn't an allowed scope (expected #{ALLOWED_SCOPES.join(", ")})"
         end
 
-        registry[key] = Permission.new(key: key, label: label, area: area, subject: subject, action: action.to_sym, scopes: scopes)
+        raise ArgumentError, "grantable is true or false, not #{grantable.inspect}" unless [ true, false ].include?(grantable)
+
+        registry[key] = Permission.new(key: key, label: label, area: area, subject: subject, action: action.to_sym, scopes: scopes, grantable: grantable)
       end
 
       def fetch(key) = registry.fetch(key.to_s) { raise UnknownPermission, "#{key.inspect} isn't a registered permission" }
       def find(key) = registry[key.to_s]
       def all = registry.values
       def keys = registry.keys
+
+      # Every registered permission a group may hold: all of them but those
+      # registered `grantable: false` (`forms.submit`, the visitor's alone).
+      # What the group matrix offers, what Admin's `grants: :all` resolves to
+      # (`AccessControl::Seeds`), and what a grant may name (`Grant`'s
+      # validation, `AccessControl.can_grant?`). Checking a permission
+      # (`allowed?`) still reads `all`: an ungrantable key is checked like
+      # any other, and held by nobody.
+      def grantable = all.select(&:grantable)
       def reset! = @registry = {}
 
       # Every permission whose `subject` is `klass` -- e.g. a record

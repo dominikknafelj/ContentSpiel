@@ -114,11 +114,20 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A page as compared: its body with a Form block's signed draw time left
+  # out, which is the second of the draw (`Forms::Drawn.token`) and no
+  # content of any record, so two draws a second apart differ there alone.
+  def drawn_page
+    page = Nokogiri::HTML5(response.body)
+    page.css("input[name=drawn]").each { |input| input["value"] = "" }
+    page
+  end
+
   # What a page's content can change: the title, the description and `main`
   # (the head carries a per-request nonce, so the whole body is never equal).
   def look(path)
     get path
-    page = Nokogiri::HTML5(response.body)
+    page = drawn_page
     [ response.status, page.at_css("title")&.text, page.at_css("meta[name=description]")&.[]("content"), page.at_css("main")&.to_html ]
   end
 
@@ -126,7 +135,7 @@ class PublicCanaryTest < ActionDispatch::IntegrationTest
   # section's tree, the crumbs, previous and next, and the page itself.
   def themed_look(path)
     get path
-    page = Nokogiri::HTML5(response.body)
+    page = drawn_page
     [ response.status, *%w[nav.plain-tree p.plain-crumb nav.plain-neighbours main].map { |selector| page.at_css(selector)&.to_html } ]
   end
 

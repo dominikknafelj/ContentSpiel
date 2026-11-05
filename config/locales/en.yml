@@ -123,6 +123,9 @@ en:
             image_max_upload_mb:
               format: "%{message}"
               upload_range: "Largest upload must be a whole number of MB, from 1 to 50."
+            form_keep_days:
+              format: "%{message}"
+              keep_days_range: "Days to keep submissions must be a whole number of days, from 1 to 3650."
         # A Section's anchor is named by its sentence: the attribute is the dotted
         # `settings.anchor` (`ContentBlock#settings_are_valid`).
         content_block/settings:

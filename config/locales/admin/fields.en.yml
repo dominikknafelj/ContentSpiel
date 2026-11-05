@@ -24,6 +24,12 @@ en:
           search: Or search pages and posts…
           unavailable: A page or post you can't open here
           untitled: Untitled
+        # The Form block's form (`Admin::Fields::FormField`): the empty
+        # choice, and a stored form that is no longer kept (in the trash, or
+        # purged), which the public page draws nothing for.
+        form_field:
+          choose: Choose a form
+          gone: A form that's gone
         # A theme's choices (`theme.yml`): the empty choice of a style list
         # and of an icon list, and a stored name the theme does not declare.
         theme_choice_field:

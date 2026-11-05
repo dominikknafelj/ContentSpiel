@@ -28,7 +28,7 @@ class Groups::EnsureBuiltInsTest < ActiveSupport::TestCase
     # later migrations added (`media.manage`, `trash.empty`, `ai.translate`)
     # is among them without being listed anywhere.
     admin = AccessControl::Group.find_by!(name: "Admin")
-    assert_equal AccessControl::Permissions.keys.sort, admin.grants.pluck(:permission).sort
+    assert_equal AccessControl::Permissions.grantable.map(&:key).sort, admin.grants.pluck(:permission).sort
     assert(admin.grants.all? { |grant| grant.scope == {} })
     assert_includes AccessControl::Group.find_by!(name: "Editor").grants.pluck(:permission), "media.manage"
     assert_includes AccessControl::Group.find_by!(name: "Editor").grants.pluck(:permission), "ai.translate"
@@ -38,14 +38,16 @@ class Groups::EnsureBuiltInsTest < ActiveSupport::TestCase
     # comparison below sets two readers of that one constant side by side
     # and would agree on a wrong list.
     expected = {
-      "Admin" => AccessControl::Permissions.keys.sort,
+      "Admin" => AccessControl::Permissions.grantable.map(&:key).sort,
       "Author" => %w[media.upload pages.read posts.create posts.edit posts.read],
       "Editor" => %w[ai.translate media.manage media.upload pages.create pages.delete pages.edit pages.move pages.publish pages.read
         posts.create posts.delete posts.edit posts.publish posts.read tags.manage],
       "Read only" => %w[pages.read posts.read]
     }
-    assert_equal expected, made.to_h { |name, _, grants| [ name, grants.map(&:first) ] }
-    assert_equal [ 23, 5, 15, 2 ], made.map { |_, _, grants| grants.size }, "Admin, Author, Editor, Read only"
+    # Sorted here too: the database's collation orders `forms.manage` before
+    # `form_submissions.view`, Ruby's the other way round.
+    assert_equal expected, made.to_h { |name, _, grants| [ name, grants.map(&:first).sort ] }
+    assert_equal [ 25, 5, 15, 2 ], made.map { |_, _, grants| grants.size }, "Admin, Author, Editor, Read only"
     assert_equal [ [ "posts.edit", { "own" => true } ] ], made.flat_map { |_, _, grants| grants.reject { |_, scope| scope == {} } }, "the one scoped grant"
     assert(AccessControl::Group.all.all? { |group| group.description.present? }, "every built-in group says what it is for")
 

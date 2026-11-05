@@ -1,0 +1,7 @@
+/* The ninth theme's stylesheet: its own Form template's rules, on the
+   default theme's form tokens, which this theme does not change. */
+.plain-form__body { border: 0; padding: 0; display: grid; gap: var(--th-sp-3); }
+.plain-form__body[hidden] { display: none; }
+.plain-field input { border: 1px solid var(--th-form-field-line); background: var(--th-form-field-ground); }
+.plain-field__error { color: var(--th-form-error); }
+.plain-form__thanks { background: var(--th-form-done-ground); border-left: 3px solid var(--th-form-done-line); }

@@ -1,0 +1,10 @@
+<%= t("mail.forms.submission.intro", form: @form.name) %>
+<% answers.each do |answer| %>
+
+<%= answer["label"] %>:
+<%= answer["display"].presence || t("mail.forms.submission.no_answer") %>
+<% end %>
+
+<%= t("mail.forms.submission.sent_at", time: sent_at) %>
+<%= t("mail.forms.submission.language", language: language_name) %>
+<%= page_title ? t("mail.forms.submission.page", page: page_title) : t("mail.forms.submission.no_page") %>

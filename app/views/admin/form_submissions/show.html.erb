@@ -1,0 +1,4 @@
+<%# One submission:
+    `Admin::FormsScreen::SubmissionComponent`. %>
+<% content_for :title, t(".title") %>
+<%= render Admin::FormsScreen::SubmissionComponent.new(submission: @submission, url_options: admin_url_options) %>

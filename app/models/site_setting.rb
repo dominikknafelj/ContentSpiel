@@ -119,6 +119,12 @@ class SiteSetting < ApplicationRecord
   # set to 0) -- so this is a plain non-negative check, not `greater_than: 0`.
   validates :trash_retention_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
 
+  # The default time a form that keeps its submissions and sets no time of
+  # its own keeps them (`Forms::Form#effective_keep_days`; the clean-up reads
+  # it at every run). The form's own range, so the two cannot disagree.
+  validates :form_keep_days, numericality: { only_integer: true, in: Forms::Form::KEEP_DAYS, message: :keep_days_range },
+    if: :will_save_change_to_form_keep_days?
+
   after_commit :reset_cached_state
 
   # Titled in the new row's own default language, not the ambient
