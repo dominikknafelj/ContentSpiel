@@ -12,8 +12,10 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
   def schedule_path_for(post) = schedule_admin_post_path(post)
 
   test "a schedule time is read as site-local and stored as UTC" do
-    post schedule_path_for(@post), params: { published_at: "2026-11-02T09:00" }
-    assert_equal Time.utc(2026, 11, 2, 8, 0), @post.reload.published_at   # CET = UTC+1
+    # Winter (CET), and far enough out that the suite stays green whichever day it
+    # runs on: a schedule time in the past is refused (see the neighbour below).
+    post schedule_path_for(@post), params: { published_at: "2030-01-15T09:00" }
+    assert_equal Time.utc(2030, 1, 15, 8, 0), @post.reload.published_at   # CET = UTC+1
   end
 
   test "a scheduled time shows in site-local time" do
@@ -29,11 +31,11 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
   end
 
   test "a time in the spring-forward gap is saved, not a 500" do
-    post schedule_path_for(@post), params: { published_at: "2027-03-28T02:30" }
+    post schedule_path_for(@post), params: { published_at: "2030-03-31T02:30" }
     assert_response :redirect
     # 02:30 doesn't exist in Berlin that night (clocks jump 02:00 -> 03:00);
     # ActiveSupport moves it forward an hour, to 03:30 CEST = 01:30 UTC.
-    assert_equal Time.utc(2027, 3, 28, 1, 30), @post.reload.published_at
+    assert_equal Time.utc(2030, 3, 31, 1, 30), @post.reload.published_at
   end
 
   test "audit log and trash times render in the site zone" do
