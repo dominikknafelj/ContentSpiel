@@ -64,6 +64,18 @@ class Admin::EditingHeldSystemTest < ApplicationSystemTestCase
     assert_selector "#block-#{@text.id}-hold [data-editing-kind=held]"
   end
 
+  test "a held prefix field is one box: the wrapper has the held line and the input inside it has no border of its own" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+
+    inner, wrapper = %w[.admin-prefix-input\ input .admin-prefix-input].map do |selector|
+      page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{selector.to_json})); return [s.borderTopWidth, s.borderBottomWidth, s.backgroundColor] })()")
+    end
+    assert_equal [ "0px", "0px" ], inner.first(2)
+    assert_equal "1px", wrapper[1]
+    assert_equal page.evaluate_script("getComputedStyle(document.querySelector('#page-title')).backgroundColor"), wrapper[2]
+  end
+
   def resource_requests = page.evaluate_script("performance.getEntriesByType('resource').map((entry) => entry.name).filter((name) => name.includes('/content_blocks/') || name.includes('/pages/'))")
 
   test "Enter in a held form's text field and in its read-only rich text sends no request and navigates nowhere" do

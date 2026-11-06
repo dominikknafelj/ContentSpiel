@@ -441,6 +441,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-filter-bar input:not(.sr-only),
 .admin-filter-bar select,
 .admin-filter-bar a.inline-block,
+.admin-filter-bar a.inline-flex,
 .admin-filter-bar button,
 .admin-filter-bar [data-subject-chip] {
   min-height: var(--cs-control-compact);
@@ -828,7 +829,9 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 }
 /* The chip input's frame is a div around its input, so the rule above misses
    it: sunken too, or it keeps a white frame around a sunken inner field. */
-.admin-view-only :is(.admin-column, .admin-field) .admin-chip-field { background: var(--cs-sunken); border: 1px solid var(--cs-line); border-radius: var(--cs-radius-field); }
+.admin-view-only :is(.admin-column, .admin-field) :is(.admin-chip-field, .admin-prefix-input) { background: var(--cs-sunken); border: 1px solid var(--cs-line); border-radius: var(--cs-radius-field); }
+
+.admin-view-only .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-sunken); }
 
 /* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
    `readonly` text stays selectable and keeps full contrast; a control that can only be
@@ -836,11 +839,14 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
 .admin-held :is(input, textarea)[readonly],
 .admin-held :is(select, input, button):disabled,
-.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field) { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+/* The prefix wrapper's resting border rule above is more specific than the held
+   rule, so the held wrapper restates it with the same `:not(:has())` shape. */
+.admin-held .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-paper); }
 /* A held field is not a well: a full line, no fill change, at full contrast. */
-.admin-held :is(input:not([type="checkbox"], [type="radio"]), textarea)[readonly],
+.admin-held :is(input:not([type="checkbox"], [type="radio"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea)[readonly],
 .admin-held select:disabled,
-.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the

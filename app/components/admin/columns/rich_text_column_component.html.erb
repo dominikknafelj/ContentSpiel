@@ -42,6 +42,8 @@
           content box (`bg-clip-content` + `py-1`), shorter than the row without a margin that
           would shift their top. Choosing a menu item closes the menu (`admin--ui--menu#close`) before the
           command runs; the command then moves focus (editor or popover). %>
+      <%# One control: the toolbar and the editor share one box, and the focus ring is drawn around both (admin-rich-text.css). %>
+      <div class="admin-rich-text-box">
       <% if editable? %>
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
            class="flex flex-wrap items-stretch gap-0.5 rounded-t-field bg-sunken p-1"
@@ -76,6 +78,7 @@
       <%= tag.div id: editor_id,
             class: "admin-rich-text-editor #{"admin-rich-text-table " if table?}border-0 border-b border-field-line bg-field-fill text-ink",
             data: { "admin--rich-text--editor-target": "editor", labelledby: label_id } %>
+      </div>
 
       <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text--editor-target="message"></p>
     <% end %>

@@ -39,6 +39,18 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal "Hello ", text_nodes(document).first["text"]
   end
 
+  test "the toolbar and the editor are one box: the focus ring is the box's, and the editor draws none" do
+    visit_post
+    box = ".admin-rich-text-box"
+    outline = ->(selector) { page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{selector.to_json})); return [s.outlineStyle, s.outlineWidth] })()") }
+    assert_equal "none", outline.call(box).first
+
+    editor.click
+    assert_equal [ "solid", "2px" ], outline.call(box)
+    assert_equal "0px", outline.call(".admin-rich-text-editor").last
+    assert_selector "#{box} [role=toolbar]"
+  end
+
   test "pasting a YouTube URL inserts a youtube node" do
     visit_post
 
