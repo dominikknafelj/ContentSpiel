@@ -717,6 +717,54 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @container admin-dashboard (min-width: 60rem) {
   .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* The editors' rail. The editor area (`#editing`, the live region) is the
+   container, so what the rail asks is the room the editor has, never the
+   window's: a folded tree or an open notes column changes it while the
+   window stays the same. No `@media` rule names the rail
+   (`admin_design_rules_test`).
+
+   `.admin-rail-grid` holds, in document order, the tabs
+   (`Admin::Ui::RailTabsComponent`), the panels
+   (`Admin::Ui::RailPanelComponent`) and the blocks column: settings come
+   before the blocks at every width, and only the grid places them, so the
+   focus goes header, tabs, settings, blocks. Below the threshold it is one
+   column: no tabs, every panel in the page but a docked-only one, each
+   where the document puts it.
+
+   Docked, the blocks column stands at the content's left edge and the rail
+   `--cs-rail-gap` right of it; spare width falls right of the rail, since
+   the tracks are fixed and `justify-content: start`. The rail is two rows,
+   the tabs and the one current panel. Whatever else is a grid item is the
+   blocks column, in the first column across both rows, so the rail's rows
+   never push the blocks down; a second such item would stand over the
+   first. The rail's ground is the grid's own `::before` across both rows,
+   not a box around the rail: a panel may then stand inside an element that
+   is `display: contents` in the grid (the post form) and stay inside it.
+   `--admin-rail-docked` is the docked state that `admin--ui--rail` reads
+   and writes onto the grid as `data-rail-docked`; the query alone sets it.
+   `--folded` (an editor's translation tab) never docks. */
+.admin-editor-area { container: admin-editor / inline-size; }
+.admin-rail-grid { --admin-rail-docked: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.admin-rail__tabs { display: none; }
+.admin-rail__panel--docked-only { display: none; }
+.admin-rail__tab { display: inline-flex; align-items: center; gap: 0.375rem; padding-block: 0.5rem; color: var(--cs-meta); cursor: pointer; }
+.admin-rail__tab:hover { color: var(--cs-ink); }
+/* The selected tab is a 2px accent underline with its words at the selected
+   weight: a selection, so the accent; measured on the rail's ground
+   (`admin_contrast_test`). */
+.admin-rail__tab[aria-selected="true"] { color: var(--cs-ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--cs-accent); }
+.admin-rail__tab:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+@container admin-editor (min-width: 1200px) {
+  .admin-rail-grid:not(.admin-rail-grid--folded) { --admin-rail-docked: 1; grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; }
+  .admin-rail-grid:not(.admin-rail-grid--folded)::before { content: ""; grid-column: 2; grid-row: 1 / -1; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) > :not(.admin-rail__tabs, .admin-rail__panel) { grid-column: 1; grid-row: 1 / -1; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__tabs { display: flex; gap: var(--cs-sp-4); grid-column: 2; grid-row: 1; padding: var(--cs-sp-3) var(--cs-sp-4) 0; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel { grid-column: 2; grid-row: 2; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:not([data-current]) { display: none; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel--docked-only[data-current] { display: block; }
+  /* The blocks column's cap, over `.admin-form-column`'s (0,1,0) by weight. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: var(--cs-editor-column); }
+}
 /* A section's header controls (sections spec §4.1). A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen

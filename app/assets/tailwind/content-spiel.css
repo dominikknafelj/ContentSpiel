@@ -234,6 +234,12 @@
      (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
+  /* The editors' rail where it docks: the blocks column, the rail beside it
+     and the space between them, one left-aligned group. Read by
+     `.admin-rail-grid` in content-spiel.tailwind.css; CS Studio's alone. */
+  --cs-editor-column: 900px;
+  --cs-rail-width: 360px;
+  --cs-rail-gap: 28px;
 }
 
 /* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`

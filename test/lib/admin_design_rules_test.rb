@@ -665,11 +665,24 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Layout points spec, decision 1: one cap, one place.
+  # Layout points spec, decision 1: one cap, one place. The rail's three
+  # widths (the 900px blocks column, the 360px rail, the 28px between them)
+  # are tokens of the same kind, beside it.
+  RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:900|360|28)px\]|(?:max-|min-)?width:\s*(?:900|360)px|(?:column-)?gap:\s*28px/
+  RAIL_WIDTH_ALLOWED = {
+    "app/views/admin/system_status/show.html.erb" => "System status's own column, a list screen's cap that is not the editor's",
+    "app/views/layouts/product.html.erb" => "the sign-in pages' centred column, a whole-screen form's width that is not the rail's"
+  }.freeze
+
   test "the form column's width is a token: 760px and 1144px are written once, in content-spiel.css" do
     tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
     assert_equal 1, tokens.scan("--cs-form-max: 760px;").size
     assert_equal 1, tokens.scan("--cs-form-max-pair: 1144px;").size
+    assert_equal 1, tokens.scan("--cs-editor-column: 900px;").size
+    assert_equal 1, tokens.scan("--cs-rail-width: 360px;").size
+    assert_equal 1, tokens.scan("--cs-rail-gap: 28px;").size
+    assert_equal 1, tokens.scan(/\b900px/).size, "900px is the token's alone in content-spiel.css"
+    assert_equal 1, tokens.scan(/\b360px/).size, "360px is the token's alone in content-spiel.css"
 
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-form-column\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
@@ -677,6 +690,58 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/@container \(min-width: 824px\)\s*\{\s*\.admin-translation-pair\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 560px\)\);/m, css)
     assert_no_match(/\b(?:760|1144)px/, css)
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
+
+    assert_no_match(/\b(?:900|360|28)px/, css)
+    assert_empty design_offences(RAIL_WIDTH_LITERAL, except: RAIL_WIDTH_ALLOWED.keys)
+    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} no longer writes the width: drop its allowance" }
+  end
+
+  test "the rail width pattern matches a hard-coded column, rail or gap, and not a token or a type size" do
+    [ "max-w-[900px]", "w-[360px]", "gap-x-[28px]", "max-width: 900px", "width: 360px", "column-gap: 28px" ].each { |sample| assert_match RAIL_WIDTH_LITERAL, sample }
+    [ "max-w-(--cs-editor-column)", "text-[28px]", "width: var(--cs-rail-width)", "28px 56px" ].each { |sample| assert_no_match RAIL_WIDTH_LITERAL, sample }
+  end
+
+  # A CSS block's body by its head (`@container …`, `@media …`): from the head's
+  # brace to the brace that closes it, comments stripped.
+  def self.css_blocks(name, head)
+    css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+    css.to_enum(:scan, head).map do
+      start = Regexp.last_match.end(0)
+      depth = 1
+      finish = (start...css.size).find do |index|
+        depth += 1 if css[index] == "{"
+        depth -= 1 if css[index] == "}"
+        depth.zero?
+      end
+      css[start...finish]
+    end
+  end
+
+  # Stage 3's rail: the editor area is the container, so a folded tree or a
+  # narrower content column gives the rail room the window does not show.
+  test "the rail is laid out by the editor area's container, never the window" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-editor-area\s*\{\s*container:\s*admin-editor\s*\/\s*inline-size;\s*\}/, css)
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the rail"
+    grid = docked.first[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked grid is .admin-rail-grid:not(.admin-rail-grid--folded)"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/justify-content:\s*start;/, grid)
+    assert_match(/--admin-rail-docked:\s*1;/, grid, "the controller reads the docked state from the property the query sets")
+    ground = docked.first[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{([^}]*)\}/, 1]
+    assert ground, "the rail's ground is the grid's ::before"
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*-1].each do |declaration|
+      assert_match(/#{declaration};/, ground)
+    end
+    assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-form-column\s*\{\s*max-width:\s*var\(--cs-editor-column\);\s*\}/, docked.first)
+    assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-docked:\s*0;[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column below the threshold")
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
   end
 
   # Design System: a filter bar is 38px, set by the bar, never by a control.

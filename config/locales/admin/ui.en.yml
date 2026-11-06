@@ -115,6 +115,11 @@ en:
           outdated: "%{language}: outdated"
           more: "+%{count} ▾"
 
+        # The accessible name of an editor rail's tablist; each tab's own
+        # words are its editor's.
+        rail_tabs:
+          label: "Settings"
+
         pagination:
           nav_label: "Pagination"
           range: "%{first}–%{last} OF %{total}"

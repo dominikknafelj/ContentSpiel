@@ -1,0 +1,14 @@
+<% tabs = [ Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: "Page"), Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: "Section") ] %>
+<div class="admin-editor-area">
+  <div id="preview-rail" class="admin-rail-grid" data-controller="admin--ui--rail"
+       data-action="admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal">
+    <%= render Admin::Ui::RailTabsComponent.new(rail_id: "preview-rail", tabs: tabs, current: "page") %>
+    <%= render Admin::Ui::RailPanelComponent.new(rail_id: "preview-rail", key: "page", current: true) do %>
+      <p class="text-sm text-dim">The page's settings stand here.</p>
+    <% end %>
+    <%= render Admin::Ui::RailPanelComponent.new(rail_id: "preview-rail", key: "section", docked_only: true) do %>
+      <p class="text-sm text-dim">A chosen section's settings stand here.</p>
+    <% end %>
+    <div class="admin-form-column min-h-60 rounded-card bg-surface p-4 shadow-1"></div>
+  </div>
+</div>

@@ -169,6 +169,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/translation_screen/state_cell_component.rb
     app/components/admin/ui/language_tabs_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/rail_tabs_component.rb
+    app/components/admin/ui/rail_tabs_component.html.erb
+    app/components/admin/ui/rail_panel_component.rb
     app/components/admin/ui/pagination_component.rb
     app/components/admin/ui/pagination_component.html.erb
     app/components/admin/ui/time_ago_component.rb
