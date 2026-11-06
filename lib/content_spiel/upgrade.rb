@@ -141,7 +141,7 @@ module ContentSpiel
       temp.chmod(@site.join(PIN).stat.mode & 0o7777)
       File.rename(temp, @site.join(PIN))
     ensure
-      File.delete(temp) if temp&.exist?
+      File.delete(temp) if temp&.exist? # version: none (a temp file in the site's folder, no database row)
     end
   end
 end
