@@ -12,7 +12,7 @@
   <div>
     <%= label_tag search_id, "Search images", class: "sr-only" %>
     <%= search_field_tag :q, q.is_a?(String) ? q : nil, id: search_id, placeholder: "Search title, alt text or filename", autocomplete: "off",
-          class: "block w-72 max-w-full rounded-cs border border-field-line bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+          class: "block w-72 max-w-full px-3 py-1.5 text-ink" %>
   </div>
 
   <fieldset class="m-0 min-w-0 border-0 p-0">

@@ -38,8 +38,8 @@
                   Studio (`Admin::EditorScreen::PageSettingsFormComponent`'s own comment
                   explains why the save-status cell, a sibling `<td>` rather
                   than a nested element, needs no Stimulus target here to
-                  reach it). The input has no border until it is hovered or
-                  focused: "click the name to rename it". %>
+                  reach it). The input is a well, as every field inside an
+                  `.admin-column` is (content-spiel.tailwind.css). %>
               <%= form_with url: admin_tag_path(row), method: :patch, class: "admin-column flex flex-col gap-1",
                     data: {
                       controller: "admin--saving--autosave",
@@ -52,7 +52,7 @@
                     reader's list of fields nothing. %>
                 <%= label_tag "tag-#{row.id}-name", t(".name_label", name: row.name), class: "sr-only" %>
                 <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
-                      class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-field-line focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
+                      class: "block w-full px-2 py-1 text-ink" %>
                 <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
               <% end %>
             </td>

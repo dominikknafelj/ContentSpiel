@@ -141,7 +141,7 @@
       <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
         <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
         <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
-              class: "block w-full rounded-cs border border-field-line bg-surface px-3 py-1.5 text-sm text-ink focus:outline-2 focus:outline-accent" %>
+              class: "admin-well block w-full px-3 py-1.5 text-sm text-ink" %>
         <p data-mind-graph-status role="status" class="sr-only"></p>
         <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-card bg-popover p-1 shadow-3"></ul>
       </div>

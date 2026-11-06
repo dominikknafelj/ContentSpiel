@@ -540,15 +540,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    The rich-text popovers (link/image/YouTube, built by JS inside the editor's
    column) reset it too: an invalid body must not redden their inputs. So does an
    AI suggestion box (`.admin-translation-suggestion`), whose editable textarea
-   sits under the field's input inside the same wrapper.
+   sits under the field's input inside the same wrapper, and a list's filter bar
+   (`.admin-filter-bar`, `FilterHelper`), which has no error slot.
 
    Surfaces: native controls, the prefix input's wrapper, and the rich-text
    editor's toolbar and body (the whole editor border). The media column has no
    text input, so it has nothing to colour. Explicit-save forms render their
    class server-side instead. */
-.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
+.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
-:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field) {
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field),
+.admin-well {
   background-color: var(--cs-field-fill);
   border-width: 0 0 1px;
   border-style: solid;
@@ -561,8 +563,14 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    field keeps the danger edge under the ring. A checkbox, a toggle and a
    segmented control are not wells: they keep a full 1px field-line outline.
    The prefix input's and the chip input's inner inputs are excluded by a
-   zero-specificity `:where`, so the wrapper is the well and the input inside is bare. */
-:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within) {
+   zero-specificity `:where`, so the wrapper is the well and the input inside is bare.
+   A text field outside those wrappers (the mind graph's search, a section's
+   anchor, the notes composer, whose wrapper is the well round a bare textarea,
+   and the graph card's note field) carries `.admin-well` itself: there is no
+   second look for a field, compact or not. A filter bar's controls keep the
+   bar's 38px (`--cs-control-compact`, above): the well sets no height. */
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within),
+.admin-well:is(:focus, :focus-within) {
   background-color: var(--cs-surface);
   outline: 2px solid var(--cs-accent);
   outline-offset: 0;

@@ -246,23 +246,94 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal helpers.setup_label_class, constant.("LABEL_CLASS")
   end
 
-  test "a text field is a well: the field fill and a field-line bottom edge, the accent outline on focus; a checkbox and a toggle keep a full outline" do
-    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
-    shared = css[/\n(:is\(\.admin-column, \.admin-field[^{]*\{[^}]*\})/m, 1].to_s
+  # The stylesheet's rules as `[selectors, declarations]`, comments stripped,
+  # a selector list split at its top-level commas (not those inside `:is()`),
+  # so a rule is found by its whole selector or by what it declares, never by
+  # where it happens to stand in the file.
+  def self.css_rules(name)
+    css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+    css.scan(/([^{}]+)\{([^{}]*)\}/).map do |selector, body|
+      depth = 0
+      parts = selector.strip.each_char.slice_when do |char, _|
+        depth += 1 if char == "("
+        depth -= 1 if char == ")"
+        char == "," && depth.zero?
+      end
+      [ parts.map { |part| part.join.delete_suffix(",").squish }, body ]
+    end
+  end
 
+  WELL_CONTAINERS = ":is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion)".freeze
+  WELL_CONTROLS = ':is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], ' \
+                  '[type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), ' \
+                  "textarea, select, .admin-rich-text-editor, .admin-chip-field)".freeze
+  WELL_SELECTORS = [ "#{WELL_CONTAINERS} #{WELL_CONTROLS}", ".admin-well" ].freeze
+  WELL_FOCUS_SELECTORS = [ "#{WELL_CONTAINERS} #{WELL_CONTROLS}:is(:focus, :focus-within)", ".admin-well:is(:focus, :focus-within)" ].freeze
+
+  def rule_for(selectors, name = "content-spiel.tailwind.css")
+    matches = self.class.css_rules(name).select { |found, _| found == selectors }
+    assert_equal 1, matches.size, "one rule is #{selectors.join(", ")}"
+    matches.first.last
+  end
+
+  def single_rule(selector, name = "content-spiel.tailwind.css") = rule_for([ selector ], name)
+
+  test "a text field is a well: the field fill and a field-line bottom edge, the accent outline on focus; a checkbox and a toggle keep a full outline" do
+    shared = rule_for(WELL_SELECTORS)
     # `background-color`, not the shorthand: the shorthand would wipe a select's chevron.
     assert_match(/background-color:\s*var\(--cs-field-fill\);/, shared)
     assert_match(/border-width:\s*0 0 1px;/, shared)
     assert_includes shared, "var(--cs-field-invalid-border, var(--cs-field-line))"
     assert_match(/border-radius:\s*var\(--cs-radius-field\) var\(--cs-radius-field\) 0 0;/, shared)
-    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, css[/:is\(\.admin-column[^{]*:focus[^{]*\{[^}]*\}/m].to_s)
-    assert_match(/border-width:\s*0 0 1px;/, rule.(".cs-select"))
-    assert_match(/border-bottom-color:\s*var\(--cs-field-line\);/, rule.(".cs-select"))
-    assert_match(/background-color:\s*var\(--cs-field-fill\);/, rule.(".cs-select"))
-    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-toggle"))
-    assert_match(/\.admin-prefix-input:not\(:focus-within\)\s*\{\s*border-color:\s*var\(--cs-field-line\);/, css)
-    assert_no_match(/font-size:\s*10px/, css)
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, rule_for(WELL_FOCUS_SELECTORS))
+    assert_match(/border-width:\s*0 0 1px;/, single_rule(".cs-select"))
+    assert_match(/border-bottom-color:\s*var\(--cs-field-line\);/, single_rule(".cs-select"))
+    assert_match(/background-color:\s*var\(--cs-field-fill\);/, single_rule(".cs-select"))
+    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, single_rule(".cs-toggle"))
+    assert_match(/\A\s*border-color:\s*var\(--cs-field-line\);/, single_rule(".admin-column:not(:has(> [id$=\"-errors\"] > p)) .admin-prefix-input:not(:focus-within)"))
+    assert_no_match(/font-size:\s*10px/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
+  end
+
+  test "a filter bar resets the invalid edge, as every wrapper of wells does" do
+    reset = self.class.css_rules("content-spiel.tailwind.css").find { |_, body| body.include?("--cs-field-invalid-border: initial") }
+    assert_equal %w[.admin-column .admin-field .admin-filter-bar .admin-rich-text-popover .admin-translation-suggestion], reset&.first
+  end
+
+  test "the rule parser finds a rule by its whole selector list and splits it only at top-level commas" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    assert rules.any? { |selectors, _| selectors == WELL_SELECTORS }
+    assert_not rules.any? { |selectors, _| selectors.include?(".admin-column") && selectors.include?("textarea") }, "a comma inside :is() split the list"
+  end
+
+  # The old field was a white box with a full field-line outline and an
+  # accent focus. A text field is a well, from its wrapper (`.admin-column`,
+  # `.admin-field`, `.admin-filter-bar`, the popover, the suggestion box) or
+  # from `.admin-well`, so neither that outline nor a focus colour of its own
+  # stands on an input in CS Studio's markup.
+  TEXT_INPUT = /text_field_tag|search_field_tag|text_area_tag|email_field_tag|password_field_tag|number_field_tag|date_field_tag|url_field_tag|<input|<textarea|tag\.input|tag\.textarea|element\("(?:input|textarea)"|createElement\("(?:input|textarea)"\)|(?<![\w-])(?:focus|focus-visible|focus-within):(?:outline|border)-accent(?![\w-])/
+  FULL_FIELD_LINE = /\A(?=.*(?<![\w:-])border(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-]))/
+
+  test "no text input in CS Studio is the old outlined box" do
+    offences = CONTROL_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}" if line.match?(TEXT_INPUT) && line.match?(FULL_FIELD_LINE)
+      end
+    end
+    assert_empty offences, "a text field is a well: put it in a wrapper of wells or give it `admin-well`"
+  end
+
+  test "the old-box pattern matches an outlined input, and not a well, a frame or a choice tile" do
+    [ 'text_field_tag :q, nil, class: "block rounded-cs border border-field-line bg-surface px-3"',
+      'class: "w-32 rounded-cs border border-field-line bg-surface focus-visible:outline-2 focus-visible:outline-accent"',
+      '<div class="relative rounded-cs border border-field-line bg-surface focus-within:border-accent">',
+      'element("textarea", "block w-full rounded-cs border border-field-line bg-surface")' ].each do |sample|
+      assert sample.match?(TEXT_INPUT) && sample.match?(FULL_FIELD_LINE), sample
+    end
+    [ 'text_field_tag :q, nil, class: "admin-well block w-56 px-3"', '<input class="rounded-t-field border-0 border-b border-field-line bg-field-fill">',
+      '<div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">',
+      '<label class="border border-field-line has-focus-visible:outline-accent">' ].each do |sample|
+      assert_not sample.match?(TEXT_INPUT) && sample.match?(FULL_FIELD_LINE), sample
+    end
   end
 
   test "setup_input_class draws the well: the field fill and a bottom edge" do
