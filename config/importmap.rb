@@ -60,6 +60,12 @@ pin_all_from "app/javascript/notes", under: "notes", preload: "admin"
 # form that holds unsaved changes is never replaced, and neither is anything
 # else of its unit; everything else is replaced"). Admin only, like the rest.
 pin_all_from "app/javascript/editing", under: "editing", preload: "admin"
+# The page editor's plain modules, imported by `admin--editor--blocks`: the
+# reads of its containers, the drag's options, the queued send of a move
+# (`editor/move_queue`, the one sender of a reorder), the menu's moves, the
+# handle's keyboard path and the add / duplicate / delete writes it holds in
+# the queue.
+pin_all_from "app/javascript/editor", under: "editor", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"

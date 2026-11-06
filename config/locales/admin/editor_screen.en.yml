@@ -89,6 +89,14 @@ en:
           into: "%{block} moved to column %{column} of section %{section}. Position %{position} of %{count}."
           out: "%{block} moved out of the section. Position %{position} of %{count}."
           back: "%{block} is back where it was."
+          # The handle's keyboard path (`editor/keyboard_moves.js`): Space
+          # picks a card up and drops it, Escape puts it back. `position` is
+          # said alone on every arrow, and as the `%{position}` of the two
+          # sentences above it.
+          picked_up: "Picked up %{block}. %{position}"
+          dropped: "Dropped %{block}. %{position}"
+          cancelled: "Cancelled. %{block} is back where it was."
+          position: "Position %{position} of %{count}."
         # The confirmation behind every "Delete block…", in a card and in a
         # tile.
         delete_block_dialog:

@@ -11,7 +11,7 @@ require "test_helper"
 class EditingTabHeaderTest < ActiveSupport::TestCase
   HAND_BUILT = %w[
     app/javascript/controllers/admin/saving/autosave_controller.js
-    app/javascript/controllers/admin/editor/blocks_controller.js
+    app/javascript/editor/move_queue.js
     app/javascript/controllers/admin/pages/tree_controller.js
   ].freeze
 
