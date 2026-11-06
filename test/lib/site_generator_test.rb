@@ -227,6 +227,21 @@ class SiteGeneratorTest < ActiveSupport::TestCase
     end
   end
 
+  test "new inside a site is refused, and nothing is written" do
+    in_tmp do |dir|
+      File.write(File.join(dir, ".contentspiel-version"), "0.1.0\n")
+
+      generator = ContentSpiel::SiteGenerator.new(File.join(dir, "inner-site"))
+      assert_equal "This folder is already a site; run contentspiel new outside it.", generator.refusal
+      assert_raises(ContentSpiel::SiteGenerator::Refused) { generator.write }
+
+      out, status = entrypoint("new", "inner-site", chdir: dir)
+      assert_equal 1, status.exitstatus
+      assert_includes out, "This folder is already a site; run contentspiel new outside it."
+      assert_equal [ ".contentspiel-version" ], Dir.children(dir)
+    end
+  end
+
   test "a name that is not a plain folder name is refused, and nothing is written" do
     in_tmp do |dir|
       [ "My-Site", "1site", "-site", "site-", "my_site", "my site", ".hidden", "site.", "Ü" ].each do |name|

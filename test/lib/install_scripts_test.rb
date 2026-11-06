@@ -38,6 +38,16 @@ class InstallScriptsTest < ActiveSupport::TestCase
     assert_match(/^IMAGE=\$\{CONTENTSPIEL_IMAGE:-#{Regexp.escape(IMAGE)}\}$/, File.read(WRAPPER))
   end
 
+  # The promise's tag scheme, from the side that pushes it: every installed
+  # wrapper runs `IMAGE:X.Y.Z` for a pin and `IMAGE:stable` for `upgrade` and
+  # outside a site, so the release workflow pushes exactly those two names.
+  test "the release pushes the tags every installed wrapper runs: X.Y.Z and stable" do
+    release = File.read(ROOT.join(".github/workflows/release.yml"))
+
+    assert_includes release, %(--tag "$IMAGE:$VERSION" --tag "$IMAGE:stable")
+    assert_includes release, "^[0-9]+\\.[0-9]+\\.[0-9]+$", "VERSION is X.Y.Z, digits only, as the wrapper's pin check is"
+  end
+
   test "the version comes from the pin in the folder" do
     in_sandbox do |box|
       File.write("#{box.site}/.contentspiel-version", "0.3.1\nignored\n")
@@ -55,7 +65,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       args = box.run_call.fetch(:args)
 
       assert_includes args, "#{IMAGE}:0.2.0"
-      assert_includes args, "type=bind,source=#{File.realpath(box.site)},target=/site"
+      assert_includes args, box.mount(File.realpath(box.site))
     end
   end
 
@@ -65,7 +75,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       args = box.run_call.fetch(:args)
 
       assert_includes args, "#{IMAGE}:stable"
-      assert_includes args, "type=bind,source=#{File.realpath(box.site)},target=/site"
+      assert_includes args, box.mount(File.realpath(box.site))
     end
   end
 
@@ -88,7 +98,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       assert_equal %w[run --rm], args.first(2)
       assert_equal "#{uid}:#{gid}", args[args.index("--user") + 1]
       assert_equal "/site", args[args.index("-w") + 1]
-      assert_equal "type=bind,source=#{File.realpath(box.site)},target=/site", args[args.index("--mount") + 1]
+      assert_equal box.mount(File.realpath(box.site)), args[args.index("--mount") + 1]
     end
   end
 
@@ -124,7 +134,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       assert_includes run.fetch(:args), "#{IMAGE}:stable"
       assert_not_includes run.fetch(:args).join(" "), "1.2.3"
       assert_equal %w[contentspiel upgrade], run.fetch(:args).last(2)
-      assert_includes run.fetch(:args), "type=bind,source=#{box.site},target=/site"
+      assert_includes run.fetch(:args), box.mount(box.site)
     end
   end
 
@@ -146,7 +156,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       pull, run = box.calls
       assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
       assert_includes run.fetch(:args), "#{IMAGE}:stable"
-      assert_includes run.fetch(:args), "type=bind,source=#{box.site},target=/site"
+      assert_includes run.fetch(:args), box.mount(box.site)
 
       _, status = box.wrap_raw("check")
       assert_equal 1, status.exitstatus
@@ -159,6 +169,28 @@ class InstallScriptsTest < ActiveSupport::TestCase
       File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
       box.wrap("check")
       assert_equal [ "run" ], box.calls.map { |call| call.fetch(:args).first }
+    end
+  end
+
+  test "outside a site the wrapper pulls stable first, then runs it" do
+    in_sandbox do |box|
+      box.wrap("new", "my-site")
+
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_equal %w[contentspiel new my-site], run.fetch(:args).last(3)
+    end
+  end
+
+  test "outside a site a failed pull warns and runs the stable on this machine" do
+    in_sandbox do |box|
+      out, status = box.wrap_raw("--version", env: { "FAKE_DOCKER_PULL_FAILS" => "1" })
+
+      assert status.success?, out
+      assert_includes out, "could not fetch the newest release; using the one on this machine"
+      assert_equal %w[pull run], box.calls.map { |call| call.fetch(:args).first }
+      assert_includes box.run_call.fetch(:args), "#{IMAGE}:stable"
     end
   end
 
@@ -187,7 +219,32 @@ class InstallScriptsTest < ActiveSupport::TestCase
       FileUtils.mkdir_p(odd)
       box.wrap("pages", chdir: odd)
 
-      assert_includes box.run_call.fetch(:args), "type=bind,source=#{odd},target=/site"
+      assert_includes box.run_call.fetch(:args), box.mount(odd)
+    end
+  end
+
+  test "a site path with a comma is mounted intact, as one quoted CSV field" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/a,b"
+      FileUtils.mkdir_p(odd)
+      File.write("#{odd}/.contentspiel-version", "1.2.3\n")
+      box.wrap("check", chdir: odd)
+
+      mount = box.run_call.fetch(:args).then { |args| args[args.index("--mount") + 1] }
+      assert_equal %(type=bind,"source=#{odd}",target=/site), mount
+      # Read back as Docker reads it, as CSV: three fields, the path whole.
+      assert_equal [ "type=bind", "source=#{odd}", "target=/site" ], csv_fields(mount)
+    end
+  end
+
+  test "a site path with a double quote has it doubled, as CSV writes it" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/say \"hi\""
+      FileUtils.mkdir_p(odd)
+      box.wrap("check", chdir: odd)
+
+      mount = box.run_call.fetch(:args).then { |args| args[args.index("--mount") + 1] }
+      assert_equal [ "type=bind", "source=#{odd}", "target=/site" ], csv_fields(mount)
     end
   end
 
@@ -297,7 +354,35 @@ class InstallScriptsTest < ActiveSupport::TestCase
       end
     end
 
-    def run_call = calls.first
+    # The `docker run`, after any pull.
+    def run_call = calls.find { |call| call.fetch(:args).first == "run" }
+
+    # The --mount value for a site, as the wrapper writes it: the source is
+    # a quoted CSV field, since Docker reads the value as CSV.
+    def mount(site) = %(type=bind,"source=#{site}",target=/site)
+  end
+
+  # A --mount value read as Docker reads it (Go's encoding/csv, one record):
+  # fields split at commas, a field in double quotes may hold commas, and a
+  # doubled quote inside it is one quote. The csv gem is not in the bundle.
+  def csv_fields(line)
+    fields, field, quoted, index = [], +"", false, 0
+    while index < line.length
+      char = line[index]
+      if quoted && char == '"' && line[index + 1] == '"'
+        field << '"'
+        index += 1
+      elsif char == '"'
+        quoted = !quoted
+      elsif char == "," && !quoted
+        fields << field
+        field = +""
+      else
+        field << char
+      end
+      index += 1
+    end
+    fields << field
   end
 
   def in_sandbox

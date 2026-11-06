@@ -215,6 +215,26 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     end
   end
 
+  # Part of the wrapper's promise (docs/reference/hosting.md, "The wrapper's
+  # one promise"): every installed wrapper's `dev` runs `contentspiel
+  # dev-files` in the pinned image and then `docker compose -f
+  # .contentspiel/compose.yml up`, so the subcommand's name and the file's
+  # path are frozen with it. The wrapper's half is read here too, so a change
+  # to one side alone fails.
+  test "dev-files writes .contentspiel/compose.yml, which every installed wrapper runs" do
+    in_site do |site, _theme|
+      out, status = entrypoint("dev-files", chdir: site)
+      assert status.success?, out
+
+      assert_equal ".contentspiel/compose.yml", ContentSpiel::DevFiles::FILE
+      assert_includes out, "Wrote .contentspiel/compose.yml"
+      assert File.file?(File.join(site, ".contentspiel/compose.yml"))
+      wrapper = File.read(Rails.root.join("install/contentspiel"))
+      assert_includes wrapper, "run_image dev-files"
+      assert_includes wrapper, "docker compose -f .contentspiel/compose.yml up"
+    end
+  end
+
   test "dev-files outside a site is refused" do
     Dir.mktmpdir("no-site") do |dir|
       out, status = entrypoint("dev-files", chdir: dir)

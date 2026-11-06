@@ -2,18 +2,30 @@
 # contentspiel: the image's entrypoint for everything a site does with the CMS
 # (releases spec, "The wrapper and the image").
 #
-# THE ONE PROMISE. The frozen wrapper a person installs (install/contentspiel)
+# THE PROMISE. The frozen wrapper a person installs (install/contentspiel)
 # runs, from the site's folder,
 #
 #   docker run --rm -i [-t] --user "$(id -u):$(id -g)" \
-#     --mount type=bind,source=<the site>,target=/site -w /site \
+#     --mount 'type=bind,"source=<the site>",target=/site' -w /site \
 #     <image>:<version> contentspiel ARGS...
 #
-# and relies on two things only: that an executable named `contentspiel` is on
-# the image's PATH (the Dockerfile puts /rails/bin there), and that it takes
-# the arguments exactly as they were typed. Keep the name and the arguments,
-# and every wrapper ever installed stays valid. Every command lives here, in
-# the image, so a site's tools are always its pinned version's.
+# and relies on these, all of them and nothing else (CHANGELOG.md, "A
+# promise: the entrypoint"; docs/reference/hosting.md, "The wrapper's one
+# promise"):
+# - an executable named `contentspiel` on the image's PATH (the Dockerfile
+#   puts /rails/bin there), taking the arguments exactly as they were typed;
+# - the site's folder mounted at /site, which is the working folder;
+# - the subcommand `dev-files`, which writes `.contentspiel/compose.yml` into
+#   the site: the wrapper's `dev` runs it, then `docker compose -f
+#   .contentspiel/compose.yml up`;
+# - the image tags: `X.Y.Z` for a release (what a pin names) and `stable` for
+#   the newest, and `upgrade` as the command the wrapper runs from `stable`
+#   (it pulls it first), as it runs every command outside a site.
+# Keep them, and every wrapper ever installed stays valid; change one, and it
+# is a breaking change, whatever the tests here say, since they read this
+# side and today's wrapper and not the wrappers already installed. Every
+# command lives here, in the image, so a site's tools are always its pinned
+# version's.
 #
 # WHO RUNS IT. The host's uid and gid, 501:20 on a Mac, and not the image's
 # user 1000: so that what it writes into /site belongs to the person, as if

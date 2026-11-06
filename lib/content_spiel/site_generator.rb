@@ -93,9 +93,12 @@ module ContentSpiel
     end
 
     # Why this folder cannot be made, or nil. The name first: a name that is
-    # no folder name is wrong wherever it would go.
+    # no folder name is wrong wherever it would go. Then the folder it would
+    # go into: in the image that is /site, and the wrapper mounts the site
+    # there whenever it finds a pin in the current folder or above it, so a
+    # `new` typed anywhere inside a site would write a site into the site.
     def refusal
-      self.class.name_refusal(name) || existing
+      self.class.name_refusal(name) || inside_a_site || existing
     end
 
     def write
@@ -122,6 +125,12 @@ module ContentSpiel
     end
 
     private
+
+    def inside_a_site
+      return nil unless target.dirname.join(".contentspiel-version").exist?
+
+      "This folder is already a site; run contentspiel new outside it."
+    end
 
     def existing
       return nil unless target.exist? || target.symlink?
