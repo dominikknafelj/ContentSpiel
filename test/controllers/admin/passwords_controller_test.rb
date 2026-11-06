@@ -237,39 +237,6 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, token
   end
 
-  # THE OLD ADDRESS, which mails sent before this change still carry for
-  # their fifteen minutes: answered, with a redirect that names no token (a
-  # server cannot hand a browser a fragment it was never sent, and must not
-  # repeat the token in another address). The page then says the link is
-  # incomplete.
-  test "the old address redirects to the page with no token in the Location, whatever stood in its place" do
-    [ @user.password_reset_token, "not-a-token", "edit", "new" ].each do |word|
-      get "#{ADMIN}/password/#{word}/edit?from=mail"
-
-      assert_response :found
-      assert_equal "http://www.example.com#{ADMIN}/password/edit", response.location, word
-      assert_not_includes response.body, word unless %w[edit new].include?(word)
-    end
-  end
-
-  # The old PATCH is gone, and is nobody's address any more: a plain 404,
-  # the same as any other address CS Studio does not have, and no password
-  # changes.
-  test "the old address of the form answers nothing: it is not found like any unknown address, and changes no password" do
-    token = @user.password_reset_token
-
-    assert_no_changes -> { @user.reload.password_digest } do
-      patch "#{ADMIN}/password/#{token}", params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
-    end
-    assert_response :not_found
-    unknown = [ response.status, response.location ]
-    patch "#{ADMIN}/no-such-address-here"
-
-    assert_equal [ response.status, response.location ], unknown
-    assert_not_includes response.location.to_s, token
-    assert_not_includes response.body, token
-  end
-
   test "update" do
     assert_changes -> { @user.reload.password_digest } do
       patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
@@ -420,9 +387,6 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
     patch admin_update_password_path, params: { token: "not-a-token", password: "a-new-password-1", password_confirmation: "a-new-password-1" }
     assert_equal "no-store", response.headers["Cache-Control"]
-
-    get "#{ADMIN}/password/#{@user.password_reset_token}/edit"
-    assert_equal "no-store", response.headers["Cache-Control"]
   end
 
   # NO LOGGED LINE HOLDS THE TOKEN. In the form's body it is a parameter
@@ -446,31 +410,6 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_includes log, %(Started PATCH "#{ADMIN}/password")
     assert_includes log, "Processing by Admin::PasswordsController#update"
     assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
-  end
-
-  # THE OLD LINK'S OWN REQUEST. What the application answers and writes for
-  # it holds no token: the redirect's `Location`, its body, and the
-  # parameters line, where `token` is masked. That its span holds none is
-  # telemetry's (test/integration/opentelemetry_test.rb).
-  #
-  # NOT asserted, because it is not so: that the request's first log line
-  # ("Started GET ...") is free of it. Rails writes the path it was asked
-  # for before the router runs, and so does the proxy in front, which this
-  # application cannot filter. A link of that shape exists only in a mail
-  # sent before the token moved, for the fifteen minutes it is good, and no
-  # installation has sent one.
-  test "the old link's request is answered and logged without the token, but for the line that names the address asked for" do
-    token = @user.password_reset_token
-
-    log = capture_log(REQUEST_LOGGERS) { get "#{ADMIN}/password/#{token}/edit" }
-
-    assert_response :found
-    assert_not_includes response.location, token
-    assert_not_includes response.body, token
-    assert_includes log, "Processing by Admin::PasswordsController#legacy"
-    assert_match(/Parameters: \{.*"token" ?=> ?"\[FILTERED\]"/, log)
-    assert_includes log, "Redirected to http://www.example.com#{ADMIN}/password/edit"
-    assert_equal [ %(Started GET "#{ADMIN}/password/#{token}/edit") ], log.lines.grep(/#{Regexp.escape(token)}/).map { |line| line[/\AStarted GET "[^"]+"/] }
   end
 
   # The request page and the form's page answer under a format too, as they

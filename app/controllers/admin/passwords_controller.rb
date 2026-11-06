@@ -9,7 +9,7 @@ module Admin
     # (422) carries the token in its hidden field, and the empty page must
     # not be answerable from a copy of that one. `no-store` also keeps both
     # out of the browser's back/forward cache.
-    before_action :no_store, only: %i[ edit legacy check update ]
+    before_action :no_store, only: %i[ edit check update ]
     before_action :set_user_by_token, only: :update
     # Only the REQUEST (`new`, `create`) follows mail: `edit`, `check` and
     # `update` keep working whatever the state, so a person holding a valid
@@ -58,19 +58,6 @@ module Admin
     # before. A `token` parameter handed to THIS action is ignored: it would
     # be a token in an address.
     def edit
-    end
-
-    # The link as it was mailed before, `password/<token>/edit`: redirected
-    # to the page WITHOUT the token. A server cannot hand a browser a
-    # fragment it was never sent, and must not repeat the token in another
-    # address; the page then says the link is incomplete and offers a new
-    # one. The redirect's `Location`, its body and the parameters line of
-    # the log hold no token. The request's own first log line does hold the
-    # path it was asked for, as the proxy's access log does: nothing is
-    # done about that, because such a link exists only in a mail sent
-    # before this change, for the fifteen minutes its token is good.
-    def legacy
-      redirect_to admin_edit_password_path, status: :found
     end
 
     # THE EARLY CHECK. The page cannot know whether its link is good (it is

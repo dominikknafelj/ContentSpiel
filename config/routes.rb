@@ -60,14 +60,10 @@ Rails.application.routes.draw do
     # when it has the token: is this link still good? The token is in the
     # body there as well (`#check`).
     #
-    # `password/:token/edit` is the link as it was mailed before: it answers
-    # with a redirect to the page, without the token (`#legacy`). The old
-    # form's address, PATCH `password/:token`, is gone and has no route.
     resource :password, only: %i[new create]
     get "password/edit", to: "passwords#edit", as: :edit_password
     patch "password", to: "passwords#update", as: :update_password
     post "password/check", to: "passwords#check", as: :check_password
-    get "password/:token/edit", to: "passwords#legacy", as: nil
 
     # The Pages module (cs-studio spec §4.1/§5.1). `member` adds the three
     # publish-state actions the record header's own buttons post to
