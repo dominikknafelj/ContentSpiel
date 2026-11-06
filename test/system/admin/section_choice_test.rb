@@ -552,6 +552,59 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
       outline = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{card_of(@section).to_json})); return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor ] })()")
       accent = page.evaluate_script("(() => { const probe = document.createElement('span'); probe.style.color = 'var(--cs-accent)'; document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour })()")
       assert_equal [ "solid", "2px", "2px", accent ], outline
+      # The outline wins over the held edge, so the strip says it is held, in words.
+      assert_selector "#block-#{@section.id}-hold [data-editing-kind=held]", text: "Dana Weiss", visible: :visible
+    end
+  end
+
+  test "a section deleted under unsaved text in its settings under its head, with nothing in the rail, shows its notice in the card" do
+    at_window(NARROW) do
+      open_editor
+      assert_docked(false)
+      await_notes_live
+      open_anchor
+      assert_selector at_home, visible: :visible
+      type_unsent("unsaved words")
+
+      as(@dana, channel: :admin) { ContentBlocks::Destroy.call(@section.reload) }
+
+      assert_selector "#{card_of(@section)} #block-#{@section.id}-hold [role=alert]", text: "Dana Weiss deleted this block. Your changes weren't saved.", wait: LIVE
+      assert_equal "unsaved words", find(anchor_field).value
+      assert_no_selector "#editor-grid-panel-section #{settings_region}", visible: :all
+      within("#block-#{@section.id}-hold [data-editing-kind]") { click_button "Remove" }
+      assert_no_selector card_of(@section)
+      assert_no_selector settings_region, visible: :all
+    end
+  end
+
+  test "a redraw of the chosen card brings a clean region in the rail up to date, and its next edit is saved with no 409" do
+    at_window(WIDE) do
+      open_docked
+      find("#{card_of(@second)} button[aria-label='Section actions']").click
+      click_button "Move up"
+      assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
+      assert_writes_settled
+      find(word("width")).click
+      assert_selector in_rail, visible: :visible
+      mark_region
+      travel 1.minute do
+        as_unheard(@dana) { ContentBlocks::Save.call(@section.reload, attributes: { settings: @section.settings.merge("anchor" => "theirs") }) }
+      end
+
+      within("#toasts") { press "Undo" }
+
+      assert_selector "#toasts .admin-toast", text: /Order restored/, wait: 10
+      assert same_region?, "the rail's region was replaced"
+      assert_one_region
+      assert_selector "#{card_of(@section)}[data-chosen]"
+      assert_eventually(message: "the clean region did not take the redrawn values") { find(anchor_field).value == "theirs" }
+      select "Strong", from: "block-#{@section.id}-background"
+      assert_selector "#block-#{@section.id}-save-status", text: "SAVED", wait: 8
+      assert_writes_settled
+      assert_no_text "Changed elsewhere"
+      @section.reload
+      assert_equal "strong", @section.settings["background"]
+      assert_equal "theirs", @section.settings["anchor"]
     end
   end
 

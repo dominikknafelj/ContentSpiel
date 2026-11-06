@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { mergeMoved } from "editing/merge"
 
 const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 
@@ -33,7 +34,9 @@ const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 //
 // FOUR MOMENTS PUT IT BACK (`release`), as the card's child after its home
 // marker (`[data-section-settings-home]`, where `SectionCardComponent` draws
-// the region), and never at any other:
+// the region), and never at any other (but a region whose card is gone and
+// that holds text is never put back or removed: see NOTHING TYPED IN IT IS
+// LOST):
 // - the region closing (its Close, Escape in it, a second press of the word:
 //   `admin--editor--section-settings:closed`), and the rail goes back to the
 //   tab the person last left (`admin--ui--rail:conceal`);
@@ -62,16 +65,19 @@ const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 // - a stream that redraws the card (a reorder's Undo, a list redrawn after a
 //   refusal) brings a fresh region of the same id inside the new card
 //   (`streamed`): the fresh one is removed and the new card marked chosen,
-//   so the region in the rail stays the one registered form;
+//   so the region in the rail stays the one registered form. A clean region
+//   first takes the fresh one's values and base where it stands
+//   (`editing/merge.js`, `mergeMoved`), so its next edit is not refused as
+//   stale; one holding text stays as it is;
 // - a list merge whose answer has no such section: a clean region comes back
 //   in `awayGone` (`merged`) and is removed, and one holding text is kept by
 //   the merge with its unit marked gone. It is given its own strip slot
 //   (`#block-<id>-hold`), which its card took away with it, so the
 //   "deleted, copy your text" notice is drawn in the rail.
 // A region with no card left is never removed while it holds text
-// (`holdsText`): Close and Escape leave it shown, an undock parks it, open,
-// under the blocks' alert, and it goes only by the strip's Remove
-// (`admin--editing--hold#remove`). A section removed while its region is
+// (`holdsText`): Close and Escape leave it shown, an undock or another
+// section's choice parks it, open, under the blocks' alert, and it goes only
+// by the strip's Remove (`admin--editing--hold#remove`). A section removed while its region is
 // clean takes the region with it, and the panel says "Choose a section".
 export default class extends Controller {
   static targets = [ "slot", "empty" ]
@@ -261,7 +267,9 @@ export default class extends Controller {
       if (!region) return
       const card = this.cardOf(region)
       if (card && !card.hasAttribute("data-chosen")) {
-        card.querySelector(`:scope > #${CSS.escape(region.id)}`)?.remove()
+        const twin = card.querySelector(`:scope > #${CSS.escape(region.id)}`)
+        if (twin && !this.holdsText(region)) mergeMoved(region, twin)
+        twin?.remove()
         card.setAttribute("data-chosen", "")
       } else if (!card && !this.holdsText(region)) {
         this.forget(region)

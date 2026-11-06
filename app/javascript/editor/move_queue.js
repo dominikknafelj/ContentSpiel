@@ -472,7 +472,8 @@ export class MoveQueue {
   // script moved elsewhere (`[data-editing-away]`, `editing/merge.js`).
   listForms() {
     const selector = "form[data-controller~='admin--saving--autosave']"
-    return [ ...this.host.element.querySelectorAll(selector), ...document.querySelectorAll(`[data-editing-away] ${selector}`) ]
+    // Once each: a region parked in the blocks column is both.
+    return [ ...new Set([ ...this.host.element.querySelectorAll(selector), ...document.querySelectorAll(`[data-editing-away] ${selector}`) ]) ]
   }
 
   // The autosave controller of a block's own form: in its card, or -- for a

@@ -202,6 +202,20 @@ function mergeAway(element, twin, keep, moved, gone, extra, awayGone) {
   reconcile(element, [ ...twin.children ], keep, moved, gone, extra)
 }
 
+// A clean element a script moved out of the list, brought up to date where
+// it stands from a fresh copy of it that something else drew (`twin`: a
+// stream that redrew its card), by the same rule as `mergeAway`: its
+// attributes synced but for `hidden`, its children reconciled, and what the
+// person did to it (focus, open settings) kept. With nothing kept, every
+// field takes the copy's value and the form the copy's base. The caller
+// hands in only an element with no unsaved text, and removes the twin.
+export function mergeMoved(element, twin) {
+  withState([ element ], () => {
+    syncAttributes(element, twin, [ "hidden" ])
+    reconcile(element, [ ...twin.children ], new Set(), new Set(), [], new Set())
+  })
+}
+
 // Whether every ancestor of `element` up to `root` has an id: the merge
 // reconciles level by level and matches by id, so something is left in place
 // only where the levels above it can be matched (a unit's are, by design; a
