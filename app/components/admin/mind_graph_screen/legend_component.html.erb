@@ -36,7 +36,7 @@
                     data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
               <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
               <span><%= label %></span>
-              <span data-legend-count aria-hidden="true" class="text-label text-meta"></span>
+              <span data-legend-count aria-hidden="true" class="text-count text-meta"></span>
             </label>
           <% end %>
         </fieldset>

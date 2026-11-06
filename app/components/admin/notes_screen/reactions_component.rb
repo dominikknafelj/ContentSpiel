@@ -114,7 +114,7 @@ module Admin
 
       def chip_class(mine) = "#{CHIP} #{mine ? "border-accent bg-accent-tint" : "border-line bg-sunken"}"
 
-      def count_class(mine) = "text-label #{mine ? "text-accent" : "text-dim"}"
+      def count_class(mine) = "text-count #{mine ? "text-accent" : "text-dim"}"
 
       def add_class = [ meta? ? META_CONTROL : ADD_CHIP, PRESSABLE, "list-none hover:bg-sunken [&::-webkit-details-marker]:hidden" ].join(" ")
 

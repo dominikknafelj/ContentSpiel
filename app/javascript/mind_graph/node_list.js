@@ -225,7 +225,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
-    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-label text-meta", figure(node))
+    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-count text-meta", figure(node))
     button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), trailing)
     item.append(button)
     rows.set(node.id, button)

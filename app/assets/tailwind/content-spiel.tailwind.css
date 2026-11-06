@@ -65,9 +65,11 @@
   --text-h2: var(--cs-t-h2);
   --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
+  --text-count: var(--cs-t-count);
   /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
      read faint); an explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
+  --text-count--font-weight: 500;
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);

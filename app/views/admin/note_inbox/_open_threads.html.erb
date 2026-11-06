@@ -9,7 +9,7 @@
         empty: t("admin.note_inbox.open_threads.empty")) do |card| %>
     <% if open_threads.rows.any? %>
       <% card.with_badge do %>
-        <%= tag.span open_threads.total, class: "text-label text-meta", role: "img",
+        <%= tag.span open_threads.total, class: "text-count text-meta", role: "img",
               aria: { label: t("admin.note_inbox.open_threads.total", count: open_threads.total) }, data: { notes_total: true } %>
       <% end %>
     <% end %>

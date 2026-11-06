@@ -304,10 +304,21 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  test "text-small is the 13px address size and wins over nothing but the size it replaces" do
+  test "the token --text-small is mapped to 13px, and --text-count is 11px for studio and visitor alike" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     assert_includes css, "--text-small: var(--cs-t-small);"
     assert_includes Rails.root.join("app/assets/tailwind/content-spiel.css").read, "--cs-t-small: 13px"
+    assert_includes css, "--text-count: var(--cs-t-count);"
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal [ "11px" ], tokens.scan(/--cs-t-count:\s*([^;]+);/).flatten
+  end
+
+  test "a count is text-count, not the 12px label" do
+    %w[ui/tab_links_component.html.erb presence_screen/row_marker_component.html.erb posts_screen/toolbar_component.html.erb media_library/toolbar_component.html.erb].each do |name|
+      source = Rails.root.join("app/components/admin", name).read
+      assert_includes source, "text-count", name
+      assert_not_includes source, "text-label", name
+    end
   end
 
   # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".

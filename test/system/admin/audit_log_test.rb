@@ -44,7 +44,9 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
     visit admin_audit_events_path
     await_admin_controllers
 
-    find("#audit_event_#{@recent.id} a.text-xs").click
+    time_link = find("#audit_event_#{@recent.id} a.text-xs")
+    assert_no_match(/mono/i, time_link.evaluate_script("getComputedStyle(this).fontFamily"))
+    time_link.click
     assert_selector "h1", text: "test.recent"
     assert_text "Older event"
     click_link "Older event"

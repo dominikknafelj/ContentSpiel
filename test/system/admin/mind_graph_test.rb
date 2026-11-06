@@ -2230,6 +2230,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_equal %w[PAGES POSTS TAGS], all("[data-search-group] > p").map { |heading| heading.text.upcase }
       assert_selector "[data-search-group=page] a", text: "Ruby docs"
       assert_selector "[data-search-group=page] a span.text-small", text: PublicPath.current.where(record: docs).pick(:path)
+      assert_no_match(/mono/i, find("[data-search-group=page] a span.text-small", text: PublicPath.current.where(record: docs).pick(:path)).evaluate_script("getComputedStyle(this).fontFamily"))
       assert_selector "[data-search-group=post] a", text: "Ruby notes"
       assert_selector "[data-search-group=tag] a", text: "ruby"
       # Each row's mark: a page's is the renderer's small canvas, a post's
@@ -2886,6 +2887,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       click_node(nid(blog))
       within("[data-mind-graph-card]") do
         assert_selector "span.text-small", exact_text: "/blog"
+        assert_no_match(/mono/i, find("span.text-small", exact_text: "/blog").evaluate_script("getComputedStyle(this).fontFamily"))
         assert_equal seen, find(".admin-status-chip[data-status='#{state}']#{" span[data-chip-seen]" unless state == :live}").text.squish
         assert_selector "h2", exact_text: "Blog"
         assert_text(/1 child page\s*·\s*lists 2 posts/i)
@@ -2934,6 +2936,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       click_node(nid(home))
       assert_selector "[data-mind-graph-card] a[data-mind-graph-card-open]", text: "Open page"
       assert_selector "[data-mind-graph-card] span.text-small", exact_text: "/"
+      assert_no_match(/mono/i, find("[data-mind-graph-card] span.text-small", exact_text: "/").evaluate_script("getComputedStyle(this).fontFamily"))
       find(CANVAS).execute_script("this.focus()")
       click_frame_link { page.driver.browser.keyboard.type(:Enter) }
       assert_current_path admin_page_path(home)
