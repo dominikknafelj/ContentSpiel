@@ -2,7 +2,7 @@
 
 Decided with the owner, 2026-11-06: CS Studio is redesigned in direction **E4**, "colour by role", from the Design System artifact (https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT). The owner then widened it to the whole of CS Studio: "i mean everything shoudl be adjusted do e4". Where this spec says "builder's call", the owner has not decided it and may overrule it.
 
-Status: spec. Nothing is built.
+Status: Approved, 2026-11-06 ("approved, all recommended"). Nothing is built.
 
 The design's sources, in the artifact: `project/components/StudioCalmEditor/README.md` (the problem, the measurements, options A to E), `StudioCalmColour` and `StudioCalmColourE4E5` (E4's tokens, depth, the icon hue map, the buttons, the measured contrast; the exact values are in their `preview.html`, classes `.p4` and `.dp`), `StudioCalmDashboard` and `StudioCalmEditorE` (the staging and costs), and three pages of E4 applied: `StudioCalmE4More` (the mind graph, the posts list with its New post dialog, tags), `StudioCalmE4Setup` (Settings, the wizard's first step and its Mail step) and `StudioCalmE4Together` (notes in the rail, note markers, the inbox, presence, live editing, and the people hue). Their costs and measured contrast are under their drawings.
 
@@ -20,6 +20,18 @@ The owner accepted every recommendation of the first draft; each is written into
 8. The language tabs stay at the top of the editor, above everything. The rail has three tabs, Page · Section · Notes; the notes drawer *is* the Notes tab (stage 3).
 9. At wide widths a section head's words select the section and open the Section tab; below the threshold they open the settings in place; a block's own form never moves into the rail (stages 2 and 3).
 10. The controller, on the builder check: the post editor takes its new layout in stage 3 with the page editor, since both use `EditorScreen::HeaderComponent`.
+
+On approving the spec ("approved, all recommended"):
+
+11. The mind graph's status key moves onto the legend row (stage 5a).
+12. The posts list's Type, Tag and Translation filters go in a rail at wide widths (stage 5b).
+13. Tags gets a detail rail for the selected tag, with Merge and Delete moved out of the ⋯ menu (stage 5b).
+14. Settings gets an "At a glance" rail with the state of languages, AI, mail and images (stage 5c).
+15. The wizard gets a progress bar and a welcome line on its first step, with no "time left" (stage 5c).
+16. Presence in rows and in the tree is shown as avatars (stage 6).
+17. The Notes screen gets a rail for open threads (stage 6).
+18. Labels are the normal sans everywhere: small, sentence case, in `cs-meta`; no letterspaced mono capitals. This is the single type voice E4 takes from option C (stage 1).
+19. Below the rail's threshold, notes open in a 400px panel that slides in over the canvas at elevation 3, with the same Notes tab content; the full-screen sheet is for phone widths only, below 640px (stage 3b).
 
 ## Why
 
@@ -56,7 +68,7 @@ What the artifact measured on main 6e7378b5 explains it. The grounds are equal (
 
 - The public site's theme (`th-*`, `app/assets/tailwind/themes/`, the theme contract) is untouched.
 - No behaviour changes beyond layout, except what a stage names (stage 2: one add action, tiles that preview; stage 3: choosing a section, folding the tree, notes as a rail tab; stage 4: the dashboard's merge; stage 6: the inbox's filter, presence as avatars).
-- No single type voice (option C's sans labels) and no centred column (C, E). Mono labels stay.
+- No centred column (C, E). Option C's single type voice is taken: labels in sans (decision 18).
 - No navigation rail and no collapsible tree beyond what exists (E's stage 6).
 
 ## Anti-goals
@@ -82,7 +94,7 @@ Today's names, E4's values (light / dark):
 | `--cs-sunken` | #e7e9ef | #252935 | hover, badges, disabled |
 | `--cs-ink` | #17191f | #e3e5ec | text |
 | `--cs-dim` | #4a4f5a | #b0b6c4 | secondary text |
-| `--cs-meta` | #5a6070 | #9ca2b2 | labels, dates, counts |
+| `--cs-meta` | #5a6070 | #9ca2b2 | labels (sans, 12px, sentence case), dates, counts |
 | `--cs-field-line` | #808797 | #7a8191 | a control's identifying edge |
 | `--cs-line` | rgba(23,25,31,0.10) | rgba(255,255,255,0.08) | grouping only |
 | `--cs-line-strong` | rgba(23,25,31,0.22) | rgba(255,255,255,0.16) | grouping only |
@@ -120,6 +132,8 @@ Where each level is used: 0 the canvas; 1 a card, a tile, the tree column; 2 the
 `--cs-ok`, `--cs-warn` and `--cs-danger` keep their roles (translated, outdated or a save that did not land, destruction and failure). E4 does not restate them; the builder keeps today's values and retunes only a pair that fails on E4's grounds. Danger stays far from the violet in hue and always says its word. `--cs-accent-hover` follows the drawn hover (the fill about 10% darker in light, 10% lighter in dark). The content-type dots (`--cs-cat-1…6`) and the graph tokens are kept and measured on the new grounds.
 
 **Radii.** E4 ends "one 2px radius everywhere": fields 6px (top corners only, since a text field has a bottom edge), buttons 8px (small 7px), icon chips 7px, tiles 12px, cards 14px, a section frame 16px, the rail 18px. Pills stay pills. Each is a token.
+
+**Type: one voice.** Every label (a field's label, a card's or a panel's small heading, a disclosure's summary, a table's column head, the tree's head, the wizard's step list) is Archivo at 12px, weight 500, sentence case, in `cs-meta` (6.3 / 6.4:1 on cards, 5.5 / 5.7:1 on the rail), with no tracking and no capitals. `--cs-t-label` becomes 12px and the `text-label` utility, `cs-label` and `setup_label_class` draw it; `--cs-track-mono` is no longer a label's. Mono stays for code, the Code block's fields, a token's or key's value and the save status line, which is a status, not a label ("SAVED · NOT PUBLISHED", as option C kept it). The addresses (`/de/about`) are sans at 13px. Badges (DEFAULT, OWNER, NO ALT) become sentence-case sans words on their fill.
 
 **Measured** (the artifact, E4, light / dark): ink 17.6 / 12.9:1; meta 6.3 / 6.4:1 on cards and 5.5 / 5.7:1 on the rail; section head text 6.5 / 8.5:1; Live 5.4 / 8.3:1; scheduled 7.0 / 7.8:1; panel heads 6.5 to 8.6:1; accent 6.9 / 7.1:1, white on it 6.9:1; field edge 3.2 / 3.6:1. The section frame is 2.6:1 against the canvas: it groups, it is not a control edge, so it needs no 3:1.
 
@@ -218,13 +232,15 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 **What changes.** E4's values under today's token names; the new tokens (field fill, elevations 2 and 3, shadows 1 to 4, radii, structure, live, scheduled, panel heads, type chip, the fourteen icon tokens with people's); B's fields (fill plus bottom edge, accent outline on focus) in `.admin-column`/`.admin-field`, `.cs-select` and the rich-text box (`admin-rich-text.css`); every shared component in `app/components/admin/ui/` restyled once: `ButtonComponent` gains the E4 primary, tinted secondary and text tertiary (`ghost` becomes tertiary or is mapped onto it, builder's call), `StatusChipComponent` the solid Live and outlined Draft, `DialogComponent`, `MenuComponent`, `ToastComponent`, `TooltipComponent` the elevations, `BadgeComponent`, `CheckboxComponent`, `ChipInputComponent`, `FileDropComponent`, `SaveBarComponent`, `EmptyStateComponent`, `PaginationComponent`, `TabLinksComponent`, `LanguageTabsComponent` the radii and grounds. A new `Admin::Ui::IconChipComponent` draws an icon on its family's chip; `EditorScreen::BlockIconComponent` draws through it, and the sidebar's entries use it (Posts lists, Media media, Forms form, Notes people, the rest neutral; the current module on the accent tint). A block type declares its family.
 
+**One type voice.** `--cs-t-label`, `text-label`, `cs-label` and `setup_label_class` become the sans label; the 78 inline uses of the mono label in 64 files are rewritten to it (mechanical, but each read, since some are badges, column heads or summaries), and every label's words are checked for sentence case in their keys (a key that holds capitals is rewritten, not its CSS). Browser tests that read upper-cased words change: Cuprite returns the rendered text, so "PAGE SETTINGS" becomes "Page settings".
+
 **The form-send pages stay neutral.** They share the product stylesheet, so they would turn violet with everything else. `layouts/form_send.html.erb` marks its `<html>` as a plain surface, and `content-spiel.css` re-values the accent family under that mark to today's neutral ink pair (accent and its hover the ink, its tint the sunken ground, the words on it the paper), so a visitor's page carries no CMS colour; no second stylesheet. `admin_contrast_test`'s "a form's plain pages are readable" measures the re-valued pair.
 
 **What a person sees.** Every screen at once: a cooler, slightly tinted canvas, white cards that float, violet links and buttons, coloured icons in the sidebar and editor, fields as grey wells, fewer lines.
 
-**Tests and guards.** `admin_contrast_test` (every pair re-measured; "a line that only groups is stronger than it was" is rewritten, since E4's lines are deliberately fainter and elevation now separates; new pairs: each icon on its chip and on surface at 3:1, panel-head and structure words at 4.5:1, Live and scheduled words, the dark elevation steps), `admin_design_rules_test` (the field rule reworded; the guard below), `design_tokens_test` (product tokens in both themes, none in the theme build), the components' tests and Lookbook previews (`test/components/admin/`, `test/components/previews/admin/`), `admin_i18n_test` (the new shared component listed). Browser tests likely to move: `filter_bar_test` (38px heights, the segment frame), `field_error_border_test`, `form_width_test`, `dialogs_hang_test`, `publish_dialog_steady_test`, any test that finds a button by a class.
+**Tests and guards.** `admin_contrast_test` (every pair re-measured; "a line that only groups is stronger than it was" is rewritten, since E4's lines are deliberately fainter and elevation now separates; new pairs: each icon on its chip and on surface at 3:1, panel-head and structure words at 4.5:1, Live and scheduled words, the dark elevation steps), `admin_design_rules_test` (the field rule reworded; the guard below), `design_tokens_test` (product tokens in both themes, none in the theme build), the components' tests and Lookbook previews (`test/components/admin/`, `test/components/previews/admin/`), `admin_i18n_test` (the new shared component listed). Browser tests likely to move: `filter_bar_test` (38px heights, the segment frame), `field_error_border_test`, `form_width_test`, `dialogs_hang_test`, `publish_dialog_steady_test`, any test that finds a button by a class, and every test that reads a label's words in capitals.
 
-**Size.** 5 to 7 days. **Guide.** Every page with a CS Studio screenshot; the getting-started tour first.
+**Size.** 8 to 11 days. **Guide.** Every page with a CS Studio screenshot; the getting-started tour first.
 
 ### Stage 2: the editor's canvas
 
@@ -242,7 +258,7 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 **3a, the rail, in the page and post editors, and the tree's fold.**
 
-*Layout.* The editor's header, with the language tabs, stays at the top above everything. Below it, when the rail fits (the editor area at least 1200px, a container query on that area, never a window media query), a 360px rail at elevation 2 stands right of a 900px blocks column. Its tabs are **Page · Section · Notes** in the page editor and **Post · Notes** in the post editor (a post has no sections; its tags, related posts and excerpt are its settings). When the rail does not fit, it folds back into the page: the page's or post's settings above the blocks, sections' settings in place, and Notes the full-screen sheet it is below 1024px today. A translation tab (`--cs-form-max-pair`) folds the rail too.
+*Layout.* The editor's header, with the language tabs, stays at the top above everything. Below it, when the rail fits (the editor area at least 1200px, a container query on that area, never a window media query), a 360px rail at elevation 2 stands right of a 900px blocks column. Its tabs are **Page · Section · Notes** in the page editor and **Post · Notes** in the post editor (a post has no sections; its tags, related posts and excerpt are its settings). When the rail does not fit, it folds back into the page: the page's or post's settings above the blocks, sections' settings in place, and Notes the 400px overlay panel of 3b. A translation tab (`--cs-form-max-pair`) folds the rail too.
 
 *Tab order.* Settings come first in the document at every width: header, then the rail, then the blocks. At wide widths a grid places the rail on the right; it is never moved by script, and the focus goes header, settings, blocks.
 
@@ -258,7 +274,7 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 *Size.* 8 to 10 days.
 
-**3b, notes as the rail's Notes tab.** The drawer's parts are reused as they are (`ListComponent`, `ThreadComponent`, `ComposerComponent`, the live merge in `notes/merge.js`); the Notes tab hosts the drawer's frame. Opening notes (the header button, a marker) switches the rail to Notes, and nothing else on the page moves. The open state moves from `data-notes-open` on `<html>` to the rail's tab, and the 400px column and its width rules in `content-spiel.tailwind.css` go. Below the threshold Notes is the sheet. Messages, mentions and Reply in E4 (measured: message text 17.6 / 12.9:1, times 6.3 / 6.4:1, your own mention 5.7 / 6.3:1, Reply 6.9 / 8.2:1, composer edge 3.2 / 3.6:1). Tests: `notes_drawer_test`, `notes_column_test`, `notes_flow_test`, `notes_live_test`, `note_composer_test`, `tree_column_test`, `notes_boundary_test` if the header's wording moves. *Size.* 4 to 6 days.
+**3b, notes as the rail's Notes tab.** The drawer's parts are reused as they are (`ListComponent`, `ThreadComponent`, `ComposerComponent`, the live merge in `notes/merge.js`); the Notes tab hosts the drawer's frame. Opening notes (the header button, a marker) switches the rail to Notes, and nothing else on the page moves. The open state moves from `data-notes-open` on `<html>` to the rail's tab, and the 400px column and its width rules in `content-spiel.tailwind.css` go. Below the threshold, notes open in a 400px panel that slides in from the right over the canvas at elevation 3 (shadow 3), with the same Notes tab content; it is not modal (no scrim, nothing inert, Escape closes it while the focus is inside, as the drawer today) and nothing under it moves. Below 640px, a phone's width, it is the full-screen sheet with a way back. Messages, mentions and Reply in E4 (measured: message text 17.6 / 12.9:1, times 6.3 / 6.4:1, your own mention 5.7 / 6.3:1, Reply 6.9 / 8.2:1, composer edge 3.2 / 3.6:1). Tests: `notes_drawer_test`, `notes_column_test`, `notes_flow_test`, `notes_live_test`, `note_composer_test`, `tree_column_test`, `notes_boundary_test` if the header's wording moves, at a wide, a mid and a phone width. *Size.* 5 to 8 days.
 
 **Guide.** Editing a page and a post (the rail), page settings, sections, notes, the page tree.
 
@@ -274,11 +290,11 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 ### Stage 5: the screens drawn on E4More and E4Setup (three PRs)
 
-Each is built as drawn. A drawn part that the page itself marks as a question (below, "Still open") is built only once the owner answers it; without it the stage ships the rest.
+Each is built as drawn, with the owner's answers to the pages' own questions (decisions 11 to 15).
 
-- **5a, the mind graph.** Mostly tokens: `theme.js` reads `--cs-*`, so the canvas follows; the `LOOKS` table, `LINE_STYLES` and the dim factor change in `marks.js` and `renderer.js`; the legend, the list and `node_list.js` gain icon and status chips; the card's buttons become the shared button. Pages stay neutral (the hues mean post types); every status keeps its shape and word; the script holds no colour value. The related lines, which fail today (2.25 / 2.93:1), reach 3.9 / 4.3:1; post hues 5.9–7.1 / 8.1–9.1:1, tags 6.2 / 8.9:1, tree lines 3.8 / 4.5:1, the selection ring 6.9 / 7.1:1. The CSS marks outside the canvas change with `marks.js` (no guard holds them). Tests: `admin_contrast_test` (graph tokens), `mind_graph_guards_test`, `mind_graph_test`, `mind_graph_modules_test` (its 25-drawing test keeps the looks apart). *Size* 4 to 6 days.
-- **5b, the posts list with its New post dialog, and tags.** Posts: the shared chips already carry most of it; the toolbar follows the field rules; the dialog is a field and a button. Tags: the row and its autosaving input restyled, a usage bar (structure hue, 6.2 / 8.9:1) from the count already read; Tags has no primary, since tags are made on posts. Tests: `posts_list_test`, `new_record_test`, `tags_test`, plus a keyboard test for any rail. *Size* 4 to 6 days without the two rails in question, 6 to 9 with them.
-- **5c, Settings and the setup wizard.** Settings saves explicitly: its save bar is the one primary area, floating at the foot of the column and naming what changed; a changed field carries a violet edge (6.9 / 7.1:1) from the save bar's existing dirty tracking; cards and nav restyled. The wizard keeps one primary per step (Continue), Back and Skip for now as text buttons, "Optional" in words; the current step violet on its tint, a done step's green check. Tests: `settings_test`, `settings_mail_test`, `settings_images_test`, `ai_settings_test`, `languages_test`, the setup tests (those that read "OPTIONAL" in capitals change only if its labels change). *Size* 3 to 5 days, plus 1 to 2 for Settings' "At a glance" rail and the wizard's progress bar if confirmed.
+- **5a, the mind graph.** Mostly tokens: `theme.js` reads `--cs-*`, so the canvas follows; the `LOOKS` table, `LINE_STYLES` and the dim factor change in `marks.js` and `renderer.js`; the legend, the list and `node_list.js` gain icon and status chips; the card's buttons become the shared button; the status key moves from its dialog onto the legend row (the dialog may stay for the long words). Pages stay neutral (the hues mean post types); every status keeps its shape and word; the script holds no colour value. The related lines, which fail today (2.25 / 2.93:1), reach 3.9 / 4.3:1; post hues 5.9–7.1 / 8.1–9.1:1, tags 6.2 / 8.9:1, tree lines 3.8 / 4.5:1, the selection ring 6.9 / 7.1:1. The CSS marks outside the canvas change with `marks.js` (no guard holds them). Tests: `admin_contrast_test` (graph tokens), `mind_graph_guards_test`, `mind_graph_test`, `mind_graph_modules_test` (its 25-drawing test keeps the looks apart). *Size* 4 to 6 days.
+- **5b, the posts list with its New post dialog, and tags.** Posts: the shared chips already carry most of it; the toolbar follows the field rules; the dialog is a field and a button; at wide widths the Type, Tag and Translation filters stand in a rail beside the list, the same filter form (`admin--ui--auto-submit`), above the list below the threshold. Tags: the row and its autosaving input restyled, a usage bar (structure hue, 6.2 / 8.9:1) from the count already read; Tags has no primary, since tags are made on posts; a detail rail shows the selected tag, its posts (the posts query by tag) and Merge into… and Delete tag… as buttons, out of the ⋯ menu, opening the existing two dialogs. Tests: `posts_list_test`, `filter_bar_test`, `new_record_test`, `tags_test`, plus a keyboard test for each rail. *Size* 6 to 9 days.
+- **5c, Settings and the setup wizard.** Settings saves explicitly: its save bar is the one primary area, floating at the foot of the column and naming what changed; a changed field carries a violet edge (6.9 / 7.1:1) from the save bar's existing dirty tracking; cards and nav restyled; an "At a glance" rail shows the state of languages, AI, mail and images from what the cards already compute (`MailSettings`, the AI test result, the images' progress), a component and not a query. The wizard keeps one primary per step (Continue), Back and Skip for now as text buttons, "Optional" in words; the current step violet on its tint, a done step's green check; a progress bar (6.9 / 7.1:1 against its track), static per step, and a welcome line on the first step; no time left. Tests: `settings_test`, `settings_mail_test`, `settings_images_test`, `ai_settings_test`, `languages_test`, the setup tests. *Size* 4 to 7 days.
 
 **Guide.** The mind graph, posts, tags, Settings, first-time setup.
 
@@ -286,8 +302,8 @@ Each is built as drawn. A drawn part that the page itself marks as a question (b
 
 Drawn on `StudioCalmE4Together`; three parts in one PR, because they share the people hue and the avatar.
 
-- **Note markers and presence** (2 to 4 days): `NotesScreen::MarkerComponent`, `RowPillComponent`, `Admin::Ui::AvatarComponent` and `PresenceScreen::RowMarkerComponent` are the shared parts, so the look reaches every screen at once: unread as the accent bubble with "new", read as the rose outline bubble, initials at 11px. The presence slots (`tree.row.markers`, `posts.row.markers`) draw avatars instead of an icon and a count, from what the loader already returns (the page marks this a question: below).
-- **The Notes screen and inbox** (2 to 3 days): `InboxRowComponent` and `OpenThreadRowComponent` gain the avatar and the type chip; a mentions filter is a scope on `Dashboard::NotesForYou`'s query (mentions are already a delivery kind); "● New" 5.7 / 6.3:1.
+- **Note markers and presence** (2 to 4 days): `NotesScreen::MarkerComponent`, `RowPillComponent`, `Admin::Ui::AvatarComponent` and `PresenceScreen::RowMarkerComponent` are the shared parts, so the look reaches every screen at once: unread as the accent bubble with "new", read as the rose outline bubble, initials at 11px. The presence slots (`tree.row.markers`, `posts.row.markers`) draw avatars instead of an icon and a count, from what the loader already returns.
+- **The Notes screen and inbox** (2 to 3 days): `InboxRowComponent` and `OpenThreadRowComponent` gain the avatar and the type chip; a mentions filter is a scope on `Dashboard::NotesForYou`'s query (mentions are already a delivery kind); the Notes screen gets a rail of open threads that reuses `Dashboard::OpenThreads`; "● New" 5.7 / 6.3:1.
 - **Live editing** (2 to 3 days): `HoldStripComponent` on the people tint (14.8 / 11.5:1), `HolderAvatarComponent`, `UpdatedMarkComponent`, and a held or discussed block in a people frame (a card class, 8.6 / 10.1:1 against the card). The rules the tests hold do not change: read-only at full contrast, no lock, warn for lost text, arrivals fade in and nobody fades out.
 
 Notes never write the record, names are text, links into the notes frame do not prefetch, presence and notes stay in their slots. Tests: `notes_markers_test`, `note_inbox_test`, `messages_test`, `presence_test`, `presence_lists_test`, `editing_held_test`, `editing_take_over_test`, `editing_merge_test`, `changed_elsewhere_test`, `notes_boundary_test`, `held_fields_test`, the slot tests. **Size.** 6 to 10 days. **Guide.** Notes, working with others, taking over.
@@ -303,11 +319,11 @@ By the rule above.
 
 **Guide.** Media, trash, translations, forms, the audit log, users and groups, tokens, your account, signing in, the mails.
 
-**Total.** About 11 to 16 weeks in seven stages (twelve PRs).
+**Total.** About 11 to 17 weeks in seven stages (twelve PRs).
 
 ## The guard after E4
 
-`test/lib/admin_design_rules_test.rb` checks today: no hex, `rgb()` or `hsl()` in CS Studio's sources; no `dark:` variant but `dark:scheme-dark`; no danger in translation chips, tabs, tree markers, the matrix and the dashboard's cards; the replaced components gone; no `mx-auto` but the 403 and 404; a pressable element outlined in `border-field-line`, never `border-line-strong` (with an allow-list); no text under 11px, a mono label `text-label`; the disclosure's triangle; the form column's widths and the filter bar's height as tokens written once; the dashboard's grid.
+`test/lib/admin_design_rules_test.rb` checks today: no hex, `rgb()` or `hsl()` in CS Studio's sources; no `dark:` variant but `dark:scheme-dark`; no danger in translation chips, tabs, tree markers, the matrix and the dashboard's cards; the replaced components gone; no `mx-auto` but the 403 and 404; a pressable element outlined in `border-field-line`, never `border-line-strong` (with an allow-list); no text under 11px, a label `text-label` (today mono capitals); the disclosure's triangle; the form column's widths and the filter bar's height as tokens written once; the dashboard's grid.
 
 After E4 it also holds, each with a test that proves its pattern can fail:
 
@@ -317,6 +333,7 @@ After E4 it also holds, each with a test that proves its pattern can fail:
 - **Icons only through the chip**: the `--cs-ic-*` tokens and their utilities appear only in `IconChipComponent` and the stylesheet, and a block type's icon is drawn only through `BlockIconComponent`.
 - **People are circles and bubbles**: the people tokens appear only in the avatar, the note marker and row pill, the presence marker, the hold strip, the people frame's class and the icon chip, and never in `ButtonComponent` or on a fill beside a button's classes. Avatar initials join the 11px rule, which today an avatar escapes.
 - **Status colours only in the status components**: the live, scheduled, ok, warn and danger fills appear only in the status, translation, unpublished and channel chips, the scheduled date and the alerts, each of whose tests asserts its word.
+- **One type voice**: no `uppercase` with a `tracking-*` in CS Studio's sources, no `font-mono` outside an allow-list (code, the Code block's fields, a token's or key's value, the save status line), and every label through `text-label` (sans, 12px, `cs-meta`); the 11px floor stays.
 - **The new widths written once** (the 900px column and the 360px rail), and the reworded field rule: identified by a `cs-field-line` edge (a text field's bottom edge, a full outline on a checkbox, toggle or segmented control) or by a fill of its own.
 
 `admin_contrast_test` measures the new pairs (above), the people pairs and the form-send pages' neutral re-values. `docs/reference/design-system.md` is rewritten with each stage, its "Rules a change can break silently" included.
@@ -337,15 +354,3 @@ From `CLAUDE.md` and the reference files; each binds this work.
 ## Left to the builder
 
 Token names for the new values; whether `ghost` is renamed tertiary; how a type declares its preview; the rail's markup and its tabs' controller; the plain-surface mark's name on the form-send layout; the container query's exact form; how `ok`, `warn` and `danger` are retuned if a pair fails; which allow-list entries the new guard needs. Each is written into the plan, and any that changes what a person sees goes to the owner first.
-
-## Still open: the new pages' own questions
-
-The three pages published on 2026-11-06 each end with questions the owner has not answered; the stages build without them and add each when it is answered.
-
-1. Mind graph: move the status key from its dialog onto the legend row, as drawn?
-2. Posts: the Type, Tag and Translation filters in a rail at wide widths?
-3. Tags: a detail rail for the selected tag, with Merge and Delete out of the ⋯ menu?
-4. Settings: an "At a glance" rail of states (languages, AI, mail, images)?
-5. Wizard: a progress bar with the time left, and a welcome line on the first step? Its drawing also sets labels in sans (option C), where this spec keeps mono labels.
-6. Presence in rows and the tree as avatars rather than a user icon and a count? (Stage 6 is drawn with avatars.)
-7. The Notes screen's rail for open threads (`StudioCalmE4Together`, question 4), now that the dashboard's Open threads merge into "Waiting for you"?
