@@ -807,9 +807,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # not per element. The public site is the theme's and out of scope (its
   # language switcher keeps `shadow-menu`, which its own stylesheet defines).
   SHADOW = /(?<![\w-])shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|menu|\[[^\]]*\])(?![\w-])/
-  SHADOW_ALLOWED = {
-    "app/components/admin/pages_screen/tree_node_component.rb" => "the selected row's bar; stage 2 draws it in the accent"
-  }.freeze
+  SHADOW_ALLOWED = {}.freeze
   RADIUS = /(?<![\w-])rounded-(?:(?:[trblse]|tl|tr|bl|br|ss|se|es|ee)-)?(?:xs|sm|md|lg|xl|2xl|3xl|4xl|\[[^\]]*\])(?![\w-])/
   ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS
 
@@ -837,6 +835,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "every shadow allowance is still there" do
+    assert_empty SHADOW_ALLOWED, "an allowance is added with its reason; this guard reads each entry for the shadow it excuses" if SHADOW_ALLOWED.empty?
     SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
   end
 

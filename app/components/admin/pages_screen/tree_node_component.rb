@@ -45,7 +45,8 @@ module Admin
     # `Admin::PagesScreen::TreeComponent`, same reasoning as `children_by_parent`). A row
     # shows "↻N" for N outdated fields and "○N" for N missing ones, summed over
     # the target languages and hidden at zero -- no box, never red; the tooltip
-    # names the languages (handoff §10 B24).
+    # names the languages (handoff §10 B24). They rest hidden and show as the child
+    # count does (`marker_class`).
     #
     # `loaded` is `Admin::Slots.load("tree.row.markers", ...)` for the whole tree
     # (read once by `Admin::PagesScreen::TreeComponent`, same reasoning as
@@ -88,11 +89,20 @@ module Admin
 
       def selected? = page == selected
 
-      # The selected row (contrast and buttons spec, C1): bold, on the sunken
-      # ground, with a 2px ink bar on its left edge (14:1 light, 12:1 dark),
-      # as the documentation site's navigation marks where you are. An inset
-      # shadow and not a border, so the title does not move by 2px.
-      def row_class = selected? ? "bg-sunken shadow-[inset_2px_0_0_var(--cs-ink)]" : nil
+      # The selected row: bold, on the sunken ground, with the 3px accent bar
+      # `.admin-tree-row--selected` draws on its left edge (`content-spiel.tailwind.css`;
+      # an inset shadow, so the title does not move). It is a selection and not a
+      # marker: accent stays the mark of "unread and addressed to you".
+      def row_class = selected? ? "admin-tree-row--selected bg-sunken" : nil
+
+      # How the translation markers rest. Hidden visually, never removed:
+      # `sr-only` keeps "○2" in the accessibility tree at rest, and the row's
+      # hover, the focus within it and a coarse pointer show it (the child
+      # count's classes). On the selected row they are always shown, so it
+      # says what is left to do on the page you are on.
+      MARKER_AT_REST = "sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only".freeze
+
+      def marker_class = selected? ? "" : MARKER_AT_REST
 
       def root? = @root
 

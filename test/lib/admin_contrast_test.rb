@@ -76,9 +76,16 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "a selected state is seen: the tree row's ink bar, a selected pill's words and its paper focus ring, and the accent ring at rest" do
+  test "the selected row's accent bar is 3:1 or better on its sunken ground and on the chrome" do
     each_scheme do |scheme, colour|
-      assert_ratio(3.0, colour.("--cs-ink"), colour.("--cs-sunken"), "the selected row's bar (#{scheme})")
+      %w[--cs-sunken --cs-chrome].each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the selected row's accent bar on #{ground} (#{scheme})") }
+    end
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row--selected\s*\{\s*box-shadow:\s*inset 3px 0 0 var\(--cs-accent\);\s*\}/, css)
+  end
+
+  test "a selected state is seen: a selected pill's words and its paper focus ring, and the accent ring at rest" do
+    each_scheme do |scheme, colour|
       assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "a selected pill's words and ring (#{scheme})")
       assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus ring on a pill at rest (#{scheme})")
     end

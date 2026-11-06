@@ -11,6 +11,31 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     @beta = create_page(title: "Beta")
   end
 
+  # The markers rest hidden (`sr-only`, so a screen reader still reads them) and
+  # show on the row's hover and while the focus is in it. A Cuprite hover is a
+  # real pointer move, so `:hover` applies.
+  test "a row's markers show when the pointer is on it and when it has the focus" do
+    with_locales(%w[en de], default: "en") do
+      row = create_page(title: "Counted")
+      visit "/cs-studio/pages"
+      await_admin_controllers
+
+      marker = "li[data-page-id='#{row.id}'] > div [data-translation-marker=missing]"
+      assert_selector marker, text: "○1", visible: :all
+      assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
+
+      page.find("li[data-page-id='#{row.id}'] > div a[title='Counted']").hover
+      assert_selector marker, wait: 2
+      assert_not_equal "1px", page.find(marker).evaluate_script("getComputedStyle(this).width")
+
+      page.find("li[data-page-id='#{@alpha.id}'] > div a[title='Alpha']").hover
+      assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
+
+      page.execute_script("document.querySelector(\"li[data-page-id='#{row.id}'] > div a[title='Counted']\").focus()")
+      assert_not_equal "1px", page.find(marker).evaluate_script("getComputedStyle(this).width")
+    end
+  end
+
   test "dragging a page onto another node reparents it and persists" do
     visit "/cs-studio/pages"
     await_admin_controllers

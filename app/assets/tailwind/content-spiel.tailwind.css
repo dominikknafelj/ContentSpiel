@@ -210,6 +210,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    `__tip` is where the shared tooltip hangs: a sticky box of no height near
    the top of the window, because "under the host" would be below the last
    row of a page-high divider. */
+/* The tree's selected row: a 3px accent bar on its left edge, 3:1 on the sunken
+   ground and the chrome in both schemes (`admin_contrast_test.rb`). An inset
+   shadow and not a border, so the title does not move. It is a SELECTION and not
+   a marker: accent as a marker means "unread and addressed to you", and this bar
+   says only where you are. */
+.admin-tree-row--selected { box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-divider { position: absolute; z-index: 15; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
 .admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
 .admin-tree-divider[data-hover] { cursor: col-resize; }

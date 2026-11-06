@@ -54,16 +54,18 @@
       <%# Outdated and missing translated fields (handoff §10 B24), summed over
           the target languages: plain text in a warn / meta ink, nothing at
           zero. `role="img"` + `aria-label` so a screen reader hears what the
-          tooltip says; the glyph itself is decoration. %>
+          tooltip says; the glyph itself is decoration. HIDDEN AT REST by
+          `sr-only` (`marker_class`), never `hidden` or `aria-hidden`, so the
+          reader still hears them and they take no room until hover or focus. %>
       <% if translation_total(:outdated).positive? %>
         <%= tag.span "↻#{translation_total(:outdated)}", data: { translation_marker: "outdated" }, role: "img",
               title: translation_tooltip(:outdated), aria: { label: translation_label(:outdated) },
-              class: "shrink-0 text-label text-warn-ink" %>
+              class: "shrink-0 text-count text-warn-ink #{marker_class}" %>
       <% end %>
       <% if translation_total(:missing).positive? %>
         <%= tag.span "○#{translation_total(:missing)}", data: { translation_marker: "missing" }, role: "img",
               title: translation_tooltip(:missing), aria: { label: translation_label(:missing) },
-              class: "shrink-0 text-label text-meta" %>
+              class: "shrink-0 text-count text-meta #{marker_class}" %>
       <% end %>
 
       <%# What features register at `tree.row.markers`, after the translation
