@@ -9,8 +9,8 @@ module ContentModel
   Preview = Data.define(:heading, :text, :mono) do
     def initialize(heading: nil, text: nil, mono: false)
       super(
-        heading: cut(heading, BlockTypeDefinition::SUMMARY_LENGTH),
-        text: cut(text, BlockTypeDefinition::PREVIEW_LENGTH),
+        heading: Preview.cut(heading, BlockTypeDefinition::SUMMARY_LENGTH),
+        text: Preview.cut(text, BlockTypeDefinition::PREVIEW_LENGTH),
         mono: mono ? true : false
       )
     end
