@@ -254,7 +254,7 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
 
       assert_equal 1, status.exitstatus, out
       assert_includes out, "Theme check"
-      assert_includes out, "link to nothing"
+      assert_includes out, "THEME_PATH: "
       assert_equal "0.0.0\n", File.read(File.join(site, ".contentspiel-version"))
     end
   end
