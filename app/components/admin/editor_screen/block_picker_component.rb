@@ -4,12 +4,12 @@ module Admin
     # button, which opens a three-column `Admin::Ui::MenuComponent` of every
     # registered block type, each its icon chip and its name (the menu's keys
     # walk them in reading order, Escape closes it and gives the focus back to
-    # the button). There are no between-cards pickers any more -- a new block is
-    # appended and can be moved from its "⋯" menu or dragged, and Duplicate
-    # (`Admin::ContentBlocksController#duplicate`) is what inserts below a block.
-    # An empty page shows just this row.
+    # the button). A new block is appended; Duplicate
+    # (`Admin::ContentBlocksController#duplicate`) is what inserts below a
+    # block, and the "⋯" menu and the drag move one. On a page with no blocks
+    # this button is all the list shows.
     #
-    # Every button is a plain `button_to` POSTing straight to `create`
+    # Every item is a plain `button_to` POSTing straight to `create`
     # (`Admin::ContentBlocksController#create`) -- Turbo Drive appends
     # `Accept: text/vnd.turbo-stream.html` to every non-GET form submission on
     # its own (no `data-controller`/`data-turbo-stream` needed here), so the
@@ -17,23 +17,22 @@ module Admin
     # only the drag/move-up-down side of the block list needs a real Stimulus
     # controller (`admin--editor--blocks`).
     #
-    # THE SAME PICKER AT THE END OF A LANE (sections spec §4.2), with
-    # `section:` and `column:`. A lane is a column wide, so there it is not a
-    # menu but a "+ Add" (a tertiary button, never a second primary in the
-    # area) that opens an `Admin::Ui::MenuComponent` of them;
-    # each item is the same plain `button_to`, which also posts `section_id`
-    # and `column` -- the controller's own instruction for where the block
-    # goes, beside `block[...]`. Two things differ:
-    # - it offers no container type. A section never holds a section (spec
-    #   §2.2), and a button whose only answer is a refusal is no offer. Asked
-    #   of the capability, never of the type's name, so a container type a
-    #   plugin registers is left out too. The end-of-list menu lists every
-    #   type: it is where a section is made;
-    # - the menu closes on the pick (`close_on_select`): its answer puts a
-    #   tile into the lane above it and opens the block's form under the lanes,
-    #   and a menu left open would lie over both.
-    # Both submissions are inside the Blocks section, so `admin--editor--blocks` holds
-    # them in the write queue like every add (`holdTurboRequest`).
+    # AT THE END OF A LANE (sections spec §4.2), with `section:` and `column:`,
+    # the button is a tertiary "+ Add" (never a second primary in the area)
+    # that opens a one-column `Admin::Ui::MenuComponent` of the same items;
+    # each also posts `section_id` and `column` -- the controller's own
+    # instruction for where the block goes, beside `block[...]`. It offers no
+    # container type: a section never holds a section (spec §2.2), and a
+    # button whose only answer is a refusal is no offer. Asked of the
+    # capability, never of the type's name, so a container type a plugin
+    # registers is left out too. The end-of-list menu lists every type: it is
+    # where a section is made.
+    #
+    # Both menus close on the pick (`close_on_select`): the answer puts a card
+    # at the end of the list, or a tile into the lane above with the block's
+    # form open under the lanes, and a menu left open would lie over them.
+    # Both submissions are inside the Blocks section, so `admin--editor--blocks`
+    # holds them in the write queue like every add (`holdTurboRequest`).
 
     class BlockPickerComponent < AdminComponent
       # A menu item's look: the block card's own constant, not a copy of it, so

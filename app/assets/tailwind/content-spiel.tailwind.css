@@ -740,9 +740,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    held. The three weigh the same, (0,2,0): the notes rule leaves a section's
    card out inside `:where()`, which adds no weight. Each edge is 3:1 or
    better on the card and on the canvas (`test/lib/admin_contrast_test.rb`)
-   and is never the only cue: the hold
-   strip, the "Unavailable type" sentence and the open thread say it in
-   words. */
+   and is never the only cue: the hold strip, the "Unavailable type" sentence
+   and the open thread say it in words. */
 .admin-block-card[data-card-edge="held"] { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
 /* A section whose settings form `editing/freeze.js` froze: the frame is not a
    kept unit, so a live merge gives it its server twin's attributes, and this

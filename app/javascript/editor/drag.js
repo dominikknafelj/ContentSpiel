@@ -2,9 +2,11 @@
 // list and every lane, and the clone that follows the pointer.
 
 // SortableJS is fetched when a controller that drags connects, never with the
-// screen: `preload: false` in config/importmap.rb, and no static import
-// anywhere (`test/lib/admin_design_rules_test.rb`). Resolves to its default
-// export; the module is cached, so a second call costs nothing.
+// screen (`preload: false` in config/importmap.rb, and no static import
+// anywhere: `test/lib/admin_design_rules_test.rb`), and only through
+// `loadSortable`, which the block list, a groups field's rows, the page tree
+// and Settings' rows all call. Resolves to its default export; the module is
+// cached, so a second call costs nothing.
 //
 // The caller's contract: a controller sets `data-sortable="pending"` on its
 // element in `connect` and `"ready"` once its Sortables exist (what

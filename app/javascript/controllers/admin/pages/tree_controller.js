@@ -4,6 +4,7 @@ import { enqueue, holdTurboRequest } from "saving/queue"
 import { orderErrorToast, sendOrder } from "saving/order_request"
 import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
+import { loadSortable } from "editor/drag"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
@@ -54,9 +55,8 @@ export default class extends Controller {
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     this.element.dataset.sortable = "pending"
-    // `import()` here and not `editor/drag`: a module folder serves one topic.
     const token = this.loadToken = {}
-    import("sortablejs").then(({ default: Sortable }) => {
+    loadSortable().then((Sortable) => {
       // Disconnected (or connected again) before SortableJS arrived: nothing to make.
       if (this.loadToken !== token) return
 

@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { loadSortable } from "editor/drag"
 
 // Rows that can be reordered, where the new order is only PENDING (design pass
 // round 3, Task 6): the Languages card in Settings. Unlike the block list
@@ -36,9 +37,8 @@ export default class extends Controller {
 
   connect() {
     this.element.dataset.sortable = "pending"
-    // `import()` here and not `editor/drag`: a module folder serves one topic.
     const token = this.loadToken = {}
-    import("sortablejs").then(({ default: Sortable }) => {
+    loadSortable().then((Sortable) => {
       // Disconnected (or connected again) before SortableJS arrived: nothing to make.
       if (this.loadToken !== token) return
 
