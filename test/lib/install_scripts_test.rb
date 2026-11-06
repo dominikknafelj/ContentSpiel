@@ -54,7 +54,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       args = box.run_call.fetch(:args)
 
       assert_includes args, "#{IMAGE}:0.2.0"
-      assert_includes args, "#{File.realpath(box.site)}:/site"
+      assert_includes args, "type=bind,source=#{File.realpath(box.site)},target=/site"
     end
   end
 
@@ -64,7 +64,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
       args = box.run_call.fetch(:args)
 
       assert_includes args, "#{IMAGE}:stable"
-      assert_includes args, "#{File.realpath(box.site)}:/site"
+      assert_includes args, "type=bind,source=#{File.realpath(box.site)},target=/site"
     end
   end
 
@@ -87,7 +87,67 @@ class InstallScriptsTest < ActiveSupport::TestCase
       assert_equal %w[run --rm], args.first(2)
       assert_equal "#{uid}:#{gid}", args[args.index("--user") + 1]
       assert_equal "/site", args[args.index("-w") + 1]
-      assert_equal "#{File.realpath(box.site)}:/site", args[args.index("-v") + 1]
+      assert_equal "type=bind,source=#{File.realpath(box.site)},target=/site", args[args.index("--mount") + 1]
+    end
+  end
+
+  test "a pin that is not X.Y.Z or stable is refused" do
+    in_sandbox do |box|
+      [ "latest", "1.2", "1.2.3-beta", "v1.2.3", "1.2.3.4", "@sha256:#{'a' * 64}", "../x", "1..2" ].each do |pin|
+        File.write("#{box.site}/.contentspiel-version", "#{pin}\n")
+        out, status = box.wrap_raw("pages")
+
+        assert_equal 1, status.exitstatus, pin
+        assert_includes out, ".contentspiel-version must hold X.Y.Z or stable"
+      end
+      assert_empty box.calls
+    end
+  end
+
+  test "a pin of stable is accepted" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "stable\n")
+      box.wrap("pages")
+
+      assert_includes box.run_call.fetch(:args), "#{IMAGE}:stable"
+    end
+  end
+
+  test "the wrapper without docker says to install it and exits 1" do
+    in_sandbox do |box|
+      out, status = Open3.capture2e(box.env("PATH" => "/usr/bin:/bin"), WRAPPER, "pages", chdir: box.site)
+
+      assert_equal 1, status.exitstatus
+      assert_match(/install docker/i, out)
+    end
+  end
+
+  test "dev refuses extra arguments" do
+    in_sandbox do |box|
+      out, status = box.wrap_raw("dev", "--build")
+
+      assert_equal 1, status.exitstatus
+      assert_includes out, "dev takes no arguments"
+      assert_empty box.calls
+    end
+  end
+
+  test "a site path with a colon is mounted intact" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/we:ird"
+      FileUtils.mkdir_p(odd)
+      box.wrap("pages", chdir: odd)
+
+      assert_includes box.run_call.fetch(:args), "type=bind,source=#{odd},target=/site"
+    end
+  end
+
+  test "install expands a leading ~/ in the bin folder" do
+    in_sandbox do |box|
+      status, = box.install("HOME" => box.dir, "CONTENTSPIEL_BIN_DIR" => "~/mybin")
+
+      assert status.success?
+      assert File.executable?("#{box.dir}/mybin/contentspiel")
     end
   end
 
@@ -167,6 +227,10 @@ class InstallScriptsTest < ActiveSupport::TestCase
 
     def wrap(*args, chdir: site, **)
       Open3.capture2e(env, WRAPPER, *args, chdir: chdir).tap { |_, s| raise "wrapper failed" unless s.success? }
+    end
+
+    def wrap_raw(*args, chdir: site)
+      Open3.capture2e(env, WRAPPER, *args, chdir: chdir)
     end
 
     def install(extra = {})
