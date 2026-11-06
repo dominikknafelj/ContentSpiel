@@ -5,7 +5,7 @@ module Admin
     # "Changed by <name> <time ago>. Your text is still here so you can copy
     # it; reloading shows the latest version." and a Reload link. Put into
     # the header's `#editor-notice` slot by a 409 autosave answer
-    # (`Admin::AutosaveResponses#stale_streams`); Reload is a full-page visit
+    # (`Admin::Answers::Stale`); Reload is a full-page visit
     # (`data-turbo-frame="_top"`), which is what discards the typed text and
     # loads the newer version.
     #

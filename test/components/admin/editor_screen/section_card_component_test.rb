@@ -106,7 +106,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   # The header's count is drawn by the one method a stream redraws it with
-  # (`Admin::ContentBlocksController#section_count_streams`).
+  # (`Admin::Answers::BlockDrawing#section_count_streams`).
   test "the summary a stream replaces is the one the card draws" do
     render_card
     card = Capybara.string(rendered_content).find("#section-#{@section.id}-summary")
@@ -235,7 +235,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   # The line a delete or an add inside the section replaces
-  # (`Admin::ContentBlocksController#section_count_streams`).
+  # (`Admin::Answers::BlockDrawing#section_count_streams`).
   test "the delete count a stream replaces is the one the card draws" do
     render_card
     card = Capybara.string(rendered_content).find("#section-#{@section.id}-delete-count", visible: :all)
@@ -310,7 +310,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   # One rule for the page view and for a card streamed in (`Admin
-  # ::ContentBlocksController#card_for`): a top-level block is drawn as a
+  # ::Answers::BlockDrawing#card_for`): a top-level block is drawn as a
   # section when it is a container, or holds blocks although its type is gone.
   test "a block is drawn as a section when it is a container or still holds blocks, and a plain block never" do
     outline = BlockOutline.new(@editor_page.content_blocks.reload)

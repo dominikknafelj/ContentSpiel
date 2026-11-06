@@ -42,7 +42,7 @@ module Admin
     #
     # The element is `admin--editor--section`'s `lanes` target: it is replaced as a
     # whole when the section's columns change under this screen (`Admin
-    # ::ContentBlocksController#section_structure_streams`), and the script
+    # ::Answers::BlockDrawing#section_structure_streams`), and the script
     # then has to say where the focus goes, since the control that was
     # pressed may have been in the lanes that left.
     class SectionLanesComponent < AdminComponent

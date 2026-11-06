@@ -156,7 +156,7 @@ module ContentModel
 
     # Whether a block's card and tile draw an icon of the block's own
     # (`for_block:`), which a save then has to redraw
-    # (`Admin::ContentBlocksController#block_icon_streams`).
+    # (`Admin::Answers::BlockDrawing#block_icon_streams`).
     def icon_follows_block? = !@icon_for_block.nil?
 
     # The icon one block of the type is drawn with: what `for_block:`

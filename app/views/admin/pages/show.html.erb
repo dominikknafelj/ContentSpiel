@@ -53,7 +53,7 @@
 <%# The one slot a block action with nothing left to replace on the page
     (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
     a failed `create` from the picker) reports into --
-    `Admin::ContentBlocksController#render_gone`/`#picker_error_stream`. %>
+    `Admin::Answers::BlockGone`/`BlockDrawing#picker_error_stream`. %>
 <div id="content-blocks-alert"></div>
 
 <%# `data-messages`: the two sentences `admin--editor--blocks` says itself (a block not
@@ -89,7 +89,7 @@
         `SectionCardComponent.for` picks. A section is whatever holds blocks
         (`draws?`), so one whose type is gone still shows them (spec §6). The
         outline is built once, from the blocks the controller preloaded, and
-        handed to every section. `Admin::ContentBlocksController#card_for`
+        handed to every section. `Admin::Answers::BlockDrawing#card_for`
         draws the same card for a stream. %>
     <% outline = BlockOutline.new(@page.content_blocks) %>
     <% blocks = outline.top_level %>

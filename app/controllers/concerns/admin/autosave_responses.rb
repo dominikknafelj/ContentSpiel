@@ -34,9 +34,9 @@ module Admin
     # they have the `#editor-notice` area for the explanation bar and a
     # Reload. The media detail panel and the tag rows still save on a stale
     # base and pass `base_updated_at:` here for the after-the-fact warning;
-    # those screens have no notice area. Settings no longer autosaves at all
-    # (round 3, Task 5): it is one form with a save footer and refuses a stale
-    # base itself, with a 409 (`Admin::SettingsController#stale?`). That warning is its own state
+    # those screens have no notice area. Settings does not autosave: it is
+    # one form with a save footer and refuses a stale base itself, with a 409
+    # (`Admin::SettingsController#stale?`). That warning is its own state
     # (`:saved_over`, "SAVED · ALSO CHANGED ELSEWHERE -- RELOAD ..."), so the
     # refusal's "● CHANGED ELSEWHERE" always, everywhere, means "not saved".
     def autosave_stream(record:, result:, status_id:, error_prefix:, base_updated_at: nil, fields: {})
@@ -64,10 +64,10 @@ module Admin
       #
       # Precisely because it never auto-hides, it is one toast per form, not
       # one per failed attempt: it carries a stable id, a failure removes the
-      # previous one before appending its own (three failed autosaves in a
-      # row used to stack three identical toasts), and the next successful
-      # save removes it (it used to sit there, claiming a failure that had
-      # already been fixed). Removing an id that isn't on the page is a no-op.
+      # previous one before appending its own, so failed autosaves in a row
+      # never stack identical toasts, and the next successful save removes
+      # it, so it never claims a failure that has been fixed. Removing an id
+      # that isn't on the page is a no-op.
       toast_id = "toast-#{error_prefix}"
       streams << turbo_stream.remove(toast_id)
       unless result.ok?
@@ -92,17 +92,14 @@ module Admin
     # `updated_at` as it loaded it (`base_updated_at`, iso8601 with
     # microseconds); a save sent with a base OLDER than the record as just
     # loaded for this request is refused: 409, the service never called, the
-    # record untouched, and the answer is the "● CHANGED ELSEWHERE" status
-    # plus the explanation bar in `#editor-notice`
-    # (`Admin::EditorScreen::ChangedElsewhereComponent`).
+    # record untouched, and the answer is `Admin::Answers::Stale`'s: the
+    # "● CHANGED ELSEWHERE" status plus the explanation bar in
+    # `#editor-notice` (`Admin::EditorScreen::ChangedElsewhereComponent`).
     #
-    # This used to be last-write-wins with a warning: the save went through
-    # and the status line merely said "Changed elsewhere -- reload". The
-    # handoff's rule (§10 B19) is different and only makes sense if the stale
-    # write did NOT happen: the editor's text stays on screen so they can
-    # copy it, and Reload discards it for the newer version. A warning after
-    # an overwrite would offer to throw away text that had already replaced
-    # the other editor's.
+    # The stale write does NOT happen (handoff §10 B19): the editor's text
+    # stays on screen so they can copy it, and Reload discards it for the
+    # newer version. A warning after an overwrite would offer to throw away
+    # text that had already replaced the other editor's.
     #
     # What is NOT done, deliberately: the answer carries no
     # `base_updated_at` replacement (the form keeps its old base, so every
@@ -121,27 +118,16 @@ module Admin
     # guards (another editor's save minutes ago); closing it would need
     # row locking in every service for no case a person can produce.
     #
-    # The refusal also removes a lingering failed-save error toast for the
-    # form (`toast-<error_prefix>`), as a successful save does: the failure
-    # it reports has been superseded by this answer.
-    #
     # Returns true after rendering the refusal, so a caller is
     # `return if refuse_stale_autosave(...)` before it calls its service.
     # `record` must be the record as loaded for this request, before any write.
     def refuse_stale_autosave(record, status_id:, error_prefix:, reload_url:)
       return false unless stale_base?(record, params[:base_updated_at])
 
-      render turbo_stream: stale_streams(record, status_id: status_id, error_prefix: error_prefix, reload_url: reload_url, since: Time.iso8601(params[:base_updated_at])), status: :conflict
+      answer = Admin::Answers::Stale.new(view: view_context).answer(record: record, status_id: status_id, error_prefix: error_prefix,
+        reload_url: reload_url, since: Time.iso8601(params[:base_updated_at]), live: live_record?(record))
+      render turbo_stream: answer.streams, status: answer.status
       true
-    end
-
-    def stale_streams(record, status_id:, error_prefix:, reload_url:, since:)
-      live = live_record?(record)
-      [
-        turbo_stream.replace(status_id, Admin::Ui::SaveStatusComponent.new(id: status_id, state: :stale, live: live)),
-        turbo_stream.update("editor-notice", Admin::EditorScreen::ChangedElsewhereComponent.new(record: record, reload_url: reload_url, since: since)),
-        turbo_stream.remove("toast-#{error_prefix}")
-      ]
     end
 
     # The HTTP status an autosave answers with: 200, 403 for a permission

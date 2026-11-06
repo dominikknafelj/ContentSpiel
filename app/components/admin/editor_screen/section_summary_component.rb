@@ -6,7 +6,7 @@ module Admin
     # Its own component, with the id on its own element, because it is the
     # one part of the header a block's write changes: an add into a column
     # and a delete out of one answer with this line and nothing else of the
-    # card (`Admin::ContentBlocksController#section_count_streams`), so the
+    # card (`Admin::Answers::BlockDrawing#section_count_streams`), so the
     # lanes, the tiles and whichever form is open are left as they stand.
     # The card draws it through the same door, `SectionCardComponent
     # .summary`, so the line a stream brings is the line a page load draws.

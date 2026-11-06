@@ -136,7 +136,7 @@ export default class extends Controller {
   // A lane is a Sortable for as long as it is in the page. The lanes of a
   // section are replaced as a row by a save that changed its number of
   // columns, by a refused add and with the whole list (`Admin
-  // ::ContentBlocksController#section_structure_streams`, `#blocks_list_stream`):
+  // ::Answers::BlockDrawing#section_structure_streams`, `#blocks_list_stream`):
   // the row that comes is new elements, each made a Sortable here, and the
   // one that left is destroyed below.
   //
@@ -606,7 +606,7 @@ export default class extends Controller {
   // A MOVE BETWEEN CONTAINERS REDRAWS THE BLOCK (sections plan, D8). A card
   // that goes into a column becomes a tile with its form under the lanes, a
   // tile that leaves its section a card: the answer replaces the element and
-  // the form (`Admin::ContentBlocksController#move_streams`) -- the one time
+  // the form (`Admin::Answers::BlockDrawing#move_streams`) -- the one time
   // a form on this screen is replaced while its block stays. A form is what
   // holds an edit that is not saved yet, so:
   // - every autosave form is told to send what it holds as the move is

@@ -31,7 +31,7 @@ module Admin
     # ON A TRANSLATION TAB A SECTION IS NOT THIS CARD but a heading over its
     # blocks' cards (spec §4.5, `SectionGroupComponent`): `self.for` is the
     # one door to both, so the page view and a card streamed in
-    # (`Admin::ContentBlocksController#card_for`) cannot draw different things.
+    # (`Admin::Answers::BlockDrawing#card_for`) cannot draw different things.
     #
     # A SECTION WHOSE TYPE IS GONE (spec §6, `unavailable?`) -- a removed
     # plugin's container, say -- is no `container?` any more and still holds
@@ -141,7 +141,7 @@ module Admin
       # block that still holds blocks although its type is no longer a
       # container's (a section whose type is gone, spec §6) -- asked of the
       # rows the outline was built from, never of the type's name. The page
-      # view and `Admin::ContentBlocksController#card_for` both ask here, so
+      # view and `Admin::Answers::BlockDrawing#card_for` both ask here, so
       # a card streamed in is the card a page load would draw.
       def self.draws?(block, outline:) = block.container? || outline.blocks_in(block).any?
 

@@ -13,7 +13,7 @@ module Admin
     # on its card and its tile, which hand their block in, and with the
     # type's in the picker, which has none. Only such an icon carries an id
     # (`dom_id`): a save's answer replaces it
-    # (`Admin::ContentBlocksController#block_icon_streams`), because neither
+    # (`Admin::Answers::BlockDrawing#block_icon_streams`), because neither
     # the card's head nor the tile's face is re-rendered by a save.
     class BlockIconComponent < AdminComponent
       PLACES = { picker: :regular, card: :regular, tile: :small }.freeze

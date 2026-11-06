@@ -8,7 +8,7 @@ module Admin
     # `SectionSummaryComponent` is one: the dialog is rendered with the card,
     # long before it is opened, and an add into a column or a delete out of
     # one changes the number meanwhile. Both answer with this line beside the
-    # header's count (`Admin::ContentBlocksController#section_count_streams`),
+    # header's count (`Admin::Answers::BlockDrawing#section_count_streams`),
     # and the card draws it through the same door (`SectionCardComponent
     # .delete_count`), so a dialog never promises to delete a number of
     # blocks the section no longer holds.
