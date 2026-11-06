@@ -21,7 +21,7 @@ module Admin
     # A block whose stored `block_type` isn't (or is no longer) registered --
     # a removed plugin, spec §8 -- has no `definition` to read a schema or
     # columns from: `unavailable?` switches the template to the minimal
-    # "Unavailable type" card instead (danger border, one sentence, "Delete
+    # "Unavailable type" card instead (the danger edge, one sentence, "Delete
     # block…" its only action).
     #
     # The header (design pass round 2): drag handle, the type name -- a button
@@ -146,10 +146,23 @@ module Admin
       # card of the list is a `card` (dragged, moved, counted for Move up and
       # Move down); only a panel is hidden, and it is its section's to show.
       def wrapper_attributes
-        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **held_marks, **(@open ? { open: true } : {}) } } if panel?
+        return { hidden: true, **panel_name, data: { block_id: block.id, "admin--editor--section-target": "panel", **editing_marks, **held_marks, **edge_mark, **(@open ? { open: true } : {}) } } if panel?
 
-        { data: { block_id: block.id, **editing_marks, **held_marks, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
+        { data: { block_id: block.id, **editing_marks, **held_marks, **edge_mark, **(list? ? { "admin--editor--blocks-target": "card" } : {}) } }
       end
+
+      # The state the card's edge shows (`data-card-edge`, an outline the
+      # stylesheet draws inside the card): its type is gone, or someone else
+      # holds it and the viewer could otherwise edit it. A reader sees the
+      # strip and no edge, since nothing is kept from them. Unavailable wins:
+      # a card nobody can read has no form to hold.
+      def card_edge
+        if unavailable? then "unavailable"
+        elsif read_only_hold? then "held"
+        end
+      end
+
+      def edge_mark = card_edge ? { card_edge: card_edge } : {}
 
       # The panel is the region its tile's `aria-controls` points at, named by
       # its own heading -- which an unavailable block's panel doesn't have.

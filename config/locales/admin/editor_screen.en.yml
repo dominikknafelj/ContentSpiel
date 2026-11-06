@@ -15,9 +15,13 @@ en:
           move_into: "Move into section…"
           take_over: "Take over"
 
-        # The "+" at the end of a section's lane (sections spec §4.2): the
-        # name of a button whose label is the glyph.
+        # The page's one "+ Add block" (a menu headed "Add a block", whose name
+        # `menu_heading` is too) and the "+ Add" at the end of a section's lane
+        # (sections spec §4.2), named for its column.
         block_picker:
+          add_block: "+ Add block"
+          menu_heading: "Add a block"
+          add: "+ Add"
           add_to_column: "Add a block to column %{number}"
         # A translation tab's read-only fields. Only the line above read-only
         # code is a key so far; `%{language}` is the default language's own
@@ -89,6 +93,16 @@ en:
           into: "%{block} moved to column %{column} of section %{section}. Position %{position} of %{count}."
           out: "%{block} moved out of the section. Position %{position} of %{count}."
           back: "%{block} is back where it was."
+          # The handle's keyboard path (`editor/keyboard_moves.js`): Space
+          # picks a card up and drops it, Escape puts it back. `position` is
+          # said alone on every arrow, and as the `%{position}` of the two
+          # sentences above it.
+          picked_up: "Picked up %{block}. %{position}"
+          dropped: "Dropped %{block}. %{position}"
+          cancelled: "Cancelled. %{block} is back where it was."
+          position: "Position %{position} of %{count}."
+          # The `%{block}` of a block whose card or tile shows no name.
+          untitled: "block"
         # The confirmation behind every "Delete block…", in a card and in a
         # tile.
         delete_block_dialog:
@@ -201,6 +215,8 @@ en:
           delete_title: "Delete this section?"
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
+          # The button that closes the settings under the head.
+          close_settings: "Close"
           # A section whose type is no longer registered (sections spec §6):
           # the unavailable block card's own heading, over the blocks it
           # holds. Its two buttons are `remove_keep` and `delete` above, the
@@ -235,16 +251,28 @@ en:
           blocks:
             one: "This also deletes the %{count} block in it."
             other: "This also deletes the %{count} blocks in it."
-        # "3 columns · 5 blocks" in a section's header.
+        # "5 blocks" in a section's head.
         section_summary:
-          columns:
-            one: "%{count} column"
-            other: "%{count} columns"
           blocks:
             one: "%{count} block"
             other: "%{count} blocks"
         section_lanes:
           column: "Column %{number}"
+        # A section's settings said as words in its head, each a button that
+        # opens them; `label` is a word's accessible name.
+        section_settings_words:
+          columns:
+            one: "%{count} column"
+            other: "%{count} columns"
+          backgrounds:
+            none: "No background"
+            tinted: "Tinted background"
+            strong: "Strong background"
+          widths:
+            content: "Content width"
+            full: "Full width"
+          anchor: "#%{anchor}"
+          label: "Section settings: %{word}"
         # A section on a translation tab (sections spec §4.5): a heading over
         # its blocks' cards. `unavailable` is the heading of one whose type
         # is no longer registered.

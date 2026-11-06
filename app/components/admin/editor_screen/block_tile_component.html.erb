@@ -3,18 +3,19 @@
   <%# What the pointer drags the tile by (SortableJS `handle:` in `admin--editor--blocks`). Not a
       control: see the component. %>
   <% if editable? %>
-    <span class="admin-block-tile__grip flex shrink-0 cursor-grab select-none items-center rounded-l-cs px-1 text-meta hover:text-ink" aria-hidden="true">⠿</span>
+    <span class="admin-block-tile__grip flex shrink-0 cursor-grab select-none items-center rounded-l-tile px-1 text-meta hover:text-ink" aria-hidden="true">⠿</span>
   <% end %>
-  <button type="button" class="admin-block-tile__face flex w-full min-w-0 cursor-pointer flex-col gap-0.5 rounded-cs px-3 py-2 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent"
-          aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" data-action="admin--editor--section#toggle">
-    <% if icon? %>
-      <%# The name is the face's first span child: the move announcement reads it (`blocks_controller.js`, `titleOf`). %>
-      <span class="sr-only"><%= label %></span>
-      <span class="flex min-w-0 items-center gap-1.5"><%= render block_icon %><%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %></span>
-    <% else %>
-      <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
-      <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
-    <% end %>
+  <%# No focus outline of its own: the tile's accent ring is the focus ring
+      (`.admin-block-tile` in `content-spiel.tailwind.css`, `:focus-visible`).
+      `outline-hidden` keeps a transparent outline in forced colours, where
+      the ring, a box shadow, is not drawn. %>
+  <button type="button" class="admin-block-tile__face flex w-full min-w-0 cursor-pointer flex-col gap-1 rounded-tile px-3.5 py-3 text-left focus-visible:outline-hidden"
+          aria-expanded="<%= open? %>" aria-controls="<%= panel_id %>" aria-labelledby="<%= labelled_by %>" aria-describedby="<%= described_by %>" data-action="admin--editor--section#toggle">
+    <%# The first line is the type: its chip, then its name, the face's first span child,
+        which the move announcement reads (`editor/containers.js`, `titleOf`). The chip is
+        `aria-hidden`, so the span's text is the name alone. %>
+    <span class="flex min-w-0 items-center gap-1.5"><% if icon? %><%= render block_icon %><% end %><span id="<%= type_id %>" class="truncate text-label text-meta"><%= label %></span></span>
+    <%= render Admin::EditorScreen::TileSummaryComponent.new(block: block, locale: locale) %>
   </button>
   <%# The notes marker (notes spec §4.3): beside the face, since a button cannot hold
       a button, and outside the `editable?` block below, because a viewer who can only

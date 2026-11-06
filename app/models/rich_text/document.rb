@@ -145,6 +145,23 @@ module RichText
       Array(@hash["content"]).flat_map { |node| plain_units(node) }.filter_map { |node| plain_text_of(node).strip.presence }
     end
 
+    # What a tile shows of this document, as plain text through the same walk
+    # the Markdown form is dumped from (`plain_text_of`), so no `**` or `#`
+    # reaches it. The heading is the first node's text when that node (blank
+    # paragraphs not counted) is a heading, and otherwise there is none, so a
+    # body's opening words always reach the tile. The text is every
+    # paragraph, list and quote in document order, joined with spaces; later
+    # headings, a table, an image and a rule add no words.
+    PREVIEW_TEXT_TYPES = %w[paragraph bulletList orderedList blockquote].freeze
+
+    def preview
+      nodes = Array(@hash["content"]).select { |node| node.is_a?(Hash) }
+      first = nodes.find { |node| node["type"] != "paragraph" || plain_text_of(node).strip != "" }
+      heading = plain_text_of(first).squish if first && first["type"] == "heading"
+      text = nodes.select { |node| PREVIEW_TEXT_TYPES.include?(node["type"]) }.map { |node| plain_text_of(node).squish }.reject(&:empty?).join(" ")
+      ContentModel::Preview.new(heading: heading, text: text)
+    end
+
     # Renders this document to Markdown (design spec §3.4) -- MCP's read
     # path for `posts.body`/`content_blocks.body`. Delegates to
     # `RichText::Markdown.dump`; see `.from_markdown` above for why the

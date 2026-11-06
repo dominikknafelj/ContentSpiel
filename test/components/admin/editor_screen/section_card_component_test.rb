@@ -25,15 +25,82 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-lane-3 > .admin-block-tile", text: "No image chosen"
   end
 
+  # The frame and its head are the stylesheet's (`.admin-section-card`,
+  # `__head`): the card carries no border, radius or ground utility.
+  test "a section is a structure frame with a tinted head holding its chip, name, words and count" do
+    render_card
+
+    card = page.find("##{ActionView::RecordIdentifier.dom_id(@section)}")
+    assert_equal "admin-block-card admin-section-card", card[:class]
+    assert_nil card["data-card-edge"]
+    head = "##{ActionView::RecordIdentifier.dom_id(@section)} > #section-#{@section.id}-header.admin-section-card__head"
+    assert_selector head
+    parts = page.all("#{head} > *").map do |part|
+      if part[:class].to_s.include?("admin-block-card__handle") then :handle
+      elsif part["data-block-icon"] then :chip
+      elsif part["data-action"].to_s.include?("admin--editor--blocks#toggle") then :name
+      elsif part[:id] == "section-#{@section.id}-words" then :words
+      elsif part[:id] == "section-#{@section.id}-summary" then :count
+      elsif part["data-controller"].to_s.include?("admin--ui--menu") then :menu
+      end
+    end
+    assert_equal %i[handle chip name words count menu], parts
+    assert_selector "#{head} [data-block-icon=columns_2]"
+    assert_selector "#{head} #section-#{@section.id}-summary.text-count", text: "2 blocks", exact_text: true
+    assert_selector "#{head} #section-#{@section.id}-words button.admin-section-word", text: "3 columns"
+  end
+
+  test "the settings form sits in a hidden region under the head, with its id and every editing mark" do
+    render_card
+
+    card = "##{ActionView::RecordIdentifier.dom_id(@section)}"
+    region = "#{card} > #section-#{@section.id}-settings"
+    assert_selector "#{region}[hidden].admin-section-card__settings.mx-3.mb-3.rounded-card.bg-rail.p-3[data-admin--editor--section-target='settings']", visible: :all
+    assert_equal "section-#{@section.id}-settings", Admin::EditorScreen::SectionCardComponent.settings_id(@section)
+    assert_equal "section-#{@section.id}-words", Admin::EditorScreen::SectionCardComponent.words_id(@section)
+    # One form, in the region and nowhere else, with the marks `editing/merge` reads.
+    assert_selector "form#section-#{@section.id}-form", count: 1, visible: :all
+    assert_selector "#{region} > form#section-#{@section.id}-form[data-controller~='admin--saving--autosave'][data-editing-unit]" \
+      "[data-editing-subject='#{Editing.key(@section)}'][data-editing-version]", visible: :all
+    assert_no_selector "#section-#{@section.id}-header form#section-#{@section.id}-form", visible: :all
+    %w[layout background width anchor].each { |name| assert_selector "#{region} [name='block[settings][#{name}]']", visible: :all }
+    assert_selector "#{region} #section-#{@section.id}-layout-menu", visible: :all
+    assert_selector "#{region} #block-#{@section.id}-save-status", visible: :all
+    %w[layout background width style anchor].each { |name| assert_selector "#{region} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all }
+    assert_selector "#{region} button[data-action='admin--editor--section#closeSettings']", text: "Close", visible: :all
+    # Head, the hold strip's slot and its announcer, the region, then the body.
+    order = page.all("#{card} > *", visible: :all).map { |part| part[:id] || (part["data-editing-announcer"] ? "announcer" : part.tag_name) }
+    assert_equal [ "section-#{@section.id}-header", "block-#{@section.id}-hold", "announcer", "section-#{@section.id}-settings", "section-#{@section.id}-body" ], order.first(5)
+  end
+
+  test "a held section's region holds the read-only fieldset and its strip stays above the region" do
+    dana = users(:two)
+    dana.update!(name: "Dana Weiss")
+    reserve(@section, @editor_page, dana, "tab-bbbbbbbb")
+    render_card_for(users(:one), "tab-aaaaaaaa")
+
+    card = "##{ActionView::RecordIdentifier.dom_id(@section)}"
+    assert_selector "#{card}[data-card-edge='held']"
+    assert_selector "#{card} > #block-#{@section.id}-hold [data-editing-kind=held]", text: "Dana Weiss is editing this block"
+    assert_selector "#{card} > #section-#{@section.id}-settings[hidden] > form#section-#{@section.id}-form[data-editing-held=true] fieldset.admin-held", visible: :all
+    strip, region = %W[block-#{@section.id}-hold section-#{@section.id}-settings].map { |id| page.all("#{card} > *", visible: :all).index { |part| part[:id] == id } }
+    assert_operator strip, :<, region
+
+    outline = BlockOutline.new(@editor_page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @editor_page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+    assert_selector "#section-#{@section.id}-settings fieldset.admin-view-only[disabled]", visible: :all
+    assert_selector "#section-#{@section.id}-words button.admin-section-word", count: 3
+  end
+
   # #146, decided as a note and not a declaration: the CMS cannot know what a
   # style draws, so a style other than the default only gets the words "may".
   test "a style other than the default shows a help line that it may set its own layout, background or width; the default and a dropped name do not" do
     with_section_grid_theme do
       @section.update!(settings: { "layout" => "three", "style" => "grid_six" })
       render_card
-      assert_selector "form [data-template-field='style-note']:not([hidden])", text: "This style may set its own layout, background or width."
-      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='grid_six'][data-fields='style-note']"
-      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='']:not([data-fields])"
+      assert_selector "form [data-template-field='style-note']:not([hidden])", text: "This style may set its own layout, background or width.", visible: :all
+      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='grid_six'][data-fields='style-note']", visible: :all
+      assert_selector "select[data-admin--editor--template-fields-target='select'] option[value='']:not([data-fields])", visible: :all
 
       @section.update!(settings: { "layout" => "three" })
       render_card
@@ -106,7 +173,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   # The header's count is drawn by the one method a stream redraws it with
-  # (`Admin::ContentBlocksController#section_count_streams`).
+  # (`Admin::Answers::BlockDrawing#section_count_streams`).
   test "the summary a stream replaces is the one the card draws" do
     render_card
     card = Capybara.string(rendered_content).find("#section-#{@section.id}-summary")
@@ -114,13 +181,14 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     alone = Capybara.string(render_inline(Admin::EditorScreen::SectionCardComponent.summary(section: @section, count: 2)).to_html).find("#section-#{@section.id}-summary")
 
     assert_equal [ card.text, card[:class] ], [ alone.text, alone[:class] ]
-    assert_equal "3 columns · 2 blocks", alone.text
+    assert_equal "2 blocks", alone.text
   end
 
-  test "the header names the section and counts its columns and blocks" do
+  test "the header names the section and counts its blocks; its columns are a word" do
     render_card
 
-    assert_selector "#section-#{@section.id}-summary", text: "3 columns · 2 blocks"
+    assert_selector "#section-#{@section.id}-summary", text: "2 blocks", exact_text: true
+    assert_selector "#section-#{@section.id}-words button", text: "3 columns"
   end
 
   test "each lane is labelled with its column for a screen reader and for the stacked layout" do
@@ -147,13 +215,13 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   test "the header carries the section's own autosaving form: layout, background, width" do
     render_card
 
-    assert_selector "form#section-#{@section.id}-form[data-controller~='admin--saving--autosave'][action$='/content_blocks/#{@section.id}']"
+    assert_selector "form#section-#{@section.id}-form[data-controller~='admin--saving--autosave'][action$='/content_blocks/#{@section.id}']", visible: :all
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='three']", visible: :all
-    assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
-    assert_selector "select[name='block[settings][width]'] option", count: 2
+    assert_selector "select[name='block[settings][background]'] option[selected][value='none']", visible: :all
+    assert_selector "select[name='block[settings][width]'] option", count: 2, visible: :all
     assert_selector "button[data-action='admin--editor--section#chooseLayout'][data-admin--editor--section-layout-param]", count: 6, visible: :all
     assert_selector "button[data-admin--editor--section-layout-param='three'][aria-current='true']", visible: :all
-    assert_selector "#block-#{@section.id}-save-status"
+    assert_selector "#block-#{@section.id}-save-status", visible: :all
   end
 
   # What `Admin::ContentBlocksController#update` answers into: the base the
@@ -167,8 +235,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     %w[layout background width].each do |name|
       assert_selector "#{form} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
     end
-    assert_selector "#{form} select#block-#{@section.id}-background[aria-label='Background']"
-    assert_selector "#{form} select#block-#{@section.id}-width[aria-label='Width']"
+    assert_selector "#{form} select#block-#{@section.id}-background[aria-label='Background']", visible: :all
+    assert_selector "#{form} select#block-#{@section.id}-width[aria-label='Width']", visible: :all
   end
 
   # A section just made stores no settings: the form shows, and sends, what
@@ -181,8 +249,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='two']", visible: :all
     assert_selector "button[data-admin--editor--section-layout-param='two'][aria-current='true']", visible: :all
-    assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
-    assert_selector "select[name='block[settings][width]'] option[selected][value='content']"
+    assert_selector "select[name='block[settings][background]'] option[selected][value='none']", visible: :all
+    assert_selector "select[name='block[settings][width]'] option[selected][value='content']", visible: :all
   end
 
   # The layout menu is replaced by a stream after a save, so it has its own
@@ -191,13 +259,13 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     menu = "#section-#{@section.id}-layout-menu"
-    assert_selector "#{menu}[data-admin--editor--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout"
+    assert_selector "#{menu}[data-admin--editor--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout", visible: :all
     assert_no_selector "#{menu} input", visible: :all
     assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
     assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
     assert_selector "#{menu} button[aria-current='false']", count: 5, visible: :all
     # The trigger shows the current layout: three equal columns.
-    assert_selector "#{menu} button[aria-haspopup='menu'] .admin-layout-diagram > span", count: 3
+    assert_selector "#{menu} button[aria-haspopup='menu'] .admin-layout-diagram > span", count: 3, visible: :all
   end
 
   test "the menu moves, duplicates, removes keeping the blocks, and deletes behind a dialog that counts them" do
@@ -235,7 +303,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
   end
 
   # The line a delete or an add inside the section replaces
-  # (`Admin::ContentBlocksController#section_count_streams`).
+  # (`Admin::Answers::BlockDrawing#section_count_streams`).
   test "the delete count a stream replaces is the one the card draws" do
     render_card
     card = Capybara.string(rendered_content).find("#section-#{@section.id}-delete-count", visible: :all)
@@ -252,8 +320,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_no_selector ".admin-block-card__handle"
     assert_no_selector "[aria-label='Section actions']"
-    assert_selector "fieldset[disabled] select[name='block[settings][background]']"
-    assert_selector "fieldset[disabled] button[aria-haspopup='menu'][aria-label='Layout']"
+    assert_selector "fieldset[disabled] select[name='block[settings][background]']", visible: :all
+    assert_selector "fieldset[disabled] button[aria-haspopup='menu'][aria-label='Layout']", visible: :all
     assert_no_selector "form[data-controller~='admin--saving--autosave']"
     assert_no_selector "dialog#delete-section-#{@section.id}", visible: :all
   end
@@ -305,12 +373,13 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update!(settings: { "layout" => "one" })
     render_card
 
-    assert_selector "#section-#{@section.id}-summary", text: "1 column · 1 block", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "1 block", exact_text: true
+    assert_selector "#section-#{@section.id}-words button", text: "1 column"
     assert_selector "#section-#{@section.id}-lanes[data-columns='1'][style*='--lanes: 1']"
   end
 
   # One rule for the page view and for a card streamed in (`Admin
-  # ::ContentBlocksController#card_for`): a top-level block is drawn as a
+  # ::Answers::BlockDrawing#card_for`): a top-level block is drawn as a
   # section when it is a container, or holds blocks although its type is gone.
   test "a block is drawn as a section when it is a container or still holds blocks, and a plain block never" do
     outline = BlockOutline.new(@editor_page.content_blocks.reload)
@@ -333,7 +402,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update_columns(block_type: "gone/section")
     as(users(:one), channel: :admin) { render_card }
 
-    assert_selector ".admin-section-card.border-danger[data-container][data-admin--editor--blocks-target='card']", text: "Unavailable type — gone/section"
+    assert_selector ".admin-section-card[data-card-edge='unavailable'][data-container][data-admin--editor--blocks-target='card']", text: "Unavailable type — gone/section"
     assert_selector ".admin-section-card", text: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
     assert_selector ".admin-block-tile", count: 2
     assert_selector "[data-admin--editor--blocks-target='lane'][data-no-drop]", count: 2
@@ -387,7 +456,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update_columns(block_type: "gone/section")
     as(users(:reader), channel: :admin) { render_card }
 
-    assert_selector ".admin-section-card.border-danger", text: "Unavailable type — gone/section"
+    assert_selector ".admin-section-card[data-card-edge='unavailable']", text: "Unavailable type — gone/section"
     assert_selector ".admin-block-tile", count: 2
     assert_no_selector "button", text: "Remove section, keep blocks", visible: :all
     assert_no_selector "button", text: "Delete section and its blocks…", visible: :all
@@ -410,8 +479,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     @section.update!(settings: @section.settings.merge("anchor" => "services"))
     render_card
 
-    assert_selector "#section-#{@section.id}-form input[type=text][name='block[settings][anchor]'][value=services][id='block-#{@section.id}-anchor'][autocomplete=off]:not([maxlength])"
-    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][aria-label='Anchor'][aria-describedby='block-#{@section.id}-anchor-help']"
+    assert_selector "#section-#{@section.id}-form input[type=text][name='block[settings][anchor]'][value=services][id='block-#{@section.id}-anchor'][autocomplete=off]:not([maxlength])", visible: :all
+    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][aria-label='Anchor'][aria-describedby='block-#{@section.id}-anchor-help']", visible: :all
     assert_selector "#block-#{@section.id}-anchor-help", text: "Lets a link jump here, as #anchor. Leave empty for none.", visible: :all
     assert_selector "#block-#{@section.id}-anchor-errors", visible: :all
   end
@@ -423,7 +492,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     reserve(@section, @editor_page, dana, "tab-bbbbbbbb")
     render_card_for(users(:one), "tab-aaaaaaaa")
 
-    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][value=services][readonly]"
+    assert_selector "#section-#{@section.id}-form input[name='block[settings][anchor]'][value=services][readonly]", visible: :all
   end
 
   test "a section whose own settings are held by someone else: the strip in its slot, the form read-only with the same names and values, no autosave on it" do
@@ -431,25 +500,25 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     dana.update!(name: "Dana Weiss")
     render_card_for(users(:one), "tab-aaaaaaaa")
     editable = controls_of("#section-#{@section.id}-form")
-    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']", visible: :all
 
     reserve(@section, @editor_page, dana, "tab-bbbbbbbb")
     render_card_for(users(:one), "tab-aaaaaaaa")
 
-    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot] [data-editing-kind=held]", text: "Dana Weiss is editing this block"
-    assert_selector "#section-#{@section.id}-form[data-editing-unit][data-editing-held=true]:not([data-controller])"
+    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot] [data-editing-kind=held]", text: "Dana Weiss is editing this block", visible: :all
+    assert_selector "#section-#{@section.id}-form[data-editing-unit][data-editing-held=true]:not([data-controller])", visible: :all
     assert_equal editable, controls_of("#section-#{@section.id}-form")
-    assert_selector "#section-#{@section.id}-form select[disabled]", count: 2
+    assert_selector "#section-#{@section.id}-form select[disabled]", count: 2, visible: :all
     assert_selector "[role=menu] button[data-action='admin--editing--hold#takeOver']", text: "Take over", visible: :all
   end
 
   test "held by nobody the slot is there and empty, and held by the viewer in this tab it is drawn as ever" do
     render_card_for(users(:one), "tab-aaaaaaaa")
-    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot]:empty"
+    assert_selector "#block-#{@section.id}-hold[data-editing-strip-slot]:empty", visible: :all
 
     reserve(@section, @editor_page, users(:one), "tab-aaaaaaaa")
     render_card_for(users(:one), "tab-aaaaaaaa")
-    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']", visible: :all
     assert_no_selector "[data-editing-held]"
   end
 
@@ -462,8 +531,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#block-#{@text.id}-panel[hidden][data-editing-held=true] fieldset.admin-held", visible: :all
     assert_selector "#block-#{@text.id}-panel #block-#{@text.id}-hold [data-editing-kind=held]", visible: :all
     assert_no_selector "#block-#{@text.id}-panel [data-controller~='admin--saving--autosave']", visible: :all
-    assert_selector "#content_block_#{@text.id}.admin-block-tile[data-editing-held=true]"
-    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']"
+    assert_selector "#content_block_#{@text.id}.admin-block-tile[data-editing-held=true]", visible: :all
+    assert_selector "#section-#{@section.id}-form[data-controller~='admin--saving--autosave']", visible: :all
     assert_selector "#block-#{@image.id}-panel form[data-controller~='admin--saving--autosave']", visible: :all
   end
 end

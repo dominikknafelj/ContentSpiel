@@ -61,6 +61,7 @@ module BlockTypes
         t.tokens themed: KINDS.keys.flat_map { |kind| %W[note-#{kind}-ground note-#{kind}-line note-#{kind}-ink note-#{kind}-border] }
         t.stylesheet "note.css"
         t.summary ->(block, locale:) { Note.summary(block, locale: locale) }
+        t.preview ->(block, locale:) { Note.preview(block, locale: locale) }
         # The guide's own example (a Tip with a title of its own), with the
         # title in the canary's three languages and a text the canary reads.
         t.sample settings: { "kind" => "tip" },
@@ -68,6 +69,18 @@ module BlockTypes
                  body: "Check the **address** of the page first.",
                  shows: [ "Before you publish", "Check the", "content-block--note-tip" ]
       end
+    end
+
+    # The tile's preview: the editor's title, else the kind's word, over the
+    # note's text as plain text. The kind's word is a fallback, not the
+    # block's content: a note with no title and no text has no preview, and
+    # its tile says "Empty" on its summary line.
+    def self.preview(block, locale:)
+      settings = block.settings_object(locale: locale)
+      text = block.body_document(locale: locale).plain_paragraphs.join(" ")
+      return if settings&.title.blank? && text.blank?
+
+      ContentModel::Preview.new(heading: settings&.title.presence || KINDS.fetch(kind_of(settings&.kind)), text: text)
     end
 
     # The tile's line of a closed Note, as parts (note block spec, "CS

@@ -11,6 +11,33 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     @beta = create_page(title: "Beta")
   end
 
+  # The markers rest hidden (`sr-only`, so a screen reader still reads them) and
+  # show on the row's hover and while the focus is in it. A Cuprite hover is a
+  # real pointer move, so `:hover` applies, and the browser is a mouse device
+  # (`blink-settings` in `ApplicationSystemTestCase`), so the
+  # `@media (hover: hover)` around Tailwind's `group-hover:` matches.
+  test "a row's markers show when the pointer is on it and when it has the focus" do
+    with_locales(%w[en de], default: "en") do
+      row = create_page(title: "Counted")
+      visit "/cs-studio/pages"
+      await_admin_controllers
+      assert page.evaluate_script("matchMedia('(hover: hover)').matches"), "the test browser reports it cannot hover"
+
+      marker = "li[data-page-id='#{row.id}'] > div [data-translation-marker=missing]"
+      assert_selector marker, text: "○1", visible: :all
+      assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
+
+      page.find("li[data-page-id='#{row.id}'] > div a[title='Counted']").hover
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on hover"
+
+      page.find("li[data-page-id='#{@alpha.id}'] > div a[title='Alpha']").hover
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width === '1px'", message: "the marker did not hide again"
+
+      page.execute_script("document.querySelector(\"li[data-page-id='#{row.id}'] > div a[title='Counted']\").focus()")
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on focus"
+    end
+  end
+
   test "dragging a page onto another node reparents it and persists" do
     visit "/cs-studio/pages"
     await_admin_controllers

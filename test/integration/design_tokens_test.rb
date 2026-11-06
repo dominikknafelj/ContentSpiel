@@ -155,7 +155,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes map, "--color-chrome: var(--cs-chrome);"
     (1..6).each { |n| assert_includes map, "--color-cat-#{n}: var(--cs-cat-#{n});" }
     colours = %w[field-fill rail popover structure structure-tint structure-ink live on-live scheduled on-scheduled
-                 head-action head-action-ink head-cool head-cool-ink head-warm head-warm-ink type-chip type-chip-ink on-danger]
+                 head-action head-action-ink head-cool head-cool-ink head-warm head-warm-ink type-chip type-chip-ink on-danger
+                 tile-raised]
     (colours.map { |name| "--cs-#{name}" } + (1..4).map { |n| "--cs-shadow-#{n}" }).each do |token|
       assert_includes light, "#{token}:", "#{token} missing from the light theme"
       assert_includes dark, "#{token}:", "#{token} missing from the dark theme"

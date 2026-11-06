@@ -359,4 +359,43 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, Admin::EditorScreen::TileSummaryComponent::LENGTH
     assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, BlockTypes::Code::SUMMARY_LENGTH
   end
+
+  test "a preview is cut on grapheme clusters, so a ZWJ emoji at the cut is whole or gone" do
+    family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+    length = ContentModel::BlockTypeDefinition::PREVIEW_LENGTH
+    text = ContentModel::Preview.new(text: ("a" * (length - 2)) + family + "tail").text
+    assert text.end_with?("#{family}…") || text.end_with?("a…"), text.last(8)
+    assert_equal length, text.scan(/\X/).size
+    assert_equal (("a" * (length - 2)) + family + "…"), text
+
+    cut = ContentModel::Preview.new(text: ("a" * (length - 1)) + family + "tail").text
+    assert_equal (("a" * (length - 1)) + "…"), cut
+  end
+
+  test "preview is a callable taking the block and locale:, and anything else is refused, the type's name first" do
+    d = definition
+    assert_nil d.preview
+    preview = ->(_block, locale:) { ContentModel::Preview.new(heading: locale, text: nil) }
+    d.preview preview
+    assert_same preview, d.preview
+
+    [ "words", ->(block) { block }, ->(locale:) { locale } ].each do |bad|
+      error = assert_raises(ArgumentError) { definition.preview bad }
+      assert_match(/\Atest_shape: `preview` is a callable taking the block and `locale:`/, error.message)
+    end
+  end
+
+  test "a type that declares no preview answers nil" do
+    assert_nil definition.preview
+  end
+
+  test "a preview's text is cut at PREVIEW_LENGTH and its heading at SUMMARY_LENGTH" do
+    assert_equal 240, ContentModel::BlockTypeDefinition::PREVIEW_LENGTH
+    preview = ContentModel::Preview.new(heading: "h" * 200, text: "t" * 500)
+    assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, preview.heading.length
+    assert_equal ContentModel::BlockTypeDefinition::PREVIEW_LENGTH, preview.text.length
+    assert_equal false, preview.mono
+    assert_predicate ContentModel::Preview.new(heading: " ", text: nil), :blank?
+    assert_not_predicate ContentModel::Preview.new(heading: nil, text: "x", mono: true), :blank?
+  end
 end

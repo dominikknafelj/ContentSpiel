@@ -76,9 +76,16 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "a selected state is seen: the tree row's ink bar, a selected pill's words and its paper focus ring, and the accent ring at rest" do
+  test "the selected row's accent bar is 3:1 or better on its sunken ground and on the chrome" do
     each_scheme do |scheme, colour|
-      assert_ratio(3.0, colour.("--cs-ink"), colour.("--cs-sunken"), "the selected row's bar (#{scheme})")
+      %w[--cs-sunken --cs-chrome].each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the selected row's accent bar on #{ground} (#{scheme})") }
+    end
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row--selected\s*\{\s*box-shadow:\s*inset 3px 0 0 var\(--cs-accent\);\s*\}/, css)
+  end
+
+  test "a selected state is seen: a selected pill's words and its paper focus ring, and the accent ring at rest" do
+    each_scheme do |scheme, colour|
       assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "a selected pill's words and ring (#{scheme})")
       assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus ring on a pill at rest (#{scheme})")
     end
@@ -116,6 +123,82 @@ class AdminContrastTest < ActiveSupport::TestCase
     dark = schemes[:dark]
     [ %w[--cs-surface --cs-paper], %w[--cs-rail --cs-surface], %w[--cs-popover --cs-rail] ].each do |upper, lower|
       assert_ratio(1.10, resolve_colour(dark, upper), resolve_colour(dark, lower), "#{upper} over #{lower} (dark)")
+    end
+  end
+
+  # A block card's state edges (`content-spiel.tailwind.css`): held, its
+  # type gone, its thread open. The edge is the card's only outline, so it is
+  # held to a state's 3:1 on the card it is drawn inside and on the canvas
+  # around the card.
+  test "a card's state edge is 3:1 or better against the card and the canvas, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-field-line --cs-danger --cs-accent].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
+        assert_ratio(3.0, colour.(edge), colour.(ground), "the #{edge} edge on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # A section's head (`.admin-section-card__head`): its words in the
+  # structure ink on the structure tint, and a word under the pointer or
+  # focused on the ink thinned to 12% over that tint (`.admin-section-word`).
+  # The name, the handle and the count stand on the same tint.
+  test "a section head's words and its hovered word are 4.5:1 or better on the structure tint" do
+    each_scheme do |scheme, colour|
+      tint = colour.("--cs-structure-tint")
+      hovered = mix(colour.("--cs-structure-ink"), tint, 0.12)
+      assert_ratio(4.5, colour.("--cs-structure-ink"), tint, "a word on the head (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-structure-ink"), hovered, "a hovered word (#{scheme})")
+      %w[--cs-ink --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), tint, "#{ink} on the head (#{scheme})") }
+      assert_ratio(3.0, colour.("--cs-accent"), hovered, "a focused word's ring (#{scheme})")
+    end
+  end
+
+  # A section's frame only groups (2.6:1 on the canvas, held above that
+  # floor); its state edges, held and unavailable, are a state's 3:1 on the
+  # canvas outside it and on the head's tint and the settings' rail inside.
+  test "a section's frame groups, and its held and unavailable edges are 3:1 or better on the canvas, the head and the settings" do
+    each_scheme do |scheme, colour|
+      assert_operator contrast(colour.("--cs-structure"), colour.("--cs-paper")), :>=, 2.6, "the frame on the canvas (#{scheme})"
+      %w[--cs-field-line --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
+        assert_ratio(3.0, colour.(edge), colour.(ground), "the section's #{edge} edge on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # An open or focused tile (`content-spiel.tailwind.css`, `.admin-block-tile`)
+  # is ringed in the accent outside its edge, where it stands on the section
+  # frame's tint or, in a lane at the page's own width, on the canvas.
+  test "the open tile's accent ring is 3:1 or better against the frame's ground and the canvas" do
+    each_scheme do |scheme, colour|
+      %w[--cs-paper --cs-structure-tint].each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the tile's ring on #{ground} (#{scheme})") }
+    end
+  end
+
+  # The drop place (`.admin-drag-ghost`, a tile's, a block card's and a tree
+  # row's) is a dashed edge with nothing inside it: the edge alone says where
+  # the drag lands, so it is a state's 3:1 on the grounds it stands on.
+  test "the drop place's dashed edge is 3:1 or better on the surface and the canvas" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    edge = css[/\.admin-drag-ghost \{[^}]*border: 1\.5px dashed var\((--cs-[\w-]+)\)/, 1]
+    assert edge, "the ghost's edge is a token"
+    each_scheme do |scheme, colour|
+      %w[--cs-surface --cs-paper].each { |ground| assert_ratio(3.0, colour.(edge), colour.(ground), "the drop place's #{edge} on #{ground} (#{scheme})") }
+    end
+  end
+
+  # The preview's words (`TileSummaryComponent`): the heading in ink and the
+  # text in dim, on the tile at rest and raised.
+  test "a tile's preview is readable on the tile at rest and raised" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].product(%w[--cs-surface --cs-tile-raised]).each do |ink, ground|
+        assert_ratio(4.5, colour.(ink), colour.(ground), "#{ink} on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  test "words on a raised tile are readable: ink, dim and meta 4.5:1 on --cs-tile-raised" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-tile-raised"), "#{ink} on --cs-tile-raised (#{scheme})") }
     end
   end
 

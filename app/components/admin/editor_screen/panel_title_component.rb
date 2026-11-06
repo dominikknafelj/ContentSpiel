@@ -10,7 +10,7 @@ module Admin
     # it, another tab's layout change is found out by a refused add -- and
     # the answer then rewrites this text inside the heading and leaves the
     # panel, its form and what is typed in it alone (`Admin
-    # ::ContentBlocksController#section_structure_streams`). The panel draws
+    # ::Answers::BlockDrawing#section_structure_streams`). The panel draws
     # its heading through this component too (`Admin::EditorScreen::BlockCardComponent`),
     # so the words a stream brings are the words a page load draws. Text
     # only: the heading element, with the id the panel's region is named by,

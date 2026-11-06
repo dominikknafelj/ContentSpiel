@@ -17,8 +17,8 @@ module ContentModel
     # What a block type brings beside its fields (block types spec, decision
     # 1). Each declaration is READ by the list that used to repeat it by hand:
     # `theme_methods` and `tokens` by `Theme::Contract`, `stylesheet` by the
-    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary` by
-    # the editor's tile, `read_only_actions` by the held form's allow-list,
+    # public stylesheet's build (`BlockTypes.theme_css_blocks`), `summary` and
+    # `preview` by the editor's tile, `read_only_actions` by the held form's allow-list,
     # `sample` by the shared tests. A declaration nothing reads would be
     # documentation in code; none of these is.
 
@@ -31,6 +31,9 @@ module ContentModel
     # tile (`Admin::EditorScreen::TileSummaryComponent::LENGTH`) and
     # `BlockTypes::Code`'s summary both read it.
     SUMMARY_LENGTH = 80
+
+    # The count a tile's preview text (`ContentModel::Preview#text`) is cut at.
+    PREVIEW_LENGTH = 240
 
     # The icons a block type may name (contrast and buttons spec, C2 and
     # Ruling 6): each is a branch of CS Studio's icon partial
@@ -156,7 +159,7 @@ module ContentModel
 
     # Whether a block's card and tile draw an icon of the block's own
     # (`for_block:`), which a save then has to redraw
-    # (`Admin::ContentBlocksController#block_icon_streams`).
+    # (`Admin::Answers::BlockDrawing#block_icon_streams`).
     def icon_follows_block? = !@icon_for_block.nil?
 
     # The icon one block of the type is drawn with: what `for_block:`
@@ -217,6 +220,18 @@ module ContentModel
       refuse "`summary` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
 
       @summary = callable
+    end
+
+    # The tile's heading and few words of a closed block, as data: a callable
+    # taking the block and `locale:` and answering a `ContentModel::Preview`
+    # or nil. A type that declares none is drawn from its `summary` alone.
+    # An answer that is not a Preview is the tile's to catch
+    # (`ArgumentError`), not a reason for the editor to fail.
+    def preview(callable = nil)
+      return @preview if callable.nil?
+      refuse "`preview` is a callable taking the block and `locale:`" unless callable.respond_to?(:call) && takes_block_and_locale?(callable)
+
+      @preview = callable
     end
 
     # The type's editor-script actions that only read or move focus: they

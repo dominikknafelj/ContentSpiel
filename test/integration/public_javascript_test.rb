@@ -12,7 +12,7 @@ require "test_helper"
 # The import map itself is the same on both (it's only a lookup table);
 # what differs is what each page preloads and imports.
 class PublicJavascriptTest < ActionDispatch::IntegrationTest
-  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ live/ notes/ editing/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
+  ADMIN_ONLY = %w[controllers/admin/ rich_text/ saving/ live/ notes/ editing/ editor/ search/ i18n/ media/ mind_graph/ @tiptap prosemirror linkifyjs sortablejs d3-force].freeze
 
   test "a public page loads the application entry point without any admin module" do
     create_page(title: "About")
@@ -75,10 +75,29 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     # The Table block's grid (`rich_text/table`, the table extension and
     # prosemirror-tables) is in the stack too: the one editor imports it, and
     # the public page above preloads none of it (`@tiptap`, `prosemirror`).
-    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema rich_text/table @tiptap--extension-table @tiptap--pm--tables prosemirror-tables prosemirror-model live/connection live/state notes/merge].each do |name|
+    %w[admin @tiptap--core controllers/admin/rich_text/editor_controller rich_text/schema rich_text/table @tiptap--extension-table @tiptap--pm--tables prosemirror-tables prosemirror-model live/connection live/state notes/merge editor/move_queue].each do |name|
       assert preloads.any? { |href| href.include?(name) }, "expected #{name} to be modulepreloaded in CS Studio: #{preloads.inspect}"
     end
     assert_includes entry_point_script, %(import "admin")
+  end
+
+  # SortableJS is imported with `import()` by the four controllers that drag
+  # (`editor/drag`'s `loadSortable`, the tree, Settings' language rows), and is
+  # `preload: false`: a screen with nothing to drag never fetches it, though
+  # the map still names it for the `import()` to resolve.
+  test "a CS Studio screen with nothing to drag preloads no SortableJS, and the editor fetches it on demand" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    page = create_page(title: "Landing")
+
+    [ "/cs-studio", "/cs-studio/pages/#{page.id}" ].each do |path|
+      get path
+
+      assert_response :success
+      assert modulepreloads.none? { |href| href.include?("sortablejs") }, "SortableJS is modulepreloaded on #{path}: #{modulepreloads.grep(/sortablejs/).inspect}"
+      assert_not_includes entry_point_script, "sortablejs"
+      assert_match(/"sortablejs":\s*"[^"]*sortablejs/, importmap_json, "the import map no longer maps sortablejs")
+    end
   end
 
   # Mind graph canvas spec §4.5: the graph's modules are imported by its own
@@ -324,4 +343,6 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }
 
   def entry_point_script = css_select("script[type=module]").map(&:text).join("\n")
+
+  def importmap_json = css_select("script[type=importmap]").map(&:text).join("\n")
 end

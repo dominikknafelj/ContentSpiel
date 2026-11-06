@@ -115,6 +115,28 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
+  # SortableJS is `preload: false` and every user of it imports it inside the
+  # function that makes its Sortables, so a screen with nothing to drag never
+  # fetches it. A static import is fetched at the controller's registration.
+  STATIC_SORTABLE_IMPORT = /^\s*import\b[^;]*?\bfrom\s*["']sortablejs["']|^\s*import\s+["']sortablejs["']/
+
+  test "no script imports SortableJS statically: it is loaded on demand" do
+    offenders = Dir[Rails.root.join("app/javascript/**/*.js")].select { |path| File.read(path).match?(STATIC_SORTABLE_IMPORT) }
+
+    assert_empty offenders.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+  end
+
+  test "the static SortableJS import pattern matches the static form and not import()" do
+    assert_match STATIC_SORTABLE_IMPORT, %(import Sortable from "sortablejs")
+    assert_match STATIC_SORTABLE_IMPORT, %(  import Sortable from 'sortablejs')
+    assert_match STATIC_SORTABLE_IMPORT, %(import { Sortable } from "sortablejs")
+    assert_match STATIC_SORTABLE_IMPORT, %(import Sortable, { Swap } from "sortablejs")
+    assert_match STATIC_SORTABLE_IMPORT, %(import * as Sortable from "sortablejs")
+    assert_match STATIC_SORTABLE_IMPORT, %(import "sortablejs")
+    assert_no_match STATIC_SORTABLE_IMPORT, %(const { default: Sortable } = await import("sortablejs"))
+    assert_no_match STATIC_SORTABLE_IMPORT, %(import("sortablejs").then((m) => m.default))
+  end
+
   # One placeholder for a record with no title, everywhere: "(untitled)".
   test "a blank title reads (untitled), never Untitled" do
     offenders = Dir[Rails.root.join("app/**/*.{rb,erb,js}")].select { |f| File.read(f).match?(/["']Untitled["']/) }
@@ -195,6 +217,102 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
+  # A block card's and a tile's state (held, its type gone, its thread open)
+  # is an outline inside its edge, drawn by the stylesheet from an attribute,
+  # so nothing changes size and no shadow is overwritten; a border utility on
+  # the wrapper or the head would be a second edge beside it.
+  EDITOR_CARDS = %w[block_card_component.html.erb block_tile_component.html.erb section_card_component.html.erb].map { |f| "app/components/admin/editor_screen/#{f}" }.freeze
+  EDITOR_CARD_WRAPPER = /class[=:].*(?<![\w-])admin-block-(?:card|tile)(?:__head)?(?![\w-])/
+  BORDER_EDGE = /(?<![\w-])border(?:-(?:line|line-strong|danger|accent|field-line))?(?=[\s"'])/
+  # In the order they win by: the later rule, at one weight.
+  CARD_EDGES = { '.admin-block-card[data-card-edge="held"]' => "--cs-field-line",
+                 ".admin-block-card:where(:not(.admin-section-card))[data-notes-active]" => "--cs-accent",
+                 '.admin-block-card[data-card-edge="unavailable"]' => "--cs-danger" }.freeze
+
+  test "the editor's cards and tiles draw no border utility: their edges are the stylesheet's state outlines" do
+    wrappers = EDITOR_CARDS.flat_map { |path| Rails.root.join(path).readlines.each_with_index.select { |line, _| line.match?(EDITOR_CARD_WRAPPER) }.map { |line, index| [ path, index, line ] } }
+    assert_operator wrappers.size, :>=, 3, "the wrapper lines are found: the card's, its head's and the tile's"
+    offences = wrappers.select { |_, _, line| line.match?(BORDER_EDGE) }.map { |path, index, _| "#{path}:#{index + 1}" }
+    assert_empty offences, "a border utility on a card or tile wrapper"
+
+    CARD_EDGES.each do |selector, token|
+      body = single_rule(selector)
+      assert_match(/outline:\s*2px solid var\(#{token}\)/, body, selector)
+      assert_match(/outline-offset:\s*-2px/, body, selector)
+    end
+    order = CARD_EDGES.keys.map { |selector| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == [ selector ] } }
+    assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
+  end
+
+  # A live merge synchronises a section's frame, which is not a kept unit,
+  # so a frozen settings form's held edge cannot live in `data-card-edge`
+  # there: the stylesheet draws it from the frozen form.
+  FROZEN_SECTION_EDGE = '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))'
+
+  test "a section whose settings form is frozen draws the held edge from the form, under the unavailable edge" do
+    body = single_rule(FROZEN_SECTION_EDGE)
+    assert_match(/outline:\s*2px solid var\(--cs-field-line\)/, body)
+    assert_match(/outline-offset:\s*-2px/, body)
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    frozen = rules.index { |found, _| found == [ FROZEN_SECTION_EDGE ] }
+    unavailable = rules.index { |found, _| found == [ '.admin-block-card[data-card-edge="unavailable"]' ] }
+    assert_operator frozen, :<, unavailable, "the unavailable edge comes later and weighs more"
+  end
+
+  # A section is a frame of the structure colour around its lanes, not a
+  # card: no ground of its own, the frame's radius, a 1.5px edge, danger
+  # when its type is gone. Its head is tinted and its words are the head's
+  # ink, thinned behind them under the pointer or the focus.
+  test "a section is a structure frame with a tinted head, and its words are the head's ink" do
+    frame = single_rule(".admin-section-card")
+    assert_match(/border:\s*1\.5px solid var\(--cs-structure\)/, frame)
+    assert_match(/border-radius:\s*var\(--cs-radius-frame\)/, frame)
+    assert_match(/background:\s*transparent/, frame)
+    assert_match(/border-color:\s*var\(--cs-danger\)/, single_rule('.admin-section-card[data-card-edge="unavailable"]'))
+    head = single_rule(".admin-section-card__head")
+    assert_match(/background:\s*var\(--cs-structure-tint\)/, head)
+    assert_match(/color:\s*var\(--cs-structure-ink\)/, head)
+    assert_match(/border-radius:\s*calc\(var\(--cs-radius-frame\) - 1\.5px\) calc\(var\(--cs-radius-frame\) - 1\.5px\) 0 0/, head)
+    assert_match(/padding:\s*10px 12px/, head)
+    word = single_rule(".admin-section-word")
+    assert_match(/color:\s*var\(--cs-structure-ink\)/, word)
+    assert_match(/font-size:\s*13px/, word)
+    assert_match(/border-radius:\s*var\(--cs-radius\)/, word)
+    assert_match(/background:\s*color-mix\(in srgb, var\(--cs-structure-ink\) 12%, transparent\)/, single_rule(".admin-section-word:is(:hover, :focus-visible)"))
+    assert_match(/outline:\s*2px solid var\(--cs-accent\)/, single_rule(".admin-section-word:focus-visible"))
+  end
+
+  # A tile's states are drawn by elevation (`.admin-block-tile`): at rest
+  # the first, under the pointer the second, open or focused the third with
+  # the accent ring outside its edge, its thread open the accent outline
+  # inside it. No border: the drop place's dashes are the only edge a tile
+  # shows, and only while it is the place a drag would land.
+  TILE_STATES = {
+    [ ".admin-block-tile" ] => [ "var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ],
+    [ ".admin-block-tile:where(:hover)" ] => [ "box-shadow: var(--cs-shadow-2)", "background: var(--cs-tile-raised)" ],
+    [ '.admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"]))', ".admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible))" ] =>
+      [ "box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent)", "background: var(--cs-tile-raised)" ],
+    [ ".admin-block-tile[data-notes-active]" ] => [ "outline: 2px solid var(--cs-accent)", "outline-offset: -2px" ],
+    [ ".admin-drag-ghost" ] => [ "border: 1.5px dashed var(--cs-field-line)", "border-radius: var(--cs-radius-tile)", "box-shadow: none" ],
+    [ ".admin-drag-chosen" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ],
+    [ ".admin-drag-fallback" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ]
+  }.freeze
+
+  test "a tile's states are elevations and the accent, and none of them is a border" do
+    TILE_STATES.each do |selectors, declarations|
+      body = rule_for(selectors)
+      declarations.each { |declaration| assert_includes body, declaration, selectors.join(", ") }
+      assert_no_match(/(?<![\w-])border(?:-color)?:/, body, selectors.join(", ")) unless selectors == [ ".admin-drag-ghost" ]
+    end
+    order = TILE_STATES.keys.map { |selectors| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, open or focused, the thread, then the drop place and the lifted tile: the later state wins at one weight"
+  end
+
+  test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
+    [ 'class="border ', "border-line ", "border-line-strong\"", "border-danger'", "border-accent ", "border-field-line\"", "data-[notes-active]:border-accent " ].each { |sample| assert_match BORDER_EDGE, sample }
+    [ "rounded-card ", "outline-accent ", "border-b ", "borderless ", "admin-border-x " ].each { |sample| assert_no_match BORDER_EDGE, sample }
+  end
+
   # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
   # link, a label and a script take): an outlined box with a field-line edge on
   # a button, a menu's trigger or anything a pointer presses is the old look
@@ -240,6 +358,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert CONTROL_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE) } },
         "#{marker} no longer draws a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
     end
+  end
+
+  test "the block picker builds no button of its own" do
+    source = Rails.root.join("app/components/admin/editor_screen/block_picker_component.rb").read.gsub(/^\s*#.*$/, "")
+    assert_no_match(/VARIANT_CLASSES|SMALL_CLASS/, source)
+    assert_match(/ButtonComponent\.classes\(:primary\)/, source)
   end
 
   test "the rich-text popover's script-built buttons and input are the component's strings" do
@@ -698,9 +822,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # not per element. The public site is the theme's and out of scope (its
   # language switcher keeps `shadow-menu`, which its own stylesheet defines).
   SHADOW = /(?<![\w-])shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|menu|\[[^\]]*\])(?![\w-])/
-  SHADOW_ALLOWED = {
-    "app/components/admin/pages_screen/tree_node_component.rb" => "the selected row's bar; stage 2 draws it in the accent"
-  }.freeze
+  SHADOW_ALLOWED = {}.freeze
   RADIUS = /(?<![\w-])rounded-(?:(?:[trblse]|tl|tr|bl|br|ss|se|es|ee)-)?(?:xs|sm|md|lg|xl|2xl|3xl|4xl|\[[^\]]*\])(?![\w-])/
   ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS
 
@@ -728,6 +850,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "every shadow allowance is still there" do
+    assert_empty SHADOW_ALLOWED, "an allowance is added with its reason; this guard reads each entry for the shadow it excuses" if SHADOW_ALLOWED.empty?
     SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
   end
 

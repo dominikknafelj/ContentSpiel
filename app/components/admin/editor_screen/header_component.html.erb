@@ -147,7 +147,7 @@
   <% end %>
 
   <%# Always present, empty: a 409 autosave answer puts the "Changed
-      elsewhere" bar here (`Admin::AutosaveResponses#stale_streams`). Nothing
+      elsewhere" bar here (`Admin::Answers::Stale`). Nothing
       but the tag inside it, so `:empty` holds until a stream fills it.
       The post's hold strip (`hold_strip`) shares this element with that bar:
       the live merge never replaces an area showing an alert, so a post that

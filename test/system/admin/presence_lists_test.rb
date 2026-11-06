@@ -98,13 +98,14 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
   def show_document = page.execute_script("window.__hidden = false; document.dispatchEvent(new Event('visibilitychange'))")
 
-  # What a marker looks like, measured.
+  # What a marker looks like, measured. What stands before it is the last sibling
+  # in the flow: a translation marker at rest is `sr-only` (absolute, 1px) and takes no room.
   def look(marker)
     page.evaluate_script(<<~JS)
       (() => {
         const marker = document.querySelector(#{marker.to_json})
         const [ icon, count ] = [ marker.querySelector("svg"), marker.querySelector("[data-presence-marker-count]") ]
-        const before = [ ...marker.parentElement.children ].slice(0, [ ...marker.parentElement.children ].indexOf(marker)).filter((each) => each.getClientRects().length).pop()
+        const before = [ ...marker.parentElement.children ].slice(0, [ ...marker.parentElement.children ].indexOf(marker)).filter((each) => each.getClientRects().length && getComputedStyle(each).position !== "absolute").pop()
         const probe = document.body.appendChild(Object.assign(document.createElement("span"), { className: "text-meta" }))
         const meta = getComputedStyle(probe).color
         probe.remove()

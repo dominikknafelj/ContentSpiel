@@ -14,7 +14,7 @@ module Admin
   #
   # A controller that includes this must also include
   # `Admin::AutosaveResponses` where it calls `refuse_held` (it uses
-  # `live_record?` and Turbo's `turbo_stream`); the instant actions
+  # `live_record?`); the instant actions
   # (`held_elsewhere?`, `refuse_instant_redirect`) need neither.
   #
   # THE ORDER IN AN AUTOSAVE ACTION is in two calls, and nowhere else:
@@ -60,7 +60,7 @@ module Admin
     end
 
     # What an autosave action does before it reads its form, in the one order
-    # that is right (final review M5: these lines stood in three actions):
+    # that is right, kept here so the three actions cannot drift apart:
     #   1. the claim: the tab takes the subject, renews it, or is refused;
     #   2. the refusal, a 409, when another tab holds it, whatever the base is;
     #   3. the stale check, which gives back a claim this very request took.
@@ -76,14 +76,12 @@ module Admin
       claim
     end
 
+    # The 409 of a save from a tab that does not hold the subject
+    # (`Admin::Answers::Held`).
     def refuse_held(subject, status_id:, error_prefix:)
-      hold = ::Editing::Reservation.holder_of(subject)
-      strip = Admin::EditorScreen::HoldStripComponent.new(subject:, hold:, viewer: Current.user, kind: :lost)
-      render status: :conflict, turbo_stream: [
-        turbo_stream.replace(status_id, Admin::Ui::SaveStatusComponent.new(id: status_id, state: :held, live: live_record?(subject), holder: hold, viewer: Current.user)),
-        turbo_stream.update(Admin::EditorScreen::HoldStripComponent.slot_id(subject), strip),
-        turbo_stream.remove("toast-#{error_prefix}")
-      ]
+      answer = Admin::Answers::Held.new(view: view_context).answer(subject: subject, hold: ::Editing::Reservation.holder_of(subject),
+        viewer: Current.user, status_id: status_id, error_prefix: error_prefix, live: live_record?(subject))
+      render turbo_stream: answer.streams, status: answer.status
     end
 
     # Runs the save, and gives back a claim this request `:taken` when the

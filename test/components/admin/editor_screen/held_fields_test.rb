@@ -218,7 +218,7 @@ class Admin::EditorScreen::HeldFieldsTest < ViewComponent::TestCase
     outline = BlockOutline.new(page.content_blocks.reload)
     render_inline Admin::EditorScreen::SectionCardComponent.new(page: page, section: outline.top_level.first, outline: outline, locale: "en", editable: true)
 
-    assert_selector "#section-#{section.id}-form select", count: 2
+    assert_selector "#section-#{section.id}-form select", count: 2, visible: :all
     assert_survives(rendered_content)
   end
 

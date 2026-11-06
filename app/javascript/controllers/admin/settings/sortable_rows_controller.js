@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import Sortable from "sortablejs"
+import { loadSortable } from "editor/drag"
 
 // Rows that can be reordered, where the new order is only PENDING (design pass
 // round 3, Task 6): the Languages card in Settings. Unlike the block list
@@ -36,7 +36,20 @@ export default class extends Controller {
   static targets = ["list", "row", "order", "announcer", "handle"]
 
   connect() {
-    this.sortable = Sortable.create(this.listTarget, {
+    this.element.dataset.sortable = "pending"
+    const token = this.loadToken = {}
+    loadSortable().then((Sortable) => {
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
+
+      this.Sortable = Sortable
+      this.makeSortable()
+      this.element.dataset.sortable = "ready"
+    })
+  }
+
+  makeSortable() {
+    this.sortable = this.Sortable.create(this.listTarget, {
       handle: "[data-admin--settings--sortable-rows-target='handle']",
       animation: 150,
       ghostClass: "admin-drag-ghost",
@@ -54,8 +67,10 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.loadToken = null
     this.sortable?.destroy()
     this.sortable = null
+    delete this.element.dataset.sortable
   }
 
   // A pointer drag that starts while a row is still picked up by the keyboard
@@ -74,7 +89,7 @@ export default class extends Controller {
   // form: stripped of ids and Stimulus wiring (as `admin--editor--blocks` does) so
   // nothing exists twice or connects in it.
   makeCloneInert() {
-    const clone = Sortable.ghost
+    const clone = this.Sortable?.ghost
     if (!clone) return
     for (const element of [clone, ...clone.querySelectorAll("*")]) {
       for (const { name } of Array.from(element.attributes)) {

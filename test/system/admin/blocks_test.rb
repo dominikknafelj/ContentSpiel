@@ -20,7 +20,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     # own comment): Turbo Drive already appends the Turbo Stream `Accept`
     # header to a non-GET form submission on its own, so this is a normal
     # submit, not a fetch this test would otherwise have to wait on by hand.
-    press "Rich text"
+    add_block "Rich text"
 
     assert_selector ".admin-block-card", text: "Rich text"
     assert_equal 1, @page.content_blocks.count
@@ -40,7 +40,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     assert_selector "#{card_for(first)} button[data-move='down'][disabled]", visible: :all
-    within("#block-picker-end") { press "Image" }
+    add_block "Image"
 
     assert_selector "#content-blocks-list > .admin-block-card", count: 2
     added = @page.content_blocks.where.not(id: first.id).sole
@@ -110,7 +110,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     # One tick: the Add goes out (and is slow), then Move down on the first card.
     page.execute_script(<<~JS)
-      Array.from(document.querySelectorAll("#block-picker-end button")).find((b) => b.textContent.trim() === "Rich text").click()
+      document.querySelector("#block-picker-end button[aria-haspopup=menu]").click()
+      Array.from(document.querySelectorAll("#block-picker-end [role=menu] button")).find((b) => b.textContent.trim() === "Rich text").click()
       document.querySelector('[data-block-id="#{first.id}"] [data-move="down"]').click()
     JS
 
@@ -345,7 +346,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    press "Post list"
+    add_block "Post list"
     assert_selector ".admin-block-card", text: "Post list"
     block = @page.content_blocks.sole
 
@@ -370,7 +371,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   test "a queued block save doesn't make the page settings form report a false conflict" do
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    press "Post list"
+    add_block "Post list"
     assert_selector ".admin-block-card", text: "Post list"
     block = @page.content_blocks.sole
 
@@ -484,5 +485,40 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_operator slack, :>=, 0, "the block's name is cut short by the status line (#{-slack}px of it hidden)"
   ensure
     page.execute_script("document.querySelector(#{card.to_json})?.style.removeProperty('width')") if card
+  end
+
+  # A card that is held and has its thread open shows the notes edge: the
+  # three edges weigh the same and the later rule wins, held, then notes,
+  # then unavailable (`content-spiel.tailwind.css`). What the browser draws,
+  # each edge compared with its token resolved on the card.
+  test "a card both held and notes-active draws the notes edge, and an unavailable one the danger edge over both" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit_editor(@page)
+
+    edges = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.getElementById(#{ActionView::RecordIdentifier.dom_id(block).to_json})
+        const token = (name) => {
+          const probe = document.createElement("span")
+          probe.style.color = `var(${name})`
+          card.appendChild(probe)
+          const value = getComputedStyle(probe).color
+          probe.remove()
+          return value
+        }
+        const edge = () => getComputedStyle(card).outlineColor
+        card.setAttribute("data-card-edge", "held")
+        const held = edge()
+        card.setAttribute("data-notes-active", "")
+        const both = edge()
+        card.setAttribute("data-card-edge", "unavailable")
+        const unavailable = edge()
+        return { held, both, unavailable, line: token("--cs-field-line"), accent: token("--cs-accent"), danger: token("--cs-danger") }
+      })()
+    JS
+    assert_equal edges["line"], edges["held"]
+    assert_equal edges["accent"], edges["both"], "held and notes-active: the notes edge"
+    assert_equal edges["danger"], edges["unavailable"]
+    assert_not_equal edges["line"], edges["accent"]
   end
 end

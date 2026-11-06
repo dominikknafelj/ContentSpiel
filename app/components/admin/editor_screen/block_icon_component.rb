@@ -3,7 +3,8 @@ module Admin
     # A block type's icon where the editor names the type (contrast and
     # buttons spec, C2): on a chip in its family's hue
     # (`Admin::Ui::IconChipComponent`), 24px in the picker and on a card's
-    # head, 22px on a tile, where it stands in for the name. A type naming no
+    # head, 22px on a tile, where it stands in for the name, and on a
+    # section's head, beside the name. A type naming no
     # family is on the neutral chip. Decoration: the name is always beside
     # it, on the tile as `sr-only` text. A type that names no
     # icon draws nothing (Ruling 7).
@@ -13,10 +14,10 @@ module Admin
     # on its card and its tile, which hand their block in, and with the
     # type's in the picker, which has none. Only such an icon carries an id
     # (`dom_id`): a save's answer replaces it
-    # (`Admin::ContentBlocksController#block_icon_streams`), because neither
+    # (`Admin::Answers::BlockDrawing#block_icon_streams`), because neither
     # the card's head nor the tile's face is re-rendered by a save.
     class BlockIconComponent < AdminComponent
-      PLACES = { picker: :regular, card: :regular, tile: :small }.freeze
+      PLACES = { picker: :regular, card: :regular, tile: :small, section: :small }.freeze
 
       def self.dom_id(block, place) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-icon-#{place}"
 

@@ -206,13 +206,51 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[data-status=scheduled][data-unpublished-changes][aria-label='Scheduled · Unpublished changes'][class~='bg-warn']"
   end
 
-  test "the selected row has the sunken ground and a 2px ink bar on its left edge" do
+  test "the selected row carries the accent bar's class and no inline shadow" do
+    chosen = create_page(title: "Chosen")
+    render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: chosen, locale: "en"))
+    row = page.find("li[data-page-id='#{chosen.id}'] > div", match: :first)
+    assert_includes row[:class].split, "admin-tree-row--selected"
+    assert_no_match(/shadow-/, row[:class])
+  end
+
+  test "the selected row has the sunken ground, a semibold title and the accent bar's class" do
     chosen = create_page(title: "Chosen")
     other = create_page(title: "Other")
     render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: chosen, locale: "en"))
 
-    assert_selector "li[data-page-id='#{chosen.id}'] > div[class~='bg-sunken'][class~='shadow-[inset_2px_0_0_var(--cs-ink)]']"
+    assert_selector "li[data-page-id='#{chosen.id}'] > div.admin-tree-row--selected[class~='bg-sunken']"
+    assert_selector "li[data-page-id='#{chosen.id}'] > div a.font-semibold"
+    assert_no_selector "li[data-page-id='#{chosen.id}'] > div[class*='shadow-']"
     assert_no_selector "li[data-page-id='#{other.id}'] > div[class~='bg-sunken']"
+    assert_no_selector "li[data-page-id='#{other.id}'] > div.admin-tree-row--selected"
+  end
+
+  HIDDEN_AT_REST = %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only].freeze
+
+  test "a row's translation markers are hidden at rest but read, and shown on the selected row" do
+    with_locales(%w[en de es], default: "en") do
+      row = create_page(title: "Counted", translations: { "en" => { title: "Counted", subtitle: "Sub" }, "de" => { title: "Gezählt", subtitle: "Unter" } })
+      assert Pages::Save.call(row, translations: { "en" => { title: "Counted again", subtitle: "Sub!" } }).ok?
+      render_tree
+
+      %w[outdated missing].each do |kind|
+        marker = page_node(row).find("[data-translation-marker=#{kind}]")
+        classes = marker[:class].split
+        HIDDEN_AT_REST.each { |token| assert_includes classes, token }
+        assert_includes classes, "text-count"
+        assert_equal "img", marker[:role]
+        assert marker["aria-label"].present?
+        assert_no_match(/\bhidden\b/, marker[:class])
+        assert_nil marker["aria-hidden"]
+      end
+
+      render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: row, locale: "en"))
+      %w[outdated missing].each do |kind|
+        classes = page_node(row).find("[data-translation-marker=#{kind}]")[:class].split
+        HIDDEN_AT_REST.each { |token| assert_not_includes classes, token }
+      end
+    end
   end
 
   # A row can be without a position (a half-written one; the column takes

@@ -80,6 +80,20 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "tile-summary"
   end
 
+  # The preview is drawn inside the tile summary's element, so the stream
+  # that replaces it after a save carries the new heading and text.
+  test "a saved rich text in a section streams its tile's new preview" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0, body: rich_doc("Before"))
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { body: rich_doc("## Opening hours\n\nWe open at nine.").to_json }, base_updated_at: inside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary'] template" do
+      assert_select ".admin-block-tile__title", text: "Opening hours"
+      assert_select ".admin-block-tile__text", text: "We open at nine."
+    end
+  end
+
   test "a saved block in a section streams the summary of what was saved, and a refused stale save streams none" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
@@ -130,7 +144,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     delete "#{blocks_path}/#{inside.id}", as: :turbo_stream
     assert_response :success
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
-      assert_select "#section-#{section.id}-summary", text: "2 columns · 1 block"
+      assert_select "#section-#{section.id}-summary", text: "1 block"
     end
 
     delete "#{blocks_path}/#{outside.id}", as: :turbo_stream
@@ -241,7 +255,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=update][target='block-#{moved.id}-panel-title'] template", text: "Image · column 1"
     assert_select "turbo-stream[target='block-#{moved.id}-panel']", count: 0
     assert_select "turbo-stream[target='block-#{stays.id}-panel']", count: 0
-    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "1 column · 2 blocks"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "2 blocks"
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template" do
       assert_select "button[data-admin--editor--section-layout-param='one'][aria-current='true']"
       assert_select "button[aria-current='true']", count: 1
@@ -277,12 +291,12 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     save = ->(style) { patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content", style: style } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream }
 
     get admin_page_path(@page)
-    assert_select "#section-#{section.id}-header select[name='block[settings][style]']", 0
-    assert_select "#section-#{section.id}-header select[name='block[settings][width]']", 1
+    assert_select "#section-#{section.id}-settings select[name='block[settings][style]']", 0
+    assert_select "#section-#{section.id}-settings select[name='block[settings][width]']", 1
 
     with_choices_theme do
       get admin_page_path(@page)
-      assert_select "#section-#{section.id}-header select[name='block[settings][style]'][id='block-#{section.id}-style']" do
+      assert_select "#section-#{section.id}-settings select[name='block[settings][style]'][id='block-#{section.id}-style']" do
         assert_select "option", count: 3
         assert_select "option[value='']", text: "Default"
         assert_select "option[value=services]", text: "Services"
@@ -299,7 +313,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     # The theme no longer declares it: the stored name is shown first, marked,
     # and a save that keeps it is not refused; another unknown name is.
     get admin_page_path(@page)
-    assert_select "#section-#{section.id}-header select[name='block[settings][style]'] option[selected][value=services]", text: "services (not in this theme)"
+    assert_select "#section-#{section.id}-settings select[name='block[settings][style]'] option[selected][value=services]", text: "services (not in this theme)"
     save.call("services")
     assert_response :success
     save.call("elsewhere")
@@ -381,7 +395,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-lanes']"
     assert_select "turbo-stream[action=update][target='block-#{folded.id}-panel-title'] template", text: "Image · column 2"
-    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "2 columns · 1 block"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "1 block"
     assert_select "turbo-stream[target='block-#{folded.id}-panel']", count: 0
     # Not the layout menu: the form it belongs to holds the layout this tab
     # loaded, and its next save is refused as stale and says so.
@@ -588,7 +602,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
 
     assert_response :success
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card.border-danger", text: /Unavailable type — gone\/section/
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card[data-card-edge='unavailable']", text: /Unavailable type — gone\/section/
     assert_select "#section-#{section.id}-lane-1[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(first)}.admin-block-tile"
     assert_select "#section-#{section.id}-lane-3[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(third)}.admin-block-tile"
     assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--saving--autosave']"
@@ -602,7 +616,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
 
     assert_select ".admin-section-card", count: 0
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card.border-danger", text: /Unavailable type — gone\/section/
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card[data-card-edge=unavailable]", text: /Unavailable type — gone\/section/
   end
 
   test "deleting a section whose type is gone deletes its blocks and removes its card" do
@@ -751,7 +765,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     end
     assert_select "turbo-stream[target='content-blocks-list']", count: 0
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
-      assert_select "#section-#{section.id}-summary", text: "2 columns · 3 blocks"
+      assert_select "#section-#{section.id}-summary", text: "3 blocks"
     end
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count']"
     panel = response.body.index(%(id="block-#{copy.id}-panel"))
@@ -1668,7 +1682,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "tip", block.reload.settings["kind"]
   end
 
-  test "a Note in a column says its kind and text on its tile, is duplicated with its title, and is deleted" do
+  test "a Note in a column says its title on its tile, is duplicated with its title, and is deleted" do
     section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
     post blocks_path, params: { block: { block_type: "note" }, section_id: section.id, column: 2 }, as: :turbo_stream
     assert_response :success
@@ -1677,7 +1691,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     save_note(block, { kind: "important", title: "Read this" })
     assert_response :success
-    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template", text: /Read this · Empty/
+    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template .admin-block-tile__title", text: "Read this"
     assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template svg", count: 0
     assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-tile'] template span[data-block-icon='circle_alert']"
     assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='circle_alert']"

@@ -1,10 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import Sortable from "sortablejs"
 import { enqueue, holdTurboRequest } from "saving/queue"
 import { orderErrorToast, sendOrder } from "saving/order_request"
 import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
+import { loadSortable } from "editor/drag"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
@@ -54,40 +54,50 @@ export default class extends Controller {
       holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
-    this.sortables = this.listTargets.map((list) =>
-      Sortable.create(list, {
-        group: "pages",
-        animation: 150,
-        // Only the ⠿ handle starts a drag -- the row's own title stays a
-        // normal, clickable link.
-        handle: ".admin-tree-node__handle",
-        // The drag look (handoff §9 A9): a dashed placeholder where the row
-        // would land, and the lifted row itself with a shadow.
-        ghostClass: "admin-drag-ghost",
-        chosenClass: "admin-drag-chosen",
-        // SortableJS's own pointer-driven drag instead of native HTML5
-        // drag-and-drop: the handle is a `<button>` (so the keyboard reaches
-        // it), and Firefox never starts a native drag from a button -- with
-        // the default, the mouse path would be dead there. The fallback
-        // drags a clone of the row (`fallbackClass`, styled like the lifted
-        // row), appended to `<body>` so no scrolling or transformed ancestor
-        // (the tree column is a drawer on a narrow screen) can clip or
-        // offset it. `fallbackTolerance`: a press has to travel a few pixels
-        // before it is a drag, so a slightly shaky click that only means to
-        // focus the handle doesn't lift the row.
-        forceFallback: true,
-        fallbackOnBody: true,
-        fallbackClass: "admin-drag-fallback",
-        fallbackTolerance: 3,
-        onEnd: (event) => this.onDrop(event)
-      })
-    )
+    this.element.dataset.sortable = "pending"
+    const token = this.loadToken = {}
+    loadSortable().then((Sortable) => {
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
+
+      this.sortables = this.listTargets.map((list) =>
+        Sortable.create(list, {
+          group: "pages",
+          animation: 150,
+          // Only the ⠿ handle starts a drag -- the row's own title stays a
+          // normal, clickable link.
+          handle: ".admin-tree-node__handle",
+          // The drag look (handoff §9 A9): a dashed placeholder where the row
+          // would land, and the lifted row itself with a shadow.
+          ghostClass: "admin-drag-ghost",
+          chosenClass: "admin-drag-chosen",
+          // SortableJS's own pointer-driven drag instead of native HTML5
+          // drag-and-drop: the handle is a `<button>` (so the keyboard reaches
+          // it), and Firefox never starts a native drag from a button -- with
+          // the default, the mouse path would be dead there. The fallback
+          // drags a clone of the row (`fallbackClass`, styled like the lifted
+          // row), appended to `<body>` so no scrolling or transformed ancestor
+          // (the tree column is a drawer on a narrow screen) can clip or
+          // offset it. `fallbackTolerance`: a press has to travel a few pixels
+          // before it is a drag, so a slightly shaky click that only means to
+          // focus the handle doesn't lift the row.
+          forceFallback: true,
+          fallbackOnBody: true,
+          fallbackClass: "admin-drag-fallback",
+          fallbackTolerance: 3,
+          onEnd: (event) => this.onDrop(event)
+        })
+      )
+      this.element.dataset.sortable = "ready"
+    })
   }
 
   disconnect() {
+    this.loadToken = null
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables?.forEach((sortable) => sortable.destroy())
-    this.sortables = []
+    this.sortables = null
+    delete this.element.dataset.sortable
   }
 
   // SortableJS's `onEnd`: where the dragged <li> landed (`event.to`, the

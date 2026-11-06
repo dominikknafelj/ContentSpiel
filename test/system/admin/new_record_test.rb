@@ -207,13 +207,9 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   private
 
   # A row's "+" is drawn only while the pointer is over the row (or the link
-  # has keyboard focus): Tailwind puts every `hover:` style inside
-  # `@media (hover: hover)`, and the headless Chrome on the CI runner reports
-  # a device that cannot hover, so there the link never becomes visible
-  # however the pointer moves (it failed on every CI run and never locally).
-  # The link is in the page and clickable either way -- only its opacity
-  # differs -- so the click doesn't wait for visibility; the hover stays for
-  # the browsers where it is what a person would do.
+  # has keyboard focus). The link is in the page and clickable either way --
+  # only its opacity differs -- so it is found with `visible: :all` and the
+  # click doesn't wait for the opacity; the hover is what a person does first.
   def add_page_under(parent)
     link = find("li[data-page-id='#{parent.id}'] > div a[aria-label^='Add a page under']", visible: :all)
     link.hover

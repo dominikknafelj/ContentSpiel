@@ -22,12 +22,26 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # `JsErrorCollector::IGNORED`.
   # `no-sandbox` because GitHub's runners (and most containers) can't give
   # Chrome its user-namespace sandbox.
+  #
+  # `blink-settings`: the browser is a desktop with a mouse, the device CS
+  # Studio is drawn for, on every machine. Headless Chrome takes its pointer
+  # and hover capabilities from the host: a Mac answers `(hover: hover)`, a
+  # GitHub runner has no pointing device and answers `(hover: none)` and
+  # `(pointer: none)`, and Tailwind puts every `hover:` and `group-hover:`
+  # style inside `@media (hover: hover)`, which such a browser never applies
+  # however Cuprite moves the mouse. The values are Blink's
+  # `HoverType` (2, hover) and `PointerType` (4, fine) enums; the available
+  # ones are bitmasks of the same values. `Emulation.setEmulatedMedia`
+  # cannot do this: Chrome ignores `hover` and `pointer` there.
   driven_by :cuprite, screen_size: [ 1400, 1400 ], options: {
     headless: true,
     js_errors: false,
     process_timeout: 30,
     timeout: 15,
-    browser_options: { "no-sandbox" => nil }
+    browser_options: {
+      "no-sandbox" => nil,
+      "blink-settings" => "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
+    }
   }
 
   # A node whose page has been replaced is stale AT ONCE.
@@ -154,8 +168,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # changes what the test exercises. Every call carries a one-line comment
   # naming which:
   #   - the element is inside a closed menu the test reaches by other means;
-  #   - the control is shown only by a `hover:` style, which CI's headless
-  #     Chrome (no hover device) never applies;
+  #   - the control is shown only by a `hover:` style and the test is not
+  #     about that style (a test of the hover itself moves the pointer);
   #   - a native click would change the thing under test (a `mousedown` that
   #     starts an autosave and moves the target; ProseMirror's node
   #     selection), or the test builds a same-tick race on purpose.
@@ -390,7 +404,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # needed an `await_native_input` handshake here, which is what flaked).
   def await_admin_controllers(wait: 8)
     await_controllers_connected(wait: wait)
+    await_sortables(wait: wait)
     await_live_part(wait: wait)
+  end
+
+  # SortableJS is imported when a controller that drags connects, so a
+  # controller can be connected and its Sortables not yet made: a drag begun
+  # then goes nowhere. Each such controller marks its element
+  # `data-sortable="pending"` from `connect` until its Sortables exist
+  # (`"ready"`); this waits until none is left.
+  def await_sortables(wait: 8)
+    await_js("document.querySelector('[data-sortable=pending]') === null", wait: wait, message: "SortableJS never arrived: [data-sortable=pending] stayed")
   end
 
   # The entry to an editor: visits the page's or the post's editor and waits
@@ -404,6 +428,25 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     else raise ArgumentError, "visit_editor opens the editor of a Page or a Post, not #{record.class}"
     end
     visit_screen(path)
+  end
+
+  # Adds a block of the type named `label` through the block menu. With no
+  # section it presses the page's "+ Add block" (`#block-picker-end`) and then
+  # the item; with `section:` and `column:` it presses that lane's "+ Add".
+  # Either way it waits for the new block's form to be in the page, so the
+  # next line starts on a form that is there.
+  def add_block(label, column: nil, section: nil)
+    raise ArgumentError, "a section and a column come together" if section.nil? != column.nil?
+
+    picker = section ? "#block-picker-#{section.id}-#{column}" : "#block-picker-end"
+    blocks = "[data-block-id]"
+    before = all(blocks, wait: false, visible: :all).size
+    find("#{picker} button[aria-haspopup=menu]").click
+    within("#{picker} [role=menu]") { click_button label, exact: true }
+    # wait: the block's card or tile is the answer to the request that creates
+    # it, on a runner with two slow cores; its form comes with it.
+    assert_selector blocks, minimum: before + 1, visible: :all, wait: 8
+    assert_selector ".admin-block-card form, [id^='block-'][id$='-panel']", visible: :all, wait: 8
   end
 
   # The entry to any other CS Studio screen: `visit` and then the wait for its
@@ -450,3 +493,5 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert_empty missing, "these controllers never connected within #{wait} s: #{missing.join(", ")}"
   end
 end
+
+require_relative "support/sections_system_test_case" # a subclass, so it is read after the class above

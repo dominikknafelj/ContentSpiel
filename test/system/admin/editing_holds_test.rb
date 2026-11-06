@@ -716,6 +716,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     Editing::Reservation.claim(subject: list, record: @page, user: @dana, tab: "tab-dddddddd")
     send_delayed
     assert_selector "#{card(list)} [role=alert]", text: "Dana Weiss is editing this block. Your changes weren't saved.", wait: LIVE
+    assert_selector "#{card(list)}[data-card-edge='held']", wait: 0
 
     page.execute_script("window.__marker = 'same document'")
     url = page.current_url
@@ -1094,9 +1095,13 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     open_page
     delay_next("POST", CLAIM)
     background = "#content_block_#{section.id} select[name='block[settings][background]']"
+    # The settings are under the head, opened by its words.
+    open_settings = -> { find("#section-#{section.id}-words button[data-admin--editor--section-field-param='background']").click }
+    open_settings.()
     find(background).find("option[value=tinted]").select_option
     await_delayed
     using_session(:dana) do
+      open_settings.()
       find(background).find("option[value=tinted]").select_option
       assert_writes_settled
     end
@@ -1117,6 +1122,41 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     await_frames
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Copy my text"
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Discard"
+
+    # The frame is synchronised by the merge, so its held edge is the
+    # stylesheet's, read from the frozen form: it stays without the attribute.
+    assert_selector "#content_block_#{section.id} .admin-section-card__settings > form[data-editing-frozen=true]"
+    edge = page.evaluate_script(<<~JS)
+      (() => {
+        const frame = document.getElementById("content_block_#{section.id}")
+        frame.removeAttribute("data-card-edge")
+        const style = getComputedStyle(frame)
+        return [ style.outlineStyle, style.outlineWidth ]
+      })()
+    JS
+    assert_equal [ "solid", "2px" ], edge
+  end
+
+  # `admin--editing--hold#reveal` through the section's own `showSettings`:
+  # the frozen form is in sight and the head's words say the region is open.
+  test "a tie on a section's settings closed meanwhile opens the region again, with the notice and the frozen form" do
+    section, = section_with_block
+    open_page
+    region = "#section-#{section.id}-settings"
+    background = "#{region} select[name='block[settings][background]']"
+    find("#section-#{section.id}-words button[data-admin--editor--section-field-param='background']").click
+    delay_next("POST", CLAIM)
+    find(background).find("option[value=tinted]").select_option
+    await_delayed
+    within(region) { click_button "Close" }
+    assert_no_selector region, wait: 1
+    Editing::Reservation.claim(subject: section, record: @page, user: @dana, tab: "tab-dddddddd")
+    send_delayed
+
+    assert_selector "#block-#{section.id}-hold [data-editing-kind=lost]", text: "Dana Weiss is editing this block", wait: LIVE
+    assert_selector "#{region} form[data-editing-frozen=true]"
+    assert_selector "#section-#{section.id}-words button[aria-expanded=true]", minimum: 1
+    assert_no_selector "#section-#{section.id}-words button[aria-expanded=false]"
   end
 
   test "pause() during a retry's backoff leaves nothing outstanding: the queue is quiet at once" do

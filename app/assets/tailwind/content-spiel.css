@@ -69,6 +69,9 @@
   --cs-field-fill: #f1f3f7;
   --cs-rail: #eaf1fb;
   --cs-popover: #ffffff;
+  /* The ground of a tile under the pointer or focused: the surface in
+     light, where the tile lifts by its shadow, a step up in dark. */
+  --cs-tile-raised: #ffffff;
   /* A section's 1.5px frame, its head and the head's words. */
   --cs-structure: #c98a4b;
   --cs-structure-tint: #fbeedd;
@@ -159,6 +162,7 @@
   --cs-field-fill: #272b36;
   --cs-rail: #1f2a3d;
   --cs-popover: #283244;
+  --cs-tile-raised: #1f2a3d;
   --cs-structure: #b9824a;
   --cs-structure-tint: #3a2a17;
   --cs-structure-ink: #f0c48f;

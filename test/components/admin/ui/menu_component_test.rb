@@ -29,6 +29,23 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu][data-action~='click->admin--ui--menu#select']", visible: :all
   end
 
+  test "columns: lays the items out in a grid, and a count it does not know is refused" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "Add", columns: 3)) { |menu| menu.with_item { "x" } }
+    classes = page.find("[role=menu]", visible: :all)[:class].split
+    %w[grid grid-cols-3 w-[34rem] max-w-[calc(100vw-2rem)] p-2.5 gap-0.5 shadow-3].each { |name| assert_includes classes, name }
+    render_inline(Admin::Ui::MenuComponent.new(label: "Add", columns: 2)) { |menu| menu.with_item { "x" } }
+    assert_includes page.find("[role=menu]", visible: :all)[:class].split, "grid-cols-2"
+    render_inline(Admin::Ui::MenuComponent.new(label: "Add")) { |menu| menu.with_item { "x" } }
+    assert_no_selector "[role=menu].grid", visible: :all
+    [ 1, 4, "3" ].each { |count| assert_raises(ArgumentError) { Admin::Ui::MenuComponent.new(label: "Add", columns: count) } }
+  end
+
+  test "heading: is drawn before the items and hidden from a screen reader" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "Add", aria_label: "Add a block", heading: "Add a block")) { |menu| menu.with_item { "<button>One</button>".html_safe } }
+    assert_selector "[role=menu] > p.text-label.text-meta[aria-hidden=true]:first-child", text: "Add a block", visible: :all
+    assert_selector "button[aria-label='Add a block']", text: "Add"
+  end
+
   test "without close_on_select the panel stays open on a pick" do
     render_inline(Admin::Ui::MenuComponent.new(label: "More")) { |menu| menu.with_item { "x" } }
     assert_no_selector "[role=menu][data-action]", visible: :all

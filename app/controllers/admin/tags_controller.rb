@@ -80,7 +80,7 @@ module Admin
     def destroy
       tag = Tag.find(params[:id])
       result = Tags::Destroy.call(tag)
-      return head(result.denied? ? :forbidden : :unprocessable_entity) unless result.ok?
+      return head(Admin::RefusalStatus.for(result)) unless result.ok?
 
       render turbo_stream: [
         turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag)),

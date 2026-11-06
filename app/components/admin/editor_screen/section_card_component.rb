@@ -1,11 +1,13 @@
 module Admin
   module EditorScreen
     # A section in the page editor's block list (sections spec §4.1–§4.3): a
-    # card like any other block's -- it is dragged, moved and collapsed by
-    # `admin--editor--blocks` exactly as one -- but framed and tinted, and holding the
-    # section's columns as lanes of tiles (`SectionLanesComponent`) in its
-    # body, where a block card has its fields. Its own three settings are a
-    # form in its header (below).
+    # card of the list like any other block's -- it is dragged, moved and
+    # collapsed by `admin--editor--blocks` exactly as one -- but drawn as
+    # structure, not content (E4): a frame in the structure colour around
+    # the section's columns, which are lanes of tiles
+    # (`SectionLanesComponent`) in its body, under a tinted head that says
+    # the section's settings as words (`SectionSettingsWordsComponent`). The
+    # settings themselves are a form in a region under the head (below).
     #
     # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
     # the lanes sits one `Admin::EditorScreen::BlockCardComponent` per block of the section,
@@ -31,13 +33,13 @@ module Admin
     # ON A TRANSLATION TAB A SECTION IS NOT THIS CARD but a heading over its
     # blocks' cards (spec §4.5, `SectionGroupComponent`): `self.for` is the
     # one door to both, so the page view and a card streamed in
-    # (`Admin::ContentBlocksController#card_for`) cannot draw different things.
+    # (`Admin::Answers::BlockDrawing#card_for`) cannot draw different things.
     #
     # A SECTION WHOSE TYPE IS GONE (spec §6, `unavailable?`) -- a removed
     # plugin's container, say -- is no `container?` any more and still holds
     # its blocks' rows; `self.draws?` asks the rows too, so it is still drawn
     # here and its blocks do not vanish from the editor. It is the
-    # "Unavailable type" card: the danger border, the type's stored name, one
+    # "Unavailable type" card: the danger frame, the type's stored name, one
     # sentence, and a section's own two removals as two buttons, under the
     # words the "⋯" menu has for them. "Remove section, keep blocks" comes
     # first and is the safe one: the wrapper nobody can read goes, the texts
@@ -59,23 +61,42 @@ module Admin
     # they can also be opened, edited, deleted, or moved out one by one. A
     # viewer who can't edit sees the card and its tiles and neither button.
     #
-    # THE SECTION'S OWN SETTINGS ARE A FORM IN THE HEADER (spec §4.1): layout,
-    # background and width, where a block card has its fields in its body. It
-    # is an autosave form like a card's, answered by the same action (`Admin
-    # ::ContentBlocksController#update`) into the same ids -- the wiring, the
-    # base field, the status line and one error slot per setting are all
-    # `Admin::EditorScreen::BlockCardComponent`'s, asked of its class, so a section's save
-    # is refused as stale (409) and reported exactly as a block's is. Layout
-    # is a menu over a hidden input (`SectionLayoutMenuComponent`); the other
-    # two are plain selects. A viewer who can't edit sees the three as they
-    # are, disabled, in a form with no `admin--saving--autosave` -- as a view-only
-    # block card shows its fields.
+    # THE SECTION'S OWN SETTINGS ARE A FORM IN ONE REGION UNDER THE HEAD
+    # (`settings_id`, `#section-<id>-settings`): layout, background, width,
+    # the theme's style and the anchor, where a block card has its fields in
+    # its body. The region is hidden until a word of the head opens it
+    # (`admin--editor--section#openSettings`) and is the ONE element that
+    # holds the form `#section-<id>-form`: it is never cloned and never
+    # replaced by an answer (a save replaces the words, which say what was
+    # stored), because the form may hold text a person is typing and is
+    # registered with the write queue. A script that moves the region
+    # elsewhere (the editor's right rail at wide widths) puts it back under
+    # its head before Turbo's snapshot (`turbo:before-cache`), so a page
+    # restored from the cache has it where this component draws it. The
+    # cancelable `admin--editor--section:open-settings` is that script's
+    # door: when nobody cancels it, the region opens here, in place.
+    #
+    # It is an autosave form like a card's, answered by the same action
+    # (`Admin::ContentBlocksController#update`) into the same ids -- the
+    # wiring, the base field, the status line and one error slot per setting
+    # are all `Admin::EditorScreen::BlockCardComponent`'s, asked of its class,
+    # so a section's save is refused as stale (409) and reported exactly as a
+    # block's is. Layout is a menu over a hidden input
+    # (`SectionLayoutMenuComponent`); the others are plain controls. A viewer
+    # who can't edit sees them as they are, disabled, in a form with no
+    # `admin--saving--autosave` -- as a view-only block card shows its
+    # fields -- and opens the region by the same words.
     #
     # The form holds no other form: the "⋯" menu's Duplicate and Remove are
-    # `button_to`s and the dialog's confirm is a form too, so the menu sits
-    # after the settings form in the header and the dialog after the body.
-    # (A form inside a form is dropped by the HTML parser, and its button
-    # would then submit the settings form.)
+    # `button_to`s and the dialog's confirm is a form too, so the menu sits in
+    # the head and the dialog after the body. (A form inside a form is dropped
+    # by the HTML parser, and its button would then submit the settings form.)
+    #
+    # THE CARD'S STATE EDGE is `data-card-edge`, drawn by the stylesheet as a
+    # block card's is: "unavailable" turns the frame danger, "held" (someone
+    # else holds the section's own settings) is the field line's outline over
+    # the frame. A section takes no notes (decision 10), so it has no notes
+    # edge: a marker inside it belongs to a tile or a panel, which carry it.
     #
     # THE "⋯" MENU (spec §4.1), for a viewer who may edit: Move up and Move
     # down are the block card's own buttons (`data-move`, `admin--editor--blocks
@@ -122,10 +143,20 @@ module Admin
 
       def self.summary_id(section) = "section-#{section.id}-summary"
 
-      # The header's "3 columns · 5 blocks", for the card and for a stream
-      # that replaces it after an add or a delete: one place, so the two
-      # cannot drift (`SectionSummaryComponent`).
+      # The head's "5 blocks", for the card and for a stream that replaces it
+      # after an add or a delete: one place, so the two cannot drift
+      # (`SectionSummaryComponent`).
       def self.summary(section:, count:) = Admin::EditorScreen::SectionSummaryComponent.new(section: section, count: count)
+
+      # The region under the head that holds the settings form (see the
+      # class comment): what every word's `aria-controls` names.
+      def self.settings_id(section) = "section-#{section.id}-settings"
+
+      def self.words_id(section) = "section-#{section.id}-words"
+
+      # The head's words, for the card and for the stream that follows a
+      # saved setting, as `summary` above.
+      def self.words(section:) = Admin::EditorScreen::SectionSettingsWordsComponent.new(section: section)
 
       def self.delete_count_id(section) = "section-#{section.id}-delete-count"
 
@@ -141,7 +172,7 @@ module Admin
       # block that still holds blocks although its type is no longer a
       # container's (a section whose type is gone, spec §6) -- asked of the
       # rows the outline was built from, never of the type's name. The page
-      # view and `Admin::ContentBlocksController#card_for` both ask here, so
+      # view and `Admin::Answers::BlockDrawing#card_for` both ask here, so
       # a card streamed in is the card a page load would draw.
       def self.draws?(block, outline:) = block.container? || outline.blocks_in(block).any?
 
@@ -174,6 +205,21 @@ module Admin
       def body_id = "section-#{section.id}-body"
 
       def header_id = "section-#{section.id}-header"
+
+      def settings_id = self.class.settings_id(section)
+
+      # The state the frame shows (see the class comment), as a block card's
+      # `#card_edge`: unavailable wins, and a reader gets no held edge.
+      def card_edge
+        if unavailable? then "unavailable"
+        elsif read_only_hold? then "held"
+        end
+      end
+
+      def wrapper_data
+        { block_id: section.id, container: "", "admin--editor--blocks-target": "card", controller: "admin--editor--section",
+          action: "keydown.esc->admin--editor--section#escape admin--editor--blocks:toggled@window->admin--editor--section#collapsed", **(card_edge ? { card_edge: card_edge } : {}) }
+      end
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
@@ -259,7 +305,7 @@ module Admin
       def style? = style_field&.render? || false
 
       # `.cs-select` without the full width `setup_select_class` gives it on
-      # a form's own line: these two stand side by side in a header.
+      # a form's own line: the settings stand side by side in their region.
       def select_class = "cs-select py-1 text-sm"
 
       # ---- The "⋯" menu and its dialog.

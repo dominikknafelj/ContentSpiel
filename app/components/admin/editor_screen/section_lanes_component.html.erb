@@ -1,4 +1,4 @@
-<div id="<%= lanes_id %>" class="admin-section-lanes" data-admin--editor--section-target="lanes" data-columns="<%= lanes.size %>" style="--lanes: <%= lanes.size %>">
+<div id="<%= lanes_id %>" class="admin-section-lanes gap-4" data-admin--editor--section-target="lanes" data-columns="<%= lanes.size %>" style="--lanes: <%= lanes.size %>">
   <% lanes.each do |column, blocks| %>
     <%# The wrapper has an id: a catch-up leaves a tile in place only when every element above it can be matched by id (`editing/merge`). %>
     <div id="<%= lane_id(column) %>-column" class="admin-section-lane flex min-w-0 flex-col gap-1">

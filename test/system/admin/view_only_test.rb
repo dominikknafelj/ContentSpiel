@@ -138,6 +138,21 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector ".admin-section-card button[aria-label='Section actions']"
     assert_menus_hold_only_add_note(".admin-section-card", count: 1)
     assert_no_selector ".admin-section-card dialog", visible: :all
+    # The head's words open the section's settings for a reader too: disabled, and opening and closing them sends nothing.
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__writes = []
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() !== "GET") window.__writes.push(String(url.url || url))
+        return originalFetch(url, options)
+      }
+    JS
+    find("#section-#{section.id}-words button[data-admin--editor--section-field-param='layout']").click
+    assert_selector "#section-#{section.id}-settings fieldset.admin-view-only[disabled] select[name='block[settings][background]']"
+    find("#section-#{section.id}-settings button[data-action='admin--editor--section#closeSettings']").click
+    assert_selector "#section-#{section.id}-settings", visible: :hidden
+    await_frames
+    assert_equal [], page.evaluate_script("window.__writes")
     find("##{ActionView::RecordIdentifier.dom_id(block)} .admin-block-tile__face").click
     assert_selector "#block-#{block.id}-panel fieldset[disabled]"
     assert_no_selector "#block-#{block.id}-panel form[data-controller~='admin--saving--autosave']"
@@ -170,7 +185,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{page_record.id}"
     await_admin_controllers
 
-    assert_selector ".admin-section-card.border-danger", text: "Unavailable type — gone/section"
+    assert_selector ".admin-section-card[data-card-edge='unavailable']", text: "Unavailable type — gone/section"
     assert_selector ".admin-block-tile", count: 1
     assert_no_button "Delete block…"
     assert_no_selector ".admin-section-card dialog", visible: :all

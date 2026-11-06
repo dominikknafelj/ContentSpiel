@@ -51,7 +51,7 @@ import { messages } from "i18n/messages"
 // the server never renders a count into a card.
 //
 // THE ACTIVE BLOCK. While one thread is the drawer's view, the card or tile
-// of the block it is on carries `data-notes-active` (an accent border,
+// of the block it is on carries `data-notes-active` (an accent edge,
 // handoff "Block card marker"): `markActive`, after every load of the frame,
 // on close, and when a marker connects.
 //

@@ -1,7 +1,7 @@
 <% if section %>
-  <%# A lane's "+" (see the component). The wrapper carries the id: the menu has none of its own. %>
+  <%# A lane's "+ Add" (see the component). The wrapper carries the id: the menu has none of its own. %>
   <div id="<%= id %>">
-    <%= render Admin::Ui::MenuComponent.new(label: "+", align: :left, aria_label: t(".add_to_column", number: column), close_on_select: true) do |menu| %>
+    <%= render Admin::Ui::MenuComponent.new(label: t(".add"), align: :left, button_class: lane_button_class, aria_label: t(".add_to_column", number: column), close_on_select: true) do |menu| %>
       <% types.each do |type| %>
         <% menu.with_item do %>
           <%= button_to create_path, method: :post, class: "#{menu_item_class} flex items-center gap-2",
@@ -11,10 +11,13 @@
     <% end %>
   </div>
 <% else %>
-  <div id="<%= id %>" class="admin-block-picker mt-3 flex flex-wrap items-center gap-2 rounded-cs border border-dashed border-line-strong px-3 py-2.5 text-sm text-dim">
-    <span class="font-medium text-ink">+ Add block</span>
-    <% types.each do |type| %>
-      <%= button_to create_path, method: :post, params: { block: { block_type: type.name } }, class: button_class do %><%= render Admin::EditorScreen::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
+  <div id="<%= id %>" class="mt-5">
+    <%= render Admin::Ui::MenuComponent.new(label: t(".add_block"), align: :left, button_class: end_button_class, aria_label: t(".menu_heading"), close_on_select: true, columns: 3, heading: t(".menu_heading")) do |menu| %>
+      <% types.each do |type| %>
+        <% menu.with_item do %>
+          <%= button_to create_path, method: :post, class: menu_item_class, params: { block: { block_type: type.name } } do %><%= render Admin::EditorScreen::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
+        <% end %>
+      <% end %>
     <% end %>
   </div>
 <% end %>
