@@ -72,10 +72,14 @@ module BlockTypes
     end
 
     # The tile's preview: the editor's title, else the kind's word, over the
-    # note's text as plain text.
+    # note's text as plain text. The kind's word is a fallback, not the
+    # block's content: a note with no title and no text has no preview, and
+    # its tile says "Empty" on its summary line.
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
       text = block.body_document(locale: locale).plain_paragraphs.join(" ")
+      return if settings&.title.blank? && text.blank?
+
       ContentModel::Preview.new(heading: settings&.title.presence || KINDS.fetch(kind_of(settings&.kind)), text: text)
     end
 

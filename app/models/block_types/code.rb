@@ -57,9 +57,13 @@ module BlockTypes
     end
 
     # The tile's preview: the file name, else the language's label, over the
-    # first three lines of the code in the monospace face.
+    # first three lines of the code in the monospace face. The language is a
+    # fallback, not the block's content: a block with no file name and no
+    # code has no preview, and its tile says "Empty" on its summary line.
     def self.preview(block, locale:)
       settings = block.settings_object(locale: locale)
+      return if settings&.filename.blank? && settings&.code.blank?
+
       ContentModel::Preview.new(heading: settings&.filename.presence || CodeHighlight.label(settings&.language),
                                 text: settings&.code.to_s.lines.first(3).join, mono: true)
     end

@@ -189,6 +189,28 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_no_selector text
   end
 
+  # A preview is the block's own content. A heading that only falls back
+  # (a Note's kind word, a Code block's language) is not: with no title or
+  # file name and no text, the tile says Empty on its summary line.
+  test "an empty Note shows its summary's Empty, not its kind's word alone" do
+    render_summary block("note", settings: { "kind" => "tip" })
+
+    assert_no_selector heading_row
+    assert_equal "Tip · Empty", page.find(line).text
+    assert_selector "#{line} > span.text-meta", exact_text: "Empty"
+  end
+
+  test "an empty Code block with a language shows Empty, not the language alone" do
+    render_summary block("code", settings: { "language" => "ruby" })
+
+    assert_no_selector heading_row
+    assert_equal "Empty", page.find(line).text
+
+    render_summary block("code", settings: { "language" => "ruby", "filename" => "app.rb" })
+    assert_selector heading, exact_text: "app.rb"
+    assert_no_selector text
+  end
+
   test "a refused save says Needs fixing under the preview" do
     render_summary block("rich_text", body: rich_doc("## Head\n\nWords")), invalid: true
 
@@ -260,9 +282,10 @@ class Admin::EditorScreen::TileSummaryComponentTest < ViewComponent::TestCase
     assert_selector heading, exact_text: "Tip"
     assert_selector text, exact_text: "First words of the note."
 
-    render_summary block("note")
-    assert_selector heading, exact_text: "Note"
-    assert_no_selector text
+    note.assign_settings({ "title" => "Before you publish" }, locale: "en")
+    note.save!
+    render_summary note
+    assert_selector heading, exact_text: "Before you publish"
 
     card = block("card")
     card.assign_settings({ "title" => "Our services", "text" => "What we do" }, locale: "en")

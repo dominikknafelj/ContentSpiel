@@ -140,6 +140,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The drop place (`.admin-drag-ghost`, a tile's, a block card's and a tree
+  # row's) is a dashed edge with nothing inside it: the edge alone says where
+  # the drag lands, so it is a state's 3:1 on the grounds it stands on.
+  test "the drop place's dashed edge is 3:1 or better on the surface and the canvas" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    edge = css[/\.admin-drag-ghost \{[^}]*border: 1\.5px dashed var\((--cs-[\w-]+)\)/, 1]
+    assert edge, "the ghost's edge is a token"
+    each_scheme do |scheme, colour|
+      %w[--cs-surface --cs-paper].each { |ground| assert_ratio(3.0, colour.(edge), colour.(ground), "the drop place's #{edge} on #{ground} (#{scheme})") }
+    end
+  end
+
   # The preview's words (`TileSummaryComponent`): the heading in ink and the
   # text in dim, on the tile at rest and raised.
   test "a tile's preview is readable on the tile at rest and raised" do

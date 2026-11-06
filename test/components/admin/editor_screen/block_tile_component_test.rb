@@ -46,14 +46,14 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
   # Plan ruling 12: a note's tile shows its kind's icon, under the id a
   # save's answer replaces, one icon only, and the face still says "Note".
-  test "a note's tile shows its kind's icon beside the type's name, once, and its kind's word over its text" do
+  test "a note's tile shows its kind's icon beside the type's name, once, and an empty one says its kind and Empty" do
     block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
     render_tile(block)
 
     assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='size-5.5'] svg[class~='size-3.5']"
     assert_selector ".admin-block-tile__face [data-block-icon]", count: 1
     assert_selector ".admin-block-tile__face > span:first-child", exact_text: "Note"
-    assert_selector ".admin-block-tile__face .admin-block-tile__title", exact_text: "Warning"
+    assert_selector ".admin-block-tile__face .admin-block-tile__summary", text: /Warning · Empty/
   end
 
   # Review focus 3.

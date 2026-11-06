@@ -255,7 +255,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ '.admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"]))', ".admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible))" ] =>
       [ "box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent)", "background: var(--cs-tile-raised)" ],
     [ ".admin-block-tile[data-notes-active]" ] => [ "outline: 2px solid var(--cs-accent)", "outline-offset: -2px" ],
-    [ ".admin-drag-ghost" ] => [ "border: 1.5px dashed var(--cs-line-strong)", "border-radius: var(--cs-radius-tile)", "box-shadow: none" ],
+    [ ".admin-drag-ghost" ] => [ "border: 1.5px dashed var(--cs-field-line)", "border-radius: var(--cs-radius-tile)", "box-shadow: none" ],
     [ ".admin-drag-chosen" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ],
     [ ".admin-drag-fallback" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ]
   }.freeze
@@ -266,8 +266,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       declarations.each { |declaration| assert_includes body, declaration, selectors.join(", ") }
       assert_no_match(/(?<![\w-])border(?:-color)?:/, body, selectors.join(", ")) unless selectors == [ ".admin-drag-ghost" ]
     end
-    order = TILE_STATES.keys.first(4).map { |selectors| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == selectors } }
-    assert_equal order.sort, order, "rest, the pointer, open or focused, then the thread: the later state wins at one weight"
+    order = TILE_STATES.keys.map { |selectors| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, open or focused, the thread, then the drop place and the lifted tile: the later state wins at one weight"
   end
 
   test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do

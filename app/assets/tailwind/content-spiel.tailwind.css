@@ -855,7 +855,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
    edge with its content hidden and no shadow, the only edge a tile ever
-   shows. The chosen row is the lifted one, on the popover's ground -- the
+   shows. The edge alone says where the drag lands, so it is the field
+   line, 3:1 on the surface and the canvas (`test/lib/admin_contrast_test.rb`). The chosen row is the lifted one, on the popover's ground -- the
    highest elevation (`--cs-shadow-4`: it is above everything in the list).
    Each weighs what a tile's states weigh and comes after them, so a ghost or
    a lifted tile is never drawn hovered or open.
@@ -864,7 +865,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    from the `<button>` handles), so what follows the pointer is a clone
    SortableJS appends to `<body>` with `fallbackClass`: styled as the lifted
    row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
-.admin-drag-ghost { border: 1.5px dashed var(--cs-line-strong); border-radius: var(--cs-radius-tile); background: transparent; box-shadow: none; }
+.admin-drag-ghost { border: 1.5px dashed var(--cs-field-line); border-radius: var(--cs-radius-tile); background: transparent; box-shadow: none; }
 .admin-drag-ghost > * { visibility: hidden; }
 .admin-drag-chosen { background: var(--cs-popover); box-shadow: var(--cs-shadow-4); }
 .admin-drag-fallback { list-style: none; border-radius: var(--cs-radius-tile); background: var(--cs-popover); box-shadow: var(--cs-shadow-4); }
