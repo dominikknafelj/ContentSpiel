@@ -123,8 +123,12 @@ jobs:
         with:
           bundler-cache: true
 
-      # The files are named, so this is `bin/rails test` with a list (the same
-      # command as before the suite was split, but for the list). `-v` prints
+      # The files are named, and `bin/rails test FILES` does not run
+      # `test:prepare`, which is what built the stylesheets when the whole
+      # suite was run (every public test reads app/assets/builds/tailwind.css
+      # and theme.css). So they are built first, by hand, as the browser shards
+      # do: `tailwindcss:build` is enhanced to build the public theme's
+      # stylesheet too (lib/tasks/theme_css.rake). `-v` prints
       # each test with its time: test/unit_test_seconds.yml is measured from
       # this log, since a runner's pace is not a laptop's.
       - name: Run tests
@@ -139,7 +143,7 @@ jobs:
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
           # REDIS_URL: redis://localhost:6379/0
         run: |
-          bin/rails db:test:prepare
+          bin/rails db:test:prepare tailwindcss:build
           bin/rails test -v $(bin/test-shard unit ${{ matrix.shard }} 2)
 
       # The stylesheet built with THEME_PATH set, and production started
