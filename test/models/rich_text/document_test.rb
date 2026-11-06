@@ -212,4 +212,26 @@ class RichText::DocumentTest < ActiveSupport::TestCase
     assert_equal [ "Plan", "Price", "Basic\nplan", "Pro", "9 €" ], doc(table).plain_paragraphs
     assert_equal [ "Before", "Plan", "Price", "Basic\nplan", "Pro", "9 €", "After" ], doc(para("Before"), table, para("After")).plain_paragraphs
   end
+
+  def heading(text, level = 2) = { "type" => "heading", "attrs" => { "level" => level }, "content" => [ { "type" => "text", "text" => text } ] }
+
+  test "preview takes the first heading and the text after it, without Markdown" do
+    bold = { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Bold", "marks" => [ { "type" => "bold" } ] }, { "type" => "text", "text" => " words" } ] }
+    list = { "type" => "bulletList", "content" => [ "one", "two" ].map { |t| { "type" => "listItem", "content" => [ para(t) ] } } }
+    preview = doc(heading("Title"), bold, list, heading("Later")).preview
+
+    assert_equal "Title", preview.heading
+    assert_equal "Bold words one two", preview.text
+    assert_not preview.mono
+  end
+
+  test "a body with no heading previews its text with no heading" do
+    preview = doc(para("First"), para("Second")).preview
+    assert_nil preview.heading
+    assert_equal "First Second", preview.text
+  end
+
+  test "an empty body previews as blank" do
+    assert_predicate RichText::Document.empty.preview, :blank?
+  end
 end

@@ -35,6 +35,7 @@ module BlockTypes
         t.component Blocks::CardComponent
         t.theme_methods :block, :page, :title, :text, :link, :icon, :icon_name, :image
         t.summary ->(block, locale:) { Card.summary(block, locale: locale) }
+        t.preview ->(block, locale:) { Card.preview(block, locale: locale) }
         t.tokens themed: %w[card-ground card-line card-icon]
         t.stylesheet "card.css"
         # The icon is one of the default theme's; the link is a site address,
@@ -45,6 +46,12 @@ module BlockTypes
                                  "es" => { title: "Card title es", text: "Card text es", alt: "Card alt es" } },
                  shows: [ "Card title en", "Card text en", %(alt="Card alt en") ]
       end
+    end
+
+    # The tile's preview: the card's title over its text.
+    def self.preview(block, locale:)
+      settings = block.settings_object(locale: locale)
+      ContentModel::Preview.new(heading: settings&.title, text: settings&.text)
     end
 
     # The tile's line: the icon's label (in the language of CS Studio's

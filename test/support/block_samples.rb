@@ -67,6 +67,25 @@ module BlockSamples
     end
   end
 
+  # A type's preview (the tile's heading and text) shows something the
+  # sample put in: a settings value, a translation's value, or a run of eight
+  # characters of the body's plain text.
+  def assert_preview_shows_a_sample_value(type)
+    definition = BlockTypes.fetch(type)
+    sample = definition.sample
+    block = sample_block(create_page(title: "Preview #{definition.name}"), definition.name)
+    preview = definition.preview.call(block, locale: "en")
+    assert_kind_of ContentModel::Preview, preview, "#{definition.name}'s preview is not a ContentModel::Preview"
+    shown = [ preview.heading, preview.text ].join(" ")
+
+    values = sample.settings.values + sample.translations.fetch("en", {}).values
+    values = values.map(&:to_s).reject(&:blank?)
+    plain = sample.body ? RichText::Document.new(rich_doc(sample.body, tables: definition.body_content == :table)).plain_paragraphs.join(" ") : ""
+    runs = plain.length >= 8 ? (0..plain.length - 8).map { |i| plain[i, 8] } : []
+    assert(values.any? { |value| shown.include?(value) } || runs.any? { |run| shown.include?(run) },
+           "#{definition.name}'s preview #{shown.inspect} shows none of its sample's values")
+  end
+
   def assert_every_type_built(names = BlockTypes.names)
     missing = names - Array(@built_block_types).uniq
     assert_empty missing, "this shared test built no block of #{missing.join(", ")}: build every type with sample_block or sample_every_type"

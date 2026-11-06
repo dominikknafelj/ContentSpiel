@@ -42,6 +42,7 @@ module BlockTypes
         t.tokens themed: %w[syn-comment syn-keyword syn-string syn-constant syn-tag syn-attribute syn-embed]
         t.stylesheet "code.css"
         t.summary ->(block, locale:) { Code.summary(block, locale: locale) }
+        t.preview ->(block, locale:) { Code.preview(block, locale: locale) }
         # The counter under the code field reads the field and writes nothing
         # but its own line.
         t.read_only_actions "admin--editor--code-limit#update"
@@ -53,6 +54,14 @@ module BlockTypes
                  translations: { "en" => { caption: "A template" }, "de" => { caption: "Code caption de" }, "es" => { caption: "Code caption es" } },
                  shows: [ "show.html.erb", %(<span class="syn-embed">), "A template" ]
       end
+    end
+
+    # The tile's preview: the file name, else the language's label, over the
+    # first three lines of the code in the monospace face.
+    def self.preview(block, locale:)
+      settings = block.settings_object(locale: locale)
+      ContentModel::Preview.new(heading: settings&.filename.presence || CodeHighlight.label(settings&.language),
+                                text: settings&.code.to_s.lines.first(3).join, mono: true)
     end
 
     # The tile's line of a closed Code block, as parts (block types spec,

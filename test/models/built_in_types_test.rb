@@ -140,4 +140,9 @@ class BuiltInTypesTest < ActiveSupport::TestCase
     assert_equal({ "content_type" => "blog", "limit" => 5 }, list.sample.settings, "the tag is left out on purpose (UNFILLED_FIELDS); the limit is filled so the canary compares it")
     assert_equal "tinted", section.sample.settings.fetch("background")
   end
+
+  test "the five types that preview declare one, and image, form, post list and section declare none" do
+    assert_equal %w[card code note rich_text table], BlockTypes.all.select(&:preview).map(&:name).reject { |name| name.include?("/") }.sort
+    %w[image form post_list section].each { |name| assert_nil BlockTypes.fetch(name).preview, "#{name} keeps its summary line" }
+  end
 end

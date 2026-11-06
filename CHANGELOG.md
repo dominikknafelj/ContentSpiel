@@ -57,6 +57,7 @@
 
 ### For a gem or an outside caller
 
+- For a gem's block type: `t.preview ->(block, locale:) { ContentModel::Preview.new(heading: …, text: …, mono: false) }` declares the heading and the few words CS Studio's tile shows of a closed block, as plain text (the text is cut at 240 characters, the heading at 80). It is optional: a type that declares none is drawn from its `summary`, and a callable that is not a callable taking the block and `locale:` is refused at registration. No public template or theme reads it.
 - For a gem's block type: `t.icon "name", family: :text` (one of `text media code form lists structure`) names the hue of the chip CS Studio draws the icon on; a type that names none is drawn on the neutral chip, and any other value is refused at registration. The chip is CS Studio's only: no public page draws it.
 - Added two hooks beside `ContentSpiel::Plugins.block_types`: `form_field_types` (a form field type's members, `owner/name`) and `form_destinations` (a destination's label, deliverer and settings block, `owner/name`), with the block types' owner rules and replayed after them (`docs/reference/content-blocks-and-types.md`, "Form field types and destinations from outside"). A destination's deliverer answers `deliver(delivery, final_attempt:)`.
 - `AccessControl::Permissions.register` takes `grantable:` (default true); `Permissions.grantable` is what a group may hold. A caller that listed `Permissions.all` to offer or seed grants now reads `grantable`.

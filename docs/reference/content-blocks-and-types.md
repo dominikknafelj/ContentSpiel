@@ -372,6 +372,8 @@ The three inserted lines go beside marker lines (`BlockTypeGenerator::TYPES_MARK
 
 **2. Fill the definition.**
 
+**An optional `preview`.** `t.preview ->(block, locale:) { ContentModel::Preview.new(heading: …, text: …, mono: false) }` is the heading and the few words the tile shows beside its `summary` line, as plain text (the text is cut at `BlockTypeDefinition::PREVIEW_LENGTH`, 240, the heading at `SUMMARY_LENGTH`; a rich-text body's comes from `RichText::Document#preview`, never Markdown). A type that declares none is drawn from its summary alone, and a callable that does not take the block and `locale:` is refused at registration. It is CS Studio's only: no public template or theme reads it, so the theme contract is unchanged. `assert_preview_shows_a_sample_value` (`test/models/block_types/samples_preview_test.rb`) holds that a declared preview shows something its sample put in.
+
 ```ruby
 BlockTypes.register :code do |t|
   t.label "Code"

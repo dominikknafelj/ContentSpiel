@@ -28,6 +28,7 @@ module BlockTypes
         t.tokens themed: %w[table-rule table-line table-head table-caption table-ground]
         t.stylesheet "table.css"
         t.summary ->(block, locale:) { Table.summary(block, locale: locale) }
+        t.preview ->(block, locale:) { Table.preview(block, locale: locale) }
         t.sample translations: { "en" => { caption: "Plans compared" }, "de" => { caption: "Tarife im Vergleich" }, "es" => { caption: "Planes comparados" } },
                  body: <<~MARKDOWN,
                    | Plan | Monthly price | Storage |
@@ -37,6 +38,13 @@ module BlockTypes
                  MARKDOWN
                  shows: [ "Plans compared", "Monthly price", "Unlimited" ]
       end
+    end
+
+    # The tile's preview: the caption over the first row's cells.
+    def self.preview(block, locale:)
+      body = TableBody.new(block.body_document(locale: locale))
+      first = body.rows.first.to_a.map { |cell| cell.text.strip }.reject(&:empty?).join(" · ")
+      ContentModel::Preview.new(heading: block.caption(locale: locale), text: first)
     end
 
     # The tile's line of a closed Table, as parts: "Table · 3 × 3 · " (columns
