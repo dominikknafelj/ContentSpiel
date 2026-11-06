@@ -110,6 +110,18 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "#sidebar-badge-dashboard[hidden]:not([data-badge])", visible: :all
   end
 
+  test "a module registered with a filled badge draws it filled, and a plain one plain" do
+    StudioModules.with(StudioModules.entries) do
+      StudioModules.badge(:posts, style: :filled) { |viewer:| 2 }
+      StudioModules.badge(:dashboard) { |viewer:| 1 }
+      render_sidebar(labels: %w[Dashboard Posts], badges: { posts: 2, dashboard: 1 })
+    end
+
+    assert_selector "#sidebar-badge-posts[data-badge].bg-accent.text-on-accent.rounded-full", text: "2"
+    assert_selector "#sidebar-badge-dashboard[data-badge]", text: "1"
+    assert_no_selector "#sidebar-badge-dashboard[class*=accent]"
+  end
+
   test "an entry that has no badge gets none, whatever is handed in" do
     render_sidebar(labels: %w[Posts], badges: { posts: 4 })
     assert_no_selector "[data-badge]"

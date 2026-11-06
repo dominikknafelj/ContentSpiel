@@ -41,6 +41,15 @@ class StudioModulesTest < ActiveSupport::TestCase
     assert_equal 0, StudioModules.count(:pages, viewer: users(:one)), "a module without a badge counts nothing"
   end
 
+  test "a badge is plain unless registered filled, and the Dashboard's is filled" do
+    assert_equal :filled, StudioModules.badge_style(:dashboard)
+    assert_equal :plain, StudioModules.badge_style(:trash)
+    assert_nil StudioModules.badge_style(:pages)
+    StudioModules.with(StudioModules.entries) do
+      assert_raises(ArgumentError) { StudioModules.badge(:pages, style: :loud) { |viewer:| 1 } }
+    end
+  end
+
   test "with puts the registry back" do
     before = StudioModules.entries
     StudioModules.with([]) do

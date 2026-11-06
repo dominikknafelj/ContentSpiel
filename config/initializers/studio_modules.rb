@@ -36,8 +36,9 @@ Rails.application.config.to_prepare do
   StudioModules.register :audit_log, icon: :audit, path: :admin_audit_events_path, permission: "audit.view", group: :system
 
   # The viewer's unread notes, on records they may read now: one COUNT on
-  # `note_deliveries`, served by its `(user_id, read_at)` index.
-  StudioModules.badge(:dashboard) { |viewer:| viewer ? Dashboard::NotesForYou.new(actor: viewer).unread_count : 0 }
+  # `note_deliveries`, served by its `(user_id, read_at)` index. Filled: the
+  # one count of the sidebar that is addressed to the viewer.
+  StudioModules.badge(:dashboard, style: :filled) { |viewer:| viewer ? Dashboard::NotesForYou.new(actor: viewer).unread_count : 0 }
   # What the viewer could act on in the trash, the sum of the Trash screen's
   # own tab counts (`Admin::TrashController.badge_count`).
   StudioModules.badge(:trash) { |viewer:| Admin::TrashController.badge_count(viewer) }

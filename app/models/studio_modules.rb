@@ -23,7 +23,9 @@
 #
 # A BADGE is `->(viewer:) { Integer }`, called once per page load for a viewer
 # who sees the module, with the request's actor. It costs a query on every CS
-# Studio page, so it counts with one statement.
+# Studio page, so it counts with one statement. Its style is `:plain` (a
+# number) or `:filled` (the accent pill, which means "unread and addressed to
+# you" and nothing else).
 #
 # RELOADING. This file is autoloaded, so a development reload unloads it and
 # the registry starts empty; the initializer fills it again in `to_prepare`
@@ -40,11 +42,14 @@ module StudioModules
   # no component.
   FAMILIES = %i[text media code form lists structure people neutral].freeze
 
-  Entry = Data.define(:name, :icon, :family, :path, :permission, :group, :visible, :badge) do
+  BADGE_STYLES = %i[plain filled].freeze
+
+  Entry = Data.define(:name, :icon, :family, :path, :permission, :group, :visible, :badge, :badge_style) do
     def label = I18n.t("admin.modules.#{name}")
 
     # What the shell and ⌘K read of a module (`Admin::BaseController
-    # #admin_modules`): the callables stay here.
+    # #admin_modules`): the callables and the badge's style stay here, read by
+    # name (`badged?`, `badge_style`).
     def to_row = { name:, label:, icon:, family:, path:, permission:, group: }
 
     def visible? = visible.nil? || visible.call
@@ -60,15 +65,17 @@ module StudioModules
       raise ArgumentError, "#{name.inspect}: no sidebar group is named #{group.inspect}; the groups are #{GROUPS.join(", ")}" unless GROUPS.include?(group)
       raise ArgumentError, "#{name.inspect}: no icon chip family is named #{family.inspect}; the families are #{FAMILIES.join(", ")}" unless FAMILIES.include?(family)
 
-      @entries << Entry.new(name:, icon:, family:, path:, permission:, group:, visible:, badge: nil)
+      @entries << Entry.new(name:, icon:, family:, path:, permission:, group:, visible:, badge: nil, badge_style: :plain)
     end
 
-    # Sets the count beside a registered module: `badge(:trash) { |viewer:| … }`.
-    def badge(name, &counter)
+    # Sets the count beside a registered module: `badge(:trash) { |viewer:| … }`,
+    # `style: :filled` for the accent pill.
+    def badge(name, style: :plain, &counter)
       raise ArgumentError, "a badge needs its counter, a block taking viewer:" unless counter
+      raise ArgumentError, "no badge style is named #{style.inspect}; the styles are #{BADGE_STYLES.join(", ")}" unless BADGE_STYLES.include?(style)
 
       index = @entries.index { |entry| entry.name == name.to_sym } or raise ArgumentError, "no studio module is named #{name.inspect}"
-      @entries[index] = @entries[index].with(badge: counter)
+      @entries[index] = @entries[index].with(badge: counter, badge_style: style)
     end
 
     # In registration order.
@@ -79,6 +86,9 @@ module StudioModules
     def find(name) = @entries.find { |entry| entry.name == name.to_sym }
 
     def badged?(name) = !find(name)&.badge.nil?
+
+    # `:plain` or `:filled`; nil for a module without a badge.
+    def badge_style(name) = (entry = find(name))&.badge && entry.badge_style
 
     # The module's count for `viewer`; 0 for a module without a badge.
     def count(name, viewer:)

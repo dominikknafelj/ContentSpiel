@@ -7,7 +7,8 @@ module Admin
     # registered in `StudioModules`, already narrowed to what this user may
     # see, so a section with nothing left in it disappears, heading and all,
     # and a user with no grants sees only the open modules. This component
-    # names no module but the Dashboard, whose badge is the filled one.
+    # names no module: what each draws, its badge's style included, is the
+    # registry's.
     #
     # Each module's icon stands on its family's chip
     # (`Admin::Ui::IconChipComponent`); its name beside it is the link's
@@ -80,13 +81,12 @@ module Admin
 
       def badge_id(entry) = "sidebar-badge-#{entry[:name]}"
 
-      # The Dashboard's is the one FILLED badge of the sidebar (handoff
-      # "Sidebar badge"): accent there means "unread and addressed to you"
-      # and nothing else. Every other count is a plain number in sans.
-      FILLED_BADGES = %i[dashboard].freeze
-
+      # A `:filled` badge (`StudioModules.badge(name, style: :filled)`, the
+      # Dashboard's, handoff "Sidebar badge") is the accent pill: accent there
+      # means "unread and addressed to you" and nothing else. A `:plain` one
+      # is a number in sans.
       def badge_class(entry)
-        return "ml-auto rounded-full bg-accent px-1.5 text-count leading-4 text-on-accent" if FILLED_BADGES.include?(entry[:name])
+        return "ml-auto rounded-full bg-accent px-1.5 text-count leading-4 text-on-accent" if StudioModules.badge_style(entry[:name]) == :filled
 
         "ml-auto text-count text-meta"
       end
