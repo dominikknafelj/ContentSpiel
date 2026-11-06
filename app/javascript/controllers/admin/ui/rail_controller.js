@@ -21,7 +21,7 @@ import { Controller } from "@hotwired/stimulus"
 // panel that is drawn again (a live merge replacing a form, a stream
 // replacing a tab) takes it as it connects, not the server's default, so the
 // rail never shows two current panels or none. It is kept for the document
-// only: nothing is stored or remembered.
+// only: nothing outlives the document.
 //
 // THE EVENTS ARE THE ONLY WAY A FEATURE OPENS A PANEL. A feature names no
 // tab and no panel of the rail's: it dispatches, from an element inside a
