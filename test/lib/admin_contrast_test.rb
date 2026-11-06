@@ -216,7 +216,7 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_includes map, "--text-label--font-weight: 500;"
   end
 
-  # Icon chips (E4, task 7): the icon is a graphic, 3:1 (1.4.11) on its chip
+  # Icon chips: the icon is a graphic, 3:1 (1.4.11) on its chip
   # and on every ground a chip stands on. People is a hue too, with no block.
   test "each family's icon is 3:1 or better on its chip and on surface, rail, chrome and popover, in both schemes" do
     families = %w[text media code form lists structure people]

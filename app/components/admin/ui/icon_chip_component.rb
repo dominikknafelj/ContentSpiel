@@ -1,15 +1,15 @@
 module Admin
   module Ui
     # A block type's or a module's icon on a tinted square in the hue of its
-    # family (E4, task 7). This is the one place an icon's hue is drawn
+    # family. This is the one place an icon's hue is drawn
     # (`test/lib/admin_design_rules_test.rb`): the pairs are the `--cs-ic-*`
     # tokens, a family's icon on its chip, measured at 3:1 or better on the
     # surface, rail, chrome and popover in both schemes.
     #
     # `family` is a block-type family, `:people`, `:accent` (the tint pair
     # of the secondary button) or `:neutral` (the sunken pair, for a type
-    # that names no family). `size` is `:md` (24px) or `:lg` (22px, a tile's
-    # and a section's head); the icon is 14px in both.
+    # that names no family). `size` is `:regular` (24px) or `:small` (22px, a
+    # tile's and a section's head); the icon is 14px in both.
     #
     # Decoration: a chip always stands beside its type's or module's name,
     # so it is `aria-hidden` and has no words of its own. Anything else the
@@ -26,10 +26,10 @@ module Admin
         accent: "bg-accent-tint text-accent",
         neutral: "bg-sunken text-dim"
       }.freeze
-      SIZES = { md: "size-6", lg: "size-5.5" }.freeze
+      SIZES = { regular: "size-6", small: "size-5.5" }.freeze
       CLASS = "inline-flex shrink-0 items-center justify-center rounded-chip".freeze
 
-      def initialize(icon:, family:, size: :md, **html)
+      def initialize(icon:, family:, size: :regular, **html)
         raise ArgumentError, "unknown icon chip family #{family.inspect}" unless FAMILIES.key?(family)
         raise ArgumentError, "unknown icon chip size #{size.inspect}" unless SIZES.key?(size)
 

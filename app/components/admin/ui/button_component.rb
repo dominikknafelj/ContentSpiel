@@ -6,7 +6,7 @@ module Admin
     # (the one emphasized action per screen: a solid accent fill raised to
     # shadow 2), `:secondary` (everything else: an accent tint, accent words,
     # no outline), `:tertiary` (accent words, no fill: a dialog's Cancel, the
-    # editors' Discard changes…; E4 renamed `:ghost`, which now raises),
+    # editors' Discard changes…; `:ghost` is no variant and raises),
     # `:danger_text` (the trigger for a destructive action: sunken, with
     # danger-coloured words, because red words on the violet tint would fight)
     # and `:danger` (solid red, only for the confirm button inside a
@@ -27,7 +27,8 @@ module Admin
       VARIANT_CLASSES = {
         primary: "bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 " \
                  "not-disabled:active:translate-y-px not-disabled:active:shadow-none",
-        # The hover is not drawn in the design; the lift is this plan's choice.
+        # The design draws no hover for it: the lift to shadow 1 is the
+        # only change, so a secondary never moves or changes colour.
         secondary: "bg-accent-tint text-accent not-disabled:hover:shadow-1",
         tertiary: "bg-transparent text-accent not-disabled:hover:underline",
         # Solid red: a dialog's destructive confirm only. `on-danger` is the

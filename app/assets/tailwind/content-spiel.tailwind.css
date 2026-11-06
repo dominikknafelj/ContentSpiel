@@ -557,7 +557,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   border-color: var(--cs-field-invalid-border, var(--cs-field-line));
   border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0;
 }
-/* A field is a well (E4): a filled ground with a bottom edge only. Focused, the
+/* A field is a well: a filled ground with a bottom edge only. Focused, the
    well is lifted onto the surface, rings in the accent (2px, no offset) and its
    bottom edge goes transparent so the ring is the whole boundary; an invalid
    field keeps the danger edge under the ring. A checkbox, a toggle and a

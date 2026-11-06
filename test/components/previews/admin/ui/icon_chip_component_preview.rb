@@ -1,11 +1,11 @@
 module Admin
   module Ui
-    # `Admin::Ui::IconChipComponent` (E4): every family in both sizes, each
+    # `Admin::Ui::IconChipComponent`: every family in both sizes, each
     # beside its name as a chip always stands.
     class IconChipComponentPreview < ViewComponent::Preview
-      def md = render_with_template(template: "admin/ui/icon_chip_component_preview/families", locals: { size: :md })
+      def regular = render_with_template(template: "admin/ui/icon_chip_component_preview/families", locals: { size: :regular })
 
-      def lg = render_with_template(template: "admin/ui/icon_chip_component_preview/families", locals: { size: :lg })
+      def small = render_with_template(template: "admin/ui/icon_chip_component_preview/families", locals: { size: :small })
     end
   end
 end

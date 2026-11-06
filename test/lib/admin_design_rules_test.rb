@@ -528,7 +528,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
   end
 
-  # E4 (Stage 1, Task 5): the buttons are tokens only. A Tailwind palette
+  # The buttons are tokens only. A Tailwind palette
   # step (`bg-violet-600`, `text-gray-500`), or white and black as a utility,
   # is a second source of colour that does not switch with the theme.
   PALETTE = /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|decoration|accent|caret|shadow|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950)(?![\w-])|(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke)-(?:white|black)(?![\w-])/
@@ -601,7 +601,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Icon chips (E4, task 7): a family's hue is drawn by one component, so a
+  # Icon chips: a family's hue is drawn by one component, so a
   # restyle of the palette is one file, and a hue never stands for a thing
   # that is not a type or a module.
   ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
@@ -641,7 +641,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # Elevation and radii: a shadow is one of the four elevation tokens and a
-  # radius is one of E4's, so depth and shape are decided in the stylesheet and
+  # radius is one of the radius tokens, so depth and shape are decided in the stylesheet and
   # not per element. The public site is the theme's and out of scope (its
   # language switcher keeps `shadow-menu`, which its own stylesheet defines).
   SHADOW = /(?<![\w-])shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|menu|\[[^\]]*\])(?![\w-])/

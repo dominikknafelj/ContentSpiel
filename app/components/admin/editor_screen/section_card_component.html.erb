@@ -1,3 +1,4 @@
+<%# The card keeps `rounded-cs` and its border until stage 2 redraws the editor's cards. %>
 <%= tag.div id: dom_id, class: [ "admin-block-card admin-section-card rounded-cs border bg-sunken", (unavailable? ? "border-danger" : "border-line-strong") ],
       data: { block_id: section.id, container: "", "admin--editor--blocks-target": "card", controller: "admin--editor--section", action: "keydown.esc->admin--editor--section#escape" } do %>
   <% if unavailable? %>

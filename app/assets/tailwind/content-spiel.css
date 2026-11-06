@@ -63,7 +63,7 @@
      `mind_graph/theme.js`: a page's mark, and the tree's lines. */
   --cs-graph-page: var(--cs-ink);
   --cs-graph-tree: var(--cs-dim);
-  /* The grounds E4 stacks, lowest first: paper, surface (a card), rail
+  /* The grounds, lowest first: paper, surface (a card), rail
      (elevation 2: a rail or panel), popover (elevation 3: a popover, menu,
      dialog, a dragged card). A text field sits on its own fill. */
   --cs-field-fill: #f1f3f7;
@@ -87,7 +87,7 @@
   --cs-head-warm-ink: #7a4a12;
   --cs-type-chip: #e6ecfb;
   --cs-type-chip-ink: #2b50c8;
-  /* Icon hues (E4): a block-type family's icon and its chip, drawn only by
+  /* Icon hues: a block-type family's icon and its chip, drawn only by
      Admin::Ui::IconChipComponent. Each icon is 5.06:1 or better on its chip, the
      surface, the rail, the chrome and the popover. */
   --cs-ic-text: #2a4fc6;
@@ -150,8 +150,10 @@
   --cs-cat-4: oklch(0.74 0.09 0);
   --cs-cat-5: oklch(0.74 0.07 260);   /* away from cat-1's teal (design answer D2) */
   --cs-cat-6: oklch(0.78 0.08 95);
-  /* Ink-white page marks glared in dark; the tree's lines are dim at 60%
-     (that is `--cs-dim`'s value, here as a colour a canvas can take). */
+  /* Ink-white page marks glared in dark; the tree's lines are #a9aaaf at 60%,
+     as a colour a canvas can take. That was `--cs-dim`'s dark value before
+     the grounds moved; the graph keeps it, apart from `--cs-dim`, until stage
+     5a redraws the graph. */
   --cs-graph-page: #d9d9dc;
   --cs-graph-tree: rgba(169,170,175,0.6);
   --cs-field-fill: #272b36;
@@ -216,7 +218,7 @@
   --cs-sp-1: 4px; --cs-sp-2: 8px; --cs-sp-3: 14px; --cs-sp-4: 22px;
   --cs-sp-5: 34px; --cs-sp-6: 54px; --cs-sp-7: 80px;
   --cs-radius: 2px; --cs-radius-pill: 999px;
-  /* E4's radii. `--cs-radius` stays the radius of small marks: a status,
+  /* The radii. `--cs-radius` stays the radius of small marks: a status,
      translation or channel chip, a badge, the tooltip and a menu row's hover. */
   --cs-radius-field: 6px; --cs-radius-button: 8px; --cs-radius-button-sm: 7px; --cs-radius-chip: 7px;
   --cs-radius-tile: 12px; --cs-radius-card: 14px; --cs-radius-frame: 16px; --cs-radius-rail: 18px;
@@ -232,7 +234,9 @@
 
 /* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`
    on <html>: the label is 12px there and stays 11px on every page a visitor
-   sees, the form-send pages included. */
+   sees, the form-send pages included. The selector's (0,1,1) outweighs
+   `:root`'s (0,1,0) in any order; it stands after the `:root` blocks by
+   convention. */
 html[data-surface="studio"] {
   --cs-t-label: 12px;
 }

@@ -1,7 +1,7 @@
 module Admin
   module EditorScreen
     # A block type's icon where the editor names the type (contrast and
-    # buttons spec, C2; E4 task 7): on a chip in its family's hue
+    # buttons spec, C2): on a chip in its family's hue
     # (`Admin::Ui::IconChipComponent`), 24px in the picker and on a card's
     # head, 22px on a tile, where it stands in for the name. A type naming no
     # family is on the neutral chip. Decoration: the name is always beside
@@ -16,7 +16,7 @@ module Admin
     # (`Admin::ContentBlocksController#block_icon_streams`), because neither
     # the card's head nor the tile's face is re-rendered by a save.
     class BlockIconComponent < AdminComponent
-      PLACES = { picker: :md, card: :md, tile: :lg }.freeze
+      PLACES = { picker: :regular, card: :regular, tile: :small }.freeze
 
       def self.dom_id(block, place) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-icon-#{place}"
 

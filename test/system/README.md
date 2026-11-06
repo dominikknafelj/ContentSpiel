@@ -9,7 +9,7 @@ Sign in (`sign_in_via_form`), then enter a screen through one of two helpers. Ea
 - `visit_editor(record, locale: nil)` opens the editor of a `Page` or a `Post` (any other record raises `ArgumentError`) and waits for the controllers and for the editor's live part.
 - `visit_screen(path)` opens any other CS Studio screen and waits for its controllers.
 
-An open page or post editor catches up once when its live-editing subscription is confirmed, and `await_admin_controllers` waits for that too (`await_live_part`: the region `#editing` says `answered`), because a test that touched the page before it would see it reconciled under it. Both waits fail with a message of their own after eight seconds (the controllers that never connected are named), so a page that does not settle is not a driver timeout. A notes or presence test waits with `await_notes_live` instead, which also waits for every cable subscription of the page (a part that is an element of the page says it on its own `data-live-part`, `app/javascript/live/state.js`).
+An open page or post editor catches up once when its live-editing subscription is confirmed, and `await_admin_controllers` waits for that too (`await_live_part`: the region `#editing` says `answered`), because a test that touched the page before it would see it reconciled under it. Both waits fail with a message of their own after a short deadline (`wait:`; the controllers that never connected are named), so a page that does not settle is not a driver timeout. A notes or presence test waits with `await_notes_live` instead, which also waits for every cable subscription of the page (a part that is an element of the page says it on its own `data-live-part`, `app/javascript/live/state.js`).
 
 ## Waits, and no sleeps
 

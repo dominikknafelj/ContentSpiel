@@ -42,7 +42,7 @@ module ContentModel
     # is the Table block's.
     ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
 
-    # The hue families an icon may be drawn in (E4, task 7): the chip behind a
+    # The hue families an icon may be drawn in: the chip behind a
     # type's icon takes the family's colour pair
     # (`Admin::Ui::IconChipComponent`). The people hue is not here: it has no
     # block type. A type that names none is neutral (`#family`).

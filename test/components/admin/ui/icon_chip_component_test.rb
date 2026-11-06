@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Icon chips (E4, task 7): a block type's or a module's icon on a tinted
+# Icon chips: a block type's or a module's icon on a tinted
 # square in the hue of its family. Decoration: the name is always beside it.
 class Admin::Ui::IconChipComponentTest < ViewComponent::TestCase
   FAMILIES = ContentModel::BlockTypeDefinition::ICON_FAMILIES
@@ -12,8 +12,8 @@ class Admin::Ui::IconChipComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "the large chip is 22px, the icon still 14px" do
-    render_inline Admin::Ui::IconChipComponent.new(icon: :columns_2, family: :structure, size: :lg)
+  test "the small chip is 22px, the icon still 14px" do
+    render_inline Admin::Ui::IconChipComponent.new(icon: :columns_2, family: :structure, size: :small)
     assert_selector "span[class~='size-5.5'][class~='rounded-chip'] svg[class~='size-3.5']"
   end
 
