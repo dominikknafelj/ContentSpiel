@@ -103,7 +103,7 @@
 // list that a script has moved out of it (a section's settings region, shown
 // in the rail) carries `data-editing-away` and its own id, and the caller
 // hands it in. A merge never moves a unit, so it never puts such an element
-// back: the answer's element of that id is taken out of the answer before
+// back: every element of that id is taken out of the answer before
 // anything is drawn, so the list gets no second copy of it, and the away
 // element is merged WHERE IT STANDS, as an ancestor of a kept unit is in the
 // list: its attributes synced but for `hidden` and RUNTIME, its children
@@ -147,13 +147,7 @@ export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = nu
   const roots = [ list, ...movedOut ]
   const keep = new Set(roots.flatMap((root) => [ ...root.querySelectorAll(UNIT) ]).filter((unit) => holds(unit, unsaved)))
   const moved = displace(list, fresh, keep)
-  // The answer's element of each away one's id, taken out of the answer
-  // before anything is drawn, so the list gets no second copy of it.
-  const twins = new Map(movedOut.map((element) => {
-    const twin = fresh.querySelector(`#${CSS.escape(element.id)}`)
-    twin?.remove()
-    return [ element, twin ]
-  }))
+  const twins = takeTwins(movedOut, fresh)
   const same = onlyChanged ? [
     ...unchanged(list, fresh, keep, { containers: true }),
     ...movedOut.flatMap((element) => twins.get(element) ? unchanged(element, twins.get(element), keep, { containers: true }) : [])
@@ -176,6 +170,17 @@ export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = nu
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
   })
   return { kept: [ ...keep, ...held ], gone, moved, same, awayGone }
+}
+
+// The answer's element of each away element's id, taken out of the answer
+// before anything is drawn, so the list gets no second copy of it: every
+// element of that id is removed, and the first is the twin (null: none).
+function takeTwins(movedOut, fresh) {
+  return new Map(movedOut.map((element) => {
+    const copies = [ ...fresh.querySelectorAll(`#${CSS.escape(element.id)}`) ]
+    copies.forEach((copy) => copy.remove())
+    return [ element, copies[0] || null ]
+  }))
 }
 
 // One element a script moved out of the list, merged where it stands against

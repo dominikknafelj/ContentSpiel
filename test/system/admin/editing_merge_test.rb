@@ -538,6 +538,64 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert_equal 1, count_of("[data-chosen]")
   end
 
+  test "an answer that holds an away id twice draws neither copy in the list" do
+    move_away
+    result = run_merge(blocks_path, <<~JS)
+      // A second copy of the region at the top level of the answer, beside the one in its card.
+      fresh.append(fresh.querySelector("#section-#{@section.id}-settings").cloneNode(true))
+      const away = [ ...document.querySelectorAll("[data-editing-away]") ]
+      const out = merge.mergeList(list, fresh, { unsaved: window.__unsaved, away })
+      done({ awayGone: out.awayGone.map((each) => each.id) })
+    JS
+
+    assert_equal [], result["awayGone"]
+    assert_equal 1, count_of(settings_region)
+    assert_equal 1, count_of("#section-#{@section.id}-form")
+    assert_selector "#away-host > #{settings_region}", visible: :visible
+    assert_no_selector "#content-blocks-list #{settings_region}", visible: :all
+  end
+
+  test "a clean field with the focus in an away region is replaced, and the focus and the selection come back to it" do
+    assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two", "anchor" => "about-us" } }, actor: nil).ok?
+    open_editor
+    move_away
+    anchor = "block-#{@section.id}-anchor"
+    find("##{anchor}").click
+    page.execute_script("document.getElementById('#{anchor}').setSelectionRange(2, 4)")
+    keep("##{anchor}", "__field")
+    colleague { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two", "anchor" => "about-us", "background" => "strong" } }).ok? }
+
+    merge_list(away: true)
+
+    assert_not same?("__field", "##{anchor}"), "a clean field is the answer's"
+    assert_equal "strong", find("#block-#{@section.id}-background").value
+    assert page.evaluate_script("document.activeElement === document.getElementById('#{anchor}')")
+    assert_selector "#away-host ##{anchor}"
+    assert_equal [ 2, 4 ], page.evaluate_script("[ document.activeElement.selectionStart, document.activeElement.selectionEnd ]")
+  end
+
+  # The card stays (a panel in it holds unsaved text), so `data-chosen` is
+  # kept by RUNTIME: the attribute is never taken off, not merely put back.
+  test "a kept chosen card keeps data-chosen, never taken off and put back" do
+    hidden_panel_with(@inside, "typed in a panel")
+    move_away
+    page.execute_script(<<~JS)
+      const card = document.getElementById("content_block_#{@section.id}")
+      card.setAttribute("data-chosen", "")
+      window.__chosenChanges = 0
+      new MutationObserver((records) => { window.__chosenChanges += records.length }).observe(card, { attributes: true, attributeFilter: [ "data-chosen" ] })
+    JS
+    keep("#content_block_#{@section.id}", "__card")
+    colleague { add_block(section_id: @section.id, section_column: 2) }
+
+    result = merge_list(away: true)
+
+    assert_includes result["kept"], "block-#{@inside.id}-panel"
+    assert same?("__card", "#content_block_#{@section.id}")
+    assert_selector "#content_block_#{@section.id}[data-chosen]"
+    assert_equal 0, page.evaluate_script("window.__chosenChanges")
+  end
+
   test "two cards that both hold unsaved text keep both texts when their order changed" do
     type_unsaved(@first, "first words")
     type_unsaved(@second, "second words")
