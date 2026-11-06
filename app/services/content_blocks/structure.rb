@@ -18,8 +18,8 @@ module ContentBlocks
     # order made, and the list of writers that keep it: these four;
     # `Translations::Confirm`, which includes this module for a block's
     # field, because it writes the block's row and then the page's
-    # `translation_states` rows; and `Tags::Merge`, `Trash::Purge` and
-    # `RichText::ActionTextImport`, which lock their pages themselves).
+    # `translation_states` rows; and `Tags::Merge` and `Trash::Purge`,
+    # which lock their pages themselves).
     # Asking again inside the same transaction -- a duplicate's saves and
     # its reorder do -- is one short query for a lock already held.
     #

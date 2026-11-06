@@ -1,6 +1,5 @@
 # Rewrites a document Hash built from *outside* input -- Markdown
-# (`RichText::Markdown::Loader`), stored ActionText HTML
-# (`RichText::HtmlImport`) -- into one that satisfies the editor's content
+# (`RichText::Markdown::Loader`) -- into one that satisfies the editor's content
 # model (final fix wave, A), and says what it had to change.
 #
 # `RichText::Document#validate` refuses anything Tiptap/ProseMirror would

@@ -57,16 +57,10 @@ class DropActionTextMigrationTest < ActiveSupport::TestCase
     assert_raises(StandardError) { migrate_up }
   end
 
-  # Fix round 1 (I1): a body whose only content can't be mapped imports as
-  # blank, which the guard can't tell from "never converted" -- the task
-  # lists it, and FORCE_DROP_ACTION_TEXT=1 is the way past the guard. Runs
-  # the real task (and its SQL source) against the recreated table.
+  # A body nothing has converted blocks the drop, and
+  # FORCE_DROP_ACTION_TEXT=1 is the way past the guard.
   test "an unmappable body blocks the drop until FORCE_DROP_ACTION_TEXT=1" do
     insert_body(@post, %(<action-text-attachment content-type="image/png" url="https://cdn.example/x.png"></action-text-attachment>))
-
-    out = StringIO.new
-    RichText::ActionTextImport.new(out: out).run
-    assert_match(/Imported blank \(1\).*\n  Post##{@post.id} \(en\)/, out.string)
 
     error = assert_raises(StandardError) { migrate_up }
     assert_includes error.message, "FORCE_DROP_ACTION_TEXT=1"
