@@ -123,6 +123,81 @@ class ReleaseTaskTest < ActiveSupport::TestCase
     assert_raises(Release::Refused) { Release.notes(changelog, "0.2") }
   end
 
+  test "a section with nothing but whitespace has no notes: refused, as a missing one is" do
+    changelog = "# Changelog\n\n## 0.2.0 (2026-11-05)\n\n  \n\t\n\n## 0.1.0 (2026-10-01)\n\n- One.\n"
+    error = assert_raises(Release::Refused) { Release.notes(changelog, "0.2.0") }
+    assert_equal "CHANGELOG.md's section for 0.2.0 is empty", error.message
+    assert_raises(Release::Refused) { Release.notes(changelog, "0.2.0", ordered: true) }
+    assert_equal "- One.", Release.notes(changelog, "0.1.0")
+  end
+
+  test "ordered notes put Breaking, Theme contract, Removed, Migrations needing action and Environment first, in that order" do
+    changelog = <<~MD
+      ## 0.2.0 (2026-11-05)
+
+      Opening line.
+
+      ### Added
+
+      - Added.
+
+      ### Environment
+
+      - Env.
+
+      ### For a gem or an outside caller
+
+      - Gem.
+
+      ### Migrations needing action
+
+      - Act.
+
+      ### Migrations
+
+      - Migrate.
+
+      ### Removed
+
+      - Gone.
+
+      ### Theme contract
+
+      - Contract.
+
+      ### Breaking
+
+      - Broke.
+    MD
+    headings = Release.notes(changelog, "0.2.0", ordered: true).scan(/^### (.*)$/).flatten
+
+    assert_equal [ "Breaking", "Theme contract", "Removed", "Migrations needing action", "Environment",
+                   "Added", "For a gem or an outside caller", "Migrations" ], headings
+    assert Release.notes(changelog, "0.2.0", ordered: true).start_with?("Opening line.")
+    assert_equal Release.notes(changelog, "0.2.0").scan(/^### (.*)$/).flatten.first, "Added", "unordered is the file's order"
+  end
+
+  # release.yml's notes step is this line, run with no bundle: the GitHub
+  # Release carries the ordered section, and an empty one stops the run.
+  test "the release workflow's notes are the ordered ones, and an empty section fails its step" do
+    workflow = File.read(Rails.root.join(".github/workflows/release.yml"))
+    assert_includes workflow, "ContentSpiel::Release.notes(File.read(\"CHANGELOG.md\"), ARGV.fetch(0), ordered: true)"
+    assert_not_includes workflow, "-s release-notes.md", "the check is the method's own, not the file's size"
+
+    Dir.mktmpdir do |dir|
+      File.write("#{dir}/CHANGELOG.md", "## 0.2.0 (2026-11-05)\n\n### Added\n\n- A.\n\n### Breaking\n\n- B.\n\n## 0.1.0 (2026-10-01)\n\n\n")
+      script = "puts ContentSpiel::Release.notes(File.read(\"CHANGELOG.md\"), ARGV.fetch(0), ordered: true)"
+      ruby = ->(version) { Bundler.with_unbundled_env { Open3.capture3("ruby", "-r", Rails.root.join("lib/content_spiel/release").to_s, "-e", script, version, chdir: dir) } }
+
+      out, _err, status = ruby.("0.2.0")
+      assert status.success?
+      assert_operator out.index("### Breaking"), :<, out.index("### Added")
+      _out, err, status = ruby.("0.1.0")
+      assert_not status.success?
+      assert_includes err, "CHANGELOG.md's section for 0.1.0 is empty"
+    end
+  end
+
   test "the rake task prints the commands and refuses with a message and a failing exit" do
     in_repo do |root, _git|
       commit_all root

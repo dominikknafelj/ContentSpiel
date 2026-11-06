@@ -54,9 +54,11 @@ jobs:
           newest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
           newest=${newest#v}
           echo "VERSION $version, newest tag ${newest:-none}"
-          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "release=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel"
+            echo "version=$version"
+            echo "release=false"
+          } >> "$GITHUB_OUTPUT"
 
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::VERSION ${version:-(none)} is not MAJOR.MINOR.PATCH"; exit 1
@@ -71,10 +73,19 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
             echo "::error::the tag v$version already exists"; exit 1
           fi
-          ruby -r ./lib/content_spiel/release -e \
-            'puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ARGV.fetch(0))' "$version" > release-notes.md \
-            || { echo "::error::CHANGELOG.md has no dated section for $version"; exit 1; }
-          [ -s release-notes.md ] || { echo "::error::CHANGELOG.md's section for $version is empty"; exit 1; }
+          # The notes are the version's section, its subsections in the order
+          # `contentspiel upgrade` shows them (Release::FIRST: Breaking first).
+          # `notes` refuses a missing section and one of whitespace only, and
+          # its sentence is the error.
+          if ! ruby -r ./lib/content_spiel/release -e \
+              'begin
+                 puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ARGV.fetch(0), ordered: true)
+               rescue ContentSpiel::Release::Refused => e
+                 warn e.message
+                 exit 1
+               end' "$version" > release-notes.md 2> notes-error.txt; then
+            echo "::error::$(cat notes-error.txt)"; exit 1
+          fi
           for file in install/install.sh install/contentspiel; do
             [ -f "$file" ] || { echo "::error::$file does not exist"; exit 1; }
           done

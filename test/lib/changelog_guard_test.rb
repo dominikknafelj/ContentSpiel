@@ -4,12 +4,14 @@ require "tmpdir"
 require "fileutils"
 
 # bin/changelog-guard BASE_REF: a change to a guarded file (the contract ledger,
-# the plugin hooks) needs a line under "## Unreleased" in CHANGELOG.md. Run on a
+# the plugin hooks, a migration) needs a line under "## Unreleased" in
+# CHANGELOG.md, and a new migration its version under "### Migrations" there. Run on a
 # throwaway repository, so no commit of this one (signed through 1Password) is
 # made or read.
 class ChangelogGuardTest < ActiveSupport::TestCase
   GUARD = Rails.root.join("bin/changelog-guard").to_s
   LEDGER = "test/support/contract_ledger.rb"
+  MIGRATION = "db/migrate/20260101000000_old.rb"
   CHANGELOG = "# Changelog\n\n## Unreleased\n\n- Something.\n\n## 0.1.0\n\n- Older.\n"
 
   test "a ledger change with no changelog change fails and names the ledger" do
@@ -53,6 +55,40 @@ class ChangelogGuardTest < ActiveSupport::TestCase
     end
   end
 
+  test "a changed migration is guarded too" do
+    in_repo do |git|
+      write MIGRATION, "# changed\n"
+      git.call "commit", "-am", "migration"
+      out, status = run_guard
+      assert_not status.success?
+      assert_includes out, MIGRATION
+    end
+  end
+
+  test "a new migration needs its version under ### Migrations in Unreleased" do
+    in_repo do |git|
+      added = "db/migrate/20261106090000_add_thing.rb"
+      write added, "# new\n"
+      write "CHANGELOG.md", CHANGELOG.sub("- Something.\n", "- Something.\n- Added a thing.\n")
+      git.call "add", "."
+      git.call "commit", "-qm", "migration with a line elsewhere"
+      out, status = run_guard
+      assert_not status.success?, "a line outside ### Migrations is not enough"
+      assert_includes out, "not named under \"### Migrations\""
+      assert_includes out, added
+
+      write "CHANGELOG.md", CHANGELOG.sub("- Something.\n", "- Something.\n\n### Migrations needing action\n\n- `20261106090000` needs a person.\n")
+      git.call "commit", "-qam", "under needing action"
+      _out, status = run_guard
+      assert_not status.success?, "Migrations needing action is not Migrations"
+
+      write "CHANGELOG.md", CHANGELOG.sub("- Something.\n", "- Something.\n\n### Migrations\n\n- `20261106090000_add_thing` adds a column.\n")
+      git.call "commit", "-qam", "under Migrations"
+      out, status = run_guard
+      assert status.success?, out
+    end
+  end
+
   test "a change of another file passes" do
     in_repo do |git|
       write "app/other.rb", "# changed\n"
@@ -81,6 +117,7 @@ class ChangelogGuardTest < ActiveSupport::TestCase
       write LEDGER, "# ledger\n"
       write "lib/content_spiel/plugins.rb", "# hooks\n"
       write "app/other.rb", "# other\n"
+      write MIGRATION, "# old\n"
       write "CHANGELOG.md", CHANGELOG
       git.call "add", "."
       git.call "commit", "-q", "-m", "base"

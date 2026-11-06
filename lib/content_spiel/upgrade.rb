@@ -41,8 +41,12 @@ module ContentSpiel
 
     # The subsections shown first in each section, in this order: what a
     # person must act on before anything else. The rest follow in file order.
-    FIRST = [ "Breaking", "Theme contract" ].freeze
-    MIGRATIONS = "Migrations needing action".freeze
+    # Release's list, which the GitHub Release's notes are ordered by too.
+    FIRST = Release::FIRST
+    # A section with either heading changed the database, so going back
+    # past it is not safe: "Migrations" lists every migration, "Migrations
+    # needing action" those a person must do something about.
+    MIGRATIONS = [ "Migrations", "Migrations needing action" ].freeze
     PIN = ".contentspiel-version".freeze
     # The backup command of the site's README (lib/site_template/README.md.tt).
     BACKUP = 'kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql'.freeze
@@ -88,22 +92,11 @@ module ContentSpiel
 
     def notes_text(pinned, sections)
       head = "Release notes\n\nChanges from ContentSpiel #{pinned} to #{@version}, oldest release first."
-      parts = sections.map { |version, body| "## #{version}\n\n#{ordered(body)}".rstrip }
+      parts = sections.map { |version, body| "## #{version}\n\n#{Release.order(body)}".rstrip }
       # This image's own version should have a section; if it has none, say
       # so among the notes rather than let the gap pass unseen.
       parts << "CHANGELOG has no section for #{@version}." unless sections.any? { |version, _| version == @version }
       ([ head ] + parts).join("\n\n")
-    end
-
-    # A section's body with the subsections of FIRST moved to the top, each
-    # with its heading, and the rest after them in file order. Lines before
-    # the first heading stay at the very top.
-    def ordered(body)
-      parts = body.split(/^(?=### )/)
-      preamble = parts.first&.start_with?("### ") ? "" : parts.shift
-      title = ->(part) { part[/\A### (.*)$/, 1].to_s.strip }
-      first = FIRST.flat_map { |name| parts.select { |part| title.(part) == name } }
-      ([ preamble.to_s ] + first + (parts - first)).map(&:strip).reject(&:empty?).join("\n\n")
     end
 
     def failed(notes, problems)
@@ -123,8 +116,8 @@ module ContentSpiel
                 "1. Review the release notes above.",
                 "2. Commit #{PIN} (and any change to theme/).",
                 "3. Deploy: kamal deploy" ]
-      if sections.any? { |_, body| body.match?(/^### #{Regexp.escape(MIGRATIONS)}/) }
-        steps << "A release between them has migrations needing action. Going back to #{pinned} after deploying is not safe: " \
+      if sections.any? { |_, body| MIGRATIONS.any? { |heading| body.match?(/^### #{Regexp.escape(heading)}[ \t]*$/) } }
+        steps << "A release between them changes the database. Going back to #{pinned} after deploying is not safe: " \
                  "make a backup before step 3 (the README's command: #{BACKUP})."
       end
       volume = DevFiles.new(@site).builds_volume(pinned)

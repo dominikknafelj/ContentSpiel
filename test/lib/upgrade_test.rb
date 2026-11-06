@@ -126,13 +126,14 @@ class UpgradeTest < ActiveSupport::TestCase
     end
   end
 
-  test "within a section, Breaking and Theme contract come first, then the rest in file order" do
+  test "within a section, Release::FIRST's subsections come first in its order, then the rest in file order" do
+    assert_equal [ "Breaking", "Theme contract", "Removed", "Migrations needing action", "Environment" ], ContentSpiel::Upgrade::FIRST
     in_site("0.1.0") do |site|
       text = upgrade(site).run.text
       two = text[text.index("## 0.2.0")...text.index("## 0.3.0")]
 
-      assert_operator two.index("### Theme contract"), :<, two.index("### Environment")
-      assert_operator two.index("### Environment"), :<, two.index("### Migrations needing action")
+      assert_operator two.index("### Theme contract"), :<, two.index("### Migrations needing action")
+      assert_operator two.index("### Migrations needing action"), :<, two.index("### Environment")
 
       three = text[text.index("## 0.3.0")..]
       assert_operator three.index("### Breaking"), :<, three.index("### Added")
@@ -160,6 +161,14 @@ class UpgradeTest < ActiveSupport::TestCase
       text = upgrade(site).run.text
       assert_not_includes text, "not safe"
       assert_not_includes text, "pg_dumpall"
+    end
+  end
+
+  test "a section with Migrations alone warns as well: every migration makes going back unsafe" do
+    changelog = "## 0.2.0 (2026-02-01)\n\n### Migrations\n\n- `20260201000000_add_thing` adds a column.\n\n## 0.1.0 (2026-01-01)\n\n- One.\n"
+    in_site("0.1.0") do |site|
+      text = upgrade(site, changelog: changelog, version: "0.2.0").run.text
+      assert_includes text, "Going back to 0.1.0 after deploying is not safe"
     end
   end
 
@@ -219,8 +228,8 @@ class UpgradeTest < ActiveSupport::TestCase
 
   private
 
-  def upgrade(site, changelog: CHANGELOG, check: NO_PROBLEMS)
-    ContentSpiel::Upgrade.new(site, changelog: changelog, version: "0.3.0", check: check)
+  def upgrade(site, changelog: CHANGELOG, check: NO_PROBLEMS, version: "0.3.0")
+    ContentSpiel::Upgrade.new(site, changelog: changelog, version: version, check: check)
   end
 
   def pin(site) = File.read(File.join(site, ".contentspiel-version"))

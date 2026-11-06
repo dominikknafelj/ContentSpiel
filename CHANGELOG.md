@@ -33,10 +33,18 @@
 
 ### Migrations needing action
 
-- `db:migrate` adds the forms' four tables (`forms`, `form_destinations`, `form_submissions`, `form_deliveries`) and `site_settings.form_keep_days` (90), and `20261104090300_grant_forms_permissions_to_admin_group` gives the built-in Admin group "Manage forms" and "View form submissions"; any other group gets them by hand on the Groups screen.
+- Only the built-in Admin group is given the two forms permissions (`20261104090300`, below); any other group that should build forms or read submissions gets "Manage forms" and "View form submissions" by hand on the Groups screen.
 - **A site without Active Record encryption keys takes no form answers**: every form says it can't take answers, a send is refused, and System status's Forms row says so. Set the three keys (`docs/reference/translations.md`, "Active Record encryption keys") before placing a form.
 - A site behind a CDN adds the CDN's ranges to `config.action_dispatch.trusted_proxies`, or the forms' per-visitor rate limit counts every visitor as one (`docs/reference/hosting.md`, "Forms").
-- None beyond `db:migrate`. `20261101100000_replace_page_type_with_page_settings` moves every page's type into `pages.settings` and rewrites every page's published copies (current, pending and superseded) the same way; nothing is drawn differently and the content version does not move. A unique index on a section's anchor is added (no anchor exists before it).
+
+### Migrations
+
+- `20261101090000_add_unique_section_anchor_to_content_blocks`: a unique index on a section's anchor (no anchor exists before it).
+- `20261101100000_replace_page_type_with_page_settings`: moves every page's type into `pages.settings` and rewrites every page's published copies (current, pending and superseded) the same way; nothing is drawn differently and the content version does not move.
+- `20261101110000_restate_state_check_constraints`: writes the check constraints on `note_threads.state` and `presence_marks.state` again in a form `db/schema.rb` dumps the same on every Postgres version; what they allow does not change.
+- `20261104090000_create_forms`, `20261104090100_create_form_destinations`, `20261104100000_create_form_submissions` and `20261104100100_create_form_deliveries`: the forms' four tables.
+- `20261104090200_add_form_keep_days_to_site_settings`: `site_settings.form_keep_days`, 90 by default.
+- `20261104090300_grant_forms_permissions_to_admin_group`: gives the built-in Admin group "Manage forms" and "View form submissions".
 
 ### Removed
 
@@ -59,4 +67,4 @@
 - **A promise: the pin.** A site names its CMS version in one file at its top, `.contentspiel-version`: one line, `X.Y.Z`. The `contentspiel` command run in the folder or under it uses that version, the site's `config/deploy.yml` reads it into the `Dockerfile`'s `CMS_VERSION`, and `contentspiel upgrade` is what moves it (`docs/reference/hosting.md`, "A site's version").
 - Added the `contentspiel` command, for a machine with Docker and nothing else: `curl -fsSL https://github.com/dominikknafelj/ContentSpiel/releases/latest/download/install.sh | sh` installs it into `~/.local/bin`. `contentspiel new NAME` writes a site that builds on this release (theme, `Dockerfile`, Kamal's `config/deploy.yml` with three placeholders, the secrets' names, a README to follow); `generate section_style NAME "Label"` and `generate page_template NAME "Label"` add a theme choice; `check` is `theme:check` on the site's `theme/`; `dev` runs the site on the machine with its theme mounted and a database of its own; `upgrade` shows the notes since the pin, checks the theme against the newest release and only then moves the pin; `--version` and `help`. Inside a site every command runs the pinned image and pulls nothing by itself; outside one it pulls `stable` first, and runs the one on the machine, with a warning, when it can't.
 - Added `ContentSpiel::VERSION` and `ContentSpiel::IMAGE` (`lib/content_spiel/version.rb`).
-- For the CMS's own contributors: `bin/rails 'release:prepare[X.Y.Z]'` prepares a release's pull request, and a pull request that changes `test/support/contract_ledger.rb` or `lib/content_spiel/plugins.rb` fails CI until this file's "Unreleased" section changes too (`bin/changelog-guard`).
+- For the CMS's own contributors: `bin/rails 'release:prepare[X.Y.Z]'` prepares a release's pull request, and a pull request that changes `test/support/contract_ledger.rb`, `lib/content_spiel/plugins.rb` or a file under `db/migrate/` fails CI until this file's "Unreleased" section changes too, and one that adds a migration until its version is named under "### Migrations" there (`bin/changelog-guard`).

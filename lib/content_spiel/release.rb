@@ -22,28 +22,62 @@ module ContentSpiel
     VERSION_LINE = /^(\s*VERSION = ")[^"]*(")/
     NUMBER = /\A\d+\.\d+\.\d+\z/
 
+    # The subsections a reader must act on, first in a section and in this
+    # order: what breaks, what a theme must change, what is gone, what a
+    # person must do to the database, what the host must set. The rest follow
+    # in file order. One list for both readers of a section: the GitHub
+    # Release's notes (release.yml, `notes(…, ordered: true)`) and
+    # `contentspiel upgrade` (`ContentSpiel::Upgrade`).
+    FIRST = [ "Breaking", "Theme contract", "Removed", "Migrations needing action", "Environment" ].freeze
+
     # The text of one version's changelog section, from under its
-    # `## V (date)` heading to the next `## `, without surrounding blank lines.
-    def self.notes(changelog, version)
-      lines = changelog.lines
-      start = lines.index { |line| line.match?(/\A## #{Regexp.escape(version)}(\s|\z)/) }
-      raise Refused, "CHANGELOG.md has no section for #{version}" unless start
-      body = lines[(start + 1)..].take_while { |line| !line.start_with?("## ") }
-      body.join.strip
+    # `## V (date)` heading to the next `## `, without surrounding blank
+    # lines; with `ordered: true`, its subsections in FIRST's order (`order`).
+    # Refused when there is no such section, and when the section holds
+    # nothing but whitespace: a release's notes are never empty.
+    def self.notes(changelog, version, ordered: false)
+      body = section(changelog, version)
+      raise Refused, "CHANGELOG.md has no section for #{version}" unless body
+      raise Refused, "CHANGELOG.md's section for #{version} is empty" if body.empty?
+
+      ordered ? order(body) : body
+    end
+
+    # A section's body with the subsections of FIRST moved to the top, in
+    # FIRST's order, each with its heading, and the rest after them in file
+    # order. Lines before the first heading stay at the very top.
+    def self.order(body)
+      parts = body.split(/^(?=### )/)
+      preamble = parts.first&.start_with?("### ") ? "" : parts.shift
+      title = ->(part) { part[/\A### (.*)$/, 1].to_s.strip }
+      first = FIRST.flat_map { |name| parts.select { |part| title.(part) == name } }
+      ([ preamble.to_s ] + first + (parts - first)).map(&:strip).reject(&:empty?).join("\n\n")
     end
 
     # Every released section with `from` < version <= `to`, oldest first, as
-    # [[version, notes]]. `## Unreleased` is never one (it is no number), and
+    # [[version, body]]. `## Unreleased` is never one (it is no number), and
     # a heading that is no X.Y.Z is skipped. `contentspiel upgrade` shows
-    # these; the body of each is `notes`'s, so there is one parser.
+    # these; the body of each is found as `notes` finds it, so there is one
+    # parser, but an empty one is passed over and not refused: a site's
+    # upgrade does not stop on a release that said nothing.
     def self.sections_between(changelog, from, to)
       low = Gem::Version.new(from)
       high = Gem::Version.new(to)
       versions = changelog.scan(/^## (\d+\.\d+\.\d+)(?=\s|\z)/).flatten.uniq
       versions.select { |v| Gem::Version.new(v) > low && Gem::Version.new(v) <= high }
               .sort_by { |v| Gem::Version.new(v) }
-              .map { |v| [ v, notes(changelog, v) ] }
+              .map { |v| [ v, section(changelog, v) ] }
     end
+
+    # The body under `## V`, stripped, or nil when there is no such heading.
+    def self.section(changelog, version)
+      lines = changelog.lines
+      start = lines.index { |line| line.match?(/\A## #{Regexp.escape(version)}(\s|\z)/) }
+      return nil unless start
+
+      lines[(start + 1)..].take_while { |line| !line.start_with?("## ") }.join.strip
+    end
+    private_class_method :section
 
     def initialize(root, today: Date.today)
       @root = root.to_s
