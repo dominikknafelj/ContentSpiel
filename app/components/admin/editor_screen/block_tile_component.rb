@@ -84,6 +84,16 @@ module Admin
 
       def panel_id = Admin::EditorScreen::BlockCardComponent.panel_id(block)
 
+      # The face's name is the type and the preview's heading (or the one
+      # line), with the attention mark and "Needs fixing" when they are
+      # drawn; the preview's few lines of text are its description, so a
+      # screen reader says what the tile is before it reads what it holds.
+      def type_id = "#{dom_id}-type"
+
+      def labelled_by = [ type_id, *TileSummaryComponent.part_ids(block) ].join(" ")
+
+      def described_by = TileSummaryComponent.text_id(block)
+
       def open? = @open
 
       def editable? = @editable

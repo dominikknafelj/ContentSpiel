@@ -29,6 +29,24 @@ class Admin::SectionsPanelsSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector panel(@right)
   end
 
+  # What the browser computes, not what the markup points at: the name is
+  # what the tile is, the description what it holds.
+  test "a tile's face is named by its type and heading and described by its preview's text" do
+    text = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 2, position: 1, body: rich_doc("## Opening hours\n\nWe open at nine."))
+    open_editor
+
+    node = ax_node(face(text))
+    assert_equal "Rich text Opening hours", node.dig("name", "value")
+    assert_equal "We open at nine.", node.dig("description", "value")
+  end
+
+  def ax_node(selector)
+    cdp = page.driver.browser.page
+    cdp.command("Accessibility.enable")
+    object = cdp.command("Runtime.evaluate", expression: "document.querySelector(#{selector.to_json})")
+    cdp.command("Accessibility.getPartialAXTree", objectId: object.dig("result", "objectId"), fetchRelatives: false).fetch("nodes").first
+  end
+
   test "typing in the open form autosaves like a card" do
     open_editor
     find(face(@left)).click

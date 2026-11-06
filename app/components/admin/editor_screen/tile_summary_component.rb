@@ -72,6 +72,21 @@ module Admin
 
       def dom_id = self.class.dom_id(block)
 
+      # The parts of the summary the tile's face is named and described by
+      # (`BlockTileComponent`), in the order the name reads them: the
+      # attention mark, the preview's heading (or the one line), then
+      # "Needs fixing"; the description is the preview's text. The ids are
+      # fixed for the block, because a save replaces this component and never
+      # the face that points at them, and a part that is not drawn is an id
+      # that names nothing, which a name or a description skips.
+      def self.part_ids(block) = %w[attention name status].map { |part| "#{dom_id(block)}-#{part}" }
+      def self.text_id(block) = "#{dom_id(block)}-text"
+
+      def attention_id = self.class.part_ids(block)[0]
+      def name_id = self.class.part_ids(block)[1]
+      def status_id = self.class.part_ids(block)[2]
+      def text_id = self.class.text_id(block)
+
       # The line as text, whatever its parts look like.
       def line = parts.map(&:first).join
 

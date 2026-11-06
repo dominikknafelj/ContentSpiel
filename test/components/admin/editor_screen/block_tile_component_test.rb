@@ -37,6 +37,32 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector "#{face}[class*='outline-accent'], #{face}[class*='outline-2']"
   end
 
+  # A screen reader hears what the tile is, the type and the heading, and
+  # then what it holds: the preview's lines are the face's description. The
+  # ids are the block's, fixed, since a save replaces the summary and never
+  # the face that points at its parts.
+  test "the face is named by the type and the heading, and described by the preview's text" do
+    text = @editor_page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 2, position: 0, body: rich_doc("## Opening hours\n\nWe open at nine."))
+    render_tile(text)
+
+    summary = "block-#{text.id}-tile-summary"
+    face = page.find(".admin-block-tile__face")
+    assert_equal "content_block_#{text.id}-type #{summary}-attention #{summary}-name #{summary}-status", face["aria-labelledby"]
+    assert_equal "#{summary}-text", face["aria-describedby"]
+    assert_selector "#content_block_#{text.id}-type", exact_text: "Rich text"
+    assert_selector "##{summary}-name.admin-block-tile__title", exact_text: "Opening hours"
+    assert_selector "##{summary}-text", exact_text: "We open at nine."
+  end
+
+  test "a tile with no preview is named by its type and its one line, and describes nothing" do
+    render_tile
+
+    summary = "block-#{@block.id}-tile-summary"
+    assert_selector "##{summary} > ##{summary}-attention[role=img]"
+    assert_selector "##{summary} > span##{summary}-name:last-child"
+    assert_no_selector "##{summary}-text"
+  end
+
   test "the tile shows the type's icon beside its name, and the face is named by the type" do
     render_tile
 

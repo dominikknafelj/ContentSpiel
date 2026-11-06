@@ -486,4 +486,39 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   ensure
     page.execute_script("document.querySelector(#{card.to_json})?.style.removeProperty('width')") if card
   end
+
+  # A card that is held and has its thread open shows the notes edge: the
+  # three edges weigh the same and the later rule wins, held, then notes,
+  # then unavailable (`content-spiel.tailwind.css`). What the browser draws,
+  # each edge compared with its token resolved on the card.
+  test "a card both held and notes-active draws the notes edge, and an unavailable one the danger edge over both" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit_editor(@page)
+
+    edges = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.getElementById(#{ActionView::RecordIdentifier.dom_id(block).to_json})
+        const token = (name) => {
+          const probe = document.createElement("span")
+          probe.style.color = `var(${name})`
+          card.appendChild(probe)
+          const value = getComputedStyle(probe).color
+          probe.remove()
+          return value
+        }
+        const edge = () => getComputedStyle(card).outlineColor
+        card.setAttribute("data-card-edge", "held")
+        const held = edge()
+        card.setAttribute("data-notes-active", "")
+        const both = edge()
+        card.setAttribute("data-card-edge", "unavailable")
+        const unavailable = edge()
+        return { held, both, unavailable, line: token("--cs-field-line"), accent: token("--cs-accent"), danger: token("--cs-danger") }
+      })()
+    JS
+    assert_equal edges["line"], edges["held"]
+    assert_equal edges["accent"], edges["both"], "held and notes-active: the notes edge"
+    assert_equal edges["danger"], edges["unavailable"]
+    assert_not_equal edges["line"], edges["accent"]
+  end
 end
