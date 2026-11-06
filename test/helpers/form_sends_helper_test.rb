@@ -1,7 +1,7 @@
 require "test_helper"
 
 class FormSendsHelperTest < ActionView::TestCase
-  test "the form-send page's button keeps its pre-E4 look, whatever CS Studio's buttons do" do
+  test "the form-send page's button is its own frozen string, whatever CS Studio's buttons do" do
     assert_equal "inline-block cursor-pointer rounded-cs bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-hover", form_send_button_class
     assert_predicate form_send_button_class, :frozen?
     assert_not_equal Admin::Ui::ButtonComponent.classes(:primary), form_send_button_class
