@@ -287,6 +287,16 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     end
   end
 
+  test "icon with a family or a for_block: and no name is refused, and leaves the icon as it was" do
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    definition.icon "pilcrow", family: :text
+    [ { family: :lists }, { for_block: ->(_block) { "info" } } ].each do |options|
+      error = assert_raises(ArgumentError, options.keys.first.to_s) { definition.icon(**options) }
+      assert_match(/\Ax: `icon family:` and `for_block:` go with an icon's name/, error.message)
+    end
+    assert_equal [ "pilcrow", :text, false ], [ definition.icon, definition.family, definition.icon_follows_block? ]
+  end
+
   test "every built-in block type declares the family the design gives it" do
     families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "table" => :code,
                  "form" => :form, "post_list" => :lists, "section" => :structure }

@@ -47,7 +47,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_includes response.headers["Cache-Control"], "no-store"
     assert_nil response.headers["Set-Cookie"]
     assert_empty cookies.to_hash
-    assert_select "html[lang=en]"
+    assert_select "html[lang=en][data-surface=plain]"
     assert_select "head title", text: "#{I18n.t("public.forms.pages.sent")} · Test Site"
     assert_select "meta[name=robots][content=noindex]"
     assert_select "meta[name=csrf-token], meta[name=csrf-param], script[type=importmap]", count: 0
@@ -190,6 +190,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_nothing_written do
       send_form
       assert_response :not_found
+      assert_select "html[data-surface=plain]"
       assert_select "h1", text: I18n.t("public.forms.pages.gone")
       assert_select "main p", text: "This form is no longer available."
       assert_back_link "/contact-us"
@@ -211,6 +212,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
         assert_nothing_written do
           send_form
           assert_response :service_unavailable
+          assert_select "html[data-surface=plain]"
           assert_select "h1", text: I18n.t("public.forms.pages.unavailable")
           assert_select "main p", text: "This form can't take answers at the moment. Please try again later."
           assert_back_link "/contact-us"

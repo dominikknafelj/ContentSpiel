@@ -353,6 +353,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }
+/* A menu's row under the keyboard and the palette's selected row. Their
+   sunken fill is a hover's, and on the popover it is 1.13:1 in dark: too
+   faint to be the one cue a keyboard user has. So the row also carries a 2px
+   accent bar inside its left edge, as the sidebar's current row stands out in
+   the accent; the accent is 3:1 or better on the popover in both schemes
+   (`test/lib/admin_contrast_test.rb`). Inset, so the row does not move. */
+.admin-menu-panel :is(a, button):focus-visible,
+.admin-palette [role="option"][aria-selected="true"] > a { box-shadow: inset 2px 0 0 var(--cs-accent); }
 /* The media picker (Media::PickerComponent) hangs from a fixed top edge
    instead of being centred, because its height changes while it is open: the
    Library frame is empty until its request answers, and the two tabs' panels

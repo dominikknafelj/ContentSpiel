@@ -87,6 +87,18 @@ class AdminContrastTest < ActiveSupport::TestCase
       "the reason for the paper ring: the accent on a dark selected pill is too faint"
   end
 
+  test "a menu's keyboard row and the palette's selected row carry an accent bar, 3:1 on the popover, where their sunken fill is not" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-popover"), "the keyboard row's accent bar on the popover (#{scheme})")
+    end
+    dark = schemes[:dark]
+    assert_operator contrast(resolve_colour(dark, "--cs-sunken"), resolve_colour(dark, "--cs-popover")), :<, 3.0,
+      "the reason for the bar: a sunken row on the dark popover is too faint to be the only cue"
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-menu-panel :is\(a, button\):focus-visible,\s*\.admin-palette \[role="option"\]\[aria-selected="true"\] > a\s*\{\s*box-shadow:\s*inset 2px 0 0 var\(--cs-accent\);\s*\}/, css)
+    assert_includes Rails.root.join("app/components/admin/ui/menu_component.rb").read, '"admin-menu-panel '
+  end
+
   test "a line that only groups stays a hairline: the strong one above the plain one, both under 3:1" do
     each_scheme do |scheme, colour|
       surface = colour.("--cs-surface")
@@ -199,6 +211,22 @@ class AdminContrastTest < ActiveSupport::TestCase
 
   test "the plain surface re-values every accent token and nothing else" do
     assert_equal %w[--cs-accent --cs-accent-hover --cs-accent-tint --cs-on-accent], plain_surface.keys.sort
+  end
+
+  # `[data-surface="plain"]` and `[data-theme="dark"]` are both (0,1,0) on the
+  # same <html>, so the plain block wins in dark only by standing after the
+  # dark block; a selector that outweighs both would win wherever it stands.
+  test "the plain block wins over both theme blocks: after them, or by a heavier selector" do
+    css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
+    at = ->(selector) { css.index(/^#{Regexp.escape(selector)}\s*\{/) }
+    plain = css[/^([^{}\n]*data-surface="plain"[^{}\n]*)\{/, 1].to_s.strip
+    assert_not_empty plain, "the plain block is there"
+    next if plain.start_with?("html[") || plain.start_with?(":root[")
+
+    [ ':root, [data-theme="light"]', '[data-theme="dark"]' ].each do |theme|
+      assert at.(theme), "#{theme} is there"
+      assert_operator at.(plain), :>, at.(theme), "#{plain} stands after #{theme}: equal specificity, so the later one wins"
+    end
   end
 
   test "the measuring can fail: the grouping line is no outline, a translucent colour needs a ground, and an unread notation is refused" do

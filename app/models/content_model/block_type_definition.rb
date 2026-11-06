@@ -134,9 +134,14 @@ module ContentModel
     # has no block, draws the type's, so the type's should be the icon of
     # the value a new block starts with. `family:` is one of `ICON_FAMILIES`,
     # the hue of the chip the icon is drawn on; a type that names none, a
-    # gem's included, is drawn on the neutral chip (`#family`).
+    # gem's included, is drawn on the neutral chip (`#family`). With no name
+    # it is the reader; `family:` or `for_block:` without a name is refused,
+    # since there is no icon for it to describe and it would be dropped.
     def icon(name = nil, for_block: nil, family: nil)
-      return @icon if name.nil?
+      if name.nil?
+        refuse "`icon family:` and `for_block:` go with an icon's name (`icon \"pilcrow\", family: :text`)" unless family.nil? && for_block.nil?
+        return @icon
+      end
       refuse "icon family is one of #{ICON_FAMILIES.join(", ")} (the hues of CS Studio's icon chips): #{family.inspect}" unless family.nil? || ICON_FAMILIES.include?(family.to_s.to_sym)
       refuse "icon is one of #{ICONS.join(", ")} (the icons CS Studio draws for a block type): #{name.inspect}" unless ICONS.include?(name.to_s)
       refuse "`icon for_block:` is a callable taking the block and answering one of #{ICONS.join(", ")}" unless for_block.nil? || for_block.respond_to?(:call)

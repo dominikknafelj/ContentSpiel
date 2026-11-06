@@ -38,6 +38,11 @@ class CommandPaletteTest < ApplicationSystemTestCase
     second = find("#jump-results [role=option][aria-selected=true]")[:id]
     assert_not_equal first, second
     assert_equal second, input["aria-activedescendant"]
+    # The selected row's cue is the accent bar inside its left edge, not
+    # only the sunken fill, and the row it left has none.
+    bar = ->(id) { page.evaluate_script("getComputedStyle(document.querySelector('##{id} > a')).boxShadow") }
+    assert_match(/inset/, bar.(second))
+    assert_equal "none", bar.(first)
 
     input.set("zzzqqq")
     assert_text "No results for “zzzqqq”."

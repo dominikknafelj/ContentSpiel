@@ -4,7 +4,8 @@ require "test_helper"
 # and none of the components the shared parts replaced. These rules are easy to
 # break one innocent edit at a time, so they are pinned here.
 class AdminDesignRulesTest < ActiveSupport::TestCase
-  # Everything that draws CS Studio, or is drawn inside it: its views and
+  # Everything that draws CS Studio, or is drawn inside it: its views (the
+  # invitation page `views/invitations`, a product-layout page, among them) and
   # components, the media components it shares with the public site
   # (`components/media`: the picker and the picture tag), the public site's own
   # components (`components/public`: the preview bar, whose two colours are
@@ -14,7 +15,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # graph's draw onto a canvas, where a colour is a string handed to the
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
-    views/admin views/layouts views/setup components/admin components/media components/public
+    views/admin views/layouts views/setup views/invitations components/admin components/media components/public
     javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
@@ -53,6 +54,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A directory that is renamed or emptied would otherwise drop out of every
   # rule below without a word.
+  test "the visitor's two layouts are there, and out of the type-voice and elevation scans" do
+    VISITOR_LAYOUTS.each do |path|
+      assert File.exist?(path), path
+      assert_not_includes TYPE_VOICE_SOURCES, path
+      assert_not_includes ELEVATION_SOURCES, path
+    end
+  end
+
   test "every directory the rules cover is there and has sources" do
     SOURCE_DIRECTORIES.each do |directory|
       root = Rails.root.join("app", directory).to_s
@@ -356,7 +365,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   }.freeze
   # CS Studio's sources, the setup pages and the three layouts around them.
   # The public site is the theme's and out of scope: its pages keep their look.
-  TYPE_VOICE_SOURCES = (ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")]).concat(
+  # The visitor's two layouts (`application`, the public page's, and
+  # `form_send`) are a visitor's page, not CS Studio's.
+  VISITOR_LAYOUTS = %w[application form_send].map { |name| Rails.root.join("app/views/layouts/#{name}.html.erb").to_s }.freeze
+  TYPE_VOICE_SOURCES = (ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS).concat(
     Dir[Rails.root.join("app/helpers/setup_helper.rb")],
     Dir[Rails.root.join("app/views/setup/**/*.erb")],
     Dir[Rails.root.join("app/views/layouts/{product,setup,admin}.html.erb")]
@@ -395,12 +407,26 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
   end
 
-  test "the stylesheets set no label in capitals" do
-    %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
-      # The form-send pages are the public site's: their rules keep their look.
-      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "").lines.grep_v(/\A\.form-send-page/).join
-      assert_no_match(/text-transform:\s*uppercase/, css, name)
+  # The form-send pages' required word keeps its capitals: a visitor's page,
+  # not CS Studio's. Only a selector under `.form-send-page` is let through: a
+  # CS Studio selector beside it in the same list, or on the same line, is not.
+  def capitals_offences(name, rules = self.class.css_rules(name))
+    rules.flat_map do |selectors, body|
+      next [] unless body.match?(/text-transform:\s*uppercase/)
+
+      selectors.reject { |selector| selector.match?(/\A\.form-send-page(?![\w-])/) }.map { |selector| "#{name}: #{selector}" }
     end
+  end
+
+  test "the stylesheets set no label in capitals" do
+    %w[content-spiel.tailwind.css admin-rich-text.css].each { |name| assert_empty capitals_offences(name) }
+  end
+
+  test "the capitals check lets through a form-send selector and nothing beside it" do
+    rules = [ [ [ ".form-send-page .form-field__required" ], "text-transform: uppercase;" ],
+              [ [ ".form-send-page .x", ".admin-badge" ], "text-transform: uppercase;" ],
+              [ [ ".form-send-pager" ], "text-transform: uppercase;" ] ]
+    assert_equal [ "x.css: .admin-badge", "x.css: .form-send-pager" ], capitals_offences("x.css", rules)
   end
 
   # Mono is for code and for a value a person copies or compares exactly. Everything else (counts, times,
@@ -460,11 +486,38 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "11px" ], tokens.scan(/--cs-t-count:\s*([^;]+);/).flatten
   end
 
+  # A count is a figure in a pill, `text-count`; the 12px label would grow it
+  # with the label. A line that draws a count (a count helper, a tab's count,
+  # a total, the graph legend's count, the presence marker's) carries no
+  # `text-label`, but where the number is inside words.
+  COUNT_MARKER = /(?<![\w-])(?:count|counts|open_count|count_for|badge_count|presence_marker_count)(?![\w-])|\.total(?![\w-])|tab\[:count\]|data-legend-count/
+  LABEL_CLASS = /(?<![\w-])text-label(?![\w-])/
+  COUNT_LABEL_ALLOWED = {
+    "admin.note_inbox.card.new" => "the inbox card's “3 new” is words with a number in them, not a figure in a pill"
+  }.freeze
+
   test "a count is text-count, not the 12px label" do
-    %w[ui/tab_links_component.html.erb presence_screen/row_marker_component.html.erb posts_screen/toolbar_component.html.erb media_library/toolbar_component.html.erb].each do |name|
-      source = Rails.root.join("app/components/admin", name).read
-      assert_includes source, "text-count", name
-      assert_not_includes source, "text-label", name
+    offences = TYPE_VOICE_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next unless line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS)
+        next if COUNT_LABEL_ALLOWED.keys.any? { |marker| line.include?(marker) }
+
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}"
+      end
+    end
+    assert_empty offences, "a count is `text-count`; words with a number go in COUNT_LABEL_ALLOWED"
+  end
+
+  test "the count pattern matches a count helper, a tab's count, a total and the markers, and not text-count or a word" do
+    [ '<span class="text-label"><%= count %></span>', '<%= open_count %>', "tab[:count]", "@page.total", "data-legend-count", "presence_marker_count(row)", "count_for(name)" ]
+      .each { |sample| assert_match COUNT_MARKER, sample }
+    [ "text-count", "account", "counter", "discount", "totally", "count-down" ].each { |sample| assert_no_match COUNT_MARKER, sample }
+  end
+
+  test "every count-label allowance is still used" do
+    COUNT_LABEL_ALLOWED.each_key do |marker|
+      assert TYPE_VOICE_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS) } },
+        "#{marker} no longer draws a count in the label: drop it from COUNT_LABEL_ALLOWED"
     end
   end
 
@@ -649,7 +702,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/pages_screen/tree_node_component.rb" => "the selected row's bar; stage 2 draws it in the accent"
   }.freeze
   RADIUS = /(?<![\w-])rounded-(?:(?:[trblse]|tl|tr|bl|br|ss|se|es|ee)-)?(?:xs|sm|md|lg|xl|2xl|3xl|4xl|\[[^\]]*\])(?![\w-])/
-  ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")]
+  ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS
 
   def elevation_offences(pattern, allowed = {})
     (ELEVATION_SOURCES - allowed.keys.map { |path| Rails.root.join(path).to_s }).flat_map do |path|
@@ -687,8 +740,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
   }.freeze
 
+  # `border` as a class of its own, wherever it stands in the string: after a
+  # space and before a space or the closing quote, or first in the string.
+  CARD_BORDER = /rounded-card[^"']*\sborder(?=[\s"'])|(?<=[\s"'])border\s[^"']*rounded-card/
+
+  test "the card-border pattern matches border before, after and last beside rounded-card, and not a border utility" do
+    [ 'class="rounded-card border"', "class='rounded-card bg-surface border'", 'class="border rounded-card"', 'class="p-2 border bg-surface rounded-card"' ]
+      .each { |sample| assert_match CARD_BORDER, sample }
+    [ 'class="rounded-card border-b"', 'class="rounded-card border-line"', 'class="border-t rounded-card"', 'class="rounded-card bg-surface"' ]
+      .each { |sample| assert_no_match CARD_BORDER, sample }
+  end
+
   test "a card has no border of its own; the tree column and the dragged tile take their elevation from the stylesheet" do
-    assert_empty elevation_offences(/rounded-card[^"']*\sborder\s|\sborder\s[^"']*rounded-card/, CARD_BORDER_ALLOWED)
+    assert_empty elevation_offences(CARD_BORDER, CARD_BORDER_ALLOWED)
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     assert_match(/\.admin-shell__tree \{[^}]*box-shadow: var\(--cs-shadow-1\)/, css)
     assert_no_match(/\.admin-shell__tree \{[^}]*border-right/, css)
@@ -749,6 +813,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/passwords/new.html.erb
     app/views/admin/sessions/new.html.erb
     app/views/admin/shared/_stale_banner.html.erb
+    app/views/invitations/show.html.erb
     app/views/setup/_flash.html.erb
   ].freeze
 
