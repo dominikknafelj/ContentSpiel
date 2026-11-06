@@ -13,7 +13,8 @@ set -eu
 
 BIN_DIR=${CONTENTSPIEL_BIN_DIR:-$HOME/.local/bin}
 # A quoted "~/..." arrives unexpanded; expand a leading ~/ ourselves.
-# shellcheck disable=SC2088  (the literal text "~/" is what is matched)
+# shellcheck disable=SC2088
+# (the literal text "~/" is what is matched)
 case $BIN_DIR in
   "~/"*) BIN_DIR=$HOME/${BIN_DIR#"~/"} ;;
 esac
