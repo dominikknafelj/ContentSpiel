@@ -16,6 +16,14 @@ module Admin
     # first link when it opens and Tab reaches the divider between the tree
     # and the editor, which is where it stands.
     #
+    # THE CONTROLLER IS THE COLUMN'S. `admin--shell--tree-width` stands on
+    # the aside (`.column_data`, which the layout hands it), because the
+    # column holds the three things it works with: this divider (its
+    # `divider` target), the tree head's "Hide page tree" (`fold`, inside
+    # the tree's frame, so it comes and goes with a move) and the strip's
+    # "Show page tree" (`unfold`, `Admin::Shell::TreeFoldComponent`). What
+    # is here are the divider's target, its gestures and the tooltip's words.
+    #
     # THE NUMBERS are here once for the three that need them: this markup, the
     # layout's head script (`admin/shared/_tree_head`, which applies the
     # remembered width before the first paint) and the script, which reads them
@@ -42,6 +50,9 @@ module Admin
     # - `NOTES`: the notes drawer as a column (`--admin-notes-width`). With
     #   it open the tree stays beside the editor only while
     #   sidebar + tree + notes + `EDITOR` fit the window (T3).
+    # - `STRIP`: the folded tree, a strip that holds "Show page tree"
+    #   (`--admin-tree-strip`, 2.75rem). While folded it stands in the sum
+    #   above in place of the chosen width, which the fold keeps.
     #
     # THE TOOLTIP is the shared one (`Admin::Ui::TooltipComponent`), with the
     # divider as its host: on keyboard focus at once, on hover after its own
@@ -57,11 +68,13 @@ module Admin
       EDITOR = 640
       SIDEBAR = 240
       NOTES = 400
+      STRIP = 44
       # The root font size the figures above are for (all but `NOTES`).
       BASE = 16
       # `localStorage`, per browser: a convenience, like the theme and the
-      # notes drawer's "open".
+      # notes drawer's "open". The width in pixels, and "1" while folded.
       STORAGE_KEY = "cs-tree-width".freeze
+      FOLD_KEY = "cs-tree-folded".freeze
 
       # A drag's moves, its release and its cancel are not here: the script
       # listens for them on the window for as long as a drag lasts. A lost
@@ -70,9 +83,28 @@ module Admin
         pointerdown->admin--shell--tree-width#press lostpointercapture->admin--shell--tree-width#release blur@window->admin--shell--tree-width#release
         pointerenter->admin--shell--tree-width#enter pointerleave->admin--shell--tree-width#leave
         dblclick->admin--shell--tree-width#reset keydown->admin--shell--tree-width#key focus->admin--shell--tree-width#sync
+      ].join(" ").freeze
+
+      # What keeps the column's state current whatever has the focus: a
+      # resized window, a frame that has loaded (an editor with a notes
+      # drawer may have arrived in `#content`), and the page put away.
+      COLUMN_ACTIONS = %w[
         resize@window->admin--shell--tree-width#sync turbo:frame-load@document->admin--shell--tree-width#sync
         turbo:before-cache@document->admin--shell--tree-width#rest
       ].join(" ").freeze
+
+      # The `data:` of `aside#tree-column`: the controller, every number and
+      # both storage keys as its values, and the column's actions.
+      def self.column_data
+        {
+          controller: "admin--shell--tree-width",
+          action: COLUMN_ACTIONS,
+          "admin--shell--tree-width-min-value": MIN, "admin--shell--tree-width-default-value": DEFAULT, "admin--shell--tree-width-max-value": MAX,
+          "admin--shell--tree-width-editor-value": EDITOR, "admin--shell--tree-width-sidebar-value": SIDEBAR, "admin--shell--tree-width-notes-value": NOTES,
+          "admin--shell--tree-width-strip-value": STRIP,
+          "admin--shell--tree-width-key-value": STORAGE_KEY, "admin--shell--tree-width-fold-key-value": FOLD_KEY
+        }
+      end
 
       def call
         tag.div(class: "admin-tree-divider", role: "separator", tabindex: 0,
@@ -87,11 +119,9 @@ module Admin
       def divider_data
         tooltip = Admin::Ui::TooltipComponent.host_data
         {
-          controller: "#{tooltip[:controller]} admin--shell--tree-width",
+          controller: tooltip[:controller],
+          "admin--shell--tree-width-target": "divider",
           action: "#{tooltip[:action]} #{ACTIONS}",
-          "admin--shell--tree-width-min-value": MIN, "admin--shell--tree-width-default-value": DEFAULT, "admin--shell--tree-width-max-value": MAX,
-          "admin--shell--tree-width-editor-value": EDITOR, "admin--shell--tree-width-sidebar-value": SIDEBAR, "admin--shell--tree-width-notes-value": NOTES,
-          "admin--shell--tree-width-key-value": STORAGE_KEY,
           messages: messages_data("components.shell.tree_divider.tooltip")
         }
       end

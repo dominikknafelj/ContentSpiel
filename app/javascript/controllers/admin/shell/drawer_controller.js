@@ -44,8 +44,11 @@ export default class extends Controller {
     this.syncTriggers()
     this.scrimTarget.hidden = false
     // Focus moves into the drawer so a keyboard user isn't left behind it
-    // on the page it covers.
-    const first = panel.querySelector("a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])")
+    // on the page it covers: to its first control that is drawn. A control
+    // the stylesheet does not draw in a drawer (the page tree's strip button
+    // and "Hide page tree", which are the column's) cannot take the focus.
+    const first = Array.from(panel.querySelectorAll("a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])"))
+      .find((control) => control.checkVisibility())
     ;(first || panel).focus({ preventScroll: true })
     // The notes drawer hears this and makes room (`admin--notes--drawer#shellOpened`),
     // unless it is a column and this is the page tree folded beside it.

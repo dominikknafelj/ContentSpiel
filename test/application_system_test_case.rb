@@ -177,6 +177,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     find(:link_or_button, label).execute_script("this.click()")
   end
 
+  # The window at `width` by `height` for the block, and back at the size it
+  # had afterwards, also when the block fails: the browser is shared with the
+  # tests that follow.
+  def at_window(width, height: 900)
+    original = page.current_window.size
+    page.current_window.resize_to(width, height)
+    yield
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
   # Follows a link into the `#content` frame and waits until Turbo has finished
   # with it. Such a link (a media tile, a trash tab, a list row, the users
   # list's "New user") renders the frame and is then promoted to a page visit

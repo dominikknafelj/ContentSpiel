@@ -26,7 +26,16 @@
     out with, whoever sets it (today nobody does: it is the browser's own).
     Still before <body> exists, so still before the first paint.
 
-    Both stay on <html> for the life of the document: Turbo replaces <body>
+    THE FOLD. `data-tree-folded` says the person folded the column to its
+    strip (`FOLD_KEY` holds "1"; `admin--shell--tree-width#fold`). It is set
+    here before the first paint, so a folded tree is laid out as the strip
+    from the start; the stylesheet asks it from 1024px only, where the tree
+    is a column. While folded the strip, not the chosen width, is what stands
+    beside the notes, so it is the strip that is counted in the
+    `data-tree-fits` sum. The chosen width is applied either way: the fold
+    keeps it, and an unfold finds it on <html>.
+
+    All three stay on <html> for the life of the document: Turbo replaces <body>
     and merges <head>, never the root element, so a visit and Back find them
     as they were. Guarded like the theme's (`shared/_theme_head`):
     `localStorage` can throw, and the page is then laid out at the default. %>
@@ -38,12 +47,16 @@
     var scale = size > 0 ? size / <%= divider::BASE %> : 1;
     var width = <%= divider::DEFAULT %> * scale;
     var stored = NaN;
+    var folded = false;
     try { stored = parseFloat(localStorage.getItem("<%= divider::STORAGE_KEY %>")); } catch (e) {}
+    try { folded = localStorage.getItem("<%= divider::FOLD_KEY %>") === "1"; } catch (e) {}
     if (stored >= <%= divider::MIN %> * scale && stored <= <%= divider::MAX %> * scale) {
       width = stored;
       root.style.setProperty("--admin-tree-width", stored + "px");
     }
+    if (folded) root.setAttribute("data-tree-folded", "");
+    var tree = folded ? <%= divider::STRIP %> * scale : width;
     var sidebar = window.matchMedia("(min-width: 1280px)").matches ? <%= divider::SIDEBAR %> * scale : 0;
-    if (window.innerWidth >= sidebar + width + <%= divider::NOTES %> + <%= divider::EDITOR %> * scale) root.setAttribute("data-tree-fits", "");
+    if (window.innerWidth >= sidebar + tree + <%= divider::NOTES %> + <%= divider::EDITOR %> * scale) root.setAttribute("data-tree-fits", "");
   })();
 <% end %>

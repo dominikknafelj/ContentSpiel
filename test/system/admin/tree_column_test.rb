@@ -38,15 +38,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     page.execute_script("try { window.localStorage.removeItem('cs-notes-open'); window.localStorage.removeItem('#{WIDTH_KEY}') } catch (error) {}")
   end
 
-  # A test that resizes the window puts the size back, because the browser
-  # is shared.
-  def at_width(width)
-    original = page.current_window.size
-    page.current_window.resize_to(width, 900)
-    yield
-  ensure
-    page.current_window.resize_to(*original)
-  end
+  def at_width(width, &block) = at_window(width, &block)
 
   def open_editor(record = @docs, query = "")
     visit "/cs-studio/pages/#{record.id}#{query}"
@@ -536,7 +528,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       open_notes
 
       assert_tree 272
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
       drawer = box("#notes-drawer")
       assert_equal [ 1200, 1600 ], [ drawer[0], drawer[2] ].map(&:round), "the notes are the window's last 400px"
       assert_operator drawer[0] - box(".admin-shell__main")[0], :>=, 640, "the editor keeps 640px between the tree and the notes"
@@ -601,7 +593,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       open_notes
 
       assert_tree 220, sidebar: 0
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
       assert_operator box("#notes-drawer")[0] - box(".admin-shell__main")[0], :>=, 640, "the editor really has its 640px"
 
       page.current_window.resize_to(1280, 900)
@@ -677,7 +669,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_selector "#notes-drawer #notes-list"
       assert fits?
       assert_tree 272
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
     end
 
     at_width(1440) do
@@ -700,7 +692,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_no_selector ".admin-tree-divider"
       assert_equal "480px", chosen
 
-      find("button[aria-controls='tree-column']").click
+      find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]").click
       assert_selector "#tree-column[data-open]"
       assert_eventually(message: -> { "the drawer is #{tree_width}px wide" }) { (tree_width - 272).abs <= 1 }
       assert_no_selector ".admin-tree-divider"

@@ -139,4 +139,30 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_no_selector "button.px-4"
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "x", size: :huge) }
   end
+
+  # An icon button shows only its icon: the label is its name and the shared
+  # tooltip's text, and the tooltip's controller and actions come before the
+  # caller's own, which are kept.
+  test "an icon button draws the icon, names itself with the label and hosts the shared tooltip, keeping the caller's data" do
+    render_inline Admin::Ui::ButtonComponent.new(label: "Hide page tree", variant: :tertiary, size: :small, icon: :panel_left_close,
+      aria: { controls: "tree-column" }, data: { action: "admin--shell--tree-width#fold", "admin--shell--tree-width-target": "fold" })
+    button = page.find("button")
+
+    assert_equal "Hide page tree", button["aria-label"]
+    assert_equal "tree-column", button["aria-controls"]
+    assert_equal "fold", button["data-admin--shell--tree-width-target"]
+    assert_equal "admin--ui--tooltip", button["data-controller"]
+    assert_equal Admin::Ui::TooltipComponent::ACTIONS.split + %w[admin--shell--tree-width#fold], button["data-action"].split
+    assert_includes button["class"].split, Admin::Ui::TooltipComponent::HOST
+    assert_selector "button > svg[aria-hidden=true]", count: 1
+    assert_selector "button [data-tooltip][hidden]", visible: :all, text: "Hide page tree"
+    assert_equal %w[svg span], button.native.children.reject { |node| node.text? && node.text.strip.empty? }.map(&:name), "an icon button shows no words beside its icon and the hidden tooltip"
+  end
+
+  test "a button without an icon is its label alone, with no tooltip" do
+    render_inline Admin::Ui::ButtonComponent.new(label: "Save")
+
+    assert_no_selector "button [data-tooltip]", visible: :all
+    assert_nil page.find("button")["aria-label"]
+  end
 end

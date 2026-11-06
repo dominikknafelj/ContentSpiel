@@ -64,7 +64,13 @@ module Admin
         [ (size == :small ? SMALL_CLASS : BASE_CLASS), VARIANT_CLASSES.fetch(variant) ].join(" ")
       end
 
-      def initialize(label:, variant: :primary, type: "button", size: :regular, **html)
+      # `icon:` (a name of the shared icon partial, `admin/shared/icon`) makes
+      # an ICON BUTTON: the icon is all it shows, and `label` is its name, as
+      # its `aria-label` and as the shared tooltip's text
+      # (`Admin::Ui::TooltipComponent`), so a mouse reads what a screen
+      # reader hears. The tooltip's controller and actions come before the
+      # caller's own `data: { controller:, action: }`, which are kept.
+      def initialize(label:, variant: :primary, type: "button", size: :regular, icon: nil, **html)
         raise ArgumentError, "unknown button variant #{variant.inspect}" unless VARIANT_CLASSES.key?(variant)
         raise ArgumentError, "unknown button size #{size.inspect}" unless %i[regular small].include?(size)
 
@@ -72,6 +78,7 @@ module Admin
         @variant = variant
         @size = size
         @type = type
+        @icon = icon
         @html = html
       end
 
@@ -79,12 +86,22 @@ module Admin
       # the variant's classes -- a caller adding e.g. a width utility
       # shouldn't have to also repeat this component's whole class string.
       def html_attrs
-        html.merge(type: type, class: [ self.class.classes(variant, size: size), html[:class] ].compact.join(" "))
+        attrs = html.merge(type: type, class: [ self.class.classes(variant, size: size), (TooltipComponent::HOST if icon), html[:class] ].compact.join(" "))
+        return attrs unless icon
+
+        tooltip = TooltipComponent.host_data
+        data = html.fetch(:data, {})
+        attrs.merge(aria: html.fetch(:aria, {}).merge(label: label),
+          data: data.merge(controller: [ tooltip[:controller], data[:controller] ].compact.join(" "), action: [ tooltip[:action], data[:action] ].compact.join(" ")))
       end
 
       private
 
-      attr_reader :label, :variant, :type, :size, :html
+      attr_reader :label, :variant, :type, :size, :icon, :html
+
+      def icon_content
+        safe_join([ helpers.render("admin/shared/icon", name: icon, size: "size-4").strip.html_safe, render(TooltipComponent.new(text: label)) ])
+      end
     end
   end
 end

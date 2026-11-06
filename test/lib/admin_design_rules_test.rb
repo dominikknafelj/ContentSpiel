@@ -961,4 +961,56 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
     [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
   end
+
+  # The page tree's width state on <html>: the chosen width
+  # (`--admin-tree-width`), whether the tree fits beside the notes
+  # (`data-tree-fits`) and the fold (`data-tree-folded`). The layout's head
+  # script writes them before the first paint and `admin--shell--tree-width`
+  # from then on; a third writer would lay the column out by a rule neither
+  # of them knows. A write is a `setProperty` or `removeProperty` of the
+  # property, a `setAttribute`, `toggleAttribute` or `removeAttribute` of an
+  # attribute, or a `dataset` assignment or delete, each named by its string
+  # or by a constant the same file binds to that string.
+  TREE_STATE_NAMES = %w[--admin-tree-width data-tree-fits data-tree-folded].freeze
+  TREE_STATE_WRITERS = %w[app/views/admin/shared/_tree_head.html.erb app/javascript/controllers/admin/shell/tree_width_controller.js].freeze
+  TREE_STATE_SOURCES = Dir[Rails.root.join("app/{javascript,views,components}/**/*.{erb,rb,js}")]
+
+  def self.tree_state_write?(source)
+    quoted = TREE_STATE_NAMES.map { |name| %(["'`]#{Regexp.escape(name)}["'`]) }
+    constants = source.scan(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["'`](#{TREE_STATE_NAMES.map { |name| Regexp.escape(name) }.join("|")})["'`]/).map(&:first)
+    named = Regexp.union(quoted.map { |pattern| Regexp.new(pattern) } + constants.map { |name| /(?<![\w$])#{Regexp.escape(name)}(?![\w$])/ })
+    source.match?(/\b(?:setProperty|removeProperty|setAttribute|toggleAttribute|removeAttribute)\(\s*(?:#{named.source})/) ||
+      source.match?(/\bdataset\.tree(?:Fits|Folded)\s*=(?!=)|\bdelete\s+[\w$.]*dataset\.tree(?:Fits|Folded)\b/)
+  end
+
+  test "the tree's width, fits and fold are written by the head script and the tree-width controller alone" do
+    writers = TREE_STATE_SOURCES.select { |path| self.class.tree_state_write?(File.read(path)) }.map { |path| path.delete_prefix("#{Rails.root}/") }
+    assert_equal TREE_STATE_WRITERS.sort, writers.sort, "the tree's width state on <html> has two writers, the head script and admin--shell--tree-width"
+  end
+
+  test "the writer pattern matches each way of writing the three" do
+    [
+      %(root.style.setProperty("--admin-tree-width", "300px")),
+      %(document.documentElement.style.removeProperty('--admin-tree-width')),
+      %(root.setAttribute("data-tree-fits", "")),
+      %(root.toggleAttribute("data-tree-folded", true)),
+      %(this.root.removeAttribute("data-tree-folded")),
+      %(const PROPERTY = "--admin-tree-width"\nthis.root.style.setProperty(PROPERTY, width)),
+      %(const FITS = "data-tree-fits"\nthis.root.toggleAttribute(FITS, fits)),
+      %(const FOLDED = "data-tree-folded"\nthis.root.setAttribute(FOLDED, "")),
+      %(const FOLDED = "data-tree-folded"\nthis.root.removeAttribute( FOLDED )),
+      %(document.documentElement.dataset.treeFolded = ""),
+      %(delete document.documentElement.dataset.treeFits)
+    ].each { |sample| assert self.class.tree_state_write?(sample), "not seen as a write: #{sample}" }
+
+    [
+      %(root.hasAttribute("data-tree-folded")),
+      %(root.style.getPropertyValue("--admin-tree-width")),
+      %(:root[data-tree-folded] { --admin-tree-column: var(--admin-tree-strip); }),
+      %(const FOLDED = "data-tree-folded"\nif (root.hasAttribute(FOLDED)) open()),
+      %(const OTHER = "data-other"\nroot.setAttribute(OTHER, "")),
+      %(root.setAttribute("data-tree-resizing", "")),
+      %(if (root.dataset.treeFolded === "") fold())
+    ].each { |sample| assert_not self.class.tree_state_write?(sample), "seen as a write: #{sample}" }
+  end
 end

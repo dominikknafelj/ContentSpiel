@@ -78,6 +78,7 @@ class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/components/admin/shell/sidebar_component.rb
     app/components/admin/shell/sidebar_component.html.erb
+    app/components/admin/shell/tree_fold_component.rb
     app/components/admin/ui/icon_chip_component.rb
     app/components/admin/forms_screen/list_component.rb
     app/components/admin/forms_screen/list_component.html.erb

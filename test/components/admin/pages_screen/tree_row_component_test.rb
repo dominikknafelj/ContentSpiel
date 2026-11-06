@@ -70,4 +70,42 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{branch.id}'][data-context-only]"
     assert_equal row_html(whole, inside), alone_html
   end
+
+  # The selected look has two writers: the server's drawing here, and
+  # `admin--pages--tree#mark`, which moves it in the browser with the marks it
+  # is handed (`SELECTED_CLASS`, `SELECTED_TITLE_CLASS`, `MARKER_AT_REST`) and
+  # `aria-current`. So the server's selected row must differ from its
+  # unselected one by exactly those, element by element, or the script would
+  # leave something of a selection behind, or miss something of one.
+  test "a selected row differs from an unselected one by the marks the tree's script moves, and nothing else" do
+    with_locales(%w[en de es], default: "en") do
+      parent = create_page(title: "Parent")
+      create_page(title: "Child", parent: parent)
+      other = create_page(title: "Other")
+      draw = ->(selected) { render_inline(Admin::PagesScreen::TreeRowComponent.for_page(parent.reload, selected: selected, locale: "en", url_options: {})).at_css("#tree-row-#{parent.id}") }
+      selected = draw.call(parent)
+      unselected = draw.call(other)
+      assert selected.at_css("[data-translation-marker]"), "the premise: the row has a translation marker"
+
+      pairs = selected.css("*").to_a.unshift(selected).zip(unselected.css("*").to_a.unshift(unselected))
+      assert pairs.all? { |on, off| off && on.name == off.name }, "the two rows are not the same elements"
+      row = Admin::PagesScreen::TreeRowComponent
+      differences = pairs.filter_map do |on, off|
+        on_classes, off_classes = [ on, off ].map { |node| node["class"].to_s.split }
+        names = (on.attributes.keys | off.attributes.keys) - %w[class]
+        attributes = names.reject { |name| on[name] == off[name] }.sort
+        next if on_classes == off_classes && attributes.empty?
+
+        { node: on["id"] || on["data-translation-marker"] || on.name, added: on_classes - off_classes, removed: off_classes - on_classes, attributes: attributes }
+      end
+
+      marker = selected.at_css("[data-translation-marker]")["data-translation-marker"]
+      assert_equal [
+        { node: "tree-row-#{parent.id}", added: row::SELECTED_CLASS.split, removed: [], attributes: [] },
+        { node: "tree-link-#{parent.id}", added: row::SELECTED_TITLE_CLASS.split, removed: [], attributes: %w[aria-current] },
+        { node: marker, added: [], removed: row::MARKER_AT_REST.split, attributes: [] }
+      ], differences
+      assert_equal "page", selected.at_css("#tree-link-#{parent.id}")["aria-current"]
+    end
+  end
 end

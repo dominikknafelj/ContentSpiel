@@ -224,6 +224,34 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-divider[data-dragging]::after { background: var(--cs-accent); }
 .admin-tree-divider__tip { position: sticky; top: calc(var(--admin-top-offset) + 3rem); display: block; height: 0; }
 :root[data-tree-resizing], :root[data-tree-resizing] * { cursor: col-resize; user-select: none; }
+/* THE TREE FOLDS TO A STRIP. "Hide page tree" in the tree's head
+   (`.admin-tree-hide`) sets `data-tree-folded` on <html>, and "Show page
+   tree", the strip's one button (`.admin-tree-fold`,
+   `Admin::Shell::TreeFoldComponent`), takes it away; the layout's head
+   script sets it before the first paint where this browser remembers the
+   fold (`admin/shared/_tree_head`), and `admin--shell--tree-width` from then
+   on. Folded, the grid's track is the strip (`--admin-tree-strip`, 2.75rem,
+   `TreeDividerComponent::STRIP`), everything in the column but the strip's
+   button is hidden and so is the divider. `--admin-tree-width` keeps the
+   CHOSEN width all along: the fold does not touch it, so the column comes
+   back at it.
+
+   From 1024px only: below, the tree is a drawer of a fixed width and the
+   fold means nothing, so the attribute is there and nothing asks it (the
+   fold is back when the window is wide again). Nor while the tree is the
+   drawer beside the open notes (`:root[data-notes-open]:not([data-tree-fits])
+   body:has(#notes-drawer)`, further down: even the strip does not fit there):
+   that drawer shows the whole tree, as the one below 1024px does. Both
+   buttons are drawn from 1024px only. */
+:root { --admin-tree-strip: 2.75rem; }
+.admin-tree-fold, .admin-tree-hide { display: none; }
+@media (min-width: 1024px) {
+  .admin-tree-hide { display: inline-flex; }
+  :root[data-tree-folded] { --admin-tree-column: var(--admin-tree-strip); }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree { display: flex; justify-content: center; align-items: flex-start; padding: 0.75rem 0; }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree > :not(.admin-tree-fold) { display: none; }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-tree-fold { display: inline-flex; position: sticky; top: calc(var(--admin-top-offset) + 0.75rem); }
+}
 .admin-top-bar { display: none; }
 .admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
 

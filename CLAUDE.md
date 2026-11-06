@@ -103,10 +103,6 @@ A rule a test holds is in the reference file for its area, under this same headi
 - A new list or count of notes narrows through `Notes.readable_threads` and joins the same test; no test fails for one that doesn't (`docs/reference/notes.md`).
 - A new write path that changes what `public_paths` or `translation_states` are computed from refreshes them in its transaction and joins `test/models/public_site/paths_test.rb` or `test/services/translation_state_parity_test.rb`; no test fails for one that doesn't (`docs/reference/page-tree-and-routing.md`).
 
-**Page tree's width, `docs/reference/cs-studio-shell-and-dashboard.md`:**
-
-- `--admin-tree-width` and `data-tree-fits` on `<html>` are written by the layout's head script and `admin--shell--tree-width`, and by nothing else. **No guard** for a second writer of the property or the attribute.
-
 **The Mind graph, the same file:**
 
 - Whatever its script writes into the page is taken back in the controller's `reset()`, because Turbo's snapshot keeps it. **No guard** for something new a script writes into the page that `reset()` does not take back: a test that waits for `[data-settled]` then passes on the snapshot.

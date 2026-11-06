@@ -17,7 +17,7 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   end
 
   test "the numbers are the design's, and the default is the 17rem the column always was" do
-    assert_equal [ 220, 272, 480, 640, 240, 400 ], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR, Divider::NOTES ]
+    assert_equal [ 220, 272, 480, 640, 240, 400, 44 ], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR, Divider::NOTES, Divider::STRIP ]
     assert_equal 17 * Divider::BASE, Divider::DEFAULT
     # The design's own sum: at the default the tree stays beside the notes from a 1552px window.
     assert_equal 1552, Divider::SIDEBAR + Divider::DEFAULT + Divider::NOTES + Divider::EDITOR
@@ -38,28 +38,38 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
     assert_includes rules, "@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - #{rem.(Divider::EDITOR)}); } }"
     assert_no_match(/\d+px(?! \{)/, rules.gsub("1279px", ""), "a pixel length among the tree column's rules")
     assert_match(/^:root \{ --admin-notes-width: #{Divider::NOTES}px; \}/, css)
+    assert_match(/^:root \{ --admin-tree-strip: #{rem.(Divider::STRIP)}; \}/, css)
   end
 
-  test "the script is handed every number and the storage key as values, and the tooltip's sentence as a message" do
+  test "the column carries the controller, every number and both storage keys as its values, and the actions that keep it current" do
+    data = Divider.column_data
+
+    assert_equal "admin--shell--tree-width", data[:controller]
+    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, notes: 400, strip: 44, key: "cs-tree-width", "fold-key": "cs-tree-folded" }.each do |name, value|
+      assert_equal value, data[:"admin--shell--tree-width-#{name}-value"], name.to_s
+    end
+    assert_equal %w[resize@window->admin--shell--tree-width#sync turbo:frame-load@document->admin--shell--tree-width#sync
+                    turbo:before-cache@document->admin--shell--tree-width#rest], data[:action].split
+  end
+
+  test "the divider is the controller's divider target, the tooltip's host, and hands over the tooltip's sentence as a message" do
     render_inline(Divider.new)
     divider = page.find("[role=separator]")
 
-    assert_equal %w[admin--ui--tooltip admin--shell--tree-width], divider["data-controller"].split
-    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, notes: 400, key: "cs-tree-width" }.each do |name, value|
-      assert_equal value.to_s, divider["data-admin--shell--tree-width-#{name}-value"], name.to_s
-    end
+    assert_equal %w[admin--ui--tooltip], divider["data-controller"].split
+    assert_equal "divider", divider["data-admin--shell--tree-width-target"]
+    assert_empty divider.native.attributes.keys.grep(/-value\z/), "the values are the column's"
     messages = JSON.parse(divider["data-messages"])
     assert_equal "Tree width %{width}px. Arrow keys to resize.", messages.fetch("components.shell.tree_divider.tooltip")
   end
 
-  test "every gesture has its action: the press that begins a drag, a double click, the keys, and what keeps the values current" do
+  test "every gesture has its action on the divider: the press that begins a drag, a double click, the keys and the focus" do
     render_inline(Divider.new)
     actions = page.find("[role=separator]")["data-action"].split
 
     %w[pointerdown->admin--shell--tree-width#press lostpointercapture->admin--shell--tree-width#release blur@window->admin--shell--tree-width#release
        pointerenter->admin--shell--tree-width#enter pointerleave->admin--shell--tree-width#leave
-       dblclick->admin--shell--tree-width#reset keydown->admin--shell--tree-width#key
-       resize@window->admin--shell--tree-width#sync turbo:before-cache@document->admin--shell--tree-width#rest].each do |action|
+       dblclick->admin--shell--tree-width#reset keydown->admin--shell--tree-width#key focus->admin--shell--tree-width#sync].each do |action|
       assert_includes actions, action
     end
     # The shared tooltip's own, unchanged: the divider is its host.
