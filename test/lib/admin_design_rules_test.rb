@@ -345,6 +345,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
+  test "the block picker builds no button of its own" do
+    source = Rails.root.join("app/components/admin/editor_screen/block_picker_component.rb").read.gsub(/^\s*#.*$/, "")
+    assert_no_match(/VARIANT_CLASSES|SMALL_CLASS/, source)
+    assert_match(/ButtonComponent\.classes\(:primary\)/, source)
+  end
+
   test "the rich-text popover's script-built buttons and input are the component's strings" do
     source = Rails.root.join("app/javascript/rich_text/popover.js").read
     constant = ->(name) { source[/^const #{name} = "([^"]*)"$/, 1] }

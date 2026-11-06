@@ -63,7 +63,7 @@ class Admin::CodeBlockSystemTest < ApplicationSystemTestCase
   test "a Code block added from the picker is typed into, saved by itself, and keeps its indentation after a reload; Tab leaves the field" do
     open_editor
     # Scoped to the picker: the rich-text toolbar has a "Code block" button, and a label is matched as a part.
-    within("#block-picker-end") { press "Code" }
+    add_block "Code"
     # wait: the card is the answer to the request that creates the block, on a runner with two slow cores.
     assert_selector ".admin-block-card textarea[name='block[settings][code]']", wait: 8
     block = @page.content_blocks.sole

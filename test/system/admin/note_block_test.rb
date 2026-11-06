@@ -26,7 +26,7 @@ class Admin::NoteBlockSystemTest < ApplicationSystemTestCase
 
   test "a Note added from the picker is a Note; its kind is chosen with the arrow keys, the title's placeholder follows it, and all of it is saved and back after a reload" do
     open_editor
-    within("#block-picker-end") { press "Note" }
+    add_block "Note"
     # wait: the card is the answer to the request that creates the block, on a runner with two slow cores.
     assert_selector ".admin-block-card fieldset input[type=radio][name='block[settings][kind]']", visible: :all, count: 4, wait: 8
     block = @page.content_blocks.sole

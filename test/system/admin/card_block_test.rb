@@ -25,7 +25,7 @@ class Admin::CardBlockSystemTest < ApplicationSystemTestCase
 
   test "a Card added from the picker is typed into, saved by itself and back after a reload" do
     open_editor
-    within("#block-picker-end") { press "Card" }
+    add_block "Card"
     # wait: the card is the answer to the request that creates the block, on a runner with two slow cores.
     assert_selector ".admin-block-card input[name='block[settings][title]']", wait: 8
     block = @page.content_blocks.sole

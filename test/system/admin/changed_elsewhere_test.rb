@@ -105,7 +105,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    press "Rich text"
+    add_block "Rich text"
     assert_selector ".admin-block-card", count: 1, wait: 5
 
     fill_in "Subtitle", with: "After add"

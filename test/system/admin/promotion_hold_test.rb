@@ -148,7 +148,8 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     hold_frame_fetches
     page.execute_script(<<~JS, about.id)
       document.querySelector(`li[data-page-id='${arguments[0]}'] a[href*='/pages/${arguments[0]}']`).click()
-      const button = Array.from(document.querySelectorAll(".admin-block-picker button")).find((b) => b.textContent.trim() === "Image")
+      document.querySelector("#block-picker-end button[aria-haspopup=menu]").click()
+      const button = Array.from(document.querySelectorAll("#block-picker-end [role=menu] button")).find((b) => b.textContent.trim() === "Image")
       button.click()
       window.__pickerHeld = button.form.hasAttribute("aria-busy") || button.disabled
     JS

@@ -416,6 +416,25 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     visit_screen(path)
   end
 
+  # Adds a block of the type named `label` through the block menu. With no
+  # section it presses the page's "+ Add block" (`#block-picker-end`) and then
+  # the item; with `section:` and `column:` it presses that lane's "+ Add".
+  # Either way it waits for the new block's form to be in the page, so the
+  # next line starts on a form that is there.
+  def add_block(label, column: nil, section: nil)
+    raise ArgumentError, "a section and a column come together" if section.nil? != column.nil?
+
+    picker = section ? "#block-picker-#{section.id}-#{column}" : "#block-picker-end"
+    blocks = "[data-block-id]"
+    before = all(blocks, wait: false, visible: :all).size
+    find("#{picker} button[aria-haspopup=menu]").click
+    within("#{picker} [role=menu]") { click_button label, exact: true }
+    # wait: the block's card or tile is the answer to the request that creates
+    # it, on a runner with two slow cores; its form comes with it.
+    assert_selector blocks, minimum: before + 1, visible: :all, wait: 8
+    assert_selector ".admin-block-card form, [id^='block-'][id$='-panel']", visible: :all, wait: 8
+  end
+
   # The entry to any other CS Studio screen: `visit` and then the wait for its
   # controllers. A test that starts on a screen begins here, so the first thing
   # it does is not lost to a controller still connecting.

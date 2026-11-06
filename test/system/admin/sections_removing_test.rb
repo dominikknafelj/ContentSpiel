@@ -170,6 +170,7 @@ class Admin::SectionsRemovingSystemTest < Admin::SectionsSystemTestCase
     page.execute_script("document.getElementById(#{"block-#{far.id}-panel".to_json}).dataset.mark = 'kept'")
     as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
 
+    # Not `add_block`: the answer is a refusal, and no form comes.
     find("#block-picker-#{@section.id}-4 button[aria-haspopup=menu]").click
     within("#block-picker-#{@section.id}-4") { press "Image" }
 

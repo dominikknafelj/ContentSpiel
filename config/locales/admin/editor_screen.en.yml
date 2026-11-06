@@ -15,9 +15,13 @@ en:
           move_into: "Move into section…"
           take_over: "Take over"
 
-        # The "+" at the end of a section's lane (sections spec §4.2): the
-        # name of a button whose label is the glyph.
+        # The page's one "+ Add block" (a menu headed "Add a block", whose name
+        # `menu_heading` is too) and the "+ Add" at the end of a section's lane
+        # (sections spec §4.2), named for its column.
         block_picker:
+          add_block: "+ Add block"
+          menu_heading: "Add a block"
+          add: "+ Add"
           add_to_column: "Add a block to column %{number}"
         # A translation tab's read-only fields. Only the line above read-only
         # code is a key so far; `%{language}` is the default language's own

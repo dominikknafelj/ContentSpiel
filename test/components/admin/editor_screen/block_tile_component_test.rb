@@ -65,7 +65,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
       assert_selector ".admin-block-tile__face > span:first-child > span.text-label.text-meta:only-child", exact_text: "Album"
       assert_no_selector "[data-block-icon]"
       render_inline Admin::EditorScreen::BlockPickerComponent.new(page: @editor_page, locale: "en")
-      assert_selector "#block-picker-end button", text: "Album"
+      assert_selector "#block-picker-end [role=menu] button", text: "Album", visible: :all
     end
   end
 

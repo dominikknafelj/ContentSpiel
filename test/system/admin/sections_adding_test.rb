@@ -5,12 +5,11 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     plain = create_page(title: "Built by hand")
     visit_editor(plain)
 
-    within("#block-picker-end") { press "Section" }
+    add_block "Section"
     assert_selector ".admin-section-card [data-admin--editor--blocks-target='lane']", count: 2
     section = plain.content_blocks.sole
 
-    find("#block-picker-#{section.id}-2 button[aria-haspopup=menu]").click
-    within("#block-picker-#{section.id}-2") { press "Image" }
+    add_block "Image", column: 2, section: section
 
     assert_selector "#section-#{section.id}-lane-2 > .admin-block-tile", count: 1
     block = section.section_blocks.reload.sole
@@ -37,8 +36,7 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
       field.dispatchEvent(new Event("input", { bubbles: true }))
     JS
 
-    find("#block-picker-#{@section.id}-1 button[aria-haspopup=menu]").click
-    within("#block-picker-#{@section.id}-1") { press "Rich text" }
+    add_block "Rich text", column: 1, section: @section
 
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
     assert_no_selector panel(@left)
@@ -58,6 +56,34 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector "#block-picker-#{@section.id}-1 [role=menu] [role=menuitem]", text: "Section"
   end
 
+  # The keys of the grid: the menu walks its items one by one, in document
+  # order, which in the three columns is reading order (left to right, then the
+  # next row); Down and Up are the only arrows it answers (`admin--ui--menu`).
+  test "+ Add block opens by Enter, the arrows walk the types in reading order, and Escape gives the focus back to it" do
+    plain = create_page(title: "Built by hand")
+    visit_editor(plain)
+    trigger = "#block-picker-end button[aria-haspopup=menu]"
+    labels = BlockTypes.all.map(&:label)
+
+    page.execute_script("document.querySelector(#{trigger.to_json}).focus()")
+    page.driver.browser.keyboard.type(:enter)
+    assert_selector "#{trigger}[aria-expanded=true]"
+    focused = "document.activeElement.textContent.trim()"
+    assert_equal labels.first, page.evaluate_script(focused)
+    labels.drop(1).each do |label|
+      page.driver.browser.keyboard.type(:down)
+      assert_eventually(message: "the focus did not reach #{label}") { page.evaluate_script(focused) == label }
+    end
+    page.driver.browser.keyboard.type(:down)
+    assert_eventually(message: "the focus did not wrap to #{labels.first}") { page.evaluate_script(focused) == labels.first }
+    page.driver.browser.keyboard.type(:up)
+    assert_eventually(message: "Up did not wrap to #{labels.last}") { page.evaluate_script(focused) == labels.last }
+
+    page.driver.browser.keyboard.type(:escape)
+    assert_selector "#{trigger}[aria-expanded=false]"
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{trigger.to_json})")
+  end
+
   # Review Focus of the sections plan: two tabs. This one was loaded while
   # the section had four columns and still shows the "+" of the fourth;
   # another has folded it to two since. The add is refused and says why, no
@@ -72,6 +98,7 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     as_unheard(users(:two)) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
     assert_equal 2, far.reload.section_column
 
+    # Not `add_block`: the answer is a refusal, and no form comes.
     find("#block-picker-#{@section.id}-4 button[aria-haspopup=menu]").click
     within("#block-picker-#{@section.id}-4") { press "Image" }
 

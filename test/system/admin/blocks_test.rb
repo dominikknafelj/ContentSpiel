@@ -20,7 +20,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     # own comment): Turbo Drive already appends the Turbo Stream `Accept`
     # header to a non-GET form submission on its own, so this is a normal
     # submit, not a fetch this test would otherwise have to wait on by hand.
-    press "Rich text"
+    add_block "Rich text"
 
     assert_selector ".admin-block-card", text: "Rich text"
     assert_equal 1, @page.content_blocks.count
@@ -40,7 +40,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     assert_selector "#{card_for(first)} button[data-move='down'][disabled]", visible: :all
-    within("#block-picker-end") { press "Image" }
+    add_block "Image"
 
     assert_selector "#content-blocks-list > .admin-block-card", count: 2
     added = @page.content_blocks.where.not(id: first.id).sole
@@ -110,7 +110,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     # One tick: the Add goes out (and is slow), then Move down on the first card.
     page.execute_script(<<~JS)
-      Array.from(document.querySelectorAll("#block-picker-end button")).find((b) => b.textContent.trim() === "Rich text").click()
+      document.querySelector("#block-picker-end button[aria-haspopup=menu]").click()
+      Array.from(document.querySelectorAll("#block-picker-end [role=menu] button")).find((b) => b.textContent.trim() === "Rich text").click()
       document.querySelector('[data-block-id="#{first.id}"] [data-move="down"]').click()
     JS
 
@@ -345,7 +346,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    press "Post list"
+    add_block "Post list"
     assert_selector ".admin-block-card", text: "Post list"
     block = @page.content_blocks.sole
 
@@ -370,7 +371,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   test "a queued block save doesn't make the page settings form report a false conflict" do
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    press "Post list"
+    add_block "Post list"
     assert_selector ".admin-block-card", text: "Post list"
     block = @page.content_blocks.sole
 

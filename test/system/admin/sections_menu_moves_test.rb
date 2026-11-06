@@ -172,7 +172,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
     scope = "##{ActionView::RecordIdentifier.dom_id(block)}"
     assert_selector "#{scope} button[data-move='into'][disabled]", visible: :all
 
-    within("#block-picker-end") { press "Section" }
+    add_block "Section"
 
     assert_selector ".admin-section-card [data-admin--editor--blocks-target='lane']", count: 2
     assert_selector "#{scope} button[data-move='into']:not([disabled])", visible: :all

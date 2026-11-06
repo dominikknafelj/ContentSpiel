@@ -29,14 +29,24 @@ module Admin
     # (`admin--ui--menu#leave`), and on a click outside. `panel_id` gives the
     # panel an id and the button its `aria-controls`.
     #
+    # `columns: 2` or `3` lays the items out in a grid of that many columns
+    # (the block menu is three), widening the panel to 34rem (never wider than
+    # the window less its margins) and giving a button the grid cell's look; any
+    # other count raises. `heading:` is a line of words before the items, hidden
+    # from a screen reader because the panel is already named by `aria_label`.
+    # The grid changes nothing the keyboard does: the items are still walked
+    # one by one, in document order, which in a grid is reading order
+    # (`admin--ui--menu#keydown`: ArrowDown/ArrowUp step to the next/previous).
+    #
     # `align` is the edge the panel hangs from (`:right` is the right edge of
     # the button, for a menu at the end of a row); `button_class` replaces the
     # default button look, for a trigger that has to read as a tab or a link.
     class MenuComponent < AdminComponent
       renders_many :items
 
-      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil)
+      def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil, columns: nil, heading: nil)
         raise ArgumentError, "unknown menu alignment #{align.inspect}" unless %i[left right].include?(align)
+        raise ArgumentError, "unknown menu column count #{columns.inspect}" unless [ nil, 2, 3 ].include?(columns)
 
         @label = label
         @align = align
@@ -46,11 +56,13 @@ module Admin
         @list = list
         @list_label = list_label
         @panel_id = panel_id
+        @columns = columns
+        @heading = heading
       end
 
       private
 
-      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id
+      attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id, :columns, :heading
 
       ACTIONS = "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown".freeze
       LIST_ACTIONS = "mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave".freeze
@@ -76,13 +88,22 @@ module Admin
 
       def button_classes = button_class || "inline-flex cursor-pointer items-center gap-1 rounded-cs px-2 py-1 text-sm text-meta hover:bg-sunken hover:text-ink"
 
+      # Whole class strings, which Tailwind sees.
+      GRID_CLASSES = { 2 => "grid grid-cols-2", 3 => "grid grid-cols-3" }.freeze
+      GRID_PANEL = "w-[34rem] max-w-[calc(100vw-2rem)] gap-0.5".freeze
+      LIST_BUTTON = "[&_button]:block [&_button]:w-full [&_button]:cursor-pointer [&_button]:rounded-cs [&_button]:px-2 [&_button]:py-1 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken".freeze
+      # A grid cell is a chip and a name side by side; `flex` stands where the
+      # list's `block` would, never beside it, so the two cannot fight.
+      GRID_BUTTON = "[&_button]:flex [&_button]:w-full [&_button]:cursor-pointer [&_button]:items-center [&_button]:gap-2 [&_button]:rounded-button-sm [&_button]:px-1.5 [&_button]:py-1.5 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken".freeze
+
       def panel_classes
         # `admin-menu-panel`: the keyboard's row carries the stylesheet's accent bar.
-        [ "admin-menu-panel absolute z-30 mt-1 min-w-44 rounded-card bg-popover p-1 shadow-3",
+        [ "admin-menu-panel absolute z-30 mt-1 min-w-44 rounded-card bg-popover shadow-3",
+          (columns ? "#{GRID_CLASSES.fetch(columns)} #{GRID_PANEL} p-2.5" : "p-1"),
           ("focus:outline-none focus-visible:outline-2 focus-visible:outline-accent" if list),
           align == :right ? "right-0" : "left-0",
           "[&_[aria-current]]:bg-accent-tint [&_a]:block [&_a]:rounded-cs [&_a]:px-2 [&_a]:py-1 [&_a:hover]:bg-sunken [&_a:focus-visible]:bg-sunken",
-          "[&_button]:block [&_button]:w-full [&_button]:cursor-pointer [&_button]:rounded-cs [&_button]:px-2 [&_button]:py-1 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken" ].compact.join(" ")
+          (columns ? GRID_BUTTON : LIST_BUTTON) ].compact.join(" ")
       end
     end
   end
