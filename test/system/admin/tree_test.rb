@@ -25,14 +25,13 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
 
       page.find("li[data-page-id='#{row.id}'] > div a[title='Counted']").hover
-      assert_selector marker, wait: 2
-      assert_not_equal "1px", page.find(marker).evaluate_script("getComputedStyle(this).width")
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on hover"
 
       page.find("li[data-page-id='#{@alpha.id}'] > div a[title='Alpha']").hover
-      assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width === '1px'", message: "the marker did not hide again"
 
       page.execute_script("document.querySelector(\"li[data-page-id='#{row.id}'] > div a[title='Counted']\").focus()")
-      assert_not_equal "1px", page.find(marker).evaluate_script("getComputedStyle(this).width")
+      await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on focus"
     end
   end
 
