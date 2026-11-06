@@ -70,7 +70,18 @@ module Admin
         @context_only_ids = Set.new
         @translation_counts = {}
         @loaded = {}
-        @root = root && load_visible(root)
+        @root_page = root
+      end
+
+      # Never drawn into a frame answer: a frame answer keeps only `#content`,
+      # and the tree column outside it outlives the navigation, so a tree
+      # drawn there would be read and sent for nothing. The tree's own script
+      # moves the selection to the page the frame opened
+      # (`admin--pages--tree`, "The selected row").
+      def render? = !helpers.turbo_frame_request?
+
+      def before_render
+        @root = @root_page && load_visible(@root_page) if render?
       end
 
       private

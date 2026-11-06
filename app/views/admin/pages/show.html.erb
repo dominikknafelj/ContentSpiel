@@ -1,14 +1,14 @@
-<%# Never restored from Turbo's page cache (final fix wave 1, ledger m1): a
+<%# Never restored from Turbo's page cache: a
     snapshot of an editor holds its forms as they stood when it was left --
     typed text whose save was only sent as the page was torn down (Back
     drains nothing), next to the base from before that save. Restored, the
-    form took that text for what the server holds and sent the next edit on
-    the old base: refused as "Changed elsewhere" against one's own save. With
-    this, Back/Forward to an editor fetches it afresh. (A frame navigation's
+    form would take that text for what the server holds and send the next
+    edit on the old base: refused as "Changed elsewhere" against one's own
+    save. With this, Back/Forward to an editor fetches it afresh. (A frame navigation's
     answer carries the tag too, and the promoted visit merges it into the
     head, so it also holds for an editor opened from the tree.)
 
-    And no link is prefetched from an editor (follow-up N1): Turbo fetches a
+    And no link is prefetched from an editor: Turbo fetches a
     link on hover and reuses that answer for the click. From an editor the
     click first waits for the save queue (`saving/queue.js`), so a
     prefetched answer for the same record -- its other language tab, its own
@@ -22,6 +22,11 @@
 <% content_for :tree do %>
   <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
+
+<%# The page this editor opens, named for the page tree, which stands outside
+    `#content` and marks this page's row selected (`admin--pages--tree`, "The
+    selected row"). %>
+<div hidden data-tree-open-page="<%= @page.id %>"></div>
 
 <%# The page's open notes (notes spec §4.3): two queries for the drawer's
     counts, every marker's and which of them hold something unread for the

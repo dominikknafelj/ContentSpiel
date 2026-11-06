@@ -187,4 +187,21 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected"
     assert_eventually { page.evaluate_script("document.activeElement?.closest('#tree-row-#{@beta.id}') != null") }
   end
+
+  # Turbo's snapshot keeps the selection the tree's script marked, and Back
+  # to a page opened from the tree shows that page's row as the one selected.
+  test "Back to a page opened from the tree selects that page's row" do
+    visit_editor(@alpha)
+    find("#tree-row-#{@beta.id} a[title='Beta']").click
+    assert_selector "#content h1", text: "Beta"
+    find("#tree-row-#{@alpha.id} a[title='Alpha']").click
+    assert_selector "#content h1", text: "Alpha"
+    assert_selector "#tree .admin-tree-row--selected#tree-row-#{@alpha.id}", count: 1
+
+    page.go_back
+    assert_selector "#content h1", text: "Beta"
+    assert_selector "#tree .admin-tree-row--selected", count: 1
+    assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected a[aria-current=page]"
+    assert_selector "#tree a[aria-current=page]", count: 1
+  end
 end

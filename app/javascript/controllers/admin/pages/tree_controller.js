@@ -38,8 +38,9 @@ import { loadSortable } from "editor/drag"
 // `#content` and outlives a frame navigation, so "the page showing as the
 // move is queued" is the page the move belongs to.
 export default class extends Controller {
-  static targets = ["list", "announcer"]
+  static targets = ["list", "announcer", "row"]
   static values = { moveUrl: String }
+  static classes = ["selected", "selectedTitle", "markerAtRest"]
 
   connect() {
     this.holdUndo = (event) => {
@@ -51,8 +52,6 @@ export default class extends Controller {
       holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
-    this.keepFocus = (event) => this.keepFocusThrough(event)
-    document.addEventListener("turbo:before-stream-render", this.keepFocus)
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
     loadSortable().then((Sortable) => {
@@ -94,7 +93,6 @@ export default class extends Controller {
   disconnect() {
     this.loadToken = null
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
-    document.removeEventListener("turbo:before-stream-render", this.keepFocus)
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = null
     delete this.element.dataset.sortable
@@ -283,23 +281,52 @@ export default class extends Controller {
     document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
   }
 
-  // A stream that replaces the whole tree (a frame answer handing over the
-  // tree for the page it opened, `layouts/admin.html.erb`) takes this element
-  // and the focused link with it. A stream inside an HTML answer is not
-  // rendered the way a stream answer is, and Turbo gives no focus back for
-  // it, so the keyboard user would be left on <body>: the focused element's
-  // id is found again in the new tree and focused. Only an element with an
-  // id (the rows' title links) is followed.
-  keepFocusThrough(event) {
-    if (event.target.getAttribute("target") !== this.element.id) return
-    const focused = document.activeElement
-    if (!focused?.id || !this.element.contains(focused)) return
+  // ---- The selected row -------------------------------------------------
+  //
+  // THE SELECTED ROW IS THE PAGE THAT IS OPEN. The tree column sits outside
+  // `#content` and outlives a frame navigation, and a frame answer carries
+  // no tree (`TreeComponent#render?`), so the server's drawing of the
+  // selection holds only for the page it was drawn with. The open page is
+  // the one `#content` names (`[data-tree-open-page]`, drawn by the page
+  // editor; nothing on another screen, which selects no row), and this
+  // marks exactly that row, whoever drew it: as each row connects (a full
+  // visit, a restored snapshot, a move's redrawn tree, a save's redrawn row)
+  // and after every load of the content frame (`follow`). Turbo's snapshot
+  // keeps what this marked, which is right for the URL it is kept under,
+  // and a restored one is marked again as its rows connect.
+  //
+  // The marks are the server's own classes, handed over as Stimulus classes
+  // (`TreeRowComponent::SELECTED_CLASS`, `SELECTED_TITLE_CLASS`,
+  // `MARKER_AT_REST`): the row's ground and bar, the title's weight with
+  // `aria-current="page"`, and the translation markers shown rather than at
+  // rest. Only rows that can be selected are `row` targets (a context-only
+  // row never is).
+  rowTargetConnected(row) {
+    this.mark(row, row.dataset.pageId === this.openPageId())
+  }
 
-    const render = event.detail.render
-    event.detail.render = async (stream) => {
-      await render(stream)
-      document.getElementById(focused.id)?.focus()
+  follow(event) {
+    if (event.target.id !== "content") return
+
+    const open = this.openPageId()
+    this.rowTargets.forEach((row) => this.mark(row, row.dataset.pageId === open))
+  }
+
+  openPageId() {
+    return document.querySelector("#content [data-tree-open-page]")?.dataset.treeOpenPage ?? null
+  }
+
+  mark(row, selected) {
+    this.selectedClasses.forEach((name) => row.classList.toggle(name, selected))
+    const title = row.querySelector(`#tree-link-${row.dataset.pageId}`)
+    if (title) {
+      this.selectedTitleClasses.forEach((name) => title.classList.toggle(name, selected))
+      if (selected) title.setAttribute("aria-current", "page")
+      else title.removeAttribute("aria-current")
     }
+    row.querySelectorAll("[data-translation-marker]").forEach((marker) => {
+      this.markerAtRestClasses.forEach((name) => marker.classList.toggle(name, !selected))
+    })
   }
 
   // Focus leaving the handle. A DOM move (`moved`) blurs it too and refocuses

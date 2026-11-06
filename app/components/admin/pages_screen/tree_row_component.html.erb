@@ -6,7 +6,9 @@
   </div>
 <% else %>
   <%# `relative`: the handle is placed against the row, outside its box. %>
-  <div id="<%= dom_id %>" class="group/node relative flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken <%= row_class %>">
+  <%# A `row` target of `admin--pages--tree`, which keeps the open page's row
+      the one selected. %>
+  <div id="<%= dom_id %>" data-admin--pages--tree-target="row" data-page-id="<%= page.id %>" class="group/node relative flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken <%= row_class %>">
     <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
         grab; nor can a page the actor may not move, nor the top of a branch
         under a page they can't read. Every other node's
@@ -46,7 +48,7 @@
     <%# `title:` is the full name for a row the narrow column truncates. %>
     <%= link_to title, path, id: link_id, title: title, data: { turbo_frame: "content" },
           aria: (selected? ? { current: "page" } : {}),
-          class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
+          class: title_class %>
 
     <%# Draft, Scheduled or Live with changes, one small named mark (see the component). %>
     <%= render Admin::PagesScreen::TreeStateMarkComponent.new(page: page) %>

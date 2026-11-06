@@ -131,16 +131,6 @@
               moves into `#toasts`) instead of in the region below, where it
               would be consumed and dropped. %>
           <%= render Admin::Ui::ToastRegionComponent.new(flash: flash, relay: true) if turbo_frame_request? %>
-          <%# The tree column is outside this frame and outlives a frame
-              navigation, so a frame answer that draws the tree hands it over
-              as a stream: the tree's selection is the page now shown, written
-              by the server as on a full visit. A settings save then redraws
-              the saved page's row alone, and it is the row already selected.
-              `admin--pages--tree#keepFocus` gives the focus back to the link
-              that opened the page. %>
-          <% if turbo_frame_request? && content_for?(:tree) %>
-            <%= turbo_stream.replace("tree") { content_for(:tree) } %>
-          <% end %>
           <%= yield %>
         </turbo-frame>
       </main>

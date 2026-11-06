@@ -94,8 +94,9 @@ module Admin
 
       def dom_id = self.class.dom_id(page)
 
-      # The title link's id, by which the focus finds the link again in a
-      # tree drawn afresh (`admin--pages--tree#keepFocus`).
+      # The title link's id: Turbo gives the focus back to the element of the
+      # same id after a stream answer replaces the tree or the row, and
+      # `admin--pages--tree#mark` finds the title by it.
       def link_id = "tree-link-#{page.id}"
 
       def selected? = page == selected
@@ -104,7 +105,15 @@ module Admin
       # `.admin-tree-row--selected` draws on its left edge (`content-spiel.tailwind.css`;
       # an inset shadow, so the title does not move). It is a selection and not a
       # marker: accent stays the mark of "unread and addressed to you".
-      def row_class = selected? ? "admin-tree-row--selected bg-sunken" : nil
+      def row_class = selected? ? SELECTED_CLASS : nil
+
+      # The selected row's marks, drawn here and moved in the browser by
+      # `admin--pages--tree` (its "The selected row"), which is handed these
+      # same strings as Stimulus classes.
+      SELECTED_CLASS = "admin-tree-row--selected bg-sunken".freeze
+      SELECTED_TITLE_CLASS = "font-semibold".freeze
+
+      def title_class = [ "flex-1 truncate text-ink", (SELECTED_TITLE_CLASS if selected?) ].compact.join(" ")
 
       # How the translation markers rest. Hidden visually, never removed:
       # `sr-only` keeps "○2" in the accessibility tree at rest, and the row's

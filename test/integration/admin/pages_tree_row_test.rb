@@ -59,4 +59,22 @@ class Admin::PagesTreeRowTest < ActionDispatch::IntegrationTest
       assert_empty tree_reads, "a settings save read the tree's pages"
     end
   end
+
+  # The tree column outlives a frame navigation, so a frame answer is no
+  # place for the tree: it would be read and sent with every page opened
+  # from it. The answer names the page it opens, for the tree's script.
+  test "an editor opened in the frame sends no tree" do
+    pages = 3.times.map { |index| create_page(title: "Sibling #{index}") }
+
+    get admin_page_path(pages.first), headers: { "Turbo-Frame" => "content" }
+
+    assert_response :success
+    assert_select "turbo-frame#content [data-tree-open-page='#{pages.first.id}']", count: 1
+    assert_select "turbo-frame#tree", count: 0
+    assert_select "li[data-page-id]", count: 0
+    pages.each { |page| assert_select "#tree-row-#{page.id}", count: 0 }
+
+    get admin_page_path(pages.first)
+    assert_select "turbo-frame#tree li[data-page-id='#{pages.second.id}']"
+  end
 end
