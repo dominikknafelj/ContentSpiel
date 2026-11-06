@@ -17,6 +17,11 @@ name: Image
 # build of main. A merge that raises `VERSION` is then given its release
 # number by release.yml, which runs when this workflow completes. No `latest`:
 # a site that followed it would change under its owner at the next deploy.
+#
+# Then, in the job `site-template`, the image is used as a site uses it: a
+# site is made with its `contentspiel` commands, the site's image is built on
+# it, and production is started under that. The workflow succeeds only when
+# both jobs do, and release.yml waits for its success.
 on:
   push:
     branches: [ main ]
@@ -37,6 +42,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+
+    # The image's name, for the site-template job below, which pulls what
+    # this job pushed.
+    outputs:
+      image: ${{ steps.name.outputs.image }}
 
     steps:
       - name: Checkout code
@@ -71,3 +81,254 @@ jobs:
             ${{ github.ref == 'refs/heads/main' && format('{0}:main', steps.name.outputs.image) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # THE SITE TEMPLATE, BUILT AND BOOTED with the image just pushed (releases
+  # spec, "The site template is built and booted in CI"). What a person does
+  # with a new site, in the order the site's README.md gives, against the
+  # commit's own image and nothing else: the image's `contentspiel` commands,
+  # the site's image built FROM this one, production started under it. The
+  # entrypoint's commands are tested by test/bin/ and test/lib/ outside the
+  # image, as the uid of a checkout; only here do they run as the wrapper runs
+  # them, as a stranger to the image (not root, not its user 1000), with the
+  # site's folder mounted, and only here is a site's Dockerfile built and its
+  # production started.
+  #
+  # WHAT A FAILURE HERE STOPS. release.yml runs on this workflow's
+  # `workflow_run` and only when the run concluded `success`, so a template
+  # that does not build or boot also gives the commit no release number. That
+  # is intended: a release is what a site is built on, and a release whose
+  # template does not build is the one thing no site can be built on.
+  #
+  # WHERE IT RUNS: where this workflow runs, on a merge to main and by hand,
+  # never for a pull request (ci.yml), which does not pay for an image pull,
+  # a second image build and a production boot. A pull request that breaks the
+  # template therefore shows here, on main, after the merge.
+  #
+  # NOTHING IS PUSHED, AND NO SECRET IS REAL. The job's token reads packages
+  # and nothing more; the site's image is built into the runner's Docker and
+  # removed at the end; every secret the boot is given is made up in the step
+  # that uses it.
+  site-template:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: read
+
+    # The commit's image by its full commit id, the tag a site pins and the
+    # one tag `build` always pushes (`main` is only pushed from main).
+    env:
+      CMS_IMAGE: ${{ needs.build.outputs.image }}
+      CMS: ${{ needs.build.outputs.image }}:${{ github.sha }}
+      SITE_IMAGE: contentspiel-site-template:${{ github.sha }}
+      BOOT: contentspiel-site-template-boot
+      # The port /up is asked on, on the runner. Production is served on 80
+      # inside the container (Thruster, the CMS image's CMD).
+      SITE_PORT: "3000"
+
+    # Postgres 17, as the template's deploy.yml runs it. No `ports:`: the
+    # site's container joins the job's network (`job.services.postgres.network`)
+    # and reaches it by the name `postgres`, as Kamal's accessory is reached by
+    # `<service>-db`. The user is `content_spiel`, the name the CMS's
+    # config/database.yml fixes for every production database, and here it is
+    # the superuser, so `db:prepare` creates the four databases itself where a
+    # real site's init script (config/postgres/10-contentspiel-databases.sh)
+    # makes them for an ordinary role. Its password is a made-up one in the
+    # open: the database lives as long as the job and is reachable from
+    # nothing outside it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: content_spiel
+          POSTGRES_PASSWORD: site-template-ci
+        options: >-
+          --health-cmd "pg_isready -U content_spiel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      # The package is public, so a pull needs no login; logging in anyway
+      # with the job's read-only token keeps a pull off the anonymous rate
+      # limit and keeps the job working should the package ever be private.
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the commit's image
+        run: docker pull "$CMS"
+
+      # Every command exactly as install/contentspiel runs it:
+      #
+      #   docker run --rm -i --user "$(id -u):$(id -g)" \
+      #     --mount type=bind,source=<the site>,target=/site -w /site \
+      #     <image>:<version> contentspiel ARGS
+      #
+      # with the runner's uid and gid, 1001:118 or so on GitHub's runners and
+      # neither root nor the image's 1000, as a person's 501:20 is neither on a
+      # Mac. The wrapper itself is not run: it takes its version from the
+      # site's pin, which must be X.Y.Z or `stable`, so it cannot run a commit
+      # image, and CONTENTSPIEL_IMAGE replaces the name, not the tag. `-t` is
+      # left out, as the wrapper leaves it out without a terminal.
+      #
+      # The mounted folder is the wrapper's too: outside a site (for `new`)
+      # the current folder, inside one the folder that holds the pin.
+      #
+      # Each command's exit code and one line of what it says are held, and
+      # after every command nothing in the site belongs to anyone but the
+      # runner's user: a file the image writes as 1000, or as root, is one a
+      # person cannot edit or delete.
+      - name: Run the image's contentspiel commands as the wrapper does
+        run: |
+          work="$RUNNER_TEMP/site-template"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cd "$work"
+
+          fail() { echo "::error::$*"; exit 1; }
+
+          # contentspiel CODE LINE ARGS...: runs `contentspiel ARGS` with the
+          # current folder mounted, prints what it said, and fails unless it
+          # exited CODE and said LINE (a fixed string, on a line of its own or
+          # inside one). stdin is /dev/null: `-i` keeps it open, as the
+          # wrapper's does, and nothing here answers a question.
+          contentspiel() {
+            local expected=$1 line=$2 code output
+            shift 2
+            echo "::group::contentspiel $*"
+            set +e
+            output=$(docker run --rm -i --user "$(id -u):$(id -g)" \
+              --mount type=bind,source="$(pwd -P)",target=/site -w /site \
+              "$CMS" contentspiel "$@" < /dev/null 2>&1)
+            code=$?
+            set -e
+            printf '%s\n' "$output"
+            echo "::endgroup::"
+            [ "$code" = "$expected" ] || fail "contentspiel $* exited $code, not $expected"
+            grep -qF -- "$line" <<< "$output" || fail "contentspiel $* did not say: $line"
+            CONTENTSPIEL_OUTPUT=$output
+          }
+
+          owned_by_runner() {
+            local strangers
+            strangers=$(find "$1" ! -user "$(id -u)" -print)
+            [ -z "$strangers" ] || fail "written as another user than the runner's ($(id -u)): $strangers"
+          }
+
+          # The CMS version, X.Y.Z (0.0.0 for a commit before the first
+          # release). The pin `new` writes, and the version `upgrade` compares.
+          contentspiel 0 "." --version
+          version=$CONTENTSPIEL_OUTPUT
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "--version said $version, not X.Y.Z"
+
+          contentspiel 0 "Wrote the site demo-site/, pinned to ContentSpiel $version." new demo-site
+          owned_by_runner demo-site
+          cd demo-site
+          [ "$(head -n 1 .contentspiel-version)" = "$version" ] || fail ".contentspiel-version holds $(cat .contentspiel-version), not $version"
+
+          contentspiel 0 "Added the section style banner" generate section_style banner "Banner"
+          owned_by_runner .
+
+          # theme:check itself, on the theme with the generated style in it.
+          contentspiel 0 "no problems." check
+
+          contentspiel 0 "Wrote .contentspiel/compose.yml" dev-files
+          [ -s .contentspiel/compose.yml ] || fail "dev-files wrote no .contentspiel/compose.yml"
+          owned_by_runner .
+
+          # Pinned to the image's own version (what `new` wrote, and written
+          # again here so the step holds that whatever `new` does), `upgrade`
+          # has nothing to do, and must say so and write nothing. Nothing:
+          # no file added, removed, changed, or rewritten with the same bytes
+          # (a newer mtime than the marker, made outside the site).
+          echo "$version" > .contentspiel-version
+          before=$({ find . -print | LC_ALL=C sort; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 cksum; })
+          touch "$work/before-upgrade"
+          contentspiel 0 "This site is already on ContentSpiel $version. Nothing to do." upgrade
+          after=$({ find . -print | LC_ALL=C sort; find . -type f -print0 | LC_ALL=C sort -z | xargs -0 cksum; })
+          [ "$before" = "$after" ] || fail "upgrade changed the site: $(diff <(echo "$before") <(echo "$after"))"
+          touched=$(find . -newer "$work/before-upgrade" -print)
+          [ -z "$touched" ] || fail "upgrade wrote: $touched"
+
+      # The site's own Dockerfile, as Kamal builds it: FROM the CMS image at
+      # CMS_VERSION, the theme copied in, `theme:check`, then `assets:clobber
+      # assets:precompile` under the site's theme. A build that succeeds has
+      # proved all three. CMS_IMAGE is this repository's image name, which is
+      # the template's default (`ContentSpiel::IMAGE`) here and a fork's own
+      # name in a fork. Plain `docker build`: the runner's Docker already
+      # holds the pulled image, which the FROM finds there.
+      - name: Build the site's image
+        working-directory: ${{ runner.temp }}/site-template/demo-site
+        run: |
+          docker build \
+            --build-arg CMS_IMAGE="$CMS_IMAGE" \
+            --build-arg CMS_VERSION="${{ github.sha }}" \
+            -t "$SITE_IMAGE" .
+
+      # Production under the site's image, with the variables the template's
+      # deploy.yml names (docs/reference/hosting.md), every secret made up
+      # here and gone with the runner:
+      # - SECRET_KEY_BASE, without which production stops at boot;
+      # - PUBLIC_HOST, an http address so nothing is forced to HTTPS (the
+      #   boot's "[ContentSpiel] Serving" line is held below);
+      # - PGHOST and CONTENT_SPIEL_DATABASE_PASSWORD, the service above;
+      # - SOLID_QUEUE_IN_PUMA, as deploy.yml sets it, so the jobs' supervisor
+      #   starts inside Puma as on a server;
+      # - SETUP_TOKEN and the three Active Record encryption keys, which
+      #   production starts without but a site is deployed with.
+      # THEME_PATH is the site Dockerfile's own ENV. The CMS image's CMD runs
+      # `db:prepare` (bin/docker-entrypoint), which loads the four schemas,
+      # and then the server: /up answering 200 is the whole boot.
+      - name: Boot the site in production
+        run: |
+          docker run -d --name "$BOOT" \
+            --network "${{ job.services.postgres.network }}" \
+            -p "127.0.0.1:$SITE_PORT:80" \
+            -e SECRET_KEY_BASE="$(openssl rand -hex 64)" \
+            -e PUBLIC_HOST="http://localhost:$SITE_PORT" \
+            -e PGHOST=postgres \
+            -e CONTENT_SPIEL_DATABASE_PASSWORD=site-template-ci \
+            -e SOLID_QUEUE_IN_PUMA=true \
+            -e SETUP_TOKEN="$(openssl rand -hex 16)" \
+            -e ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY="$(openssl rand -hex 16)" \
+            -e ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY="$(openssl rand -hex 16)" \
+            -e ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT="$(openssl rand -hex 16)" \
+            "$SITE_IMAGE"
+
+          # About 90 seconds: a fresh database takes four schema loads before
+          # the server starts. A container that has stopped will not answer,
+          # so that ends the wait at once.
+          up=""
+          for _ in $(seq 1 45); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SITE_PORT/up" || true)" = 200 ]; then
+              up=yes
+              break
+            fi
+            [ "$(docker inspect -f '{{.State.Running}}' "$BOOT")" = true ] || break
+            sleep 2
+          done
+
+          # The log is read once, into a variable: `docker logs | grep -q`
+          # fails under the step's pipefail whenever grep stops reading at
+          # its match and `docker logs` is killed by the closed pipe.
+          log=$(docker logs "$BOOT" 2>&1)
+          printf '%s\n' "$log"
+          [ -n "$up" ] || { echo "::error::the site's production did not answer 200 on /up (its log is above)"; exit 1; }
+          grep -qF "[ContentSpiel] Serving http://localhost:$SITE_PORT." <<< "$log" \
+            || { echo "::error::the boot did not say it serves http://localhost:$SITE_PORT (PUBLIC_HOST)"; exit 1; }
+
+      # Whatever happened above. The runner is thrown away after the job, but
+      # a self-hosted one would not be, and a container left running would
+      # hold the port for the next run. The CMS image stays: it is the
+      # registry's, and was only pulled.
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f "$BOOT" 2> /dev/null || true
+          docker rmi -f "$SITE_IMAGE" 2> /dev/null || true
+          rm -rf "$RUNNER_TEMP/site-template"
