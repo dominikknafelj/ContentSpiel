@@ -232,7 +232,7 @@ module Admin
       # section, keep blocks" form, `SectionCardComponent#settled_screen_data`).
       # Waiting its turn in the queue would not be enough: the delete would go
       # ahead of the follow-up of a save still on the wire, and over a form
-      # paused by a 409 (`test/system/admin/sections_test.rb`, the two "Remove
+      # paused by a 409 (`test/system/admin/sections_removing_test.rb`, the two "Remove
       # section, keep blocks" tests about unsaved text). Each card is told
       # whether it is the list's first or last, as on a page load; its
       # neighbours are corrected in the browser (`admin--editor--blocks

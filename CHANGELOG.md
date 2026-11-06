@@ -30,6 +30,8 @@
 - A new recurring task, `forms_resend_not_ready` (every 15 minutes, in `config/recurring.yml` for every environment): once mail is set up, by Settings or by `MAIL_*` variables, the form mails that failed because it was not are sent again, each recorded as System's "sent a submission again".
 - The first numbered release. From it on, a release `X.Y.Z` is a git tag `vX.Y.Z`, a GitHub Release whose notes are its section of this file, and the image `ghcr.io/dominikknafelj/content_spiel:X.Y.Z` for `linux/amd64` and `linux/arm64`; `:stable` names the newest release. The commit tags stay, so a site that pins a commit still builds (`docs/reference/hosting.md`, "Releases").
 - The image's `PATH` ends with `/rails/bin`, and `bin/docker-entrypoint` hands a `contentspiel …` command straight over, with no `db:prepare`.
+- CS Studio, editor (E4, stage 2): a block's closed tile shows its type, a heading and a few lines of its text; one "+ Add block" opens the menu of types; a section is a frame whose head says its layout, background and width as words, with the settings opened under it; the page tree's markers rest hidden (a screen reader still reads them) and the selected row carries an accent bar. "Discard changes…" is red text. No setting or data changes.
+- SortableJS is no longer preloaded on every CS Studio screen: it is fetched on the screens where something is dragged (the editor, the page tree, Settings' language rows, Groups).
 
 ### Migrations needing action
 
