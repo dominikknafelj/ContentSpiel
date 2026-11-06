@@ -169,6 +169,54 @@ class UpgradeTest < ActiveSupport::TestCase
     end
   end
 
+  test "sections_between: pin equal to the version is empty, a pin older than all gets all, Unreleased never" do
+    assert_empty ContentSpiel::Release.sections_between(CHANGELOG, "0.3.0", "0.3.0")
+    assert_equal %w[0.1.0 0.2.0 0.3.0], ContentSpiel::Release.sections_between(CHANGELOG, "0.0.1", "0.3.0").map(&:first)
+    assert_equal %w[0.2.0], ContentSpiel::Release.sections_between(CHANGELOG, "0.1.0", "0.2.0").map(&:first)
+  end
+
+  test "sections_between: headings without dates count, and a duplicate heading is one section" do
+    changelog = "## 0.2.0\n\n- two\n\n## 0.10.0\n\n- ten\n\n## 0.2.0 (2026-02-01)\n\n- again\n"
+    sections = ContentSpiel::Release.sections_between(changelog, "0.1.0", "0.10.0")
+
+    assert_equal %w[0.2.0 0.10.0], sections.map(&:first)
+    assert_equal "- two", sections.first.last
+  end
+
+  test "a version with no changelog section is said among the notes" do
+    in_site("0.1.0") do |site|
+      text = upgrade(site, changelog: "## 0.2.0 (2026-02-01)\n\n- two\n").run.text
+
+      assert_includes text, "CHANGELOG has no section for 0.3.0."
+      assert_includes text, "## 0.2.0"
+    end
+  end
+
+  test "the pin keeps its file mode" do
+    in_site("0.1.0") do |site|
+      File.chmod(0o600, File.join(site, ".contentspiel-version"))
+      upgrade(site).run
+
+      assert_equal 0o600, File.stat(File.join(site, ".contentspiel-version")).mode & 0o7777
+      assert_equal "0.3.0\n", pin(site)
+    end
+  end
+
+  test "a rename that fails leaves the old pin and no temp file" do
+    in_site("0.1.0") do |site|
+      original = File.method(:rename)
+      File.singleton_class.send(:define_method, :rename) { |*| raise Errno::EACCES, "rename" }
+      begin
+        assert_raises(Errno::EACCES) { upgrade(site).run }
+      ensure
+        File.singleton_class.send(:define_method, :rename, original)
+      end
+
+      assert_equal "0.1.0\n", pin(site)
+      assert_empty Dir.children(site).grep(/tmp/)
+    end
+  end
+
   private
 
   def upgrade(site, changelog: CHANGELOG, check: NO_PROBLEMS)

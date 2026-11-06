@@ -71,6 +71,8 @@ USAGE = <<~TEXT.freeze
     dev-files      Write the files `dev` runs (the wrapper runs it for `dev`).
     --version      Print this CMS version.
     help           Print this.
+
+  A refusal or failure is a sentence on stderr and exit 1; a result is on stdout.
 TEXT
 
 # What a process started from /rails needs to start the application here:
@@ -190,13 +192,25 @@ when "upgrade"
   require File.join(root, "lib/content_spiel/upgrade")
   theme = File.join(Dir.pwd, ContentSpiel::SiteGenerator::THEME)
   check = lambda do
+    # lib/theme_folder.rb is plain Ruby that config/application.rb requires
+    # first; `checking` must be set before the application starts.
+    require File.join(root, "lib/theme_folder")
     ThemeFolder.checking { start_application.call }
     Theme::Check.problems(ThemeFolder.new(theme), deep: true)
   rescue ThemeFolder::Invalid => error
     [ error.message ]
   end
+  # No `Theme.current.refusal` check as theme:check makes after its own: that
+  # one is for a THEME_PATH naming another folder than the one asked about.
+  # This image is the CMS's own, run by the wrapper, with THEME_PATH unset
+  # (only a site's Dockerfile and compose file set it, and neither is this
+  # image), so the application starts under the default theme.
+  #
+  # The version is the image's; the test environment alone may name another,
+  # since a source tree is at 0.0.0 and nothing is older than that.
+  version = ENV["RAILS_ENV"] == "test" && ENV["CONTENTSPIEL_UPGRADE_VERSION"] ? ENV["CONTENTSPIEL_UPGRADE_VERSION"] : ContentSpiel::VERSION
   begin
-    result = ContentSpiel::Upgrade.new(Dir.pwd, changelog: File.read(File.join(root, "CHANGELOG.md")), check: check).run
+    result = ContentSpiel::Upgrade.new(Dir.pwd, changelog: File.read(File.join(root, "CHANGELOG.md")), check: check, version: version).run
   rescue ContentSpiel::Upgrade::Refused => error
     refuse.(error.message)
   end

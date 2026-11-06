@@ -224,6 +224,41 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     end
   end
 
+  test "upgrade checks the theme in process: a sound theme moves the pin, a broken one prints the problem and keeps it" do
+    in_site do |site, theme|
+      File.write(File.join(site, ".contentspiel-version"), "0.0.0\n")
+      env = { "CONTENTSPIEL_UPGRADE_VERSION" => "0.0.1" }
+
+      File.write(File.join(theme, "notes.txt"), "stray")
+      out, status = entrypoint("upgrade", chdir: site, env: env)
+      assert_equal 1, status.exitstatus, out
+      assert_includes out, "Theme check"
+      assert_includes out, "notes.txt"
+      assert_includes out, "The version was not moved"
+      assert_equal "0.0.0\n", File.read(File.join(site, ".contentspiel-version"))
+
+      File.delete(File.join(theme, "notes.txt"))
+      out, status = entrypoint("upgrade", chdir: site, env: env)
+      assert_equal 0, status.exitstatus, out
+      assert_includes out, "no problems"
+      assert_includes out, "Next steps"
+      assert_equal "0.0.1\n", File.read(File.join(site, ".contentspiel-version"))
+    end
+  end
+
+  test "upgrade says a theme folder the application refuses to start under as a problem" do
+    in_site do |site, theme|
+      File.write(File.join(site, ".contentspiel-version"), "0.0.0\n")
+      File.symlink("/nowhere/at/all", File.join(theme, "dangling.erb"))
+      out, status = entrypoint("upgrade", chdir: site, env: { "CONTENTSPIEL_UPGRADE_VERSION" => "0.0.1" })
+
+      assert_equal 1, status.exitstatus, out
+      assert_includes out, "Theme check"
+      assert_includes out, "link to nothing"
+      assert_equal "0.0.0\n", File.read(File.join(site, ".contentspiel-version"))
+    end
+  end
+
   test "upgrade answers without starting the application when the pin is current, refused or given arguments" do
     in_site do |site, _theme|
       File.write(File.join(site, ".contentspiel-version"), "#{ContentSpiel::VERSION}\n")
@@ -281,9 +316,9 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     end
   end
 
-  def entrypoint(*arguments, chdir:)
+  def entrypoint(*arguments, chdir:, env: {})
     Bundler.with_unbundled_env do
-      Open3.capture2e({ "RAILS_ENV" => "test" }, "ruby", ENTRYPOINT, *arguments, chdir: chdir)
+      Open3.capture2e({ "RAILS_ENV" => "test" }.merge(env), "ruby", ENTRYPOINT, *arguments, chdir: chdir)
     end
   end
 end

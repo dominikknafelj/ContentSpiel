@@ -139,13 +139,23 @@ class InstallScriptsTest < ActiveSupport::TestCase
     end
   end
 
-  test "upgrade refuses a bad pin before it pulls, and other commands never pull" do
+  test "upgrade with a bad pin still pulls and runs stable, for the image to refuse; other commands refuse it" do
     in_sandbox do |box|
       File.write("#{box.site}/.contentspiel-version", "latest\n")
-      _, status = box.wrap_raw("upgrade")
-      assert_equal 1, status.exitstatus
-      assert_empty box.calls
+      box.wrap("upgrade")
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_includes run.fetch(:args), "type=bind,source=#{box.site},target=/site"
 
+      _, status = box.wrap_raw("check")
+      assert_equal 1, status.exitstatus
+      assert_equal 2, box.calls.size
+    end
+  end
+
+  test "other commands never pull" do
+    in_sandbox do |box|
       File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
       box.wrap("check")
       assert_equal [ "run" ], box.calls.map { |call| call.fetch(:args).first }

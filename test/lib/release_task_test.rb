@@ -167,6 +167,9 @@ class ReleaseTaskTest < ActiveSupport::TestCase
         out.strip
       end
       git.call "init", "-q", "-b", "main"
+      # No background work in the throwaway repository: auto maintenance and gc
+      # take .git/objects/maintenance.lock, which the folder's removal raced.
+      %w[maintenance.auto=false gc.auto=0 core.fsmonitor=false].each { |setting| git.call "config", *setting.split("=") }
       yield root.to_s, git
     end
   end

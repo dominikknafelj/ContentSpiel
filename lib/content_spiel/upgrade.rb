@@ -88,9 +88,11 @@ module ContentSpiel
 
     def notes_text(pinned, sections)
       head = "Release notes\n\nChanges from ContentSpiel #{pinned} to #{@version}, oldest release first."
-      return "#{head}\nThe changelog lists no release between them." if sections.empty?
-
-      ([ head ] + sections.map { |version, body| "## #{version}\n\n#{ordered(body)}".rstrip }).join("\n\n")
+      parts = sections.map { |version, body| "## #{version}\n\n#{ordered(body)}".rstrip }
+      # This image's own version should have a section; if it has none, say
+      # so among the notes rather than let the gap pass unseen.
+      parts << "CHANGELOG has no section for #{@version}." unless sections.any? { |version, _| version == @version }
+      ([ head ] + parts).join("\n\n")
     end
 
     # A section's body with the subsections of FIRST moved to the top, each
@@ -136,6 +138,7 @@ module ContentSpiel
     def write_pin
       temp = @site.join("#{PIN}.tmp#{Process.pid}")
       temp.write("#{@version}\n")
+      temp.chmod(@site.join(PIN).stat.mode & 0o7777)
       File.rename(temp, @site.join(PIN))
     ensure
       File.delete(temp) if temp&.exist?
