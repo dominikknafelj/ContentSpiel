@@ -29,6 +29,25 @@
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
   --color-chrome: var(--cs-chrome);
+  --color-field-fill: var(--cs-field-fill);
+  --color-rail: var(--cs-rail);
+  --color-popover: var(--cs-popover);
+  --color-structure: var(--cs-structure);
+  --color-structure-tint: var(--cs-structure-tint);
+  --color-structure-ink: var(--cs-structure-ink);
+  --color-live: var(--cs-live);
+  --color-on-live: var(--cs-on-live);
+  --color-scheduled: var(--cs-scheduled);
+  --color-on-scheduled: var(--cs-on-scheduled);
+  --color-head-action: var(--cs-head-action);
+  --color-head-action-ink: var(--cs-head-action-ink);
+  --color-head-cool: var(--cs-head-cool);
+  --color-head-cool-ink: var(--cs-head-cool-ink);
+  --color-head-warm: var(--cs-head-warm);
+  --color-head-warm-ink: var(--cs-head-warm-ink);
+  --color-type-chip: var(--cs-type-chip);
+  --color-type-chip-ink: var(--cs-type-chip-ink);
+  --color-on-danger: var(--cs-on-danger);
   --color-cat-1: var(--cs-cat-1);
   --color-cat-2: var(--cs-cat-2);
   --color-cat-3: var(--cs-cat-3);
@@ -51,7 +70,22 @@
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);
-  --shadow-menu: var(--cs-shadow-menu);
+  --radius-field: var(--cs-radius-field);
+  --radius-button: var(--cs-radius-button);
+  --radius-button-sm: var(--cs-radius-button-sm);
+  --radius-chip: var(--cs-radius-chip);
+  --radius-tile: var(--cs-radius-tile);
+  --radius-card: var(--cs-radius-card);
+  --radius-frame: var(--cs-radius-frame);
+  --radius-rail: var(--cs-radius-rail);
+  /* Elevation: 1 a card, 2 a rail or panel, 3 a popover, menu, dialog or a
+     dragged card, 4 what stands over a dialog. `shadow-menu` is the
+     elevation-3 name the existing menus still use. */
+  --shadow-1: var(--cs-shadow-1);
+  --shadow-2: var(--cs-shadow-2);
+  --shadow-3: var(--cs-shadow-3);
+  --shadow-4: var(--cs-shadow-4);
+  --shadow-menu: var(--cs-shadow-3);
   --ease-cs: var(--cs-ease);
 }
 
@@ -743,7 +777,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
    outline with its content hidden. The chosen row is the lifted one -- the
-   only drag state that carries a shadow (`--cs-shadow-menu`).
+   only drag state that carries a shadow (`--cs-shadow-3`).
 
    Both Sortables run with `forceFallback` (Firefox can't start a native drag
    from the `<button>` handles), so what follows the pointer is a clone
@@ -751,8 +785,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
 .admin-drag-ghost { border: 1px dashed var(--cs-line-strong); background: transparent; }
 .admin-drag-ghost > * { visibility: hidden; }
-.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
-.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius); background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-3); }
+.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius); background: var(--cs-surface); box-shadow: var(--cs-shadow-3); }
 /* The placeholder is also the "chosen" element for the length of a mouse
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }

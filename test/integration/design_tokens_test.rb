@@ -154,6 +154,19 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     map = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     assert_includes map, "--color-chrome: var(--cs-chrome);"
     (1..6).each { |n| assert_includes map, "--color-cat-#{n}: var(--cs-cat-#{n});" }
+    colours = %w[field-fill rail popover structure structure-tint structure-ink live on-live scheduled on-scheduled
+                 head-action head-action-ink head-cool head-cool-ink head-warm head-warm-ink type-chip type-chip-ink on-danger]
+    (colours.map { |name| "--cs-#{name}" } + (1..4).map { |n| "--cs-shadow-#{n}" }).each do |token|
+      assert_includes light, "#{token}:", "#{token} missing from the light theme"
+      assert_includes dark, "#{token}:", "#{token} missing from the dark theme"
+    end
+    colours.each { |name| assert_includes map, "--color-#{name}: var(--cs-#{name});" }
+    (1..4).each { |n| assert_includes map, "--shadow-#{n}: var(--cs-shadow-#{n});" }
+    assert_includes map, "--shadow-menu: var(--cs-shadow-3);"
+    %w[field button button-sm chip tile card frame rail].each do |name|
+      assert_match(/--cs-radius-#{name}: \d+px;/, css, "--cs-radius-#{name} missing from the scheme-independent block")
+      assert_includes map, "--radius-#{name}: var(--cs-radius-#{name});"
+    end
     refute_match(/color-scheme\s*:/, css.gsub(%r{/\*.*?\*/}m, ""), "color-scheme stays per layout, never global")
   end
 
