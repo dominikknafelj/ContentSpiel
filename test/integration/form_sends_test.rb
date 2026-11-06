@@ -85,13 +85,13 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_equal "en", Forms::Submission.last.locale
   end
 
-  test "the admin layout's html carries no data-surface" do
+  test "the admin layout's html is not the plain surface" do
     sign_in_as users(:one)
     get "/cs-studio"
 
     assert_response :success
     assert_select "html"
-    assert_select "html[data-surface]", count: 0
+    assert_select "html[data-surface=plain]", count: 0
   end
 
   test "invalid answers redraw the form with the errors linked from the summary and the typed values, 422" do
@@ -105,6 +105,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_includes response.headers["Cache-Control"], "no-store"
     assert_nil response.headers["Set-Cookie"]
     assert_select "html[data-surface=plain]"
+    assert_select "html[data-surface=studio]", count: 0
     assert_select "h1", text: I18n.t("public.forms.pages.invalid")
     assert_select "[role=alert][tabindex='-1'][autofocus]" do
       assert_select "p", text: "Please correct 2 answers."

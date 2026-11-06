@@ -236,6 +236,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     UPPER_TRACKED_ALLOWED.each_key { |marker| assert TYPE_VOICE_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
+  test "the label is 11px for a visitor and 12px under CS Studio's surface" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal [ "11px" ], css.scan(/--cs-t-label:\s*([^;]+);/).flatten.reject { |v| v == "12px" }
+    assert_equal "12px", css[/\[data-surface="studio"\]\s*\{[^}]*--cs-t-label:\s*([^;]+);/m, 1]
+    %w[admin product setup].each { |name| assert_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, '<html data-surface="studio"', name }
+    %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
+  end
+
   test "the stylesheets set no label in capitals" do
     %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
       # The form-send pages are the public site's: their rules keep their look.

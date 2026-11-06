@@ -10,6 +10,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_root_url
     follow_redirect!
     assert_select "h1", "Dashboard"
+    assert_select "html[data-surface=studio]"
   end
 
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
