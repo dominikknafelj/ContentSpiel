@@ -60,11 +60,17 @@ Open http://localhost:3000.
 
 You should see: the sample home page, drawn by the theme in `theme/`.
 
-To use CS Studio, the CMS's editor, open http://localhost:3000/cs-studio/sign-in and sign in as `admin@example.com` with the password `password12345`. This account and the sample content exist on this machine only: they are made for development and never reach the server, where the setup wizard makes the first account (step 4.2).
+To use CS Studio, the CMS's editor, open http://localhost:3000/cs-studio/sign-in and sign in as `admin@example.com` (an owner, who may do everything) or `author@example.com` (an author), each with the password `password12345`. These accounts and the sample content exist on this machine only: they are made for development and never reach the server, where the setup wizard makes the first account (step 4.2). The sample content is the CMS's own demo, not your site's, and is never deployed.
+
+The database's user and password (`contentspiel`, in `.contentspiel/compose.yml`) are a fixed development value as well: the database has no published port, so only the site's containers reach it, and production never uses them.
 
 Edit a file in `theme/` and reload the page to see the change. A change to `theme/assets/stylesheets/theme.css` is built by the watch within a few seconds; a change to `theme/theme.yml` needs a new start (Ctrl-C, then `contentspiel dev`).
 
 The database is kept between starts. To start again from an empty one, stop the site, then run `docker compose -f .contentspiel/compose.yml down -v` in this folder.
+
+The built stylesheets are kept in a volume named after the site and the CMS version, `<%= name %>-dev_builds_<%= version.tr(".", "_") %>` for this one. After `contentspiel upgrade` the next start makes a new one; the old one is not used again and can be removed: `docker volume ls` lists them, and `docker volume rm <%= name %>-dev_builds_<old version, dots as underscores>` removes one.
+
+On Linux, `contentspiel dev` needs Docker 28 or newer, which keeps a port published on 127.0.0.1 to this machine alone (`docker version` says which you have). Docker Desktop on a Mac or Windows does already.
 
 If the terminal says `THEME_PATH: ... cannot be read`: the containers read `theme/` as their own user (uid 1000), not as you, so every file in it must be readable by everyone and every folder open to everyone (on Linux a strict umask makes them yours alone; Docker Desktop on a Mac does not ask this). Run `chmod -R a+rX theme` and start again.
 
@@ -89,7 +95,9 @@ contentspiel check
 
 You should see: one line that ends in `no problems.`
 
-If it lists problems instead, each line names a file in `theme/`, says what is wrong and what to do, and the last line says how many. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
+The line starts with `/site/theme:`, the path of this folder's `theme/` inside the container the command runs in, and says how many templates the theme holds: for example `/site/theme: 30 templates, no problems.`
+
+If it lists problems instead, each is numbered, names a file by its path inside `theme/` (`views/pages/templates/_project.html.erb` is `theme/views/pages/templates/_project.html.erb` here), says what is wrong and what to do, and the last line, `/site/theme: 2 problems.`, says how many. A path that starts with `/site/` is this folder. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
 
 ## Step 4. Deploy
 

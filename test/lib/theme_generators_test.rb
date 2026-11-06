@@ -67,6 +67,55 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     end
   end
 
+  test "the entry lands after the list's last entry, never below the comment that heads the next key" do
+    in_site do |_site, theme|
+      File.write(File.join(theme, "theme.yml"), <<~YAML)
+        section_styles:
+          - name: quiet
+            label: Quiet
+
+        # Page templates below
+        page_templates:
+          - name: standard
+            label: Standard
+          - name: landing
+            label: Landing
+      YAML
+      generators(theme).generate("section_style", "banner", "Banner")
+
+      assert_equal <<~YAML, File.read(File.join(theme, "theme.yml"))
+        section_styles:
+          - name: quiet
+            label: Quiet
+          - name: banner
+            label: Banner
+
+        # Page templates below
+        page_templates:
+          - name: standard
+            label: Standard
+          - name: landing
+            label: Landing
+      YAML
+      assert_no_problems theme
+    end
+  end
+
+  test "a list in flow style with entries is refused with the lines to add by hand" do
+    in_site do |_site, theme|
+      File.write(File.join(theme, "theme.yml"), "section_styles: [{name: quiet, label: Quiet}]\n")
+      error = assert_refused(theme, /add these lines\s+to the list by hand/i) { generators(theme).generate("section_style", "banner", "Banner") }
+      assert_includes error.message, "  - name: banner\n    label: Banner"
+    end
+  end
+
+  test "theme.yml and a template are written whole, through a file beside them, and none is left" do
+    in_site do |_site, theme|
+      generators(theme).generate("page_template", "project", "Project")
+      assert_empty Dir.glob("**/.*.tmp", File::FNM_DOTMATCH, base: theme)
+    end
+  end
+
   test "a name that is taken is refused, the default's page templates too, and nothing is written" do
     in_site do |_site, theme|
       generators(theme).generate("section_style", "banner", "Banner")
@@ -153,6 +202,9 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
         assert_includes service["volumes"], "../theme:#{ContentSpiel::SiteGenerator::THEME_PATH}:ro"
         assert_includes service["volumes"], "builds:/rails/app/assets/builds"
       end
+      assert_equal "0.0.0.0", web.dig("environment", "BINDING"), "inside the container; published on 127.0.0.1 only"
+      assert_equal [ "/rails/public/assets" ], web["tmpfs"], "the image's precompiled manifest is hidden, so Propshaft serves the watch's build"
+      assert_equal "my-site-dev_builds_#{ContentSpiel::VERSION.tr(".", "_")}", compose.dig("volumes", "builds", "name")
       assert_equal [ "127.0.0.1:3000:3000" ], web["ports"]
       assert_equal %w[./bin/rails server], web["command"]
       assert_equal %w[./bin/rails theme_css:watch], css["command"]
@@ -200,6 +252,7 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     error = assert_raises(ContentSpiel::ThemeGenerators::Refused, *message) { yield }
     assert_match sentence, error.message, message
     assert_equal before, snapshot(theme), "nothing is written (#{message})"
+    error
   end
 
   def snapshot(theme)

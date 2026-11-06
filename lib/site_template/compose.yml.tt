@@ -12,7 +12,11 @@
 #   builds the public stylesheet for theme/ and again at each change. It
 #   writes into the volume `builds`, which web serves from.
 # - db: Postgres <%= postgres_version %>, its data in the volume `db`, reached
-#   by the site only.
+#   by the site only. Its user and password (contentspiel/contentspiel) are a
+#   fixed development value, written here in the open on purpose: the
+#   database has no published port, so nothing outside these containers
+#   reaches it, and production never uses them (its passwords are the
+#   site's secrets, config/deploy.yml).
 #
 # Only 127.0.0.1:3000 is published: the site is not reachable from another
 # machine. The containers run as the image's own user (uid 1000), which

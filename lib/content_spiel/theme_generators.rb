@@ -1,5 +1,6 @@
 require "pathname"
 require "json"
+require "fileutils"
 
 module ContentSpiel
   # `contentspiel generate KIND NAME ["Label"]` (bin/contentspiel): adds one
@@ -142,9 +143,12 @@ module ContentSpiel
           insert_after(source, value, entry.(" " * value.start_column))
         end
 
-      expected = current.map(&:name) + [ name ]
+      # Every entry that was there, as it was (name, labels, fields: an
+      # insertion inside a block scalar would change a label), then the new one.
+      shape = ->(choices) { choices.map { |choice| [ choice.name, choice.labels, choice.fields ] } }
+      expected = shape.(current) + [ [ name, { "en" => label }, [] ] ]
       lists, problems = edited ? Theme::Declarations.read(edited, folder: ThemeFolder.new(theme)) : [ {}, [ "not edited" ] ]
-      return edited if problems.empty? && lists.fetch(list, []).map(&:name) == expected
+      return edited if problems.empty? && shape.(lists.fetch(list, [])) == expected
 
       raise Refused, "#{Theme::Declarations::FILE} writes #{list} in a form this command does not add to. Add these lines " \
                      "to the list by hand, as an entry of its own:\n#{entry.("  ").join("\n")}"
@@ -164,11 +168,25 @@ module ContentSpiel
     end
 
     # The entry on the line after the list's last entry ends.
+    #
+    # Psych ends a block mapping where the NEXT token starts, past every
+    # blank and comment line after it, so `end_line` of the last entry can
+    # be the line of the next key, with that key's own heading comment
+    # (`# Page templates below`) above it. The insertion steps back over
+    # those lines to just after the entry's last line of content, so a
+    # comment stays with the key it stands above. A comment line indented
+    # deeper than the entry's keys may be content of a block scalar (a
+    # `label: |`) and is not stepped over; the read-back in `add_entry`
+    # refuses whatever an insertion would still change.
     def insert_after(source, sequence, lines)
       last = sequence.children.last
       rows = source.lines
       rows[-1] = "#{rows[-1]}\n" if rows.any? && !rows[-1].end_with?("\n")
       at = last.end_column.zero? ? last.end_line : last.end_line + 1
+      if last.end_column.zero?
+        between = ->(row) { row.strip.empty? || (row.lstrip.start_with?("#") && row[/\A */].size <= last.start_column) }
+        at -= 1 while at - 1 > last.start_line && between.(rows[at - 1])
+      end
       (rows[0...at] + lines.map { |line| "#{line}\n" } + rows[at..].to_a).join
     end
 
@@ -215,10 +233,26 @@ module ContentSpiel
       ERB
     end
 
+    # A file written whole goes to a hidden file beside it first and is
+    # renamed onto its name (one step on the same file system), so an
+    # interrupted write never leaves half a theme.yml or half a template.
+    # The temporary file takes the mode the file had (or the umask's), as an
+    # ordinary write would. The stylesheet's rule is appended: an append that
+    # stops halfway leaves an unfinished rule at the end, which the check's
+    # build names, and the author's text before it is untouched.
     def write(relative, content, append: false)
       file = theme.join(relative)
       file.dirname.mkpath
-      append ? File.write(file, content, mode: "a") : File.write(file, content)
+      return File.write(file, content, mode: "a") if append
+
+      temporary = file.dirname.join(".#{file.basename}.#{Process.pid}.tmp")
+      begin
+        File.write(temporary, content)
+        File.chmod(file.exist? ? file.stat.mode & 0o7777 : 0o666 & ~File.umask, temporary)
+        File.rename(temporary, file)
+      ensure
+        FileUtils.rm_f(temporary)
+      end
     end
   end
 end
