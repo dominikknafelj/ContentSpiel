@@ -702,8 +702,9 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    (and the card's danger outline below lies over it), held by someone else
    is the card's field-line outline over the frame. The head is the
    structure tint with the structure ink, its top corners the frame's less
-   the frame's width, and all four when the body is collapsed and the head
-   is the whole card. A word of the head (`SectionSettingsWordsComponent`)
+   the frame's width, and all four when the body is collapsed and the
+   settings closed, so the head is the whole card (a collapse closes them;
+   a word opens them again under the folded head). A word of the head (`SectionSettingsWordsComponent`)
    is a button in the head's ink, its own ground the ink thinned to 12%
    under the pointer or the keyboard's focus, which also rings it in the
    accent; every pair is measured in `test/lib/admin_contrast_test.rb`. The
@@ -716,7 +717,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   border-radius: calc(var(--cs-radius-frame) - 1.5px) calc(var(--cs-radius-frame) - 1.5px) 0 0;
   padding: 10px 12px;
 }
-.admin-section-card:has(> [data-block-body].hidden) > .admin-section-card__head { border-radius: calc(var(--cs-radius-frame) - 1.5px); }
+.admin-section-card:has(> [data-block-body].hidden):not(:has(> .admin-section-card__settings:not([hidden]))) > .admin-section-card__head { border-radius: calc(var(--cs-radius-frame) - 1.5px); }
 .admin-section-card__settings { margin-top: 0.75rem; }
 .admin-section-card__settings:not([hidden]) ~ [data-block-body] { padding-top: 0; }
 .admin-section-word {

@@ -41,7 +41,7 @@
             aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
       <%= t(".name") %>
     </button>
-    <%= render self.class.words(section: section, editable: editable?) %>
+    <%= render self.class.words(section: section) %>
     <%= render self.class.summary(section: section, count: blocks.size) %>
 
     <% if editable? %>

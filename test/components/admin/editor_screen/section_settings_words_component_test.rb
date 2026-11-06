@@ -6,8 +6,8 @@ class Admin::EditorScreen::SectionSettingsWordsComponentTest < ViewComponent::Te
     @section = @editor_page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
   end
 
-  def render_words(editable: true)
-    render_inline Admin::EditorScreen::SectionCardComponent.words(section: @section.reload, editable: editable)
+  def render_words
+    render_inline Admin::EditorScreen::SectionCardComponent.words(section: @section.reload)
   end
 
   def words = page.all("#section-#{@section.id}-words button.admin-section-word").map { |word| word.text.delete("▾").strip }
@@ -68,8 +68,6 @@ class Admin::EditorScreen::SectionSettingsWordsComponentTest < ViewComponent::Te
     assert_selector "button.admin-section-word", count: 4
     assert_selector "button.admin-section-word[aria-controls='section-#{@section.id}-settings'][aria-expanded='false']", count: 4
 
-    # A viewer who can't edit gets the same buttons: the region shows the read-only fieldset.
-    render_words(editable: false)
-    assert_selector "button.admin-section-word[aria-controls='section-#{@section.id}-settings'][aria-expanded='false']:not([disabled])", count: 4
+    assert_no_selector "button.admin-section-word[disabled]"
   end
 end

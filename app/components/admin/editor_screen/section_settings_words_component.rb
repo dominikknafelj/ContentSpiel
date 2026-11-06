@@ -18,15 +18,14 @@ module Admin
     # a stream that lands while it is open is set right by
     # `admin--editor--section#wordsTargetConnected`, which reads the region.
     #
-    # A viewer who can't edit gets the same buttons (`editable:` changes no
-    # word): reading a setting changes nothing, and the region shows them the
-    # disabled fieldset, as a tile shows them a block's disabled form.
+    # A viewer who can't edit gets the same buttons: reading a setting changes
+    # nothing, and the region shows them the disabled fieldset, as a tile
+    # shows them a block's disabled form.
     class SectionSettingsWordsComponent < AdminComponent
       FIELDS = %w[layout background width style anchor].freeze
 
-      def initialize(section:, editable:)
+      def initialize(section:)
         @section = section
-        @editable = editable
       end
 
       def call

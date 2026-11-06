@@ -431,13 +431,19 @@ export default class extends Controller {
   }
 
   // Shows what holds the subject's notice: a section's panel that is hidden is
-  // opened through the section's own `open` (so its tile says so), and a card
-  // that is collapsed is expanded.
+  // opened through the section's own `open` (so its tile says so), a
+  // section's settings region that is closed through its `showSettings` (so
+  // its words say so), and a card that is collapsed is expanded.
   reveal(subject) {
     for (const unit of this.unitsOf(subject)) {
       if (unit.hidden && unit.matches("[data-admin--editor--section-target~='panel']")) {
         const host = unit.closest("[data-controller~='admin--editor--section']")
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.open(unit.dataset.blockId)
+      }
+      const region = unit.closest("[data-admin--editor--section-target~='settings']")
+      if (region?.hidden) {
+        const host = region.closest("[data-controller~='admin--editor--section']")
+        if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.showSettings()
       }
       const body = unit.querySelector("[data-block-body].hidden")
       if (body) {

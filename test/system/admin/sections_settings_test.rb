@@ -78,6 +78,63 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     assert_selector "#{word("width")}[aria-expanded='false']"
   end
 
+  # Typing into the settings claims the section for this tab: the hold that
+  # closing must let go of.
+  def claim_by_typing
+    fill_in id: "block-#{@section.id}-anchor", with: "about"
+    assert_eventually(message: "the section was never claimed") { Editing::Reservation.of(@section).exists? }
+  end
+
+  def assert_released
+    assert_eventually(message: "the section's hold was not released") { !Editing::Reservation.of(@section).exists? }
+  end
+
+  def name_button = "#{section_card} > .admin-section-card__head button[aria-controls='section-#{@section.id}-body']"
+
+  test "collapsing a section closes its settings, keeps the focus on its name, and lets its hold go" do
+    open_editor
+    open_settings
+    claim_by_typing
+
+    find(name_button).click
+
+    assert_selector "#section-#{@section.id}-body.hidden", visible: :all
+    assert_selector settings_region, visible: :hidden
+    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "false", each["aria-expanded"] }
+    assert_eventually(message: "the focus is not on the section's name") { focus_is_on(name_button) }
+    assert_released
+    assert_equal "about", @section.reload.settings["anchor"]
+  end
+
+  test "Close sends the settings and lets the section's hold go" do
+    open_editor
+    open_settings
+    claim_by_typing
+
+    find("#{settings_region} button[data-action='admin--editor--section#closeSettings']").click
+
+    assert_selector settings_region, visible: :hidden
+    assert_released
+    assert_equal "about", @section.reload.settings["anchor"]
+  end
+
+  test "Escape in a block's panel closes that panel and leaves the settings open; in the settings it closes them" do
+    open_editor
+    open_settings
+    find(face(@right)).click
+    assert_selector panel(@right), visible: :visible
+    find_field(id: caption(@right)).click
+
+    keyboard.type(:escape)
+
+    assert_selector panel(@right), visible: :hidden
+    assert_selector settings_region, visible: :visible
+
+    page.execute_script("document.getElementById(#{"block-#{@section.id}-background".to_json}).focus()")
+    keyboard.type(:escape)
+    assert_selector settings_region, visible: :hidden
+  end
+
   # ---- The section's own controls (sections spec §4.1) ----
 
   test "choosing a narrower layout folds the second lane into the first without losing the open form" do

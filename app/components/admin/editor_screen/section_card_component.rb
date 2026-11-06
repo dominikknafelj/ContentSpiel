@@ -156,7 +156,7 @@ module Admin
 
       # The head's words, for the card and for the stream that follows a
       # saved setting, as `summary` above.
-      def self.words(section:, editable: true) = Admin::EditorScreen::SectionSettingsWordsComponent.new(section: section, editable: editable)
+      def self.words(section:) = Admin::EditorScreen::SectionSettingsWordsComponent.new(section: section)
 
       def self.delete_count_id(section) = "section-#{section.id}-delete-count"
 
@@ -218,7 +218,7 @@ module Admin
 
       def wrapper_data
         { block_id: section.id, container: "", "admin--editor--blocks-target": "card", controller: "admin--editor--section",
-          action: "keydown.esc->admin--editor--section#escape", **(card_edge ? { card_edge: card_edge } : {}) }
+          action: "keydown.esc->admin--editor--section#escape admin--editor--blocks:toggled@window->admin--editor--section#collapsed", **(card_edge ? { card_edge: card_edge } : {}) }
       end
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable

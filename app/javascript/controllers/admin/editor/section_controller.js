@@ -175,29 +175,49 @@ export default class extends Controller {
     const field = event.params.field
     if (this.settingsOpen && this.openedBy === field) return this.closeSettings()
 
+    if (this.showSettings(field)) this.focusSetting(field)
+  }
+
+  // Opens the region, unless whoever hears `open-settings` cancels it (it
+  // shows the region somewhere else). Also `admin--editing--hold#reveal`'s
+  // door, with no field: a frozen form must be in sight. True when opened.
+  showSettings(field = null) {
+    if (!this.hasSettingsTarget) return false
     const region = this.settingsTarget
     const asked = this.dispatch("open-settings", { detail: { sectionId: this.element.dataset.blockId, region, field }, cancelable: true })
-    if (asked.defaultPrevented) return
+    if (asked.defaultPrevented) return false
 
     region.hidden = false
     this.openedBy = field
     this.markWords(true)
-    this.focusSetting(field)
+    return true
   }
 
-  // Also the region's own Close button and Escape inside the card. The form
-  // is told to send what it holds now (an edit inside its debounce would
-  // otherwise go a second later with nothing on screen to say so), and the
-  // focus goes back to the word that opened the region: what had it is about
-  // to be hidden.
-  closeSettings() {
+  // Also the region's own Close button, Escape in the head or the region,
+  // and the card collapsing (`collapsed`). The form is told to send what it
+  // holds now (an edit inside its debounce would otherwise go a second later
+  // with nothing on screen to say so), and then `closed` says the section's
+  // own form is closed, as a panel's close does, so whoever holds the
+  // section for this tab lets it go (`admin--editing--hold`) once that save
+  // is over. The focus goes back to the word that opened the region: what
+  // had it is about to be hidden. Not on a collapse: the name just pressed
+  // has it.
+  closeSettings({ refocus = true } = {}) {
     if (!this.settingsOpen) return
     const form = this.settingsTarget.querySelector("form[data-controller~='admin--saving--autosave']")
     if (form) this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
+    this.dispatch("closed", { detail: { blockId: this.element.dataset.blockId } })
     this.settingsTarget.hidden = true
     this.markWords(false)
-    this.wordFor(this.openedBy)?.focus()
+    if (refocus) this.wordFor(this.openedBy)?.focus()
     this.openedBy = null
+  }
+
+  // `admin--editor--blocks:toggled`, heard on the window: a collapsed
+  // section's settings close with its body, so nothing of it stays editable
+  // under a head that says it is folded.
+  collapsed(event) {
+    if (event.detail.hidden && event.detail.blockId === this.element.dataset.blockId) this.closeSettings({ refocus: false })
   }
 
   // The named setting's control, or the layout menu's button for the layout
@@ -295,8 +315,8 @@ export default class extends Controller {
     if (refocus) face?.focus()
   }
 
-  // Escape closes the section's settings when they are open, and otherwise
-  // the open form -- unless it was meant for something open inside them: a
+  // Escape in the head or the settings closes the settings when they are
+  // open; anywhere else in the card (a block's panel) it closes the open form -- unless it was meant for something open inside them: a
   // menu, a suggestion list or a dialog closes itself on Escape, and the
   // same key press must not also take the settings or the form away. Their listeners sit
   // on descendants of the card, so they have run by the time this one does,
@@ -311,10 +331,12 @@ export default class extends Controller {
     const target = event.target
     const orphan = target.closest?.("[data-editing-gone]")
     const id = orphan ? orphan.dataset.blockId : this.openId
-    if ((!id && !this.settingsOpen) || event.defaultPrevented) return
+    const head = this.element.querySelector(":scope > .admin-section-card__head")
+    const inSettings = this.settingsOpen && (this.settingsTarget.contains(target) || Boolean(head?.contains(target)))
+    if ((!id && !inSettings) || event.defaultPrevented) return
     if (target.closest("[role=menu], [role=listbox], dialog[open]")) return
     if (target.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-expanded=true]")) return
-    if (this.settingsOpen) {
+    if (inSettings) {
       if (this.settingsTarget.querySelector("[role=listbox]:not([hidden])")) return
       event.preventDefault()
       return this.closeSettings()
