@@ -72,9 +72,11 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{region} #block-#{@section.id}-save-status", visible: :all
     %w[layout background width style anchor].each { |name| assert_selector "#{region} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all }
     assert_selector "#{region} button[data-action='admin--editor--section-settings#close']", text: "Close", visible: :all
-    # Head, the hold strip's slot and its announcer, the region, then the body.
-    order = page.all("#{card} > *", visible: :all).map { |part| part[:id] || (part["data-editing-announcer"] ? "announcer" : part.tag_name) }
-    assert_equal [ "section-#{@section.id}-header", "block-#{@section.id}-hold", "announcer", "section-#{@section.id}-settings", "section-#{@section.id}-body" ], order.first(5)
+    # Head, the hold strip's slot and its announcer, the region's home marker
+    # (where the rail puts the region back) right before the region, then the body.
+    order = page.all("#{card} > *", visible: :all).map { |part| part[:id] || (part["data-editing-announcer"] ? "announcer" : (part["data-section-settings-home"] ? "home" : part.tag_name)) }
+    assert_equal [ "section-#{@section.id}-header", "block-#{@section.id}-hold", "announcer", "home", "section-#{@section.id}-settings", "section-#{@section.id}-body" ], order.first(6)
+    assert_selector "#{card} > span[data-section-settings-home][hidden]:empty", visible: :all
   end
 
   test "a held section's region holds the read-only fieldset and its strip stays above the region" do

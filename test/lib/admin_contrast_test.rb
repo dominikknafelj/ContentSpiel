@@ -160,6 +160,21 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The section chosen in the page editor's rail (`.admin-section-card[data-chosen]`):
+  # an outline 2px outside the frame, so it stands on the canvas. Its colour is
+  # read from the rule that draws it.
+  test "the chosen section's outline is 3:1 or better on the canvas, in both schemes" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    rule = css[/\.admin-section-card\[data-chosen\]\s*\{([^}]*)\}/, 1]
+    assert rule, "the chosen section is drawn by the stylesheet"
+    outline = rule[/outline:\s*2px solid var\((--cs-[\w-]+)\)/, 1]
+    assert_equal "--cs-accent", outline, "a selection is the accent"
+    assert_match(/outline-offset:\s*2px/, rule, "the outline stands outside the frame, on the canvas")
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.(outline), colour.("--cs-paper"), "the chosen section's #{outline} outline on the canvas (#{scheme})")
+    end
+  end
+
   # A section's head (`.admin-section-card__head`): its words in the
   # structure ink on the structure tint, and a word under the pointer or
   # focused on the ink thinned to 12% over that tint (`.admin-section-word`).

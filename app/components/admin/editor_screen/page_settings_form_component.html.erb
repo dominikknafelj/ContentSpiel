@@ -1,5 +1,10 @@
 <%= tag.details id: "page-settings", open: true, class: "admin-page-settings #{Admin::EditorScreen::FormColumn.classes(locale)} rounded-card bg-surface shadow-1 p-4",
       data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks, **template_fields_data } do %>
+  <%# A disclosure the person opens and closes where the settings stand above the blocks.
+      In the page editor's docked rail the Page tab is the choice to see them: the summary
+      is not drawn and the content is shown whatever `open` says, which the person's
+      choice keeps for when the rail folds back (`content-spiel.tailwind.css`, the rail's
+      container query). %>
   <summary class="admin-disclosure cursor-pointer text-label text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>

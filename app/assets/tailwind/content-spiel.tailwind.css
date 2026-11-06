@@ -769,7 +769,27 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel--docked-only[data-current] { display: block; }
   /* The blocks column's cap, over `.admin-form-column`'s (0,1,0) by weight. */
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: var(--cs-editor-column); }
+  /* Its top is the rail's: the space it keeps under the settings when they
+     stand above it is not kept beside them. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { margin-top: 0; }
+  /* The page settings in the Page panel: always open, since the tab is the
+     choice to see them, so the summary is not drawn and the content is
+     forced visible whatever the `<details>`' own `open` (as a translation
+     pair's reference card is), and the person's open or closed is theirs
+     again below the threshold. On the rail's ground they are not a card of
+     their own (owner). */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
 }
+/* A section's settings region that `admin--editor--section-choice` moved
+   into the Section panel: the panel's padding is its edge and the rail its
+   ground, so it keeps none of the room it takes under a head. Keyed on
+   `data-editing-away`, the one mark the choice writes on the region, which
+   live editing's merge leaves alone (its RUNTIME set): a class written by
+   the script would be taken away by the next list merge. */
+.admin-section-card__settings[data-editing-away] { margin: 0; padding: 0; background: transparent; }
 /* A section's header controls (sections spec §4.1). A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen
@@ -803,6 +823,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    ground, and the lanes under it need no padding of their own above. */
 .admin-section-card { container-type: inline-size; border: 1.5px solid var(--cs-structure); border-radius: var(--cs-radius-frame); background: transparent; }
 .admin-section-card[data-card-edge="unavailable"] { border-color: var(--cs-danger); }
+/* The section chosen in the editor's rail (`admin--editor--section-choice`):
+   a selection, so the accent, 2px outside the frame (3:1 on the canvas,
+   `admin_contrast_test`). A state edge written after this (held,
+   unavailable) weighs the same and wins. */
+.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 .admin-section-card__head {
   background: var(--cs-structure-tint); color: var(--cs-structure-ink);
   border-radius: calc(var(--cs-radius-frame) - 1.5px) calc(var(--cs-radius-frame) - 1.5px) 0 0;

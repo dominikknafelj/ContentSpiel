@@ -76,6 +76,11 @@
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
   <span class="sr-only" aria-live="polite" data-editing-announcer></span>
 
+  <%# Where the settings region belongs: the editor's rail puts a region it showed back
+      after this marker (`admin--editor--section-choice#release`), wherever the region
+      stood meanwhile. Empty, and drawn nothing. %>
+  <span hidden data-section-settings-home></span>
+
   <%# The one element that holds the section's settings form (see the component): hidden
       until a word of the head opens it, never replaced by an answer, and carrying its own
       controller, so its menu, Close and Escape work wherever it stands. Close is outside

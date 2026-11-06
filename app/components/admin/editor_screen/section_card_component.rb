@@ -70,11 +70,13 @@ module Admin
     # replaced by an answer (a save replaces the words, which say what was
     # stored), because the form may hold text a person is typing and is
     # registered with the write queue. A script that moves the region
-    # elsewhere (the editor's right rail at wide widths) puts it back under
-    # its head before Turbo's snapshot (`turbo:before-cache`), so a page
-    # restored from the cache has it where this component draws it. The
-    # cancelable `admin--editor--section:open-settings` is that script's
-    # door: when nobody cancels it, the region opens here, in place. What is
+    # elsewhere (the editor's rail at wide widths,
+    # `admin--editor--section-choice`) puts it back after the empty marker
+    # `[data-section-settings-home]`, the region's place here, and does so
+    # before Turbo's snapshot (`turbo:before-cache`), so a page restored from
+    # the cache has it where this component draws it. The cancelable
+    # `admin--editor--section:open-settings` is that script's door: when
+    # nobody cancels it, the region opens here, in place. What is
     # done inside the region (the layout menu, Close, Escape) is its own
     # controller's (`admin--editor--section-settings`, with `data-section-id`),
     # so it works outside the card; the card finds the region by its id
