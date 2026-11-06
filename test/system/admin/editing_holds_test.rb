@@ -1122,6 +1122,19 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     await_frames
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Copy my text"
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Discard"
+
+    # The frame is synchronised by the merge, so its held edge is the
+    # stylesheet's, read from the frozen form: it stays without the attribute.
+    assert_selector "#content_block_#{section.id} .admin-section-card__settings > form[data-editing-frozen=true]"
+    edge = page.evaluate_script(<<~JS)
+      (() => {
+        const frame = document.getElementById("content_block_#{section.id}")
+        frame.removeAttribute("data-card-edge")
+        const style = getComputedStyle(frame)
+        return [ style.outlineStyle, style.outlineWidth ]
+      })()
+    JS
+    assert_equal [ "solid", "2px" ], edge
   end
 
   test "pause() during a retry's backoff leaves nothing outstanding: the queue is quiet at once" do

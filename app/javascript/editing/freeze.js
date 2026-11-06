@@ -27,6 +27,12 @@
 // draws a card someone else holds), unless it already shows another: the
 // nearest card, so a panel's form marks its panel and a section's settings
 // form the section's frame.
+//
+// A frozen card stays a kept unit of `editing/merge.js`, because its autosave
+// is paused and a paused form is unsaved (`clean()` is false): a merge never
+// synchronises its attributes, so the edge written here stays. A section's
+// frame is not a unit and is synchronised; its held edge is the stylesheet's,
+// read from the frozen form inside it.
 const GUARD = '<button type="submit" disabled hidden tabindex="-1" data-held-guard></button>'
 
 // `click:stop->admin--x#go:once@window` is `admin--x#go`: the event with its

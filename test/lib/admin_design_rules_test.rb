@@ -244,6 +244,21 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
   end
 
+  # A live merge synchronises a section's frame, which is not a kept unit,
+  # so a frozen settings form's held edge cannot live in `data-card-edge`
+  # there: the stylesheet draws it from the frozen form.
+  FROZEN_SECTION_EDGE = '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))'
+
+  test "a section whose settings form is frozen draws the held edge from the form, under the unavailable edge" do
+    body = single_rule(FROZEN_SECTION_EDGE)
+    assert_match(/outline:\s*2px solid var\(--cs-field-line\)/, body)
+    assert_match(/outline-offset:\s*-2px/, body)
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    frozen = rules.index { |found, _| found == [ FROZEN_SECTION_EDGE ] }
+    unavailable = rules.index { |found, _| found == [ '.admin-block-card[data-card-edge="unavailable"]' ] }
+    assert_operator frozen, :<, unavailable, "the unavailable edge comes later and weighs more"
+  end
+
   # A section is a frame of the structure colour around its lanes, not a
   # card: no ground of its own, the frame's radius, a 1.5px edge, danger
   # when its type is gone. Its head is tinted and its words are the head's

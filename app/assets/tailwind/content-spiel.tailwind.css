@@ -744,6 +744,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    strip, the "Unavailable type" sentence and the open thread say it in
    words. */
 .admin-block-card[data-card-edge="held"] { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
+/* A section whose settings form `editing/freeze.js` froze: the frame is not a
+   kept unit, so a live merge gives it its server twin's attributes, and this
+   draws the held edge from the frozen form inside it instead. Inside
+   `:where()` it weighs (0,1,0), under the unavailable edge. */
+.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
 .admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
 /* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
