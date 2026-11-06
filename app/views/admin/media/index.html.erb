@@ -26,6 +26,7 @@
 <div class="mb-4 flex flex-col gap-4"
      data-controller="admin--media--drop admin--media--upload"
      data-admin--media--upload-url-value="<%= admin_media_path(**admin_url_options) %>"
+     data-admin--media--upload-button-class-value="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>"
      data-action="admin--media--drop:dropped->admin--media--upload#dropped">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-h1 text-ink">Media</h1>

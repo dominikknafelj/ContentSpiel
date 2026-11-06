@@ -45,7 +45,10 @@ module Admin
       CURRENT_LIMIT = 300
       MODES = %i[translate update].freeze
 
-      BUTTON_CLASS = "cursor-pointer rounded-cs border border-field-line bg-surface px-2 py-0.5 text-ink hover:bg-sunken".freeze
+      # Dismiss on an error: the small secondary, as Discard is beside Use.
+      # `admin--translation--translate`'s own error box reads the same string
+      # from the box's `data-dismiss-class` (`_translation_box`).
+      BUTTON_CLASS = Admin::Ui::ButtonComponent.classes(:secondary, size: :small).freeze
 
       # `mode: :update` is a **Suggest update** answer (`Admin::Translations
       # Controller#suggest` with `mode=update`): the field already has a

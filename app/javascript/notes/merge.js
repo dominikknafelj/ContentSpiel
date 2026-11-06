@@ -361,6 +361,9 @@ function divider(t) {
 // part, stays. So the scroll is heard on the document in the capture
 // phase, which hears every scroller in it (a scroll does not bubble) and
 // the window's too.
+//
+// The button's look is the small secondary's, read from the dock's
+// `data-note-jump-class` (`ThreadComponent`): the script holds no copy.
 function jump(view, reply, count, t) {
   let button = reply.querySelector(":scope > [data-note-jump]")
   const total = count + Number(button?.dataset.count || 0)
@@ -368,7 +371,7 @@ function jump(view, reply, count, t) {
     button = document.createElement("button")
     button.type = "button"
     button.dataset.noteJump = ""
-    button.className = "absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 cursor-pointer whitespace-nowrap rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink shadow-3 focus-visible:outline-2 focus-visible:outline-accent"
+    button.className = `absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 whitespace-nowrap shadow-3 ${reply.dataset.noteJumpClass || ""}`
     const watch = () => { if (!button.isConnected || !view.isConnected || nearBottom(scrollerOf(view))) dismiss() }
     const dismiss = () => {
       document.removeEventListener("scroll", watch, { capture: true })

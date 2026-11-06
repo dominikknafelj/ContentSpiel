@@ -22,14 +22,14 @@ let tiles = null
 
 export default class extends Controller {
   static targets = [ "input", "status" ]
-  static values = { url: String }
+  static values = { url: String, buttonClass: String }
 
   connect() {
     if (!tiles) {
-      tiles = new UploadTiles({ url: this.urlValue, grid: () => this.grid, fields: () => this.fields, onUploaded: (done) => this.uploaded(done), announce: (text) => this.announce(text) })
+      tiles = new UploadTiles({ url: this.urlValue, grid: () => this.grid, fields: () => this.fields, onUploaded: (done) => this.uploaded(done), announce: (text) => this.announce(text), buttonClass: this.buttonClassValue })
     }
     // This page's callbacks (its own status region, its own URL), the same queue.
-    Object.assign(tiles, { url: this.urlValue, grid: () => this.grid, fields: () => this.fields, announce: (text) => this.announce(text), onUploaded: (done) => this.uploaded(done) })
+    Object.assign(tiles, { url: this.urlValue, grid: () => this.grid, fields: () => this.fields, announce: (text) => this.announce(text), onUploaded: (done) => this.uploaded(done), buttonClass: this.buttonClassValue })
     tiles.reattach()
   }
 

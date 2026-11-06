@@ -48,8 +48,10 @@ export class UploadTiles {
   // onUploaded: ({ json, tile, file }) => void -- after the finished tile is in
   //             (when there is a grid to put it in)
   // announce:   (message) => void -- the polite live region
-  constructor({ url, grid, fields = () => ({}), onUploaded = () => {}, announce = () => {} }) {
-    Object.assign(this, { url, grid, fields, onUploaded, announce })
+  // buttonClass: the Dismiss button's classes, `Admin::Ui::ButtonComponent`'s
+  //             small secondary, handed over by the view (no copy lives here)
+  constructor({ url, grid, fields = () => ({}), onUploaded = () => {}, announce = () => {}, buttonClass = "" }) {
+    Object.assign(this, { url, grid, fields, onUploaded, announce, buttonClass })
     this.queue = []
     this.live = []
     this.current = null
@@ -233,7 +235,7 @@ export class UploadTiles {
     const status = element("span", "text-xs text-meta")
     status.dataset.uploadStatus = ""
     status.textContent = TEXTS.uploading
-    const dismiss = element("button", "self-start rounded-cs border border-field-line px-2 py-0.5 text-xs text-ink hover:bg-sunken focus:outline-2 focus:outline-accent")
+    const dismiss = element("button", `self-start ${this.buttonClass}`)
     dismiss.type = "button"
     dismiss.hidden = true
     dismiss.dataset.uploadDismiss = ""

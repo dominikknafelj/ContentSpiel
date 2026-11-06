@@ -186,6 +186,66 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
+  # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
+  # link, a label and a script take): an outlined box with a field-line edge on
+  # a button, a menu's trigger or anything a pointer presses is the old look
+  # drawn by hand. A script takes the strings from the view (a `data-` value),
+  # or, where it cannot, is held to them string for string (the popover, below).
+  # What may keep a field-line edge and still be pressed is a control that is
+  # not a button, each named with its reason.
+  PRESSABLE = /<button|tag\.button|button_class:|(?<![\w-])cursor-pointer(?![\w-])|element\("button"|createElement\("button"\)/
+  FIELD_LINE_EDGE = /(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-])/
+  HAND_BUTTON_ALLOWED = {
+    "admin-rich-text-button" => "the rich-text toolbar's toggles: `aria-pressed` draws their edge",
+    "has-checked:border-accent has-checked:bg-accent-tint" => "New post's type choice, a radio group drawn as tiles",
+    "rounded-button border border-field-line px-2 py-1 text-sm text-meta" => "the top bar's ⌘K launcher, drawn as the search field it opens",
+    "rounded-button border border-field-line px-2 py-1.5 text-left text-sm text-meta" => "the sidebar's ⌘K launcher, drawn as the search field it opens"
+  }.freeze
+
+  test "no hand-built button: nothing pressable in CS Studio draws a field-line edge, but the named controls" do
+    offences = CONTROL_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next unless line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE)
+        next if HAND_BUTTON_ALLOWED.keys.any? { |marker| line.include?(marker) }
+
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}"
+      end
+    end
+    assert_empty offences, "draw it with Admin::Ui::ButtonComponent (or `.classes`), or name the control in HAND_BUTTON_ALLOWED"
+  end
+
+  test "the hand-built button patterns match a button with a field-line edge, and not a well or a frame" do
+    [ '<button class="rounded-cs border border-field-line px-2">', 'tag.button type: "button", class: "border border-field-line"',
+      'button_class: "inline-flex rounded-cs border border-field-line"', '<label class="cursor-pointer border border-field-line">',
+      'element("button", "rounded-cs border border-field-line")' ].each do |sample|
+      assert sample.match?(PRESSABLE) && sample.match?(FIELD_LINE_EDGE), sample
+    end
+    [ '<input class="rounded-t-field border-0 border-b border-field-line bg-field-fill">', '<div class="inline-flex rounded-cs border border-field-line">',
+      '<button class="cursor-pointer bg-accent-tint text-accent">', '<span class="border-field-line-ish cursor-pointer">' ].each do |sample|
+      assert_not sample.match?(PRESSABLE) && sample.match?(FIELD_LINE_EDGE), sample
+    end
+  end
+
+  test "every hand-built button allowance is still used" do
+    HAND_BUTTON_ALLOWED.each_key do |marker|
+      assert CONTROL_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE) } },
+        "#{marker} no longer draws a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
+    end
+  end
+
+  test "the rich-text popover's script-built buttons and input are the component's strings" do
+    source = Rails.root.join("app/javascript/rich_text/popover.js").read
+    constant = ->(name) { source[/^const #{name} = "([^"]*)"$/, 1] }
+    variants = source[/^const BUTTON_VARIANTS = \{\n(.*?)^\}/m, 1].to_s.scan(/^\s*(\w+): "([^"]*)"/).to_h
+    assert_equal %w[primary secondary tertiary danger_text], variants.keys
+    variants.each do |variant, classes|
+      assert_equal Admin::Ui::ButtonComponent.classes(variant.to_sym, size: :small), "#{constant.("BUTTON_CLASS")} #{classes}", variant
+    end
+    helpers = Object.new.extend(SetupHelper)
+    assert_equal helpers.setup_input_class, constant.("INPUT_CLASS")
+    assert_equal helpers.setup_label_class, constant.("LABEL_CLASS")
+  end
+
   test "a text field is a well: the field fill and a field-line bottom edge, the accent outline on focus; a checkbox and a toggle keep a full outline" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }

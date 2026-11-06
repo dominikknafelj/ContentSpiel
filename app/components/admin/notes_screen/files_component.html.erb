@@ -12,9 +12,9 @@
                 data: { "admin--notes--gif-target": "moving", action: "load->admin--notes--gif#paint" } %>
           <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--notes--gif-target="still"></canvas>
         <% end %>
-        <%# Centred over the still; in the corner while the picture plays, so it does not lie over it. %>
+        <%# Drawn only when motion is reduced (`motion-safe:hidden`). Centred over the still; in the corner while the picture plays, so it does not lie over it. %>
         <%= tag.button type: "button", data: { playing: "false", action: "admin--notes--gif#toggle", "admin--notes--gif-target": "button", play: t(".play"), pause: t(".pause") },
-              class: "admin-note-gif-button absolute hidden cursor-pointer items-center gap-1.5 rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent motion-reduce:inline-flex" do %>
+              class: "admin-note-gif-button absolute #{Admin::Ui::ButtonComponent.classes(:secondary, size: :small)} motion-safe:hidden" do %>
           <span data-admin--notes--gif-target="icon" class="flex"><%= helpers.render "admin/shared/icon", name: :play, size: "size-3" %></span>
           <span data-admin--notes--gif-target="label"><%= t(".play") %></span>
         <% end %>
