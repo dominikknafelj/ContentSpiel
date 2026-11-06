@@ -149,7 +149,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     JS
     find("#section-#{section.id}-words button[data-admin--editor--section-field-param='layout']").click
     assert_selector "#section-#{section.id}-settings fieldset.admin-view-only[disabled] select[name='block[settings][background]']"
-    find("#section-#{section.id}-settings button[data-action='admin--editor--section#closeSettings']").click
+    find("#section-#{section.id}-settings button[data-action='admin--editor--section-settings#close']").click
     assert_selector "#section-#{section.id}-settings", visible: :hidden
     await_frames
     assert_equal [], page.evaluate_script("window.__writes")

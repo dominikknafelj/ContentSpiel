@@ -155,6 +155,43 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
     assert_equal({ "seenPending" => true, "sortable" => "none", "mark" => nil }, result)
   end
 
+  # The editor's rail takes a section's settings region out of its card. Its
+  # layout menu, its Close and Escape are its own controller's, so they work
+  # wherever the region stands; the card finds the region by its id.
+  test "a section's settings region works outside its card: layout, Close and Escape" do
+    region = "#section-#{@narrow.id}-settings"
+    word = "#section-#{@narrow.id}-words button[data-admin--editor--section-field-param='layout']"
+    layout_button = "#{region} button[aria-label='Layout']"
+    focused = ->(selector) { page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})") }
+    page.execute_script("document.body.append(document.querySelector(#{region.to_json}))")
+
+    find(word, text: "1 column").click
+    assert_selector "body > #{region}", visible: :visible
+    assert_eventually(message: "the focus is not on the Layout button of the region") { focused.call(layout_button) }
+
+    find(layout_button).click
+    find("#{region} [role=menuitem][data-admin--editor--section-settings-layout-param='two']").click
+
+    assert_selector "#section-#{@narrow.id}-form #block-#{@narrow.id}-save-status", text: "SAVED"
+    assert_selector word, text: "2 columns"
+    assert_writes_settled
+    assert_equal "two", @narrow.reload.settings["layout"]
+    assert_eventually(message: "the focus is not on the Layout button the answer brought") { focused.call(layout_button) }
+
+    page.driver.browser.keyboard.type(:escape)
+
+    assert_selector region, visible: :hidden
+    assert_selector "#{word}[aria-expanded='false']", text: "2 columns"
+    assert_eventually(message: "the focus did not go back to the word") { focused.call(word) }
+
+    # Its Close button closes it too, and gives the focus to the word.
+    find(word).click
+    assert_selector region, visible: :visible
+    find("#{region} button[data-action='admin--editor--section-settings#close']").click
+    assert_selector region, visible: :hidden
+    assert_eventually(message: "Close did not give the focus to the word") { focused.call(word) }
+  end
+
   test "the keyboard path's sentences are the locale's words" do
     announcer = "[data-admin--editor--blocks-target=announcer]"
     announced = -> { page.evaluate_script("document.querySelector(#{announcer.to_json}).textContent") }

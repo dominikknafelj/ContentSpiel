@@ -74,7 +74,12 @@ module Admin
     # its head before Turbo's snapshot (`turbo:before-cache`), so a page
     # restored from the cache has it where this component draws it. The
     # cancelable `admin--editor--section:open-settings` is that script's
-    # door: when nobody cancels it, the region opens here, in place.
+    # door: when nobody cancels it, the region opens here, in place. What is
+    # done inside the region (the layout menu, Close, Escape) is its own
+    # controller's (`admin--editor--section-settings`, with `data-section-id`),
+    # so it works outside the card; the card finds the region by its id
+    # (`admin--editor--section-settings-id-value`) and hears it close on the
+    # window.
     #
     # It is an autosave form like a card's, answered by the same action
     # (`Admin::ContentBlocksController#update`) into the same ids -- the
@@ -218,7 +223,10 @@ module Admin
 
       def wrapper_data
         { block_id: section.id, container: "", "admin--editor--blocks-target": "card", controller: "admin--editor--section",
-          action: "keydown.esc->admin--editor--section#escape admin--editor--blocks:toggled@window->admin--editor--section#collapsed", **(card_edge ? { card_edge: card_edge } : {}) }
+          "admin--editor--section-settings-id-value": settings_id,
+          action: "keydown.esc->admin--editor--section#escape admin--editor--blocks:toggled@window->admin--editor--section#collapsed " \
+                  "admin--editor--section-settings:closed@window->admin--editor--section#settingsClosed",
+          **(card_edge ? { card_edge: card_edge } : {}) }
       end
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable

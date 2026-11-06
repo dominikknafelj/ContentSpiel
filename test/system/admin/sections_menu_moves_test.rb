@@ -106,7 +106,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
 
     open_settings
     find(layout_button).click
-    find("#{section_card} [role=menuitem][data-admin--editor--section-layout-param='two']").click
+    find("#{section_card} [role=menuitem][data-admin--editor--section-settings-layout-param='two']").click
 
     assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
     assert_selector "#{tile(@left)} button[data-move='column']:not([disabled])", visible: :all

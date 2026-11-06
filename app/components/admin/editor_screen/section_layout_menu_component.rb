@@ -6,7 +6,8 @@ module Admin
     # A WIDGET OVER A HIDDEN INPUT, NOT A FIELD. The section's layout is the
     # hidden `block[settings][layout]` of the section's own autosave form
     # (`SectionCardComponent`); a pick writes the layout's name into it and
-    # sends the form (`admin--editor--section#chooseLayout`). So the choice is saved
+    # sends the form (`admin--editor--section-settings#chooseLayout`, the
+    # controller of the settings region the form stands in). So the choice is saved
     # as every field of a block is -- with the section's `base_updated_at`,
     # through the write queue, refused with a 409 when it is stale -- and
     # this component holds no state of its own. The input is deliberately not
@@ -19,9 +20,9 @@ module Admin
     # answer replaces this element and nothing else of the form (`Admin
     # ::ContentBlocksController#layout_menu_stream`), and the card draws it
     # through the same door (`SectionCardComponent.layout_menu`), so the menu
-    # a stream brings is the menu a page load draws. `admin--editor--section` finds it
-    # as its `layoutMenu` target and puts the focus back on its button when
-    # the one that was pressed has been replaced.
+    # a stream brings is the menu a page load draws. `admin--editor--section-settings`
+    # finds it as its `layoutMenu` target and puts the focus back on its button
+    # when the one that was pressed has been replaced.
     #
     # The diagram is for the eye (`aria-hidden`); each choice is named for a
     # screen reader by the words beside it ("One third, two thirds"), and the

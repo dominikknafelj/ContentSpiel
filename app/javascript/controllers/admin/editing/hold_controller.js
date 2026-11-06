@@ -440,7 +440,7 @@ export default class extends Controller {
         const host = unit.closest("[data-controller~='admin--editor--section']")
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.open(unit.dataset.blockId)
       }
-      const region = unit.closest("[data-admin--editor--section-target~='settings']")
+      const region = unit.closest("[data-controller~='admin--editor--section-settings']")
       if (region?.hidden) {
         const host = region.closest("[data-controller~='admin--editor--section']")
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.showSettings()

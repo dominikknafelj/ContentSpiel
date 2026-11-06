@@ -55,8 +55,12 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     card = "##{ActionView::RecordIdentifier.dom_id(@section)}"
     region = "#{card} > #section-#{@section.id}-settings"
-    assert_selector "#{region}[hidden].admin-section-card__settings.mx-3.mb-3.rounded-card.bg-rail.p-3[data-admin--editor--section-target='settings']", visible: :all
+    assert_selector "#{region}[hidden].admin-section-card__settings.mx-3.mb-3.rounded-card.bg-rail.p-3[data-controller='admin--editor--section-settings'][data-section-id='#{@section.id}']", visible: :all
     assert_equal "section-#{@section.id}-settings", Admin::EditorScreen::SectionCardComponent.settings_id(@section)
+    # The card finds the region by its id, and hears it close on the window: the region may stand in the rail.
+    assert_selector "#{card}[data-admin--editor--section-settings-id-value='section-#{@section.id}-settings']" \
+      "[data-action~='admin--editor--section-settings:closed@window->admin--editor--section#settingsClosed']", visible: :all
+    assert_selector "#{region}[data-action='keydown.esc->admin--editor--section-settings#escape']", visible: :all
     assert_equal "section-#{@section.id}-words", Admin::EditorScreen::SectionCardComponent.words_id(@section)
     # One form, in the region and nowhere else, with the marks `editing/merge` reads.
     assert_selector "form#section-#{@section.id}-form", count: 1, visible: :all
@@ -67,7 +71,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#{region} #section-#{@section.id}-layout-menu", visible: :all
     assert_selector "#{region} #block-#{@section.id}-save-status", visible: :all
     %w[layout background width style anchor].each { |name| assert_selector "#{region} ##{Admin::Ui::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all }
-    assert_selector "#{region} button[data-action='admin--editor--section#closeSettings']", text: "Close", visible: :all
+    assert_selector "#{region} button[data-action='admin--editor--section-settings#close']", text: "Close", visible: :all
     # Head, the hold strip's slot and its announcer, the region, then the body.
     order = page.all("#{card} > *", visible: :all).map { |part| part[:id] || (part["data-editing-announcer"] ? "announcer" : part.tag_name) }
     assert_equal [ "section-#{@section.id}-header", "block-#{@section.id}-hold", "announcer", "section-#{@section.id}-settings", "section-#{@section.id}-body" ], order.first(5)
@@ -219,8 +223,8 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='three']", visible: :all
     assert_selector "select[name='block[settings][background]'] option[selected][value='none']", visible: :all
     assert_selector "select[name='block[settings][width]'] option", count: 2, visible: :all
-    assert_selector "button[data-action='admin--editor--section#chooseLayout'][data-admin--editor--section-layout-param]", count: 6, visible: :all
-    assert_selector "button[data-admin--editor--section-layout-param='three'][aria-current='true']", visible: :all
+    assert_selector "button[data-action='admin--editor--section-settings#chooseLayout'][data-admin--editor--section-settings-layout-param]", count: 6, visible: :all
+    assert_selector "button[data-admin--editor--section-settings-layout-param='three'][aria-current='true']", visible: :all
     assert_selector "#block-#{@section.id}-save-status", visible: :all
   end
 
@@ -248,7 +252,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     assert_selector "input[type=hidden][name='block[settings][layout]'][value='two']", visible: :all
-    assert_selector "button[data-admin--editor--section-layout-param='two'][aria-current='true']", visible: :all
+    assert_selector "button[data-admin--editor--section-settings-layout-param='two'][aria-current='true']", visible: :all
     assert_selector "select[name='block[settings][background]'] option[selected][value='none']", visible: :all
     assert_selector "select[name='block[settings][width]'] option[selected][value='content']", visible: :all
   end
@@ -259,10 +263,10 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     menu = "#section-#{@section.id}-layout-menu"
-    assert_selector "#{menu}[data-admin--editor--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout", visible: :all
+    assert_selector "#{menu}[data-admin--editor--section-settings-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout", visible: :all
     assert_no_selector "#{menu} input", visible: :all
-    assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
-    assert_selector "#{menu} button[data-admin--editor--section-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
+    assert_selector "#{menu} button[data-admin--editor--section-settings-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
+    assert_selector "#{menu} button[data-admin--editor--section-settings-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
     assert_selector "#{menu} button[aria-current='false']", count: 5, visible: :all
     # The trigger shows the current layout: three equal columns.
     assert_selector "#{menu} button[aria-haspopup='menu'] .admin-layout-diagram > span", count: 3, visible: :all
@@ -438,7 +442,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "button[aria-label='Section actions']", visible: :all
-    assert_no_selector "select, [data-admin--editor--section-target='layoutMenu']", visible: :all
+    assert_no_selector "select, [data-admin--editor--section-settings-target='layoutMenu']", visible: :all
     assert_no_selector "#section-#{@section.id}-summary", visible: :all
     keep = "#{header} form[action$='/content_blocks/#{@section.id}'][data-controller='admin--saving--queue-hold'][data-action='submit->admin--saving--queue-hold#submit']"
     assert_selector "#{keep} input[name='_method'][value='delete']", visible: :all

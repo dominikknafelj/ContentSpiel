@@ -105,7 +105,7 @@
 const UNIT = "[data-editing-unit]"
 const PANEL = "[data-admin--editor--section-target~='panel']"
 // A section's settings region: opened by its head's words, closed as drawn.
-const SETTINGS = "[data-admin--editor--section-target~='settings']"
+const SETTINGS = "[data-controller~='admin--editor--section-settings']"
 const FOCUSABLE = "input:not([type=hidden]), textarea, select, button, a[href], summary, [tabindex]:not([tabindex='-1']), [contenteditable=true]"
 // Set by a script on an element that stays, and not the server's to take away.
 const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gone" ]
