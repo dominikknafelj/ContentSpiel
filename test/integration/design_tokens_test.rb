@@ -95,7 +95,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   # WCAG 1.4.3: 4.5:1 for text. On the strong band the three colours a block
   # can write in; on the tinted band the ordinary text tokens, with `meta`
   # read as `sections.css` remaps it there (plain `--th-meta` on the light
-  # tinted band is 4.3:1, which is why it is remapped).
+  # tinted band is 4.71:1; the band reads it as dim, the stronger).
   test "text on a band is readable in both themes" do
     theme_tokens.each do |theme, tokens|
       colour = ->(name) { resolve_colour(tokens, name) }
@@ -200,7 +200,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/\.content-block--code pre\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*pre;/m, css)
     assert_match(/\.content-block--code \.code-status\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;[^}]*overflow:\s*hidden;[^}]*clip:\s*rect\(0 0 0 0\);[^}]*clip-path:\s*inset\(50%\);/m, css,
       "the status line is hidden from sight by the block's own rule, so a theme's template needs no scanned utility")
-    assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.3:1 in the light theme; the head reads as dim")
+    assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.71:1 in the light theme; the head reads as dim, the stronger")
   end
 
   # Design answers C1 and C8, each a rule on tokens.
@@ -258,6 +258,21 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
       assert_operator contrast(meta, page), :>=, 3.0, "a control's outline (#{theme})"
       assert_operator line, :>=, 1.3, "--th-line (#{theme}) is #{line.round(2)}:1"
       assert_operator line, :<, 3.0, "--th-line (#{theme}) would be an outline"
+    end
+  end
+
+  # Where the default theme draws `--th-meta` words on `--th-sunken`: a form
+  # whose block is unavailable draws its fields and its submit disabled, in
+  # `--th-meta` on `--th-sunken` (`form.css`). The page's `--th-meta` on the
+  # page's sunken ground was 4.06:1 in the light theme.
+  test "faint text is 4.5:1 on the sunken ground, where a disabled form draws it, in both themes" do
+    form = Rails.root.join("app/assets/tailwind/themes/default/form.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.form-body:disabled[^{]*\{[^}]*color:\s*var\(--th-meta\);\s*background:\s*var\(--th-sunken\);/m, form)
+    assert_match(/\.form-body:disabled \.form-submit\s*\{[^}]*color:\s*var\(--th-meta\);\s*background:\s*var\(--th-sunken\);/m, form)
+
+    theme_tokens.each do |theme, tokens|
+      ratio = contrast(resolve_colour(tokens, "--th-sunken"), resolve_colour(tokens, "--th-meta"))
+      assert_operator ratio, :>=, 4.5, "faint text on the sunken ground (#{theme}) is #{ratio.round(2)}:1"
     end
   end
 
