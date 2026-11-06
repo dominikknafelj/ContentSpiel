@@ -239,7 +239,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "the label is 11px for a visitor and 12px under CS Studio's surface" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_equal [ "11px" ], css.scan(/--cs-t-label:\s*([^;]+);/).flatten.reject { |v| v == "12px" }
-    assert_equal "12px", css[/\[data-surface="studio"\]\s*\{[^}]*--cs-t-label:\s*([^;]+);/m, 1]
+    studio = css.index(/^html\[data-surface="studio"\]\s*\{[^}]*--cs-t-label:\s*12px;/m)
+    assert studio, "the studio rule is `html[data-surface=\"studio\"]`: (0,1,1) beats `:root` (0,1,0)"
+    roots = css.enum_for(:scan, /^:root[^{]*\{[^}]*--cs-t-label/m).map { Regexp.last_match.begin(0) }
+    assert_not_empty roots
+    assert roots.all? { |at| at < studio }, "the studio rule comes after every :root block that sets --cs-t-label"
     %w[admin product setup].each { |name| assert_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, '<html data-surface="studio"', name }
     %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
   end

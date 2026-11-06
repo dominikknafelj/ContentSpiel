@@ -167,13 +167,6 @@
    stylesheet (there is no second one), so under `data-surface="plain"` the
    accent family is re-valued to ink on paper in both schemes, with var()
    only. After both theme blocks, so it wins in both. */
-/* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`
-   on <html>: the label is 12px there and stays 11px on every page a visitor
-   sees, the form-send pages included. */
-[data-surface="studio"] {
-  --cs-t-label: 12px;
-}
-
 [data-surface="plain"] {
   --cs-accent: var(--cs-ink);
   --cs-accent-hover: var(--cs-ink);
@@ -203,4 +196,11 @@
      (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
+}
+
+/* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`
+   on <html>: the label is 12px there and stays 11px on every page a visitor
+   sees, the form-send pages included. */
+html[data-surface="studio"] {
+  --cs-t-label: 12px;
 }
