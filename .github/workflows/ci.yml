@@ -40,38 +40,16 @@ jobs:
       # `bin/importmap audit` boots the full Rails app, which requires
       # ActiveStorage's vips variant processor at initialization -- same
       # native dependency the test jobs below install.
-      # The packages come from azure.archive.ubuntu.com, whose download speed
-      # varies: the libvips dependencies (about forty .debs) took 20 seconds on one
-      # run and four minutes on the next, in a single job of a few. So the
-      # downloaded .debs are kept with actions/cache, one entry per package set and
-      # runner image, in a folder of the runner user's own (apt is pointed at it,
-      # and `sudo` is not needed to save it); on a hit apt installs from them with
-      # no download at all. The lock file is root's and unreadable, so it is left
-      # out. Install first, update only if that fails: the image ships apt lists
-      # (the logs show `Hit:` on them), and a stale list that 404s falls back to
-      # `apt-get update`.
-      - name: Name the apt cache
-        id: apt
-        run: |
-          echo "key=apt-$(. /etc/os-release; echo $VERSION_ID)-${ImageVersion:-none}-libvips" >> "$GITHUB_OUTPUT"
-          mkdir -p "$RUNNER_TEMP/apt-archives/partial"
-          chmod -R a+rwX "$RUNNER_TEMP/apt-archives"
-
-      - name: Restore the downloaded packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ runner.temp }}/apt-archives
-            !${{ runner.temp }}/apt-archives/lock
-          key: ${{ steps.apt.outputs.key }}
-
-      - name: Install packages
-        env:
-          APT: -o Dir::Cache::archives=${{ runner.temp }}/apt-archives -o APT::Keep-Downloaded-Packages=true
-        run: sudo apt-get $APT install --no-install-recommends -y libvips || { sudo apt-get update && sudo apt-get $APT install --no-install-recommends -y libvips; }
-
+      # Packages and their cache: .github/actions/apt-packages (apt-cache.yml fills
+      # the cache from main). After the checkout, since a local action is read
+      # from it.
       - name: Checkout code
         uses: actions/checkout@v7
+
+      - name: Install packages
+        uses: ./.github/actions/apt-packages
+        with:
+          packages: libvips
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -139,38 +117,16 @@ jobs:
       #   options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-      # The packages come from azure.archive.ubuntu.com, whose download speed
-      # varies: the libvips dependencies (about forty .debs) took 20 seconds on one
-      # run and four minutes on the next, in a single job of a few. So the
-      # downloaded .debs are kept with actions/cache, one entry per package set and
-      # runner image, in a folder of the runner user's own (apt is pointed at it,
-      # and `sudo` is not needed to save it); on a hit apt installs from them with
-      # no download at all. The lock file is root's and unreadable, so it is left
-      # out. Install first, update only if that fails: the image ships apt lists
-      # (the logs show `Hit:` on them), and a stale list that 404s falls back to
-      # `apt-get update`.
-      - name: Name the apt cache
-        id: apt
-        run: |
-          echo "key=apt-$(. /etc/os-release; echo $VERSION_ID)-${ImageVersion:-none}-libpq-dev-libvips" >> "$GITHUB_OUTPUT"
-          mkdir -p "$RUNNER_TEMP/apt-archives/partial"
-          chmod -R a+rwX "$RUNNER_TEMP/apt-archives"
-
-      - name: Restore the downloaded packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ runner.temp }}/apt-archives
-            !${{ runner.temp }}/apt-archives/lock
-          key: ${{ steps.apt.outputs.key }}
-
-      - name: Install packages
-        env:
-          APT: -o Dir::Cache::archives=${{ runner.temp }}/apt-archives -o APT::Keep-Downloaded-Packages=true
-        run: sudo apt-get $APT install --no-install-recommends -y libpq-dev libvips || { sudo apt-get update && sudo apt-get $APT install --no-install-recommends -y libpq-dev libvips; }
-
+      # Packages and their cache: .github/actions/apt-packages (apt-cache.yml fills
+      # the cache from main). After the checkout, since a local action is read
+      # from it.
       - name: Checkout code
         uses: actions/checkout@v7
+
+      - name: Install packages
+        uses: ./.github/actions/apt-packages
+        with:
+          packages: libpq-dev libvips
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -300,38 +256,16 @@ jobs:
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
-      # The packages come from azure.archive.ubuntu.com, whose download speed
-      # varies: the libvips dependencies (about forty .debs) took 20 seconds on one
-      # run and four minutes on the next, in a single job of a few. So the
-      # downloaded .debs are kept with actions/cache, one entry per package set and
-      # runner image, in a folder of the runner user's own (apt is pointed at it,
-      # and `sudo` is not needed to save it); on a hit apt installs from them with
-      # no download at all. The lock file is root's and unreadable, so it is left
-      # out. Install first, update only if that fails: the image ships apt lists
-      # (the logs show `Hit:` on them), and a stale list that 404s falls back to
-      # `apt-get update`.
-      - name: Name the apt cache
-        id: apt
-        run: |
-          echo "key=apt-$(. /etc/os-release; echo $VERSION_ID)-${ImageVersion:-none}-libpq-dev-libvips" >> "$GITHUB_OUTPUT"
-          mkdir -p "$RUNNER_TEMP/apt-archives/partial"
-          chmod -R a+rwX "$RUNNER_TEMP/apt-archives"
-
-      - name: Restore the downloaded packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ runner.temp }}/apt-archives
-            !${{ runner.temp }}/apt-archives/lock
-          key: ${{ steps.apt.outputs.key }}
-
-      - name: Install packages
-        env:
-          APT: -o Dir::Cache::archives=${{ runner.temp }}/apt-archives -o APT::Keep-Downloaded-Packages=true
-        run: sudo apt-get $APT install --no-install-recommends -y libpq-dev libvips || { sudo apt-get update && sudo apt-get $APT install --no-install-recommends -y libpq-dev libvips; }
-
+      # Packages and their cache: .github/actions/apt-packages (apt-cache.yml fills
+      # the cache from main). After the checkout, since a local action is read
+      # from it.
       - name: Checkout code
         uses: actions/checkout@v7
+
+      - name: Install packages
+        uses: ./.github/actions/apt-packages
+        with:
+          packages: libpq-dev libvips
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
