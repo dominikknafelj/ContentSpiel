@@ -1,4 +1,4 @@
-<nav aria-label="<%= label %>" class="inline-flex self-start overflow-hidden rounded-cs border border-field-line bg-surface">
+<nav aria-label="<%= label %>" class="inline-flex self-start overflow-hidden rounded-button border border-field-line bg-surface">
   <% tabs.each do |tab| %>
     <%= link_to tab[:href], class: link_class(tab[:current]), aria: { current: (tab[:current] ? "page" : nil) }, data: link_data do %>
       <%= tab[:label] %><% unless tab[:count].nil? %> <span class="text-count"><%= tab[:count] %></span><% end %>

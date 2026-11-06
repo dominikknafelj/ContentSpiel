@@ -228,4 +228,21 @@ class AdminContrastTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # The people hue is a circle or a bubble with initials in it: those are
+  # words, so the pair is 4.5:1 and not the icon's 3:1.
+  test "the people hue's initials are 4.5:1 or better on their circle, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-ic-people"), colour.("--cs-ic-people-bg"), "the people hue on its circle (#{scheme})")
+    end
+  end
+
+  test "a Draft chip's words and outline hold on the grounds a chip stands on, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-paper --cs-surface --cs-rail].each do |ground|
+        assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "Draft's words on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "Draft's outline on #{ground} (#{scheme})")
+      end
+    end
+  end
 end

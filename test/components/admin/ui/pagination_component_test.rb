@@ -10,6 +10,7 @@ class Admin::Ui::PaginationComponentTest < ViewComponent::TestCase
     assert_selector "a[rel=prev][href='/list?page=1']", text: "Previous"
     assert_selector "a[rel=next][href='/list?page=3']", text: "Next"
     assert_selector "[aria-current=page]", text: "2"
+    assert_selector "a[rel=prev].rounded-button, [aria-current=page].rounded-button"
     assert_selector "a[href='/list?page=7']", text: "7"
   end
 

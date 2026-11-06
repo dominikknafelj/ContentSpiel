@@ -547,8 +547,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
   end
 
+  # A card is told apart by its shadow. These keep an edge because the edge is
+  # the thing: an alert's tint and an error's outline, a drop zone's dashes.
+  CARD_BORDER_ALLOWED = {
+    "app/components/admin/ui/error_summary_component.html.erb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/insecure_notice_component.rb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/mail_failed_notice_component.rb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
+  }.freeze
+
   test "a card has no border of its own; the tree column and the dragged tile take their elevation from the stylesheet" do
-    assert_empty elevation_offences(/rounded-card[^"']*\sborder\s|\sborder\s[^"']*rounded-card/)
+    assert_empty elevation_offences(/rounded-card[^"']*\sborder\s|\sborder\s[^"']*rounded-card/, CARD_BORDER_ALLOWED)
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     assert_match(/\.admin-shell__tree \{[^}]*box-shadow: var\(--cs-shadow-1\)/, css)
     assert_no_match(/\.admin-shell__tree \{[^}]*border-right/, css)
@@ -556,5 +565,82 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_match(/#{Regexp.escape(selector)} \{[^}]*var\(--cs-shadow-4\)/, css, selector)
     end
     assert_no_match(/--shadow-menu/, css)
+  end
+
+  # Status colour belongs to the status components. The Live and Scheduled
+  # fills are the solid chips', so a new use of them is a new state of the
+  # chip; the ok, warn and danger fills are held to the files that draw one
+  # today, a list that may only shrink as screens move their fills into a
+  # status component.
+  LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
+  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb].freeze
+  STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
+  STATUS_FILL_FILES = %w[
+    app/components/admin/dashboard_screen/translation_card_component.html.erb
+    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
+    app/components/admin/editor_screen/changes_overview_component.html.erb
+    app/components/admin/editor_screen/delete_block_dialog_component.rb
+    app/components/admin/editor_screen/hold_strip_component.html.erb
+    app/components/admin/editor_screen/live_region_component.html.erb
+    app/components/admin/editor_screen/no_address_chip_component.html.erb
+    app/components/admin/editor_screen/publish_changes_dialog_component.html.erb
+    app/components/admin/editor_screen/table_controls_component.html.erb
+    app/components/admin/forms_screen/list_component.rb
+    app/components/admin/forms_screen/new_form_dialog_component.html.erb
+    app/components/admin/forms_screen/submission_component.html.erb
+    app/components/admin/groups_screen/permission_matrix_component.html.erb
+    app/components/admin/groups_screen/scope_editor_component.html.erb
+    app/components/admin/notes_screen/thread_component.rb
+    app/components/admin/pages_screen/tree_state_mark_component.rb
+    app/components/admin/settings_screen/language_dialogs_component.html.erb
+    app/components/admin/settings_screen/mail_alert_component.rb
+    app/components/admin/settings_screen/mail_state_component.rb
+    app/components/admin/settings_screen/mail_test_outcome_component.rb
+    app/components/admin/tokens_screen/create_step_component.html.erb
+    app/components/admin/translation_screen/summary_card_component.html.erb
+    app/components/admin/ui/badge_component.rb
+    app/components/admin/ui/button_component.rb
+    app/components/admin/ui/chip_input_component.rb
+    app/components/admin/ui/error_summary_component.html.erb
+    app/components/admin/ui/insecure_notice_component.rb
+    app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/mail_failed_notice_component.rb
+    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/translation_chip_component.rb
+    app/components/admin/ui/unpublished_chip_component.html.erb
+    app/components/admin/ui/word_diff_component.rb
+    app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/javascript/controllers/admin/ui/chip_input_controller.js
+    app/javascript/controllers/password_field_controller.js
+    app/javascript/mind_graph/card.js
+    app/views/admin/accounts/edit.html.erb
+    app/views/admin/passwords/edit.html.erb
+    app/views/admin/passwords/new.html.erb
+    app/views/admin/sessions/new.html.erb
+    app/views/admin/shared/_stale_banner.html.erb
+    app/views/setup/_flash.html.erb
+  ].freeze
+
+  test "the live and scheduled fills are drawn only by the status chip" do
+    assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
+    assert File.read(Rails.root.join(LIVE_SCHEDULED_FILES.last)).match?(LIVE_SCHEDULED_FILL), "the chip no longer draws them: the guard looks at nothing"
+  end
+
+  test "the ok, warn and danger fills are in no file beyond today's: a new one goes in a status component" do
+    drawn = relative_sources.select { |path| Rails.root.join(path).read.match?(STATUS_FILL) }
+    assert_empty drawn - STATUS_FILL_FILES, "these files draw a status fill: put it in a status component, not here"
+  end
+
+  test "the status-fill list holds only files that still draw a status fill" do
+    STATUS_FILL_FILES.each do |path|
+      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} no longer draws a status fill: drop it from STATUS_FILL_FILES"
+    end
+  end
+
+  test "the status patterns match a fill utility and not a word or another token" do
+    [ "bg-live", "text-on-live", "hover:border-scheduled", "text-on-scheduled" ].each { |sample| assert_match LIVE_SCHEDULED_FILL, sample }
+    [ "bg-live-ness", "text-delivered", "live-region", "bg-sunken" ].each { |sample| assert_no_match LIVE_SCHEDULED_FILL, sample }
+    [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
+    [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
   end
 end

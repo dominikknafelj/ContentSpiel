@@ -8,8 +8,8 @@ module Admin
     # names, never `request.query_parameters` wholesale). Nothing renders on a
     # single page.
     class PaginationComponent < AdminComponent
-      LINK_CLASS = "rounded-cs px-2 py-0.5 text-sm text-dim hover:bg-sunken".freeze
-      CURRENT_CLASS = "rounded-cs bg-sunken px-2 py-0.5 text-sm text-ink".freeze
+      LINK_CLASS = "rounded-button px-2 py-0.5 text-sm text-dim hover:bg-sunken".freeze
+      CURRENT_CLASS = "rounded-button bg-sunken px-2 py-0.5 text-sm text-ink".freeze
 
       def initialize(pagination:, url:)
         @pagination = pagination

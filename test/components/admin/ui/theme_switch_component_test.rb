@@ -7,6 +7,7 @@ class Admin::Ui::ThemeSwitchComponentTest < ViewComponent::TestCase
     %w[light dark auto].each do |choice|
       assert_selector "button[role=radio][data-theme-choice-param='#{choice}'][data-action='theme#choose']"
     end
+    assert_selector "[role=radiogroup].rounded-button"
     assert_text "Light"
     assert_text "Dark"
     assert_text "Auto"
