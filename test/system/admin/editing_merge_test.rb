@@ -101,10 +101,13 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     end
   end
 
-  def merge_list(path = blocks_path, only_changed: false)
+  # `away: true` hands the merge every element marked `data-editing-away`, as the live controller does.
+  def merge_list(path = blocks_path, only_changed: false, away: false)
     run_merge(path, <<~JS)
-      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved, onlyChanged: #{only_changed} }))
-      done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id), moved: result.moved.map((each) => each.id), same: result.same.map((each) => each.id) })
+      const away = #{away} ? [ ...document.querySelectorAll("[data-editing-away]") ] : []
+      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved, onlyChanged: #{only_changed}, away }))
+      done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id), moved: result.moved.map((each) => each.id), same: result.same.map((each) => each.id),
+        awayGone: (result.awayGone || []).map((each) => each.id) })
     JS
   end
 
@@ -421,6 +424,118 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
     assert_selector settings_region, visible: :visible
     page.all("#section-#{@section.id}-words button").each { |each| assert_equal "true", each["aria-expanded"] }
+  end
+
+  # WHAT A SCRIPT MOVED AWAY. The rail moves a section's settings region out
+  # of the list; here a script does what it does: the region goes into a host
+  # outside the list, inside the live region, shown and marked
+  # `data-editing-away`.
+  def move_away(section = @section)
+    page.execute_script(<<~JS)
+      const host = document.getElementById("away-host") || Object.assign(document.createElement("div"), { id: "away-host" })
+      document.getElementById("editing").append(host)
+      const region = document.getElementById("section-#{section.id}-settings")
+      host.append(region)
+      region.setAttribute("data-editing-away", "")
+      region.hidden = false
+    JS
+    assert_selector "#away-host #section-#{section.id}-settings", visible: :visible
+  end
+
+  def count_of(selector) = page.evaluate_script("document.querySelectorAll(#{selector.to_json}).length")
+
+  test "an away region with no unsaved text is replaced where it stands, and the list gets no copy" do
+    move_away
+    keep(settings_region, "__region")
+    keep("#section-#{@section.id}-form", "__form")
+    colleague { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "three" } }).ok? }
+
+    result = merge_list(away: true)
+
+    assert_equal [], result["awayGone"]
+    assert_equal 1, count_of(settings_region)
+    assert_equal 1, count_of("#section-#{@section.id}-form")
+    assert_selector "#away-host > #{settings_region}", visible: :visible
+    assert same?("__region", settings_region), "the region is merged where it stands"
+    assert_not same?("__form", "#section-#{@section.id}-form"), "its clean form is the answer's"
+    assert_not_nil find(settings_region)["data-editing-away"]
+    assert_equal "three", find("#block-#{@section.id}-layout", visible: :all).value
+    assert_equal "Three columns", find("#{settings_region} button[aria-current='true'] .sr-only", visible: :all).text(:all)
+    assert_no_selector "#content-blocks-list #{settings_region}", visible: :all
+  end
+
+  test "an away region holding unsaved text is the same element afterwards, with its text, its focus and its caret" do
+    move_away
+    form = "#section-#{@section.id}-form"
+    raise_debounce(form)
+    find("#block-#{@section.id}-anchor").click
+    find("#block-#{@section.id}-anchor").send_keys("about-us")
+    page.execute_script("document.getElementById('block-#{@section.id}-anchor').setSelectionRange(3, 3)")
+    keep(settings_region, "__region")
+    keep(form, "__form")
+    added = colleague { add_block(section_id: @section.id, section_column: 2) }
+
+    result = merge_list(away: true)
+
+    assert_includes result["kept"], "section-#{@section.id}-form"
+    assert same?("__region", settings_region)
+    assert same?("__form", form)
+    assert_equal "about-us", find("#block-#{@section.id}-anchor").value
+    assert page.evaluate_script("document.activeElement === document.getElementById('block-#{@section.id}-anchor')")
+    assert_equal 3, page.evaluate_script("document.activeElement.selectionStart")
+    assert_selector "#section-#{@section.id}-lanes [data-column='2'] [data-block-id='#{added.id}']"
+    assert_equal 1, count_of(settings_region)
+    assert_equal 1, count_of(form)
+  end
+
+  test "an away region whose section the answer lacks is returned in awayGone when clean, and kept with its unit marked gone when unsaved" do
+    unsaved = ContentBlocks::Save.call(ContentBlock.new(owner: @page), attributes: { block_type: "section", settings: { "layout" => "two" } }).record
+    open_editor
+    move_away(@section)
+    move_away(unsaved)
+    raise_debounce("#section-#{unsaved.id}-form")
+    find("#block-#{unsaved.id}-anchor").click
+    find("#block-#{unsaved.id}-anchor").send_keys("kept")
+    colleague do
+      assert ContentBlocks::Destroy.call(ContentBlock.find(@section.id)).ok?
+      assert ContentBlocks::Destroy.call(ContentBlock.find(unsaved.id)).ok?
+    end
+
+    result = merge_list(away: true)
+
+    assert_equal [ "section-#{@section.id}-settings" ], result["awayGone"]
+    assert_selector "#away-host > #{settings_region}", visible: :visible
+    assert_equal [ "section-#{unsaved.id}-form" ], result["gone"]
+    assert_equal "true", find("#section-#{unsaved.id}-form")["data-editing-gone"]
+    assert_equal "kept", find("#block-#{unsaved.id}-anchor").value
+    assert_selector "#away-host > #section-#{unsaved.id}-settings", visible: :visible
+    assert_no_selector "#content-blocks-list #content_block_#{@section.id}", visible: :all
+  end
+
+  test "a catch-up leaves an away region of the same version alone" do
+    move_away
+    keep(settings_region, "__region")
+    keep("#section-#{@section.id}-form", "__form")
+
+    result = merge_list(only_changed: true, away: true)
+
+    assert_includes result["same"], "section-#{@section.id}-form"
+    assert same?("__region", settings_region)
+    assert same?("__form", "#section-#{@section.id}-form")
+    assert_equal 1, count_of(settings_region)
+  end
+
+  test "a chosen section's card keeps data-chosen through a merge" do
+    move_away
+    page.execute_script("document.getElementById('content_block_#{@section.id}').setAttribute('data-chosen', '')")
+    keep("#content_block_#{@section.id}", "__card")
+    colleague { add_block(section_id: @section.id, section_column: 2) }
+
+    merge_list(away: true)
+
+    assert_not same?("__card", "#content_block_#{@section.id}"), "a clean card is the answer's"
+    assert_selector "#content_block_#{@section.id}[data-chosen]"
+    assert_equal 1, count_of("[data-chosen]")
   end
 
   test "two cards that both hold unsaved text keep both texts when their order changed" do
