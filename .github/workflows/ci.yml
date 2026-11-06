@@ -1,7 +1,7 @@
 name: CI
 
-# CI runs for every pull request: lint, the scans, the unit tests and the
-# browser suite (as four shards). A merge to main is the code a pull request
+# CI runs for every pull request: lint, the scans, the unit tests (as two shards)
+# and the browser suite (as four shards). A merge to main is the code a pull request
 # already tested, so it is not run again; main is run by hand when that is
 # wanted. `workflow_dispatch` runs everything on any branch, main included
 # ("Run workflow", or `gh workflow run CI --ref main`).
@@ -80,8 +80,20 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
-  test:
+  # The unit suite, as two jobs side by side: a runner has two cores, and the
+  # whole suite on them took nine minutes, about as long as a browser shard.
+  # `bin/test-shard unit` deals the files by their measured seconds
+  # (test/unit_test_seconds.yml), the way the browser suite is dealt below, and
+  # test/lib/test_shards_test.rb keeps every file in exactly one shard. The
+  # check that speaks for both is `test`, further down: the main branch's
+  # ruleset requires a check of that name.
+  test-shard:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
 
     services:
       postgres:
@@ -111,6 +123,10 @@ jobs:
         with:
           bundler-cache: true
 
+      # The files are named, so this is `bin/rails test` with a list (the same
+      # command as before the suite was split, but for the list). `-v` prints
+      # each test with its time: test/unit_test_seconds.yml is measured from
+      # this log, since a runner's pace is not a laptop's.
       - name: Run tests
         env:
           RAILS_ENV: test
@@ -122,26 +138,51 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
           # REDIS_URL: redis://localhost:6379/0
-        run: bin/rails db:test:prepare test
+        run: |
+          bin/rails db:test:prepare
+          bin/rails test -v $(bin/test-shard unit ${{ matrix.shard }} 2)
 
       # The stylesheet built with THEME_PATH set, and production started
       # under that theme (bin/theme-build-check). After the tests, because
-      # it writes app/assets/builds. A step of this job and not a job of its
-      # own: a job pays its setup time and would set up Ruby
-      # again; here it is three boots of the application.
+      # it writes app/assets/builds, which every public test reads. A step of
+      # ONE shard, the first, and not a job of its own: a job pays its setup
+      # time and would set up Ruby again, while here it is three boots of the
+      # application, about ten seconds, and shard 0 is the lighter shard.
+      # Never in both shards: a second run would only repeat the first.
       - name: Build the stylesheet under a theme and start production under it
+        if: matrix.shard == 0
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
         run: bin/theme-build-check
 
+      # One report per shard, each under a name of its own (two uploads under
+      # one name fail). They are not merged: each shows the lines its own half
+      # of the suite ran, and there is no minimum to check against yet, so a
+      # merged number would be read by no one. Add a merge step (SimpleCov's
+      # `collate`) the day a minimum is set.
       - name: Keep the coverage report
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: coverage
+          name: coverage-${{ matrix.shard }}
           path: ${{ github.workspace }}/coverage
           include-hidden-files: true
           if-no-files-found: ignore
+
+  # One check that speaks for the two unit shards, under the name the main
+  # branch's ruleset requires (`test`): green only when both shards passed.
+  # A matrix job's checks are named `test-shard (0)` and so on, which that
+  # ruleset does not list.
+  test:
+    needs: test-shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Did every shard pass?
+        env:
+          SHARDS: ${{ needs.test-shard.result }}
+        run: |
+          [ "$SHARDS" = "success" ] || { echo "unit tests: $SHARDS"; exit 1; }
 
   # What changed, so the browser suite can be skipped when nothing it tests did.
   # Only documents count as "nothing": the unit suite reads them (the guards in
@@ -176,9 +217,10 @@ jobs:
           fi
 
   # The browser suite, as four jobs side by side: a runner has two cores, and
-  # the whole suite on two processes took 28 minutes. `bin/system-test-shard`
-  # deals the files so each job holds about the same number of tests
-  # (test/lib/system_test_shards_test.rb keeps every file in exactly one).
+  # the whole suite on two processes took 28 minutes. `bin/test-shard system`
+  # deals the files so each job takes about the same time, by the seconds in
+  # test/system_test_seconds.yml (test/lib/test_shards_test.rb keeps every file
+  # in exactly one).
   system-test-shard:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -226,7 +268,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           bin/rails db:test:prepare tailwindcss:build
-          bin/rails test -v $(bin/system-test-shard ${{ matrix.shard }} 4)
+          bin/rails test -v $(bin/test-shard system ${{ matrix.shard }} 4)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
