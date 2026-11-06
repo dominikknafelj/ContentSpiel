@@ -27,7 +27,6 @@
 
 - A form's submission mail is in no log at any level: at `RAILS_LOG_LEVEL=debug` Action Mailer's line for it is a placeholder, where every other mail is still logged whole.
 - A new recurring task, `forms_resend_not_ready` (every 15 minutes, in `config/recurring.yml` for every environment): once mail is set up, by Settings or by `MAIL_*` variables, the form mails that failed because it was not are sent again, each recorded as System's "sent a submission again".
-
 - The first numbered release. From it on, a release `X.Y.Z` is a git tag `vX.Y.Z`, a GitHub Release whose notes are its section of this file, and the image `ghcr.io/dominikknafelj/content_spiel:X.Y.Z` for `linux/amd64` and `linux/arm64`; `:stable` names the newest release. The commit tags stay, so a site that pins a commit still builds (`docs/reference/hosting.md`, "Releases").
 - The image's `PATH` ends with `/rails/bin`, and `bin/docker-entrypoint` hands a `contentspiel …` command straight over, with no `db:prepare`.
 
@@ -49,12 +48,11 @@
 ### Removed
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
-- The old password-reset link `GET <admin>/password/:token/edit`: it is a 404 now. The mailed link is `<admin>/password/edit#<token>`; ask for a new one.
+- The old password-reset link `GET <admin>/password/:token/edit`: it is a 404 now. The mailed link is `<admin>/password/edit#<token>`; ask for a new one. With it went telemetry's scrubbing of a token segment in `<admin>/password/…` paths: the reset token is in no path, and every query string is still cut from a span.
 - `SITEMAP_HOST`, the old name of `PUBLIC_HOST`: set `PUBLIC_HOST`; `SITEMAP_HOST` is no longer read.
 - The `after_id` parameter of the block create request (`POST …/blocks`): the block is appended; to place it, create it and move it.
 - The comma-separated string for a post's `tag_names` in the post form's autosave (`post[tag_names]=a, b`): send an Array, `post[tag_names][]=a&post[tag_names][]=b`, as the chip input does. A string leaves the tags as they were.
-- The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start.
-- Telemetry's scrubbing of a token segment in `<admin>/password/…` paths: the reset token is in no path, and every query string is still cut from a span.
+- The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start. The migration that drops the ActionText tables (`20260928040000_drop_action_text`) stays, for a database that still has them, and refuses while a body in them was never converted, since nothing converts it any more: `FORCE_DROP_ACTION_TEXT=1` drops the tables and discards such bodies.
 
 ### For a gem or an outside caller
 

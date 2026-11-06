@@ -30,7 +30,7 @@ The Tiptap editor is vendored under `vendor/javascript` via import maps (`config
 
 ## ActionText
 
-There is no ActionText import: a body is a Tiptap/ProseMirror document from the start. The ActionText tables are dropped by a guarded migration (`db/migrate/20260928040000_drop_action_text.rb`), which stays so that a database that still has them migrates.
+There is no ActionText import: a body is a Tiptap/ProseMirror document from the start. The ActionText tables are dropped by a guarded migration (`db/migrate/20260928040000_drop_action_text.rb`), which stays so that a database that still has them migrates. It refuses while a body in them was never converted, and says that nothing converts one any more; `FORCE_DROP_ACTION_TEXT=1` drops the tables and discards such bodies (`test/migrations/drop_action_text_test.rb`).
 
 ## Rules a change can break silently
 
