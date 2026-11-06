@@ -1,0 +1,8 @@
+# What `docker build` (and so `kamal build`) may read of this folder.
+#
+# It is an allow-list: nothing enters the build but what the Dockerfile
+# copies, the theme. So no secret file (.kamal/secrets), no .env file and no
+# token can reach the build or an image layer, whatever lies in the folder.
+# A file the Dockerfile is to COPY must be allowed here as well.
+*
+!theme/

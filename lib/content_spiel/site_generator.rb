@@ -1,4 +1,5 @@
 require "fileutils"
+require "tmpdir"
 require "pathname"
 require_relative "version"
 
@@ -33,9 +34,11 @@ module ContentSpiel
   #
   # NOTHING IS WRITTEN UNLESS EVERYTHING CAN BE. The target must not exist at
   # all (not even empty: `new` makes a site, it does not fill a folder), and
-  # a refusal raises before the first file. A failure halfway (a full disk)
-  # leaves the half-written folder, which names itself; the person deletes it
-  # and runs `new` again.
+  # a refusal raises before the first file. The site is written into a
+  # hidden folder beside the target (`.NAME-…`, on the same file system)
+  # and renamed to NAME only when it is whole, so a failure halfway (a full
+  # disk, a scaffold that refuses) leaves nothing: the hidden folder is
+  # removed on the way out.
   class SiteGenerator
     class Refused < StandardError; end
 
@@ -49,15 +52,19 @@ module ContentSpiel
 
     # What `new` writes beside the theme: the file in the site => its
     # template. The templates' names carry no leading dot, so no ignore file
-    # of this repository (.gitignore's `.env*`, .dockerignore's `/.kamal`)
-    # can ever drop one of them from a commit or from the image.
+    # of this repository can ever drop one of them from a commit or from the
+    # image (.gitignore's `/.env*` and .dockerignore's `/.kamal` are anchored
+    # at the top today and would not, but a name with a dot would be one
+    # unanchored pattern away from it).
     FILES = {
       ".contentspiel-version" => "contentspiel-version.tt",
+      ".dockerignore" => "dockerignore.tt",
       ".gitignore" => "gitignore.tt",
       ".kamal/secrets.example" => "kamal/secrets.example.tt",
       "Dockerfile" => "Dockerfile.tt",
       "README.md" => "README.md.tt",
       "config/deploy.yml" => "config/deploy.yml.tt",
+      "config/postgres/10-contentspiel-databases.sh" => "config/postgres/10-contentspiel-databases.sh.tt",
       "seeds/README.md" => "seeds/README.md.tt"
     }.freeze
 
@@ -95,11 +102,23 @@ module ContentSpiel
       reason = refusal
       raise Refused, reason if reason
 
-      # Every template is rendered before the first file is written, so a
-      # template that fails writes nothing.
       rendered = FILES.transform_values { |template| render(TEMPLATES.join(template)) }
-      rendered.each { |file, content| put(file, content) }
-      rendered.keys + Theme::Scaffold.write(target.join(THEME)).map { |file| "#{THEME}/#{file}" }
+      building = Pathname(Dir.mktmpdir(".#{name}-", target.dirname))
+      begin
+        rendered.each { |file, content| put(building, file, content) }
+        written = rendered.keys + Theme::Scaffold.write(building.join(THEME)).map { |file| "#{THEME}/#{file}" }
+        # mktmpdir makes its folder 0700; the site is an ordinary folder.
+        File.chmod(0o777 & ~File.umask, building)
+        # Asked again: something may have made the folder meanwhile, and a
+        # rename onto an empty folder would replace it.
+        reason = existing
+        raise Refused, reason if reason
+
+        File.rename(building, target)
+        written
+      ensure
+        FileUtils.rm_rf(building) if building.exist?
+      end
     end
 
     private
@@ -111,10 +130,12 @@ module ContentSpiel
         "choose another name, or move #{name} away first."
     end
 
-    def put(relative, content)
-      file = target.join(relative)
+    # A script is written executable, as Postgres's image runs it.
+    def put(root, relative, content)
+      file = root.join(relative)
       FileUtils.mkdir_p(file.dirname)
       File.write(file, content)
+      File.chmod(0o777 & ~File.umask, file) if relative.end_with?(".sh")
     end
 
     # The templates are ERB, `-%>` trimming its line. Kamal's own ERB in

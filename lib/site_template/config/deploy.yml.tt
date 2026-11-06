@@ -10,9 +10,16 @@
   registry_user = "<your-registry-user>"
 
   # A placeholder left in is refused, so no command ever reaches for a
-  # server or an address that is not yours.
-  left = { "host" => host, "server_ip" => server_ip, "registry_user" => registry_user }.select { |_, value| value.start_with?("<your-") }
+  # server or an address that is not yours. (The pattern is written so that
+  # this line holds no placeholder itself: README.md's grep finds none here.)
+  left = { "host" => host, "server_ip" => server_ip, "registry_user" => registry_user }.select { |_, value| value.match?(/\A<your-[a-z-]+>\z/) }
   raise "config/deploy.yml still holds a placeholder for #{left.keys.join(", ")}. Fill it in at the top of the file (README.md, step 1)." if left.any?
+
+  # The CMS version this site is built on: the pin, in ONE place, the file
+  # .contentspiel-version (`contentspiel upgrade` moves it). Read from the
+  # folder kamal is run in, which must be the site's.
+  pin = File.exist?(".contentspiel-version") ? File.read(".contentspiel-version").strip : ""
+  raise "config/deploy.yml needs the file .contentspiel-version (the CMS version, e.g. 0.1.0); run kamal from the site's folder" if pin.empty?
 %>
 # Kamal's configuration of this site, written by `contentspiel new` with
 # ContentSpiel <%= version %>. Every variable the CMS reads in production is
@@ -147,7 +154,7 @@ builder:
     # pinned to. The pin lives in ONE place, the file .contentspiel-version:
     # `contentspiel upgrade` moves it, and this line reads it.
     CMS_IMAGE: <%= cms_image %>
-    CMS_VERSION: <%%= File.read(".contentspiel-version").strip %>
+    CMS_VERSION: <%%= pin %>
 
 accessories:
   db:
@@ -161,15 +168,21 @@ accessories:
     # by the name <%= name %>-db.
     env:
       clear:
-        # The site's role. Postgres makes it on its first start, with the
-        # password below, and the site's first start (db:prepare) makes the
-        # four databases as that role.
-        POSTGRES_USER: content_spiel
+        # The superuser. Used by the init script and by backups, never by
+        # the site.
+        POSTGRES_USER: postgres
       secret:
-        # The same secret as the site's: Kamal hands
-        # CONTENT_SPIEL_DATABASE_PASSWORD to Postgres under the name it reads.
-        # Postgres reads it on its FIRST start only, while the volume is empty.
-        - POSTGRES_PASSWORD:CONTENT_SPIEL_DATABASE_PASSWORD
+        # Both are read on Postgres's FIRST start only, while the volume is
+        # empty: the superuser's password by Postgres, the site role's by the
+        # init script below. Never change either afterwards.
+        - POSTGRES_PASSWORD
+        - CONTENT_SPIEL_DATABASE_PASSWORD
+    files:
+      # Makes the site's role `content_spiel` (an ordinary one) and the four
+      # databases it owns. Postgres runs it on the FIRST start only, while
+      # the volume is empty; the site's first start (db:prepare) then finds
+      # the databases empty and loads the schemas.
+      - config/postgres/10-contentspiel-databases.sh:/docker-entrypoint-initdb.d/10-contentspiel-databases.sh
     volumes:
       # A named Docker volume: kept when the container is replaced. All the
       # site's text is in it.

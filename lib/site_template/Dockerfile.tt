@@ -22,8 +22,8 @@ FROM ${CMS_IMAGE}:${CMS_VERSION}
 
 # The theme sits beside the application, never inside it and never as a
 # mounted volume: the stylesheet and the digested assets are made below, at
-# build time. Only theme/ is copied: nothing else of this folder is in the
-# image.
+# build time. Only theme/ is copied, and .dockerignore lets nothing else of
+# this folder into the build at all: a file to copy in must be allowed there.
 ENV THEME_PATH=<%= theme_path %>
 COPY --chown=1000:1000 theme/ <%= theme_path %>/
 

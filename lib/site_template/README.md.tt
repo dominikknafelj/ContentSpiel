@@ -12,6 +12,8 @@ Follow the steps below in order. Each step says what to run and what you should 
 | `.contentspiel-version` | The CMS version this site runs on, one line. `contentspiel upgrade` changes it. Every `contentspiel` command run in this folder uses this version. |
 | `Dockerfile` | Builds the site's image: the CMS image of that version, plus `theme/`. |
 | `config/deploy.yml` | Kamal's configuration: the server, the registry, the address, the database, the variables. |
+| `config/postgres/` | The script that makes the site's database role and its four databases, on the database's first start. |
+| `.dockerignore` | Lets only `theme/` into the image's build, so no secret file can reach it. |
 | `.kamal/secrets.example` | The names of the secrets the site needs, and how to make each. No value. |
 | `seeds/` | The place for starting content. Nothing reads it yet. |
 | `.gitignore` | Keeps `.kamal/secrets`, `.env*` and `.contentspiel/` out of git. |
@@ -26,12 +28,12 @@ You need Docker and the `contentspiel` command on this machine. To deploy you al
 |---|---|---|
 | `<your-host>` | The site's host name, without `https://`. Only this name is answered. | `www.example.org` |
 | `<your-server-ip>` | The address of the server the site runs on. You reach it as `root` over SSH. | `203.0.113.10` |
-| `<your-registry-user>` | Your user or organisation at the image registry (`ghcr.io` unless you change `registry.server`). | `my-github-user` |
+| `<your-registry-user>` | Your user or organisation at the image registry (`ghcr.io` unless you change `registry.server`), in lowercase: an image's name takes no capital letters. | `my-github-user` |
 
 Then check that none is left:
 
 ```sh
-grep -n '<your-' config/deploy.yml
+grep -nE '<your-[a-z-]+>' config/deploy.yml
 ```
 
 You should see: no output. Kamal refuses to run while a placeholder is left, and says which.
@@ -78,7 +80,7 @@ cp .kamal/secrets.example .kamal/secrets
 
 `.kamal/secrets.example` says how to make each value. As copied, each line reads the variable of the same name from your shell, so either export every one of them before you run `kamal`, or change the line to read from your password manager (the file shows how). `.kamal/secrets` is git-ignored: never commit it, and never put a value into any other file of this folder.
 
-Make each value once and keep it. The database password and the three encryption keys must never change after the first deploy.
+Make each value once and keep it. The two database passwords (`CONTENT_SPIEL_DATABASE_PASSWORD`, `POSTGRES_PASSWORD`) and the three encryption keys must never change after the first deploy.
 
 ### 4.2 The first deploy
 
@@ -112,9 +114,10 @@ contentspiel upgrade
 
 This shows what changed in the CMS between this site's version and the newest release, breaking changes first, checks `theme/` against the new version, and only when the check passes, writes the new version into `.contentspiel-version`. If it lists problems, fix them in `theme/` and run it again; the version is not changed until the theme passes.
 
-Then make a backup of the database, commit `.contentspiel-version`, and deploy:
+Then make a backup of the database (it writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account), commit `.contentspiel-version`, and deploy:
 
 ```sh
+kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql
 git commit -am "ContentSpiel $(cat .contentspiel-version)"
 kamal deploy
 ```

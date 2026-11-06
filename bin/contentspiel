@@ -117,7 +117,7 @@ when "new"
   start_application.call
   begin
     generator.write
-  rescue ContentSpiel::SiteGenerator::Refused => error
+  rescue ContentSpiel::SiteGenerator::Refused, Theme::Scaffold::Refused => error
     refuse.(error.message)
   end
   puts "Wrote the site #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."

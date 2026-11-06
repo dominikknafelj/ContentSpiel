@@ -15,11 +15,13 @@ class SiteGeneratorTest < ActiveSupport::TestCase
   # Everything `new` writes beside the theme, and nothing else.
   SITE_FILES = %w[
     .contentspiel-version
+    .dockerignore
     .gitignore
     .kamal/secrets.example
     Dockerfile
     README.md
     config/deploy.yml
+    config/postgres/10-contentspiel-databases.sh
     seeds/README.md
   ].freeze
 
@@ -55,7 +57,9 @@ class SiteGeneratorTest < ActiveSupport::TestCase
       assert_operator dockerfile.index("theme:check"), :<, dockerfile.index("assets:precompile"), "the check goes first"
 
       deploy = File.read(File.join(site, "config/deploy.yml"))
-      assert_includes deploy, %(CMS_VERSION: <%= File.read(".contentspiel-version").strip %>)
+      assert_includes deploy, %(pin = File.exist?(".contentspiel-version") ? File.read(".contentspiel-version").strip : "")
+      assert_includes deploy, %(CMS_VERSION: <%= pin %>)
+      assert_equal ContentSpiel::VERSION, kamal_config(site).dig("builder", "args", "CMS_VERSION")
       assert_includes deploy, "service: my-site"
       assert_includes deploy, "PGHOST: my-site-db"
       assert_no_match(/CMS_REVISION|CMS_TAG/, deploy)
@@ -79,12 +83,13 @@ class SiteGeneratorTest < ActiveSupport::TestCase
         assert_includes deploy, name
       end
 
-      # Every secret deploy.yml names has its line in the example, and the
-      # example names nothing else.
-      named = secrets.lines.grep_v(/\A\s*(#|\z)/).map { |line| line[/\A([A-Z0-9_]+)=/, 1] }
-      assert_equal %w[KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE SETUP_TOKEN CONTENT_SPIEL_DATABASE_PASSWORD
-                      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
-                      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT].sort, named.sort
+      # Every secret deploy.yml names (the site's, the registry's, the
+      # database's) has its line in the example, and the example names
+      # nothing else.
+      config = kamal_config(site)
+      listed = config.dig("env", "secret") + config.dig("registry", "password") + config.dig("accessories", "db", "env", "secret")
+      assert_equal listed.map { |key| key.split(":").first }.uniq.sort, example_names(secrets).sort
+      assert_includes example_names(secrets), "POSTGRES_PASSWORD"
 
       placeholders = deploy.scan(/<your-[a-z-]+>/).uniq
       assert_operator placeholders.size, :>=, 3
@@ -111,9 +116,74 @@ class SiteGeneratorTest < ActiveSupport::TestCase
       File.read(File.join(site, ".kamal/secrets.example")).lines.grep_v(/\A\s*(#|\z)/).each do |line|
         assert_match(/\A([A-Z0-9_]+)=\$\1\n?\z/, line)
       end
-      # And no secret is given a value in deploy.yml: they are listed by name.
+      # And no secret is given a value in deploy.yml, commented or not: they
+      # are listed by name. The names are the example's own, the optional
+      # ones it lists in comments included.
+      secrets = File.read(File.join(site, ".kamal/secrets.example"))
+      optional = secrets.scan(/^#\s+([A-Z][A-Z0-9_]+)\s{2,}/).flatten
+      assert_includes optional, "OTEL_EXPORTER_OTLP_HEADERS"
       deploy = File.read(File.join(site, "config/deploy.yml"))
-      assert_no_match(/^\s*(SECRET_KEY_BASE|SETUP_TOKEN|\w*PASSWORD|ACTIVE_RECORD_ENCRYPTION_\w+):/, deploy)
+      (example_names(secrets) + optional).each do |key|
+        assert_no_match(/^[\s#]*#{key}:/, deploy, "#{key} is given a value in deploy.yml")
+      end
+    end
+  end
+
+  test "README's grep for placeholders finds none once they are filled, and the guard line is not one" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      readme = File.read(File.join(site, "README.md"))
+      assert_includes readme, "grep -nE '<your-[a-z-]+>' config/deploy.yml"
+
+      pattern = /<your-[a-z-]+>/ # the README's, as grep -E reads it
+      filled = File.read(File.join(site, "config/deploy.yml")).gsub(pattern, "filled")
+      assert_empty filled.lines.grep(pattern)
+    end
+  end
+
+  test "Postgres runs as its own superuser, and the init script makes the site's role and the four databases" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      db = kamal_config(site).dig("accessories", "db")
+      assert_equal "postgres", db.dig("env", "clear", "POSTGRES_USER")
+      assert_equal %w[POSTGRES_PASSWORD CONTENT_SPIEL_DATABASE_PASSWORD], db.dig("env", "secret")
+      assert_equal [ "config/postgres/10-contentspiel-databases.sh:/docker-entrypoint-initdb.d/10-contentspiel-databases.sh" ], db["files"]
+
+      script = File.join(site, "config/postgres/10-contentspiel-databases.sh")
+      assert File.executable?(script)
+      production = Rails.application.config.database_configuration.fetch("production")
+      assert_equal production.values.map { |config| config.fetch("database") }.sort,
+                   File.read(script).scan(/CREATE DATABASE (\S+)/).flatten.sort
+      assert_includes File.read(script), "CREATE ROLE #{production.fetch("primary").fetch("username")} LOGIN"
+    end
+  end
+
+  test "the .dockerignore lets the theme into the build and nothing else" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      lines = File.read(File.join(site, ".dockerignore")).lines.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+      assert_equal [ "*", "!theme/" ], lines
+    end
+  end
+
+  test "a scaffold that fails halfway leaves nothing behind" do
+    in_tmp do |dir|
+      failing = ->(*) { raise Theme::Scaffold::Refused, "no" }
+      with_singleton_override(Theme::Scaffold, :write, failing) do
+        assert_raises(Theme::Scaffold::Refused) { ContentSpiel::SiteGenerator.new(File.join(dir, "my-site")).write }
+      end
+      assert_empty Dir.children(dir)
+    end
+  end
+
+  test "the site folder is an ordinary folder, not mktmpdir's 0700" do
+    in_tmp do |dir|
+      site = File.join(dir, "my-site")
+      ContentSpiel::SiteGenerator.new(site).write
+      assert_equal 0o777 & ~File.umask, File.stat(site).mode & 0o777
     end
   end
 
@@ -242,6 +312,16 @@ class SiteGeneratorTest < ActiveSupport::TestCase
   end
 
   private
+
+  # The non-comment names of a secrets example.
+  def example_names(secrets) = secrets.lines.grep_v(/\A\s*(#|\z)/).map { |line| line[/\A([A-Z0-9_]+)=/, 1] }
+
+  # deploy.yml as Kamal reads it: its ERB rendered from the site's folder,
+  # with the placeholders filled.
+  def kamal_config(site)
+    text = File.read(File.join(site, "config/deploy.yml")).gsub(/<your-[a-z-]+>/, "filled")
+    Dir.chdir(site) { YAML.safe_load(ERB.new(text).result, aliases: true) }
+  end
 
   def in_tmp(&block) = Dir.mktmpdir("site-generator", &block)
 
