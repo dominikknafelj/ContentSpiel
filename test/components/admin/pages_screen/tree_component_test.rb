@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The page tree's cost profile with translation markers on (final fix wave,
-# I1/T4): the tree is drawn on every editor visit and after every move, so it
+# The page tree's cost profile with translation markers on: the tree is drawn on every editor visit and after every move, so it
 # must cost the same handful of queries however many pages (and blocks) it
 # shows; its markers are one read of the stored `translation_states`.
 class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
@@ -29,7 +28,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
   # The tree asks the database for the pages it draws, never for every page
   # and every column: a trashed page and a page the viewer may not see are
-  # not loaded at all, and the row reads only `TreeComponent::COLUMNS`.
+  # not loaded at all, and the row reads only `PageTree::COLUMNS`.
   test "the tree reads only kept, visible pages, and only the tree's columns" do
     kept = create_page(title: "Kept")
     trashed = create_page(title: "Thrown away")
@@ -203,7 +202,8 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-status-chip"
   end
 
-  # Review focus 4.
+  # One mark a row: a scheduled page with unpublished changes draws the
+  # scheduled dot, named for both states.
   test "a scheduled page with unpublished changes has one mark that names both" do
     soon = create_page(title: "Soon")
     soon.update_columns(published_at: 2.days.from_now, unpublished_changes_at: Time.current) # version: none (a test schedules a page) # changes: none (a test marks a scheduled page)
@@ -274,7 +274,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
     render_tree
 
-    read = Admin::PagesScreen::TreeComponent.visible_pages(Page.kept.ids).to_a.group_by(&:parent_id)
+    read = PageTree.rows(Page.kept.ids).to_a.group_by(&:parent_id)
     assert_operator read.size, :>=, 2
     read.each do |parent_id, pages|
       assert_equal TreeOrder.sort(pages).map(&:id), pages.map(&:id), "the read's order under page #{parent_id}"

@@ -14,10 +14,9 @@ module Admin
     # (`Admin::Ui::IconChipComponent`); its name beside it is the link's
     # accessible name.
     #
-    # `url_options` goes on every module link (final-fixes round, finding 5):
-    # without it, following a modules link while editing a non-default
-    # language silently dropped back to `Locales.default` -- these are the
-    # one navigation in the shell that doesn't already run through a
+    # `url_options` goes on every module link: without it, following a
+    # modules link while editing a non-default language would fall back to
+    # `Locales.default` -- these are the one navigation in the shell that doesn't already run through a
     # component (`Admin::PagesScreen::TreeRowComponent#path`, `Admin::Ui::LanguageTabsComponent`,
     # ...) that threads it through for its own links.
     class SidebarComponent < Admin::AdminComponent

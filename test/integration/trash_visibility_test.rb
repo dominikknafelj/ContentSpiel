@@ -7,8 +7,8 @@ require "tmpdir"
 # fails if the trashed one leaks. A new list, search, picker or public query
 # that reads pages, posts or library images belongs here too.
 #
-# Trashing is done by setting `trashed_at` straight on the record (the trash
-# services come later): `update!` still runs the model callbacks, so the
+# Most tests trash by setting `trashed_at` straight on the record, which
+# needs no permission or audit around it: `update!` still runs the model callbacks, so the
 # trashed page and post lose their `public_paths` rows exactly as a real
 # move to the trash would make them (trash spec §4.1, `PublicSite::Paths
 # #compute_path`).
@@ -72,7 +72,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # own query, apart from the navigation: asserted inside `.page-children`,
   # because the header's navigation names the kept page on every page anyway.
   # A trashed page keeps its `published_at`, so "published" alone doesn't
-  # hide it -- and it has no URL any more, so its link would point nowhere.
+  # hide it -- and it has no URL, so its link would point nowhere.
   test "a trashed page's and a trashed post's published copy is served nowhere: not at its address, in the menu, in a list of subpages or in a post list" do
     listing = create_page(title: "Copy listing", published: false)
     ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
@@ -851,7 +851,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   # The posts list's own filters, search, scope counts and pagination, and the
-  # bulk endpoints (design pass round 2): every one of them is kept
+  # bulk endpoints: every one of them is kept
   # posts only, a trashed id is "not found", and Undo restores only trashed ones.
   test "the posts list's search, scope, type, tag and translation filters, counts and pager never include a trashed post" do
     sign_in_as users(:one)

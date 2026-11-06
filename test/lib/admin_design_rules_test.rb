@@ -102,7 +102,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # Every place a translation STATE is drawn: red is for destruction and
-  # failure, never for "missing" or "outdated" (final review C, M13).
+  # failure, never for "missing" or "outdated".
   test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
     %w[
       app/components/admin/ui/translation_chip_component.rb app/components/admin/ui/language_tabs_component.html.erb
@@ -155,9 +155,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
-    # Round 3: Languages is a card of the Settings screen, an image's detail a
-    # panel beside the Media grid, and the audit log words its rows through
-    # `Audit::Sentence` -- the screens and helper they replaced stay deleted.
+    # Languages is a card of the Settings screen, an image's detail a panel
+    # beside the Media grid, and the audit log words its rows through
+    # `Audit::Sentence`: no screen or helper draws them a second way.
     %w[
       app/views/admin/languages/index.html.erb app/views/admin/media/show.html.erb
       app/views/admin/shared/_image_upload_field.html.erb app/views/admin/api_tokens/_connection.html.erb
@@ -165,7 +165,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     ].each do |file|
       assert_not Rails.root.join(file).exist?, file
     end
-    # The translation states live in `translation_states` (`Translations::StateIndex`) now.
+    # The translation states live in `translation_states` (`Translations::StateIndex`).
     assert_not Rails.root.join("app/models/translations/cached_status.rb").exist?
   end
 
@@ -315,8 +315,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
   # link, a label and a script take): an outlined box with a field-line edge on
-  # a button, a menu's trigger or anything a pointer presses is the old look
-  # drawn by hand. A script takes the strings from the view (a `data-` value),
+  # a button, a menu's trigger or anything a pointer presses is a button drawn
+  # by hand, outside the component. A script takes the strings from the view (a `data-` value),
   # or, where it cannot, is held to them string for string (the popover, below).
   # What may keep a field-line edge and still be pressed is a control that is
   # not a button, each named with its reason.
@@ -438,11 +438,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_not rules.any? { |selectors, _| selectors.include?(".admin-column") && selectors.include?("textarea") }, "a comma inside :is() split the list"
   end
 
-  # The old field was a white box with a full field-line outline and an
-  # accent focus. A text field is a well, from its wrapper (`.admin-column`,
+  # A text field is a well, from its wrapper (`.admin-column`,
   # `.admin-field`, `.admin-filter-bar`, the popover, the suggestion box) or
-  # from `.admin-well`, so neither that outline nor a focus colour of its own
-  # stands on an input in CS Studio's markup.
+  # from `.admin-well`, so neither a full field-line outline nor a focus
+  # colour of its own stands on an input in CS Studio's markup.
   TEXT_INPUT = /text_field_tag|search_field_tag|text_area_tag|email_field_tag|password_field_tag|number_field_tag|date_field_tag|url_field_tag|<input|<textarea|tag\.input|tag\.textarea|element\("(?:input|textarea)"|createElement\("(?:input|textarea)"\)|(?<![\w-])(?:focus|focus-visible|focus-within):(?:outline|border)-accent(?![\w-])/
   FULL_FIELD_LINE = /\A(?=.*(?<![\w:-])border(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-]))/
 

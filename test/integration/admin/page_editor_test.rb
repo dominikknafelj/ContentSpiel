@@ -16,7 +16,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 
-  # Ledger m1: a restored snapshot of an editor holds stale bases and unsent
+  # A restored snapshot of an editor holds stale bases and unsent
   # text (see the view's own comment), so the editors opt out of Turbo's page
   # cache -- in a full page and in the frame answer a tree link gets alike.
   test "the page and post editors are never restored from Turbo's page cache, and prefetch no links" do
@@ -110,12 +110,12 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "About us"
   end
 
-  # Fix (final-fixes round, finding 1): each of these redirects after a
-  # plain (non-Turbo-Stream) POST/DELETE -- left to this form/button's own
-  # default frame targeting (the enclosing `<turbo-frame id="content">"),
-  # that redirect would only ever refresh the content frame, leaving a
-  # stale status dot in the tree. `data-turbo-frame="_top"` on each one is
-  # what makes it an ordinary full-page visit instead.
+  # Each of these redirects after a plain (non-Turbo-Stream) POST/DELETE --
+  # left to this form/button's own default frame targeting (the enclosing
+  # `<turbo-frame id="content">"), that redirect would refresh the content
+  # frame alone, and the tree's state mark and the sidebar's Trash badge
+  # would stay as they were. `data-turbo-frame="_top"` on each one makes it
+  # an ordinary full-page visit.
   test "publish, unpublish, schedule, delete and new-page all target the top level, not just the content frame" do
     get "/cs-studio/pages/#{@page.id}"
 
@@ -139,9 +139,8 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     # `assert_match` would build this string into a Regexp via
     # `Regexp.escape`, and the response body has its apostrophe HTML-entity
     # escaped (`&#39;`, the same auto-escaping `Admin::Ui::SaveStatusComponent`'s
-    # own `<%= text %>` -- unmodified, Task 2 -- gets from ERB) -- so this
-    # matches either spelling rather than only the literal `'` the brief's
-    # own snippet has.
+    # own `<%= text %>` gets from ERB) -- so this matches either spelling,
+    # not only the literal `'`.
     assert_match(/Couldn.*?t save — 1 problem(?!s)/, response.body)
     # Same HTML-entity-escaped apostrophe as above.
     assert_match(/can.*?t be blank/, response.body)
@@ -188,7 +187,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
     patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "" } }, as: :turbo_stream
     assert_response :ok
-    # A form drawn before this rule sent the default's name: the same nothing.
+    # The default's name sent by name is the same nothing.
     patch admin_page_path(@page), params: { base_updated_at: @page.reload.settings_changed_at.iso8601(6), page: { title: "About", template: "standard" } }, as: :turbo_stream
     assert_response :ok
 
@@ -464,8 +463,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   end
 
   # Deleting moves the page to the trash (`Trash::Move`), its subpages
-  # with it -- no longer refused for a page with children. Only the
-  # homepage is still refused, with the reason.
+  # with it. Only the homepage is refused, with the reason.
   test "deleting a page with children moves the whole branch to the trash" do
     parent = create_page(title: "Parent")
     kid = create_page(title: "Kid", parent: parent)
@@ -482,7 +480,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_not root_page.reload.trashed?
   end
 
-  # Task 10: the flash names the branch (singular for a leaf, "and N
+  # The flash names the branch (singular for a leaf, "and N
   # subpages" for a branch) and offers an Undo that posts straight back to
   # `Admin::TrashController#restore` with `from=undo` -- which, unlike an
   # ordinary Trash-screen restore, lands the actor back on this page's own
@@ -521,7 +519,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_no_match(/and \d+ subpage/, response.body)
   end
 
-  # Media library Task 8: the hero is chosen through the picker into a
+  # The hero is chosen through the picker into a
   # hidden `hero_media_asset_id`, with `hero_alt` as the page's own
   # override -- its placeholder is the image's own default alt.
   test "a landing page's editor shows the hero picker field and the image's default alt as the override's placeholder" do
@@ -538,8 +536,8 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
       assert_select "button", text: "Remove image"
     end
     assert_select "input[name='page[hero_alt]'][placeholder='A dog on a beach']"
-    # No upload field of its own any more; the one file input is the
-    # picker's header Upload, rendered once by the layout.
+    # No upload field of its own; the one file input is the picker's header
+    # Upload, rendered once by the layout.
     assert_select "form[data-controller~='admin--saving--autosave'] input[type=file]", count: 0
     assert_select "dialog#media-picker[data-controller~='admin--media--picker']", count: 1
   end
@@ -604,7 +602,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal asset, landing.hero_media_asset
     assert_equal "Landing", landing.title(locale: :en)
 
-    # Fix round 1 (I2): the whole field is re-rendered with the *stored*
+    # The whole field is re-rendered with the *stored*
     # hero -- its id in the hidden input, so the next autosave doesn't
     # resend the refused one -- and the message inside it, after the error
     # slot's own replace (which the section replace then supersedes).
@@ -647,8 +645,8 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(value="#{stored.id}")
   end
 
-  # The interim upload field (media library Task 4) is gone: a `hero_image`
-  # file param is no longer permitted, so nothing is uploaded through it.
+  # The settings form takes no file: a `hero_image` file param is not
+  # permitted, so nothing is uploaded through it.
   test "a hero_image file param is ignored and uploads nothing" do
     landing = landing_page_with_hero_image
     asset = landing.hero_media_asset
@@ -690,8 +688,8 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "Über uns", @page.title(locale: :de)
   end
 
-  # Design pass round 2, Task 10: the new controls sit inside the form's
-  # disabled fieldset, so a viewer who can't edit can't press Reset or type.
+  # The hero's Reset and the counter inputs sit inside the form's disabled
+  # fieldset, so a viewer who can't edit can't press Reset or type.
   test "a view-only viewer gets the Reset button and the counter inputs disabled" do
     landing = landing_page_with_hero_image
     Pages::Save.call(landing, attributes: {}, translations: { Locales.default => { hero_alt: "My own alt" } })

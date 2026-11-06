@@ -22,20 +22,17 @@ import { loadSortable } from "editor/drag"
 // server says nothing (offline, signed out, an error page), nothing is
 // rendered: the row is put back where it was and a toast says why (`save`).
 //
-// A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor (final
-// fix wave 1, reviews A I1 / B I1), so it takes its turn in the page's write
-// queue (`enqueue`) like a block write (`admin--editor--blocks`,
+// A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor, so it
+// takes its turn in the page's write queue (`enqueue`) like a block write (`admin--editor--blocks`,
 // `saving/queue.js`): it is never on the wire together with an autosave of
 // the same page. The toast's Undo is the same PATCH, sent by Turbo from
 // `#toasts`: it is caught by its URL and held in the same queue (`holdUndo`).
 //
 // IT SAYS NOTHING TO THE OPEN SETTINGS FORM. `Pages::Move` saves the page, so
 // its `updated_at` moves, but not the settings form's base: a move is not a
-// change of the page's settings (`Page::SETTINGS_BASE_IGNORES`, live editing's
-// final review I1). Until then a move carried the open form's base as
-// `X-Page-Base-Updated-At` and wrote the answer's new one into the hidden
-// field; that only ever helped the mover's own tab, and a colleague's move
-// still refused whoever held the form. Both went: no header, no base written.
+// change of the page's settings (`Page::SETTINGS_BASE_IGNORES`). So a move
+// sends no base and writes none: the form's base stays valid in the mover's
+// tab and in a colleague's alike.
 //
 // No generation is handed to `enqueue`: the tree column sits outside
 // `#content` and outlives a frame navigation, so "the page showing as the
@@ -54,6 +51,8 @@ export default class extends Controller {
       holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
+    this.keepFocus = (event) => this.keepFocusThrough(event)
+    document.addEventListener("turbo:before-stream-render", this.keepFocus)
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
     loadSortable().then((Sortable) => {
@@ -95,6 +94,7 @@ export default class extends Controller {
   disconnect() {
     this.loadToken = null
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
+    document.removeEventListener("turbo:before-stream-render", this.keepFocus)
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = null
     delete this.element.dataset.sortable
@@ -126,8 +126,7 @@ export default class extends Controller {
   // hold the queue either.
   //
   // What came back is judged by `sendOrder` (`saving/order_request.js`,
-  // which also says what this used to do with an expired session's sign-in
-  // page):
+  // which also says why an expired session's sign-in page is not rendered):
   // - a Turbo Stream is the endpoint's answer, at any status, and is
   //   rendered: it redraws the whole tree as the server has it, which is
   //   also what undoes the optimistic DOM move of a refused drop;
@@ -282,6 +281,25 @@ export default class extends Controller {
     // its handle so the keyboard user isn't dropped at the top of the page.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
+  }
+
+  // A stream that replaces the whole tree (a frame answer handing over the
+  // tree for the page it opened, `layouts/admin.html.erb`) takes this element
+  // and the focused link with it. A stream inside an HTML answer is not
+  // rendered the way a stream answer is, and Turbo gives no focus back for
+  // it, so the keyboard user would be left on <body>: the focused element's
+  // id is found again in the new tree and focused. Only an element with an
+  // id (the rows' title links) is followed.
+  keepFocusThrough(event) {
+    if (event.target.getAttribute("target") !== this.element.id) return
+    const focused = document.activeElement
+    if (!focused?.id || !this.element.contains(focused)) return
+
+    const render = event.detail.render
+    event.detail.render = async (stream) => {
+      await render(stream)
+      document.getElementById(focused.id)?.focus()
+    }
   }
 
   // Focus leaving the handle. A DOM move (`moved`) blurs it too and refocuses

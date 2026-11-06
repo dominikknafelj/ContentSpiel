@@ -131,6 +131,16 @@
               moves into `#toasts`) instead of in the region below, where it
               would be consumed and dropped. %>
           <%= render Admin::Ui::ToastRegionComponent.new(flash: flash, relay: true) if turbo_frame_request? %>
+          <%# The tree column is outside this frame and outlives a frame
+              navigation, so a frame answer that draws the tree hands it over
+              as a stream: the tree's selection is the page now shown, written
+              by the server as on a full visit. A settings save then redraws
+              the saved page's row alone, and it is the row already selected.
+              `admin--pages--tree#keepFocus` gives the focus back to the link
+              that opened the page. %>
+          <% if turbo_frame_request? && content_for?(:tree) %>
+            <%= turbo_stream.replace("tree") { content_for(:tree) } %>
+          <% end %>
           <%= yield %>
         </turbo-frame>
       </main>
@@ -168,7 +178,7 @@
         do nothing here, and it sits outside every form. %>
     <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
 
-    <%# The one Leave dialog (design pass spec §4; round 3 decision D24):
+    <%# The one Leave dialog (design pass spec §4):
         `admin--saving--save-bar` opens it when a Turbo visit, a link into the content
         frame or Back / Forward would drop unsaved changes. Here, outside
         `#content` and every form, like every dialog.
@@ -197,14 +207,14 @@
         on <body>, which also owns the ⌘K / Ctrl+K shortcut. %>
     <%= render Admin::Shell::CommandPaletteComponent.new %>
 
-    <%# The one media picker (media library Task 8) -- here, outside the
+    <%# The one media picker -- here, outside the
         `#content` frame and every form, so there's exactly one per page
         however many image fields and editors open it, and its own inputs
         never feed an autosave. Renders nothing without `media.upload`
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
 
-    <%# The New page and New post dialogs (design pass round 2, Task 15): once
+    <%# The New page and New post dialogs: once
         each, here, outside `#content` and every form. Every "+ New page" /
         "New post" trigger (tree header and rows, ⌘K, the pages empty state,
         the dashboard, the posts list) opens one of these. Only the SHELL is
@@ -217,8 +227,8 @@
       <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options) %>
     <% end %>
 
-    <%# The rich-text editor's image, YouTube and Page link dialogs (design pass
-        round 2, Task 13): one of each, here for the same reason as the picker
+    <%# The rich-text editor's image, YouTube and Page link dialogs: one of
+        each, here for the same reason as the picker
         -- outside `#content` and every autosave form. The editor that opens
         one is the only one that hears its answer. %>
     <%= render Admin::EditorScreen::RichTextDialogsComponent.new %>

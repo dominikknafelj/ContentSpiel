@@ -49,16 +49,21 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
 
   # A readable page whose parent the viewer can't read is the top of the
   # branch they may read: it is not moved from there (`movable?`), as in the
-  # whole tree.
-  test "a row under a context-only page has no handle, alone as in the tree" do
+  # whole tree. Under a branch grant the row alone counts its children through
+  # the read scope and the tree counts the children it loaded: the one scoped
+  # case in which the two counts could differ, held by the equal markup.
+  test "a row under a context-only page has no handle and counts its children, alone as in the tree" do
     branch = create_page(title: "Branch")
     inside = create_page(title: "Inside", parent: branch)
+    2.times { |index| create_page(title: "Below #{index}", parent: inside) }
+    create_page(title: "Thrown away below", parent: inside).update!(trashed_at: Time.current)
     access_control_groups(:branch_editors).grants.create!(permission: "pages.edit", scope: { "page_ids" => [ inside.id ] })
     access_control_groups(:branch_editors).grants.create!(permission: "pages.move", scope: { "page_ids" => [ inside.id ] })
     Current.actor = users(:editor_branch)
 
     alone = render_inline(Admin::PagesScreen::TreeRowComponent.for_page(inside.reload, selected: inside, locale: "en", url_options: {}))
     assert_no_selector "#tree-row-#{inside.id} .admin-tree-node__handle", visible: :all
+    assert_selector "#tree-row-#{inside.id} [data-child-count]", text: "2", visible: :all
     alone_html = row_html(alone, inside)
 
     whole = render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: inside, locale: "en"))

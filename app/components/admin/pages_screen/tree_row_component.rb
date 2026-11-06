@@ -62,8 +62,8 @@ module Admin
       def self.for_page(page, selected:, locale:, url_options:)
         actor = Current.actor
         AccessControl.preload_branches([ page ])
-        child_count = AccessControl.scope(actor, "pages.read", Page.where(parent_id: page.id)).count
-        parent_context_only = page.parent_id.present? && !AccessControl.scope(actor, "pages.read", Page.where(id: page.parent_id)).exists?
+        child_count = ::PageTree.readable_child_count(page, actor: actor)
+        parent_context_only = ::PageTree.parent_context_only?(page, actor: actor)
         translation_counts = Translations.target_locales.empty? ? {} : Translations::StateIndex.counts_for([ page ]).fetch(page, {})
         loaded = Admin::Slots.load("tree.row.markers", [ page ], viewer: actor)
 
@@ -93,6 +93,10 @@ module Admin
       end
 
       def dom_id = self.class.dom_id(page)
+
+      # The title link's id, by which the focus finds the link again in a
+      # tree drawn afresh (`admin--pages--tree#keepFocus`).
+      def link_id = "tree-link-#{page.id}"
 
       def selected? = page == selected
 

@@ -227,8 +227,8 @@ module Admin
     end
 
     # Moves the page, with its whole branch, to the trash (`Trash::Move`,
-    # trash spec §4.1) -- nothing is deleted from here any more; the
-    # permanent delete is `Trash::Purge`, reachable only from the trash.
+    # trash spec §4.1) -- nothing is deleted from here; the permanent delete
+    # is `Trash::Purge`, reachable only from the trash.
     # `count` is read before the move (`Trash::Move` itself trashes every
     # kept descendant, so counting after would just see them all already
     # gone): it's both the notice's own "and N subpages" and, unlike a

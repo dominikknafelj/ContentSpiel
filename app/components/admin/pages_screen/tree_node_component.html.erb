@@ -5,8 +5,8 @@
       a real SortableJS drop target (`data-admin--pages--tree-target="list"`), so a
       currently-childless page can still receive a dropped page. Except under
       a context-only page (see the component's comment). %>
-  <%# 16px of indent a level (T2; it was 25): 8px to the guide line, the 1px
-      line, 7px to the row. A row's handle stands in exactly that gutter. %>
+  <%# 16px of indent a level (T2): 8px to the guide line, the 1px line, 7px
+      to the row. A row's handle stands in exactly that gutter. %>
   <ul <%= tag.attributes("data-admin--pages--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-2 flex flex-col gap-0.5 border-l border-line pl-[7px]">
     <% children.each do |child| %>
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, selected: selected, locale: locale, url_options: url_options) %>

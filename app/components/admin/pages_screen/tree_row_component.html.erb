@@ -29,7 +29,7 @@
           ANY pointer of the device is coarse (`any-pointer-coarse:`, not
           `pointer-coarse:`, which asks about the first pointer only: on a
           touch-screen laptop that is the mouse, and the finger that cannot
-          hover would never see a handle that until now was always there).
+          hover would never see the handle).
           `focus:` and not `focus-visible:`, because a row
           picked up with Space after a click on its handle must show what
           holds it. Not shown by `opacity` it is still there: in the Tab
@@ -44,7 +44,7 @@
     <% end %>
 
     <%# `title:` is the full name for a row the narrow column truncates. %>
-    <%= link_to title, path, title: title, data: { turbo_frame: "content" },
+    <%= link_to title, path, id: link_id, title: title, data: { turbo_frame: "content" },
           aria: (selected? ? { current: "page" } : {}),
           class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
