@@ -17,6 +17,7 @@ class InstallScriptsTest < ActiveSupport::TestCase
     #!/bin/sh
     { echo CALL; for a in "$@"; do printf '%s\\n' "$a"; done; echo "PWD=$(pwd)"; } >> "$FAKE_LOG"
     [ "$1" = version ] && [ -n "${FAKE_DOCKER_DOWN:-}" ] && exit 1
+    [ "$1" = pull ] && [ -n "${FAKE_DOCKER_PULL_FAILS:-}" ] && exit 1
     exit 0
   SH
 
@@ -110,6 +111,44 @@ class InstallScriptsTest < ActiveSupport::TestCase
       box.wrap("pages")
 
       assert_includes box.run_call.fetch(:args), "#{IMAGE}:stable"
+    end
+  end
+
+  test "upgrade pulls stable, then runs stable and not the pin" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      box.wrap("upgrade")
+
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_not_includes run.fetch(:args).join(" "), "1.2.3"
+      assert_equal %w[contentspiel upgrade], run.fetch(:args).last(2)
+      assert_includes run.fetch(:args), "type=bind,source=#{box.site},target=/site"
+    end
+  end
+
+  test "upgrade stops when the pull fails, and does not run an old stable" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      out, status = box.wrap_raw("upgrade", env: { "FAKE_DOCKER_PULL_FAILS" => "1" })
+
+      assert_equal 1, status.exitstatus
+      assert_includes out, "could not pull"
+      assert_equal 1, box.calls.size
+    end
+  end
+
+  test "upgrade refuses a bad pin before it pulls, and other commands never pull" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "latest\n")
+      _, status = box.wrap_raw("upgrade")
+      assert_equal 1, status.exitstatus
+      assert_empty box.calls
+
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      box.wrap("check")
+      assert_equal [ "run" ], box.calls.map { |call| call.fetch(:args).first }
     end
   end
 
@@ -229,8 +268,8 @@ class InstallScriptsTest < ActiveSupport::TestCase
       Open3.capture2e(env, WRAPPER, *args, chdir: chdir).tap { |_, s| raise "wrapper failed" unless s.success? }
     end
 
-    def wrap_raw(*args, chdir: site)
-      Open3.capture2e(env, WRAPPER, *args, chdir: chdir)
+    def wrap_raw(*args, chdir: site, env: {})
+      Open3.capture2e(env(env), WRAPPER, *args, chdir: chdir)
     end
 
     def install(extra = {})

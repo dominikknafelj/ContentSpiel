@@ -85,6 +85,6 @@ volumes:
   # first mounted from, so a site moved to another version starts from that
   # version's build of the admin's stylesheet and not the last one's.
   builds:
-    name: <%= project %>_builds_<%= version.tr(".", "_") %>
+    name: <%= builds_volume(version) %>
   storage:
   db:

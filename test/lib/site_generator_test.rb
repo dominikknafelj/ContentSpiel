@@ -263,11 +263,11 @@ class SiteGeneratorTest < ActiveSupport::TestCase
     end
   end
 
-  test "upgrade is not available yet and dev is not run inside the image: each says so and ends 1" do
-    %w[upgrade dev].each do |command|
+  test "dev is not run inside the image, and upgrade outside a site's folder is refused: each says so and ends 1" do
+    { "dev" => /not run inside the image/, "upgrade" => /not a site's folder/ }.each do |command, sentence|
       out, status = entrypoint(command)
       assert_equal 1, status.exitstatus, command
-      assert_match(/not (yet available|run inside the image)/, out, command)
+      assert_match(sentence, out, command)
     end
   end
 

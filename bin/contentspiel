@@ -100,10 +100,6 @@ refuse = lambda do |sentence|
   exit 1
 end
 
-# Filled in by later steps of the releases plan; until then each says so
-# rather than pretending.
-not_yet = ->(command) { refuse.("contentspiel #{command} is not yet available in ContentSpiel #{ContentSpiel::VERSION}.") }
-
 command, *arguments = ARGV
 
 case command
@@ -183,7 +179,29 @@ when "dev-files"
   require "bundler/setup"
   files.write.each { |file| puts "Wrote #{file} (ContentSpiel #{ContentSpiel::VERSION})." }
 when "upgrade"
-  not_yet.(command)
+  # Run by the newest image (the wrapper pulls `stable` for this command).
+  # The work is ContentSpiel::Upgrade's, plain Ruby; the application starts
+  # only inside `check`, so a pin that is refused or already current answers
+  # at once. The theme check is the very code `theme:check` runs (the rake
+  # task's `Theme::Check.problems(folder, deep: true)` inside
+  # `ThemeFolder.checking`), in this process, so its problems come back as
+  # data and not as text to parse.
+  refuse.("contentspiel upgrade takes no arguments.") if arguments.any?
+  require File.join(root, "lib/content_spiel/upgrade")
+  theme = File.join(Dir.pwd, ContentSpiel::SiteGenerator::THEME)
+  check = lambda do
+    ThemeFolder.checking { start_application.call }
+    Theme::Check.problems(ThemeFolder.new(theme), deep: true)
+  rescue ThemeFolder::Invalid => error
+    [ error.message ]
+  end
+  begin
+    result = ContentSpiel::Upgrade.new(Dir.pwd, changelog: File.read(File.join(root, "CHANGELOG.md")), check: check).run
+  rescue ContentSpiel::Upgrade::Refused => error
+    refuse.(error.message)
+  end
+  puts result.text
+  exit result.code
 when "dev"
   refuse.("contentspiel dev is not run inside the image: the contentspiel command on your machine runs it, " \
           "from the site's folder (it is the one command that starts containers that keep running).")

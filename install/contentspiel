@@ -15,6 +15,11 @@
 # pin the current folder is. The only network use is the image pull `docker
 # run` does by itself.
 #
+# `upgrade` is the one command that does not run the pin: it pulls
+# `IMAGE:stable` first (so a stale local `stable` is never used) and runs
+# that, because the newest image knows the newest release's notes. The pin is
+# still found, and the site mounted, as for any command.
+#
 # CONTENTSPIEL_IMAGE replaces the image's name (to try a local image).
 set -eu
 
@@ -61,6 +66,17 @@ if [ -n "$site" ]; then
 else
   site=$(pwd -P)
   version=stable
+fi
+
+# `upgrade` runs the newest image, not the pin, and pulls it first: `docker
+# run` pulls an image only when it is missing, and a `stable` left from last
+# month would upgrade to last month's release.
+if [ "${1:-}" = upgrade ]; then
+  version=stable
+  docker pull "$IMAGE:stable" || {
+    echo "contentspiel: could not pull $IMAGE:stable; upgrade needs the network." >&2
+    exit 1
+  }
 fi
 
 # Ask for a terminal only when there is one, or docker refuses to start.

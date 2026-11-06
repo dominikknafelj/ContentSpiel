@@ -224,11 +224,22 @@ class ThemeGeneratorsTest < ActiveSupport::TestCase
     end
   end
 
-  test "upgrade is still not available" do
+  test "upgrade answers without starting the application when the pin is current, refused or given arguments" do
     in_site do |site, _theme|
+      File.write(File.join(site, ".contentspiel-version"), "#{ContentSpiel::VERSION}\n")
+      out, status = entrypoint("upgrade", chdir: site)
+      assert_equal 0, status.exitstatus
+      assert_includes out, "already on ContentSpiel #{ContentSpiel::VERSION}"
+
+      File.write(File.join(site, ".contentspiel-version"), "stable\n")
       out, status = entrypoint("upgrade", chdir: site)
       assert_equal 1, status.exitstatus
-      assert_includes out, "not yet available"
+      assert_includes out, "X.Y.Z"
+      assert_equal "stable\n", File.read(File.join(site, ".contentspiel-version"))
+
+      out, status = entrypoint("upgrade", "now", chdir: site)
+      assert_equal 1, status.exitstatus
+      assert_includes out, "takes no arguments"
     end
   end
 

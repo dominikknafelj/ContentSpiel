@@ -32,6 +32,19 @@ module ContentSpiel
       body.join.strip
     end
 
+    # Every released section with `from` < version <= `to`, oldest first, as
+    # [[version, notes]]. `## Unreleased` is never one (it is no number), and
+    # a heading that is no X.Y.Z is skipped. `contentspiel upgrade` shows
+    # these; the body of each is `notes`'s, so there is one parser.
+    def self.sections_between(changelog, from, to)
+      low = Gem::Version.new(from)
+      high = Gem::Version.new(to)
+      versions = changelog.scan(/^## (\d+\.\d+\.\d+)(?=\s|\z)/).flatten.uniq
+      versions.select { |v| Gem::Version.new(v) > low && Gem::Version.new(v) <= high }
+              .sort_by { |v| Gem::Version.new(v) }
+              .map { |v| [ v, notes(changelog, v) ] }
+    end
+
     def initialize(root, today: Date.today)
       @root = root.to_s
       @today = today

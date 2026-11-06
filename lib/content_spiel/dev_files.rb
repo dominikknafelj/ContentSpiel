@@ -58,6 +58,12 @@ module ContentSpiel
       [ FILE ]
     end
 
+    # The dev stylesheet volume of a version (`compose.yml.tt` names it so).
+    # `contentspiel upgrade` prints the command that removes the old one.
+    def builds_volume(version = ContentSpiel::VERSION)
+      "#{project}_builds_#{version.tr(".", "_")}"
+    end
+
     private
 
     def render
