@@ -162,7 +162,7 @@ A form that raises is logged by its id and the error's class (never its message,
 
 ## CS Studio
 
-**The sidebar** has "Forms" after Media (icon `clipboard_list`, the Form block's) for a holder of either right; `admin_forms_path` is in ⌘K's `JumpHelper::JUMP_ROUTES`.
+**The sidebar** has "Forms" after Media (icon `clipboard_list`, the Form block's) for a holder of either right; `admin_forms_path` is a module, so on ⌘K's `Admin::JumpHelper.routes`.
 
 **The Forms list** (`Admin::FormsController#index`, `Admin::FormsScreen::ListComponent`) opens for a holder of either right (a 403 without both): the card table, by name, with the fields' count, the submissions' count (a link to them, with a warn badge "N NOT DELIVERED"), keeping, where it is placed and when it was changed, and a ⋯ menu for `forms.manage`; "+ New form" opens `NewFormDialogComponent` (a page of its own without JavaScript), whose starter is three fields labelled in the default language from admin keys (`STARTER`, picked by value type) and a mail destination from "Mail to", or keeping when that is empty and the site has keys. The counts are `Forms::SubmissionCounts` and the placements `Forms::Placements.for_forms`, a constant number of statements for the page; nothing reads an answer.
 

@@ -13,7 +13,7 @@ module Admin
   # permission checks and the `settings.updated` event.
   #
   # WHO OPENS IT (decision D9): either `settings.manage` or `languages.manage`
-  # (`MODULES`, and the gate below); each card and its nav link render only for
+  # (`StudioModules`, and the gate below); each card and its nav link render only for
   # the right that owns them (`Admin::SettingsScreen::NavComponent`). Nothing
   # here is guarded per card by a `before_action`: the service enforces the
   # same split, and what the form carries is built from what the viewer may

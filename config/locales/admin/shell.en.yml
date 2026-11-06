@@ -1,13 +1,47 @@
 # CS Studio's shell, the components in `app/components/admin/shell/`
 # (docs/reference/i18n.md). A component's keys are
 # `admin.components.shell.<its class name without Admin::Shell:: and Component, underscored>`.
-# Only the page tree's divider is here so far: the sidebar, the top bar and
-# the palette still hold their English as literals and move here with the
-# shell's own conversion (`CONVERTED` in test/lib/admin_i18n_test.rb).
+# The sidebar and the page tree's divider are converted; the top bar and the
+# palette still hold their English as literals and move here with the rest of
+# the shell (`CONVERTED` in test/lib/admin_i18n_test.rb).
+#
+# `admin.modules` and `admin.module_groups` are the names of the modules
+# registered in `StudioModules` and of the sidebar's groups, one key per
+# module name (`StudioModules::Entry#label`); ⌘K finds a module by the same
+# words.
 en:
   admin:
+    modules:
+      dashboard: "Dashboard"
+      pages: "Pages"
+      posts: "Posts"
+      media: "Media"
+      forms: "Forms"
+      translations: "Translations"
+      tags: "Tags"
+      mind_graph: "Mind graph"
+      trash: "Trash"
+      users: "Users"
+      groups: "Groups"
+      settings: "Settings"
+      ai_assistant: "AI assistant"
+      system_status: "System status"
+      audit_log: "Audit log"
+    module_groups:
+      content: "Content"
+      people: "People"
+      system: "System"
     components:
       shell:
+        sidebar:
+          # The column's accessible name.
+          label: "Modules"
+          # The product's wordmark, drawn in capitals as the brand draws it.
+          wordmark: "CONTENT·SPIEL"
+          # The button that opens ⌘K, and the key that opens it from anywhere.
+          jump: "Jump to…"
+          shortcut: "⌘K"
+          sign_out: "Sign out"
         tree_divider:
           # The separator's accessible name; its value (the width in pixels) is read after it.
           label: "Page tree width"

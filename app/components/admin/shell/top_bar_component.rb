@@ -18,7 +18,7 @@ module Admin
       def drawer_button(label:, controls:, name:, classes: "", &block)
         tag.button(type: "button", aria: { label: label, controls: controls, expanded: "false" },
           data: { action: "admin--shell--drawer#toggle", admin__shell__drawer_name_param: name, admin__shell__drawer_target: "trigger" },
-          class: "cursor-pointer rounded-cs px-2 py-1 text-ink hover:bg-sunken #{classes}", &block)
+          class: "cursor-pointer rounded-button px-2 py-1 text-ink hover:bg-sunken #{classes}", &block)
       end
     end
   end

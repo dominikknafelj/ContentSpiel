@@ -87,7 +87,10 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     end
   end
 
-  # Core components that host a slot: no word "notes" in code or comment.
+  # Core components that host a slot: no word "notes" in code or comment. The
+  # sidebar draws the modules registered in `StudioModules`, the unread count
+  # among them (`config/initializers/studio_modules.rb`); its template is a
+  # named exception for its sign-out form.
   SLOT_HOSTS = %w[
     app/components/admin/editor_screen/header_component.rb
     app/components/admin/editor_screen/header_component.html.erb
@@ -100,6 +103,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_node_component.rb
     app/components/admin/pages_screen/tree_node_component.html.erb
     app/components/admin/posts_screen/table_component.rb
+    app/components/admin/shell/sidebar_component.rb
   ].freeze
 
   # "note" or "notes" at the start of a word or after an underscore, digit, colon or hyphen
@@ -120,8 +124,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       "the section tile's Add note menu item: a slot with the block card's, when a second feature puts an item into a block's menu (the marker is in the slot editor.block.markers)",
     %w[app/components/admin/dashboard_screen/card_component.rb] =>
       "the dashboard's notes cards: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
-    %w[app/components/admin/shell/sidebar_component.rb app/components/admin/shell/sidebar_component.html.erb] =>
-      "the sidebar's unread badge: a slot when a second feature wants a badge on a sidebar entry",
+    %w[app/components/admin/shell/sidebar_component.html.erb] =>
+      "the sign-out form, which has the inbox drop the unsent drafts as the document goes: a slot when a second feature acts on signing out (the badge is a registered module's)",
     %w[app/components/admin/mind_graph_screen/legend_component.rb app/components/admin/mind_graph_screen/legend_component.html.erb] =>
       "the mind graph's open-notes legend and nodes: a slot when a second feature draws on the graph (presence there is out of scope)",
     %w[app/components/admin/media_library/tile_component.rb app/components/admin/media_library/tile_component.html.erb
@@ -132,7 +136,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   }.freeze
 
   test "the editors' header and the media panel do not name notes: they draw their slots" do
-    assert_equal 11, SLOT_HOSTS.size
+    assert_equal 12, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end

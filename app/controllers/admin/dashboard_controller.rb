@@ -2,7 +2,7 @@ module Admin
   # CS Studio's start page (dashboard spec §3-§4, design pass round 2): quick
   # create, the cards "Your drafts", "Going live next" and "Needs
   # translation", and "Recent activity". Open to every signed-in user -- its own
-  # `MODULES` entry (`BaseController::MODULES`) has `permission: nil`, so a
+  # module (`StudioModules`' `:dashboard`) has `permission: nil`, so a
   # user whose groups hold no grants at all (nothing to read, nothing to
   # write) still lands here instead of a 403 the moment they sign in; each
   # list it shows is read-scoped (`Dashboard::Feed`, through

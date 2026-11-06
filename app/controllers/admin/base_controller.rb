@@ -19,61 +19,12 @@ module Admin
     # Helpers for this controller's own use, not actions.
     private(*AccessControlHelper.public_instance_methods)
 
-    # The modules column (cs-studio spec §4.2), in order: each entry is
-    # shown only when the actor holds its `permission` anywhere (`can?`
-    # without a record); `nil` is open to every signed-in user (the
-    # dashboard, CS Studio's home, dashboard spec §3-§4 -- and the AI
-    # assistant screen, which lists and manages the user's own tokens,
-    # spec §5). One list for the sidebar (`admin_modules`) and for where
-    # the Pages index sends someone who can't read pages
-    # (`first_admin_module_path`), so the two can never disagree about
-    # what a user can open -- with Dashboard listed first and always open,
-    # that fallback now always lands on the dashboard.
-    #
-    # A `permission` Array means *any* of them (trash spec §6): the Trash
-    # screen lists whatever the viewer could restore or purge, so it opens
-    # for anyone holding one of the rights that act on a trashed item --
-    # `Admin::TrashController#require_trash_access` gates on the very same
-    # list (`TRASH_PERMISSIONS`).
+    # The rights that open the Trash screen, any one of them (trash spec §6):
+    # it lists whatever the viewer could restore or purge, so it opens for
+    # anyone holding one of the rights that act on a trashed item. The
+    # sidebar's Trash module (`config/initializers/studio_modules.rb`) and
+    # `Admin::TrashController#require_trash_access` share the list.
     TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload forms.manage trash.empty].freeze
-
-    # An entry's optional `if:` is a further condition, a lambda evaluated
-    # per request (`admin_modules`) for what a static `permission` can't
-    # say -- the Translations overview (translation helpers spec §4) only
-    # makes sense with more than one language enabled, which is a runtime
-    # site setting, not a right.
-    #
-    # `group:` is the sidebar section (design pass spec §4, handoff
-    # "StudioSidebar"): Content, People, System. The array's order is the
-    # sidebar's order within a group, and Dashboard stays first overall --
-    # `first_admin_module_path` falls back to `admin_modules.first`, which
-    # must keep landing on an always-open module.
-    MODULE_GROUPS = { content: "Content", people: "People", system: "System" }.freeze
-
-    MODULES = [
-      { label: "Dashboard", icon: :dashboard, path: :admin_root_path, permission: nil, group: :content },
-      { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read", group: :content },
-      { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read", group: :content },
-      { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload", group: :content },
-      # Either right: the list opens for a
-      # holder of `form_submissions.view` as well as `forms.manage`.
-      { label: "Forms", icon: :clipboard_list, path: :admin_forms_path, permission: %w[forms.manage form_submissions.view], group: :content },
-      { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],
-        if: -> { Locales.enabled.size > 1 }, group: :content },
-      { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage", group: :content },
-      # Either read right (pages in the mind graph, spec §2): the screen opens
-      # for someone who may read a page or a post, as its own gate says
-      # (`Admin::MindGraphController#require_graph_access`), so someone with
-      # `pages.read` alone has the link to it.
-      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: %w[pages.read posts.read], group: :content },
-      { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS, group: :content },
-      { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage", group: :people },
-      { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage", group: :people },
-      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: %w[settings.manage languages.manage], group: :system },
-      { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil, group: :system },
-      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view", group: :system },
-      { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view", group: :system }
-    ].freeze
 
     # The rights that make someone a person who runs the site, for the
     # plain-HTTP notice in the shell (`insecure_notice_viewer?`): the one
@@ -99,8 +50,8 @@ module Admin
     # always UTC until now.
     around_action :use_site_time_zone
 
-    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count, :notes_badge_count,
-      :insecure_notice_viewer?
+    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :admin_module_badges,
+      :trash_badge_count, :notes_badge_count, :insecure_notice_viewer?
 
     # A record outside the viewer's scope and a record that doesn't exist
     # answer identically (access-control design spec §3.3) -- now inside the
@@ -135,38 +86,41 @@ module Admin
       Time.use_zone(Current.site.effective_time_zone, &block)
     end
 
-    # The `MODULES` entries this actor may open: `nil` is open to everyone,
-    # otherwise any one of the entry's keys will do -- and an entry with an
-    # `if:` lambda only while it's true.
+    # The modules this actor may see (`StudioModules`), as rows of the shape
+    # the sidebar and ⌘K read: `nil` is open to everyone, otherwise any one
+    # of the entry's keys will do, and an entry with a `visible` condition
+    # only while it holds. Navigation only: each screen gates itself.
     def admin_modules
-      @admin_modules ||= MODULES.select do |entry|
-        (entry[:permission].nil? || holds_any?(entry[:permission])) && (entry[:if].nil? || entry[:if].call)
+      @admin_modules ||= StudioModules.entries.select { |entry| (entry.permission.nil? || holds_any?(entry.permission)) && entry.visible? }.map(&:to_row)
+    end
+
+    # The counts beside the modules this actor sees, by module name, for the
+    # sidebar: one per module with a badge, and none for a module they don't
+    # see, which costs no query.
+    def admin_module_badges
+      admin_modules.select { |row| StudioModules.badged?(row[:name]) }.to_h { |row| [ row[:name], admin_module_badge(row[:name]) ] }
+    end
+
+    # One module's count for this request's actor, asked once per request:
+    # a view that shows the same number (the dashboard's card, the inbox's
+    # "Mark all read") costs nothing more. 0 where the actor doesn't see the
+    # module.
+    def admin_module_badge(name)
+      @admin_module_badges ||= {}
+      @admin_module_badges.fetch(name) do
+        @admin_module_badges[name] = admin_modules.any? { |row| row[:name] == name } ? StudioModules.count(name, viewer: Current.actor) : 0
       end
     end
 
-    # The sidebar's Trash badge (design pass spec §4): how many trashed
-    # items *this viewer* could act on -- the same delete-right scopes the
-    # Trash screen lists with (page branch roots, posts, images;
-    # `Admin::TrashController.badge_count`), so the number matches what
-    # they'd see there. Three COUNTs per CS Studio page load, each on the
-    # indexed `trashed_at`; none at all when the viewer can't open Trash.
-    def trash_badge_count
-      return 0 unless admin_modules.any? { |entry| entry[:path] == :admin_trash_path }
+    # A count the action has read already (the Trash screen's tab counts),
+    # so the sidebar does not ask it again.
+    def known_admin_module_badge(name, count) = (@admin_module_badges ||= {})[name] = count
 
-      # (`Admin::TrashController#index` presets it from its tabs' counts.)
-      @trash_badge_count ||= Admin::TrashController.badge_count(Current.actor)
-    end
+    # The Dashboard's count: the viewer's unread notes (notes spec §5).
+    def notes_badge_count = admin_module_badge(:dashboard)
 
-    # The Dashboard entry's count in the sidebar: the viewer's unread notes
-    # (notes spec §5), on records they may read now. The sidebar is on every
-    # CS Studio page, so this is paid on every page load: exactly one COUNT on
-    # `note_deliveries`, narrowed by the read scope as a subquery and served
-    # by the `(user_id, read_at)` index; none for an answer that renders no
-    # layout. Memoized, so a view that asks too (the dashboard's card, the
-    # inbox's "Mark all read") costs nothing more.
-    def notes_badge_count
-      @notes_badge_count ||= Current.user ? Dashboard::NotesForYou.new(actor: Current.actor).unread_count : 0
-    end
+    # The Trash's count: how many trashed items this viewer could act on.
+    def trash_badge_count = admin_module_badge(:trash)
 
     def holds_any?(keys) = Array(keys).any? { |key| can?(key) }
 

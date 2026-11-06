@@ -456,10 +456,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
     "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
     "app/components/admin/ui/icon_chip_component.rb" => "the accent icon chip, not pressable",
+    "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention"
   }.freeze
 
-  test "the tint with accent words is a secondary button's, a chip's or your own mention, and nothing else" do
+  test "the tint with accent words is a secondary button's, a chip's, your own mention or the current module's row, and nothing else" do
     assert_empty class_offences(TINT_PAIR, allowed: TINT_PAIR_ALLOWED)
   end
 

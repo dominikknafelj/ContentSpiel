@@ -41,7 +41,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
   def row_id(type, record) = "translation-item-#{type}-#{record.id}"
 
   def sidebar_labels
-    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge])").text.strip }
+    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge]):not([aria-hidden])").text.strip }
   end
 
   def row(type, record) = "##{row_id(type, record)}"

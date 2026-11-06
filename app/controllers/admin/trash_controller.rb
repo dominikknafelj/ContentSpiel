@@ -97,10 +97,10 @@ module Admin
       @type = tab_type(params[:type])
       @tab = TABS.key(@type)
       @counts = self.class.counts(Current.actor)
-      # The sidebar's badge is the sum of these same three counts
-      # (`BaseController#trash_badge_count`, memoised in this ivar): hand it
-      # over rather than let the layout count each type a second time.
-      @trash_badge_count = @counts.values.sum
+      # The sidebar's badge is the sum of these same counts
+      # (`BaseController#trash_badge_count`): hand it over rather than let
+      # the layout count each type a second time.
+      known_admin_module_badge(:trash, @counts.values.sum)
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
       # A page past the end shows the "back to page 1" notice and no rows:
       # don't load `offset + 50` records per type just to drop them all.
