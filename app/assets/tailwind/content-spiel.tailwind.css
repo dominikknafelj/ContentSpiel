@@ -788,6 +788,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
     .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
     .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
   }
+  /* The post form (`Admin::EditorScreen::PostFormComponent`) generates no
+     box while docked, so its settings panel and its main column are the
+     grid's items and stand in their two columns. It is `display: contents`
+     and not a grid of its own, because the settings panel must stay inside
+     the one form (one autosave, one base, one unit for the live merge) while
+     it stands in the rail's column, and the rail's other panels (Notes) must
+     stand outside every form, as siblings of the form in the same grid. The
+     card look the form has below the threshold is the main column's here:
+     the settings stand on the rail's ground. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) > #post-form { display: contents; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-post-main { border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: calc(var(--spacing) * 4); }
 }
 /* A section's settings region that `admin--editor--section-choice` moved
    into the Section panel: the panel's padding is its edge and the rail its
