@@ -19,6 +19,13 @@ class Admin::EntryHelpersSystemTest < ApplicationSystemTestCase
     assert_equal admin_page_path(@page), page.current_path
   end
 
+  test "visit_editor returns only after the editor's Sortables are made" do
+    visit_editor(@page)
+
+    assert_selector "section.admin-content-blocks[data-sortable=ready]", wait: 0
+    assert_no_selector "[data-sortable=pending]", wait: 0
+  end
+
   test "visit_editor opens a post's editor, in the language it is given" do
     visit_editor(@post, locale: "de")
 

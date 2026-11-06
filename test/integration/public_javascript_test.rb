@@ -81,6 +81,25 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     assert_includes entry_point_script, %(import "admin")
   end
 
+  # SortableJS is imported with `import()` by the four controllers that drag
+  # (`editor/drag`'s `loadSortable`, the tree, Settings' language rows), and is
+  # `preload: false`: a screen with nothing to drag never fetches it, though
+  # the map still names it for the `import()` to resolve.
+  test "a CS Studio screen with nothing to drag preloads no SortableJS, and the editor fetches it on demand" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    page = create_page(title: "Landing")
+
+    [ "/cs-studio", "/cs-studio/pages/#{page.id}" ].each do |path|
+      get path
+
+      assert_response :success
+      assert modulepreloads.none? { |href| href.include?("sortablejs") }, "SortableJS is modulepreloaded on #{path}: #{modulepreloads.grep(/sortablejs/).inspect}"
+      assert_not_includes entry_point_script, "sortablejs"
+      assert_match(/"sortablejs":\s*"[^"]*sortablejs/, importmap_json, "the import map no longer maps sortablejs")
+    end
+  end
+
   # Mind graph canvas spec §4.5: the graph's modules are imported by its own
   # controller with a dynamic `import()`, and d3-force only by the layout
   # worker, from its asset URL. So no page -- not even the Mind graph itself --
@@ -324,4 +343,6 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
   def modulepreloads = css_select("link[rel=modulepreload]").map { |link| link["href"] }
 
   def entry_point_script = css_select("script[type=module]").map(&:text).join("\n")
+
+  def importmap_json = css_select("script[type=importmap]").map(&:text).join("\n")
 end

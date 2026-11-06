@@ -390,7 +390,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # needed an `await_native_input` handshake here, which is what flaked).
   def await_admin_controllers(wait: 8)
     await_controllers_connected(wait: wait)
+    await_sortables(wait: wait)
     await_live_part(wait: wait)
+  end
+
+  # SortableJS is imported when a controller that drags connects, so a
+  # controller can be connected and its Sortables not yet made: a drag begun
+  # then goes nowhere. Each such controller marks its element
+  # `data-sortable="pending"` from `connect` until its Sortables exist
+  # (`"ready"`); this waits until none is left.
+  def await_sortables(wait: 8)
+    await_js("document.querySelector('[data-sortable=pending]') === null", wait: wait, message: "SortableJS never arrived: [data-sortable=pending] stayed")
   end
 
   # The entry to an editor: visits the page's or the post's editor and waits

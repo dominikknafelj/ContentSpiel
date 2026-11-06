@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import Sortable from "sortablejs"
+import { loadSortable } from "editor/drag"
 
 // Add/remove/reorder rows in a `groups` field (cs-studio spec §4.3), the
 // counterpart to `Admin::Fields::GroupsField`'s markup: `list` wraps the
@@ -19,17 +19,26 @@ export default class extends Controller {
   static targets = ["list", "template", "row"]
 
   connect() {
-    this.sortable = Sortable.create(this.listTarget, {
-      // Only the ⠿ handle starts a drag -- the row's own inputs stay
-      // normal, focusable form fields.
-      handle: ".admin-groups-field__handle",
-      animation: 150,
-      onEnd: () => this.renumber()
+    this.element.dataset.sortable = "pending"
+    loadSortable().then((Sortable) => {
+      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
+      if (!this.element.isConnected || this.sortable) return
+
+      this.sortable = Sortable.create(this.listTarget, {
+        // Only the ⠿ handle starts a drag -- the row's own inputs stay
+        // normal, focusable form fields.
+        handle: ".admin-groups-field__handle",
+        animation: 150,
+        onEnd: () => this.renumber()
+      })
+      this.element.dataset.sortable = "ready"
     })
   }
 
   disconnect() {
     this.sortable?.destroy()
+    this.sortable = null
+    delete this.element.dataset.sortable
   }
 
   // Clones the template, replaces every `__INDEX__` placeholder with the

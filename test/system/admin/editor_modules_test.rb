@@ -126,6 +126,32 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
     assert_equal true, result["collapsed"]
   end
 
+  # The Sortables are made after `import("sortablejs")` resolves, which is
+  # after `connect`. A list that left the document in between (a Turbo visit,
+  # a replaced section) must get none, and the late resolve must throw
+  # nothing: the teardown fails this test on any JavaScript error.
+  test "a controller disconnected before SortableJS arrives creates no Sortable and throws nothing" do
+    result = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("sortablejs").then(async ({ default: Sortable }) => {
+        const section = document.createElement("section")
+        section.setAttribute("data-controller", "admin--editor--blocks")
+        section.innerHTML = '<ul data-admin--editor--blocks-target="list"></ul>'
+        document.body.append(section)
+        const list = section.querySelector("ul")
+        // Stimulus connects in a mutation observer's microtask, and `connect` marks the element pending.
+        let turns = 0
+        while (section.dataset.sortable !== "pending" && turns++ < 1000) await null
+        const seenPending = section.dataset.sortable === "pending"
+        section.remove()
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        done({ seenPending, sortable: Sortable.get(list) ? "made" : "none", mark: section.dataset.sortable || null })
+      }).catch((error) => done({ error: String(error) }))
+    JS
+
+    assert_equal({ "seenPending" => true, "sortable" => "none", "mark" => nil }, result)
+  end
+
   test "the keyboard path's sentences are the locale's words" do
     announcer = "[data-admin--editor--blocks-target=announcer]"
     announced = -> { page.evaluate_script("document.querySelector(#{announcer.to_json}).textContent") }

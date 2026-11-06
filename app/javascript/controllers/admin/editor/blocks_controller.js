@@ -1,7 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
-import Sortable from "sortablejs"
 import { accepts, besideSection, isClosed, refreshMoveState, snapshot } from "editor/containers"
-import { makeCloneInert, sortableOptions } from "editor/drag"
+import { loadSortable, makeCloneInert, sortableOptions } from "editor/drag"
 import { MoveQueue, currentGeneration } from "editor/move_queue"
 import { MenuMoves } from "editor/menu_moves"
 import { KeyboardMoves } from "editor/keyboard_moves"
@@ -56,9 +55,19 @@ export default class extends Controller {
     this.writes = watchWrites(this)
     this.moveStateObserver.observe(this.listTarget, { childList: true })
     this.refreshMoveState()
-    this.sortable = Sortable.create(this.listTarget, {
-      ...this.dragOptions(true),
-      onMove: (event, pointer) => besideSection(event, pointer)
+    this.element.dataset.sortable = "pending"
+    this.sortableLoaded = loadSortable().then((Sortable) => {
+      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
+      if (!this.element.isConnected || this.sortable) return
+
+      this.Sortable = Sortable
+      this.sortable = Sortable.create(this.listTarget, {
+        ...this.dragOptions(true),
+        onMove: (event, pointer) => besideSection(event, pointer)
+      })
+      // The lanes that connected while it was on its way.
+      for (const lane of this.laneTargets) this.makeLane(lane)
+      this.element.dataset.sortable = "ready"
     })
   }
 
@@ -79,10 +88,17 @@ export default class extends Controller {
   // card being dragged would drop that card after its first step. A lane
   // that is back in the document by the time Stimulus says it left is the
   // same lane: it keeps its Sortable, and its observer.
+  //
+  // A lane that connects before SortableJS has arrived is made with the rest
+  // (`connect`): `this.Sortable` is the library once it has.
   laneTargetConnected(lane) {
+    if (this.Sortable) this.makeLane(lane)
+  }
+
+  makeLane(lane) {
     if (this.laneSortables.has(lane)) return
 
-    this.laneSortables.set(lane, Sortable.create(lane, {
+    this.laneSortables.set(lane, this.Sortable.create(lane, {
       ...this.dragOptions((to, _from, dragged) => accepts(to.el, dragged)),
       sort: !isClosed(lane)
     }))
@@ -95,7 +111,7 @@ export default class extends Controller {
 
     // A lane destroyed under a drag that began in it: SortableJS calls no
     // `onEnd` for `destroy()`, so the hold is let go here.
-    if (this.dragging && Sortable.active?.el === lane) { this.dragging = false; this.sayMoving() }
+    if (this.dragging && this.Sortable?.active?.el === lane) { this.dragging = false; this.sayMoving() }
     this.laneSortables.get(lane)?.destroy()
     this.laneSortables.delete(lane)
   }
@@ -108,7 +124,7 @@ export default class extends Controller {
       onStart: () => {
         this.dragging = true
         this.sayMoving()
-        makeCloneInert(Sortable.ghost)
+        makeCloneInert(this.Sortable.ghost)
         this.dragSnapshot = this.snapshot()
       },
       onEnd: (event) => {
@@ -126,6 +142,8 @@ export default class extends Controller {
     this.queue.reset()
     this.sayMoving()
     this.sortable?.destroy()
+    this.sortable = null
+    delete this.element.dataset.sortable
     // The lanes are told to go after this (`laneTargetDisconnected`), which
     // would keep the Sortable of one that is still in a document.
     for (const sortable of this.laneSortables.values()) sortable.destroy()

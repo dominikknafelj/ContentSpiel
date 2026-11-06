@@ -116,6 +116,24 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # One placeholder for a record with no title, everywhere: "(untitled)".
+  # SortableJS is `preload: false` and every user of it imports it inside the
+  # function that makes its Sortables, so a screen with nothing to drag never
+  # fetches it. A static import is fetched at the controller's registration.
+  STATIC_SORTABLE_IMPORT = /^\s*import\s+\w+\s+from\s+["']sortablejs["']/
+
+  test "no script imports SortableJS statically: it is loaded on demand" do
+    offenders = Dir[Rails.root.join("app/javascript/**/*.js")].select { |path| File.read(path).match?(STATIC_SORTABLE_IMPORT) }
+
+    assert_empty offenders.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+  end
+
+  test "the static SortableJS import pattern matches the static form and not import()" do
+    assert_match STATIC_SORTABLE_IMPORT, %(import Sortable from "sortablejs")
+    assert_match STATIC_SORTABLE_IMPORT, %(  import Sortable from 'sortablejs')
+    assert_no_match STATIC_SORTABLE_IMPORT, %(const { default: Sortable } = await import("sortablejs"))
+    assert_no_match STATIC_SORTABLE_IMPORT, %(import("sortablejs").then((m) => m.default))
+  end
+
   test "a blank title reads (untitled), never Untitled" do
     offenders = Dir[Rails.root.join("app/**/*.{rb,erb,js}")].select { |f| File.read(f).match?(/["']Untitled["']/) }
     assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
