@@ -159,7 +159,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 
 **`docs/reference/hosting.md`:**
 
-- `PUBLIC_HOST` (else `SITEMAP_HOST`) is read by `SiteAddress` and by nothing else, and a test sets the address through `with_site_address` only: no guard finds a second reader of the variable or a test that sets `ENV` itself.
+- `PUBLIC_HOST` is read by `SiteAddress` and by nothing else, and a test sets the address through `with_site_address` only: no guard finds a second reader of the variable or a test that sets `ENV` itself.
 - No credential is part of a route's path or query: no guard reads the routes for a new credential in a path.
 - The forms' per-visitor rate limit keys on `request.remote_ip` (an IPv6 address by its /64), which is right only behind proxies Rails trusts: behind a CDN (Cloudflare, `config/deploy.yml`) its published ranges go in `config.action_dispatch.trusted_proxies`, or every visitor shares one counter. **No guard** detects it.
 

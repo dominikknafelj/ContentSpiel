@@ -163,7 +163,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     def boot_production(variables)
       env = {
         "RAILS_ENV" => "production", "SECRET_KEY_BASE_DUMMY" => "1",
-        "PUBLIC_HOST" => nil, "SITEMAP_HOST" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
+        "PUBLIC_HOST" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
         "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil
       }.merge(variables)

@@ -49,9 +49,9 @@ class SiteAddressTest < ActiveSupport::TestCase
   end
 
   test "the message names the variable the value came from and never repeats the value" do
-    error = assert_raises(SiteAddress::Invalid) { SiteAddress.parse("nonsense", source: "SITEMAP_HOST") }
+    error = assert_raises(SiteAddress::Invalid) { SiteAddress.parse("nonsense") }
 
-    assert_equal "SITEMAP_HOST must be the site's address with its scheme, for example https://www.example.org", error.message
+    assert_equal "PUBLIC_HOST must be the site's address with its scheme, for example https://www.example.org", error.message
 
     [ "https://user:hunter2@", "https://user:hunter2@exa mple.org", "https://user:hunter2@host.example:99999" ].each do |value|
       error = assert_raises(SiteAddress::Invalid, value) { SiteAddress.parse(value) }
@@ -170,10 +170,8 @@ class SiteAddressTest < ActiveSupport::TestCase
     assert SiteAddress.parse(nil).frozen?
   end
 
-  test "current reads PUBLIC_HOST before SITEMAP_HOST and is memoised until reset" do
+  test "current reads PUBLIC_HOST and is memoised until reset" do
     with_site_address("https://public.example.org") do
-      ENV["SITEMAP_HOST"] = "https://sitemap.example.org"
-
       assert_equal "https://public.example.org", SiteAddress.current.origin
 
       ENV["PUBLIC_HOST"] = "https://changed.example.org"
@@ -184,18 +182,13 @@ class SiteAddressTest < ActiveSupport::TestCase
     end
   end
 
-  test "a PUBLIC_HOST that is set but blank falls through to SITEMAP_HOST" do
+  test "a PUBLIC_HOST that is set but blank is not configured" do
     [ "", "   " ].each do |blank|
-      with_site_address(blank) do
-        ENV["SITEMAP_HOST"] = "https://sitemap.example.org"
-        SiteAddress.reset!
-
-        assert_equal "https://sitemap.example.org", SiteAddress.current.origin, blank.inspect
-      end
+      with_site_address(blank) { assert_not SiteAddress.current.configured?, blank.inspect }
     end
   end
 
-  test "with neither variable there is no address, and that is not an error" do
+  test "with no variable there is no address, and that is not an error" do
     with_site_address(nil) { assert_not SiteAddress.current.configured? }
   end
 
@@ -204,30 +197,18 @@ class SiteAddressTest < ActiveSupport::TestCase
       error = assert_raises(SiteAddress::Invalid) { SiteAddress.current }
       assert_equal "PUBLIC_HOST must be the site's address with its scheme, for example https://www.example.org", error.message
     end
-
-    with_site_address(nil) do
-      ENV["SITEMAP_HOST"] = "nonsense"
-      SiteAddress.reset!
-
-      error = assert_raises(SiteAddress::Invalid) { SiteAddress.current }
-      assert_equal "SITEMAP_HOST must be the site's address with its scheme, for example https://www.example.org", error.message
-    end
   end
 
-  test "with_site_address puts both variables and the memo back, also when the block raises" do
+  test "with_site_address puts the variable and the memo back, also when the block raises" do
     with_site_address("https://outer.example.org") do
-      ENV["SITEMAP_HOST"] = "https://outer-sitemap.example.org"
-
       assert_raises(RuntimeError) do
         with_site_address("https://inner.example.org") do
           assert_equal "https://inner.example.org", SiteAddress.current.origin
-          assert_nil ENV["SITEMAP_HOST"]
           raise "stop"
         end
       end
 
       assert_equal "https://outer.example.org", ENV["PUBLIC_HOST"]
-      assert_equal "https://outer-sitemap.example.org", ENV["SITEMAP_HOST"]
       assert_equal "https://outer.example.org", SiteAddress.current.origin
     end
   end

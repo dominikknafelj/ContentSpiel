@@ -1,8 +1,7 @@
 require "uri"
 require "ipaddr"
 
-# The site's public address, parsed once from `PUBLIC_HOST` (else
-# `SITEMAP_HOST`, its older name). Everything that must agree about "where
+# The site's public address, parsed once from `PUBLIC_HOST`. Everything that must agree about "where
 # this site lives" (host authorisation, HTTPS, absolute URLs, head tags)
 # reads it here instead of splitting the variable itself.
 #
@@ -29,8 +28,8 @@ class SiteAddress
   DEFAULT_PORTS = { "http" => 80, "https" => 443 }.freeze
   PORTS = (1..65_535)
 
-  # Read in this order; a blank one counts as not there.
-  VARIABLES = %w[PUBLIC_HOST SITEMAP_HOST].freeze
+  # A blank one counts as not there.
+  VARIABLES = %w[PUBLIC_HOST].freeze
 
   attr_reader :host, :port
 

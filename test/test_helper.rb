@@ -30,7 +30,7 @@ end
 # get the theme the test names and not the shell's. The mail variables go too
 # (`MailSettings::ENV_NAMES`): a developer's MAIL_SMTP_SERVER would otherwise
 # point every test's mail at a real server.
-%w[PUBLIC_HOST SITEMAP_HOST THEME_PATH
+%w[PUBLIC_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
    MAIL_SENDER_NAME MAIL_SENDER_ADDRESS].each { |name| ENV.delete(name) }
 
