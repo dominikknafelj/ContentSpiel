@@ -1,0 +1,27 @@
+# The strings of `app/components/admin/pages_screen/`: a row of the page tree
+# (`tree_row`). The translation markers' words name the languages, so a
+# screen reader hears what the tooltip shows a mouse.
+en:
+  admin:
+    components:
+      pages_screen:
+        tree_row:
+          untitled: "(untitled)"
+          context_only: "You can’t open this page"
+          move: "Move %{title}"
+          add_child: "Add a page under %{title}"
+          subpages:
+            one: "%{count} subpage"
+            other: "%{count} subpages"
+          translations:
+            separator: " · "
+            outdated:
+              label:
+                one: "%{count} outdated translation: %{languages}"
+                other: "%{count} outdated translations: %{languages}"
+              tooltip: "%{language}: %{count} outdated"
+            missing:
+              label:
+                one: "%{count} missing translation: %{languages}"
+                other: "%{count} missing translations: %{languages}"
+              tooltip: "%{language}: %{count} missing"

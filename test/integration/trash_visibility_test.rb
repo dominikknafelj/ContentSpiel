@@ -488,6 +488,22 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A settings save answers the saved page's row alone, read for that page
+  # (`TreeRowComponent.for_page`): its child count is of kept children too.
+  test "the tree row a settings save answers with counts kept children only" do
+    sign_in_as users(:one)
+    create_page(title: "Kept child", parent: @kept_page)
+    create_page(title: "Gone child", parent: @kept_page).update!(trashed_at: Time.current)
+
+    patch "/cs-studio/pages/#{@kept_page.id}", as: :turbo_stream,
+      params: { base_updated_at: @kept_page.reload.settings_changed_at.iso8601(6), page: { title: "Kept page, renamed" } }
+
+    assert_response :success
+    row = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='tree-row-#{@kept_page.id}'] template")
+    assert row, "the save answered no row"
+    assert_equal "1", Nokogiri::HTML5.fragment(row.inner_html).at_css("[data-child-count]")&.text
+  end
+
   # The translations matrix keeps a trashed record's `translation_states` rows
   # (a restore needs no work), so only the readers' scopes hide it: not as a
   # row, not in the type filter's counts, not in a language's percentage.

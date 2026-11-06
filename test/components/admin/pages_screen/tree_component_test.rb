@@ -1,7 +1,7 @@
 require "test_helper"
 
 # The page tree's cost profile with translation markers on (final fix wave,
-# I1/T4): the tree is re-rendered after every page-settings autosave, so it
+# I1/T4): the tree is drawn on every editor visit and after every move, so it
 # must cost the same handful of queries however many pages (and blocks) it
 # shows; its markers are one read of the stored `translation_states`.
 class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
@@ -27,23 +27,31 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
   def render_tree = render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, locale: "en"))
 
-  # Every statement sent, cached or not (the same counting the tree's
-  # access-control query test uses): a per-row query shows up either way.
-  def count_queries(&block)
-    count = 0
-    counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
-    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
-    count
+  # The tree asks the database for the pages it draws, never for every page
+  # and every column: a trashed page and a page the viewer may not see are
+  # not loaded at all, and the row reads only `TreeComponent::COLUMNS`.
+  test "the tree reads only kept, visible pages, and only the tree's columns" do
+    kept = create_page(title: "Kept")
+    trashed = create_page(title: "Thrown away")
+    assert Trash::Move.call(trashed).ok?
+    root = root_page.reload
+
+    statements = capture_sql { render_inline(Admin::PagesScreen::TreeComponent.new(root: root, locale: "en")) }
+
+    assert_empty statements.grep(/SELECT "pages"\.\* FROM "pages"/), "the tree read every column of pages"
+    assert statements.any? { |sql| sql.match?(/"pages"\."id" IN/) }, "the tree did not narrow its pages to the visible ids in SQL:\n#{statements.join("\n")}"
+    assert_selector "li[data-page-id='#{kept.id}']"
+    assert_no_selector "li[data-page-id='#{trashed.id}']"
   end
 
   test "the tree with translation markers costs the same queries for 3 pages as for 30" do
     with_locales(%w[en de es], default: "en") do
       add_pages(3, "Small")
       render_tree # warm up whatever a first render loads once
-      small = count_queries { render_tree }
+      small = count_statements { render_tree }
 
       add_pages(27, "Large")
-      large = count_queries { render_tree }
+      large = count_statements { render_tree }
 
       assert_selector "li.admin-tree-node", minimum: 31
       assert_equal small, large, "the tree ran a query per page"
@@ -56,11 +64,11 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     small_pages = add_pages(3, "Small")
     add_notes.(small_pages)
     render_tree # warm up whatever a first render loads once
-    small = count_queries { render_tree }
+    small = count_statements { render_tree }
 
     large_pages = add_pages(27, "Large")
     add_notes.(large_pages)
-    large = count_queries { render_tree }
+    large = count_statements { render_tree }
 
     assert_selector "span[data-notes-marker]", minimum: 30
     assert_equal small, large, "the tree ran a notes query per page"
@@ -77,10 +85,10 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
     mark_all.(add_pages(3, "Small"))
     render_tree # warm up whatever a first render loads once
-    small = count_queries { render_tree }
+    small = count_statements { render_tree }
 
     mark_all.(add_pages(27, "Large"))
-    large = count_queries { render_tree }
+    large = count_statements { render_tree }
 
     assert_selector "span[data-notes-marker]", minimum: 30
     assert_selector "span[data-presence-marker][data-presence-count='2']", count: 30
@@ -253,6 +261,29 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
+  # The tree's SQL read comes in the order the tree is drawn in, and both are
+  # `TreeOrder`'s, which the mind graph and the public branch share: over a
+  # nested tree with a page without a position and two pages of one position,
+  # each parent's children read, sorted by `TreeOrder` and drawn are one list.
+  test "the tree's read, TreeOrder and the drawn tree give each parent's children in one order" do
+    parent = create_page(title: "Parent")
+    children = 4.times.map { |index| create_page(title: "Child #{index}", parent: parent) }
+    create_page(title: "Sibling")
+    children[0].update_columns(position: nil) # version: none (a test takes a position away, as only a half-written row has none)
+    children[3].update_columns(position: children[1].reload.position) # version: none (a test gives two rows one position)
+
+    render_tree
+
+    read = Admin::PagesScreen::TreeComponent.visible_pages(Page.kept.ids).to_a.group_by(&:parent_id)
+    assert_operator read.size, :>=, 2
+    read.each do |parent_id, pages|
+      assert_equal TreeOrder.sort(pages).map(&:id), pages.map(&:id), "the read's order under page #{parent_id}"
+      drawn = page.all("ul[data-parent-id='#{parent_id}'] > li", visible: :all).map { |node| node["data-page-id"].to_i }
+      assert_equal pages.map(&:id), drawn, "the drawn order under page #{parent_id}" if parent_id
+    end
+    assert_equal children.values_at(1, 3, 2, 0).map(&:id), read.fetch(parent.id).map(&:id)
+  end
+
   # A row can be without a position (a half-written one; the column takes
   # NULL). The tree sorted its rows in Ruby by the bare column and raised for
   # it, a 500 for the whole Pages screen, where the public site's menu and
@@ -349,10 +380,10 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
     mark.call(3, "Small")
     render_tree
-    small = count_queries { render_tree }
+    small = count_statements { render_tree }
 
     mark.call(27, "Large")
-    large = count_queries { render_tree }
+    large = count_statements { render_tree }
 
     assert_selector "[data-unpublished-changes]", count: 30
     assert_equal small, large

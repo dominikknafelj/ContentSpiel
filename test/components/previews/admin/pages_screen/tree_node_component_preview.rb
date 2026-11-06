@@ -17,7 +17,7 @@ module Admin
         root = PreviewFixtures.root_page
         children_by_parent = Page.all.to_a.group_by(&:parent_id)
 
-        render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, locale: "en", root: true)
+        render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, locale: "en")
       end
     end
   end

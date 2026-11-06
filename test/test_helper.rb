@@ -167,6 +167,11 @@ module ActiveSupport
       statements
     end
 
+    # How many statements the block runs, cached ones included (a statement
+    # per row shows up either way): the count a "costs the same for 3 as for
+    # 30" test compares.
+    def count_statements(&) = capture_sql(&).size
+
     # Replaces a singleton method (a module function, a class method) for
     # the block's duration, then restores it -- for forcing a failure out of
     # a collaborator the code under test calls.

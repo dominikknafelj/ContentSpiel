@@ -186,6 +186,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/presence/record_controller.js
     app/components/admin/presence_screen/row_marker_component.rb
     app/components/admin/presence_screen/row_marker_component.html.erb
+    app/components/admin/pages_screen/tree_node_component.rb
+    app/components/admin/pages_screen/tree_node_component.html.erb
+    app/components/admin/pages_screen/tree_row_component.rb
+    app/components/admin/pages_screen/tree_row_component.html.erb
     app/javascript/controllers/admin/presence/list_controller.js
     app/components/admin/ui/menu_component.rb
     app/components/admin/ui/menu_component.html.erb

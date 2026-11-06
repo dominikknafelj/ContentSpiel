@@ -193,7 +193,7 @@ export default class extends Controller {
   // neither does a context-only page's list, so ArrowLeft out to a level
   // whose parent is context-only does nothing. (ArrowRight never meets a
   // context-only sibling: a row only has a handle when its parent is a page
-  // the editor can read -- `Admin::PagesScreen::TreeNodeComponent#movable?` -- and every
+  // the editor can read -- `Admin::PagesScreen::TreeRowComponent#movable?` -- and every
   // page under a readable one is readable.) A page can only nest under a
   // *sibling*, never into its own subtree.
   //

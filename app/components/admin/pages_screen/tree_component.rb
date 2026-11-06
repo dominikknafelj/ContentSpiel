@@ -6,12 +6,19 @@ module Admin
     # (`Admin::PagesController`, `Admin::TreeController`) renders this exact
     # same component -- on a normal page load via `content_for :tree`, and
     # again inside a Turbo Stream `replace` after a move -- so there is
-    # exactly one thing "what the tree looks like right now" can mean.
+    # exactly one thing "what the tree looks like right now" can mean. The
+    # tree's shape changes only through a move, a create or a trash; a
+    # settings save changes one page's row and nothing else, so its answer
+    # replaces that row alone (`TreeRowComponent.for_page`, drawing what the
+    # row draws here).
     #
     # `root`'s own children (and their descendants) are preloaded here, in one
     # query, rather than left to each node to call its own `#children`:
     # closure_tree's `#children` is a query per node, which would make
-    # rendering an N-page tree cost N queries instead of one.
+    # rendering an N-page tree cost N queries instead of one. That query asks
+    # for the visible, kept pages only and for the columns the rows read
+    # (`visible_pages`, `COLUMNS`), so a page the viewer can't see or one in
+    # the trash is never loaded at all.
     #
     # Only the pages the actor may see are rendered (access-control design
     # spec §3.3 "The page tree"): the readable ones, plus `context_only`
@@ -55,6 +62,22 @@ module Admin
     # or none the actor may see) there's nothing to hang the tree on, and
     # the empty state shows instead.
     class TreeComponent < AdminComponent
+      # The columns of `pages` the tree reads: the rows (`TreeRowComponent`:
+      # the title, the order, the parent), their state mark
+      # (`TreeStateMarkComponent`, from `Publishing::State`),
+      # `AccessControl.preload_branches` and the `tree.row.markers` loaders.
+      # Nothing else is loaded, so a row that starts reading another column
+      # raises `ActiveModel::MissingAttributeError` in the tree's tests until
+      # the column is named here.
+      COLUMNS = %w[id parent_id position title published_at unpublished_changes_at].freeze
+
+      # The tree's pages: the kept ones among `ids` (the viewer's readable and
+      # context-only pages), with only `COLUMNS`, in the tree's order
+      # (`ORDER BY position, id`, which is `TreeOrder`'s, so each parent's
+      # children come grouped in the order they are drawn). A trashed page is
+      # left out here, in SQL, whatever the ids say.
+      def self.visible_pages(ids) = Page.kept.where(id: ids.to_a).select(*COLUMNS).order(:position, :id)
+
       def initialize(root:, selected: nil, locale:, url_options: {})
         @selected = selected
         @locale = locale
@@ -73,7 +96,7 @@ module Admin
       def load_visible(root)
         visibility = AccessControl.tree_visibility(Current.actor)
         visible_ids = visibility[:readable] | visibility[:context_only]
-        pages = AccessControl.preload_branches(Page.all.to_a.select { |page| visible_ids.include?(page.id) })
+        pages = AccessControl.preload_branches(self.class.visible_pages(visible_ids).to_a)
 
         @context_only_ids = visibility[:context_only]
         @children_by_parent = pages.group_by(&:parent_id)
@@ -95,7 +118,7 @@ module Admin
       def new_page_path = helpers.new_admin_page_path(**url_options)
 
       # "Home and nothing else, counting kept pages" (design pass bug 4); the
-      # cheap checks first, since the tree re-renders after every autosave.
+      # cheap checks first, since the tree is drawn on every editor visit.
       def offer_starter_pages?
         return @offer_starter_pages if defined?(@offer_starter_pages)
 

@@ -206,23 +206,21 @@ module Admin
       end
       streams << refused if refused
 
-      # The tree column lives outside this form entirely (the layout's own
-      # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream
-      # response targeting *this* form's own elements would ever touch it
-      # on its own (final-fixes round, finding 1) -- left alone, a title
-      # edit saved here left the tree showing the page's stale title (and,
-      # since `Admin::PagesScreen::TreeNodeComponent#status` reads straight off the same
-      # `@page`, would go stale the same way for any other autosaved
-      # attribute a later field ever changes what the tree itself renders).
-      # Re-rendered on every successful save here, not just when `title`
-      # itself was actually in this particular PATCH's own params: the tree
-      # render costs a fixed handful of queries however many pages it shows
-      # (`Admin::PagesScreen::TreeComponent`'s own comment; pinned by
-      # test/components/admin/pages_screen/tree_component_test.rb), its translation
-      # markers are one read of the stored `translation_states`, and there's no cheaper way to know
-      # from here whether *this* save happened to be the one that mattered
-      # to it.
-      streams << tree_replace_stream if result.ok?
+      # The tree column lives outside this form (the layout's own `<aside>`,
+      # spec §4.2), so nothing aimed at the form's elements reaches it: the
+      # saved page's row is replaced here, or the tree would keep showing its
+      # old title, state mark and translation markers. Only that row: a
+      # settings save changes nothing of the tree's shape (a page's place is
+      # `TreeOrder`, by position and never by title, so a retitled page stays
+      # where it is), and the shape changes only through a move, a create or
+      # a trash, which redraw the whole tree (`Admin::TreeController#tree_stream`,
+      # a create's and a trash's redirect). A burst of autosaves while someone
+      # types therefore costs one row's fixed handful of statements, however
+      # many pages the site has (test/integration/admin/pages_tree_row_test.rb).
+      # On every successful save, not only when `title` was sent: there is no
+      # cheaper way to know from here whether this save changed what the row
+      # draws.
+      streams << tree_row_stream if result.ok?
       streams.concat(publishing_state_streams(@page)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
@@ -341,17 +339,11 @@ module Admin
       }
     end
 
-    # See `update`'s own comment for why every successful settings-form
-    # save re-renders the tree, not just a title change specifically.
-    # `Admin::TreeController#tree_stream`'s own private method builds the
-    # identical stream (down to the same `root_page` lookup, `BaseController
-    # #root_page`, final-fixes round finding 12) for the drag-to-move
-    # endpoint -- not shared as-is, since that one also replaces
-    # `tree-status` (the move-specific flash line this controller has no
-    # equivalent of), but kept in exact sync with it by hand for the one
-    # line the two do share.
-    def tree_replace_stream
-      turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options))
+    # The saved page's row of the tree, drawn alone and selected, since the
+    # editor that saved it is the page the tree has selected (see `update`).
+    def tree_row_stream
+      turbo_stream.replace(Admin::PagesScreen::TreeRowComponent.dom_id(@page),
+        Admin::PagesScreen::TreeRowComponent.for_page(@page, selected: @page, locale: admin_locale, url_options: admin_url_options))
     end
 
     def redirect_after(result, success:)

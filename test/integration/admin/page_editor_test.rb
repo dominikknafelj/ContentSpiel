@@ -100,15 +100,13 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_match(/SAVED( · NOT PUBLISHED)? \d\d:\d\d/, response.body)
   end
 
-  # Fix (final-fixes round, finding 1): the tree lives outside this form
-  # entirely (the layout's own `<aside>`), so a title autosave has to
-  # explicitly stream a tree replace for the tree's own node to ever pick up
-  # the new title -- nothing about a normal Turbo Stream response targeting
-  # this form's own elements would touch it otherwise.
-  test "autosaving the title also refreshes the tree with the new title" do
+  # The tree lives outside this form (the layout's own `<aside>`), so a
+  # title autosave streams the page's row for the tree to pick up the new
+  # title: nothing aimed at this form's own elements would touch it.
+  test "autosaving the title also refreshes the page's row in the tree with the new title" do
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+    assert_includes response.body, %(<turbo-stream action="replace" target="tree-row-#{@page.id}">)
     assert_includes response.body, "About us"
   end
 

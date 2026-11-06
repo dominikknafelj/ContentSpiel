@@ -34,9 +34,9 @@ import { settle } from "live/state"
 // drawing; this script holds none.
 //
 // THE MARKERS ARE STIMULUS TARGETS, read from the document each time: the
-// tree is replaced as a whole by a Turbo Stream after a move or a save, the
-// posts table with its frame, and a marker kept in a variable would be one
-// that is no longer in the page. When the list's own element is replaced
+// tree is replaced as a whole by a Turbo Stream after a move, a page's row
+// alone after a settings save, the posts table with its frame, and a marker
+// kept in a variable would be one that is no longer in the page. When the list's own element is replaced
 // (the tree's frame is), the old controller hands its clock to the new one
 // (`handover`): the replacement comes from the server with fresh markers
 // and asks nothing by itself, a reading that was owed is still made, and
