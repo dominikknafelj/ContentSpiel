@@ -360,6 +360,18 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     assert_equal ContentModel::BlockTypeDefinition::SUMMARY_LENGTH, BlockTypes::Code::SUMMARY_LENGTH
   end
 
+  test "a preview is cut on grapheme clusters, so a ZWJ emoji at the cut is whole or gone" do
+    family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+    length = ContentModel::BlockTypeDefinition::PREVIEW_LENGTH
+    text = ContentModel::Preview.new(text: ("a" * (length - 2)) + family + "tail").text
+    assert text.end_with?("#{family}…") || text.end_with?("a…"), text.last(8)
+    assert_equal length, text.scan(/\X/).size
+    assert_equal (("a" * (length - 2)) + family + "…"), text
+
+    cut = ContentModel::Preview.new(text: ("a" * (length - 1)) + family + "tail").text
+    assert_equal (("a" * (length - 1)) + "…"), cut
+  end
+
   test "preview is a callable taking the block and locale:, and anything else is refused, the type's name first" do
     d = definition
     assert_nil d.preview

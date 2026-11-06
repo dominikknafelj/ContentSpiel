@@ -9,10 +9,19 @@ module ContentModel
   Preview = Data.define(:heading, :text, :mono) do
     def initialize(heading: nil, text: nil, mono: false)
       super(
-        heading: heading.to_s.strip.truncate(BlockTypeDefinition::SUMMARY_LENGTH).presence,
-        text: text.to_s.strip.truncate(BlockTypeDefinition::PREVIEW_LENGTH).presence,
+        heading: cut(heading, BlockTypeDefinition::SUMMARY_LENGTH),
+        text: cut(text, BlockTypeDefinition::PREVIEW_LENGTH),
         mono: mono ? true : false
       )
+    end
+
+    # Cuts at `length` grapheme clusters, the ellipsis included, so a cut
+    # never splits an emoji sequence or a letter and its accent.
+    def self.cut(value, length)
+      graphemes = value.to_s.strip.scan(/\X/)
+      return graphemes.join.presence if graphemes.size <= length
+
+      graphemes.first(length - 1).join.rstrip + "…"
     end
 
     def blank? = heading.blank? && text.blank?

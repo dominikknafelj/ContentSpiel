@@ -215,6 +215,24 @@ class RichText::DocumentTest < ActiveSupport::TestCase
 
   def heading(text, level = 2) = { "type" => "heading", "attrs" => { "level" => level }, "content" => [ { "type" => "text", "text" => text } ] }
 
+  test "an intro paragraph before a heading leaves no heading, and the text starts with the intro" do
+    preview = doc(para("Intro"), heading("Title"), para("After")).preview
+    assert_nil preview.heading
+    assert_equal "Intro After", preview.text
+  end
+
+  test "blank paragraphs do not hide a leading heading" do
+    preview = doc(para("  "), heading("Title"), para("After")).preview
+    assert_equal "Title", preview.heading
+    assert_equal "After", preview.text
+  end
+
+  test "a body of only a table or an image previews as blank" do
+    table = { "type" => "table", "content" => [ { "type" => "tableRow", "content" => [ { "type" => "tableCell", "content" => [ para("Cell") ] } ] } ] }
+    assert_predicate doc(table).preview, :blank?
+    assert_predicate doc({ "type" => "image", "attrs" => { "src" => "x" } }).preview, :blank?
+  end
+
   test "preview takes the first heading and the text after it, without Markdown" do
     bold = { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Bold", "marks" => [ { "type" => "bold" } ] }, { "type" => "text", "text" => " words" } ] }
     list = { "type" => "bulletList", "content" => [ "one", "two" ].map { |t| { "type" => "listItem", "content" => [ para(t) ] } } }
