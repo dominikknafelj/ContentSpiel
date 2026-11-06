@@ -65,10 +65,14 @@ module Admin
 
       def counter_class = [ "mt-1 text-right text-xs", (over? ? "text-danger-ink" : "text-meta") ]
 
-      # 1rem + 2px: the field's own padding above and below (`py-2`) and its border.
+      # 1rem + 1px: the field's own padding above and below (`py-2`) and its
+      # one border, the well's line underneath (`border-0 border-b` in
+      # `setup_input_class`). The bounds are border boxes, so a change of that
+      # border is a change of these numbers, or the field is a fraction of a
+      # line off six and twenty-four.
       def input_class
         "#{setup_input_class} font-cs-mono text-sm whitespace-pre overflow-auto [tab-size:2] " \
-          "[field-sizing:content] min-h-[calc(6lh+1rem+2px)] max-h-[calc(24lh+1rem+2px)]"
+          "[field-sizing:content] min-h-[calc(6lh+1rem+1px)] max-h-[calc(24lh+1rem+1px)]"
       end
 
       def described_by = (counter_id if counter? && counter_shown?)
