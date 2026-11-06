@@ -1,0 +1,156 @@
+# <%= name %>
+
+A website built with ContentSpiel <%= version %>. This folder holds what makes this site differ from every other: its theme, its deploy configuration and the CMS version it runs on. The CMS itself is not in this folder; it comes from the image `<%= cms_image %>` at the version in `.contentspiel-version`.
+
+Follow the steps below in order. Each step says what to run and what you should see. They are written so that a person at a terminal and an AI tool can both follow them without guessing: do exactly what a step says, and stop at a step whose "You should see" does not match.
+
+## What is in this folder
+
+| Path | What it is |
+|---|---|
+| `theme/` | The site's theme, a copy of the default theme. Change it to change how the site looks. `theme/README.md` says what each folder holds. |
+| `.contentspiel-version` | The CMS version this site runs on, one line. `contentspiel upgrade` changes it. Every `contentspiel` command run in this folder uses this version. |
+| `Dockerfile` | Builds the site's image: the CMS image of that version, plus `theme/`. |
+| `config/deploy.yml` | Kamal's configuration: the server, the registry, the address, the database, the variables. |
+| `config/postgres/` | The script that makes the site's database role and its four databases, on the database's first start. |
+| `.dockerignore` | Lets only `theme/` into the image's build, so no secret file can reach it. |
+| `.kamal/secrets.example` | The names of the secrets the site needs, and how to make each. No value. |
+| `seeds/` | The place for starting content. Nothing reads it yet. |
+| `.gitignore` | Keeps `.kamal/secrets`, `.env*` and `.contentspiel/` out of git. |
+
+You need Docker and the `contentspiel` command on this machine. To deploy you also need Kamal (step 4).
+
+## Step 1. Fill in the placeholders
+
+`config/deploy.yml` starts with three placeholders. Replace each, including its angle brackets, in the lines at the top of that file:
+
+| Placeholder | What to write | Example |
+|---|---|---|
+| `<your-host>` | The site's host name, without `https://`. Only this name is answered. | `www.example.org` |
+| `<your-server-ip>` | The address of the server the site runs on. You reach it as `root` over SSH. | `203.0.113.10` |
+| `<your-registry-user>` | Your user or organisation at the image registry (`ghcr.io` unless you change `registry.server`), in lowercase: an image's name takes no capital letters. | `my-github-user` |
+
+Then check that none is left:
+
+```sh
+grep -nE '<your-[a-z-]+>' config/deploy.yml
+```
+
+You should see: no output. Kamal refuses to run while a placeholder is left, and says which.
+
+If your server is an ARM machine, also change `arch: amd64` to `arch: arm64` under `builder` in `config/deploy.yml`.
+
+Put the folder under git now, if it is not yet. Kamal builds from it and names each version by its commit:
+
+```sh
+git init
+git add .
+git commit -m "A new ContentSpiel site"
+```
+
+## Step 2. Run the site on this machine
+
+```sh
+contentspiel dev
+```
+
+This starts three containers from the site's folder: the CMS <%= version %> in development with `theme/` mounted, the stylesheet watch, and a database of its own (Postgres 17). The first start makes the database and fills it with sample pages and posts, which takes a minute; it is ready when the terminal shows `Listening on http://0.0.0.0:3000`. Leave the terminal open: Ctrl-C stops it all.
+
+Open http://localhost:3000.
+
+You should see: the sample home page, drawn by the theme in `theme/`.
+
+To use CS Studio, the CMS's editor, open http://localhost:3000/cs-studio/sign-in and sign in as `admin@example.com` (an owner, who may do everything) or `author@example.com` (an author), each with the password `password12345`. These accounts and the sample content exist on this machine only: they are made for development and never reach the server, where the setup wizard makes the first account (step 4.2). The sample content is the CMS's own demo, not your site's, and is never deployed.
+
+The database's user and password (`contentspiel`, in `.contentspiel/compose.yml`) are a fixed development value as well: the database has no published port, so only the site's containers reach it, and production never uses them.
+
+Edit a file in `theme/` and reload the page to see the change. A change to `theme/assets/stylesheets/theme.css` is built by the watch within a few seconds; a change to `theme/theme.yml` needs a new start (Ctrl-C, then `contentspiel dev`).
+
+The database is kept between starts. To start again from an empty one, stop the site, then run `docker compose -f .contentspiel/compose.yml down -v` in this folder.
+
+The built stylesheets are kept in a volume named after the site and the CMS version, `<%= name %>-dev_builds_<%= version.tr(".", "_") %>` for this one. After `contentspiel upgrade` the next start makes a new one; the old one is not used again and can be removed: `docker volume ls` lists them, and `docker volume rm <%= name %>-dev_builds_<old version, dots as underscores>` removes one.
+
+On Linux, `contentspiel dev` needs Docker 28 or newer, which keeps a port published on 127.0.0.1 to this machine alone (`docker version` says which you have). Docker Desktop on a Mac or Windows does already.
+
+If the terminal says `THEME_PATH: ... cannot be read`: the containers read `theme/` as their own user (uid 1000), not as you, so every file in it must be readable by everyone and every folder open to everyone (on Linux a strict umask makes them yours alone; Docker Desktop on a Mac does not ask this). Run `chmod -R a+rX theme` and start again.
+
+If port 3000 is taken by another program, stop that program first: the site is always at port 3000.
+
+### Add a section style or a page template
+
+```sh
+contentspiel generate section_style banner "Banner"
+contentspiel generate page_template project "Project"
+```
+
+The first adds a style an editor can pick for a section: an entry in `theme/theme.yml` and the rule `.content-section--style-banner` at the end of `theme/assets/stylesheets/theme.css`, to fill in. The second adds a template an editor can pick for a page: an entry in `theme/theme.yml` and `theme/views/pages/templates/_project.html.erb`, a copy of the Standard template to change. A name is lowercase letters, digits and underscores, a letter first; the label in quotes is what CS Studio shows.
+
+You should see: `Added the section style banner: theme/theme.yml and theme/assets/stylesheets/theme.css.` (or the page template's files), and the next step. Then restart `contentspiel dev`, since `theme/theme.yml` changed.
+
+## Step 3. Check the theme
+
+```sh
+contentspiel check
+```
+
+You should see: one line that ends in `no problems.`
+
+The line starts with `/site/theme:`, the path of this folder's `theme/` inside the container the command runs in, and says how many templates the theme holds: for example `/site/theme: 30 templates, no problems.`
+
+If it lists problems instead, each is numbered, names a file by its path inside `theme/` (`views/pages/templates/_project.html.erb` is `theme/views/pages/templates/_project.html.erb` here), says what is wrong and what to do, and the last line, `/site/theme: 2 problems.`, says how many. A path that starts with `/site/` is this folder. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
+
+## Step 4. Deploy
+
+Install Kamal if you do not have it: `gem install kamal` (it needs Ruby), or follow https://kamal-deploy.org for another way.
+
+### 4.1 The secrets
+
+```sh
+cp .kamal/secrets.example .kamal/secrets
+```
+
+`.kamal/secrets.example` says how to make each value. As copied, each line reads the variable of the same name from your shell, so either export every one of them before you run `kamal`, or change the line to read from your password manager (the file shows how). `.kamal/secrets` is git-ignored: never commit it, and never put a value into any other file of this folder.
+
+Make each value once and keep it. The two database passwords (`CONTENT_SPIEL_DATABASE_PASSWORD`, `POSTGRES_PASSWORD`) and the three encryption keys must never change after the first deploy.
+
+### 4.2 The first deploy
+
+The first time, on a new server:
+
+```sh
+kamal setup
+```
+
+This installs Docker on the server, builds the site's image (it runs `theme:check` while it builds), pushes it, starts Postgres and the site.
+
+You should see, at the end: `Finished all in ... seconds`. Then open `https://<your-host>/setup` (your host name) and enter the setup token, the value of `SETUP_TOKEN`.
+
+### 4.3 Every later deploy
+
+Commit your change, then:
+
+```sh
+kamal deploy
+```
+
+You should see: `Finished all in ... seconds`. The old version keeps running until the new one answers.
+
+If a deploy fails, read the site's log with `kamal app logs`.
+
+## Step 5. Upgrade the CMS
+
+```sh
+contentspiel upgrade
+```
+
+This shows what changed in the CMS between this site's version and the newest release, breaking changes first, checks `theme/` against the new version, and only when the check passes, writes the new version into `.contentspiel-version`. If it lists problems, fix them in `theme/` and run it again; the version is not changed until the theme passes.
+
+Then make a backup of the database (it writes every database to the file `backup.sql` on this machine; keep it like a secret, it holds every page and every account), commit `.contentspiel-version`, and deploy:
+
+```sh
+kamal accessory exec db --reuse --raw "pg_dumpall -U postgres" > backup.sql
+git commit -am "ContentSpiel $(cat .contentspiel-version)"
+kamal deploy
+```
+
+To go back, write the old version into `.contentspiel-version` and deploy again. That is safe only for a release with no migration: the release notes say which ones have one.

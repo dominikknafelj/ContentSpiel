@@ -2,25 +2,24 @@
 # `action_text_rich_texts` and `youtube_embeds` (the `YoutubeEmbed`
 # attachable is replaced by the `youtube` node), plus the Active Storage
 # attachment rows that tied blobs to ActionText records -- the blobs
-# themselves stay: an image the importer converted is now attached to a
-# `MediaAsset` instead (the same blob, re-attached, spec §5).
+# themselves stay.
 #
 # Guarded: `up` refuses to run while any ActionText body with visible
 # content -- text, or an attachment -- belongs to a post/block whose JSON
-# `body` has nothing for that language, i.e. while
-# `rich_text:migrate_from_action_text` hasn't converted it yet. "Nothing"
-# mirrors `RichText::Document#blank?` in SQL (no non-empty text node, no
-# image or youtube node), so a locale an editor left blank in CS Studio
-# still counts as unconverted. Bodies with nothing visible (Trix's empty
-# `<div><br></div>`, markup that's only a script) and rows whose record is
-# gone have nothing to lose and don't block.
+# `body` has nothing for that language, i.e. a body that was never
+# converted. "Nothing" mirrors `RichText::Document#blank?` in SQL (no
+# non-empty text node, no image or youtube node), so a locale an editor
+# left blank in CS Studio still counts as unconverted. Bodies with nothing
+# visible (Trix's empty `<div><br></div>`, markup that's only a script) and
+# rows whose record is gone have nothing to lose and don't block.
 #
-# `FORCE_DROP_ACTION_TEXT=1` skips the guard (fix round 1): a body whose
-# only content is something the importer can't map (a remote attachment, a
-# missing blob, text inside a dropped `<script>`) converts to a blank
-# document, which the guard can't tell apart from "not converted yet" -- so
-# without an override `db:migrate` could refuse forever. The task lists
-# those rows under "Imported blank"; check them, then force the drop.
+# NOTHING CONVERTS THEM ANY MORE. The importer that did
+# (`rich_text:migrate_from_action_text`) was removed before 0.1.0 (CHANGELOG,
+# "Removed"; no site has ActionText bodies), and this migration stays only so
+# that a database that still has the tables migrates. So the refusal says
+# what is left: `FORCE_DROP_ACTION_TEXT=1` skips the guard and DISCARDS every
+# unconverted body with the tables. Without that word `db:migrate` stops here,
+# which is the point: nothing is lost unless someone says so.
 #
 # Plain SQL throughout, not the
 # app's models -- ActionText's models are already gone from the code this
@@ -61,9 +60,10 @@ class DropActionText < ActiveRecord::Migration[8.1]
       end
 
       if unconverted.positive?
-        raise "#{unconverted} ActionText #{"body".pluralize(unconverted)} haven't been converted yet: " \
-          "run bin/rails rich_text:migrate_from_action_text first, then bin/rails db:migrate again " \
-          "(if the task lists them as imported blank and you've checked them, migrate with FORCE_DROP_ACTION_TEXT=1)"
+        raise "Refusing to drop ActionText: #{unconverted} ActionText #{"body".pluralize(unconverted)} " \
+          "#{unconverted == 1 ? "has" : "have"} never been converted, and nothing in this version converts them any more. " \
+          "To drop the tables and discard #{unconverted == 1 ? "that body" : "those bodies"}, run bin/rails db:migrate " \
+          "with FORCE_DROP_ACTION_TEXT=1."
       end
     end
 

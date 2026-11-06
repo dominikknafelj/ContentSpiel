@@ -107,23 +107,13 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     sign_in_via_form(@user, password: NEW_PASSWORD)
   end
 
-  test "the page opened without a token says the link is incomplete and shows no form, and so does the old link" do
+  test "the page opened without a token says the link is incomplete and shows no form" do
     visit admin_edit_password_path
 
     assert_selector "[role=alert]", text: INCOMPLETE
     assert_no_selector FORM
     assert_selector "#{FORM}[hidden]", visible: :all
     assert_no_field "New password"
-
-    # The link as it was mailed before: its token is in the path, and the
-    # server answers with the page and no token.
-    token = @user.password_reset_token
-    visit "/cs-studio/password/#{token}/edit"
-
-    assert_selector "[role=alert]", text: INCOMPLETE
-    assert_no_selector FORM
-    assert_not_includes address, token
-    assert_equal "", token_field.value
 
     press "Send a new link"
     assert_selector "h1", text: "Reset password"

@@ -40,17 +40,12 @@ module Admin
 
     before_action :set_page
 
-    # The "Add block" row (spec §5.1): the new block is appended. `params
-    # [:after_id]`, when present, is which existing block this new one goes
-    # *below* -- read here, not folded into `params[:block]`, since it's this
-    # controller's own insertion instruction, not a column `ContentBlocks
-    # ::Save` assigns. No view sends it any more (the between-cards pickers
-    # are gone; Duplicate has its own route), but it stays honoured so a
-    # client that wants "insert below" has one.
+    # The "Add block" row (spec §5.1): the new block is appended.
     #
     # The "+" at the end of a section's lane (sections spec §4.2) posts here
-    # too, with `section_id` and `column` -- read beside `params[:block]` for
-    # the same reason `after_id` is. The section is looked up among this
+    # too, with `section_id` and `column` -- read beside `params[:block]`,
+    # since they are this controller's own insertion instruction, not a
+    # column `ContentBlocks::Save` assigns. The section is looked up among this
     # page's blocks, so another page's is as gone as a deleted one: both are
     # refused before the service is asked, with the words a move into a
     # missing section gets (`ContentBlocks::Reorder::NO_COLUMN`). Everything
@@ -87,8 +82,7 @@ module Admin
       elsif section
         render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section), *publishing_state_streams(@page) ], status: :created
       else
-        reposition_after(result.record, params[:after_id])
-        render turbo_stream: [ *insertion_stream(result.record, params[:after_id]), *publishing_state_streams(@page) ], status: :created
+        render turbo_stream: [ *insertion_stream(result.record), *publishing_state_streams(@page) ], status: :created
       end
     end
 
@@ -158,8 +152,8 @@ module Admin
     # exists.
     #
     # A section has two deletes (sections spec §3.3, §4.1), and which one is
-    # asked for is said beside the request, in `keep_blocks`, as `after_id`
-    # and `section_id` are for an add: with it, the blocks are lifted to the
+    # asked for is said beside the request, in `keep_blocks`, as `section_id`
+    # is for an add: with it, the blocks are lifted to the
     # page's own list where the section stood ("Remove section, keep
     # blocks"); without it they go with the section, which the dialog in
     # front of that request has said, with their number. The parameter means
@@ -276,10 +270,8 @@ module Admin
     # Duplicate (spec §5.1; sections spec §3.3): `ContentBlocks::Duplicate`
     # makes the copy -- of a section, with every block in it -- and puts it
     # directly after its source; what is copied is said there. The copy's
-    # card is inserted after the source's the same way `create`'s own
-    # `after_id` does -- `after_id: source.id` here is always present,
-    # unlike `create`'s (which is only sometimes given), so this never
-    # falls back to appending at the end. A section's card comes with its
+    # card is inserted right after the source's (`insertion_stream` with the
+    # source), so this never falls back to appending at the end. A section's card comes with its
     # lanes, tiles and forms (`card_for`).
     #
     # The copy of a block in a column is in that column, and is drawn there
@@ -292,7 +284,7 @@ module Admin
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
       copy = result.record
-      streams = copy.section_id ? copy_tile_streams(copy, source) : insertion_stream(copy, source.id)
+      streams = copy.section_id ? copy_tile_streams(copy, source) : insertion_stream(copy, source)
       render turbo_stream: [ *streams, *publishing_state_streams(@page) ], status: :created
     end
 
@@ -760,28 +752,9 @@ module Admin
       definition.uses_columns.each_with_object(fields) { |column, hash| hash[column] = [ column ] }
     end
 
-    # Appends `block.id` right after `after_id` in the page's current block
-    # order, then persists that through `ContentBlocks::Reorder` -- for
-    # `create`'s "add between two cards", its only caller: a duplicate
-    # places its copy itself, inside its own transaction (`ContentBlocks
-    # ::Duplicate#place_after_source`), so that a placement that fails
-    # leaves no copy behind. A blank `after_id` (the end-of-list picker, or
-    # a `create` with none given) leaves the block exactly where
-    # `ContentBlocks::Save#assign_position` already appended it, so there's
-    # nothing here to do.
-    def reposition_after(block, after_id)
-      return if after_id.blank?
-
-      ordered = top_level_blocks.ids
-      ordered.delete(block.id)
-      index = ordered.index(after_id.to_i)
-      ordered.insert(index ? index + 1 : ordered.length, block.id) # version: none (Array#insert, no SQL)
-      ContentBlocks::Reorder.call(@page, ordered)
-    end
-
-    # Where the new card's own Turbo Stream lands: right after the card it
-    # was added below (an `after_id`, which Duplicate always has), or appended
-    # to the list (the "Add block" row, or a stale/blank `after_id`).
+    # Where the new card's own Turbo Stream lands: right after `after`, the
+    # card it was copied from (Duplicate), or appended to the list (the "Add
+    # block" row, which gives none).
     #
     # The card is rendered knowing whether it is now first and/or last (its
     # Move up / Move down start disabled accordingly). Its neighbours are not
@@ -791,9 +764,9 @@ module Admin
     # --blocks#refreshMoveState`, which runs whenever the list's children
     # change. (Re-rendering a neighbour would also throw away whatever its
     # editors held, an unsaved field included.)
-    def insertion_stream(block, after_id)
+    def insertion_stream(block, after = nil)
       ordered = top_level_blocks.to_a
-      after_block = after_id.present? ? ordered.find { |candidate| candidate.id == after_id.to_i } : nil
+      after_block = after && ordered.find { |candidate| candidate.id == after.id }
       card = card_for(block, first: ordered.first&.id == block.id, last: ordered.last&.id == block.id)
 
       [ after_block ? turbo_stream.after(ActionView::RecordIdentifier.dom_id(after_block), card) : turbo_stream.append("content-blocks-list", card) ]

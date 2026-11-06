@@ -8,10 +8,9 @@
 
 # Absolute URLs are required by the sitemap protocol, and nothing in a Rails
 # app knows the canonical public host, so it is supplied by the environment:
-# `PUBLIC_HOST`, the site's address (`SiteAddress`, docs/reference/hosting.md),
-# or `SITEMAP_HOST`, its older name, read when the first is not set.
+# `PUBLIC_HOST`, the site's address (`SiteAddress`, docs/reference/hosting.md).
 # The default is the placeholder sitemap_generator's own installer writes: a
-# sitemap generated with neither set is obviously wrong rather than
+# sitemap generated with it unset is obviously wrong rather than
 # quietly pointing at localhost. `PublicSite::Urls.default_host` is the same
 # fallback chain `Urls#url_for` uses everywhere else, so a URL built here and
 # one built for, say, an MCP response never disagree about the host.

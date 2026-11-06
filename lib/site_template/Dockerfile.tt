@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom
+#
+# This site's image: the ContentSpiel image of the pinned version plus this
+# site's theme. Kamal builds it (config/deploy.yml, `builder`), and hands it
+# the version from the file .contentspiel-version. By hand, from this folder:
+#
+#   docker build --build-arg CMS_VERSION=$(cat .contentspiel-version) -t <%= name %> .
+
+# The CMS image this site is built on. Both are build arguments:
+#   CMS_IMAGE    the image's name in the registry, without a tag
+#   CMS_VERSION  its tag: the release in .contentspiel-version. No default on
+#                purpose: a build without it stops here, so a site is never
+#                built on "whatever is newest". (That is also why the check
+#                InvalidDefaultArgInFrom is skipped above.)
+ARG CMS_IMAGE=<%= cms_image %>
+ARG CMS_VERSION
+FROM ${CMS_IMAGE}:${CMS_VERSION}
+
+# No USER line: the CMS image ends as uid 1000 and /rails belongs to it.
+# --chown is what makes the copied files readable by that user.
+
+# The theme sits beside the application, never inside it and never as a
+# mounted volume: the stylesheet and the digested assets are made below, at
+# build time. Only theme/ is copied, and .dockerignore lets nothing else of
+# this folder into the build at all: a file to copy in must be allowed there.
+ENV THEME_PATH=<%= theme_path %>
+COPY --chown=1000:1000 theme/ <%= theme_path %>/
+
+# 1. theme:check first: it lists every problem of the folder in sentences.
+#    The precompile would stop at the first one, with a trace.
+# 2. assets:clobber: takes the default theme's digested files away.
+# 3. assets:precompile: builds the stylesheet for THIS theme and stamps it.
+#    Production does not start with a stylesheet built for another theme.
+# SECRET_KEY_BASE_DUMMY=1: each command starts production, and a build has
+# no secret. No database is needed.
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails theme:check && \
+    SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:clobber assets:precompile

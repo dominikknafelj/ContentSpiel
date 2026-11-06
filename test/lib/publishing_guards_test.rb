@@ -150,7 +150,7 @@ class PublishingGuardsTest < ActiveSupport::TestCase
   CONTENT_WRITERS = %w[
     app/services/content_blocks/**/*.rb app/services/tags/**/*.rb app/services/pages/**/*.rb app/services/posts/**/*.rb
     app/services/translations/**/*.rb app/services/trash/**/*.rb app/services/locales/**/*.rb app/services/publishing/**/*.rb
-    app/models/page/**/*.rb app/models/rich_text/action_text_import.rb app/models/access_control/seeds.rb
+    app/models/page/**/*.rb app/models/access_control/seeds.rb
   ].freeze
   MARKS = /\.touch\b|\bPublishing\.note_change\(/
   NO_CHANGE = /changes:\s*none\s*\((?<reason>[^)]{10,})\)/

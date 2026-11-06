@@ -1,5 +1,13 @@
 #!/bin/bash -e
 
+# `contentspiel ...` (bin/contentspiel) is a site's command, run by the
+# wrapper a person installs, as the host's uid and with the site's folder as
+# the working directory. It needs no database and must not touch one: it is
+# handed over before anything else, with no `db:prepare`.
+if [ "${1:-}" == "contentspiel" ]; then
+  exec "${@}"
+fi
+
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare

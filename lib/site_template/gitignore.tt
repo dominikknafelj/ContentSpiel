@@ -1,0 +1,13 @@
+# Kamal's secrets, with their values: never committed.
+# .kamal/secrets.example, which holds names only, is.
+.kamal/secrets
+.kamal/secrets-common
+.kamal/secrets.*
+!.kamal/secrets.example
+
+# Environment files.
+.env*
+
+# What `contentspiel dev` writes for itself (the compose file of the pinned
+# version). It is written again at every start.
+.contentspiel/

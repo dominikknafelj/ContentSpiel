@@ -14,7 +14,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    # The end-of-list picker (`after_id` absent) is open by default -- no
+    # The end-of-list picker is open by default -- no
     # disclosure click needed before its own type buttons are visible.
     # Every button here is a plain `button_to` (`Admin::EditorScreen::BlockPickerComponent`'s
     # own comment): Turbo Drive already appends the Turbo Stream `Accept`

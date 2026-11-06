@@ -102,22 +102,19 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
     assert_empty @exporter.finished_spans.map(&:name)
   end
 
-  # The two routes that carried a password-reset token in their path. The
-  # word standing for the token is no valid token, which is beside the point:
-  # the path is recorded before anybody asks whether it is one. Every
-  # attribute, name and event of every span of the request is read, so an
-  # instrumentation that starts to write the path somewhere new fails here.
-  test "no span of a request to a reset address carries the token" do
+  # A token handed to the reset page in its query string, which the page
+  # ignores. The word standing for the token is no valid token, which is
+  # beside the point. Every attribute, name and event of every span of the
+  # request is read, so an instrumentation that starts to write the query
+  # somewhere new fails here.
+  test "no span of a request to a reset address carries a token handed in its query" do
     word = "not-a-real-token-0123456789"
 
-    get "/#{ContentSpiel::ADMIN_PATH}/password/#{word}/edit?from=mail"
-    patch "/#{ContentSpiel::ADMIN_PATH}/password/#{word}", params: { password: "x", password_confirmation: "x" }
+    get "/#{ContentSpiel::ADMIN_PATH}/password/edit?token=#{word}"
+    post "/#{ContentSpiel::ADMIN_PATH}/password/check", params: { token: word }
 
     spans = @exporter.finished_spans
-    paths = spans.filter_map { |span| span.attributes&.[]("url.path") }
-    assert_includes paths, "/#{ContentSpiel::ADMIN_PATH}/password/[FILTERED]/edit"
-    assert_includes paths, "/#{ContentSpiel::ADMIN_PATH}/password/[FILTERED]"
-
+    assert_not_empty spans
     spans.each do |span|
       written = [ span.name, span.attributes.to_a, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.join(" ")
       assert_not_includes written, word, "span #{span.name.inspect} carries the token"

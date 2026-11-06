@@ -48,11 +48,10 @@ class Admin::EditorScreen::BlockPickerComponentTest < ViewComponent::TestCase
     assert_no_selector "#block-picker-end, .admin-block-picker", visible: :all
   end
 
-  test "sends no after_id: a new block is appended, and can be moved" do
+  test "offers no between-cards picker: a new block is appended, and can be moved" do
     page = create_page(title: "Picker test")
     render_inline Admin::EditorScreen::BlockPickerComponent.new(page: page, locale: "en")
 
-    assert_no_selector "input[name='after_id']", visible: :all
     assert_no_selector "[id^='block-picker-after-']", visible: :all
     assert_no_selector "details", visible: :all
   end

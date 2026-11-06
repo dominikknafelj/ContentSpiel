@@ -3,9 +3,10 @@ require Rails.root.join("db/migrate/20260928040000_drop_action_text").to_s
 
 # The safety net on `DropActionText#up` (design spec §5): it refuses to drop
 # `action_text_rich_texts` while any ActionText body with visible content
-# still has nothing to show for it in the record's JSON `body`, so running
-# `db:migrate` before `rich_text:migrate_from_action_text` can't lose
-# content. The test database no longer has ActionText's tables (this
+# still has nothing to show for it in the record's JSON `body`, so
+# `db:migrate` can't lose content unless told to. Nothing converts such a
+# body any more (the importer is gone), so the refusal says that, and that
+# FORCE_DROP_ACTION_TEXT=1 discards it. The test database no longer has ActionText's tables (this
 # migration already ran against it), so each test recreates them inside its
 # own transaction -- Postgres DDL is transactional, so they're rolled back
 # with everything else.
@@ -42,12 +43,16 @@ class DropActionTextMigrationTest < ActiveSupport::TestCase
 
   def migrate_up = ActiveRecord::Migration.suppress_messages { DropActionText.new.migrate(:up) }
 
-  test "refuses to drop ActionText while a body with content hasn't been imported" do
+  test "refuses to drop ActionText while a body with content was never converted, and says nothing converts it and how to discard it" do
     insert_body(@post, "<p>Not imported yet</p>")
 
     error = assert_raises(StandardError) { migrate_up }
 
-    assert_includes error.message, "run bin/rails rich_text:migrate_from_action_text first"
+    assert_includes error.message, "Refusing to drop ActionText: 1 ActionText body has never been converted"
+    assert_includes error.message, "nothing in this version converts them any more"
+    assert_includes error.message, "discard that body"
+    assert_includes error.message, "FORCE_DROP_ACTION_TEXT=1"
+    assert_not_includes error.message, "rich_text:migrate_from_action_text", "no task to run is named: it is gone"
     assert connection.table_exists?(:action_text_rich_texts)
   end
 
@@ -57,16 +62,10 @@ class DropActionTextMigrationTest < ActiveSupport::TestCase
     assert_raises(StandardError) { migrate_up }
   end
 
-  # Fix round 1 (I1): a body whose only content can't be mapped imports as
-  # blank, which the guard can't tell from "never converted" -- the task
-  # lists it, and FORCE_DROP_ACTION_TEXT=1 is the way past the guard. Runs
-  # the real task (and its SQL source) against the recreated table.
+  # A body nothing has converted blocks the drop, and
+  # FORCE_DROP_ACTION_TEXT=1 is the way past the guard, discarding it.
   test "an unmappable body blocks the drop until FORCE_DROP_ACTION_TEXT=1" do
     insert_body(@post, %(<action-text-attachment content-type="image/png" url="https://cdn.example/x.png"></action-text-attachment>))
-
-    out = StringIO.new
-    RichText::ActionTextImport.new(out: out).run
-    assert_match(/Imported blank \(1\).*\n  Post##{@post.id} \(en\)/, out.string)
 
     error = assert_raises(StandardError) { migrate_up }
     assert_includes error.message, "FORCE_DROP_ACTION_TEXT=1"

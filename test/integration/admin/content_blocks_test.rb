@@ -715,19 +715,6 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_nil card.at_css("button[data-move='up'][disabled]")
   end
 
-  test "after_id is still honoured by create: the card lands right after that block" do
-    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
-    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
-
-    post blocks_path, params: { block: { block_type: "rich_text" }, after_id: first.id }, as: :turbo_stream
-    assert_response :success
-
-    added = (@page.content_blocks.reload.to_a - [ first, second ]).sole
-    assert_equal [ first, added, second ], @page.content_blocks.to_a
-    assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
-    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
-  end
-
   test "duplicating a block streams the copy in right after the source and replaces no other card" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)

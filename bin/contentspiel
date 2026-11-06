@@ -1,0 +1,257 @@
+#!/usr/bin/env ruby
+# contentspiel: the image's entrypoint for everything a site does with the CMS
+# (releases spec, "The wrapper and the image").
+#
+# THE PROMISE. The frozen wrapper a person installs (install/contentspiel)
+# runs, from the site's folder,
+#
+#   docker run --rm -i [-t] --user "$(id -u):$(id -g)" \
+#     --mount 'type=bind,"source=<the site>",target=/site' -w /site \
+#     <image>:<version> contentspiel ARGS...
+#
+# and relies on these, all of them and nothing else (CHANGELOG.md, "A
+# promise: the entrypoint"; docs/reference/hosting.md, "The wrapper's one
+# promise"):
+# - an executable named `contentspiel` on the image's PATH (the Dockerfile
+#   puts /rails/bin there), taking the arguments exactly as they were typed;
+# - the site's folder mounted at /site, which is the working folder;
+# - the subcommand `dev-files`, which writes `.contentspiel/compose.yml` into
+#   the site: the wrapper's `dev` runs it, then `docker compose -f
+#   .contentspiel/compose.yml up`;
+# - the image tags: `X.Y.Z` for a release (what a pin names) and `stable` for
+#   the newest, and `upgrade` as the command the wrapper runs from `stable`
+#   (it pulls it first), as it runs every command outside a site.
+# Keep them, and every wrapper ever installed stays valid; change one, and it
+# is a breaking change, whatever the tests here say, since they read this
+# side and today's wrapper and not the wrappers already installed. Every
+# command lives here, in the image, so a site's tools are always its pinned
+# version's.
+#
+# WHO RUNS IT. The host's uid and gid, 501:20 on a Mac, and not the image's
+# user 1000: so that what it writes into /site belongs to the person, as if
+# they had written it. That user has no entry in /etc/passwd, so HOME is `/`
+# or nothing, and /rails (owned by 1000) is read-only to it. Hence:
+# - HOME is set to /tmp when it is no writable folder, for Bundler and for
+#   anything else that wants a home;
+# - Bootsnap reads the cache the image build made and writes none
+#   (BOOTSNAP_READONLY), when /rails/tmp/cache cannot be written;
+# - nothing is written into /rails; the only files written are the site's,
+#   under the current folder.
+#
+# NO DATABASE. bin/docker-entrypoint hands a `contentspiel` command straight
+# over, without `db:prepare`, and no command here connects to one.
+#
+# THE APPLICATION IS STARTED ONLY WHEN A COMMAND NEEDS IT. `--version`,
+# `help`, `dev-files` (ERB and no more) and a refusal are plain Ruby and
+# answer at once. `generate` starts it after judging the arguments and the
+# folder (the declarations' rules are application code); `check` hands the
+# process over to `bin/rails theme:check`, which starts it. `new` judges the
+# name and the folder first (ContentSpiel::SiteGenerator is plain Ruby until
+# it writes), then starts the application, because the theme it writes is
+# `theme:new`'s (`Theme::Scaffold`), which reads the theme contract, which is
+# application code. It starts the application from /rails and writes by
+# absolute path into the folder it was started in. In the image that is
+# production, with SECRET_KEY_BASE_DUMMY (no secret is needed to copy files,
+# as none is to build assets) and the log at fatal, so the boot's own lines
+# do not bury what the command says.
+#
+# Exit codes: 0 done; 1 refused or failed, with a sentence that says why;
+# 2 no such command, with the usage.
+
+root = File.expand_path("..", __dir__)
+
+home = ENV["HOME"].to_s
+ENV["HOME"] = "/tmp" unless !home.empty? && File.directory?(home) && File.writable?(home)
+
+# Bundler is set up BEFORE anything else is required, for every command. The
+# files below (and the standard library they load: fileutils, tmpdir, time,
+# date, json, psych) can activate a default gem at its bundled version, and
+# Bundler then refuses to activate the Gemfile.lock's newer one ("You have
+# already activated date 3.4.1, but your Gemfile requires ..."). It showed on
+# a runner whose Ruby ships an older `date` than the lockfile; the image
+# could meet the same. Setting up first puts the locked versions on the load
+# path before any of them is read.
+ENV["BUNDLE_GEMFILE"] ||= File.join(root, "Gemfile")
+require "bundler/setup"
+
+require File.join(root, "lib/content_spiel/version")
+require File.join(root, "lib/content_spiel/site_generator")
+
+USAGE = <<~TEXT.freeze
+  Usage: contentspiel COMMAND [ARGUMENTS]
+
+  ContentSpiel #{ContentSpiel::VERSION}. Run in a site's folder, a command uses the
+  version in its .contentspiel-version; anywhere else, the newest release.
+
+  Commands:
+    new NAME       Write a new site into the folder NAME, here: its theme, its
+                   Dockerfile, its Kamal configuration and a README to follow.
+    generate       Add a piece to the theme: generate section_style NAME "Label",
+                   or generate page_template NAME "Label".
+    check          Say what is wrong with the site's theme/, or that nothing is.
+    dev            Run the site on this machine, with its theme and a database.
+    upgrade        Show what the newest release changes, check the theme
+                   against it, and move the site to it.
+    dev-files      Write the files `dev` runs (the wrapper runs it for `dev`).
+    --version      Print this CMS version.
+    help           Print this.
+
+  A refusal or failure is a sentence on stderr and exit 1; a result is on stdout.
+TEXT
+
+# What a process started from /rails needs to start the application here:
+# set in this process, so a `bin/rails` it starts inherits it too.
+boot_environment = lambda do
+  if (ENV["RAILS_ENV"] || ENV["RACK_ENV"]) == "production"
+    ENV["SECRET_KEY_BASE_DUMMY"] ||= "1"
+  end
+  # fatal: production logs to the terminal, and loading the application
+  # logs a line for each partial its template digests cannot follow, at
+  # error, hundreds of them. A boot that fails raises, and that is printed
+  # whatever the level.
+  ENV["RAILS_LOG_LEVEL"] ||= "fatal"
+  cache = File.join(root, "tmp/cache")
+  writable = File.exist?(cache) ? File.writable?(cache) : File.writable?(File.join(root, "tmp"))
+  ENV["BOOTSNAP_READONLY"] ||= "1" unless writable
+end
+
+# The application, started from /rails. Once per process.
+start_application = lambda do
+  boot_environment.call
+  Dir.chdir(root) { require File.join(root, "config/environment") }
+end
+
+refuse = lambda do |sentence|
+  warn sentence
+  exit 1
+end
+
+command, *arguments = ARGV
+
+case command
+when "--version", "-v", "version"
+  puts ContentSpiel::VERSION
+when "help", "--help", "-h"
+  puts USAGE
+when "new"
+  refuse.("Say which: contentspiel new NAME, for example contentspiel new my-site") if arguments.empty?
+  refuse.("contentspiel new takes one name, and was given #{arguments.size}: #{arguments.join(" ")}") if arguments.size > 1
+
+  name = arguments.first
+  # The name as typed first: `a/b` or `../x` is no name, though the path
+  # made of it would end in one.
+  reason = ContentSpiel::SiteGenerator.name_refusal(name)
+  refuse.(reason) if reason
+  generator = ContentSpiel::SiteGenerator.new(File.join(Dir.pwd, name))
+  reason = generator.refusal
+  refuse.(reason) if reason
+
+  start_application.call
+  begin
+    generator.write
+  rescue ContentSpiel::SiteGenerator::Refused, Theme::Scaffold::Refused => error
+    refuse.(error.message)
+  rescue SystemCallError => error
+    # The folder can't be written (no permission, a full disk, a read-only
+    # mount): one sentence, not a stack trace. The generator has removed
+    # whatever it had written. The system's own words, without Ruby's
+    # "@ function - path" part, which names a hidden temp folder.
+    refuse.("Could not write the site #{name}/ here: #{error.message.sub(/ @ .*\z/m, "")}. " \
+            "Check that this folder can be written, then run contentspiel new again.")
+  end
+  puts "Wrote the site #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."
+  puts "Next: cd #{name}, then follow README.md, from step 1: fill in the placeholders at the top of config/deploy.yml."
+when "generate"
+  # The theme is the site's theme/, from the site's root (the wrapper runs
+  # every command there), and nothing is judged before the application
+  # starts but the arguments' number and the folder.
+  usage = "Say what: contentspiel generate section_style NAME \"Label\", or contentspiel generate page_template NAME \"Label\" " \
+          "(the label is what CS Studio shows; without one it is made of the name)."
+  refuse.(usage) unless (2..3).cover?(arguments.size)
+  theme = File.join(Dir.pwd, ContentSpiel::SiteGenerator::THEME)
+  refuse.("There is no theme/ here: run contentspiel generate in the site's folder, the one contentspiel new wrote.") unless File.directory?(theme)
+
+  start_application.call
+  require File.join(root, "lib/content_spiel/theme_generators")
+  begin
+    written = ContentSpiel::ThemeGenerators.new(theme).generate(*arguments)
+  rescue ContentSpiel::ThemeGenerators::Refused => error
+    refuse.(error.message)
+  end
+  kind, name = arguments
+  puts "Added the #{kind.tr("_", " ")} #{name}: #{written.map { |file| "theme/#{file}" }.join(" and ")}."
+  puts "Next: change #{"theme/#{written.last}"} to draw it, and run contentspiel check."
+when "check"
+  # `theme:check` itself, the very task the site's image build runs, on the
+  # site's theme/: its sentences, its count and its exit code (1 for a
+  # problem) are the command's. The task's own boot is the one start of the
+  # application; this process only replaces itself with it.
+  #
+  # The folder is the rake argument and not THEME_PATH: the application
+  # starts under the default theme (the image's own) whatever the site's
+  # theme says, and the test environment ignores THEME_PATH. Rake cuts an
+  # argument at a comma, so a path with one is refused here rather than
+  # checked in pieces (in the image it is always /site/theme).
+  theme = File.join(Dir.pwd, ContentSpiel::SiteGenerator::THEME)
+  refuse.("contentspiel check takes no arguments; it checks the site's theme/.") if arguments.any?
+  refuse.("There is no theme/ here: run contentspiel check in the site's folder, the one contentspiel new wrote.") unless File.directory?(theme)
+  refuse.("The site's folder #{Dir.pwd} has a comma in its path, which contentspiel check cannot hand over. Rename or move it.") if theme.include?(",")
+
+  boot_environment.call
+  Dir.chdir(root)
+  exec(File.join(root, "bin/rails"), "theme:check[#{theme}]")
+when "dev-files"
+  # Plain Ruby and ERB: the bundle is set up (ERB is a gem it locks,
+  # SiteGenerator#render says why that matters) and no application starts.
+  require File.join(root, "lib/content_spiel/dev_files")
+  files = ContentSpiel::DevFiles.new(Dir.pwd)
+  reason = files.refusal
+  refuse.(reason) if reason
+
+  ENV["BUNDLE_GEMFILE"] ||= File.join(root, "Gemfile")
+  require "bundler/setup"
+  files.write.each { |file| puts "Wrote #{file} (ContentSpiel #{ContentSpiel::VERSION})." }
+when "upgrade"
+  # Run by the newest image (the wrapper pulls `stable` for this command).
+  # The work is ContentSpiel::Upgrade's, plain Ruby; the application starts
+  # only inside `check`, so a pin that is refused or already current answers
+  # at once. The theme check is the very code `theme:check` runs (the rake
+  # task's `Theme::Check.problems(folder, deep: true)` inside
+  # `ThemeFolder.checking`), in this process, so its problems come back as
+  # data and not as text to parse.
+  refuse.("contentspiel upgrade takes no arguments.") if arguments.any?
+  require File.join(root, "lib/content_spiel/upgrade")
+  theme = File.join(Dir.pwd, ContentSpiel::SiteGenerator::THEME)
+  check = lambda do
+    # lib/theme_folder.rb is plain Ruby that config/application.rb requires
+    # first; `checking` must be set before the application starts.
+    require File.join(root, "lib/theme_folder")
+    ThemeFolder.checking { start_application.call }
+    Theme::Check.problems(ThemeFolder.new(theme), deep: true)
+  rescue ThemeFolder::Invalid => error
+    [ error.message ]
+  end
+  # No `Theme.current.refusal` check as theme:check makes after its own: that
+  # one is for a THEME_PATH naming another folder than the one asked about.
+  # This image is the CMS's own, run by the wrapper, with THEME_PATH unset
+  # (only a site's Dockerfile and compose file set it, and neither is this
+  # image), so the application starts under the default theme.
+  #
+  # The version is the image's; the test environment alone may name another,
+  # since a source tree is at 0.0.0 and nothing is older than that.
+  version = ENV["RAILS_ENV"] == "test" && ENV["CONTENTSPIEL_UPGRADE_VERSION"] ? ENV["CONTENTSPIEL_UPGRADE_VERSION"] : ContentSpiel::VERSION
+  begin
+    result = ContentSpiel::Upgrade.new(Dir.pwd, changelog: File.read(File.join(root, "CHANGELOG.md")), check: check, version: version).run
+  rescue ContentSpiel::Upgrade::Refused => error
+    refuse.(error.message)
+  end
+  puts result.text
+  exit result.code
+when "dev"
+  refuse.("contentspiel dev is not run inside the image: the contentspiel command on your machine runs it, " \
+          "from the site's folder (it is the one command that starts containers that keep running).")
+else
+  warn "contentspiel: no command #{command.inspect}." if command
+  warn USAGE
+  exit 2
+end

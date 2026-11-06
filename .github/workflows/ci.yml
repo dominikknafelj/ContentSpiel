@@ -66,6 +66,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # The base branch through the environment, not spliced into the
+      # script: an expression in `run:` is pasted into the shell's text.
+      - name: Changelog guard
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bin/changelog-guard "origin/$BASE_REF"
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

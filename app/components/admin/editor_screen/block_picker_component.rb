@@ -13,15 +13,14 @@ module Admin
     # its own (no `data-controller`/`data-turbo-stream` needed here), so the
     # controller's Turbo Stream response is applied in place automatically;
     # only the drag/move-up-down side of the block list needs a real Stimulus
-    # controller (`admin--editor--blocks`). The controller still honours an `after_id`
-    # param on `create`, but nothing here sends one.
+    # controller (`admin--editor--blocks`).
     #
     # THE SAME PICKER AT THE END OF A LANE (sections spec §4.2), with
     # `section:` and `column:`. A lane is a column wide, so there it is not a
     # row of buttons but a "+" that opens an `Admin::Ui::MenuComponent` of them;
     # each item is the same plain `button_to`, which also posts `section_id`
     # and `column` -- the controller's own instruction for where the block
-    # goes, beside `block[...]`, as `after_id` is. Two things differ:
+    # goes, beside `block[...]`. Two things differ:
     # - it offers no container type. A section never holds a section (spec
     #   §2.2), and a button whose only answer is a refusal is no offer. Asked
     #   of the capability, never of the type's name, so a container type a

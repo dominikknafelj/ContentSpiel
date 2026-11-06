@@ -1,0 +1,140 @@
+#!/bin/sh
+# contentspiel: the command a ContentSpiel site is run with.
+#
+# This file is frozen: it is installed once (install.sh) and never has to
+# change with a release. It does not do the work, it runs the site's pinned
+# image and hands every argument over to it.
+#
+# THE PROMISE this wrapper relies on, all of it, and every release keeps it
+# (CHANGELOG.md, "A promise: the entrypoint"; docs/reference/hosting.md,
+# "The wrapper's one promise"):
+# - inside every image there is an executable named `contentspiel` on PATH,
+#   and it takes the arguments exactly as typed;
+# - it runs with the site's folder mounted at /site as the working folder;
+# - `contentspiel dev-files` writes `.contentspiel/compose.yml` into the site,
+#   which `dev` then runs with `docker compose`;
+# - the images are tagged `X.Y.Z` for each release and `stable` for the
+#   newest, and `upgrade` is the command that runs `stable`.
+# Keep all of that in the image and the release workflow and this file
+# stays valid.
+#
+# Which image: the first line of `.contentspiel-version`, looked for in the
+# current folder and then each parent up to `/`; none found means `stable`.
+# The folder holding that pin is the site and is mounted at /site; without a
+# pin the current folder is.
+#
+# Pulls. A command inside a site never pulls by itself (`docker run` pulls a
+# pinned image only when it is missing). Two cases pull `IMAGE:stable` first,
+# because `docker run` would otherwise use a `stable` left on the machine
+# from months ago:
+# - `upgrade`, the one command that does not run the pin: it runs `stable`,
+#   because the newest image knows the newest release's notes, and stops when
+#   the pull fails. The pin is still found, and the site mounted, as for any
+#   command;
+# - any command outside a site (no pin, so `stable`: `new`, `--version`,
+#   `help`), which warns and runs the local `stable` when the pull fails, so
+#   a machine without the network still answers.
+# A pull's progress goes to stderr: stdout is the command's result.
+#
+# CONTENTSPIEL_IMAGE replaces the image's name (to try a local image).
+set -eu
+
+IMAGE=${CONTENTSPIEL_IMAGE:-ghcr.io/dominikknafelj/content_spiel}
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "contentspiel needs Docker, which was not found. Install Docker, then try again." >&2
+  exit 1
+fi
+
+# `dev` takes no arguments; refuse them rather than drop them silently.
+if [ "${1:-}" = dev ] && [ $# -gt 1 ]; then
+  echo "contentspiel: dev takes no arguments" >&2
+  exit 1
+fi
+
+# Walk up from the current folder to the first one holding a pin.
+site=""
+outside=""
+dir=$(pwd -P)
+while :; do
+  if [ -f "$dir/.contentspiel-version" ]; then
+    site=$dir
+    break
+  fi
+  [ "$dir" = / ] && break
+  dir=$(dirname "$dir")
+done
+
+if [ -n "$site" ]; then
+  version=$(head -n 1 "$site/.contentspiel-version" | tr -d '[:space:]')
+  [ -n "$version" ] || version=stable
+  # The pin is `stable` or a release number X.Y.Z (digits only), nothing else:
+  # it becomes part of an image name, so a tag, a digest or a path is refused.
+  # `upgrade` runs `:stable` whatever the pin says, so the pin never reaches an
+  # image name there, and the image's own refusal says what to write instead.
+  if [ "${1:-}" != upgrade ]; then
+    case $version in
+      stable) ;;
+      *[!0-9.]* | .* | *. | *..* | *.*.*.*) version="" ;;
+      [0-9]*.[0-9]*.[0-9]*) ;;
+      *) version="" ;;
+    esac
+    if [ -z "$version" ]; then
+      echo ".contentspiel-version must hold X.Y.Z or stable" >&2
+      exit 1
+    fi
+  fi
+else
+  site=$(pwd -P)
+  version=stable
+  outside=1
+fi
+
+# `upgrade` runs the newest image, not the pin, and pulls it first: `docker
+# run` pulls an image only when it is missing, and a `stable` left from last
+# month would upgrade to last month's release. Outside a site the image is
+# `stable` too, pulled for the same reason, but a failed pull there is not
+# fatal: the one on this machine still answers.
+if [ "${1:-}" = upgrade ]; then
+  version=stable
+  docker pull "$IMAGE:stable" >&2 || {
+    echo "contentspiel: could not pull $IMAGE:stable; upgrade needs the network." >&2
+    exit 1
+  }
+elif [ -n "$outside" ]; then
+  docker pull "$IMAGE:stable" >&2 ||
+    echo "contentspiel: could not fetch the newest release; using the one on this machine." >&2
+fi
+
+# Ask for a terminal only when there is one, or docker refuses to start.
+tty_flag=""
+if [ -t 0 ] && [ -t 1 ]; then
+  tty_flag="-t"
+fi
+
+# Docker reads --mount as one line of CSV, so a comma in the site's path
+# would end the field: the source is a quoted CSV field, a `"` in the path
+# doubled as CSV writes it. --mount, not -v, so a site path containing ":"
+# works.
+mount_source=$(printf '%s' "$site" | sed 's/"/""/g')
+
+# $tty_flag is deliberately unquoted: empty means no argument at all.
+# -w /site: every command runs from the site root, whatever folder it was
+# typed in.
+# shellcheck disable=SC2086
+run_image() {
+  docker run --rm -i $tty_flag \
+    --user "$(id -u):$(id -g)" \
+    --mount "type=bind,\"source=$mount_source\",target=/site" -w /site \
+    "$IMAGE:$version" contentspiel "$@"
+}
+
+# `dev` is the one command run differently: the image writes the compose file
+# of ITS version (so the file is the pinned one's), then compose runs it.
+if [ "${1:-}" = dev ]; then
+  run_image dev-files
+  cd "$site"
+  exec docker compose -f .contentspiel/compose.yml up
+fi
+
+run_image "$@"

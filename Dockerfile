@@ -89,7 +89,15 @@ USER 1000:1000
 COPY --chown=rails:rails --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
 COPY --chown=rails:rails --from=build /rails /rails
 
-# Entrypoint prepares the database.
+# `contentspiel` (bin/contentspiel) is on PATH, so the wrapper a person
+# installs can run `docker run ... <image> contentspiel ARGS` from any working
+# directory (it runs from /site, the site's folder): that name on PATH is the
+# one promise between the wrapper and the image. /rails/bin goes LAST, so
+# nothing in it (`setup`, `dev`, `ci`) ever stands in for a system command.
+ENV PATH="${PATH}:/rails/bin"
+
+# Entrypoint prepares the database for the server, and for `contentspiel`
+# hands the command over untouched.
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 
 # Start server via Thruster by default, this can be overwritten at runtime

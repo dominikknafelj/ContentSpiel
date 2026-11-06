@@ -97,8 +97,7 @@ module ContentBlocks
         # saves and the reorder it runs), the tag merge (`Tags::Merge
         # #repoint_blocks`, which rewrites listing blocks), the purge of
         # a page (`Trash::Purge#purge_branch`, which deletes them),
-        # `Translations::Confirm` for a block's field, and the one-off
-        # `RichText::ActionTextImport` for a block's body.
+        # and `Translations::Confirm` for a block's field.
         #
         # WHAT THE PAGE'S ROW STANDS FOR is every row a write to one of the
         # page's blocks may go on to write: the page itself (the touch),

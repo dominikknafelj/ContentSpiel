@@ -1,0 +1,410 @@
+require "test_helper"
+require "open3"
+require "tmpdir"
+require "fileutils"
+
+# install/install.sh and install/contentspiel (the wrapper) are plain POSIX sh
+# that a person runs on their own machine, so they are tested as they are run:
+# in a throwaway folder, with a fake `docker` and `curl` first on PATH that
+# write each call's arguments, one per line after a "CALL" line, to a file.
+class InstallScriptsTest < ActiveSupport::TestCase
+  ROOT = Rails.root
+  WRAPPER = ROOT.join("install/contentspiel").to_s
+  INSTALLER = ROOT.join("install/install.sh").to_s
+  IMAGE = ContentSpiel::IMAGE
+
+  FAKE_DOCKER = <<~SH.freeze
+    #!/bin/sh
+    { echo CALL; for a in "$@"; do printf '%s\\n' "$a"; done; echo "PWD=$(pwd)"; } >> "$FAKE_LOG"
+    [ "$1" = version ] && [ -n "${FAKE_DOCKER_DOWN:-}" ] && exit 1
+    [ "$1" = pull ] && [ -n "${FAKE_DOCKER_PULL_FAILS:-}" ] && exit 1
+    exit 0
+  SH
+
+  # Writes what the installer would download, or fails the way `curl -f` does.
+  FAKE_CURL = <<~SH.freeze
+    #!/bin/sh
+    { echo CURL; for a in "$@"; do printf '%s\\n' "$a"; done; } >> "$FAKE_LOG"
+    [ -n "${FAKE_CURL_FAILS:-}" ] && exit 22
+    out=""
+    while [ $# -gt 0 ]; do
+      [ "$1" = -o ] && out=$2
+      shift
+    done
+    printf '#!/bin/sh\\necho downloaded\\n' > "$out"
+  SH
+
+  test "the wrapper's default image is the one the release workflow pushes" do
+    assert_match(/^IMAGE=\$\{CONTENTSPIEL_IMAGE:-#{Regexp.escape(IMAGE)}\}$/, File.read(WRAPPER))
+  end
+
+  # The promise's tag scheme, from the side that pushes it: every installed
+  # wrapper runs `IMAGE:X.Y.Z` for a pin and `IMAGE:stable` for `upgrade` and
+  # outside a site, so the release workflow pushes exactly those two names.
+  test "the release pushes the tags every installed wrapper runs: X.Y.Z and stable" do
+    release = File.read(ROOT.join(".github/workflows/release.yml"))
+
+    assert_includes release, %(--tag "$IMAGE:$VERSION" --tag "$IMAGE:stable")
+    assert_includes release, "^[0-9]+\\.[0-9]+\\.[0-9]+$", "VERSION is X.Y.Z, digits only, as the wrapper's pin check is"
+  end
+
+  test "the version comes from the pin in the folder" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "0.3.1\nignored\n")
+      box.wrap("pages", "list")
+
+      assert_includes box.run_call.fetch(:args), "#{IMAGE}:0.3.1"
+    end
+  end
+
+  test "the version comes from a pin in a parent folder, and that folder is the site" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "0.2.0\n")
+      FileUtils.mkdir_p("#{box.site}/a/b")
+      box.wrap("pages", chdir: "#{box.site}/a/b")
+      args = box.run_call.fetch(:args)
+
+      assert_includes args, "#{IMAGE}:0.2.0"
+      assert_includes args, box.mount(File.realpath(box.site))
+    end
+  end
+
+  test "without a pin the version is stable and the site is the current folder" do
+    in_sandbox do |box|
+      box.wrap("pages")
+      args = box.run_call.fetch(:args)
+
+      assert_includes args, "#{IMAGE}:stable"
+      assert_includes args, box.mount(File.realpath(box.site))
+    end
+  end
+
+  test "arguments reach the image unchanged, spaces, quotes and flags included" do
+    in_sandbox do |box|
+      given = [ "page", "new", "--title", "Hello  world", "it's \"quoted\"", "--flag=a b", "$HOME", "" ]
+      box.wrap(*given)
+      args = box.run_call.fetch(:args)
+
+      assert_equal [ "contentspiel", *given ], args.drop(args.index("contentspiel"))
+    end
+  end
+
+  test "the line carries the user's uid and gid, the site mount and the working folder" do
+    in_sandbox do |box|
+      box.wrap("pages")
+      args = box.run_call.fetch(:args)
+      uid, gid = `id -u`.strip, `id -g`.strip
+
+      assert_equal %w[run --rm], args.first(2)
+      assert_equal "#{uid}:#{gid}", args[args.index("--user") + 1]
+      assert_equal "/site", args[args.index("-w") + 1]
+      assert_equal box.mount(File.realpath(box.site)), args[args.index("--mount") + 1]
+    end
+  end
+
+  test "a pin that is not X.Y.Z or stable is refused" do
+    in_sandbox do |box|
+      [ "latest", "1.2", "1.2.3-beta", "v1.2.3", "1.2.3.4", "@sha256:#{'a' * 64}", "../x", "1..2" ].each do |pin|
+        File.write("#{box.site}/.contentspiel-version", "#{pin}\n")
+        out, status = box.wrap_raw("pages")
+
+        assert_equal 1, status.exitstatus, pin
+        assert_includes out, ".contentspiel-version must hold X.Y.Z or stable"
+      end
+      assert_empty box.calls
+    end
+  end
+
+  test "a pin of stable is accepted" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "stable\n")
+      box.wrap("pages")
+
+      assert_includes box.run_call.fetch(:args), "#{IMAGE}:stable"
+    end
+  end
+
+  test "upgrade pulls stable, then runs stable and not the pin" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      box.wrap("upgrade")
+
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_not_includes run.fetch(:args).join(" "), "1.2.3"
+      assert_equal %w[contentspiel upgrade], run.fetch(:args).last(2)
+      assert_includes run.fetch(:args), box.mount(box.site)
+    end
+  end
+
+  test "upgrade stops when the pull fails, and does not run an old stable" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      out, status = box.wrap_raw("upgrade", env: { "FAKE_DOCKER_PULL_FAILS" => "1" })
+
+      assert_equal 1, status.exitstatus
+      assert_includes out, "could not pull"
+      assert_equal 1, box.calls.size
+    end
+  end
+
+  test "upgrade with a bad pin still pulls and runs stable, for the image to refuse; other commands refuse it" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "latest\n")
+      box.wrap("upgrade")
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_includes run.fetch(:args), box.mount(box.site)
+
+      _, status = box.wrap_raw("check")
+      assert_equal 1, status.exitstatus
+      assert_equal 2, box.calls.size
+    end
+  end
+
+  test "other commands never pull" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "1.2.3\n")
+      box.wrap("check")
+      assert_equal [ "run" ], box.calls.map { |call| call.fetch(:args).first }
+    end
+  end
+
+  test "outside a site the wrapper pulls stable first, then runs it" do
+    in_sandbox do |box|
+      box.wrap("new", "my-site")
+
+      pull, run = box.calls
+      assert_equal [ "pull", "#{IMAGE}:stable" ], pull.fetch(:args)
+      assert_includes run.fetch(:args), "#{IMAGE}:stable"
+      assert_equal %w[contentspiel new my-site], run.fetch(:args).last(3)
+    end
+  end
+
+  test "outside a site a failed pull warns and runs the stable on this machine" do
+    in_sandbox do |box|
+      out, status = box.wrap_raw("--version", env: { "FAKE_DOCKER_PULL_FAILS" => "1" })
+
+      assert status.success?, out
+      assert_includes out, "could not fetch the newest release; using the one on this machine"
+      assert_equal %w[pull run], box.calls.map { |call| call.fetch(:args).first }
+      assert_includes box.run_call.fetch(:args), "#{IMAGE}:stable"
+    end
+  end
+
+  test "the wrapper without docker says to install it and exits 1" do
+    in_sandbox do |box|
+      # A PATH of symlinks to the tools the wrapper calls and no docker: a
+      # runner has a real one in /usr/bin, which "/usr/bin:/bin" would find.
+      tools = "#{box.dir}/tools"
+      FileUtils.mkdir_p(tools)
+      %w[sh head tr dirname id pwd sed cat printf env].each do |name|
+        found = ENV["PATH"].split(":").map { |d| File.join(d, name) }.find { |f| File.executable?(f) }
+        File.symlink(found, "#{tools}/#{name}") if found
+      end
+      out, status = Open3.capture2e(box.env("PATH" => tools), WRAPPER, "pages", chdir: box.site)
+
+      assert_equal 1, status.exitstatus
+      assert_match(/install docker/i, out)
+    end
+  end
+
+  test "dev refuses extra arguments" do
+    in_sandbox do |box|
+      out, status = box.wrap_raw("dev", "--build")
+
+      assert_equal 1, status.exitstatus
+      assert_includes out, "dev takes no arguments"
+      assert_empty box.calls
+    end
+  end
+
+  test "a site path with a colon is mounted intact" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/we:ird"
+      FileUtils.mkdir_p(odd)
+      box.wrap("pages", chdir: odd)
+
+      assert_includes box.run_call.fetch(:args), box.mount(odd)
+    end
+  end
+
+  test "a site path with a comma is mounted intact, as one quoted CSV field" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/a,b"
+      FileUtils.mkdir_p(odd)
+      File.write("#{odd}/.contentspiel-version", "1.2.3\n")
+      box.wrap("check", chdir: odd)
+
+      mount = box.run_call.fetch(:args).then { |args| args[args.index("--mount") + 1] }
+      assert_equal %(type=bind,"source=#{odd}",target=/site), mount
+      # Read back as Docker reads it, as CSV: three fields, the path whole.
+      assert_equal [ "type=bind", "source=#{odd}", "target=/site" ], csv_fields(mount)
+    end
+  end
+
+  test "a site path with a double quote has it doubled, as CSV writes it" do
+    in_sandbox do |box|
+      odd = "#{box.dir}/say \"hi\""
+      FileUtils.mkdir_p(odd)
+      box.wrap("check", chdir: odd)
+
+      mount = box.run_call.fetch(:args).then { |args| args[args.index("--mount") + 1] }
+      assert_equal [ "type=bind", "source=#{odd}", "target=/site" ], csv_fields(mount)
+    end
+  end
+
+  test "install expands a leading ~/ in the bin folder" do
+    in_sandbox do |box|
+      status, = box.install("HOME" => box.dir, "CONTENTSPIEL_BIN_DIR" => "~/mybin")
+
+      assert status.success?
+      assert File.executable?("#{box.dir}/mybin/contentspiel")
+    end
+  end
+
+  test "without a terminal there is no -t" do
+    in_sandbox do |box|
+      box.wrap("pages")
+
+      assert_not_includes box.run_call.fetch(:args), "-t"
+    end
+  end
+
+  test "dev runs dev-files in the image and then compose from the site folder" do
+    in_sandbox do |box|
+      File.write("#{box.site}/.contentspiel-version", "0.4.0\n")
+      FileUtils.mkdir_p("#{box.site}/sub")
+      box.wrap("dev", chdir: "#{box.site}/sub")
+      calls = box.calls
+
+      assert_equal 2, calls.size
+      assert_includes calls[0][:args], "#{IMAGE}:0.4.0"
+      assert_equal %w[contentspiel dev-files], calls[0][:args].last(2)
+      assert_equal %w[compose -f .contentspiel/compose.yml up], calls[1][:args]
+      assert_equal File.realpath(box.site), calls[1][:pwd]
+    end
+  end
+
+  test "install with no Docker exits 1 and writes nothing" do
+    in_sandbox do |box|
+      status, out = box.install("FAKE_DOCKER_DOWN" => "1")
+
+      assert_equal 1, status.exitstatus
+      assert_match(/docker/i, out)
+      assert_empty Dir.children(box.bin)
+      assert_not_includes File.read(box.log), "CURL"
+    end
+  end
+
+  test "install with Docker writes an executable wrapper" do
+    in_sandbox do |box|
+      status, = box.install
+      target = "#{box.bin}/contentspiel"
+
+      assert status.success?
+      assert File.executable?(target)
+      assert_match(/downloaded/, File.read(target))
+      assert_equal [ "contentspiel" ], Dir.children(box.bin), "no temp file is left behind"
+      assert_includes File.read(box.log), "https://example.test/contentspiel"
+    end
+  end
+
+  test "a failed download writes nothing" do
+    in_sandbox do |box|
+      status, = box.install("FAKE_CURL_FAILS" => "1")
+
+      assert_not status.success?
+      assert_empty Dir.children(box.bin)
+    end
+  end
+
+  test "the PATH hint shows when the folder is missing from PATH and not when it is there" do
+    in_sandbox do |box|
+      _, out = box.install
+      assert_includes out, "export PATH=\"#{box.bin}:$PATH\""
+
+      _, out = box.install("PATH" => "#{box.bin}:#{box.path}")
+      assert_not_includes out, "export PATH"
+    end
+  end
+
+  private
+
+  Box = Struct.new(:dir, :site, :bin, :log, :path, keyword_init: true) do
+    def env(extra = {})
+      { "PATH" => path, "FAKE_LOG" => log, "CONTENTSPIEL_BIN_DIR" => bin,
+        "CONTENTSPIEL_WRAPPER_URL" => "https://example.test/contentspiel" }.merge(extra)
+    end
+
+    def wrap(*args, chdir: site, **)
+      Open3.capture2e(env, WRAPPER, *args, chdir: chdir).tap { |_, s| raise "wrapper failed" unless s.success? }
+    end
+
+    def wrap_raw(*args, chdir: site, env: {})
+      Open3.capture2e(env(env), WRAPPER, *args, chdir: chdir)
+    end
+
+    def install(extra = {})
+      out, status = Open3.capture2e(env(extra), "/bin/sh", INSTALLER)
+      [ status, out ]
+    end
+
+    # Every fake call, as { args:, pwd: }, in order. The first line of an
+    # entry is CALL (docker) or CURL; only docker calls are returned.
+    def calls
+      File.read(log).split(/^CALL\n/).drop(1).filter_map do |chunk|
+        lines = chunk.lines.map(&:chomp)
+        pwd = lines.pop.delete_prefix("PWD=")
+        { args: lines, pwd: pwd } unless lines.first == "version"
+      end
+    end
+
+    # The `docker run`, after any pull.
+    def run_call = calls.find { |call| call.fetch(:args).first == "run" }
+
+    # The --mount value for a site, as the wrapper writes it: the source is
+    # a quoted CSV field, since Docker reads the value as CSV.
+    def mount(site) = %(type=bind,"source=#{site}",target=/site)
+  end
+
+  # A --mount value read as Docker reads it (Go's encoding/csv, one record):
+  # fields split at commas, a field in double quotes may hold commas, and a
+  # doubled quote inside it is one quote. The csv gem is not in the bundle.
+  def csv_fields(line)
+    fields, field, quoted, index = [], +"", false, 0
+    while index < line.length
+      char = line[index]
+      if quoted && char == '"' && line[index + 1] == '"'
+        field << '"'
+        index += 1
+      elsif char == '"'
+        quoted = !quoted
+      elsif char == "," && !quoted
+        fields << field
+        field = +""
+      else
+        field << char
+      end
+      index += 1
+    end
+    fields << field
+  end
+
+  def in_sandbox
+    Dir.mktmpdir do |dir|
+      dir = File.realpath(dir)
+      fakes = "#{dir}/fakes"
+      FileUtils.mkdir_p [ fakes, "#{dir}/site", "#{dir}/bin" ]
+      { "docker" => FAKE_DOCKER, "curl" => FAKE_CURL }.each do |name, body|
+        File.write("#{fakes}/#{name}", body)
+        File.chmod(0o755, "#{fakes}/#{name}")
+      end
+      File.write("#{dir}/log", "")
+      yield Box.new(dir: dir, site: "#{dir}/site", bin: "#{dir}/bin", log: "#{dir}/log",
+        path: "#{fakes}:/usr/bin:/bin:/usr/sbin:/sbin")
+    end
+  end
+end

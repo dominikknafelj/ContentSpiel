@@ -9,10 +9,8 @@
 #
 # `YOUTUBE_ID_PATTERN` lives on the namespace module, not on `BuiltIns` or
 # `NodeType`, because more than the `youtube` node's own `id` attribute
-# needs it: its `html` renderer re-checks every id against it, and the
-# ActionText importer (`RichText::HtmlImport`) only emits a node whose id
-# passes it -- the rule the retired `YoutubeEmbed` model used to own
-# (design spec §5). One shared constant is what keeps "a valid stored id"
+# needs it: its `html` renderer re-checks every id against it -- the rule
+# the retired `YoutubeEmbed` model used to own (design spec §5). One shared constant is what keeps "a valid stored id"
 # and "an id the embed will render" from drifting apart. An 11-character id
 # built from letters, digits, `-` and `_` is YouTube's actual video-id
 # shape.

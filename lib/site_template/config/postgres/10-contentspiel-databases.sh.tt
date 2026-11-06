@@ -1,0 +1,33 @@
+#!/bin/bash
+# Runs ONCE, inside the Postgres container, when its data volume is empty
+# (the image runs everything in /docker-entrypoint-initdb.d on first start).
+# Kamal mounts this file there (config/deploy.yml, accessories.db.files).
+#
+# It makes what config/database.yml of the CMS expects in production:
+#   - the role `content_spiel` (the name is fixed in that file),
+#   - the four databases: primary, cache, queue and cable.
+#
+# Why here and not by the application: the application's `db:prepare` can
+# create the databases only if its role may create databases. This way the
+# role the site runs as is an ordinary one: it owns its four databases and
+# nothing else. `db:prepare` then finds them empty and loads the schemas.
+#
+# The password comes from the environment (a Kamal secret) and is handed to
+# psql as a variable, so it is never part of a command line or of this file.
+#
+# The image may run this file or source it, so it changes no shell option.
+
+if [ -z "${CONTENT_SPIEL_DATABASE_PASSWORD:-}" ]; then
+  echo "10-contentspiel-databases: CONTENT_SPIEL_DATABASE_PASSWORD is not set. Nothing was created." >&2
+  exit 1
+fi
+
+psql -v ON_ERROR_STOP=1 \
+     -v app_password="$CONTENT_SPIEL_DATABASE_PASSWORD" \
+     --username "$POSTGRES_USER" --dbname postgres <<'SQL' || exit 1
+CREATE ROLE content_spiel LOGIN PASSWORD :'app_password';
+CREATE DATABASE content_spiel_production       OWNER content_spiel ENCODING 'UTF8';
+CREATE DATABASE content_spiel_production_cache OWNER content_spiel ENCODING 'UTF8';
+CREATE DATABASE content_spiel_production_queue OWNER content_spiel ENCODING 'UTF8';
+CREATE DATABASE content_spiel_production_cable OWNER content_spiel ENCODING 'UTF8';
+SQL

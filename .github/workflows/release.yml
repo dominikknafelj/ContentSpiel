@@ -1,0 +1,185 @@
+name: Release
+
+# Gives a merge that raised `VERSION` its release number
+# (`docs/reference/hosting.md`, "Releases"): the manifests `V` and `stable`
+# (amd64 and arm64), the tag `vV` and the GitHub Release.
+#
+# When: after `image.yml` has completed successfully on main, never beside it:
+# the amd64 image of the commit is built there, and this workflow needs it to
+# exist. The commit is `workflow_run.head_sha`, the one that was built, not
+# whatever main has become. A merge whose `VERSION` is the newest `v*` tag's
+# does nothing, which is every merge but a release.
+on:
+  workflow_run:
+    workflows: [ Image ]
+    types: [ completed ]
+    branches: [ main ]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Everything is decided here, before anything is pushed. A VERSION that is
+  # not newer than the newest tag is not a release: green, nothing done. A
+  # VERSION that is newer but fails a later check fails the run loudly.
+  decide:
+    # Only a push to main of this repository's own branch (not a manual run of
+    # Image on some other ref, not a fork).
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.compare.outputs.release }}
+      version: ${{ steps.compare.outputs.version }}
+      image: ${{ steps.compare.outputs.image }}
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: ruby/setup-ruby@v1
+
+      - name: Decide whether this commit is a release
+        id: compare
+        run: |
+          version=$(sed -n 's/^ *VERSION = "\(.*\)"$/\1/p' lib/content_spiel/version.rb)
+          newest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          newest=${newest#v}
+          echo "VERSION $version, newest tag ${newest:-none}"
+          {
+            echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel"
+            echo "version=$version"
+            echo "release=false"
+          } >> "$GITHUB_OUTPUT"
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::VERSION ${version:-(none)} is not MAJOR.MINOR.PATCH"; exit 1
+          fi
+          # Not newer than the newest tag (no tag: newer than 0.0.0): not a release.
+          highest=$(printf '%s\n' "${newest:-0.0.0}" "$version" | sort -V | tail -n 1)
+          if [ "$version" = "${newest:-0.0.0}" ] || [ "$highest" != "$version" ]; then
+            echo "VERSION is not newer than the newest tag: nothing to release."; exit 0
+          fi
+
+          # Newer: from here every failure is loud, and nothing has been pushed.
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "::error::the tag v$version already exists"; exit 1
+          fi
+          # The notes are the version's section, its subsections in the order
+          # `contentspiel upgrade` shows them (Release::FIRST: Breaking first).
+          # `notes` refuses a missing section and one of whitespace only, and
+          # its sentence is the error.
+          if ! ruby -r ./lib/content_spiel/release -e \
+              'begin
+                 puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ARGV.fetch(0), ordered: true)
+               rescue ContentSpiel::Release::Refused => e
+                 warn e.message
+                 exit 1
+               end' "$version" > release-notes.md 2> notes-error.txt; then
+            echo "::error::$(cat notes-error.txt)"; exit 1
+          fi
+          for file in install/install.sh install/contentspiel; do
+            [ -f "$file" ] || { echo "::error::$file does not exist"; exit 1; }
+          done
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      # The notes the Release will carry, kept for the publish job.
+      - name: Keep the release notes
+        if: steps.compare.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  arm64:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same Dockerfile and build arguments as image.yml (it passes none),
+      # pushed as `<sha>-arm64`, which the manifests below join. That tag is
+      # permanent: the manifests refer to the image, and it is not deleted. No provenance: the arm64 image stays a plain image
+      # manifest for `imagetools create` to join.
+      - name: Build and push linux/arm64
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ needs.decide.outputs.image }}:${{ github.event.workflow_run.head_sha }}-arm64
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,scope=arm64,mode=max
+
+  publish:
+    needs: [ decide, arm64 ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ${{ needs.decide.outputs.image }}
+      VERSION: ${{ needs.decide.outputs.version }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The commit's amd64 image (image.yml's tag, the 40-character sha) and
+      # the arm64 one, one manifest each under V and stable.
+      - name: Join amd64 and arm64 into V and stable
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:$VERSION" --tag "$IMAGE:stable" \
+            "$IMAGE:$SHA" "$IMAGE:$SHA-arm64"
+
+      - name: Fetch the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      # Creates the tag vV on the built commit with the Release. install.sh
+      # and contentspiel are the installer and the site's command (install/).
+      - name: Tag and create the GitHub Release
+        run: |
+          gh release create "v$VERSION" install/install.sh install/contentspiel \
+            --target "$SHA" --title "$VERSION" --notes-file release-notes.md

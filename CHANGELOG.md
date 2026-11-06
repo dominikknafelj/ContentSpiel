@@ -27,17 +27,32 @@
 
 - A form's submission mail is in no log at any level: at `RAILS_LOG_LEVEL=debug` Action Mailer's line for it is a placeholder, where every other mail is still logged whole.
 - A new recurring task, `forms_resend_not_ready` (every 15 minutes, in `config/recurring.yml` for every environment): once mail is set up, by Settings or by `MAIL_*` variables, the form mails that failed because it was not are sent again, each recorded as System's "sent a submission again".
+- The first numbered release. From it on, a release `X.Y.Z` is a git tag `vX.Y.Z`, a GitHub Release whose notes are its section of this file, and the image `ghcr.io/dominikknafelj/content_spiel:X.Y.Z` for `linux/amd64` and `linux/arm64`; `:stable` names the newest release. The commit tags stay, so a site that pins a commit still builds (`docs/reference/hosting.md`, "Releases").
+- The image's `PATH` ends with `/rails/bin`, and `bin/docker-entrypoint` hands a `contentspiel …` command straight over, with no `db:prepare`.
 
 ### Migrations needing action
 
-- `db:migrate` adds the forms' four tables (`forms`, `form_destinations`, `form_submissions`, `form_deliveries`) and `site_settings.form_keep_days` (90), and `20261104090300_grant_forms_permissions_to_admin_group` gives the built-in Admin group "Manage forms" and "View form submissions"; any other group gets them by hand on the Groups screen.
+- Only the built-in Admin group is given the two forms permissions (`20261104090300`, below); any other group that should build forms or read submissions gets "Manage forms" and "View form submissions" by hand on the Groups screen.
 - **A site without Active Record encryption keys takes no form answers**: every form says it can't take answers, a send is refused, and System status's Forms row says so. Set the three keys (`docs/reference/translations.md`, "Active Record encryption keys") before placing a form.
 - A site behind a CDN adds the CDN's ranges to `config.action_dispatch.trusted_proxies`, or the forms' per-visitor rate limit counts every visitor as one (`docs/reference/hosting.md`, "Forms").
-- None beyond `db:migrate`. `20261101100000_replace_page_type_with_page_settings` moves every page's type into `pages.settings` and rewrites every page's published copies (current, pending and superseded) the same way; nothing is drawn differently and the content version does not move. A unique index on a section's anchor is added (no anchor exists before it).
+
+### Migrations
+
+- `20261101090000_add_unique_section_anchor_to_content_blocks`: a unique index on a section's anchor (no anchor exists before it).
+- `20261101100000_replace_page_type_with_page_settings`: moves every page's type into `pages.settings` and rewrites every page's published copies (current, pending and superseded) the same way; nothing is drawn differently and the content version does not move.
+- `20261101110000_restate_state_check_constraints`: writes the check constraints on `note_threads.state` and `presence_marks.state` again in a form `db/schema.rb` dumps the same on every Postgres version; what they allow does not change.
+- `20261104090000_create_forms`, `20261104090100_create_form_destinations`, `20261104100000_create_form_submissions` and `20261104100100_create_form_deliveries`: the forms' four tables.
+- `20261104090200_add_form_keep_days_to_site_settings`: `site_settings.form_keep_days`, 90 by default.
+- `20261104090300_grant_forms_permissions_to_admin_group`: gives the built-in Admin group "Manage forms" and "View form submissions".
 
 ### Removed
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
+- The old password-reset link `GET <admin>/password/:token/edit`: it is a 404 now. The mailed link is `<admin>/password/edit#<token>`; ask for a new one. With it went telemetry's scrubbing of a token segment in `<admin>/password/…` paths: the reset token is in no path, and every query string is still cut from a span.
+- `SITEMAP_HOST`, the old name of `PUBLIC_HOST`: set `PUBLIC_HOST`; `SITEMAP_HOST` is no longer read.
+- The `after_id` parameter of the block create request (`POST …/blocks`): the block is appended; to place it, create it and move it.
+- The comma-separated string for a post's `tag_names` in the post form's autosave (`post[tag_names]=a, b`): send an Array, `post[tag_names][]=a&post[tag_names][]=b`, as the chip input does. A string leaves the tags as they were.
+- The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start. The migration that drops the ActionText tables (`20260928040000_drop_action_text`) stays, for a database that still has them, and refuses while a body in them was never converted, since nothing converts it any more: `FORCE_DROP_ACTION_TEXT=1` drops the tables and discards such bodies.
 
 ### For a gem or an outside caller
 
@@ -46,3 +61,8 @@
 - `ContentModel::FieldTypes` has two more built-ins, `email` and `form`, and `text` takes `max:`.
 - A form field type or destination that a gem no longer registers is dormant, not gone: a stored field of it is left out of a send and carried through a save, and a stored destination of it is carried through a save (its deliveries fail `unknown_destination`) and drawn in the builder with a box that removes it. Only one given anew under an unknown name is refused.
 - `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.
+- **A promise: the entrypoint.** Every installed wrapper relies on these and nothing else: every image holds an executable `contentspiel` on its `PATH` that takes the arguments exactly as typed; the wrapper runs it with the site's folder mounted at `/site` as the working folder; the subcommand `dev-files` writes `.contentspiel/compose.yml` into the site, which the wrapper's `dev` runs with `docker compose`; a release's image is tagged `X.Y.Z` and the newest is `stable`; and `upgrade` is the command the wrapper runs from `stable`, as it runs every command outside a site. A change to any of them is a breaking change (`docs/reference/hosting.md`, "The wrapper's one promise").
+- **A promise: the pin.** A site names its CMS version in one file at its top, `.contentspiel-version`: one line, `X.Y.Z`. The `contentspiel` command run in the folder or under it uses that version, the site's `config/deploy.yml` reads it into the `Dockerfile`'s `CMS_VERSION`, and `contentspiel upgrade` is what moves it (`docs/reference/hosting.md`, "A site's version").
+- Added the `contentspiel` command, for a machine with Docker and nothing else: `curl -fsSL https://github.com/dominikknafelj/ContentSpiel/releases/latest/download/install.sh | sh` installs it into `~/.local/bin`. `contentspiel new NAME` writes a site that builds on this release (theme, `Dockerfile`, Kamal's `config/deploy.yml` with three placeholders, the secrets' names, a README to follow); `generate section_style NAME "Label"` and `generate page_template NAME "Label"` add a theme choice; `check` is `theme:check` on the site's `theme/`; `dev` runs the site on the machine with its theme mounted and a database of its own; `upgrade` shows the notes since the pin, checks the theme against the newest release and only then moves the pin; `--version` and `help`. Inside a site every command runs the pinned image and pulls nothing by itself; outside one it pulls `stable` first, and runs the one on the machine, with a warning, when it can't.
+- Added `ContentSpiel::VERSION` and `ContentSpiel::IMAGE` (`lib/content_spiel/version.rb`).
+- For the CMS's own contributors: `bin/rails 'release:prepare[X.Y.Z]'` prepares a release's pull request, and a pull request that changes `test/support/contract_ledger.rb`, `lib/content_spiel/plugins.rb` or a file under `db/migrate/` fails CI until this file's "Unreleased" section changes too, and one that adds a migration until its version is named under "### Migrations" there (`bin/changelog-guard`).
