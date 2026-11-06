@@ -120,7 +120,6 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-controller~='admin--saving--autosave']"
     assert_selector ".admin-view-only"
     assert find_field("Title", disabled: true).disabled?
-
   end
 
   # Sections spec §1: view only stays view only inside a section too. A tile
