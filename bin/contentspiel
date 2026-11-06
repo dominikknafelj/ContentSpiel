@@ -1,0 +1,130 @@
+#!/usr/bin/env ruby
+# contentspiel: the image's entrypoint for everything a site does with the CMS
+# (releases spec, "The wrapper and the image").
+#
+# THE ONE PROMISE. The frozen wrapper a person installs (install/contentspiel)
+# runs, from the site's folder,
+#
+#   docker run --rm -i [-t] --user "$(id -u):$(id -g)" \
+#     --mount type=bind,source=<the site>,target=/site -w /site \
+#     <image>:<version> contentspiel ARGS...
+#
+# and relies on two things only: that an executable named `contentspiel` is on
+# the image's PATH (the Dockerfile puts /rails/bin there), and that it takes
+# the arguments exactly as they were typed. Keep the name and the arguments,
+# and every wrapper ever installed stays valid. Every command lives here, in
+# the image, so a site's tools are always its pinned version's.
+#
+# WHO RUNS IT. The host's uid and gid, 501:20 on a Mac, and not the image's
+# user 1000: so that what it writes into /site belongs to the person, as if
+# they had written it. That user has no entry in /etc/passwd, so HOME is `/`
+# or nothing, and /rails (owned by 1000) is read-only to it. Hence:
+# - HOME is set to /tmp when it is no writable folder, for Bundler and for
+#   anything else that wants a home;
+# - Bootsnap reads the cache the image build made and writes none
+#   (BOOTSNAP_READONLY), when /rails/tmp/cache cannot be written;
+# - nothing is written into /rails; the only files written are the site's,
+#   under the current folder.
+#
+# NO DATABASE. bin/docker-entrypoint hands a `contentspiel` command straight
+# over, without `db:prepare`, and no command here connects to one.
+#
+# THE APPLICATION IS STARTED ONLY WHEN A COMMAND NEEDS IT. `--version`,
+# `help` and a refusal are plain Ruby and answer at once. `new` judges the
+# name and the folder first (ContentSpiel::SiteGenerator is plain Ruby until
+# it writes), then starts the application, because the theme it writes is
+# `theme:new`'s (`Theme::Scaffold`), which reads the theme contract, which is
+# application code. It starts the application from /rails and writes by
+# absolute path into the folder it was started in. In the image that is
+# production, with SECRET_KEY_BASE_DUMMY (no secret is needed to copy files,
+# as none is to build assets) and the log at warn, so the boot's own lines do
+# not bury what the command says.
+#
+# Exit codes: 0 done; 1 refused or failed, with a sentence that says why;
+# 2 no such command, with the usage.
+
+root = File.expand_path("..", __dir__)
+require File.join(root, "lib/content_spiel/version")
+require File.join(root, "lib/content_spiel/site_generator")
+
+home = ENV["HOME"].to_s
+ENV["HOME"] = "/tmp" unless !home.empty? && File.directory?(home) && File.writable?(home)
+
+USAGE = <<~TEXT.freeze
+  Usage: contentspiel COMMAND [ARGUMENTS]
+
+  ContentSpiel #{ContentSpiel::VERSION}. Run in a site's folder, a command uses the
+  version in its .contentspiel-version; anywhere else, the newest release.
+
+  Commands:
+    new NAME       Write a new site into the folder NAME, here: its theme, its
+                   Dockerfile, its Kamal configuration and a README to follow.
+    generate       Add a piece to the theme (a section style, a page template).
+    check          Say what is wrong with the site's theme, or that nothing is.
+    dev            Run the site on this machine, with its theme and a database.
+    upgrade        Show what the newest release changes, check the theme
+                   against it, and move the site to it.
+    dev-files      Write the files `dev` runs (the wrapper runs it for `dev`).
+    --version      Print this CMS version.
+    help           Print this.
+TEXT
+
+# The application, started from /rails. Once per process.
+start_application = lambda do
+  if (ENV["RAILS_ENV"] || ENV["RACK_ENV"]) == "production"
+    ENV["SECRET_KEY_BASE_DUMMY"] ||= "1"
+  end
+  ENV["RAILS_LOG_LEVEL"] ||= "warn"
+  cache = File.join(root, "tmp/cache")
+  writable = File.exist?(cache) ? File.writable?(cache) : File.writable?(File.join(root, "tmp"))
+  ENV["BOOTSNAP_READONLY"] ||= "1" unless writable
+  Dir.chdir(root) { require File.join(root, "config/environment") }
+end
+
+refuse = lambda do |sentence|
+  warn sentence
+  exit 1
+end
+
+# Filled in by later steps of the releases plan; until then each says so
+# rather than pretending.
+not_yet = ->(command) { refuse.("contentspiel #{command} is not yet available in ContentSpiel #{ContentSpiel::VERSION}.") }
+
+command, *arguments = ARGV
+
+case command
+when "--version", "-v", "version"
+  puts ContentSpiel::VERSION
+when "help", "--help", "-h"
+  puts USAGE
+when "new"
+  refuse.("Say which: contentspiel new NAME, for example contentspiel new my-site") if arguments.empty?
+  refuse.("contentspiel new takes one name, and was given #{arguments.size}: #{arguments.join(" ")}") if arguments.size > 1
+
+  name = arguments.first
+  # The name as typed first: `a/b` or `../x` is no name, though the path
+  # made of it would end in one.
+  reason = ContentSpiel::SiteGenerator.name_refusal(name)
+  refuse.(reason) if reason
+  generator = ContentSpiel::SiteGenerator.new(File.join(Dir.pwd, name))
+  reason = generator.refusal
+  refuse.(reason) if reason
+
+  start_application.call
+  begin
+    written = generator.write
+  rescue ContentSpiel::SiteGenerator::Refused => error
+    refuse.(error.message)
+  end
+  puts "Wrote #{written.size} files into #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."
+  puts "Next: cd #{name}, then follow README.md, from step 1: fill in the placeholders at the top of config/deploy.yml."
+when "generate", "check", "upgrade", "dev-files"
+  not_yet.(command)
+when "dev"
+  refuse.("contentspiel dev is not run inside the image: the contentspiel command on your machine runs it, " \
+          "from the site's folder (it is the one command that starts containers that keep running).")
+else
+  warn "contentspiel: no command #{command.inspect}." if command
+  warn USAGE
+  exit 2
+end

@@ -59,6 +59,15 @@ module ContentSpiel
     # It is required above, so the autoloader is told to leave it alone.
     Rails.autoloaders.main.ignore(Rails.root.join("lib/content_spiel/version.rb"))
 
+    # The site template (`contentspiel new`): lib/content_spiel/site_generator.rb
+    # is required by path by bin/contentspiel BEFORE the application starts
+    # (it refuses a bad name without starting it), so it is not the
+    # autoloader's; lib/site_template holds its `.tt` files and no Ruby.
+    Rails.autoloaders.main.ignore(
+      Rails.root.join("lib/content_spiel/site_generator.rb"),
+      Rails.root.join("lib/site_template")
+    )
+
     # The locales Mobility and I18n will accept reads and writes for. Mobility
     # reads these back out of this config (not out of I18n directly), and
     # uses them to decide which per-locale accessors and rich-text

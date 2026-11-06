@@ -1,0 +1,122 @@
+# <%= name %>
+
+A website built with ContentSpiel <%= version %>. This folder holds what makes this site differ from every other: its theme, its deploy configuration and the CMS version it runs on. The CMS itself is not in this folder; it comes from the image `<%= cms_image %>` at the version in `.contentspiel-version`.
+
+Follow the steps below in order. Each step says what to run and what you should see. They are written so that a person at a terminal and an AI tool can both follow them without guessing: do exactly what a step says, and stop at a step whose "You should see" does not match.
+
+## What is in this folder
+
+| Path | What it is |
+|---|---|
+| `theme/` | The site's theme, a copy of the default theme. Change it to change how the site looks. `theme/README.md` says what each folder holds. |
+| `.contentspiel-version` | The CMS version this site runs on, one line. `contentspiel upgrade` changes it. Every `contentspiel` command run in this folder uses this version. |
+| `Dockerfile` | Builds the site's image: the CMS image of that version, plus `theme/`. |
+| `config/deploy.yml` | Kamal's configuration: the server, the registry, the address, the database, the variables. |
+| `.kamal/secrets.example` | The names of the secrets the site needs, and how to make each. No value. |
+| `seeds/` | The place for starting content. Nothing reads it yet. |
+| `.gitignore` | Keeps `.kamal/secrets`, `.env*` and `.contentspiel/` out of git. |
+
+You need Docker and the `contentspiel` command on this machine. To deploy you also need Kamal (step 4).
+
+## Step 1. Fill in the placeholders
+
+`config/deploy.yml` starts with three placeholders. Replace each, including its angle brackets, in the lines at the top of that file:
+
+| Placeholder | What to write | Example |
+|---|---|---|
+| `<your-host>` | The site's host name, without `https://`. Only this name is answered. | `www.example.org` |
+| `<your-server-ip>` | The address of the server the site runs on. You reach it as `root` over SSH. | `203.0.113.10` |
+| `<your-registry-user>` | Your user or organisation at the image registry (`ghcr.io` unless you change `registry.server`). | `my-github-user` |
+
+Then check that none is left:
+
+```sh
+grep -n '<your-' config/deploy.yml
+```
+
+You should see: no output. Kamal refuses to run while a placeholder is left, and says which.
+
+If your server is an ARM machine, also change `arch: amd64` to `arch: arm64` under `builder` in `config/deploy.yml`.
+
+Put the folder under git now, if it is not yet. Kamal builds from it and names each version by its commit:
+
+```sh
+git init
+git add .
+git commit -m "A new ContentSpiel site"
+```
+
+## Step 2. Run the site on this machine
+
+```sh
+contentspiel dev
+```
+
+This starts the site with its theme and a database of its own, in development. Open http://localhost:3000. The first visit asks you to finish the setup; follow what the page and the terminal say. Edit files in `theme/` and reload the page to see the change. Stop it with Ctrl-C.
+
+You should see: the site, drawn by the theme in `theme/`.
+
+## Step 3. Check the theme
+
+```sh
+contentspiel check
+```
+
+You should see: one line that ends in `no problems.`
+
+If it lists problems instead, each line names a file in `theme/`, says what is wrong and what to do. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
+
+## Step 4. Deploy
+
+Install Kamal if you do not have it: `gem install kamal` (it needs Ruby), or follow https://kamal-deploy.org for another way.
+
+### 4.1 The secrets
+
+```sh
+cp .kamal/secrets.example .kamal/secrets
+```
+
+`.kamal/secrets.example` says how to make each value. As copied, each line reads the variable of the same name from your shell, so either export every one of them before you run `kamal`, or change the line to read from your password manager (the file shows how). `.kamal/secrets` is git-ignored: never commit it, and never put a value into any other file of this folder.
+
+Make each value once and keep it. The database password and the three encryption keys must never change after the first deploy.
+
+### 4.2 The first deploy
+
+The first time, on a new server:
+
+```sh
+kamal setup
+```
+
+This installs Docker on the server, builds the site's image (it runs `theme:check` while it builds), pushes it, starts Postgres and the site.
+
+You should see, at the end: `Finished all in ... seconds`. Then open `https://<your-host>/setup` (your host name) and enter the setup token, the value of `SETUP_TOKEN`.
+
+### 4.3 Every later deploy
+
+Commit your change, then:
+
+```sh
+kamal deploy
+```
+
+You should see: `Finished all in ... seconds`. The old version keeps running until the new one answers.
+
+If a deploy fails, read the site's log with `kamal app logs`.
+
+## Step 5. Upgrade the CMS
+
+```sh
+contentspiel upgrade
+```
+
+This shows what changed in the CMS between this site's version and the newest release, breaking changes first, checks `theme/` against the new version, and only when the check passes, writes the new version into `.contentspiel-version`. If it lists problems, fix them in `theme/` and run it again; the version is not changed until the theme passes.
+
+Then make a backup of the database, commit `.contentspiel-version`, and deploy:
+
+```sh
+git commit -am "ContentSpiel $(cat .contentspiel-version)"
+kamal deploy
+```
+
+To go back, write the old version into `.contentspiel-version` and deploy again. That is safe only for a release with no migration: the release notes say which ones have one.

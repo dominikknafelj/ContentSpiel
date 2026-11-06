@@ -1,0 +1,182 @@
+<%%
+  # THE PLACEHOLDERS. Each value is written once, here, and the lines below
+  # read it. README.md, step 1, says what goes in each.
+  #
+  #   host           the site's host name, without a scheme: www.example.org
+  #   server_ip      the address of the server the site runs on
+  #   registry_user  your user (or organisation) at the registry below
+  host          = "<your-host>"
+  server_ip     = "<your-server-ip>"
+  registry_user = "<your-registry-user>"
+
+  # A placeholder left in is refused, so no command ever reaches for a
+  # server or an address that is not yours.
+  left = { "host" => host, "server_ip" => server_ip, "registry_user" => registry_user }.select { |_, value| value.start_with?("<your-") }
+  raise "config/deploy.yml still holds a placeholder for #{left.keys.join(", ")}. Fill it in at the top of the file (README.md, step 1)." if left.any?
+%>
+# Kamal's configuration of this site, written by `contentspiel new` with
+# ContentSpiel <%= version %>. Every variable the CMS reads in production is
+# named below; a commented one is optional and says what it does.
+#
+# Only you run kamal. See README.md.
+
+service: <%= name %>
+
+# The SITE image (this folder's Dockerfile), which Kamal builds and pushes
+# itself: see `builder` below. Kamal puts the registry's server in front.
+image: <%%= registry_user %>/<%= name %>
+
+servers:
+  web:
+    - <%%= server_ip %>
+  # No job role. Background jobs run inside the web container: see
+  # SOLID_QUEUE_IN_PUMA below.
+
+# kamal-proxy gets a Let's Encrypt certificate for the host. Behind a CDN
+# that ends TLS itself (Cloudflare), set its mode to "Full": "Flexible"
+# loops, because the site forces HTTPS.
+proxy:
+  ssl: true
+  host: <%%= host %>
+
+  # The CMS's own value: AI translation waits on the provider inside a web
+  # request, up to two calls of 25 s. Keep it in step with the CMS.
+  response_timeout: 75
+
+  # The CMS answers /up for any host name and without a redirect.
+  healthcheck:
+    path: /up
+    interval: 3
+    timeout: 5
+
+# The first start loads four schemas before the server answers /up.
+# 30 seconds (the default) may be short for that.
+deploy_timeout: 120
+
+# Where the site's image is pushed and pulled from. Another registry: change
+# `server` (Docker Hub is `server` left out) and the user at the top.
+registry:
+  server: ghcr.io
+  username: <%%= registry_user %>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# NAMES only. The values of `secret` come from .kamal/secrets, which is
+# git-ignored; .kamal/secrets.example says where each comes from.
+env:
+  clear:
+    # The site's address with its scheme. Only this host name is answered
+    # (an exact match: no www. if the host has none), HTTPS is forced, and
+    # pages and mails carry it.
+    PUBLIC_HOST: https://<%%= host %>
+
+    # The theme folder in the image. The Dockerfile sets the same value and
+    # copies theme/ there; change both or neither.
+    THEME_PATH: <%= theme_path %>
+
+    # Where Postgres is: the accessory below, by its container name
+    # (<service>-db). The CMS's database configuration names no host for
+    # any of its four production databases, so libpq's own variable is the
+    # one thing that moves all four (DATABASE_URL would move one).
+    PGHOST: <%= name %>-db
+
+    # Jobs run inside Puma: one container on one server. Without this
+    # variable NO job runs (mail, image widths, scheduled publishing, the
+    # trash's clean-up).
+    SOLID_QUEUE_IN_PUMA: true
+
+    # Only for a proxy that ends TLS and sends no X-Forwarded-Proto.
+    # kamal-proxy sends it, so this stays off. `1` and no other value.
+    # ASSUME_SSL: 1
+
+    # Telemetry. With an endpoint set the CMS sends its spans there
+    # (OTLP, batched); with none it sends and prints nothing. The headers
+    # (an API key, say) are a secret: see `secret` below.
+    # OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.example.com
+    # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: https://otlp.example.com/v1/traces
+    # OTEL_SERVICE_NAME: <%= name %>
+    # OTEL_CONSOLE (`1` prints spans to the log) is for a terminal, not for
+    # a server.
+
+    # Outgoing mail. Each of these overrides its field of Settings → Mail,
+    # where the same can be typed in instead. Without mail, password resets
+    # and invitations are not sent. The password is a secret: below.
+    # MAIL_SMTP_SERVER: smtp.example.com
+    # MAIL_SMTP_PORT: 587
+    # MAIL_SMTP_SECURITY: starttls
+    # MAIL_SMTP_USERNAME: site@example.com
+    # MAIL_SENDER_NAME: Example
+    # MAIL_SENDER_ADDRESS: site@example.com
+
+    # Never set RAILS_LOG_LEVEL to debug here: at debug Rails logs every mail
+    # in full, a password reset link included.
+  secret:
+    # Signs sessions and tokens. Without it production does not start.
+    - SECRET_KEY_BASE
+    # The one-time code /setup asks for on the first visit. Set here, so it
+    # is never printed to the log.
+    - SETUP_TOKEN
+    # The password of the Postgres role `content_spiel` (all four databases).
+    - CONTENT_SPIEL_DATABASE_PASSWORD
+    # Encrypt what the CMS stores encrypted: the AI key, the mail login, a
+    # form's answers (without them no form takes answers). All three or
+    # none, from the same place. Once set, never change or lose them.
+    - ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
+    - ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
+    - ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
+    # Uncomment with its line in .kamal/secrets when you use it.
+    # - OTEL_EXPORTER_OTLP_HEADERS
+    # - MAIL_SMTP_PASSWORD
+
+# Uploads. The CMS stores them on disk in production, under /rails/storage.
+# One named volume holds them and is kept when a container is replaced.
+volumes:
+  - "<%= name.tr("-", "_") %>_storage:/rails/storage"
+
+# Keeps the old and the new digested assets side by side during a deploy.
+asset_path: /rails/public/assets
+
+builder:
+  # The server's architecture. Release images of the CMS are built for
+  # amd64 and arm64: write arm64 for an ARM server.
+  arch: amd64
+  dockerfile: Dockerfile
+  context: .
+  args:
+    # The CMS image the site is built FROM, at the version this site is
+    # pinned to. The pin lives in ONE place, the file .contentspiel-version:
+    # `contentspiel upgrade` moves it, and this line reads it.
+    CMS_IMAGE: <%= cms_image %>
+    CMS_VERSION: <%%= File.read(".contentspiel-version").strip %>
+
+accessories:
+  db:
+    # The CMS develops and tests against Postgres 17. Stay on 17: the image
+    # of version 18 keeps its data at another path.
+    image: postgres:17
+    host: <%%= server_ip %>
+
+    # NO `port:` line, on purpose. Without it Docker publishes nothing on the
+    # host: Postgres is reachable only inside Kamal's private Docker network,
+    # by the name <%= name %>-db.
+    env:
+      clear:
+        # The site's role. Postgres makes it on its first start, with the
+        # password below, and the site's first start (db:prepare) makes the
+        # four databases as that role.
+        POSTGRES_USER: content_spiel
+      secret:
+        # The same secret as the site's: Kamal hands
+        # CONTENT_SPIEL_DATABASE_PASSWORD to Postgres under the name it reads.
+        # Postgres reads it on its FIRST start only, while the volume is empty.
+        - POSTGRES_PASSWORD:CONTENT_SPIEL_DATABASE_PASSWORD
+    volumes:
+      # A named Docker volume: kept when the container is replaced. All the
+      # site's text is in it.
+      - <%= name.tr("-", "_") %>_pgdata:/var/lib/postgresql/data
+
+aliases:
+  console: app exec --interactive --reuse "bin/rails console"
+  shell: app exec --interactive --reuse "bash"
+  logs: app logs -f
+  dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
