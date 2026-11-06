@@ -165,6 +165,14 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector "dialog#discard-changes-page-#{live.id}[data-destructive] form[action='/cs-studio/publishing/page/#{live.id}/discard']", visible: :all
   end
 
+  test "Discard changes… throws work away, so it is the danger_text button" do
+    live = edit_title(create_page(title: "About"))
+    render_header(live)
+
+    button = page.find("header #publishing-actions button", text: "Discard changes…", visible: :all)
+    assert_equal Admin::Ui::ButtonComponent.classes(:danger_text), button[:class]
+  end
+
   test "the buttons and the dialogs are drawn for a live record with nothing to publish too, without their marks: the first save's answer shows them" do
     live = create_page(title: "About")
     render_header(live)
@@ -448,12 +456,10 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     def call = tag.b("actions", data: { slot_probe: "actions" })
   end
 
-  test "a live record's Discard changes… is a tertiary beside the one primary, and View on site is a plain link" do
+  test "a live record's View on site is a plain link" do
     record = create_page(title: "About", published: true)
     render_header(record)
 
-    assert_selector "header button.text-accent", text: "Discard changes…", visible: :all
-    assert_no_selector "header button[class~='border-field-line']", text: "Discard changes…", visible: :all
     link = page.find("a[href='/about']", text: "View on site")
     assert_includes link["class"].split, "text-accent"
     assert_includes link["class"].split, "hover:underline"

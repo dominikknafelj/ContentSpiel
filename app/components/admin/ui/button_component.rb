@@ -5,10 +5,10 @@ module Admin
     # the tree's "+", and so on (spec §4.3). Five variants only: `:primary`
     # (the one emphasized action per screen: a solid accent fill raised to
     # shadow 2), `:secondary` (everything else: an accent tint, accent words,
-    # no outline), `:tertiary` (accent words, no fill: a dialog's Cancel, the
-    # editors' Discard changes…; `:ghost` is no variant and raises),
-    # `:danger_text` (the trigger for a destructive action: sunken, with
-    # danger-coloured words, because red words on the violet tint would fight)
+    # no outline), `:tertiary` (accent words, no fill: a dialog's Cancel;
+    # `:ghost` is no variant and raises), `:danger_text` (the trigger for a
+    # destructive action: sunken, with danger-coloured words, because red
+    # words on the violet tint would fight)
     # and `:danger` (solid red, only for the confirm button inside a
     # `Ui::ConfirmDialogComponent`). Anything else a caller needs on the tag --
     # `data-action` for a Stimulus controller, `disabled`, `form`, a `name`
@@ -18,9 +18,8 @@ module Admin
     # The whole look is in this file and nowhere else: `VARIANT_CLASSES` and
     # `COMMON_CLASS`, joined by `.classes(variant, size:)`, which is also what
     # the setup wizard's links (`SetupHelper`) are drawn with. The variant a
-    # caller asks for is the one place to move a button's look: "Discard
-    # changes…" is a `:tertiary` by the owner's ruling (it may be revised to a
-    # danger tertiary: change the variant at that one call).
+    # caller asks for is the one place to move a button's look: a button that
+    # throws work away (Discard changes…) is `:danger_text`.
     class ButtonComponent < AdminComponent
       # Every hover is `not-disabled:hover:` (contrast and buttons spec, D1): a
       # disabled button never answers the pointer.
