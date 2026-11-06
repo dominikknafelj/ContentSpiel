@@ -559,8 +559,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # and a tag's count is never cut. The labels are drawn, not elements, so the
   # rule is asked of the function that makes them.
   test "a long label is cut with an ellipsis by code point, and a tag keeps its count whole" do
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
 
     labels = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
@@ -583,8 +582,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "the data can't be loaded: a message with Retry, which loads it" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script(<<~JS)
       const original = window.fetch
       window.realFetch ??= original
@@ -606,8 +604,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "the server refuses the data: the same message" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script(<<~JS)
       const original = window.fetch
       window.realFetch ??= original
@@ -628,8 +625,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # here waits out the real time.
   test "the data request gets no answer: it times out into the same message, and Retry loads the graph" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script(<<~JS)
       const original = window.fetch
       window.realFetch ??= original
@@ -663,8 +659,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # chooses the plural form.
   test "over the cap the screen says what it shows and what it leaves out" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(CAPPED_GRAPH)
 
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -687,8 +682,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   test "at the cap an added post moves the figure of its own sentence and no other, and a sentence that did not change is not written again" do
     create_post(title: "A")
     create_page(title: "Blog") # a viewer who reads a page has the filter's checkbox
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(CAPPED_GRAPH)
     page.execute_script(<<~JS)
       const real = window.fetch
@@ -747,8 +741,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     alone = create_post(title: "Alone")
     row = "#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]"
     blog = ContentTypes.fetch("blog").label.downcase
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script(<<~JS)
       const real = window.fetch
       window.realFetch ??= real
@@ -796,8 +789,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # connected" would be untrue of it.
   test "over the cap a local view says it shows the nearest posts, not the best-connected" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(CAPPED_LOCAL_GRAPH)
 
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -838,8 +830,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # no label beside it, hovered or not.
   test "a post, a tag and a page of one database id are three nodes, and a page, a type and a pill are drawn and pressed" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(SHARED_ID_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
@@ -934,8 +925,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # of different lengths.
   test "a notice line and an action of the card are as wide as their text, not as their container" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(CAPPED_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
@@ -965,8 +955,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # the messages are German between a failed load and its Retry.
   test "the cap's numbers are formatted for the language of the messages, not the browser's" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script("window.failGraph = true")
     stub_graph_data(CAPPED_GRAPH)
 
@@ -986,8 +975,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "the worker can't start: a message without Retry, and an error in the console" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
 
     without_workers do
       within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -1011,8 +999,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   test "the worker can't start: the corner where unplaced nodes would be answers no hover, no click and no position" do
     post = create_post(title: "Alpha", tags: [ "shared" ])
     create_post(title: "Beta", tags: [ "shared" ])
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     without_workers do
       within("nav[aria-label='Modules']") { click_link "Mind graph" }
       assert_selector "#{GRAPH}[data-state='worker-failed']"
@@ -1039,8 +1026,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Alpha", tags: [ "shared" ])
     create_post(title: "Beta", tags: [ "shared" ])
     tag = Tag.find_by!(name: "shared")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
 
     # The window outlives the visit below: the real worker comes back first.
     without_workers do
@@ -1075,8 +1061,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     a = create_post(title: "Alpha", tags: [ "shared" ])
     create_post(title: "Beta", tags: [ "shared" ])
     PostRelation.create!(post: a, related_post: create_post(title: "Gamma"))
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     without_workers do
       within("nav[aria-label='Modules']") { click_link "Mind graph" }
       assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='4'][data-edges='3']"
@@ -1100,8 +1085,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "a graph with nothing to draw says so in the list" do
     create_post(title: "Alone")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data("({ nodes: [], tags: [], edges: [], total: 0, shown: 0, isolated: 0 })")
 
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -1119,8 +1103,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # posts and 30 tags made in the page (`BIG_GRAPH`); the worker is the real one.
   test "leaving while the graph is loading or settling raises nothing and stops the worker" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     count_workers
     page.execute_script(<<~JS)
       const original = window.fetch
@@ -1164,8 +1147,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # to the moment of leaving, and none is drawn afterwards.
   test "nothing is drawn once the screen is left" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(BIG_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     assert_selector "#{GRAPH}[data-state='ready'][data-nodes='1530']", wait: 15
@@ -1914,8 +1896,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     a, b, c = %w[A B C].map { |title| create_post(title: title) }
     PostRelation.create!(post: a, related_post: b)
     PostRelation.create!(post: b, related_post: c)
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     record_worker_answers
 
     with_reduced_motion do
@@ -1947,8 +1928,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   test "a small graph unfolds frame by frame" do
     a = create_post(title: "A")
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     record_worker_answers
 
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
@@ -2733,8 +2713,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   test "a tick the worker posted before it took an added post leaves that post where the page put it" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     page.execute_script(<<~JS)
       window.RealWorker = window.Worker
       window.Worker = class extends window.RealWorker {
@@ -3458,8 +3437,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   test "the list holds exactly the nodes a capped graph draws" do
     create_post(title: "A")
-    visit admin_tags_path
-    await_admin_controllers
+    visit_screen admin_tags_path
     stub_graph_data(CAPPED_GRAPH)
 
     within("nav[aria-label='Modules']") { click_link "Mind graph" }

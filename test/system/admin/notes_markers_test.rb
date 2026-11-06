@@ -14,8 +14,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
   teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
 
   def open_editor
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
   end
 
   # The drawer's small headings are in sentence case, and that

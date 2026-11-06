@@ -35,8 +35,7 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   test "a field that fails an autosave turns red with its message, and loses it once fixed" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     wrapper = ".admin-prefix-input"
     assert_not_equal danger_colour, border_colour(wrapper)
 
@@ -76,8 +75,7 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   test "an error in one sub-field colours only that sub-field, not its sibling or the outer wrapper's other inputs" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     inject_nested_fields
     danger = danger_colour
     assert_not_equal danger, border_colour("#a-input")
@@ -92,8 +90,7 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   test "an error on the outer wrapper itself is a message only: nothing in its nested sub-fields turns red" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     inject_nested_fields
     slot_message("outer-errors")
 
@@ -102,8 +99,7 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   test "an invalid column does not redden the inputs of a rich-text popover inside it" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     inject_nested_fields
     slot_message("col-errors")
 

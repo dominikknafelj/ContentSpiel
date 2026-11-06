@@ -84,8 +84,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "Translate, then Use, fills the German title and autosaves it" do
     post = create_post(title: "Hello")
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
 
     press_within slot("title"), "Translate"
     assert_suggestion "translation-suggestion-post-title", "[de] Hello"
@@ -104,8 +103,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "an edited suggestion is what Use applies, and editing it saves nothing by itself" do
     post = create_post(title: "Hello")
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
 
     press_within slot("title"), "Translate"
     suggestion = find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]")
@@ -137,8 +135,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "en" => { body: paragraph("Body text") } }).ok?
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
 
     press_within slot("body"), "Translate"
     assert_selector "#translation-suggestion-post-body-json", text: "[de] Body text"
@@ -158,8 +155,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "test/quote" },
         translations: { "en" => { settings: { "text" => "To be" } } }).record
 
-      visit "/cs-studio/pages/#{page_record.id}?locale=de"
-      await_admin_controllers
+      visit_editor(page_record, locale: "de")
 
       press "Suggest translations for 3 empty fields"
       assert_text "3 suggestions ready"
@@ -195,8 +191,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
           translations: { "en" => { settings: { "text" => "Line #{i}" } } }).record
       end
 
-      visit "/cs-studio/pages/#{page_record.id}?locale=de"
-      await_admin_controllers
+      visit_editor(page_record, locale: "de")
 
       press "Suggest translations for 3 empty fields"
       assert_text "3 suggestions ready"
@@ -215,8 +210,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "test/quote" },
         translations: { "en" => { settings: { "text" => "To be" } } }).record
 
-      visit "/cs-studio/pages/#{page_record.id}?locale=de"
-      await_admin_controllers
+      visit_editor(page_record, locale: "de")
 
       # The page's own fields are one request (it fails), the block's
       # another (it works): one record per request.
@@ -246,8 +240,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     assert_button "Suggest translations for 2 empty fields"
 
     press "Suggest translations for 2 empty fields"
@@ -282,8 +275,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "Discard all removes every suggestion and saves nothing" do
     post = post_with_excerpt
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     press "Suggest translations for 2 empty fields"
     assert_text "2 suggestions ready"
 
@@ -303,8 +295,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     track_suggestion_requests
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
@@ -323,8 +314,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     track_suggestion_requests
     press_within slot("title"), "Translate"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
@@ -350,8 +340,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     shorten_pending_timeout(1)
     track_suggestion_requests
     press_within slot("title"), "Translate"
@@ -374,8 +363,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     track_suggestion_requests
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
@@ -395,8 +383,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = post_with_excerpt
     GatedProvider.hold!
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     press "Suggest translations for 2 empty fields"
     assert_selector "[role='status'][aria-live='polite'][data-admin--translation--translate-target='status']", text: /Suggesting 1 of 2 fields/, visible: :all
     GatedProvider.release
@@ -415,8 +402,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert Posts::Save.call(post, translations: { "de" => { title: "Über uns" } }).ok?
     assert Posts::Save.call(post, translations: { "en" => { title: "About our team" } }).ok?
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     assert_no_selector "#{slot("title")} button", text: "Translate"
 
     press_within "[data-original-for='title']", "Suggest update"
@@ -435,8 +421,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "an answer that isn't a stream shows a generic error the editor can dismiss" do
     post = create_post(title: "Hello")
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     # Trashed after the page loaded: the request is now a 404 page, not a
     # stream, so the box is filled by `admin--translation--translate` itself.
     assert Trash::Move.call(post).ok?
@@ -456,14 +441,12 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
 
-    visit "/cs-studio/posts/#{post.id}"
-    await_admin_controllers
+    visit_editor(post)
     fill_in "Title", with: "Hello there"
     assert_selector "#post-save-status", text: /\A(● )?SAVED( · NOT PUBLISHED)? \d{2}:\d{2}\z/, wait: 5
     assert_equal :outdated, post.reload.translation_state("title", "de")
 
-    visit "/cs-studio/posts/#{post.id}?locale=de"
-    await_admin_controllers
+    visit_editor(post, locale: "de")
     assert_selector "[data-original-for='title'] ins", text: "there"
 
     click_on "Still correct — mark up to date"
@@ -545,8 +528,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     click_on "Still correct — mark up to date"
     assert_no_selector "[data-original-for='title'] ins", wait: 5
 
-    visit "/cs-studio/posts/#{stale.id}?locale=es"
-    await_admin_controllers
+    visit_editor(stale, locale: "es")
     click_on "Still correct — mark up to date"
     assert_no_selector "[data-original-for='title'] ins", wait: 5
 
@@ -561,8 +543,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   # panel visible): the header's bulk run, and Use all, act on the language
   # being looked at -- never on a hidden panel's fields.
   test "Suggest translations on Settings acts on the visible language only" do
-    visit "/cs-studio/settings?locale=de"
-    await_admin_controllers
+    visit_screen "/cs-studio/settings?locale=de"
 
     press "Suggest translations for 1 empty field"
     assert_suggestion "translation-suggestion-settings-de-title", "[de] Test Site"
@@ -584,8 +565,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     root_page
     Mobility.with_locale(:en) { site_settings(:default).update!(title: "Dana's Notes", tagline: "Things I learned") }
 
-    visit "/cs-studio/settings?locale=de"
-    await_admin_controllers
+    visit_screen "/cs-studio/settings?locale=de"
     assert_selector "[data-original-for='tagline']", text: "Things I learned"
 
     fill_in "settings-de-tagline", with: "Was ich gelernt habe"
@@ -606,8 +586,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
         translations: { "en" => { settings: { "text" => "To be" } } }).record
       Editing::Reservation.claim(subject: block, record: page_record, user: users(:two), tab: "tab-bbbbbbbb", now: Time.current)
 
-      visit "/cs-studio/pages/#{page_record.id}?locale=de"
-      await_admin_controllers
+      visit_editor(page_record, locale: "de")
 
       press "Suggest translations for 1 empty field"
       assert_suggestion "translation-suggestion-page-title", "[de] About"

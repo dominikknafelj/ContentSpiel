@@ -15,8 +15,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   end
 
   def open_editor
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
   end
 
   def tile(block) = "##{ActionView::RecordIdentifier.dom_id(block)}"
@@ -302,8 +301,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
   test "a section is added from the picker and a block added to its second lane opens at once" do
     plain = create_page(title: "Built by hand")
-    visit "/cs-studio/pages/#{plain.id}"
-    await_admin_controllers
+    visit_editor(plain)
 
     within("#block-picker-end") { press "Section" }
     assert_selector ".admin-section-card [data-admin--editor--blocks-target='lane']", count: 2
@@ -772,8 +770,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   test "a page without sections has its cards, no section card and no section controller" do
     plain = create_page(title: "Plain")
     plain.content_blocks.create!(block_type: "rich_text", position: 0)
-    visit "/cs-studio/pages/#{plain.id}"
-    await_admin_controllers
+    visit_editor(plain)
 
     assert_selector "#content-blocks-list > .admin-block-card", count: 1
     assert_no_selector ".admin-section-card"
@@ -1714,8 +1711,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     plain = create_page(title: "No sections")
     plain.content_blocks.create!(block_type: "image", position: 0)
-    visit "/cs-studio/pages/#{plain.id}"
-    await_admin_controllers
+    visit_editor(plain)
     assert_selector "button[data-move='into'][disabled]", visible: :all
   end
 
@@ -1724,8 +1720,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   test "Move into section… is enabled when the page gains a section and disabled when it loses its last" do
     plain = create_page(title: "Gains a section")
     block = plain.content_blocks.create!(block_type: "image", position: 0)
-    visit "/cs-studio/pages/#{plain.id}"
-    await_admin_controllers
+    visit_editor(plain)
     scope = "##{ActionView::RecordIdentifier.dom_id(block)}"
     assert_selector "#{scope} button[data-move='into'][disabled]", visible: :all
 
@@ -2004,8 +1999,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     with_locales(%w[en de], default: "en") do
       @left.update!(caption: "Left original")
       @right.update!(caption: "Right original")
-      visit "/cs-studio/pages/#{@page.id}?locale=de"
-      await_admin_controllers
+      visit_editor(@page, locale: "de")
 
       assert_selector ".admin-section-group", count: 1
       assert_selector ".admin-section-group > h3", text: "Section", exact_text: true
@@ -2030,8 +2024,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   test "on a translation tab a card is moved past a section's group, and the group has no handle and no menu but its cards' Add note" do
     with_locales(%w[en de], default: "en") do
       below = @page.content_blocks.create!(block_type: "image", position: 1)
-      visit "/cs-studio/pages/#{@page.id}?locale=de"
-      await_admin_controllers
+      visit_editor(@page, locale: "de")
       group = "#content-blocks-list > .admin-section-group[data-block-id='#{@section.id}']"
 
       assert_selector group

@@ -10,8 +10,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
 
     # A real, single multi-file selection on the visible file input --
     # `admin--media--upload#filesSelected` fires one POST per file, one at a time
@@ -51,8 +50,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     assert_selector "#media-asset-#{existing.id}"
 
     attach_file("media-upload-input", file_fixture("tiny.png").to_s, visible: :all)
@@ -67,8 +65,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert Media::Save.call(described, translations: { "en" => { alt: "A wide view" } }).ok?
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     assert_selector "#media-count-missing_alt", text: "1"
     assert_selector "#media-asset-#{bare.id}", text: "No alt"
     assert_no_selector "#media-panel"
@@ -99,8 +96,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert Media::Save.call(asset, translations: { "en" => { alt: "A wide view" } }).ok?
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media?selected=#{asset.id}"
-    await_admin_controllers
+    visit_screen "/cs-studio/media?selected=#{asset.id}"
     within("nav[aria-label='Languages']") { press "Deutsch" }
     assert_selector "nav[aria-label='Languages'] [aria-current='true']", text: /deutsch/i
     assert_selector "#media-panel [data-original-for='alt']"
@@ -118,8 +114,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "dropping files anywhere shows the overlay, then a progress tile for each and the real tile after it, with no reload" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     page.execute_script("window.__noReload = 'still here'")
     hold_uploads
 
@@ -143,8 +138,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "a drop of one good and one refused file: the good one becomes a tile, the refused one keeps its reason and Dismiss, nothing reloads" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     page.execute_script("window.__noReload = 'still here'")
 
     dispatch_file_drop("fake.png", "tiny.png")
@@ -162,8 +156,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "a drag that carries text, and one that Escape ends, never shows the overlay for long" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
 
     page.execute_script(<<~JS)
       const data = new DataTransfer()
@@ -189,8 +182,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset(filename: "tiny.png")
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
 
     page.execute_script("document.querySelector('#media-asset-#{asset.id} img').dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true }))")
     dispatch_file_drag("dragenter", "tiny.png")
@@ -211,8 +203,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Quick one") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
 
     find("#media-asset-#{asset.id} a").click
     find("#media-panel #media-alt").set("Typed at once")
@@ -228,16 +219,14 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     with_locales(%w[en de], default: "en")
     asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Tabbed") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     click_tile(asset)
 
     within("#media-panel") { click_link "Deutsch" }
     assert_current_path(/locale=de/)
     assert_eventually(message: "focus never came back to the panel") { page.evaluate_script("document.activeElement.id") == "media-panel" }
 
-    visit "/cs-studio/media?q=no-such-image&selected=#{asset.id}"
-    await_admin_controllers
+    visit_screen "/cs-studio/media?q=no-such-image&selected=#{asset.id}"
     assert_no_selector "#media-asset-#{asset.id}"
     find("#media-panel a[aria-label='Close panel']").click
     assert_no_selector "#media-panel"
@@ -248,8 +237,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     click_tile(existing)
     assert_selector "#media-count-all", text: "1"
     hold_uploads
@@ -272,8 +260,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     hold_uploads
 
     dispatch_file_drop("tiny.png")
@@ -297,8 +284,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     second = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Second image") }
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     click_tile(first)
 
     fill_in "Alt", with: "Typed just before leaving"
@@ -321,14 +307,12 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     asset = create_media_asset.tap { |record| record.update!(title: "Keyboard image") }
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media?selected=#{asset.id}"
-    await_admin_controllers
+    visit_screen "/cs-studio/media?selected=#{asset.id}"
     assert_selector "#media-panel"
     await_frames # a focus move into the panel would be made by `connect()` or the frame's load, both done by now
     assert_not_equal "media-panel", active_element_id, "a plain page load must not move focus into the panel"
 
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     # The keyboard alone: the tile is focused by script and Enter goes to the
     # page, whatever has the focus (`press_enter`). `node.send_keys(:enter)` is
     # NOT that -- Cuprite clicks the node with the mouse first and types
@@ -358,8 +342,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     hold_uploads
     dispatch_file_drop("tiny.png")
     assert_selector "[data-upload-tile]", text: "Uploading…"
@@ -377,8 +360,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     dispatch_file_drop("fake.png")
     assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/, wait: 10
     click_tile(existing)
@@ -395,8 +377,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "a restored grid's ghost progress tiles are removed when the queue re-attaches" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     # A clone, as Turbo's snapshot would leave: no listeners, no live entry.
     page.execute_script(<<~JS)
       const ghost = document.createElement("li")
@@ -418,8 +399,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset
     sign_in_via_form(users(:one))
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     click_tile(asset)
 
     assert_selector "#media-panel #media-notes #notes-list"
@@ -456,8 +436,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     thread = as(users(:two)) { Notes::Start.call(asset, body: "For @[#{users(:one).id}]: too dark") }.record
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media"
-    await_admin_controllers
+    visit_screen "/cs-studio/media"
     assert_selector "#media-asset-#{asset.id} [data-notes-chip][data-unread]", text: "1"
     # On the image, 6px from its top right corner, on the surface colour.
     box = page.evaluate_script(<<~JS)
@@ -469,8 +448,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     JS
     assert_equal [ 6, 6, 20 ], box
 
-    visit "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}"
-    await_admin_controllers
+    visit_screen "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}"
 
     assert_selector "#media-panel #media-notes #note-thread-#{thread.id}", text: "too dark"
   end
@@ -483,8 +461,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     gone.destroy!
     sign_in_via_form(users(:one))
 
-    visit "/cs-studio/media?selected=#{asset.id}&thread=#{stale}"
-    await_admin_controllers
+    visit_screen "/cs-studio/media?selected=#{asset.id}&thread=#{stale}"
 
     # The JavaScript error collector fails this test on "Content missing".
     assert_selector "#media-panel #media-notes #notes-list [role=status]", text: "This note is gone"

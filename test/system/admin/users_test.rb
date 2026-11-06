@@ -15,8 +15,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   def row(user) = "##{ActionView::RecordIdentifier.dom_id(user)}"
 
   test "a row opens the editor; ticking a group card is one unsaved change; Save user saves it" do
-    visit admin_users_path
-    await_admin_controllers
+    visit_screen admin_users_path
     within(row(@target)) { click_link @target.email_address }
     assert_current_path edit_admin_user_path(@target)
     assert_selector "h1", text: @target.email_address
@@ -39,8 +38,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   end
 
   test "Make owner… confirms and the list shows the Owner tag" do
-    visit edit_admin_user_path(@target)
-    await_admin_controllers
+    visit_screen edit_admin_user_path(@target)
 
     click_button "Make owner…"
     within("dialog#owner-user-#{@target.id}") do
@@ -58,8 +56,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   end
 
   test "with a typed change the owner and delete buttons are disabled with the hint, and come back when it is undone" do
-    visit edit_admin_user_path(@target)
-    await_admin_controllers
+    visit_screen edit_admin_user_path(@target)
 
     assert_selector ".admin-owner-zone button:not([disabled])", text: "Make owner…"
     assert_selector ".admin-delete-zone button:not([disabled])", text: "Delete user…"
@@ -76,8 +73,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   end
 
   test "Set a new password… counts nothing until something is typed, and closing it forgets what was typed" do
-    visit edit_admin_user_path(@target)
-    await_admin_controllers
+    visit_screen edit_admin_user_path(@target)
     assert_no_selector "#user_password", visible: :visible
 
     find("summary", text: "Set a new password…").click
@@ -97,8 +93,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   end
 
   test "Delete user… asks, then removes the user and lands on the list" do
-    visit edit_admin_user_path(@target)
-    await_admin_controllers
+    visit_screen edit_admin_user_path(@target)
 
     click_button "Delete user…"
     within("dialog#delete-user-#{@target.id}") do

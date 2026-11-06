@@ -233,7 +233,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # script's own timeout, which rejects the promise after that long: the wait
   # runs inside `using_wait_time(wait + 1)`, so the page's deadline (and this
   # helper's message) comes first.
-  def await_js(condition, wait: 5)
+  def await_js(condition, wait: 5, message: nil)
     met = using_wait_time(wait + 1) do
       page.evaluate_async_script(<<~JS, condition, wait * 1000)
         const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
@@ -246,7 +246,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
         poll()
       JS
     end
-    assert met, "timed out waiting for: #{condition}"
+    assert met, message ? "#{message} (timed out waiting for: #{condition})" : "timed out waiting for: #{condition}"
   end
 
   # Waits until the write queue (`saving/queue.js`) says the screen is
@@ -388,9 +388,30 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
-  def await_admin_controllers
-    await_controllers_connected
-    await_live_part
+  def await_admin_controllers(wait: 8)
+    await_controllers_connected(wait: wait)
+    await_live_part(wait: wait)
+  end
+
+  # The entry to an editor: visits the page's or the post's editor and waits
+  # until it is ready to be typed into (`await_admin_controllers`: the
+  # controllers connected and the live part answered). `locale:` opens it in
+  # that language. It signs nobody in (`sign_in_via_form`) and returns nothing.
+  def visit_editor(record, locale: nil)
+    path = case record
+    when Page then admin_page_path(record, locale: locale)
+    when Post then admin_post_path(record, locale: locale)
+    else raise ArgumentError, "visit_editor opens the editor of a Page or a Post, not #{record.class}"
+    end
+    visit_screen(path)
+  end
+
+  # The entry to any other CS Studio screen: `visit` and then the wait for its
+  # controllers. A test that starts on a screen begins here, so the first thing
+  # it does is not lost to a controller still connecting.
+  def visit_screen(path)
+    visit(path)
+    await_admin_controllers
   end
 
   # An open editor catches up once when its subscription is confirmed
@@ -400,21 +421,32 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # that would see it changed under it, so the wait is here, on its own, with
   # its own message. A page with no editor has nothing to wait for.
   def await_live_part(wait: 8)
-    await_js("(() => { const region = document.getElementById('editing'); return !region || !region.hasAttribute('data-live-part') || region.dataset.livePart === 'answered' })()", wait: wait)
+    await_js("(() => { const region = document.getElementById('editing'); return !region || !region.hasAttribute('data-live-part') || region.dataset.livePart === 'answered' })()", wait: wait, message: "the editor's live part never answered (#editing[data-live-part] stayed at its first value)")
   end
 
-  def await_controllers_connected
-    page.evaluate_async_script(<<~JS)
-      const done = arguments[arguments.length - 1]
-      const ready = () => {
-        const app = window.Stimulus
-        if (!app) return false
-        return Array.from(document.querySelectorAll("[data-controller*='admin--']")).every((element) =>
-          element.getAttribute("data-controller").split(" ").filter((name) => name.startsWith("admin--"))
-            .every((name) => app.getControllerForElementAndIdentifier(element, name)))
-      }
-      const poll = () => (ready() ? done(true) : setTimeout(poll, 20))
-      poll()
-    JS
+  # Fails after `wait` seconds, naming the controllers that never connected,
+  # instead of leaving the script to the driver's own timeout.
+  def await_controllers_connected(wait: 8)
+    missing = using_wait_time(wait + 1) do # see `await_js`
+      page.evaluate_async_script(<<~JS, wait * 1000)
+        const [timeout, done] = [arguments[0], arguments[arguments.length - 1]]
+        const deadline = Date.now() + timeout
+        const unconnected = () => {
+          const app = window.Stimulus
+          if (!app) return ["window.Stimulus"]
+          return Array.from(document.querySelectorAll("[data-controller*='admin--']")).flatMap((element) =>
+            element.getAttribute("data-controller").split(" ").filter((name) => name.startsWith("admin--"))
+              .filter((name) => !app.getControllerForElementAndIdentifier(element, name)))
+        }
+        const poll = () => {
+          const missing = unconnected()
+          if (missing.length === 0) return done([])
+          if (Date.now() > deadline) return done(Array.from(new Set(missing)))
+          setTimeout(poll, 20)
+        }
+        poll()
+      JS
+    end
+    assert_empty missing, "these controllers never connected within #{wait} s: #{missing.join(", ")}"
   end
 end

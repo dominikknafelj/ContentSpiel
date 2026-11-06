@@ -37,7 +37,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     bare = create_media_asset(filename: "tiny.png") # its widths are not made: the preview stands in
     @asset.update_columns(width: 3000, height: 2000) # version: none (a test's own size)
 
-    visit_editor
+    visit_editor(@landing)
     within("#page-hero-image-section") { click_on "Choose image" }
     pick_from_library(bare)
     thumb = "#page-hero-image-section img[data-admin--media--field-target=thumbnail]"
@@ -60,7 +60,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     # Hero: choose the library image. The hero's alt override now shows the
     # image's own default as its placeholder.
-    visit_editor
+    visit_editor(@landing)
     within("#page-hero-image-section") { click_on "Choose image" }
     pick_from_library(@asset)
     within("#page-hero-image-section") { assert_button "Change image" }
@@ -75,15 +75,14 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_selector "header img[src='#{@asset.src}'][srcset*='480w']"
 
     # Image block: the same image.
-    visit_editor
+    visit_editor(@landing)
     within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
     pick_from_library(@asset)
     assert_eventually { block.reload.media_asset_id == @asset.id }
 
     # Rich text: the Image button opens the same picker and inserts an
     # `image{asset_id}` node.
-    visit "/cs-studio/posts/#{post.id}"
-    await_admin_controllers
+    visit_editor(post)
     find(".ProseMirror").click
     press_insert "Image"
     # Picking opens the image dialog, so not `pick_from_library`,
@@ -107,7 +106,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_link "Rich text — post “Notes” (en)"
 
     # Removing the hero clears the reference; the usage goes with it.
-    visit_editor
+    visit_editor(@landing)
     within("#page-hero-image-section") { click_on "Remove image" }
     within("#page-hero-image-section") { assert_button "Choose image" }
     assert_eventually { @landing.reload.hero_media_asset_id.nil? }
@@ -120,7 +119,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   test "an upload through the picker's header Upload: a refused file keeps its tile and reason, a good one is selected, Use image lands it in an image block" do
     block = @landing.content_blocks.create!(block_type: "image", position: 0)
-    visit_editor
+    visit_editor(@landing)
 
     within("##{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -149,7 +148,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   # The carried requirement: one good and one refused file in a single batch.
   test "a batch of one good and one refused file in the picker: the good one becomes a tile and is selected, the refused one keeps its reason and Dismiss" do
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -182,7 +181,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   test "choosing: a click only selects, Use image fills the field, a double click picks at once" do
     other = create_media_asset(filename: "tiny.png")
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -211,7 +210,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   end
 
   test "the keyboard selects a tile with Enter or Space and a second Enter on the selected tile confirms" do
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     tile = nil
@@ -228,7 +227,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   test "the search is instant with no button, segments filter inside the dialog, and the selection survives" do
     other = create_media_asset(filename: "tiny.png")
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -255,7 +254,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   end
 
   test "Escape clears the search first, a second Escape closes the dialog and focus goes back to the opener" do
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -274,7 +273,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   end
 
   test "the × and Cancel close without choosing, and a press that begins inside and ends on the backdrop leaves it open" do
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -314,7 +313,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     stored = create_media_asset(filename: "tiny.png")
     assert Pages::Save.call(@landing, attributes: { hero_media_asset_id: stored.id }).ok?
     doomed = create_media_asset(filename: "medium.png")
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Change image" }
     within("dialog[open]") { assert_button doomed.title }
@@ -345,7 +344,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   end
 
   test "Escape closes the picker and returns focus to the button that opened it" do
-    visit_editor
+    visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
     assert_selector "dialog[open]"
@@ -368,7 +367,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # whichever the timing gives it.
   test "the picker's top edge stays where it is when the grid arrives and when a search narrows it" do
     other = create_media_asset(filename: "tiny.png")
-    visit_editor
+    visit_editor(@landing)
     page.execute_script(<<~JS)
       const original = window.fetch
       window.__gridHeld = new Promise((release) => { window.__releaseGrid = release })
@@ -409,7 +408,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # own making, not the picker's.
   test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
     page.driver.resize(1400, 900)
-    visit_editor
+    visit_editor(@landing)
     # Make sure there is 600px to scroll whatever the editor's own height is.
     page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 0)")
     button_top = page.evaluate_script("Math.round(document.querySelector('#page-hero-image-section button').getBoundingClientRect().top)")
@@ -434,11 +433,6 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_equal scrolled_to, box["scrollY"]
   ensure
     page.driver.resize(1400, 1400)
-  end
-
-  def visit_editor
-    visit "/cs-studio/pages/#{@landing.id}"
-    await_admin_controllers
   end
 
   # Select-then-use (D14): a click selects the tile, Use image confirms.

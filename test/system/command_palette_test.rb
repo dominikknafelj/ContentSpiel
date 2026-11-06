@@ -159,8 +159,7 @@ class CommandPaletteTest < ApplicationSystemTestCase
   test "Ctrl+K does nothing while another dialog is open" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form users(:one)
-    visit "/cs-studio/pages/#{root_page.id}"
-    await_admin_controllers
+    visit_editor(root_page)
 
     find("#tree a", text: "+ New page").click
     assert_selector "dialog#new-page-dialog[open]"

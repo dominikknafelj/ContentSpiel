@@ -22,8 +22,7 @@ class Admin::NotesViewOnlySystemTest < ApplicationSystemTestCase
   def marker(block) = "#notes-marker-ContentBlock-#{block.id}"
 
   test "a read-only viewer starts a note from a block's menu, whose only item is Add note, and sees it" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     assert_selector "[data-view-only-hint]"
     # Nothing at rest: the control beside the name is not shown.
     assert_selector "#{marker(@text)}:not([data-has-notes])", visible: :all
@@ -49,8 +48,7 @@ class Admin::NotesViewOnlySystemTest < ApplicationSystemTestCase
   end
 
   test "a read-only viewer's tile in a section has the same menu, and its control is not shown at rest either" do
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     assert_equal "0", find(marker(@inside), visible: :all).evaluate_script("getComputedStyle(this).opacity")
 
     within(card(@inside)) do

@@ -19,8 +19,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
   def mention(subject, body = "Is this ready, @[#{@me.id}]?") = as(users(:two)) { Notes::Start.call(subject, body: body) }.record
 
   def open_dashboard
-    visit "/cs-studio"
-    await_admin_controllers
+    visit_screen "/cs-studio"
   end
 
   test "a row of Notes for you opens the page with its drawer at the thread, which reads it: the dot, the count and the badge go" do

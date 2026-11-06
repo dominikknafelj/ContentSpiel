@@ -14,8 +14,7 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
   end
 
   test "choosing a date preset or a channel applies at once; Custom reveals the two dates" do
-    visit admin_audit_events_path
-    await_admin_controllers
+    visit_screen admin_audit_events_path
     assert_selector "#audit_event_#{@recent.id}"
     assert_selector "#audit_event_#{@old.id}"
 
@@ -41,8 +40,7 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
   end
 
   test "a row opens its event page, and Older goes to the next event in the list" do
-    visit admin_audit_events_path
-    await_admin_controllers
+    visit_screen admin_audit_events_path
 
     time_link = find("#audit_event_#{@recent.id} a.text-xs")
     assert_no_match(/mono/i, time_link.evaluate_script("getComputedStyle(this).fontFamily"))
