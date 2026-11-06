@@ -4,7 +4,7 @@
    replaces the block's template keeps these by writing the same classes.
 
    The code and its head stand on the sunken ground, so the head reads as
-   `dim`: `meta` on sunken is 4.3:1 in the light theme. A band re-values the
+   `dim`: `meta` on sunken is 4.71:1 in the light theme, `dim` is stronger. A band re-values the
    tokens for what is inside it (`sections.css`), so nothing here knows a
    band.
 

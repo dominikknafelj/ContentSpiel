@@ -73,8 +73,8 @@
    block added later is right without a rule here.
 
    Tinted is the sunken surface. Ink, dim and the accent stay readable on it
-   (4.5:1 or better in both themes); `meta` does not in the light theme
-   (4.3:1), so it reads as `dim` here. A code block's own sunken background
+   (4.5:1 or better in both themes); `meta` is 4.71:1 in the light theme,
+   but it reads as `dim` here, the stronger of the two. A code block's own sunken background
    would vanish into the band, so it takes the surface. */
 .content-section--tinted {
   background: var(--th-band-tinted);
@@ -83,7 +83,7 @@
   /* A table's tokens are computed where they are declared, on the page, so
      the band gives the two that differ: the ground (its sticky column and its
      fade must match the band they stand on) and the caption, which is
-     --th-meta and would keep the page's value, 4.3:1 on this band in the
+     --th-meta and would keep the page's value, 4.71:1 on this band in the
      light theme, where the line above reads it as dim. */
   --th-table-ground: var(--th-band-tinted);
   --th-table-caption: var(--th-dim);
@@ -163,7 +163,7 @@
      band's accent. The computed tokens would otherwise keep the page's.
      The tinted band re-values none of them: the card's tokens are computed
      on the page, where --th-meta is still the page's, and the frame is
-     still 3:1 against the band (4.06:1 light, 4.93:1 dark). */
+     still 3:1 against the band (4.71:1 light, 4.93:1 dark). */
   --th-card-ground: color-mix(in srgb, var(--th-on-band-strong) 6%, var(--th-band-strong));
   --th-card-line: var(--th-on-band-strong-dim);
   --th-card-icon: var(--th-on-band-strong-accent);
