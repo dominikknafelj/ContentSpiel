@@ -1,0 +1,66 @@
+#!/bin/sh
+# contentspiel: the command a ContentSpiel site is run with.
+#
+# This file is frozen: it is installed once (install.sh) and never has to
+# change with a release. It does not do the work, it runs the site's pinned
+# image and hands every argument over to it.
+#
+# THE ONE PROMISE this wrapper relies on: inside every image there is an
+# executable named `contentspiel`, and it takes the arguments exactly as typed.
+# Keep that name and that behaviour in the image and this file stays valid.
+#
+# Which image: the first line of `.contentspiel-version`, looked for in the
+# current folder and then each parent up to `/`; none found means `stable`.
+# The folder holding that pin is the site and is mounted at /site; without a
+# pin the current folder is. The only network use is the image pull `docker
+# run` does by itself.
+#
+# CONTENTSPIEL_IMAGE replaces the image's name (to try a local image).
+set -eu
+
+IMAGE=${CONTENTSPIEL_IMAGE:-ghcr.io/dominikknafelj/content_spiel}
+
+# Walk up from the current folder to the first one holding a pin.
+site=""
+dir=$(pwd -P)
+while :; do
+  if [ -f "$dir/.contentspiel-version" ]; then
+    site=$dir
+    break
+  fi
+  [ "$dir" = / ] && break
+  dir=$(dirname "$dir")
+done
+
+if [ -n "$site" ]; then
+  version=$(head -n 1 "$site/.contentspiel-version" | tr -d '[:space:]')
+  [ -n "$version" ] || version=stable
+else
+  site=$(pwd -P)
+  version=stable
+fi
+
+# Ask for a terminal only when there is one, or docker refuses to start.
+tty_flag=""
+if [ -t 0 ] && [ -t 1 ]; then
+  tty_flag="-t"
+fi
+
+# $tty_flag is deliberately unquoted: empty means no argument at all.
+# shellcheck disable=SC2086
+run_image() {
+  docker run --rm -i $tty_flag \
+    --user "$(id -u):$(id -g)" \
+    -v "$site:/site" -w /site \
+    "$IMAGE:$version" contentspiel "$@"
+}
+
+# `dev` is the one command run differently: the image writes the compose file
+# of ITS version (so the file is the pinned one's), then compose runs it.
+if [ "${1:-}" = dev ]; then
+  run_image dev-files
+  cd "$site"
+  exec docker compose -f .contentspiel/compose.yml up
+fi
+
+run_image "$@"
