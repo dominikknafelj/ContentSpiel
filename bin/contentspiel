@@ -139,6 +139,13 @@ when "new"
     generator.write
   rescue ContentSpiel::SiteGenerator::Refused, Theme::Scaffold::Refused => error
     refuse.(error.message)
+  rescue SystemCallError => error
+    # The folder can't be written (no permission, a full disk, a read-only
+    # mount): one sentence, not a stack trace. The generator has removed
+    # whatever it had written. The system's own words, without Ruby's
+    # "@ function - path" part, which names a hidden temp folder.
+    refuse.("Could not write the site #{name}/ here: #{error.message.sub(/ @ .*\z/m, "")}. " \
+            "Check that this folder can be written, then run contentspiel new again.")
   end
   puts "Wrote the site #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."
   puts "Next: cd #{name}, then follow README.md, from step 1: fill in the placeholders at the top of config/deploy.yml."

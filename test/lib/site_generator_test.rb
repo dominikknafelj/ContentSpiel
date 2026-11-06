@@ -313,6 +313,20 @@ class SiteGeneratorTest < ActiveSupport::TestCase
     end
   end
 
+  test "new in a folder that can't be written says so in one sentence, with no stack trace, and leaves nothing" do
+    in_tmp do |dir|
+      File.chmod(0o555, dir)
+      out, status = entrypoint("new", "demo-site", chdir: dir, env: { "RAILS_ENV" => "test" })
+
+      assert_equal 1, status.exitstatus, out
+      assert_equal "Could not write the site demo-site/ here: Permission denied. " \
+                   "Check that this folder can be written, then run contentspiel new again.\n", out
+      assert_empty Dir.children(dir)
+    ensure
+      File.chmod(0o755, dir)
+    end
+  end
+
   test "the image finds contentspiel on PATH, and its entrypoint hands it over with no db:prepare" do
     assert_match(%r{^ENV PATH="\$\{PATH\}:/rails/bin"$}, File.read(Rails.root.join("Dockerfile")))
 
