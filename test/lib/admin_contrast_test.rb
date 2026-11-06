@@ -131,6 +131,25 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # An open or focused tile (`content-spiel.tailwind.css`, `.admin-block-tile`)
+  # is ringed in the accent outside its edge, where it stands on the section
+  # frame's tint or, in a lane at the page's own width, on the canvas.
+  test "the open tile's accent ring is 3:1 or better against the frame's ground and the canvas" do
+    each_scheme do |scheme, colour|
+      %w[--cs-paper --cs-structure-tint].each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the tile's ring on #{ground} (#{scheme})") }
+    end
+  end
+
+  # The preview's words (`TileSummaryComponent`): the heading in ink and the
+  # text in dim, on the tile at rest and raised.
+  test "a tile's preview is readable on the tile at rest and raised" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].product(%w[--cs-surface --cs-tile-raised]).each do |ink, ground|
+        assert_ratio(4.5, colour.(ink), colour.(ground), "#{ink} on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   test "words on a raised tile are readable: ink, dim and meta 4.5:1 on --cs-tile-raised" do
     each_scheme do |scheme, colour|
       %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-tile-raised"), "#{ink} on --cs-tile-raised (#{scheme})") }

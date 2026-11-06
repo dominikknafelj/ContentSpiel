@@ -80,6 +80,20 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "tile-summary"
   end
 
+  # The preview is drawn inside the tile summary's element, so the stream
+  # that replaces it after a save carries the new heading and text.
+  test "a saved rich text in a section streams its tile's new preview" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0, body: rich_doc("Before"))
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { body: rich_doc("## Opening hours\n\nWe open at nine.").to_json }, base_updated_at: inside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary'] template" do
+      assert_select ".admin-block-tile__title", text: "Opening hours"
+      assert_select ".admin-block-tile__text", text: "We open at nine."
+    end
+  end
+
   test "a saved block in a section streams the summary of what was saved, and a refused stale save streams none" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
@@ -1668,7 +1682,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "tip", block.reload.settings["kind"]
   end
 
-  test "a Note in a column says its kind and text on its tile, is duplicated with its title, and is deleted" do
+  test "a Note in a column says its title on its tile, is duplicated with its title, and is deleted" do
     section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
     post blocks_path, params: { block: { block_type: "note" }, section_id: section.id, column: 2 }, as: :turbo_stream
     assert_response :success
@@ -1677,7 +1691,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     save_note(block, { kind: "important", title: "Read this" })
     assert_response :success
-    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template", text: /Read this · Empty/
+    assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template .admin-block-tile__title", text: "Read this"
     assert_select "turbo-stream[target='block-#{block.id}-tile-summary'] template svg", count: 0
     assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-tile'] template span[data-block-icon='circle_alert']"
     assert_select "turbo-stream[action='replace'][target='block-#{block.id}-icon-card'] template span[data-block-icon='circle_alert']"

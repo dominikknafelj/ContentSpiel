@@ -244,6 +244,32 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
   end
 
+  # A tile's states are drawn by elevation (`.admin-block-tile`): at rest
+  # the first, under the pointer the second, open or focused the third with
+  # the accent ring outside its edge, its thread open the accent outline
+  # inside it. No border: the drop place's dashes are the only edge a tile
+  # shows, and only while it is the place a drag would land.
+  TILE_STATES = {
+    [ ".admin-block-tile" ] => [ "var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ],
+    [ ".admin-block-tile:where(:hover)" ] => [ "box-shadow: var(--cs-shadow-2)", "background: var(--cs-tile-raised)" ],
+    [ '.admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"]))', ".admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible))" ] =>
+      [ "box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent)", "background: var(--cs-tile-raised)" ],
+    [ ".admin-block-tile[data-notes-active]" ] => [ "outline: 2px solid var(--cs-accent)", "outline-offset: -2px" ],
+    [ ".admin-drag-ghost" ] => [ "border: 1.5px dashed var(--cs-line-strong)", "border-radius: var(--cs-radius-tile)", "box-shadow: none" ],
+    [ ".admin-drag-chosen" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ],
+    [ ".admin-drag-fallback" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ]
+  }.freeze
+
+  test "a tile's states are elevations and the accent, and none of them is a border" do
+    TILE_STATES.each do |selectors, declarations|
+      body = rule_for(selectors)
+      declarations.each { |declaration| assert_includes body, declaration, selectors.join(", ") }
+      assert_no_match(/(?<![\w-])border(?:-color)?:/, body, selectors.join(", ")) unless selectors == [ ".admin-drag-ghost" ]
+    end
+    order = TILE_STATES.keys.first(4).map { |selectors| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, open or focused, then the thread: the later state wins at one weight"
+  end
+
   test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
     [ 'class="border ', "border-line ", "border-line-strong\"", "border-danger'", "border-accent ", "border-field-line\"", "data-[notes-active]:border-accent " ].each { |sample| assert_match BORDER_EDGE, sample }
     [ "rounded-card ", "outline-accent ", "border-b ", "borderless ", "admin-border-x " ].each { |sample| assert_no_match BORDER_EDGE, sample }

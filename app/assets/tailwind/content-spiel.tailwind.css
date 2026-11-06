@@ -710,12 +710,23 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-block-card[data-card-edge="held"] { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
 .admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
-.admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
-.admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
+/* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
+   its states are elevations, with no border. At rest the first; under the
+   pointer the second, raised, and never moved, so nothing shifts under a
+   pointer that drags or clicks; open or focused (its face's `aria-expanded`,
+   its face's `:focus-visible`: the ring is the face's focus ring) the third
+   with a 2px accent ring outside its edge, 3:1 on the frame's tint and the
+   canvas (`test/lib/admin_contrast_test.rb`). The states are inside
+   `:where()`, so each weighs what the rest rule weighs and the later wins:
+   open over the pointer, and the drag rules below over all three. */
+.admin-block-tile { border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+.admin-block-tile:where(:hover) { box-shadow: var(--cs-shadow-2); background: var(--cs-tile-raised); }
+.admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"])),
+.admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible)) { box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent); background: var(--cs-tile-raised); }
 /* The tile of the block whose thread is open in the notes drawer
-   (`admin--notes--drawer#markActive`). Here and not a utility on the tile: the tile's
-   border is set by the rule above, which a utility does not outweigh. */
-.admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
+   (`admin--notes--drawer#markActive`): the card's notes edge, a 2px accent
+   outline inside the edge, which leaves the shadow and the ring alone. */
+.admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 
 /* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
    image and still GIF tile"). Its box is the picture's own size and shows
@@ -843,17 +854,20 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
-   outline with its content hidden. The chosen row is the lifted one -- the
-   only drag state that carries a shadow (`--cs-shadow-4`, the highest: it is above everything in the list).
+   edge with its content hidden and no shadow, the only edge a tile ever
+   shows. The chosen row is the lifted one, on the popover's ground -- the
+   highest elevation (`--cs-shadow-4`: it is above everything in the list).
+   Each weighs what a tile's states weigh and comes after them, so a ghost or
+   a lifted tile is never drawn hovered or open.
 
    Both Sortables run with `forceFallback` (Firefox can't start a native drag
    from the `<button>` handles), so what follows the pointer is a clone
    SortableJS appends to `<body>` with `fallbackClass`: styled as the lifted
    row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
-.admin-drag-ghost { border: 1px dashed var(--cs-line-strong); border-radius: var(--cs-radius-tile); background: transparent; }
+.admin-drag-ghost { border: 1.5px dashed var(--cs-line-strong); border-radius: var(--cs-radius-tile); background: transparent; box-shadow: none; }
 .admin-drag-ghost > * { visibility: hidden; }
-.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-4); }
-.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-4); }
+.admin-drag-chosen { background: var(--cs-popover); box-shadow: var(--cs-shadow-4); }
+.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius-tile); background: var(--cs-popover); box-shadow: var(--cs-shadow-4); }
 /* The placeholder is also the "chosen" element for the length of a mouse
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }

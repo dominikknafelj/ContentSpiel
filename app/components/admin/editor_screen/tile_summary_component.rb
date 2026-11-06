@@ -1,15 +1,24 @@
 module Admin
   module EditorScreen
-    # One line of a block's content on its tile (sections spec §4.2): the
-    # start of a text, an image's file name with a small thumbnail, or the
-    # line a type with a `summary` answers itself (the Code block's file
-    # name, or its language and first line; a post list's filter).
+    # What a closed block's tile says of its content (sections spec §4.2):
+    # the type's preview, a heading over a few lines of its text, or, for a
+    # type with no preview or a blank one, one line: the start of a text,
+    # an image's file name with a small thumbnail, or the line a type with a
+    # `summary` answers itself (a post list's filter, an empty Code block's
+    # "Empty").
     # A block in a section's column is a tile until it is opened, so this
-    # line is all that says which block it is -- and what marks the ones that
+    # is all that says which block it is -- and what marks the ones that
     # need attention, as a card would: an image block without an image (see
-    # `#missing_image?`), a
-    # type that is no longer registered, a save that was refused as invalid
-    # (`invalid:`).
+    # `#missing_image?`), a type that is no longer registered, a save that
+    # was refused as invalid (`invalid:`).
+    #
+    # THE PREVIEW (`#preview`, a `ContentModel::Preview` the type's
+    # `preview` answers) is plain text, cut by the Preview itself: the
+    # heading is one line (`truncate`), the text at most three
+    # (`line-clamp-3`), in the mono face when it is code (`mono`). Both are
+    # ERB-escaped where they are drawn, never `raw`: they are what a person
+    # typed. A preview with nothing in it is not drawn, so an empty block
+    # keeps its line ("Empty text") and never shows an empty heading.
     #
     # WHAT THE LINE IS comes from the type's definition, never from its name:
     # the columns it uses (`uses_columns`) or its own `summary`, so a type a
@@ -30,17 +39,16 @@ module Admin
     # (`truncate` on the element around the parts), after the count that
     # every tile's text is cut at (`LENGTH`).
     #
-    # THE TILE IS THE ONLY PLACE a closed block has a line of its content. A
+    # THE TILE IS THE ONLY PLACE a closed block shows its content. A
     # card of the page's own list that is collapsed
     # (`admin--editor--blocks#toggle`) shows its type's label and nothing
-    # else, for every type, so the Code block's line (design answer C7,
-    # "tile and collapsed card") is here and not on the card.
+    # else, for every type.
     #
     # It is its own component with its own id because it is the one part of
-    # a tile that a save changes: `Admin::ContentBlocksController#update`
-    # replaces it (`dom_id`) with every answer for a block in a section. The
-    # tile around it -- the button that holds the focus and `aria-expanded`
-    # -- is never re-rendered by a save.
+    # a tile that a save changes: `Admin::Answers::BlockDrawing#tile_summary_stream`
+    # replaces it (`dom_id`) with every answer for a block in a section, so
+    # the preview follows a save. The tile around it -- the button that
+    # holds the focus and `aria-expanded` -- is never re-rendered by a save.
     #
     # `invalid:` is only ever true in such an answer. A block's stored state
     # is always valid, so a tile drawn with the page has nothing to say here.
@@ -78,6 +86,25 @@ module Admin
 
       def attention? = invalid || definition.nil? || missing_image?
 
+      # The type's preview, or nil: for a type with none, one with nothing
+      # in it, and an outside type whose `preview` raised or answered
+      # something that is not a Preview (see `#own_preview`).
+      def preview
+        return @preview if defined?(@preview)
+
+        @preview = (own_preview if definition&.preview)
+      end
+
+      # The preview's text, in the mono face when it is code: the one mono
+      # the tile draws besides a summary's `:mono` part (`MONO_ALLOWED` names
+      # this file). `whitespace-pre-wrap` keeps code's lines and indents.
+      def preview_text_class
+        [ "admin-block-tile__text line-clamp-3 text-sm text-dim", ("font-cs-mono whitespace-pre-wrap" if preview.mono) ].compact.join(" ")
+      end
+
+      # "Needs fixing" under a preview: a refused save's word, alone.
+      def needs_fixing = t(".needs_fixing")
+
       # The image drawn small (`Admin::Ui::LibraryImageComponent`: a width, the
       # preview or a box, as the Media grid draws it), for a type that uses one
       # and has it.
@@ -110,8 +137,33 @@ module Admin
 
       # The definitions whose faulty summary has been logged, so a page of
       # twenty such tiles says it once (per registration: a reload makes new
-      # definitions, and says it again).
+      # definitions, and says it again). A faulty preview is kept apart, so a
+      # type with both faults says each once.
       FAULTY = ObjectSpace::WeakMap.new
+      FAULTY_PREVIEW = ObjectSpace::WeakMap.new
+
+      # A type's own preview. As with `own_summary`, an OUTSIDE type's is a
+      # gem's code: one that raises, or answers something that is not a
+      # Preview, would be a 500 on every editor page holding a block of the
+      # type, so its tile draws the summary line instead, and the log and
+      # `Rails.error` hear it once, naming the type and the error's class and
+      # never its message in the log line. A built-in's raises.
+      def own_preview
+        answer = definition.preview.call(block, locale: locale)
+        raise ArgumentError, "#{block.block_type}'s preview answered a #{answer.class}: a preview is a ContentModel::Preview or nil" unless answer.nil? || answer.is_a?(ContentModel::Preview)
+
+        answer.presence
+      rescue StandardError => error
+        raise unless definition.owner
+
+        unless FAULTY_PREVIEW.key?(definition)
+          FAULTY_PREVIEW[definition] = true
+          said = "[ContentSpiel] the block type #{definition.name}'s preview could not be drawn (#{error.class}); its tiles show the summary line" # i18n-ok: a log line for whoever runs the site, not a word of CS Studio
+          Rails.logger.error(said)
+          Rails.error.report(error, handled: true, context: { block_type: definition.name })
+        end
+        nil
+      end
 
       # A type's own line. An OUTSIDE type's summary is a gem's code: one that
       # raises, or answers a part of no known kind, was a 500 on every editor

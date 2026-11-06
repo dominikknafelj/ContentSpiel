@@ -19,25 +19,41 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
   def menu_items = Capybara.string(rendered_content).all("[role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
 
-  test "the tile shows the type's icon in place of its name, and the face is still named by the type" do
+  # The face's first line is the type: its chip and its name in the label
+  # voice. The name is the face's first span's text, which the move
+  # announcement reads (`editor/containers.js`, `titleOf`); the chip is
+  # `aria-hidden` and adds no words to it.
+  test "the face holds the type chip and the name first, then the preview, and the name is the face's first span" do
+    text = @editor_page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 2, position: 0, body: rich_doc("## Opening hours\n\nWe open at nine."))
+    render_tile(text)
+
+    face = ".admin-block-tile__face"
+    assert_selector "#{face}.px-3\\.5.py-3"
+    assert_selector "#{face} > span:first-child > [data-block-icon][class~='size-5.5'] + span.text-label.text-meta", exact_text: "Rich text"
+    assert_equal "Rich text", page.find("#{face} > span:first-child").text
+    assert_selector "#{face} > span:first-child + #block-#{text.id}-tile-summary .admin-block-tile__title", exact_text: "Opening hours"
+    assert_selector "#{face} #block-#{text.id}-tile-summary .admin-block-tile__text", exact_text: "We open at nine."
+    assert_no_selector "#{face} .sr-only"
+    assert_no_selector "#{face}[class*='outline-accent'], #{face}[class*='outline-2']"
+  end
+
+  test "the tile shows the type's icon beside its name, and the face is named by the type" do
     render_tile
 
     assert_selector ".admin-block-tile__face [data-block-icon=image][class~='size-5.5'] svg[class~='size-3.5']"
-    assert_selector ".admin-block-tile__face .sr-only", text: "Image"
-    assert_selector ".admin-block-tile__face > span:first-child.sr-only", text: "Image"
-    assert_no_selector ".admin-block-tile__face span.font-semibold", text: "Image"
+    assert_selector ".admin-block-tile__face > span:first-child", exact_text: "Image"
   end
 
   # Plan ruling 12: a note's tile shows its kind's icon, under the id a
   # save's answer replaces, one icon only, and the face still says "Note".
-  test "a note's tile shows its kind's icon in place of the type's name, once, and the face is still named Note" do
+  test "a note's tile shows its kind's icon beside the type's name, once, and its kind's word over its text" do
     block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
     render_tile(block)
 
     assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='size-5.5'] svg[class~='size-3.5']"
     assert_selector ".admin-block-tile__face [data-block-icon]", count: 1
-    assert_selector ".admin-block-tile__face .sr-only", text: "Note"
-    assert_selector ".admin-block-tile__face", text: /Warning · Empty/
+    assert_selector ".admin-block-tile__face > span:first-child", exact_text: "Note"
+    assert_selector ".admin-block-tile__face .admin-block-tile__title", exact_text: "Warning"
   end
 
   # Review focus 3.
@@ -46,7 +62,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
       block = @editor_page.content_blocks.create!(block_type: "gallery/album", section: @section, section_column: 2, position: 0)
       render_tile(block)
 
-      assert_selector ".admin-block-tile__face span.font-semibold", text: "Album"
+      assert_selector ".admin-block-tile__face > span:first-child > span.text-label.text-meta:only-child", exact_text: "Album"
       assert_no_selector "[data-block-icon]"
       render_inline Admin::EditorScreen::BlockPickerComponent.new(page: @editor_page, locale: "en")
       assert_selector "#block-picker-end button", text: "Album"

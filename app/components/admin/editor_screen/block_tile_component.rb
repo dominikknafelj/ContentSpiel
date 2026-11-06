@@ -1,8 +1,11 @@
 module Admin
   module EditorScreen
     # A block inside a section, as it stands in its column (sections spec
-    # §4.2): its type and one line of its content, on a button that opens the
-    # block's form under the lanes (`admin--editor--section#toggle`).
+    # §4.2): its type (chip and name) over its preview or its one line
+    # (`TileSummaryComponent`), on a button that opens the block's form under
+    # the lanes (`admin--editor--section#toggle`). Its states -- under the
+    # pointer, open or focused, dragged, its thread open -- are the
+    # stylesheet's (`.admin-block-tile`), drawn by elevation.
     #
     # THE TILE HAS THE BLOCK'S `dom_id`, as a card of the block list has: it
     # is the element that stands for the block where the block is, the one a
@@ -120,10 +123,10 @@ module Admin
       def note_key = ::Notes.key(block)
 
       # A type whose icon follows its block (the Note's kind) shows the block's own.
-      # The type's icon stands in for its name on the face (contrast and
-      # buttons spec, C2), which then keeps the name as `sr-only` text so the
-      # face's accessible name still says the type. A type with no icon
-      # keeps its visible name (Ruling 7).
+      # The chip stands before the type's name on the face's first line; it
+      # is `aria-hidden`, so the face's accessible name and the move
+      # announcement read the name. A type with no icon shows its name alone
+      # (Ruling 7).
       def block_icon = @block_icon ||= Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: :tile, block: block)
 
       def icon? = block_icon.render?
