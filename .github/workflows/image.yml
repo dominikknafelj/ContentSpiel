@@ -107,10 +107,23 @@ jobs:
   # NOTHING IS PUSHED, AND NO SECRET IS REAL. The job's token reads packages
   # and nothing more; the site's image is built into the runner's Docker and
   # removed at the end; every secret the boot is given is made up in the step
-  # that uses it.
+  # that uses it. The one exception is the Postgres password, below.
   site-template:
     needs: build
     runs-on: ubuntu-latest
+
+    # A healthy run takes a few minutes: an image pull, a site build and a
+    # boot. Without a limit a hung `docker run` or build would hold a runner
+    # for GitHub's six hours.
+    timeout-minutes: 20
+
+    # `shell: bash` named, for every step: only then does GitHub run a step as
+    # `bash --noprofile --norc -eo pipefail {0}`. With no shell named it is
+    # `bash -e {0}`, without pipefail, and the steps below are written for
+    # pipefail (a failing command inside a pipe fails the step).
+    defaults:
+      run:
+        shell: bash
 
     permissions:
       contents: read
@@ -134,9 +147,14 @@ jobs:
     # config/database.yml fixes for every production database, and here it is
     # the superuser, so `db:prepare` creates the four databases itself where a
     # real site's init script (config/postgres/10-contentspiel-databases.sh)
-    # makes them for an ordinary role. Its password is a made-up one in the
-    # open: the database lives as long as the job and is reachable from
-    # nothing outside it.
+    # makes them for an ordinary role.
+    #
+    # THE PASSWORD IS FIXED, AND WRITTEN HERE: an accepted exception to "every
+    # secret is made up in its step". A service's `env:` is read before any
+    # step runs, so it cannot take a value a step generates. It protects
+    # nothing: the service publishes no port, so the database is reachable
+    # only from containers on the job's own network, and it is thrown away
+    # with the job.
     services:
       postgres:
         image: postgres:17
@@ -267,7 +285,7 @@ jobs:
         run: |
           docker build \
             --build-arg CMS_IMAGE="$CMS_IMAGE" \
-            --build-arg CMS_VERSION="${{ github.sha }}" \
+            --build-arg CMS_VERSION="$GITHUB_SHA" \
             -t "$SITE_IMAGE" .
 
       # Production under the site's image, with the variables the template's
@@ -285,9 +303,14 @@ jobs:
       # `db:prepare` (bin/docker-entrypoint), which loads the four schemas,
       # and then the server: /up answering 200 is the whole boot.
       - name: Boot the site in production
+        # The `job` context is not readable in the job's own `env:`, so the
+        # service's network is handed over here, and the script reads a
+        # variable, never an expression.
+        env:
+          POSTGRES_NETWORK: ${{ job.services.postgres.network }}
         run: |
           docker run -d --name "$BOOT" \
-            --network "${{ job.services.postgres.network }}" \
+            --network "$POSTGRES_NETWORK" \
             -p "127.0.0.1:$SITE_PORT:80" \
             -e SECRET_KEY_BASE="$(openssl rand -hex 64)" \
             -e PUBLIC_HOST="http://localhost:$SITE_PORT" \
@@ -300,12 +323,15 @@ jobs:
             -e ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT="$(openssl rand -hex 16)" \
             "$SITE_IMAGE"
 
-          # About 90 seconds: a fresh database takes four schema loads before
-          # the server starts. A container that has stopped will not answer,
-          # so that ends the wait at once.
+          # 90 seconds by the clock (bash's SECONDS), not by a count of tries:
+          # each try may wait up to curl's --max-time 5 on a server that has
+          # taken the connection and not answered. A fresh database takes four
+          # schema loads before the server starts. A container that has
+          # stopped will not answer, so that ends the wait at once.
           up=""
-          for _ in $(seq 1 45); do
-            if [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SITE_PORT/up" || true)" = 200 ]; then
+          deadline=$((SECONDS + 90))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if [ "$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SITE_PORT/up" || true)" = 200 ]; then
               up=yes
               break
             fi
@@ -331,4 +357,6 @@ jobs:
         run: |
           docker rm -f "$BOOT" 2> /dev/null || true
           docker rmi -f "$SITE_IMAGE" 2> /dev/null || true
-          rm -rf "$RUNNER_TEMP/site-template"
+          # `|| true`: a cleanup that fails (a file left by a container as
+          # another user) must not hide the failure that came before it.
+          rm -rf "$RUNNER_TEMP/site-template" || true
