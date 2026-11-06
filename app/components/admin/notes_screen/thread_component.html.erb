@@ -126,7 +126,7 @@
       stands in the composer and names it (`form=`). `data-note-jump-class` is
       the small secondary's classes for the "n new messages" button the
       script puts on the dock (`notes/merge.js`). %>
-  <div id="<%= dom_id %>-reply" data-note-part="reply" data-note-jump-class="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>" class=""sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
+  <div id="<%= dom_id %>-reply" data-note-part="reply" data-note-jump-class="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>" class="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
     <%= form_with url: change_path(thread.resolved? ? "reopen" : "resolve"), id: state_form_id, class: "hidden", data: { turbo_frame: "notes" } do %><% end %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: reply_path, key: key, label: t(".reply"), submit: t(".send_reply"), mentions_url: mentions_path,
           body: reply_failure&.dig(:body).to_s, names: reply_failure&.dig(:names) || {}, errors: reply_failure&.dig(:errors),
