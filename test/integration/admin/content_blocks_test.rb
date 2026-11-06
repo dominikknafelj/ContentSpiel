@@ -602,7 +602,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
 
     assert_select ".admin-section-card", count: 0
-    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card.border-danger", text: /Unavailable type — gone\/section/
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card[data-card-edge=unavailable]", text: /Unavailable type — gone\/section/
   end
 
   test "deleting a section whose type is gone deletes its blocks and removes its card" do

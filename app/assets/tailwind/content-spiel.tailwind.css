@@ -32,6 +32,7 @@
   --color-field-fill: var(--cs-field-fill);
   --color-rail: var(--cs-rail);
   --color-popover: var(--cs-popover);
+  --color-tile-raised: var(--cs-tile-raised);
   --color-structure: var(--cs-structure);
   --color-structure-tint: var(--cs-structure-tint);
   --color-structure-ink: var(--cs-structure-ink);
@@ -695,6 +696,20 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-layout-choice[aria-current="true"] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-layout-choice[aria-current="true"] .admin-layout-diagram > span { background: var(--cs-accent); }
 .admin-section-errors:not(:has(p)) { display: none; }
+/* A block card's state edge (`Admin::EditorScreen::BlockCardComponent`): a 2px
+   outline inside the card's edge, so the card keeps its size and its shadow.
+   Held by someone else is the field line, its type gone is danger, its thread
+   open in the notes drawer (`admin--notes--drawer#markActive`) is the accent.
+   Where two apply, the later rule wins: unavailable over notes-active over
+   held. The three weigh the same, (0,2,0): the notes rule leaves a section's
+   card out inside `:where()`, which adds no weight. Each edge is 3:1 or
+   better on the card and on the canvas (`test/lib/admin_contrast_test.rb`)
+   and is never the only cue: the hold
+   strip, the "Unavailable type" sentence and the open thread say it in
+   words. */
+.admin-block-card[data-card-edge="held"] { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
+.admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
 /* The tile of the block whose thread is open in the notes drawer

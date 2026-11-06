@@ -25,6 +25,42 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::BlockCardComponent.new(page: page, block: block, locale: "en", **options)
   end
 
+  # A border utility of any colour, or a rule under the head.
+  BORDER_UTILITY = /(?<![\w:-])border(?:-[a-z][\w-]*)?(?![\w-])/
+
+  test "a card is a raised tile with no border of its own and no rule under its head" do
+    record = create_page(title: "Raised test")
+    block = record.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: record)
+
+    card = page.find(".admin-block-card")
+    assert_equal %w[admin-block-card bg-surface rounded-card shadow-1], card[:class].split.sort
+    assert_nil card["data-card-edge"]
+    head = card.find(".admin-block-card__head", match: :first)
+    assert_equal %w[admin-block-card__head flex gap-2 items-center pb-1 pt-3 px-3], head[:class].split.sort
+    assert_no_match BORDER_UTILITY, head[:class]
+    assert_no_match(/hover:bg-sunken/, head[:class])
+    assert_selector ".admin-block-card__head > .admin-block-card__handle:first-child + [data-block-icon]"
+  end
+
+  test "a held card says so in data-card-edge=held, an unavailable one in data-card-edge=unavailable, and neither carries a border utility" do
+    held_setup
+    reserve(@held_block, @held_page, @dana, B)
+    render_for(users(:one), A)
+    held = page.find("#content_block_#{@held_block.id}")
+    assert_equal "held", held["data-card-edge"]
+    assert_no_match BORDER_UTILITY, held[:class]
+
+    gone = @held_page.content_blocks.create!(block_type: "rich_text", position: 1)
+    gone.update_column(:block_type, "gone/thing")
+    render_card(gone.reload, page: @held_page)
+    unavailable = page.find("#content_block_#{gone.id}")
+    assert_equal "unavailable", unavailable["data-card-edge"]
+    assert_no_match BORDER_UTILITY, unavailable[:class]
+    assert_no_match BORDER_UTILITY, unavailable.find(".admin-block-card__head", match: :first)[:class]
+  end
+
   test "the header has a drag handle, the type name as a collapse button and a Block actions menu" do
     page = create_page(title: "Header test")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
@@ -147,14 +183,14 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_text "Shows the newest posts of this type.", count: 1
   end
 
-  test "an unavailable type is a danger-bordered card with its sentence, Delete block… only, and no form" do
+  test "an unavailable type is a card with the danger edge, its sentence, Delete block… only, and no form" do
     page = create_page(title: "Unavailable test")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
     block.update_column(:block_type, "gone/thing")
 
     render_card(block.reload, page: page)
 
-    assert_selector ".admin-block-card.border-danger"
+    assert_selector ".admin-block-card[data-card-edge='unavailable']"
     assert_text "Unavailable type — gone/thing"
     assert_text "Its content is kept but can’t be shown or edited."
     assert_selector "button", text: "Delete block…"
@@ -437,21 +473,20 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#block-#{@held_block.id}-hold[data-editing-strip-slot]:empty"
   end
 
-  test "the card's border is line-strong and its menu has Take over first (handoff 2, 3)" do
+  test "the card has the held edge and its menu has Take over first (handoff 2, 3)" do
     held_setup
     reserve(@held_block, @held_page, @dana, B)
 
     render_for(users(:one), A)
 
-    assert_selector "#content_block_#{@held_block.id}.border-line-strong"
-    assert_no_selector "#content_block_#{@held_block.id}.border-line"
+    assert_selector "#content_block_#{@held_block.id}[data-card-edge='held']"
     items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all).map { |item| item.text(:all).strip }
     assert_equal [ "Take over", "Add note", "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items
     assert_selector "[role=menu] button[type=button][data-action='admin--editing--hold#takeOver']", text: "Take over", visible: :all
     assert_selector "[role=menu] button[data-move='up']:not([disabled]), [role=menu] form[action$='/duplicate']", visible: :all
   end
 
-  test "someone who may only read sees the strip without Take over and the ordinary border (handoff 26)" do
+  test "someone who may only read sees the strip without Take over and no held edge (handoff 26)" do
     held_setup
     reserve(@held_block, @held_page, @dana, B)
 
@@ -460,8 +495,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#block-#{@held_block.id}-hold", text: "Dana Weiss is editing this block"
     assert_no_selector "#block-#{@held_block.id}-hold button"
     assert_no_selector "button", text: "Take over", visible: :all
-    assert_selector "#content_block_#{@held_block.id}.border-line"
-    assert_no_selector "#content_block_#{@held_block.id}.border-line-strong"
+    assert_selector "#content_block_#{@held_block.id}.admin-block-card:not([data-card-edge])"
   end
 
   test "the rich-text field of a held card has no toolbar and says read-only (handoff 7)" do

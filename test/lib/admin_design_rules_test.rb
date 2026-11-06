@@ -217,6 +217,38 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
+  # A block card's and a tile's state (held, its type gone, its thread open)
+  # is an outline inside its edge, drawn by the stylesheet from an attribute,
+  # so nothing changes size and no shadow is overwritten; a border utility on
+  # the wrapper or the head would be a second edge beside it.
+  EDITOR_CARDS = %w[block_card_component.html.erb block_tile_component.html.erb].map { |f| "app/components/admin/editor_screen/#{f}" }.freeze
+  EDITOR_CARD_WRAPPER = /class[=:].*(?<![\w-])admin-block-(?:card|tile)(?:__head)?(?![\w-])/
+  BORDER_EDGE = /(?<![\w-])border(?:-(?:line|line-strong|danger|accent|field-line))?(?=[\s"'])/
+  # In the order they win by: the later rule, at one weight.
+  CARD_EDGES = { '.admin-block-card[data-card-edge="held"]' => "--cs-field-line",
+                 ".admin-block-card:where(:not(.admin-section-card))[data-notes-active]" => "--cs-accent",
+                 '.admin-block-card[data-card-edge="unavailable"]' => "--cs-danger" }.freeze
+
+  test "the editor's cards and tiles draw no border utility: their edges are the stylesheet's state outlines" do
+    wrappers = EDITOR_CARDS.flat_map { |path| Rails.root.join(path).readlines.each_with_index.select { |line, _| line.match?(EDITOR_CARD_WRAPPER) }.map { |line, index| [ path, index, line ] } }
+    assert_operator wrappers.size, :>=, 3, "the wrapper lines are found: the card's, its head's and the tile's"
+    offences = wrappers.select { |_, _, line| line.match?(BORDER_EDGE) }.map { |path, index, _| "#{path}:#{index + 1}" }
+    assert_empty offences, "a border utility on a card or tile wrapper"
+
+    CARD_EDGES.each do |selector, token|
+      body = single_rule(selector)
+      assert_match(/outline:\s*2px solid var\(#{token}\)/, body, selector)
+      assert_match(/outline-offset:\s*-2px/, body, selector)
+    end
+    order = CARD_EDGES.keys.map { |selector| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == [ selector ] } }
+    assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
+  end
+
+  test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
+    [ 'class="border ', "border-line ", "border-line-strong\"", "border-danger'", "border-accent ", "border-field-line\"", "data-[notes-active]:border-accent " ].each { |sample| assert_match BORDER_EDGE, sample }
+    [ "rounded-card ", "outline-accent ", "border-b ", "borderless ", "admin-border-x " ].each { |sample| assert_no_match BORDER_EDGE, sample }
+  end
+
   # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
   # link, a label and a script take): an outlined box with a field-line edge on
   # a button, a menu's trigger or anything a pointer presses is the old look

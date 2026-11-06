@@ -119,6 +119,24 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A block card's state edges (`content-spiel.tailwind.css`): held, its
+  # type gone, its thread open. The edge is the card's only outline, so it is
+  # held to a state's 3:1 on the card it is drawn inside and on the canvas
+  # around the card.
+  test "a card's state edge is 3:1 or better against the card and the canvas, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-field-line --cs-danger --cs-accent].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
+        assert_ratio(3.0, colour.(edge), colour.(ground), "the #{edge} edge on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  test "words on a raised tile are readable: ink, dim and meta 4.5:1 on --cs-tile-raised" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-tile-raised"), "#{ink} on --cs-tile-raised (#{scheme})") }
+    end
+  end
+
   test "the primary's, the secondary's and the danger confirm's words are 4.5:1 or better on their fills, at rest and hovered" do
     each_scheme do |scheme, colour|
       assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent"), "the primary at rest (#{scheme})")

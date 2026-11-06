@@ -365,7 +365,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
 
     pick_by_keyboard(tile(gone), "Move out of section")
 
-    assert_selector "#{card(gone)}.border-danger", text: "Unavailable type — gone/thing"
+    assert_selector "#{card(gone)}[data-card-edge='unavailable']", text: "Unavailable type — gone/thing"
     assert_writes_settled
     assert_equal [ @section.id, gone.id ], @page.content_blocks.top_level.reorder(:position).ids
     assert_nil gone.reload.section_id

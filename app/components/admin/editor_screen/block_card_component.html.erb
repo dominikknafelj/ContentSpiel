@@ -1,8 +1,11 @@
-<%# `data-notes-active` is set by `admin--notes--drawer#markActive` while a thread on this
-    block is the one open in the drawer (notes handoff, "Block card marker").
-    The card keeps `rounded-cs` and its border until stage 2 redraws the editor's cards. %>
-<%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface data-[notes-active]:border-accent", (unavailable? ? "border-danger" : (read_only_hold? ? "border-line-strong" : "border-line")) ], **wrapper_attributes do %>
-  <div class="admin-block-card__head flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
+<%# A card floats at elevation 1 and has no border of its own. Its state is an edge
+    inside it, drawn by `content-spiel.tailwind.css` from an attribute: `data-card-edge`
+    (`#card_edge`: held by someone else, or its type gone) and `data-notes-active`, set by
+    `admin--notes--drawer#markActive` while a thread on this block is the one open in the
+    drawer (notes handoff, "Block card marker"). Each edge stands beside its words: the
+    hold strip, the "Unavailable type" sentence, the open thread. %>
+<%= tag.div id: wrapper_id, class: "admin-block-card rounded-card bg-surface shadow-1", **wrapper_attributes do %>
+  <div class="admin-block-card__head flex items-center gap-2 px-3 pt-3 pb-1">
     <%# Not for an unavailable card: it has no body, no menu with Move up / Move
         down, and a handle that only moves a card nobody can read would be the one
         move a keyboard user couldn't undo with the menu. %>

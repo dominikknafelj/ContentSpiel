@@ -716,6 +716,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     Editing::Reservation.claim(subject: list, record: @page, user: @dana, tab: "tab-dddddddd")
     send_delayed
     assert_selector "#{card(list)} [role=alert]", text: "Dana Weiss is editing this block. Your changes weren't saved.", wait: LIVE
+    assert_selector "#{card(list)}[data-card-edge='held']", wait: 0
 
     page.execute_script("window.__marker = 'same document'")
     url = page.current_url
