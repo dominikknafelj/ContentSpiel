@@ -381,7 +381,10 @@ export default class extends Controller {
       const away = [ ...this.element.querySelectorAll("[data-editing-away]") ]
       const before = new Set([ list, ...away ].flatMap((root) => [ ...root.querySelectorAll("[data-editing-gone]") ]))
       const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart, away }))
-      result.gone.filter((unit) => !before.has(unit)).forEach((unit) => this.dispatch("deleted", { detail: { blockId: unit.dataset.blockId, unit } }))
+      // A section's own settings form names its block by its region's
+      // `data-section-id`, as a card or a panel names it by `data-block-id`.
+      const blockOf = (unit) => unit.dataset.blockId ?? unit.closest("[data-section-id]")?.dataset.sectionId
+      result.gone.filter((unit) => !before.has(unit)).forEach((unit) => this.dispatch("deleted", { detail: { blockId: blockOf(unit), unit } }))
       if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
       return this.dispatch("merged", { detail: { part, replaced: [], ...result } })
     }

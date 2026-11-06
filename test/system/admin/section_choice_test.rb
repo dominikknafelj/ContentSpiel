@@ -315,6 +315,246 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
     end
   end
 
+  # ---- Nothing typed in the rail is lost ----
+
+  RELOAD_LATER = "Something on this page changed elsewhere. Reload once your unsaved text is safe.".freeze
+  CLAIM = '/editing/(page|post)/\\d+/claim(\\?.*)?$'.freeze
+  LIVE = 8
+
+  def anchor_field(section = @section) = "#block-#{section.id}-anchor"
+
+  # Marks the rail's region, so a test can tell it is the same element later.
+  def mark_region(section = @section) = page.execute_script("document.querySelector(#{settings_region(section).to_json}).__same = true")
+
+  def same_region?(section = @section) = page.evaluate_script("document.querySelector(#{settings_region(section).to_json}).__same === true")
+
+  def delay_next(verb, source)
+    page.execute_script(<<~JS, verb, source)
+      const [ verb, source ] = arguments
+      let spent = false
+      const real = window.fetch
+      window.fetch = function (input, init = {}) {
+        const url = typeof input === "string" ? input : input.url
+        const method = String(init.method || "GET").toUpperCase()
+        if (!spent && method === verb && new RegExp(source).test(url)) {
+          spent = true
+          const args = arguments
+          return new Promise((resolve) => { window.__delayed = () => resolve(real.apply(window, args)) })
+        }
+        return real.apply(this, arguments)
+      }
+    JS
+  end
+
+  def await_delayed = assert_eventually(wait: LIVE, message: "the delayed request never reached the page's fetch") { page.evaluate_script("typeof window.__delayed === 'function'") }
+
+  def send_delayed = page.execute_script("window.__delayed(); window.__delayed = null")
+
+  # An anchor typed into the rail's region whose save never goes: what a
+  # deleted section's region holds when its colleague's delete arrives.
+  def type_unsent(text, section = @section)
+    form = "#section-#{section.id}-form".to_json
+    page.execute_script("const a = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{form}), 'admin--saving--autosave'); a.saveNow = () => {}")
+    find(anchor_field(section)).send_keys(text)
+    page.execute_script("const a = window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{form}), 'admin--saving--autosave'); clearTimeout(a.timer); a.timer = null")
+  end
+
+  test "a refused move with text typed in the rail while it was out does not redraw the list, and the text is saved on its base" do
+    at_window(WIDE) do
+      open_docked
+      open_anchor
+      find(anchor_field).send_keys("intro")
+      ContentBlock.where(id: @left.id).update_all(section_column: 2, position: 1) # version: none (a test's own stale screen)
+      # The anchor's edit is sent ahead of the move (`sendHeldEdits` counts the rail's forms); the move is held.
+      script_writes("pass", "hold")
+
+      drop_into(@left, "#content-blocks-list")
+      await_js "typeof window.__release[1] === 'function'"
+      assert_includes page.evaluate_script("window.__writes[0]"), "/content_blocks/#{@section.id}", "the rail's edit was not sent ahead of the move"
+      mark_region
+      find(anchor_field).send_keys("-more")
+      page.execute_script("window.__release[1]()")
+
+      assert_selector "#content-blocks-alert", text: ContentBlocks::Reorder::STALE
+      assert_selector "#content-blocks-alert", text: RELOAD_LATER
+      assert same_region?, "the rail's region was replaced"
+      assert_one_region
+      assert_selector in_rail, visible: :visible
+      assert_equal "intro-more", find(anchor_field).value
+      page.execute_script("document.activeElement.blur()")
+      assert_writes_settled
+      assert_equal "intro-more", @section.reload.settings["anchor"]
+      assert_no_text "Changed elsewhere"
+    end
+  end
+
+  test "a reorder's Undo while the rail holds text inside its debounce keeps the region, and the text is saved on its base" do
+    at_window(WIDE) do
+      open_docked
+      find("#{card_of(@second)} button[aria-label='Section actions']").click
+      click_button "Move up"
+      assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
+      assert_writes_settled
+
+      open_anchor
+      mark_region
+      find(anchor_field).send_keys("intro")
+      within("#toasts") { press "Undo" }
+
+      assert_selector "#toasts .admin-toast", text: /Order restored/, wait: 10
+      assert_equal [ @section.id, @second.id ], cards_in_list
+      assert same_region?, "the rail's region was replaced by the redrawn card's"
+      assert_one_region
+      assert_selector in_rail, visible: :visible
+      assert_selector "#{card_of(@section)}[data-chosen]"
+      assert_equal "intro", find(anchor_field).value
+      assert_writes_settled
+      assert_equal "intro", @section.reload.settings["anchor"]
+      assert_no_text "Changed elsewhere"
+    end
+  end
+
+  # A 409 and a refused move have one cause, a second editor on the page,
+  # so the two meet: the paused form's text is the only copy, and the list
+  # is not drawn over it.
+  test "a 409-paused anchor in the rail that meets a refused move keeps its text and its region" do
+    at_window(WIDE) do
+      open_docked
+      open_anchor
+      travel 1.minute do
+        as_unheard(@dana) { ContentBlocks::Save.call(@section.reload, attributes: { settings: @section.settings.merge("anchor" => "theirs") }) }
+      end
+      find(anchor_field).send_keys("mine")
+      page.execute_script("document.activeElement.blur()")
+      assert_selector "#block-#{@section.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
+      mark_region
+      ContentBlock.where(id: @left.id).update_all(section_column: 2, position: 1) # version: none (a test's own stale screen)
+
+      drop_into(@left, "#content-blocks-list")
+
+      assert_selector "#content-blocks-alert", text: ContentBlocks::Reorder::STALE
+      assert_selector "#content-blocks-alert", text: RELOAD_LATER
+      assert same_region?, "the rail's region was replaced"
+      assert_one_region
+      assert_equal "mine", find(anchor_field).value
+      assert_selector "#block-#{@section.id}-save-status", text: "CHANGED ELSEWHERE"
+      # Paused, it sends nothing over the colleague's save.
+      assert_equal "theirs", @section.reload.settings["anchor"]
+    end
+  end
+
+  def deleted_strip = "#{in_rail} #block-#{@section.id}-hold [data-editing-kind]"
+
+  def delete_chosen_with_text
+    open_docked
+    await_notes_live
+    open_anchor
+    type_unsent("unsaved words")
+    as(@dana, channel: :admin) { ContentBlocks::Destroy.call(@section.reload) }
+    assert_selector "#{in_rail} [role=alert]", text: "Dana Weiss deleted this block. Your changes weren't saved.", wait: LIVE
+  end
+
+  test "a section deleted under unsaved text in the rail keeps its text there, with the notice and its Remove" do
+    at_window(WIDE) do
+      delete_chosen_with_text
+
+      assert_no_selector card_of(@section)
+      assert_selector deleted_strip, visible: :visible
+      assert_equal "unsaved words", find(anchor_field).value
+      assert_one_region
+      within(deleted_strip) { click_button "Remove" }
+      assert_no_selector settings_region, visible: :all
+      assert_empty_line
+    end
+  end
+
+  test "Close on a deleted section's region with unsaved text keeps it, with its text" do
+    at_window(WIDE) do
+      delete_chosen_with_text
+
+      find(close_button).click
+      await_frames
+      assert_selector in_rail, visible: :visible
+      assert_equal "unsaved words", find(anchor_field).value
+      keyboard.type(:escape)
+      await_frames
+      assert_selector in_rail, visible: :visible
+      assert_selector deleted_strip, visible: :visible
+    end
+  end
+
+  test "an undock with a deleted section's region holding text keeps it in sight in the blocks column" do
+    at_window(WIDE) do
+      delete_chosen_with_text
+
+      page.current_window.resize_to(NARROW, 900)
+      assert_docked(false)
+      assert_selector ".admin-content-blocks #{settings_region}", visible: :visible
+      assert_one_region
+      assert_equal "unsaved words", find(anchor_field).value
+      assert_selector "#block-#{@section.id}-hold [data-editing-kind]", visible: :visible
+      within("#block-#{@section.id}-hold [data-editing-kind]") { click_button "Remove" }
+      assert_no_selector settings_region, visible: :all
+    end
+  end
+
+  test "a section deleted while its region in the rail is clean takes the region with it" do
+    at_window(WIDE) do
+      open_docked
+      await_notes_live
+      open_anchor
+
+      as(@dana, channel: :admin) { ContentBlocks::Destroy.call(@section.reload) }
+
+      assert_no_selector card_of(@section), wait: LIVE
+      assert_no_selector settings_region, visible: :all
+      assert_empty_line
+    end
+  end
+
+  # A hold's reveal (`admin--editing--hold#reveal`) shows a frozen form with
+  # no field: it is not a press, so the rail stays where the person is.
+  test "a section's lost hold while the person types in the page settings leaves the Page panel, the focus and the text" do
+    at_window(WIDE) do
+      open_docked
+      await_notes_live
+      find(word("background")).click
+      delay_next("POST", CLAIM)
+      find("#block-#{@section.id}-background").find("option[value=tinted]").select_option
+      await_delayed
+      # The select keeps the press for itself while it has the focus.
+      page.execute_script("document.activeElement.blur()")
+      find(close_button).click
+      assert_selector at_home, visible: :hidden
+      assert_selector "#editor-grid-tab-page[aria-selected=true]"
+      Editing::Reservation.claim(subject: @section, record: @page, user: @dana, tab: "tab-dddddddd")
+      find("#page-title").click
+      find("#page-title").send_keys(" now")
+
+      send_delayed
+
+      assert_selector "#block-#{@section.id}-hold [data-editing-kind=lost]", wait: LIVE
+      assert_selector "#{at_home} form[data-editing-frozen=true]", visible: :visible
+      assert_selector "#editor-grid-tab-page[aria-selected=true]"
+      assert_selector "#page-settings", visible: :visible
+      assert focus_is_on("#page-title"), "the focus left the title"
+      assert_equal "Landing now", find("#page-title").value
+      assert_no_selector "[data-chosen]"
+    end
+  end
+
+  test "a held section chosen in the rail shows its selection" do
+    Editing::Reservation.claim(subject: @section, record: @page, user: @dana, tab: "tab-bbbbbbbb", now: Time.current)
+    at_window(WIDE) do
+      open_docked
+      find(word("width")).click
+      assert_selector "#{card_of(@section)}[data-chosen][data-card-edge=held]"
+      outline = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{card_of(@section).to_json})); return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor ] })()")
+      accent = page.evaluate_script("(() => { const probe = document.createElement('span'); probe.style.color = 'var(--cs-accent)'; document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour })()")
+      assert_equal [ "solid", "2px", "2px", accent ], outline
+    end
+  end
+
   def asks_before_unload?
     page.evaluate_script(<<~JS)
       (() => {

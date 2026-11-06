@@ -1,5 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
+const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
+
 // Choosing a section (`admin--editor--section-choice`), on the page editor's
 // rail grid beside `admin--ui--rail`. Where the rail docks, pressing a
 // section head's words ("3 columns ▾") shows that section's settings region
@@ -11,19 +13,23 @@ import { Controller } from "@hotwired/stimulus"
 //
 // THE WORDS ARE THE ONLY TARGET THAT SELECTS. This hears one event,
 // `admin--editor--section:open-settings`, which the card dispatches when a
-// word is pressed (or `admin--editing--hold#reveal` must show a frozen form)
-// and which nothing else of the card sends: its ground, a tile, a handle, a
-// lane and "+ Add" choose nothing, so a drag never selects.
+// word is pressed, with the word's setting as `field`; nothing else of the
+// card sends it with a field, so its ground, a tile, a handle, a lane and
+// "+ Add" choose nothing and a drag never selects. The one other sender,
+// `admin--editing--hold#reveal`, shows a frozen form with no field: that is
+// not a press, so it is left alone and the region opens in place under its
+// head, with no tab switched and no focus moved under someone typing
+// elsewhere in the rail.
 //
 // IT MOVES ONE ELEMENT AND NEVER CLONES. The region is the element the
 // section's form is registered with in the write queue (`saving/queue.js`):
-// its id, its base, its debounce and its save state go where it goes. Taking
-// it (`take`) cancels the card's event, so the card opens nothing in place,
-// appends the region to the slot, shows it and marks it `data-editing-away`
-// (what live editing reads, below). A Stimulus controller keeps its instance
-// across a move, and an autosave form that comes back with an edit inside
-// its debounce sends it (`admin--saving--autosave`, `saveStates`), so a move
-// loses no text and no save.
+// its id, its base and its save state go where it goes. Taking it (`take`)
+// cancels the card's event, so the card opens nothing in place, appends the
+// region to the slot, shows it and marks it `data-editing-away` (what live
+// editing reads, below). A move disconnects the form's autosave controller
+// and connects it again on the same instance, and that reconnect sends an
+// edit still inside its debounce (`admin--saving--autosave`, `saveStates`),
+// so a move loses no text and no save.
 //
 // FOUR MOMENTS PUT IT BACK (`release`), as the card's child after its home
 // marker (`[data-section-settings-home]`, where `SectionCardComponent` draws
@@ -33,7 +39,9 @@ import { Controller } from "@hotwired/stimulus"
 //   tab the person last left (`admin--ui--rail:conceal`);
 // - the rail undocking (`admin--ui--rail:docked` with `docked: false`: a
 //   narrowed window, an unfolded tree): the region stays open under its head,
-//   and the control that had the focus has it again, with its selection;
+//   and the control that had the focus has it again, with its selection. A
+//   rail that docks again says "Choose a section" while that region stays
+//   open in place, where its word closes it;
 // - Turbo's snapshot (`turbo:before-cache`), so a restored page has it where
 //   the server draws it;
 // - this controller disconnecting.
@@ -46,19 +54,39 @@ import { Controller } from "@hotwired/stimulus"
 // `data-editing-away` where it stands (`editing/merge.js`, "WHAT A SCRIPT
 // MOVED AWAY"), keeps `data-editing-away` and the card's `data-chosen` (its
 // RUNTIME set) and leaves `hidden` to this controller. Nothing else is
-// written on the region; its look in the rail is the stylesheet's, keyed on
-// where it stands. Two things can take the section away under it:
-// - a list merge whose answer has no such section returns a clean region in
-//   `awayGone` (`admin--editing--live:merged`, `merged`), and this removes it;
-// - a stream that removes or redraws the card ("Remove section", a list
-//   redrawn by a refused move) leaves the chosen card disconnected
-//   (`streamed`), and the region in the rail belongs to nothing: it is
-//   removed, since a redrawn card brings a region of its own.
-// Either way the panel says "Choose a section" again. A region that holds
-// unsaved text when its section goes is kept by the merge with its unit
-// marked gone, as everywhere; closing it puts it nowhere and removes it.
+// written on the region; the stylesheet keys its look in the rail on
+// `[data-editing-away]`. A list a refused move would redraw counts the
+// region's form among the list's (`editor/move_queue.js`, `listForms`).
+//
+// NOTHING TYPED IN IT IS LOST. What can take the section away under it:
+// - a stream that redraws the card (a reorder's Undo, a list redrawn after a
+//   refusal) brings a fresh region of the same id inside the new card
+//   (`streamed`): the fresh one is removed and the new card marked chosen,
+//   so the region in the rail stays the one registered form;
+// - a list merge whose answer has no such section: a clean region comes back
+//   in `awayGone` (`merged`) and is removed, and one holding text is kept by
+//   the merge with its unit marked gone. It is given its own strip slot
+//   (`#block-<id>-hold`), which its card took away with it, so the
+//   "deleted, copy your text" notice is drawn in the rail.
+// A region with no card left is never removed while it holds text
+// (`holdsText`): Close and Escape leave it shown, an undock parks it, open,
+// under the blocks' alert, and it goes only by the strip's Remove
+// (`admin--editing--hold#remove`). A section removed while its region is
+// clean takes the region with it, and the panel says "Choose a section".
 export default class extends Controller {
   static targets = [ "slot", "empty" ]
+
+  slotTargetConnected(slot) {
+    // The panel says "Choose a section" again whenever its region goes, by
+    // this controller or by the strip's Remove.
+    this.observer = new MutationObserver(() => { if (!this.chosen && this.hasEmptyTarget) this.emptyTarget.hidden = false })
+    this.observer.observe(slot, { childList: true })
+  }
+
+  slotTargetDisconnected() {
+    this.observer?.disconnect()
+    this.observer = null
+  }
 
   disconnect() {
     this.release()
@@ -67,17 +95,26 @@ export default class extends Controller {
   get docked() { return this.element.hasAttribute("data-rail-docked") }
 
   // The region in the slot, if any.
-  get chosen() { return this.slotTarget.querySelector("[data-editing-away]") }
+  get chosen() { return this.hasSlotTarget ? this.slotTarget.querySelector(":scope > [data-editing-away]") : null }
 
-  // The card of the chosen region's section, wherever the list has it.
+  // The card of a region's section, wherever the list has it.
   cardOf(region) {
     return region ? document.querySelector(`.admin-section-card[data-block-id="${CSS.escape(region.dataset.sectionId)}"]`) : null
   }
 
+  // Whether the region's form holds text the server does not have, or its
+  // unit is marked gone (its section deleted under unsaved text).
+  holdsText(region) {
+    if (region.matches("[data-editing-gone]") || region.querySelector("[data-editing-gone]")) return true
+    return [ ...region.querySelectorAll(AUTOSAVE) ]
+      .map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave"))
+      .some((form) => form && (!form.clean() || form.outstanding() || !form.unchanged()))
+  }
+
   // `admin--editor--section:open-settings`, from a card: a word pressed.
   take(event) {
-    if (!this.docked) return
-    const region = event.detail?.region
+    if (!this.docked || !event.detail?.field) return
+    const region = event.detail.region
     if (!region) return
     event.preventDefault()
 
@@ -96,7 +133,8 @@ export default class extends Controller {
   // Another section's words were pressed: the chosen one closes as its own
   // card closes it (its form sends what it holds, its words say closed, its
   // hold is let go), with the focus left for the section being chosen, and
-  // `closed` puts it home without the rail going back a tab.
+  // `closed` puts it home without the rail going back a tab. A region whose
+  // card is gone and that holds text is parked, with its text.
   closeChosen(region) {
     const card = this.cardOf(region)
     const section = card && this.application.getControllerForElementAndIdentifier(card, "admin--editor--section")
@@ -107,17 +145,19 @@ export default class extends Controller {
     } finally {
       this.switching = false
     }
-    if (this.chosen === region) this.release()
+    if (this.chosen === region) this.release({ orphan: "park" })
   }
 
   // Puts the chosen region back under its head. `open` keeps it shown there
   // (the rail undocked under it); otherwise it goes home hidden. `refocus`
   // gives the focus back to the control inside it that had it, which the
-  // move took away.
-  release({ open = false, refocus = false } = {}) {
-    if (!this.hasSlotTarget) return
+  // move took away. A region whose card is gone is removed only when clean;
+  // one that holds text stays shown where it is (`orphan: "stay"`) or is
+  // parked, open and still away, under the blocks' alert (`"park"`). True
+  // when the region left the slot.
+  release({ open = false, refocus = false, orphan = "stay" } = {}) {
     const region = this.chosen
-    if (!region) return
+    if (!region) return false
     const card = this.cardOf(region)
     const home = card?.querySelector(":scope > [data-section-settings-home]")
     const fallen = !document.activeElement || document.activeElement === document.body
@@ -126,8 +166,12 @@ export default class extends Controller {
     const selection = focused ? (this.lastFocus === focused && this.lastSelection) || selectionOf(focused) : null
     this.lastFocus = null
 
-    region.removeAttribute("data-editing-away")
-    if (home) {
+    if (!home && this.holdsText(region)) {
+      region.hidden = false
+      if (orphan !== "park") return false
+      document.getElementById("content-blocks-alert")?.after(region)
+    } else if (home) {
+      region.removeAttribute("data-editing-away")
       if (!open) region.hidden = true
       home.after(region)
     } else {
@@ -140,6 +184,7 @@ export default class extends Controller {
       focused.focus({ preventScroll: true })
       if (selection) try { focused.setSelectionRange(...selection) } catch { /* a control without a selection */ }
     }
+    return true
   }
 
   // Which control in the slot has the focus, and its selection, as the focus
@@ -155,13 +200,18 @@ export default class extends Controller {
     else if (event.target === this.lastFocus) this.lastSelection = selectionOf(event.target)
   }
 
-  // `admin--editor--section-settings:closed`: the chosen region closed in
-  // the rail. Home, and the rail back to where the person was.
+  // `admin--editor--section-settings:closed`: an away region closed (in the
+  // rail, or parked in the blocks column). Home, and the rail back to where
+  // the person was; a region with no card that holds text stays shown.
   closed(event) {
-    const region = this.chosen
-    if (!region || event.detail?.sectionId !== region.dataset.sectionId) return
-    this.release()
-    if (!this.switching) this.dispatch("conceal", { target: this.emptyTarget, prefix: "admin--ui--rail" })
+    const region = event.target
+    if (!(region instanceof Element) || !region.hasAttribute("data-editing-away")) return
+    if (!this.cardOf(region) && this.holdsText(region)) {
+      region.hidden = false
+      return
+    }
+    if (region !== this.chosen) return region.remove()
+    if (this.release() && !this.switching) this.dispatch("conceal", { target: this.emptyTarget, prefix: "admin--ui--rail" })
   }
 
   // `admin--ui--rail:docked`: undocked, the region goes back open under its
@@ -172,7 +222,7 @@ export default class extends Controller {
   // `noteBlur`), and it takes the focus back only while nothing else has it.
   undocked(event) {
     if (event.detail?.docked !== false || !this.chosen) return
-    this.release({ open: true, refocus: true })
+    this.release({ open: true, refocus: true, orphan: "park" })
     this.dispatch("conceal", { target: this.emptyTarget, prefix: "admin--ui--rail" })
   }
 
@@ -182,15 +232,27 @@ export default class extends Controller {
   }
 
   // `admin--editing--live:merged`: a list merge whose answer lacked the
-  // chosen section handed back its clean region.
+  // chosen section. Its clean region comes back in `awayGone` and goes; one
+  // whose unit the merge marked gone gets the strip slot its card took away,
+  // before the notice that is fetched for it is drawn (`deleted` came first).
   merged(event) {
     const region = this.chosen
-    if (!region || !(event.detail?.awayGone || []).includes(region)) return
-    this.forget(region)
+    if (!region) return
+    if ((event.detail?.awayGone || []).includes(region)) return this.forget(region)
+    if (!(event.detail?.gone || []).some((unit) => region.contains(unit))) return
+    this.cardOf(region)?.removeAttribute("data-chosen")
+    const slotId = `block-${region.dataset.sectionId}-hold`
+    if (region.querySelector(`#${CSS.escape(slotId)}`)) return
+    const slot = document.createElement("div")
+    slot.id = slotId
+    slot.setAttribute("data-editing-strip-slot", "")
+    region.prepend(slot)
   }
 
   // `turbo:before-stream-render` on the document: after the stream is drawn,
-  // a chosen card that left the document takes its region with it.
+  // a chosen card that was redrawn is marked chosen again and its fresh
+  // region taken out, so the one in the rail stays the section's; a chosen
+  // card that left the document takes a clean region with it.
   streamed(event) {
     const render = event.detail.render
     event.detail.render = async (stream) => {
@@ -198,7 +260,12 @@ export default class extends Controller {
       const region = this.chosen
       if (!region) return
       const card = this.cardOf(region)
-      if (!card || !card.hasAttribute("data-chosen")) this.forget(region)
+      if (card && !card.hasAttribute("data-chosen")) {
+        card.querySelector(`:scope > #${CSS.escape(region.id)}`)?.remove()
+        card.setAttribute("data-chosen", "")
+      } else if (!card && !this.holdsText(region)) {
+        this.forget(region)
+      }
     }
   }
 

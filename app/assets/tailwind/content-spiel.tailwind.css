@@ -777,11 +777,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
      forced visible whatever the `<details>`' own `open` (as a translation
      pair's reference card is), and the person's open or closed is theirs
      again below the threshold. On the rail's ground they are not a card of
-     their own (owner). */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
+     their own: the rail is already their ground and their elevation, and a
+     card's ground and shadow on it would be a second depth. Only where
+     `::details-content` is understood: a browser without it could not show
+     a folded `<details>`, so there the settings stay the card they are
+     below the threshold, with their summary to open them. */
+  @supports selector(::details-content) {
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
+  }
 }
 /* A section's settings region that `admin--editor--section-choice` moved
    into the Section panel: the panel's padding is its edge and the rail its
@@ -823,11 +829,6 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    ground, and the lanes under it need no padding of their own above. */
 .admin-section-card { container-type: inline-size; border: 1.5px solid var(--cs-structure); border-radius: var(--cs-radius-frame); background: transparent; }
 .admin-section-card[data-card-edge="unavailable"] { border-color: var(--cs-danger); }
-/* The section chosen in the editor's rail (`admin--editor--section-choice`):
-   a selection, so the accent, 2px outside the frame (3:1 on the canvas,
-   `admin_contrast_test`). A state edge written after this (held,
-   unavailable) weighs the same and wins. */
-.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 .admin-section-card__head {
   background: var(--cs-structure-tint); color: var(--cs-structure-ink);
   border-radius: calc(var(--cs-radius-frame) - 1.5px) calc(var(--cs-radius-frame) - 1.5px) 0 0;
@@ -860,6 +861,14 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
 .admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
+/* The section chosen in the editor's rail (`admin--editor--section-choice`):
+   a selection, so the accent, 2px outside the frame (3:1 on the canvas,
+   `admin_contrast_test`). Written after the state edges and as heavy, so it
+   wins over a held edge: the chosen section is the one the person is
+   acting on, and its hold says itself in words, in the strip and the
+   read-only form. A section whose type is gone draws no words and is never
+   chosen. */
+.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 /* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
    its states are elevations, with no border. At rest the first; under the
    pointer the second, raised, and never moved, so nothing shifts under a

@@ -400,9 +400,12 @@ export class MoveQueue {
   // not: a form that did not end clean (`admin--saving--autosave#clean`: paused,
   // refused, invalid, offline), or one with an edit still to be sent or
   // answered. The questions the write queue asks of a form (`settled()` in
-  // `saving/queue_core.js`), put to the forms a redrawn list would replace.
+  // `saving/queue_core.js`), put to the forms a redrawn list would replace --
+  // which include the forms of what a script moved out of the list
+  // (`[data-editing-away]`: a section's settings in the editor's rail), since
+  // a redrawn list brings their section's card again.
   formsHoldText() {
-    return Array.from(this.host.element.querySelectorAll("form[data-controller~='admin--saving--autosave']"))
+    return this.listForms()
       .map((form) => this.host.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave"))
       .some((form) => form && (!form.clean() || form.outstanding() || !form.unchanged()))
   }
@@ -460,9 +463,16 @@ export class MoveQueue {
   // inside its debounce is queued ahead of the move being made (see `move`).
   // An unchanged form sends nothing and a paused one refuses, as always.
   sendHeldEdits() {
-    for (const form of this.host.element.querySelectorAll("form[data-controller~='admin--saving--autosave']")) {
+    for (const form of this.listForms()) {
       this.host.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
     }
+  }
+
+  // The autosave forms of the block list, and of every element of it a
+  // script moved elsewhere (`[data-editing-away]`, `editing/merge.js`).
+  listForms() {
+    const selector = "form[data-controller~='admin--saving--autosave']"
+    return [ ...this.host.element.querySelectorAll(selector), ...document.querySelectorAll(`[data-editing-away] ${selector}`) ]
   }
 
   // The autosave controller of a block's own form: in its card, or -- for a
