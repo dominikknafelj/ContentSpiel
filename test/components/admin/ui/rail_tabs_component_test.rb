@@ -23,6 +23,14 @@ class Admin::Ui::RailTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "h2", wait: 0
   end
 
+  test "a current that names no tab is the first tab, so one tab is in the tab order" do
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "gone",
+      tabs: [ tab(key: "page", label: "Page"), tab(key: "section", label: "Section") ])
+
+    assert_selector "button#r-tab-page[aria-selected=true][tabindex='0']"
+    assert_selector "button[tabindex='0']", count: 1
+  end
+
   test "one tab is a heading, not a tablist" do
     render_inline Admin::Ui::RailTabsComponent.new(rail_id: "editor-grid", current: "post", tabs: [ tab(key: "post", label: "Post") ])
 

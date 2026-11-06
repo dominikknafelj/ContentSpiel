@@ -717,8 +717,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Stage 3's rail: the editor area is the container, so a folded tree or a
-  # narrower content column gives the rail room the window does not show.
+  # The editors' rail: the editor area is the container, so a folded tree or
+  # a narrower content column gives the rail room the window does not show.
+  # The blocks column opts in by its class, found anywhere in the grid (a
+  # `display: contents` form between), and nothing else is placed in it.
   test "the rail is laid out by the editor area's container, never the window" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-editor-area\s*\{\s*container:\s*admin-editor\s*\/\s*inline-size;\s*\}/, css)
@@ -735,6 +737,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert ground, "the rail's ground is the grid's ::before"
     %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*-1].each do |declaration|
       assert_match(/#{declaration};/, ground)
+    end
+    assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-rail__main\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1\s*\/\s*-1;\s*\}/, docked.first)
+    assert_no_match(/\.admin-rail-grid[^{,]*>\s*:not\(/, docked.first, "nothing but the marked blocks column is placed in the first column")
+    %w[admin-rail__tabs admin-rail__panel admin-rail__main].each do |item|
+      assert_no_match(/\.admin-rail-grid[^{,]*>\s*\.#{item}/, docked.first, "#{item} is matched anywhere in the grid, not only as a child")
     end
     assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-form-column\s*\{\s*max-width:\s*var\(--cs-editor-column\);\s*\}/, docked.first)
     assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-docked:\s*0;[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column below the threshold")

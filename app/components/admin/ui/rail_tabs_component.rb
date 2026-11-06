@@ -13,6 +13,10 @@ module Admin
     #
     # `count` is a figure beside the label (`text-count`), hidden at zero so
     # a redraw of the tab can show it again; nil draws none.
+    #
+    # In the grid (`.admin-rail-grid`) the tabs and the panels stand in the
+    # rail's column; the blocks column is the element marked
+    # `.admin-rail__main`, and nothing else is placed.
     class RailTabsComponent < AdminComponent
       Tab = Data.define(:key, :label, :count) do
         def initialize(key:, label:, count: nil) = super
@@ -24,7 +28,9 @@ module Admin
       def initialize(rail_id:, tabs:, current:)
         @rail_id = rail_id
         @tabs = tabs
-        @current = current.to_s
+        # A `current` that names no tab is the first tab, so one tab is
+        # always in the tab order.
+        @current = tabs.map { |tab| tab.key.to_s }.then { |keys| keys.include?(current.to_s) ? current.to_s : keys.first }
       end
 
       private

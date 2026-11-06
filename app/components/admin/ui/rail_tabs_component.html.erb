@@ -3,7 +3,7 @@
 <% end %>
 <% if single? %>
   <% tab = tabs.first %>
-  <%= tag.h2 id: tab_id(tab), class: "admin-rail__tabs admin-rail__heading items-center gap-1.5 py-2 text-sm font-medium text-ink" do %><%= tab.label %><% count.(tab) %><% end %>
+  <%= tag.h2 id: tab_id(tab), class: "admin-rail__tabs admin-rail__heading text-sm font-medium text-ink" do %><%= tab.label %><% count.(tab) %><% end %>
 <% else %>
   <div class="admin-rail__tabs" role="tablist" aria-label="<%= t(".label") %>">
     <% tabs.each do |tab| %>

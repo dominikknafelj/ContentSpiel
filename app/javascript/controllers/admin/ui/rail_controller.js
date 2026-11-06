@@ -33,6 +33,20 @@ import { Controller } from "@hotwired/stimulus"
 // Every selection dispatches `admin--ui--rail:shown` with `{ key }` on the
 // panel it shows.
 //
+// PREVIOUS IS THE TAB LAST LEFT. Every selection that changes the tab, the
+// person's own (a press, a key) and a reveal alike, remembers the tab it
+// leaves; so concealing a panel goes back to where the person was before it
+// became current ("close Notes returns to where I was"), never to an older
+// tab. A conceal forgets it.
+//
+// A current key that names no panel and no tab (the server's, or one whose
+// tab was taken away) is the first tab's, so one tab is always in the tab
+// order and one panel current.
+//
+// WHAT GOES WHERE (the grid's own stylesheet places it): the tabs and the
+// panels in the rail's column; the blocks column is the element marked
+// `.admin-rail__main`, and nothing else is placed.
+//
 // Tabs follow ARIA's tabs with automatic activation: Left and Right move to
 // the neighbouring tab (round the ends), Home and End to the first and last,
 // and the focused tab is selected.
@@ -85,8 +99,7 @@ export default class extends Controller {
 
   reveal(event) {
     const panel = this.panelHolding(event.target)
-    if (!panel || panel.dataset.key === this.currentValue) return
-    this.previous = this.currentValue
+    if (!panel) return
     this.show(panel.dataset.key)
   }
 
@@ -94,8 +107,8 @@ export default class extends Controller {
     const panel = this.panelHolding(event.target)
     if (!panel || panel.dataset.key !== this.currentValue) return
     const previous = this.panelTargets.some((other) => other.dataset.key === this.previous) ? this.previous : this.drawnKey(panel.dataset.key)
-    this.previous = null
     if (previous && previous !== this.currentValue) this.show(previous)
+    this.previous = null
   }
 
   get docked() {
@@ -105,6 +118,7 @@ export default class extends Controller {
   // private
 
   show(key) {
+    if (key !== this.currentValue) this.previous = this.currentValue
     this.currentValue = key
     this.apply()
     const panel = this.panelTargets.find((candidate) => candidate.dataset.key === key)
@@ -112,6 +126,8 @@ export default class extends Controller {
   }
 
   apply() {
+    const keyed = [ ...this.tabTargets, ...this.panelTargets ]
+    if (!keyed.some((element) => element.dataset.key === this.currentValue)) this.currentValue = keyed[0]?.dataset.key || ""
     const key = this.currentValue
     this.tabTargets.forEach((tab) => {
       const selected = tab.dataset.key === key
