@@ -45,10 +45,10 @@ const FIELD = "data-admin--editor--section-field-param"
 // - the lanes (`lanes`), by a save that changed the number of columns and by
 //   an add the server refused because its column is gone. After the first
 //   the focus is the layout button's, the region's to give (this asks it
-//   whether its menu was replaced, `menuReplaced`). After the second the "+" that
-//   was pressed no longer exists, and the focus goes to the "+" of the last
-//   lane there is: the column the removed ones were folded into, so the
-//   nearest thing to what was pressed.
+//   whether its menu was replaced, `menuReplaced`). After the second the
+//   "+" that was pressed no longer exists, and the focus goes to the "+" of
+//   the last lane there is: the column the removed ones were folded into,
+//   so the nearest thing to what was pressed.
 // A panel is never replaced -- its form holds unsaved text and its place in
 // the write queue -- only its heading's text, which names the column.
 //

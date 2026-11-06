@@ -442,7 +442,9 @@ export default class extends Controller {
       }
       const region = unit.closest("[data-controller~='admin--editor--section-settings']")
       if (region?.hidden) {
-        const host = region.closest("[data-controller~='admin--editor--section']")
+        // The card by the region's section, not by where the region stands:
+        // the editor's rail holds it outside its card.
+        const host = document.querySelector(`[data-controller~='admin--editor--section'][data-block-id="${CSS.escape(region.dataset.sectionId)}"]`)
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.showSettings()
       }
       const body = unit.querySelector("[data-block-body].hidden")

@@ -86,8 +86,8 @@ export default class extends Controller {
 
   get nothingFocused() { return !document.activeElement || document.activeElement === document.body }
 
-  // Also the region's own Close button, and the card's door for a collapse,
-  // a second press of the word and Escape in the head
+  // The region's own Close button, and the card's door for a collapse, a
+  // second press of the word and Escape in the head
   // (`admin--editor--section#closeSettings`). A region already hidden is
   // left alone: nothing is sent and nothing is said.
   close() {
