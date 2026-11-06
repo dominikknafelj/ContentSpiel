@@ -273,6 +273,23 @@ jobs:
           touched=$(find . -newer "$work/before-upgrade" -print)
           [ -z "$touched" ] || fail "upgrade wrote: $touched"
 
+          # THE REAL UPGRADE PATH: a site pinned to an older release, moved
+          # to this image's by `upgrade` as a person moves theirs. Pinned to
+          # 0.0.0, older than any release: the notes of every section up to
+          # this version are printed, the theme is checked in the image, and
+          # only then is the pin rewritten (a temp file and a rename, as the
+          # runner's user). SKIPPED UNTIL THE FIRST RELEASE: a commit before
+          # it is 0.0.0 itself, and `upgrade` from 0.0.0 to 0.0.0 is the
+          # nothing-to-do case above.
+          if [ "$version" != 0.0.0 ]; then
+            echo 0.0.0 > .contentspiel-version
+            contentspiel 0 "Next steps" upgrade
+            [ "$(head -n 1 .contentspiel-version)" = "$version" ] || fail "upgrade left .contentspiel-version at $(cat .contentspiel-version), not $version"
+            owned_by_runner .
+          else
+            echo "VERSION is 0.0.0: the upgrade from an older pin is skipped until the first release."
+          fi
+
       # The site's own Dockerfile, as Kamal builds it: FROM the CMS image at
       # CMS_VERSION, the theme copied in, `theme:check`, then `assets:clobber
       # assets:precompile` under the site's theme. A build that succeeds has
