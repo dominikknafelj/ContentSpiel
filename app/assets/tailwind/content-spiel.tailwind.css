@@ -409,9 +409,11 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    setup's "other languages" -- with nothing to drop down: it keeps the
    border and colours and its native list. */
 .cs-select {
-  border: 1px solid var(--cs-field-line);
-  border-radius: var(--cs-radius);
-  background-color: var(--cs-surface);
+  border-width: 0 0 1px;
+  border-style: solid;
+  border-bottom-color: var(--cs-field-line);
+  border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0;
+  background-color: var(--cs-field-fill);
   color: var(--cs-ink);
   padding: 0.5rem 0.625rem;
 }
@@ -423,8 +425,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
-.cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
-.cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
+.cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 0; background-color: var(--cs-surface); border-bottom-color: transparent; }
+.cs-select[aria-invalid="true"] { border-bottom-color: var(--cs-danger); }
 
 /* A filter bar's one height (Design System: "Controls in one row share one
    height. Forms are 42px; a filter bar is 38px, set by the bar, never by a
@@ -533,8 +535,25 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    class server-side instead. */
 .admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
-:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
+:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field) {
+  background-color: var(--cs-field-fill);
+  border-width: 0 0 1px;
+  border-style: solid;
   border-color: var(--cs-field-invalid-border, var(--cs-field-line));
+  border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0;
+}
+/* A field is a well (E4): a filled ground with a bottom edge only. Focused, the
+   well is lifted onto the surface, rings in the accent (2px, no offset) and its
+   bottom edge goes transparent so the ring is the whole boundary; an invalid
+   field keeps the danger edge under the ring. A checkbox, a toggle and a
+   segmented control are not wells: they keep a full 1px field-line outline.
+   The prefix input's and the chip input's inner inputs are excluded by a
+   zero-specificity `:where`, so the wrapper is the well and the input inside is bare. */
+:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within) {
+  background-color: var(--cs-surface);
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 0;
+  border-bottom-color: var(--cs-field-invalid-border, transparent);
 }
 /* The prefix input's wrapper is the one surface with its own focus border
    (`focus-within:border-accent`), which an invalid field must still override,
@@ -543,6 +562,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    border only while unfocused. */
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
+.admin-prefix-input:focus-within { background-color: var(--cs-surface); }
 /* The Media panel's Alt field while the default-language alt is empty (handoff
    §4.6: "warn border when empty"): the warn colour, drawn only while the input
    is empty (it carries a placeholder) so it clears as soon as the editor types,
@@ -555,7 +575,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    would otherwise draw the resting border the input's own `border-transparent`
    utility asks not to have: unlayered CSS wins over a utility. Only the resting,
    valid state is touched -- hover, focus and an error keep their borders. */
-.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; }
+.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; background-color: transparent; }
 
 /* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
@@ -798,10 +818,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    record's fields also marks them as plainly read-only -- sunken and dim,
    the same look a disabled field already has, but on the rich-text editor
    too (a `<fieldset disabled>` doesn't reach a contenteditable). */
-.admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { background: var(--cs-sunken); color: var(--cs-dim); }
+.admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { color: var(--cs-dim); }
+/* The same selector list as the well's rule, so the cascade is a tie that the later
+   rule wins: sunken ground and a full line, not the well's bottom edge. */
+.admin-view-only :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor) {
+  background-color: var(--cs-sunken);
+  border: 1px solid var(--cs-line);
+  border-radius: var(--cs-radius-field);
+}
 /* The chip input's frame is a div around its input, so the rule above misses
    it: sunken too, or it keeps a white frame around a sunken inner field. */
-.admin-view-only .admin-chip-field { background: var(--cs-sunken); }
+.admin-view-only :is(.admin-column, .admin-field) .admin-chip-field { background: var(--cs-sunken); border: 1px solid var(--cs-line); border-radius: var(--cs-radius-field); }
 
 /* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
    `readonly` text stays selectable and keeps full contrast; a control that can only be
@@ -809,8 +836,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
 .admin-held :is(input, textarea)[readonly],
 .admin-held :is(select, input, button):disabled,
-.admin-held .admin-rich-text-editor,
-.admin-held .admin-chip-field { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field) { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+/* A held field is not a well: a full line, no fill change, at full contrast. */
+.admin-held :is(input:not([type="checkbox"], [type="radio"]), textarea)[readonly],
+.admin-held select:disabled,
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the

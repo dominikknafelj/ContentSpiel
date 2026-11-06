@@ -171,3 +171,9 @@
 .admin-table-strip-corner[hidden],
 .admin-table-strip-entry[hidden],
 .admin-table-strip-add[hidden] { display: none; }
+
+/* The editor's box is a well like any field (content-spiel.tailwind.css, "A field
+   is a well"): the editor is the well, and the toolbar above it is the sunken
+   header that owns the top corners, so the well under a toolbar is square-topped.
+   Two classes in front of the toolbar so the rule beats the well's own radius. */
+:is(.admin-column, .admin-field) [role="toolbar"] ~ .admin-rich-text-editor { border-top-left-radius: 0; border-top-right-radius: 0; }

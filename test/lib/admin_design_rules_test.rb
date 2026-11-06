@@ -170,7 +170,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     'CARD = "group block w-full overflow-hidden' => "a media tile is told by its picture; its hover line only groups"
   }.freeze
 
-  test "a pressable or typed-into element is outlined in border-field-line, never border-line-strong" do
+  test "a control is identified by a field-line edge or a fill of its own, never border-line-strong" do
     offences = CONTROL_SOURCES.flat_map do |path|
       File.readlines(path).each_with_index.filter_map do |line, index|
         next unless line.include?("line-strong") && line.match?(CONTROL_STATE)
@@ -186,15 +186,31 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
-  test "the stylesheet's controls draw their outline in --cs-field-line, and no count is under 11px" do
+  test "a text field is a well: the field fill and a field-line bottom edge, the accent outline on focus; a checkbox and a toggle keep a full outline" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+    shared = css[/\n(:is\(\.admin-column, \.admin-field[^{]*\{[^}]*\})/m, 1].to_s
 
-    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-select"))
+    # `background-color`, not the shorthand: the shorthand would wipe a select's chevron.
+    assert_match(/background-color:\s*var\(--cs-field-fill\);/, shared)
+    assert_match(/border-width:\s*0 0 1px;/, shared)
+    assert_includes shared, "var(--cs-field-invalid-border, var(--cs-field-line))"
+    assert_match(/border-radius:\s*var\(--cs-radius-field\) var\(--cs-radius-field\) 0 0;/, shared)
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, css[/:is\(\.admin-column[^{]*:focus[^{]*\{[^}]*\}/m].to_s)
+    assert_match(/border-width:\s*0 0 1px;/, rule.(".cs-select"))
+    assert_match(/border-bottom-color:\s*var\(--cs-field-line\);/, rule.(".cs-select"))
+    assert_match(/background-color:\s*var\(--cs-field-fill\);/, rule.(".cs-select"))
     assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-toggle"))
-    assert_includes css, "var(--cs-field-invalid-border, var(--cs-field-line))"
     assert_match(/\.admin-prefix-input:not\(:focus-within\)\s*\{\s*border-color:\s*var\(--cs-field-line\);/, css)
     assert_no_match(/font-size:\s*10px/, css)
+  end
+
+  test "setup_input_class draws the well: the field fill and a bottom edge" do
+    classes = Object.new.extend(SetupHelper).setup_input_class.split
+    assert_includes classes, "bg-field-fill"
+    assert_includes classes, "border-b"
+    assert_includes classes, "border-0"
+    assert_includes classes, "rounded-t-field"
   end
 
   # One type voice: a label is the sans at `text-label` (12px, weight 500), in

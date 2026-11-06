@@ -31,7 +31,7 @@ class Admin::FieldErrorBorderSystemTest < ApplicationSystemTestCase
   end
 
   def border_colour(selector)
-    page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).borderTopColor")
+    page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).borderBottomColor")
   end
 
   test "a field that fails an autosave turns red with its message, and loses it once fixed" do

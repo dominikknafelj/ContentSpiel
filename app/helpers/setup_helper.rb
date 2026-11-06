@@ -2,7 +2,7 @@
 # steps stay visually consistent. Product UI -- uses the Content·Spiel tokens.
 module SetupHelper
   def setup_input_class
-    "mt-1 block w-full rounded-cs border border-field-line bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
+    "mt-1 block w-full rounded-t-field border-0 border-b border-field-line bg-field-fill px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
   end
 
   # A native `<select>`: `.cs-select` draws the border, chevron and focus ring
