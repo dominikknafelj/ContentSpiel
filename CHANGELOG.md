@@ -30,8 +30,6 @@
 - A new recurring task, `forms_resend_not_ready` (every 15 minutes, in `config/recurring.yml` for every environment): once mail is set up, by Settings or by `MAIL_*` variables, the form mails that failed because it was not are sent again, each recorded as System's "sent a submission again".
 - The first numbered release. From it on, a release `X.Y.Z` is a git tag `vX.Y.Z`, a GitHub Release whose notes are its section of this file, and the image `ghcr.io/dominikknafelj/content_spiel:X.Y.Z` for `linux/amd64` and `linux/arm64`; `:stable` names the newest release. The commit tags stay, so a site that pins a commit still builds (`docs/reference/hosting.md`, "Releases").
 - The image's `PATH` ends with `/rails/bin`, and `bin/docker-entrypoint` hands a `contentspiel …` command straight over, with no `db:prepare`.
-- CS Studio, editor (E4, stage 2): a block's closed tile shows its type, a heading and a few lines of its text; one "+ Add block" opens the menu of types; a section is a frame whose head says its layout, background and width as words, with the settings opened under it; the page tree's markers rest hidden (a screen reader still reads them) and the selected row carries an accent bar. "Discard changes…" is red text. No setting or data changes.
-- SortableJS is no longer preloaded on every CS Studio screen: it is fetched on the screens where something is dragged (the editor, the page tree, Settings' language rows, Groups).
 
 ### Migrations needing action
 
@@ -59,6 +57,7 @@
 
 ### For a gem or an outside caller
 
+- SortableJS is no longer preloaded in CS Studio; a script that imports `sortablejs` fetches it on demand (the editor, the page tree, Settings' language rows and a groups field's rows do).
 - For a gem's block type: `t.preview ->(block, locale:) { ContentModel::Preview.new(heading: …, text: …, mono: false) }` declares the heading and the few words CS Studio's tile shows of a closed block, as plain text (the text is cut at 240 characters, the heading at 80). It is optional: a type that declares none is drawn from its `summary`, and a callable that is not a callable taking the block and `locale:` is refused at registration. No public template or theme reads it.
 - For a gem's block type: `t.icon "name", family: :text` (one of `text media code form lists structure`) names the hue of the chip CS Studio draws the icon on; a type that names none is drawn on the neutral chip, and any other value is refused at registration. The chip is CS Studio's only: no public page draws it.
 - Added two hooks beside `ContentSpiel::Plugins.block_types`: `form_field_types` (a form field type's members, `owner/name`) and `form_destinations` (a destination's label, deliverer and settings block, `owner/name`), with the block types' owner rules and replayed after them (`docs/reference/content-blocks-and-types.md`, "Form field types and destinations from outside"). A destination's deliverer answers `deliver(delivery, final_attempt:)`.
