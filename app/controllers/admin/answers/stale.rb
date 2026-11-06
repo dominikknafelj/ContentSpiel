@@ -11,7 +11,7 @@ module Admin
     # the very overwrite just refused.
     class Stale
       def initialize(view:)
-        @turbo_stream = Turbo::Streams::TagBuilder.new(view)
+        @turbo_stream = Answers.stream_builder(view)
       end
 
       def answer(record:, status_id:, error_prefix:, reload_url:, since:, live:)

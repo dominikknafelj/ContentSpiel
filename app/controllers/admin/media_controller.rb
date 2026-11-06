@@ -104,7 +104,7 @@ module Admin
       if result.ok?
         render json: upload_json(result.record, picker: false), status: :created
       else
-        render json: { errors: result.errors }, status: result.denied? ? :forbidden : :unprocessable_entity
+        render json: { errors: result.errors }, status: Admin::RefusalStatus.for(result)
       end
     end
 

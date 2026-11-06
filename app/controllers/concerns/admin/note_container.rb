@@ -99,7 +99,7 @@ module Admin
     # it may be attached, is the service's question (`Notes::Files`).
     def note_files = Array(params[:files]).grep(ActionDispatch::Http::UploadedFile)
 
-    def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
+    def failure_status(result) = Admin::RefusalStatus.for(result)
 
     # What a failed form gets back: its own key, what was typed, and why.
     # Nothing here reads `result.record`: a notes service's failure has none

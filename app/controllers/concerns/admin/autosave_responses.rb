@@ -78,14 +78,8 @@ module Admin
       streams
     end
 
-    # One toast appended to the layout's `#toasts` region
-    # (`Admin::Ui::ToastRegionComponent`) from a Turbo Stream answer -- for a
-    # response that has no redirect and so no flash to carry the message.
-    # `action` is `{ label:, url:, method: }` and `id` the optional DOM id,
-    # both as for `Admin::Ui::ToastComponent`.
-    def toast_stream(message, kind: :success, action: nil, id: nil)
-      turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: message, kind: kind, action: action, id: id))
-    end
+    # One toast for this answer (`Admin::ToastStream`).
+    def toast_stream(message, kind: :success, action: nil, id: nil) = Admin::ToastStream.for(turbo_stream, message, kind: kind, action: action, id: id)
 
     # Optimistic locking for the three record editors (the page settings
     # form, a block card, the post form). Each form carries the record's
@@ -130,17 +124,10 @@ module Admin
       true
     end
 
-    # The HTTP status an autosave answers with: 200, 403 for a permission
-    # refusal (access-control design spec §3.4 -- a forged or stale-tab
-    # PATCH to a record the user may only read), 422 for anything else.
-    # The Turbo Stream body is sent either way; `admin--saving--autosave` renders a
-    # stream answer whatever its status.
-    def autosave_status(result)
-      if result.ok? then :ok
-      elsif result.denied? then :forbidden
-      else :unprocessable_entity
-      end
-    end
+    # The HTTP status an autosave answers with: 200, or the refusal's
+    # (`Admin::RefusalStatus`). The Turbo Stream body is sent either way;
+    # `admin--saving--autosave` renders a stream answer whatever its status.
+    def autosave_status(result) = result.ok? ? :ok : Admin::RefusalStatus.for(result)
 
     private
 

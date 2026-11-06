@@ -8,7 +8,7 @@ module Admin
     # failed-save toast goes. No new base: nothing was written.
     class Held
       def initialize(view:)
-        @turbo_stream = Turbo::Streams::TagBuilder.new(view)
+        @turbo_stream = Answers.stream_builder(view)
       end
 
       def answer(subject:, hold:, viewer:, status_id:, error_prefix:, live:)

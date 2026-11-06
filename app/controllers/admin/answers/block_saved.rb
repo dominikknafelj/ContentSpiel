@@ -74,16 +74,10 @@ module Admin
       # order the server now has; and it gets a plain confirmation with no Undo
       # of its own, so two orders can't be bounced between forever.
       def reorder_undo_streams(before, undo:, undo_url:)
-        return [ blocks_list_stream, toast_stream("Order restored.") ] if undo
+        return [ blocks_list_stream, Admin::ToastStream.for(turbo_stream, "Order restored.") ] if undo
         return [] if top_level_blocks.ids == before
 
-        [ toast_stream("Block order changed.", kind: :undo, action: { label: "Undo", method: :patch, url: undo_url }) ]
-      end
-
-      # One toast appended to the layout's `#toasts` region, as
-      # `Admin::AutosaveResponses#toast_stream` draws it.
-      def toast_stream(message, kind: :success, action: nil, id: nil)
-        turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: message, kind: kind, action: action, id: id))
+        [ Admin::ToastStream.for(turbo_stream, "Block order changed.", kind: :undo, action: { label: "Undo", method: :patch, url: undo_url }) ]
       end
     end
   end

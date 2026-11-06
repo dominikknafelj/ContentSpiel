@@ -14,13 +14,16 @@ module Admin
     # built, so it is made before `super` freezes the instance.
     Context = Data.define(:view, :page, :locale, :url_options, :holds, :viewer) do
       def initialize(view:, **members)
-        @turbo_stream = Turbo::Streams::TagBuilder.new(view)
+        @turbo_stream = Answers.stream_builder(view)
         super
       end
 
       attr_reader :turbo_stream
 
       def render(component) = view.render(component)
+
+      # Markup already rendered (`render`), joined without escaping it again.
+      def safe_join(parts) = view.safe_join(parts)
     end
   end
 end

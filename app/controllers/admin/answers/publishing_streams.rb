@@ -23,7 +23,7 @@ module Admin
         state = ::Publishing::State.of(owner)
         return [] if state.draft?
 
-        [ Turbo::Streams::TagBuilder.new(view).replace(Admin::EditorScreen::PublishingStateComponent::PARTS.fetch(:chip),
+        [ Answers.stream_builder(view).replace(Admin::EditorScreen::PublishingStateComponent::PARTS.fetch(:chip),
           Admin::EditorScreen::PublishingStateComponent.new(record: owner, part: :chip, url_options: url_options, state: state)) ]
       end
     end

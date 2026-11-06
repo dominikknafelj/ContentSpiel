@@ -62,7 +62,7 @@ module Admin
         outline = fresh_outline
         blocks = outline.top_level
         cards = blocks.each_with_index.map { |block, index| context.render(card_for(block, first: index.zero?, last: index == blocks.size - 1, outline: outline)) }
-        turbo_stream.update("content-blocks-list", html: context.view.safe_join(cards))
+        turbo_stream.update("content-blocks-list", html: context.safe_join(cards))
       end
 
       # A block in a section is a tile until it is opened, and the one line on
@@ -249,7 +249,7 @@ module Admin
         cards = ordered.select { |lifted| kept_ids.include?(lifted.id) }.map do |lifted|
           context.render(card_for(lifted, first: ordered.first == lifted, last: ordered.last == lifted, outline: outline))
         end
-        [ turbo_stream.replace(id, html: context.view.safe_join(cards)) ]
+        [ turbo_stream.replace(id, html: context.safe_join(cards)) ]
       end
 
       # A section's structure as the database has it now, for an answer that

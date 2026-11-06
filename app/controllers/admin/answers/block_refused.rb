@@ -4,11 +4,11 @@ module Admin
     # page's alert slot, and what the screen must be put right in. A denial
     # (`result.denied?`: no permission, a stale tab or a forged request) is a
     # 403 and puts nothing right, since it is no fault of the screen's;
-    # anything else is a 422 (`status_for`).
+    # anything else is a 422 (`status_for`, `Admin::RefusalStatus`).
     class BlockRefused
       include BlockDrawing
 
-      def status_for(result) = result.denied? ? :forbidden : :unprocessable_entity
+      def status_for(result) = Admin::RefusalStatus.for(result)
 
       # An add into a section this page does not have (another page's, or one
       # deleted meanwhile): refused before the service is asked, with the words
