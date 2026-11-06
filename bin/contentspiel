@@ -59,11 +59,23 @@
 # 2 no such command, with the usage.
 
 root = File.expand_path("..", __dir__)
-require File.join(root, "lib/content_spiel/version")
-require File.join(root, "lib/content_spiel/site_generator")
 
 home = ENV["HOME"].to_s
 ENV["HOME"] = "/tmp" unless !home.empty? && File.directory?(home) && File.writable?(home)
+
+# Bundler is set up BEFORE anything else is required, for every command. The
+# files below (and the standard library they load: fileutils, tmpdir, time,
+# date, json, psych) can activate a default gem at its bundled version, and
+# Bundler then refuses to activate the Gemfile.lock's newer one ("You have
+# already activated date 3.4.1, but your Gemfile requires ..."). It showed on
+# a runner whose Ruby ships an older `date` than the lockfile; the image
+# could meet the same. Setting up first puts the locked versions on the load
+# path before any of them is read.
+ENV["BUNDLE_GEMFILE"] ||= File.join(root, "Gemfile")
+require "bundler/setup"
+
+require File.join(root, "lib/content_spiel/version")
+require File.join(root, "lib/content_spiel/site_generator")
 
 USAGE = <<~TEXT.freeze
   Usage: contentspiel COMMAND [ARGUMENTS]

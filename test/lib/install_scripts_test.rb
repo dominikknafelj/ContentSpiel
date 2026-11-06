@@ -196,7 +196,15 @@ class InstallScriptsTest < ActiveSupport::TestCase
 
   test "the wrapper without docker says to install it and exits 1" do
     in_sandbox do |box|
-      out, status = Open3.capture2e(box.env("PATH" => "/usr/bin:/bin"), WRAPPER, "pages", chdir: box.site)
+      # A PATH of symlinks to the tools the wrapper calls and no docker: a
+      # runner has a real one in /usr/bin, which "/usr/bin:/bin" would find.
+      tools = "#{box.dir}/tools"
+      FileUtils.mkdir_p(tools)
+      %w[sh head tr dirname id pwd sed cat printf env].each do |name|
+        found = ENV["PATH"].split(":").map { |d| File.join(d, name) }.find { |f| File.executable?(f) }
+        File.symlink(found, "#{tools}/#{name}") if found
+      end
+      out, status = Open3.capture2e(box.env("PATH" => tools), WRAPPER, "pages", chdir: box.site)
 
       assert_equal 1, status.exitstatus
       assert_match(/install docker/i, out)
