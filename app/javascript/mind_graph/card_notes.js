@@ -59,7 +59,7 @@
 import { draftKey } from "controllers/admin/notes/composer_controller"
 import { recordId } from "mind_graph/ids"
 
-const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
+const LABEL = "m-0 text-label text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
 const ROWS = 3
 // The person as a round mark with their initials, as the drawer draws one

@@ -30,7 +30,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_selector "#sidebar-badge-dashboard", text: "1"
     within "turbo-frame#notes-for-you" do
       assert_selector "[data-delivery][data-unread]", count: 1
-      assert_selector "header", text: "1 NEW"
+      assert_selector "header", text: "1 new"
       assert_text "Page · Pricing · Rich text"
       press "Dana mentioned you"
     end

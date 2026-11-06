@@ -41,7 +41,7 @@ module Admin
       # destination was removed or whose type is no longer registered, so
       # it is not offered for those two.
       NOT_RESENDABLE = %w[no_destination unknown_destination].freeze
-      CHIP_CLASS = "inline-flex items-center gap-1.5 rounded-cs border px-2 py-0.5 font-cs-mono text-label uppercase tracking-mono text-ink".freeze
+      CHIP_CLASS = "inline-flex items-center gap-1.5 rounded-cs border px-2 py-0.5 text-label text-ink".freeze
 
       def initialize(submission:, url_options: {})
         @submission = submission

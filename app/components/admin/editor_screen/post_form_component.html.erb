@@ -63,7 +63,7 @@
     <%# Titled with the type's label ("RESUME ENTRY FIELDS", design pass round 2, handoff §9 B23) so the
         type's own fields read as one group between Excerpt and Body rather than more loose columns. %>
     <section class="admin-fields-group flex flex-col gap-1 rounded-cs border border-line p-3" data-editor-fields-group aria-labelledby="<%= field_id("fields-group-title") %>">
-      <h2 id="<%= field_id("fields-group-title") %>" class="font-cs-mono text-label uppercase tracking-mono text-meta" data-fields-group-title><%= fields_group_title %></h2>
+      <h2 id="<%= field_id("fields-group-title") %>" class="text-label text-meta" data-fields-group-title><%= fields_group_title %></h2>
     <% schema_fields.each do |field| %>
       <%= render Admin::Ui::FieldComponent.new(
             field: field, form_name: "post[fields]",

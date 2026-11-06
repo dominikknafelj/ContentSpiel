@@ -18,7 +18,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     await_admin_controllers
   end
 
-  # The drawer's small headings are drawn in capitals (`uppercase`), and that
+  # The drawer's small headings are in sentence case, and that
   # is the text a browser test reads.
   def marker(block) = "#notes-marker-ContentBlock-#{block.id}"
 
@@ -35,7 +35,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       press "Add note"
     end
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON RICH TEXT"
+    assert_selector "#notes-drawer #notes-new h3", text: "New note on Rich text"
     assert_eventually(message: "the new note's field never took the focus") { page.evaluate_script("document.activeElement.name") == "body" }
     find("#notes-new textarea[name=body]").send_keys("Shorter, please")
     within("#notes-new") { press "Add note" }
@@ -43,7 +43,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#{marker(@text)}[data-has-notes] [data-notes-count]", text: "1"
     assert_selector "#notes-open-count", text: "1"
     assert_selector "#notes-drawer [data-note-thread]", text: "Shorter, please"
-    assert_selector "#notes-drawer [data-note-thread] h3 [data-note-subject-type]", text: "RICH TEXT"
+    assert_selector "#notes-drawer [data-note-thread] h3 [data-note-subject-type]", text: "Rich text"
     assert_equal "1", find(marker(@text)).evaluate_script("getComputedStyle(this).opacity")
     assert_equal @text, Notes::Thread.last.subject
   end
@@ -55,7 +55,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the focused marker stayed invisible") { find(marker(@text), visible: :all).evaluate_script("getComputedStyle(this).opacity") == "1" }
     find(marker(@text), visible: :all).send_keys(:enter)
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON RICH TEXT"
+    assert_selector "#notes-drawer #notes-new h3", text: "New note on Rich text"
   end
 
   test "a marker with notes opens the drawer at that block's group; a tile in a section has its own" do
@@ -65,7 +65,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#{marker(@inside)}[data-has-notes][aria-label='1 open note on Image']"
     find(marker(@inside)).click
 
-    assert_selector "#notes-group-ContentBlock-#{@inside.id} h4 [data-note-subject-type]", text: "SECTION › COLUMN 1 · IMAGE"
+    assert_selector "#notes-group-ContentBlock-#{@inside.id} h4 [data-note-subject-type]", text: "Section › Column 1 · Image"
     assert_eventually(message: "the group never took the focus") { page.evaluate_script("document.activeElement.id") == "notes-group-ContentBlock-#{@inside.id}" }
   end
 
@@ -328,7 +328,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       press "Add note"
     end
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON RICH TEXT"
+    assert_selector "#notes-drawer #notes-new h3", text: "New note on Rich text"
     assert_no_selector "#notes-new blockquote"
   end
 
@@ -340,7 +340,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       press "Add note"
     end
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON SECTION › COLUMN 1 · IMAGE"
+    assert_selector "#notes-drawer #notes-new h3", text: "New note on Section › Column 1 · Image"
     find("#notes-new textarea[name=body]").send_keys("Wrong picture")
     within("#notes-new") { press "Add note" }
 

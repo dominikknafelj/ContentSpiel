@@ -110,7 +110,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     press_within slot("title"), "Translate"
     suggestion = find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]")
     assert_equal "[de] Hello", suggestion.value
-    assert_selector "#translation-suggestion-post-title", text: /SUGGESTED TRANSLATION · EDIT BEFORE USING\s+claude-sonnet-5/
+    assert_selector "#translation-suggestion-post-title", text: /Suggested translation · edit before using\s+claude-sonnet-5/
     # Under the field's own input, in its column -- not in the original's panel.
     assert_selector "[data-field-name='title'] #translation-suggestion-post-title"
     assert_no_selector "#{slot("title")} #translation-suggestion-post-title"

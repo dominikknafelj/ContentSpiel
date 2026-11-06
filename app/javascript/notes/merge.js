@@ -344,7 +344,7 @@ function divider(t) {
   const line = document.createElement("span")
   line.className = "h-px flex-1 bg-accent"
   const label = document.createElement("span")
-  label.className = "font-cs-mono text-label uppercase tracking-mono text-accent"
+  label.className = "text-label text-accent"
   label.textContent = t("notes.script.live.new_divider")
   divider.append(line, label)
   return divider

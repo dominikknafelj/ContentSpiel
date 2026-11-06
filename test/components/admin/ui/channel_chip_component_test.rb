@@ -1,8 +1,8 @@
 require "test_helper"
 
 class Admin::Ui::ChannelChipComponentTest < ViewComponent::TestCase
-  test "each channel is its uppercase word with an aria-label" do
-    { "admin" => "ADMIN", "mcp" => "MCP", "setup" => "SETUP", "console" => "CONSOLE", "system" => "SYSTEM" }.each do |channel, word|
+  test "each channel is its word, MCP in capitals with an aria-label" do
+    { "admin" => "Admin", "mcp" => "MCP", "setup" => "Setup", "console" => "Console", "system" => "System" }.each do |channel, word|
       render_inline(Admin::Ui::ChannelChipComponent.new(channel: channel))
       assert_selector ".admin-channel-chip[data-channel='#{channel}'][aria-label]", text: word
     end
@@ -17,9 +17,9 @@ class Admin::Ui::ChannelChipComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-channel-chip.text-accent"
   end
 
-  test "an unknown channel is a meta chip with its upcased value, never an error" do
+  test "an unknown channel is a meta chip with its value, never an error" do
     render_inline(Admin::Ui::ChannelChipComponent.new(channel: "public"))
-    assert_selector ".admin-channel-chip.text-meta", text: "PUBLIC"
+    assert_selector ".admin-channel-chip.text-meta", text: "Public"
   end
 
   test "no channel draws nothing" do

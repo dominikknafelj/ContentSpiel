@@ -132,7 +132,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_selector "[data-legend-section=show] > fieldset[data-legend-group=nodes] + fieldset[data-legend-group=lines]"
     assert_selector "[data-legend-section=key] > span#mind-graph-legend-key:first-child", exact_text: "Key"
     assert_selector "span#mind-graph-legend-key + ul[data-legend-keys][aria-labelledby=mind-graph-legend-key] + button[data-legend-status]:last-child", exact_text: "Status key…"
-    assert_selector "[data-legend-section] > span.font-cs-mono.text-label.uppercase.tracking-mono", count: 2
+    assert_selector "[data-legend-section] > span.text-label", count: 2
     assert_no_selector "ul[data-legend-keys] button, ul[data-legend-keys] input"
     assert_no_selector "[aria-label='Legend']"
   end

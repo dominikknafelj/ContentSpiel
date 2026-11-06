@@ -181,7 +181,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // `back`, the way back stands beside the heading, before the rows.
   const section = (title, list, { back = null } = {}) => {
     const wrapper = document.createElement("section")
-    const heading = element("h2", "m-0 min-w-0 px-3 pb-1 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta", title)
+    const heading = element("h2", "m-0 min-w-0 px-3 pb-1 pt-3 text-label text-meta", title)
     heading.id = `mind-graph-list-${(headings += 1)}`
     list.setAttribute("aria-labelledby", heading.id)
     if (back) {

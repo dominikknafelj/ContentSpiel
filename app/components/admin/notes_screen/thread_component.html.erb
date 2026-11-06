@@ -97,7 +97,7 @@
     <%# What the thread's state is, in words; no line at all for a thread that
         is neither pinned nor resolved. %>
     <% if thread.pinned || thread.resolved? %>
-      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-label uppercase tracking-mono text-meta">
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 text-label text-meta">
         <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
         <% if thread.resolved? %>
           <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::NotesScreen::PersonNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>

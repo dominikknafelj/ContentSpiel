@@ -21,7 +21,7 @@ class Admin::AuditScreen::ChangesComponentTest < ViewComponent::TestCase
     assert_selector "td:nth-of-type(3) del", count: 0
     assert_selector "del .sr-only", text: "Removed:"
     assert_selector "ins .sr-only", text: "Added:"
-    assert_text "1 FIELD"
+    assert_text "1 field"
   end
 
   test "an empty side reads Empty" do
@@ -29,7 +29,7 @@ class Admin::AuditScreen::ChangesComponentTest < ViewComponent::TestCase
 
     assert_selector "tr", text: /excerpt\s*Empty\s*Added:\s*We rebuilt everything\./
     assert_selector "tr", text: /subtitle\s*Removed:\s*Old\s*Empty/
-    assert_text "2 FIELDS"
+    assert_text "2 fields"
   end
 
   test "grouped per language, enabled languages by their native name, others by code" do
@@ -37,7 +37,7 @@ class Admin::AuditScreen::ChangesComponentTest < ViewComponent::TestCase
       render_changes("de title" => [ "a", "b" ], "de excerpt" => [ nil, "c" ], "en title" => [ "x", "y" ], "fr title" => [ "p", "q" ], "slug" => [ "s", "t" ])
 
       headings = page.all("[data-changes-group] > p").map(&:text)
-      assert_equal [ "1 FIELD", "1 FIELD · ENGLISH", "2 FIELDS · DEUTSCH", "1 FIELD · FR" ], headings
+      assert_equal [ "1 field", "1 field · English", "2 fields · Deutsch", "1 field · FR" ], headings
     end
   end
 

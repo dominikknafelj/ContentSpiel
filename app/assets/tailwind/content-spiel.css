@@ -179,7 +179,7 @@
   --cs-mono: "IBM Plex Mono", ui-monospace, monospace;
   --cs-t-display: clamp(34px, 5vw, 60px);
   --cs-t-h1: 28px; --cs-t-h2: 20px; --cs-t-h3: 15px;
-  --cs-t-body: 15px; --cs-t-small: 13px; --cs-t-label: 11px;
+  --cs-t-body: 15px; --cs-t-small: 13px; --cs-t-label: 12px;
   --cs-track-mono: 0.14em; --cs-track-wide: 0.18em;
   --cs-sp-1: 4px; --cs-sp-2: 8px; --cs-sp-3: 14px; --cs-sp-4: 22px;
   --cs-sp-5: 34px; --cs-sp-6: 54px; --cs-sp-7: 80px;

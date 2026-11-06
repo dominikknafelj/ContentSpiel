@@ -1,14 +1,14 @@
 module Admin
   module TrashScreen
-    # When the retention job will delete a trashed item, as a small mono tag
-    # (handoff §4.9): "IN 30 DAYS", "IN 1 DAY", "TODAY", or "NEVER" while
+    # When the retention job will delete a trashed item, as a small tag
+    # (handoff §4.9): "In 30 days", "In 1 day", "Today", or "Never" while
     # retention is 0. Never red -- it is a schedule, not a failure.
     #
     # Counted in CALENDAR days of the request's time zone (the site zone,
     # `Admin::BaseController#use_site_time_zone`): the due moment is
     # `trashed_at + retention days`, and the tag says how many dates away
-    # that date is. So the last day reads "TODAY" from midnight on, and an
-    # item the sweep hasn't reached yet (overdue) reads "TODAY" too, never a
+    # that date is. So the last day reads "Today" from midnight on, and an
+    # item the sweep hasn't reached yet (overdue) reads "Today" too, never a
     # negative number. The exact date is the tooltip AND screen-reader text
     # (a visually hidden span), so it isn't hover-only; it names the day,
     # not a time, because the sweep runs on a schedule -- and it says "on or
@@ -24,7 +24,7 @@ module Admin
     # `test/jobs/trash/purge_expired_job_test.rb` runs the job around the
     # boundary against this component's own date.
     class RetentionTagComponent < Admin::AdminComponent
-      TAG_CLASS = "font-cs-mono text-label uppercase tracking-mono text-meta".freeze
+      TAG_CLASS = "text-label text-meta".freeze
 
       def initialize(trashed_at:, retention_days:)
         @trashed_at = trashed_at.in_time_zone
@@ -38,9 +38,9 @@ module Admin
       def days_left = [ (due_on - Time.zone.today).to_i, 0 ].max
 
       def label
-        return "NEVER" if never?
+        return "Never" if never?
 
-        days_left.zero? ? "TODAY" : "IN #{days_left} #{days_left == 1 ? "DAY" : "DAYS"}"
+        days_left.zero? ? "Today" : "In #{days_left} #{days_left == 1 ? "day" : "days"}"
       end
 
       def explanation

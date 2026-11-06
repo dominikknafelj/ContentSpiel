@@ -49,7 +49,7 @@ module Admin
       # Warning chip has a warn dot *and* a warn border).
       def chip_class
         border = result.ok? ? "border-line-strong" : "border-warn"
-        "inline-flex items-center gap-1.5 rounded-cs border #{border} px-2 py-0.5 font-cs-mono text-label uppercase tracking-mono text-ink"
+        "inline-flex items-center gap-1.5 rounded-cs border #{border} px-2 py-0.5 text-label text-ink"
       end
 
       def dot_class = result.ok? ? "bg-ok" : "bg-warn"

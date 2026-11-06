@@ -132,7 +132,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     anchor.href = href
     return anchor
   }
-  const label = (content) => element("span", "font-cs-mono text-label uppercase tracking-mono text-meta", content)
+  const label = (content) => element("span", "text-label text-meta", content)
   // A count in its sentence: the figure grouped as the messages' language
   // groups it ("lists 2,040 posts"); the number only chooses the form.
   const counted = (key, count) => text.t(key, { count, figure: number(count) })

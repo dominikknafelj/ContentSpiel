@@ -21,12 +21,12 @@
     <%= render Admin::Ui::LibraryImageComponent.new(asset: asset, min_width: 960, css_class: "w-full h-auto", loading: "eager") %>
   </span>
 
-  <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-cs-mono text-xs text-meta">
+  <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-label text-meta">
     <% if filename %>
-      <dt>FILE</dt><dd class="min-w-0 break-all text-right text-dim"><%= filename %></dd>
+      <dt>File</dt><dd class="min-w-0 break-all text-right text-dim"><%= filename %></dd>
     <% end %>
-    <dt>TYPE</dt><dd class="text-right text-dim"><%= file_facts %></dd>
-    <dt>UPLOADED</dt>
+    <dt>Type</dt><dd class="text-right text-dim"><%= file_facts %></dd>
+    <dt>Uploaded</dt>
     <dd class="text-right text-dim">
       <% if uploader? %>by <%= render Admin::Ui::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
     </dd>

@@ -158,7 +158,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_text "1 selected", wait: 10
       assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/
       assert_button "tiny"
-      assert_text "UNUSED", minimum: 2
+      assert_text "Unused", minimum: 2
       find("[data-upload-tile] button", text: "Dismiss").click
       assert_no_selector "[data-upload-tile]"
     end

@@ -35,7 +35,7 @@ class Admin::NotesViewOnlySystemTest < ApplicationSystemTestCase
       press "Add note"
     end
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON RICH TEXT"
+    assert_selector "#notes-drawer #notes-new h3", text: "New note on Rich text"
     find("#notes-new textarea[name=body]").send_keys("Is this the new price?")
     within("#notes-new") { press "Add note" }
 

@@ -7,7 +7,7 @@ module Admin
     # Anything else the caller needs on the tag (`data`, `id`) passes through.
     class BadgeComponent < AdminComponent
       TONES = { neutral: "bg-sunken text-meta", warn: "bg-warn-tint text-warn-ink" }.freeze
-      CLASS = "inline-flex shrink-0 items-center rounded-cs px-1.5 py-0.5 font-cs-mono text-label uppercase tracking-mono".freeze
+      CLASS = "inline-flex shrink-0 items-center rounded-cs px-1.5 py-0.5 text-label".freeze
 
       def initialize(label:, tone: :neutral, **html)
         raise ArgumentError, "unknown badge tone #{tone.inspect}" unless TONES.key?(tone)

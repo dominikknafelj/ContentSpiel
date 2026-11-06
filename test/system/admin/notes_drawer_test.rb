@@ -54,7 +54,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the focus left the drawer when the note was sent") { focus_in_drawer? }
     find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list a[data-note-row]", text: "Is this page ready?"
-    assert_selector "#notes-drawer > header", text: "1 OPEN"
+    assert_selector "#notes-drawer > header", text: "1 open"
     assert_eventually(message: "the focus left the drawer on the way back to the list") { focus_in_drawer? }
 
     # A real key on a row focused by script. Cuprite's `send_keys` CLICKS an

@@ -8,7 +8,7 @@
               "admin--presence--list-url-value": helpers.admin_presence_here_path(kind: "post") } do %>
   <table class="admin-posts-table w-full min-w-[880px] border-collapse text-sm">
     <thead>
-      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+      <tr class="border-b border-line-strong text-left text-label text-meta">
         <% if selectable? %>
           <th scope="col" class="w-10 py-2 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select_all", id: "posts-select-all", aria: { label: "Select all posts on this page" },

@@ -145,7 +145,7 @@ class CommandPaletteTest < ApplicationSystemTestCase
     sign_in_via_form users(:one)
     await_admin_controllers
     find("body").send_keys([ :control, "k" ])
-    assert_selector "dialog#command-palette .admin-palette__hints", text: "NEW TAB"
+    assert_selector "dialog#command-palette .admin-palette__hints", text: "New tab"
     assert_selector "dialog#command-palette kbd", text: /esc/i
     assert_selector "#jump-results [role=group] [role=presentation]", text: /sections/i
     within(find("#jump-results [role=group][aria-labelledby]", text: "Settings › Languages")) do

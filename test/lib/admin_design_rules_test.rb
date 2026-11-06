@@ -15,7 +15,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup components/admin components/media components/public
-    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
@@ -195,6 +195,47 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_includes css, "var(--cs-field-invalid-border, var(--cs-field-line))"
     assert_match(/\.admin-prefix-input:not\(:focus-within\)\s*\{\s*border-color:\s*var\(--cs-field-line\);/, css)
     assert_no_match(/font-size:\s*10px/, css)
+  end
+
+  # One type voice: a label is the sans at `text-label` (12px, weight 500), in
+  # sentence case. Capitals with letterspacing is the mono-label voice that
+  # this replaces. A language code (`uppercase` alone) is its own spelling and
+  # is not tracked. The scan reads the public templates too, which draw the
+  # same labels and sit outside CS Studio's source directories.
+  UPPER_TRACKED = /(?<![\w-])uppercase(?![\w-])[^"'`]*(?<![\w-])tracking-[\w\[\].-]+|(?<![\w-])tracking-[\w\[\].-]+[^"'`]*(?<![\w-])uppercase(?![\w-])/
+  UPPER_TRACKED_ALLOWED = {
+    "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
+    "CONTENT·SPIEL" => "the product layout's wordmark",
+    "Content·Spiel</span>" => "the setup layout's wordmark"
+  }.freeze
+  TYPE_VOICE_SOURCES = Dir[Rails.root.join("app/{views,components,javascript,helpers}/**/*.{erb,rb,js}")]
+
+  test "one type voice: no capitals with tracking in the sources but the wordmark" do
+    offences = TYPE_VOICE_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next if UPPER_TRACKED_ALLOWED.keys.any? { |marker| line.include?(marker) }
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}" if line.match?(UPPER_TRACKED)
+      end
+    end
+    assert_empty offences
+  end
+
+  test "the type-voice pattern matches tracked capitals in either order, and nothing else" do
+    [ "uppercase tracking-mono", "tracking-wide font-bold uppercase", "font-cs-mono text-label uppercase tracking-mono",
+      "uppercase tracking-[0.1em] text-meta" ].each { |sample| assert_match UPPER_TRACKED, sample }
+    [ "uppercase", "tracking-tight", "text-transform: uppercase; /* note */", "uppercase\" class=\"tracking-mono",
+      "font-cs-mono text-label tracking-mono" ].each { |sample| assert_no_match UPPER_TRACKED, sample }
+  end
+
+  test "every allowed tracked-capitals marker is still there" do
+    UPPER_TRACKED_ALLOWED.each_key { |marker| assert TYPE_VOICE_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
+  end
+
+  test "the stylesheets set no label in capitals" do
+    %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
+      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+      assert_no_match(/text-transform:\s*uppercase/, css, name)
+    end
   end
 
   # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".

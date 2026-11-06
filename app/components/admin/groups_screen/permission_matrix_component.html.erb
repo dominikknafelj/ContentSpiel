@@ -9,7 +9,7 @@
       <p class="text-sm text-dim">Each permission has its own scope. No scope means everything.</p>
     </div>
     <% sections.each do |area, permissions| %>
-      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= area %></div>
+      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= area %></div>
       <% permissions.each do |permission| %>
         <%= render row_for(permission) %>
         <% stale_notes(permission).each do |note| %>

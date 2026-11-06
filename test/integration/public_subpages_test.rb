@@ -14,7 +14,7 @@ class PublicSubpagesTest < ActionDispatch::IntegrationTest
 
   def path_of(record, locale = "en") = PublicSite::Urls.new.path_for(record, locale)
 
-  test "a page with published subpages names the list In this section, in mono, and its links are the menu's: dim, ink on hover, no underline, one per line" do
+  test "a page with published subpages names the list In this section, in the label voice, and its links are the menu's: dim, ink on hover, no underline, one per line" do
     parent = create_page(title: "Guides")
     first = create_page(title: "First steps", parent: parent)
     second = create_page(title: "Going further", parent: parent)
@@ -23,7 +23,7 @@ class PublicSubpagesTest < ActionDispatch::IntegrationTest
 
     assert_select "nav.page-children[aria-labelledby]" do |navs|
       label_id = navs.first["aria-labelledby"]
-      assert_select "p#{'#'}#{label_id}.font-cs-mono", text: "In this section"
+      assert_select "p#{'#'}#{label_id}.text-label", text: "In this section"
     end
     assert_select "nav.page-children li", count: 2
     assert_select "nav.page-children li a", count: 2 do |links|

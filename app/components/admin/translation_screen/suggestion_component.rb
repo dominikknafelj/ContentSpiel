@@ -39,7 +39,7 @@ module Admin
     class SuggestionComponent < Admin::AdminComponent
       def self.dom_id(input_id) = "translation-suggestion-#{input_id}"
 
-      LABEL = "SUGGESTED TRANSLATION · EDIT BEFORE USING".freeze
+      LABEL = "Suggested translation · edit before using".freeze
 
       # How much of the existing translation "Current: …" shows.
       CURRENT_LIMIT = 300

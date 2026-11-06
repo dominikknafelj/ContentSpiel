@@ -12,7 +12,7 @@ module SetupHelper
   end
 
   def setup_label_class
-    "block font-cs-mono text-label uppercase tracking-mono text-meta"
+    "block text-label text-meta"
   end
 
   def setup_primary_button_class

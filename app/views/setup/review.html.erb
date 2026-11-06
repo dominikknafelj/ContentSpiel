@@ -20,7 +20,7 @@
      ] %>
   <% rows.each do |label, value, step| %>
     <div class="flex items-baseline gap-4 py-3">
-      <dt class="w-40 shrink-0 font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
+      <dt class="w-40 shrink-0 text-label text-meta"><%= label %></dt>
       <dd class="flex-1"><%= value %></dd>
       <% if step %>
         <dd><%= link_to "Edit", setup_step_path(step), class: "text-accent underline hover:no-underline" %></dd>

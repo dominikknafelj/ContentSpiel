@@ -59,7 +59,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-count-all", text: "2"
   end
 
-  test "choosing a tile opens the panel and advances the URL; typing an alt text takes NO ALT off the tile and drops the Missing alt count" do
+  test "choosing a tile opens the panel and advances the URL; typing an alt text takes No alt off the tile and drops the Missing alt count" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")
     bare = create_media_asset(filename: "tiny.png").tap { |asset| asset.update!(title: "Bare image") }
@@ -70,7 +70,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/media"
     await_admin_controllers
     assert_selector "#media-count-missing_alt", text: "1"
-    assert_selector "#media-asset-#{bare.id}", text: "NO ALT"
+    assert_selector "#media-asset-#{bare.id}", text: "No alt"
     assert_no_selector "#media-panel"
 
     click_tile(bare)
@@ -81,7 +81,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     fill_in "Alt", with: "A bare wall"
     assert_selector "#media-save-status", text: /SAVED/, wait: 5
 
-    assert_no_selector "#media-asset-#{bare.id}", text: "NO ALT", wait: 5
+    assert_no_selector "#media-asset-#{bare.id}", text: "No alt", wait: 5
     assert_selector "#media-count-missing_alt", text: "0"
     assert_selector "#media-count-all", text: "2"
     assert_equal "A bare wall", bare.reload.alt(locale: :en)
@@ -289,7 +289,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   # The Media screen carries the editors' `turbo-cache-control: no-cache`: without
   # it Back restores the cached panel (a form with the base it had when it was
-  # cached, and a tile with the NO ALT it had), so the next edit would be told the
+  # cached, and a tile with the No alt it had), so the next edit would be told the
   # image "also changed elsewhere" although only this tab touched it.
   test "Back after typing an alt text and choosing another tile shows the saved state, and the next edit is a plain save" do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -308,7 +308,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     page.go_back
     assert_selector "#media-panel #media-title[value='First image']", wait: 5
-    assert_no_selector "#media-asset-#{first.id}", text: "NO ALT"
+    assert_no_selector "#media-asset-#{first.id}", text: "No alt"
     await_admin_controllers
 
     fill_in "Title", with: "First image, renamed"

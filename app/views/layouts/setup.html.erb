@@ -22,7 +22,7 @@
     <header class="flex items-center justify-between px-7 py-5">
       <span class="font-cs-mono text-xs font-bold uppercase tracking-wide">Content·Spiel</span>
       <div class="flex items-center gap-4">
-        <span class="hidden font-cs-mono text-label uppercase tracking-mono text-meta sm:inline">First-run setup</span>
+        <span class="hidden text-label text-meta sm:inline">First-run setup</span>
         <%= render Admin::Ui::ThemeSwitchComponent.new %>
       </div>
     </header>
@@ -43,7 +43,7 @@
               </span>
               <span class="flex-1"><%= step_label(step) %></span>
               <% if optional_step?(step) %>
-                <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span>
+                <span class="text-label text-meta">optional</span>
               <% end %>
             <% end %>
           <% end %>

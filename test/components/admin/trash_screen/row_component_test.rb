@@ -9,7 +9,7 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup do
-    # Midday, so "IN 30 DAYS" can't become 29 on a run that crosses midnight.
+    # Midday, so "In 30 days" can't become 29 on a run that crosses midnight.
     travel_to Time.current.change(hour: 12)
     Current.actor = users(:one)
   end
@@ -23,7 +23,7 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_text "Ada Lovelace"
     assert_selector "time"
-    assert_selector "[data-retention]", text: "IN 30 DAYS"
+    assert_selector "[data-retention]", text: "In 30 days"
   end
 
   test "a page row carries its subpage sentence; other rows do not" do

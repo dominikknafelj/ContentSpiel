@@ -12,7 +12,7 @@
         empty: t("admin.note_inbox.card.empty")) do |card| %>
     <% if unread.positive? %>
       <% card.with_badge do %>
-        <%= tag.span t("admin.note_inbox.card.new", count: unread), class: "font-cs-mono text-label uppercase tracking-mono text-accent", data: { notes_new: true } %>
+        <%= tag.span t("admin.note_inbox.card.new", count: unread), class: "text-label text-accent", data: { notes_new: true } %>
       <% end %>
       <% card.with_action do %>
         <%= button_to t("admin.note_inbox.card.mark_all_read"), admin_read_notes_path(back: "dashboard", **admin_url_options),

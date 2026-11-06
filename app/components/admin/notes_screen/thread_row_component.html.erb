@@ -13,7 +13,7 @@
     </span>
     <span class="<%= excerpt_class %> text-[13px] <%= unread? ? "text-ink" : "text-dim" %>"><%= excerpt %></span>
     <% if meta.present? %>
-      <span class="font-cs-mono text-label uppercase tracking-[0.1em] text-meta"><%= meta %></span>
+      <span class="text-label text-meta"><%= meta %></span>
     <% end %>
   </span>
   <% if thread.pinned %>

@@ -20,7 +20,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     assert_selector "[data-translation-suggestion].bg-accent-tint"
     assert_selector "textarea[data-translate-suggestion-text][aria-label='Suggested translation']", text: "Hallo Welt"
     assert_no_selector "textarea[name]", visible: :all
-    assert_selector "[data-suggestion-label]", text: "SUGGESTED TRANSLATION · EDIT BEFORE USING"
+    assert_selector "[data-suggestion-label]", text: "Suggested translation · edit before using"
     assert_selector "[data-suggestion-model].ml-auto", text: "claude-sonnet-5"
     assert_selector "button", text: "Use"
     assert_selector "button", text: "Discard"
@@ -47,7 +47,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
 
   test "without a model name there is only the label" do
     render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo"))
-    assert_selector "[data-suggestion-label]", text: "SUGGESTED TRANSLATION · EDIT BEFORE USING"
+    assert_selector "[data-suggestion-label]", text: "Suggested translation · edit before using"
     assert_no_selector "[data-suggestion-model]"
   end
 

@@ -2,7 +2,7 @@ require "application_system_test_case"
 
 # The Users list and the user editor in a real browser (round 3 Task 12): a row opens
 # the editor, a ticked group card is one unsaved change, Make owner… confirms and
-# the list shows the OWNER tag, the owner and delete buttons wait for unsaved
+# the list shows the Owner tag, the owner and delete buttons wait for unsaved
 # changes, and the password disclosure counts nothing until something is typed and
 # forgets what was typed when closed.
 class Admin::UsersSystemTest < ApplicationSystemTestCase
@@ -38,7 +38,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     within(row(@target)) { assert_text "Editor" }
   end
 
-  test "Make owner… confirms and the list shows the OWNER tag" do
+  test "Make owner… confirms and the list shows the Owner tag" do
     visit edit_admin_user_path(@target)
     await_admin_controllers
 
@@ -54,7 +54,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     assert @target.reload.owner?
 
     visit admin_users_path
-    within(row(@target)) { assert_text "OWNER" }
+    within(row(@target)) { assert_text "Owner" }
   end
 
   test "with a typed change the owner and delete buttons are disabled with the hint, and come back when it is undone" do
