@@ -15,7 +15,7 @@
   </div>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, type: "submit") %>
     <% end %>
     <%# Disabled until the form has loaded (`admin--editor--new-record`). %>
     <%= render Admin::Ui::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: Admin::EditorScreen::NewPageFormComponent::FORM_ID, disabled: true) %>

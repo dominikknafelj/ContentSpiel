@@ -4,7 +4,7 @@ class Admin::Ui::ErrorSummaryComponentTest < ViewComponent::TestCase
   test "a danger-tint box that lists each field's errors as links to the field" do
     render_inline(Admin::Ui::ErrorSummaryComponent.new(errors: { "email_address" => [ "has already been taken" ], "password" => [ "Use at least 12 characters." ] },
       field_ids: { "email_address" => "user_email", "password" => "user_password" }))
-    assert_selector ".admin-error-summary[role=alert][tabindex='-1'].bg-danger-tint"
+    assert_selector ".admin-error-summary[role=alert][tabindex='-1'].rounded-card.bg-danger-tint"
     assert_text "2 things need fixing"
     assert_selector "a[href='#user_email']", text: "Email address has already been taken"
     assert_selector "a[href='#user_password']", text: "Use at least 12 characters."

@@ -10,6 +10,8 @@ class Admin::Ui::TabLinksComponentTest < ViewComponent::TestCase
 
     assert_equal [ "Form", "Submissions 3" ], page.all("nav[aria-label='Screens'] a").map { |a| a.text.squish }
     assert_selector "a[aria-current=page][href='/s'].bg-ink", text: "Submissions"
+    assert_selector "nav[aria-label='Screens'].rounded-button.overflow-hidden"
+    assert_selector "a[aria-current=page].text-paper.ring-2.ring-inset.ring-paper"
     assert_selector "a[href='/f'][data-turbo-frame=content]:not([aria-current])"
     assert_no_selector "a[href='/f'] span", wait: 0
   end

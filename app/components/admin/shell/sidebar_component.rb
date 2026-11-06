@@ -3,9 +3,16 @@ module Admin
     # CS Studio's modules column (design pass spec §4, handoff
     # "StudioSidebar"): the wordmark and the "Jump to..." button, the modules
     # in Content / People / System sections, then the theme switch and the
-    # account block. `modules` is `admin_modules` -- already narrowed to what
-    # this user may open -- so a section with nothing left in it disappears,
-    # heading and all, and a user with no grants sees only the open modules.
+    # account block. `modules` is `admin_modules`: the rows of the modules
+    # registered in `StudioModules`, already narrowed to what this user may
+    # see, so a section with nothing left in it disappears, heading and all,
+    # and a user with no grants sees only the open modules. This component
+    # names no module: what each draws, its badge's style included, is the
+    # registry's.
+    #
+    # Each module's icon stands on its family's chip
+    # (`Admin::Ui::IconChipComponent`); its name beside it is the link's
+    # accessible name.
     #
     # `url_options` goes on every module link (final-fixes round, finding 5):
     # without it, following a modules link while editing a non-default
@@ -29,12 +36,12 @@ module Admin
 
       attr_reader :user, :current_path, :link_options, :badges
 
-      # The non-empty groups, in the order `MODULE_GROUPS` declares, each
-      # with its modules in `MODULES` order.
+      # The non-empty groups, in `StudioModules.groups` order, each headed by
+      # its name and holding its modules in registration order.
       def sections
-        Admin::BaseController::MODULE_GROUPS.filter_map do |key, heading|
-          entries = @modules.select { |entry| entry[:group] == key }
-          [ heading, entries ] if entries.any?
+        StudioModules.groups.filter_map do |group|
+          entries = @modules.select { |entry| entry[:group] == group }
+          [ t("admin.module_groups.#{group}"), entries ] if entries.any?
         end
       end
 
@@ -50,34 +57,38 @@ module Admin
         current_path == path || current_path.start_with?("#{path}/")
       end
 
+      # A row rests on the column and is sunken under the pointer; the
+      # current one stands on the accent tint in accent words, its chip the
+      # accent tint too (`chip_family`): a link marked `aria-current`, never
+      # a button.
+      ROW = "flex items-center gap-2.5 rounded-button px-2 py-1.5 text-sm".freeze
+
       def link_classes(entry)
-        base = "flex items-center gap-2.5 rounded-cs px-2 py-1.5 text-sm hover:bg-sunken"
-        current?(entry) ? "#{base} bg-sunken font-medium text-ink" : "#{base} text-dim"
+        current?(entry) ? "#{ROW} bg-accent-tint font-medium text-accent" : "#{ROW} text-dim hover:bg-sunken hover:text-ink"
       end
 
-      # An entry's count (notes spec §5): Dashboard's and Trash's today,
-      # handed in by the layout as `badges`, keyed by the entry's path helper.
-      # Each has a stable id, because a tab fetches the numbers again by
-      # itself (`GET admin_unread_notes_path`) and writes them in by id.
-      #
-      # The Dashboard's element is ALWAYS in the page, `hidden` and empty at
-      # zero, because a live signal fills it; Trash's is drawn only when
-      # there is something to say, as it always was. An entry not named here
-      # has no badge, whatever is handed in.
-      BADGE_IDS = { admin_root_path: "sidebar-badge-dashboard", admin_trash_path: "sidebar-badge-trash" }.freeze
-      ALWAYS = %i[admin_root_path].freeze
+      def chip_family(entry) = current?(entry) ? :accent : entry[:family]
 
-      def badge_count(entry) = badges[entry[:path]].to_i
+      # A module's count, handed in by the layout as `badges` by module name
+      # (`admin_module_badges`). A module with a registered badge
+      # (`StudioModules.badge`) has its element ALWAYS in the page, by a
+      # stable id, `hidden` and empty at zero, because a tab fetches a number
+      # again by itself and writes it in by id. A module without one has no
+      # badge, whatever is handed in.
+      def badge?(entry) = StudioModules.badged?(entry[:name])
 
-      def badge?(entry) = BADGE_IDS.key?(entry[:path]) && (badge_count(entry).positive? || ALWAYS.include?(entry[:path]))
+      def badge_count(entry) = badges[entry[:name]].to_i
 
-      # The Dashboard's is the one FILLED badge of the sidebar (handoff
-      # "Sidebar badge"): accent means "unread and addressed to you" and
-      # nothing else (notes spec §4.5). Trash's stays the plain mono number.
+      def badge_id(entry) = "sidebar-badge-#{entry[:name]}"
+
+      # A `:filled` badge (`StudioModules.badge(name, style: :filled)`, the
+      # Dashboard's, handoff "Sidebar badge") is the accent pill: accent there
+      # means "unread and addressed to you" and nothing else. A `:plain` one
+      # is a number in sans.
       def badge_class(entry)
-        return "ml-auto rounded-full bg-accent px-1.5 font-cs-mono text-label leading-4 text-on-accent" if entry[:path] == :admin_root_path
+        return "ml-auto rounded-full bg-accent px-1.5 text-count leading-4 text-on-accent" if StudioModules.badge_style(entry[:name]) == :filled
 
-        "ml-auto font-cs-mono text-label text-meta"
+        "ml-auto text-count text-meta"
       end
     end
   end

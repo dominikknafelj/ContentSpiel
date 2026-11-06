@@ -11,7 +11,7 @@ class Admin::TokensScreen::TableComponentTest < ViewComponent::TestCase
 
     assert_equal %w[Name Acts\ as Group Created Last\ used Status Actions], page.all("th").map { |th| th.text.strip }
     assert_selector "tr#api_token_#{token.id}", text: /claude-desktop.*Active/m
-    assert_selector "tr#api_token_#{token.id} span.font-cs-mono", text: "203.0.113.5"
+    assert_selector "tr#api_token_#{token.id} span.block.text-meta", text: "203.0.113.5"
     assert_selector "tr#api_token_#{token.id}", text: "Revoke…"
     assert_selector "dialog#revoke-api-token-#{token.id}", text: "Revoke “claude-desktop”?", visible: :all
     assert_selector "tr#api_token_#{revoked.id}.opacity-60", text: /old.*Revoked/m

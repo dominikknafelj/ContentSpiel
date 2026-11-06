@@ -19,11 +19,14 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
       BlockTypes.all.to_h { |type| [ type.name, type.icon ] }.slice(*BuiltInBlockTypes.names))
   end
 
-  test "each place has its size and colour, and the icon is decoration" do
-    { picker: %w[size-4 text-dim], card: %w[size-3.5 text-dim], tile: %w[size-3 text-meta] }.each do |place, (size, colour)|
+  test "a block type's icon is drawn on its family's chip, and a type with no family on the neutral chip" do
+    { picker: [ "size-6", "size-3.5" ], card: [ "size-6", "size-3.5" ], tile: [ "size-5.5", "size-3.5" ] }.each do |place, (chip, icon)|
       render_inline Admin::EditorScreen::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: place)
-      assert_selector "span[data-block-icon=code_xml][aria-hidden=true][class~='#{colour}'] svg[class~='#{size}']"
+      assert_selector "span[data-block-icon=code_xml][aria-hidden=true][class~='#{chip}'][class~='bg-ic-code-bg'][class~='text-ic-code'] svg[class~='#{icon}']"
     end
+    render_inline Admin::EditorScreen::BlockIconComponent.new(definition: ContentModel::BlockTypeDefinition.new("plain").tap { |type| type.icon "pilcrow" }, place: :card)
+    assert_selector "span[data-block-icon=pilcrow][class~='bg-sunken'][class~='text-dim']"
+    assert_no_selector "span[class*='bg-ic-']"
   end
 
   test "a type that names no icon draws nothing" do
@@ -51,10 +54,10 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
       block = root_page.content_blocks.create!(block_type: "test_flag", position: 0, settings: { "tone" => "loud" })
 
       render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :card, block: block)
-      assert_selector "span#block-#{block.id}-icon-card[data-block-icon=triangle_alert][aria-hidden=true][class~='text-dim'] svg[class~='size-3.5']"
+      assert_selector "span#block-#{block.id}-icon-card[data-block-icon=triangle_alert][aria-hidden=true][class~='size-6'] svg[class~='size-3.5']"
 
       render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :tile, block: block)
-      assert_selector "span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='text-meta'] svg[class~='size-3']"
+      assert_selector "span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='size-5.5'] svg[class~='size-3.5']"
 
       render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :picker)
       assert_selector "span[data-block-icon=info]:not([id])"

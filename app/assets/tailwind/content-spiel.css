@@ -21,24 +21,25 @@
    utilities, e.g. `scheme-light dark:scheme-dark` on that layout's root
    element -- never globally here. */
 :root, [data-theme="light"] {
-  --cs-paper: #f5f4f0;
+  --cs-paper: #f3f4f7;
   --cs-surface: #ffffff;
-  --cs-sunken: #e6e4dd;
-  --cs-ink: #141417;
-  --cs-dim: #46474c;
-  --cs-meta: #5f6065;
+  --cs-sunken: #e7e9ef;
+  --cs-ink: #17191f;
+  --cs-dim: #4a4f5a;
+  --cs-meta: #5a6070;
   /* A line that only groups (a card, a table's rows) and a stronger one (a
      panel, a table's header rule, a chip that is no control): decoration,
      below 3:1 on purpose. Everything pressed or typed into is outlined in
-     `--cs-field-line`, 3:1 or better on paper, surface and sunken in both
-     schemes (contrast and buttons spec, C1 and Ruling 1;
+     `--cs-field-line`, 3:1 or better on paper, surface, a text field's fill,
+     the rail and the popover in both schemes; no control edge stands on
+     sunken, where it would measure under 3:1 (contrast and buttons spec, C1 and Ruling 1;
      `test/lib/admin_contrast_test.rb`). */
-  --cs-line: rgba(20,20,23,0.14);
-  --cs-line-strong: rgba(20,20,23,0.28);
-  --cs-field-line: #808186;
-  --cs-accent: oklch(0.50 0.12 250);
-  --cs-accent-hover: oklch(0.45 0.12 250);
-  --cs-accent-tint: oklch(0.95 0.025 250);
+  --cs-line: rgba(23,25,31,0.10);
+  --cs-line-strong: rgba(23,25,31,0.22);
+  --cs-field-line: #808797;
+  --cs-accent: #6236d9;
+  --cs-accent-hover: #5831c3;
+  --cs-accent-tint: #ece6fd;
   --cs-on-accent: #ffffff;
   --cs-ok: oklch(0.52 0.12 150);
   --cs-ok-ink: oklch(0.42 0.11 150);
@@ -62,26 +63,75 @@
      `mind_graph/theme.js`: a page's mark, and the tree's lines. */
   --cs-graph-page: var(--cs-ink);
   --cs-graph-tree: var(--cs-dim);
-  --cs-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
+  /* The grounds, lowest first: paper, surface (a card), rail
+     (elevation 2: a rail or panel), popover (elevation 3: a popover, menu,
+     dialog, a dragged card). A text field sits on its own fill. */
+  --cs-field-fill: #f1f3f7;
+  --cs-rail: #eaf1fb;
+  --cs-popover: #ffffff;
+  /* A section's 1.5px frame, its head and the head's words. */
+  --cs-structure: #c98a4b;
+  --cs-structure-tint: #fbeedd;
+  --cs-structure-ink: #7a4a12;
+  /* The solid Live chip, and a scheduled date's block. */
+  --cs-live: #1c7a46;
+  --cs-on-live: #ffffff;
+  --cs-scheduled: #e8a93a;
+  --cs-on-scheduled: #3a2600;
+  /* A panel's head: asks for action, offers shortcuts, informs. */
+  --cs-head-action: #ece6fd;
+  --cs-head-action-ink: #45249f;
+  --cs-head-cool: #e6ecfb;
+  --cs-head-cool-ink: #24418f;
+  --cs-head-warm: #fbeedd;
+  --cs-head-warm-ink: #7a4a12;
+  --cs-type-chip: #e6ecfb;
+  --cs-type-chip-ink: #2b50c8;
+  /* Icon hues: a block-type family's icon and its chip, drawn only by
+     Admin::Ui::IconChipComponent. Each icon is 5.06:1 or better on its chip, the
+     surface, the rail, the chrome and the popover. */
+  --cs-ic-text: #2a4fc6;
+  --cs-ic-text-bg: #e7ecfb;
+  --cs-ic-media: #a14a06;
+  --cs-ic-media-bg: #fbeedd;
+  --cs-ic-code: #0b6a73;
+  --cs-ic-code-bg: #dcf0f1;
+  --cs-ic-form: #1b7339;
+  --cs-ic-form-bg: #e0f2e5;
+  --cs-ic-lists: #6a35c9;
+  --cs-ic-lists-bg: #efe8fb;
+  --cs-ic-structure: #7a4a12;
+  --cs-ic-structure-bg: #f4e6d4;
+  --cs-ic-people: #8c1d5c;
+  --cs-ic-people-bg: #fbe6ef;
+  /* The words on the danger fill: white in light, dark in dark, where
+     white measures 3.11:1. */
+  --cs-on-danger: #ffffff;
+  /* Elevations 1 to 4. Light lifts with a cast shadow; dark lifts with a
+     lighter ground and a top highlight, so the shadow is the weaker cue. */
+  --cs-shadow-1: 0 1px 2px rgba(23,25,31,0.06), 0 4px 12px rgba(23,25,31,0.05);
+  --cs-shadow-2: 0 2px 4px rgba(23,25,31,0.07), 0 12px 28px rgba(23,25,31,0.09);
+  --cs-shadow-3: 0 3px 8px rgba(23,25,31,0.09), 0 18px 40px rgba(23,25,31,0.12);
+  --cs-shadow-4: 0 6px 12px rgba(23,25,31,0.12), 0 28px 56px rgba(23,25,31,0.20);
   /* A save footer stuck over the content (Claude Design O2, plan ruling 7):
      cast upward, faint in light and a little stronger in dark. */
-  --cs-shadow-stuck: 0 -6px 16px rgba(20,20,23,0.06);
+  --cs-shadow-stuck: 0 -6px 16px rgba(23,25,31,0.06);
 }
 
 [data-theme="dark"] {
-  --cs-paper: #0c0d0f;
-  --cs-surface: #1b1c20;
-  --cs-sunken: #28292e;
-  --cs-ink: #ededee;
-  --cs-dim: #a9aaaf;
-  --cs-meta: #9c9da3;
-  --cs-line: rgba(237,237,238,0.13);
-  --cs-line-strong: rgba(237,237,238,0.26);
-  --cs-field-line: #74757b;
-  --cs-accent: oklch(0.74 0.10 250);
-  --cs-accent-hover: oklch(0.80 0.09 250);
-  --cs-accent-tint: oklch(0.28 0.05 250);
-  --cs-on-accent: #0f1012;
+  --cs-paper: #14161c;
+  --cs-surface: #1d2029;
+  --cs-sunken: #252935;
+  --cs-ink: #e3e5ec;
+  --cs-dim: #b0b6c4;
+  --cs-meta: #9ca2b2;
+  --cs-line: rgba(255,255,255,0.08);
+  --cs-line-strong: rgba(255,255,255,0.16);
+  --cs-field-line: #7a8191;
+  --cs-accent: #b49cff;
+  --cs-accent-hover: #bca6ff;
+  --cs-accent-tint: #2c2350;
+  --cs-on-accent: #140c2e;
   --cs-ok: oklch(0.70 0.13 150);
   --cs-ok-ink: oklch(0.80 0.12 150);
   --cs-ok-tint: oklch(0.28 0.05 150);
@@ -93,19 +143,69 @@
   --cs-danger-tint: oklch(0.29 0.06 25);
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
-  --cs-chrome: #111214;
+  --cs-chrome: #181a21;
   --cs-cat-1: oklch(0.74 0.08 200);
   --cs-cat-2: oklch(0.74 0.10 300);
   --cs-cat-3: oklch(0.74 0.09 120);
   --cs-cat-4: oklch(0.74 0.09 0);
   --cs-cat-5: oklch(0.74 0.07 260);   /* away from cat-1's teal (design answer D2) */
   --cs-cat-6: oklch(0.78 0.08 95);
-  /* Ink-white page marks glared in dark; the tree's lines are dim at 60%
-     (that is `--cs-dim`'s value, here as a colour a canvas can take). */
+  /* Ink-white page marks glared in dark; the tree's lines are #a9aaaf at 60%,
+     as a colour a canvas can take. That was `--cs-dim`'s dark value before
+     the grounds moved; the graph keeps it, apart from `--cs-dim`, until stage
+     5a redraws the graph. */
   --cs-graph-page: #d9d9dc;
   --cs-graph-tree: rgba(169,170,175,0.6);
-  --cs-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
-  --cs-shadow-stuck: 0 -6px 16px rgba(20,20,23,0.12);
+  --cs-field-fill: #272b36;
+  --cs-rail: #1f2a3d;
+  --cs-popover: #283244;
+  --cs-structure: #b9824a;
+  --cs-structure-tint: #3a2a17;
+  --cs-structure-ink: #f0c48f;
+  --cs-live: #5cc48f;
+  --cs-on-live: #0f1a14;
+  --cs-scheduled: #e3a650;
+  --cs-on-scheduled: #2a1c00;
+  --cs-head-action: #2c2350;
+  --cs-head-action-ink: #cdbfff;
+  --cs-head-cool: #22304d;
+  --cs-head-cool-ink: #a9c0ff;
+  --cs-head-warm: #3a2a17;
+  --cs-head-warm-ink: #f0c48f;
+  --cs-type-chip: #24304f;
+  --cs-type-chip-ink: #9db4ff;
+  /* Icon hues, dark. */
+  --cs-ic-text: #9db4ff;
+  --cs-ic-text-bg: #24304f;
+  --cs-ic-media: #f0b06a;
+  --cs-ic-media-bg: #3a2a17;
+  --cs-ic-code: #6fd0d6;
+  --cs-ic-code-bg: #14353a;
+  --cs-ic-form: #7fd39a;
+  --cs-ic-form-bg: #183622;
+  --cs-ic-lists: #c4a8ff;
+  --cs-ic-lists-bg: #30264a;
+  --cs-ic-structure: #e8b77e;
+  --cs-ic-structure-bg: #40301c;
+  --cs-ic-people: #ffb8d6;
+  --cs-ic-people-bg: #3d2030;
+  --cs-on-danger: #1a0b0b;
+  --cs-shadow-1: inset 0 1px 0 rgba(255,255,255,0.04);
+  --cs-shadow-2: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.35);
+  --cs-shadow-3: inset 0 1px 0 rgba(255,255,255,0.07), 0 12px 32px rgba(0,0,0,0.45);
+  --cs-shadow-4: inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 56px rgba(0,0,0,0.6);
+  --cs-shadow-stuck: 0 -6px 16px rgba(0,0,0,0.35);
+}
+
+/* A visitor's page carries no CMS colour: the form-send pages share this
+   stylesheet (there is no second one), so under `data-surface="plain"` the
+   accent family is re-valued to ink on paper in both schemes, with var()
+   only. After both theme blocks, so it wins in both. */
+[data-surface="plain"] {
+  --cs-accent: var(--cs-ink);
+  --cs-accent-hover: var(--cs-ink);
+  --cs-accent-tint: var(--cs-sunken);
+  --cs-on-accent: var(--cs-paper);
 }
 
 :root {
@@ -113,11 +213,15 @@
   --cs-mono: "IBM Plex Mono", ui-monospace, monospace;
   --cs-t-display: clamp(34px, 5vw, 60px);
   --cs-t-h1: 28px; --cs-t-h2: 20px; --cs-t-h3: 15px;
-  --cs-t-body: 15px; --cs-t-small: 13px; --cs-t-label: 11px;
+  --cs-t-body: 15px; --cs-t-small: 13px; --cs-t-label: 11px; --cs-t-count: 11px;
   --cs-track-mono: 0.14em; --cs-track-wide: 0.18em;
   --cs-sp-1: 4px; --cs-sp-2: 8px; --cs-sp-3: 14px; --cs-sp-4: 22px;
   --cs-sp-5: 34px; --cs-sp-6: 54px; --cs-sp-7: 80px;
   --cs-radius: 2px; --cs-radius-pill: 999px;
+  /* The radii. `--cs-radius` stays the radius of small marks: a status,
+     translation or channel chip, a badge, the tooltip and a menu row's hover. */
+  --cs-radius-field: 6px; --cs-radius-button: 8px; --cs-radius-button-sm: 7px; --cs-radius-chip: 7px;
+  --cs-radius-tile: 12px; --cs-radius-card: 14px; --cs-radius-frame: 16px; --cs-radius-rail: 18px;
   --cs-ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
   --cs-control-compact: 2.375rem;
@@ -126,4 +230,13 @@
      (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
+}
+
+/* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`
+   on <html>: the label is 12px there and stays 11px on every page a visitor
+   sees, the form-send pages included. The selector's (0,1,1) outweighs
+   `:root`'s (0,1,0) in any order; it stands after the `:root` blocks by
+   convention. */
+html[data-surface="studio"] {
+  --cs-t-label: 12px;
 }

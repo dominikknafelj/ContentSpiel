@@ -13,14 +13,14 @@
 <p class="mb-4 text-meta"><%= t(".intro") %></p>
 
 <% if @tags.empty? %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-card bg-surface shadow-1">
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) %>
   </div>
 <% else %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-card bg-surface shadow-1">
     <table class="admin-tags-table admin-card-table w-full border-collapse text-sm">
       <thead>
-        <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <tr class="border-b border-line-strong text-left text-label text-meta">
           <th class="py-2 pr-4"><%= t(".columns.name") %></th>
           <th class="py-2 pr-4"><%= t(".columns.posts") %></th>
           <th class="py-2 pr-4"><span class="sr-only"><%= t(".columns.save_status") %></span></th>
@@ -38,8 +38,8 @@
                   Studio (`Admin::EditorScreen::PageSettingsFormComponent`'s own comment
                   explains why the save-status cell, a sibling `<td>` rather
                   than a nested element, needs no Stimulus target here to
-                  reach it). The input has no border until it is hovered or
-                  focused: "click the name to rename it". %>
+                  reach it). The input is a well, as every field inside an
+                  `.admin-column` is (content-spiel.tailwind.css). %>
               <%= form_with url: admin_tag_path(row), method: :patch, class: "admin-column flex flex-col gap-1",
                     data: {
                       controller: "admin--saving--autosave",
@@ -52,7 +52,7 @@
                     reader's list of fields nothing. %>
                 <%= label_tag "tag-#{row.id}-name", t(".name_label", name: row.name), class: "sr-only" %>
                 <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
-                      class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-field-line focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
+                      class: "block w-full px-2 py-1 text-ink" %>
                 <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
               <% end %>
             </td>
@@ -118,7 +118,7 @@
       <% end %>
       <% dialog.with_footer do %>
         <%= tag.form method: "dialog" do %>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.cancel"), variant: :ghost, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.cancel"), variant: :tertiary, type: "submit") %>
         <% end %>
         <%# Disabled until a target is chosen (`admin--tags--dialogs#targetChanged`). %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.submit"), variant: :primary, type: "submit", form: "merge-tag-form", disabled: true,

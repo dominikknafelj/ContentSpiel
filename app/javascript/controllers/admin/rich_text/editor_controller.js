@@ -496,9 +496,9 @@ export default class extends Controller {
         else chain.extendMarkRange("link").unsetLink()
         chain.run()
         this.closePopover()
-      }, { variant: "danger" }))
+      }, { variant: "danger_text" }))
     }
-    popover.actions.append(createButton("Cancel", () => this.closePopover()))
+    popover.actions.append(createButton("Cancel", () => this.closePopover(), { variant: "tertiary" }))
     this.openPopover(popover)
   }
 

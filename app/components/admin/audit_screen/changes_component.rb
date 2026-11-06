@@ -7,7 +7,7 @@ module Admin
     # `{ "title" => [old, new] }` for a plain one, `{ "en body" =>
     # { "digest_before", "digest_after" } }` for a rich-text body.
     #
-    # Grouped per language -- "2 FIELDS · DEUTSCH" -- then the fields that
+    # Grouped per language -- "2 fields · Deutsch" -- then the fields that
     # aren't a language's. A language is named from the enabled languages; one
     # since turned off is labelled by its code. Each field is one row:
     #
@@ -104,11 +104,11 @@ module Admin
       end
 
       def heading_for(code, count)
-        text = "#{count} #{count == 1 ? "FIELD" : "FIELDS"}"
+        text = "#{count} #{count == 1 ? "field" : "fields"}"
         return text if code.nil?
 
         name = ::Locales.enabled?(code) ? ::Locales.name(code, native: true) : code.upcase
-        "#{text} · #{name.upcase}"
+        "#{text} · #{name}"
       end
 
       def build_row(field, value)

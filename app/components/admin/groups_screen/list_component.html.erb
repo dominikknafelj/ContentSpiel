@@ -1,5 +1,5 @@
-<div class="admin-groups-list overflow-hidden rounded-cs border border-line bg-surface">
-  <div class="<%= COLUMNS %> border-b border-line-strong py-2 font-cs-mono text-label uppercase tracking-mono text-meta" aria-hidden="true">
+<div class="admin-groups-list overflow-hidden rounded-card bg-surface shadow-1">
+  <div class="<%= COLUMNS %> border-b border-line-strong py-2 text-label text-meta" aria-hidden="true">
     <span>Group</span><span>Members</span><span>Tokens</span><span></span>
   </div>
   <ul>
@@ -15,8 +15,8 @@
           </span>
           <% if group.description.present? %><span class="text-sm text-dim"><%= group.description %></span><% end %>
         </span>
-        <span class="font-cs-mono text-sm <%= count_class(members(group)) %>" data-column="members"><%= members(group) %><span class="sr-only"> <%= "member".pluralize(members(group)) %></span></span>
-        <span class="font-cs-mono text-sm <%= count_class(tokens(group)) %>" data-column="tokens"><%= tokens(group) %><span class="sr-only"> <%= "token".pluralize(tokens(group)) %></span></span>
+        <span class="text-sm <%= count_class(members(group)) %>" data-column="members"><%= members(group) %><span class="sr-only"> <%= "member".pluralize(members(group)) %></span></span>
+        <span class="text-sm <%= count_class(tokens(group)) %>" data-column="tokens"><%= tokens(group) %><span class="sr-only"> <%= "token".pluralize(tokens(group)) %></span></span>
         <span class="text-meta" aria-hidden="true">›</span>
       </li>
     <% end %>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html data-surface="studio" lang="en">
   <head>
     <title><%= content_for(:title) || "Set up ContentSpiel" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -20,9 +20,9 @@
       is fixed. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <span class="font-cs-mono text-xs font-bold uppercase tracking-wide">Content·Spiel</span>
+      <span class="text-xs font-bold uppercase tracking-wide">Content·Spiel</span>
       <div class="flex items-center gap-4">
-        <span class="hidden font-cs-mono text-label uppercase tracking-mono text-meta sm:inline">First-run setup</span>
+        <span class="hidden text-label text-meta sm:inline">First-run setup</span>
         <%= render Admin::Ui::ThemeSwitchComponent.new %>
       </div>
     </header>
@@ -34,7 +34,7 @@
             <% current = step == @step %>
             <% done = setup_step_done?(step, @step) %>
             <%= tag.li class: "flex items-center gap-3 rounded-cs px-2.5 py-2 #{current ? "bg-sunken font-medium text-ink" : "text-dim"}", aria: { current: ("step" if current) } do %>
-              <span class="w-4 font-cs-mono text-xs <%= done ? "text-ok-ink" : "text-meta" %>">
+              <span class="w-4 text-xs <%= done ? "text-ok-ink" : "text-meta" %>">
                 <% if done %>
                   <span aria-hidden="true">✓</span><span class="sr-only">Done: </span>
                 <% else %>
@@ -43,7 +43,7 @@
               </span>
               <span class="flex-1"><%= step_label(step) %></span>
               <% if optional_step?(step) %>
-                <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span>
+                <span class="text-label text-meta">optional</span>
               <% end %>
             <% end %>
           <% end %>

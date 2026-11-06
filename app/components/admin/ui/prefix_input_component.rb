@@ -28,8 +28,8 @@ module Admin
       def errors_id = "#{id}-errors"
 
       def wrapper_class
-        border = errors.any? ? "border-danger" : "border-field-line focus-within:border-accent"
-        "admin-prefix-input flex rounded-cs border #{border} bg-surface"
+        border = errors.any? ? "border-danger" : "border-field-line focus-within:border-b-transparent"
+        "admin-prefix-input flex rounded-t-field border-0 border-b #{border} bg-field-fill focus-within:outline-2 focus-within:outline-accent"
       end
 
       def input_attrs

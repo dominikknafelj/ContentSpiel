@@ -4,7 +4,7 @@
      data-open="<%= open? %>" data-action="change->admin--groups--permission-matrix#scopeChanged keydown.esc->admin--groups--permission-matrix#closeFromKey">
   <% if types_shown %>
     <fieldset class="flex flex-col gap-2">
-      <legend class="mb-2 font-cs-mono text-label uppercase tracking-mono text-meta">Content types · none ticked = all</legend>
+      <legend class="mb-2 text-label text-meta">Content types · none ticked = all</legend>
       <div class="flex flex-wrap gap-2">
         <% registered_types.each do |name| %>
           <% box_id = field_id("type", name.parameterize) %>
@@ -36,8 +36,8 @@
 
   <% if branch_shown %>
     <div class="flex flex-col gap-2">
-      <span class="font-cs-mono text-label uppercase tracking-mono text-meta">Page branches · ticking a page includes everything under it · none = all</span>
-      <div class="admin-branch-picker max-w-[520px] rounded-cs border border-line bg-surface p-1.5" data-controller="admin--groups--branch-picker">
+      <span class="text-label text-meta">Page branches · ticking a page includes everything under it · none = all</span>
+      <div class="admin-branch-picker max-w-[520px] rounded-card bg-surface shadow-1 p-1.5" data-controller="admin--groups--branch-picker">
         <%= branch_list(tree.roots) %>
         <% kept_page_ids.each do |page_id| %>
           <%# A stored root the viewer can't open: carried, with no title and no place in the tree. %>

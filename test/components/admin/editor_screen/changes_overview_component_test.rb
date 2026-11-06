@@ -49,7 +49,7 @@ class Admin::EditorScreen::ChangesOverviewComponentTest < ViewComponent::TestCas
 
     assert_selector "[data-change=moved]", count: 1
     assert_selector "[data-change]", count: 1
-    assert_selector "[data-change=moved] span.uppercase", text: "Moved"
+    assert_selector "[data-change=moved] span.text-label", text: "Moved"
   end
 
   test "the record's changed fields are named by their labels, and tags as Tags" do

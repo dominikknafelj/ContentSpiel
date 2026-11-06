@@ -1,5 +1,5 @@
 <% content_for :title, "Starter content" %>
-<h1 class="text-h1 font-semibold">Starter content <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<h1 class="text-h1 font-semibold">Starter content <span class="text-label text-meta">optional</span></h1>
 <p class="mt-2 text-dim">
   Finishing setup always creates your Home page at <code class="font-cs-mono">/</code>. You can also add:
 </p>
@@ -10,6 +10,6 @@
 
 <div class="mt-6 flex items-center gap-3">
   <%= button_to "Add starter content", setup_step_path("starter_content"), method: :patch, class: setup_primary_button_class %>
-  <%= link_to "Skip", setup_step_path("review"), class: setup_ghost_link_class %>
+  <%= link_to "Skip", setup_step_path("review"), class: setup_tertiary_link_class %>
   <%= render "setup/back" %>
 </div>

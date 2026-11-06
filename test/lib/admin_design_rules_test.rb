@@ -4,7 +4,8 @@ require "test_helper"
 # and none of the components the shared parts replaced. These rules are easy to
 # break one innocent edit at a time, so they are pinned here.
 class AdminDesignRulesTest < ActiveSupport::TestCase
-  # Everything that draws CS Studio, or is drawn inside it: its views and
+  # Everything that draws CS Studio, or is drawn inside it: its views (the
+  # invitation page `views/invitations`, a product-layout page, among them) and
   # components, the media components it shares with the public site
   # (`components/media`: the picker and the picture tag), the public site's own
   # components (`components/public`: the preview bar, whose two colours are
@@ -14,8 +15,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # graph's draw onto a canvas, where a colour is a string handed to the
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
-    views/admin views/layouts views/setup components/admin components/media components/public
-    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes
+    views/admin views/layouts views/setup views/invitations components/admin components/media components/public
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
@@ -53,6 +54,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A directory that is renamed or emptied would otherwise drop out of every
   # rule below without a word.
+  test "the visitor's two layouts are there, and out of the type-voice and elevation scans" do
+    VISITOR_LAYOUTS.each do |path|
+      assert File.exist?(path), path
+      assert_not_includes TYPE_VOICE_SOURCES, path
+      assert_not_includes ELEVATION_SOURCES, path
+    end
+  end
+
   test "every directory the rules cover is there and has sources" do
     SOURCE_DIRECTORIES.each do |directory|
       root = Rails.root.join("app", directory).to_s
@@ -170,7 +179,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     'CARD = "group block w-full overflow-hidden' => "a media tile is told by its picture; its hover line only groups"
   }.freeze
 
-  test "a pressable or typed-into element is outlined in border-field-line, never border-line-strong" do
+  test "a control is identified by a field-line edge or a fill of its own, never border-line-strong" do
     offences = CONTROL_SOURCES.flat_map do |path|
       File.readlines(path).each_with_index.filter_map do |line, index|
         next unless line.include?("line-strong") && line.match?(CONTROL_STATE)
@@ -186,15 +195,330 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     STRONG_LINE_ALLOWED.each_key { |marker| assert CONTROL_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
   end
 
-  test "the stylesheet's controls draw their outline in --cs-field-line, and no count is under 11px" do
-    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
+  # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
+  # link, a label and a script take): an outlined box with a field-line edge on
+  # a button, a menu's trigger or anything a pointer presses is the old look
+  # drawn by hand. A script takes the strings from the view (a `data-` value),
+  # or, where it cannot, is held to them string for string (the popover, below).
+  # What may keep a field-line edge and still be pressed is a control that is
+  # not a button, each named with its reason.
+  PRESSABLE = /<button|tag\.button|button_class:|(?<![\w-])cursor-pointer(?![\w-])|element\("button"|createElement\("button"\)/
+  FIELD_LINE_EDGE = /(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-])/
+  HAND_BUTTON_ALLOWED = {
+    "admin-rich-text-button" => "the rich-text toolbar's toggles: `aria-pressed` draws their edge",
+    "has-checked:border-accent has-checked:bg-accent-tint" => "New post's type choice, a radio group drawn as tiles",
+    "rounded-button border border-field-line px-2 py-1 text-sm text-meta" => "the top bar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare",
+    "rounded-button border border-field-line px-2 py-1.5 text-left text-sm text-meta" => "the sidebar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare"
+  }.freeze
 
-    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-select"))
-    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, rule.(".cs-toggle"))
-    assert_includes css, "var(--cs-field-invalid-border, var(--cs-field-line))"
-    assert_match(/\.admin-prefix-input:not\(:focus-within\)\s*\{\s*border-color:\s*var\(--cs-field-line\);/, css)
-    assert_no_match(/font-size:\s*10px/, css)
+  test "no hand-built button: nothing pressable in CS Studio draws a field-line edge, but the named controls" do
+    offences = CONTROL_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next unless line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE)
+        next if HAND_BUTTON_ALLOWED.keys.any? { |marker| line.include?(marker) }
+
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}"
+      end
+    end
+    assert_empty offences, "draw it with Admin::Ui::ButtonComponent (or `.classes`), or name the control in HAND_BUTTON_ALLOWED"
+  end
+
+  test "the hand-built button patterns match a button with a field-line edge, and not a well or a frame" do
+    [ '<button class="rounded-cs border border-field-line px-2">', 'tag.button type: "button", class: "border border-field-line"',
+      'button_class: "inline-flex rounded-cs border border-field-line"', '<label class="cursor-pointer border border-field-line">',
+      'element("button", "rounded-cs border border-field-line")' ].each do |sample|
+      assert sample.match?(PRESSABLE) && sample.match?(FIELD_LINE_EDGE), sample
+    end
+    [ '<input class="rounded-t-field border-0 border-b border-field-line bg-field-fill">', '<div class="inline-flex rounded-cs border border-field-line">',
+      '<button class="cursor-pointer bg-accent-tint text-accent">', '<span class="border-field-line-ish cursor-pointer">' ].each do |sample|
+      assert_not sample.match?(PRESSABLE) && sample.match?(FIELD_LINE_EDGE), sample
+    end
+  end
+
+  test "every hand-built button allowance is still used" do
+    HAND_BUTTON_ALLOWED.each_key do |marker|
+      assert CONTROL_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE) } },
+        "#{marker} no longer draws a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
+    end
+  end
+
+  test "the rich-text popover's script-built buttons and input are the component's strings" do
+    source = Rails.root.join("app/javascript/rich_text/popover.js").read
+    constant = ->(name) { source[/^const #{name} = "([^"]*)"$/, 1] }
+    variants = source[/^const BUTTON_VARIANTS = \{\n(.*?)^\}/m, 1].to_s.scan(/^\s*(\w+): "([^"]*)"/).to_h
+    assert_equal %w[primary secondary tertiary danger_text], variants.keys
+    variants.each do |variant, classes|
+      assert_equal Admin::Ui::ButtonComponent.classes(variant.to_sym, size: :small), "#{constant.("BUTTON_CLASS")} #{classes}", variant
+    end
+    helpers = Object.new.extend(SetupHelper)
+    assert_equal helpers.setup_input_class, constant.("INPUT_CLASS")
+    assert_equal helpers.setup_label_class, constant.("LABEL_CLASS")
+  end
+
+  # The stylesheet's rules as `[selectors, declarations]`, comments stripped,
+  # a selector list split at its top-level commas (not those inside `:is()`),
+  # so a rule is found by its whole selector or by what it declares, never by
+  # where it happens to stand in the file.
+  def self.css_rules(name)
+    css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+    css.scan(/([^{}]+)\{([^{}]*)\}/).map do |selector, body|
+      depth = 0
+      parts = selector.strip.each_char.slice_when do |char, _|
+        depth += 1 if char == "("
+        depth -= 1 if char == ")"
+        char == "," && depth.zero?
+      end
+      [ parts.map { |part| part.join.delete_suffix(",").squish }, body ]
+    end
+  end
+
+  WELL_CONTAINERS = ":is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion)".freeze
+  WELL_CONTROLS = ':is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], ' \
+                  '[type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), ' \
+                  "textarea, select, .admin-rich-text-editor, .admin-chip-field)".freeze
+  WELL_SELECTORS = [ "#{WELL_CONTAINERS} #{WELL_CONTROLS}", ".admin-well" ].freeze
+  WELL_FOCUS_SELECTORS = [ "#{WELL_CONTAINERS} #{WELL_CONTROLS}:is(:focus, :focus-within)", ".admin-well:is(:focus, :focus-within)" ].freeze
+
+  def rule_for(selectors, name = "content-spiel.tailwind.css")
+    matches = self.class.css_rules(name).select { |found, _| found == selectors }
+    assert_equal 1, matches.size, "one rule is #{selectors.join(", ")}"
+    matches.first.last
+  end
+
+  def single_rule(selector, name = "content-spiel.tailwind.css") = rule_for([ selector ], name)
+
+  test "a text field is a well: the field fill and a field-line bottom edge, the accent outline on focus; a checkbox and a toggle keep a full outline" do
+    shared = rule_for(WELL_SELECTORS)
+    # `background-color`, not the shorthand: the shorthand would wipe a select's chevron.
+    assert_match(/background-color:\s*var\(--cs-field-fill\);/, shared)
+    assert_match(/border-width:\s*0 0 1px;/, shared)
+    assert_includes shared, "var(--cs-field-invalid-border, var(--cs-field-line))"
+    assert_match(/border-radius:\s*var\(--cs-radius-field\) var\(--cs-radius-field\) 0 0;/, shared)
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, rule_for(WELL_FOCUS_SELECTORS))
+    assert_match(/border-width:\s*0 0 1px;/, single_rule(".cs-select"))
+    assert_match(/border-bottom-color:\s*var\(--cs-field-line\);/, single_rule(".cs-select"))
+    assert_match(/background-color:\s*var\(--cs-field-fill\);/, single_rule(".cs-select"))
+    assert_match(/border:\s*1px solid var\(--cs-field-line\);/, single_rule(".cs-toggle"))
+    assert_match(/\A\s*border-color:\s*var\(--cs-field-line\);/, single_rule(".admin-column:not(:has(> [id$=\"-errors\"] > p)) .admin-prefix-input:not(:focus-within)"))
+    assert_no_match(/font-size:\s*10px/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
+  end
+
+  test "a filter bar resets the invalid edge, as every wrapper of wells does" do
+    reset = self.class.css_rules("content-spiel.tailwind.css").find { |_, body| body.include?("--cs-field-invalid-border: initial") }
+    assert_equal %w[.admin-column .admin-field .admin-filter-bar .admin-rich-text-popover .admin-translation-suggestion], reset&.first
+  end
+
+  test "the rule parser finds a rule by its whole selector list and splits it only at top-level commas" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    assert rules.any? { |selectors, _| selectors == WELL_SELECTORS }
+    assert_not rules.any? { |selectors, _| selectors.include?(".admin-column") && selectors.include?("textarea") }, "a comma inside :is() split the list"
+  end
+
+  # The old field was a white box with a full field-line outline and an
+  # accent focus. A text field is a well, from its wrapper (`.admin-column`,
+  # `.admin-field`, `.admin-filter-bar`, the popover, the suggestion box) or
+  # from `.admin-well`, so neither that outline nor a focus colour of its own
+  # stands on an input in CS Studio's markup.
+  TEXT_INPUT = /text_field_tag|search_field_tag|text_area_tag|email_field_tag|password_field_tag|number_field_tag|date_field_tag|url_field_tag|<input|<textarea|tag\.input|tag\.textarea|element\("(?:input|textarea)"|createElement\("(?:input|textarea)"\)|(?<![\w-])(?:focus|focus-visible|focus-within):(?:outline|border)-accent(?![\w-])/
+  FULL_FIELD_LINE = /\A(?=.*(?<![\w:-])border(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-]))/
+
+  test "no text input in CS Studio is the old outlined box" do
+    offences = CONTROL_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}" if line.match?(TEXT_INPUT) && line.match?(FULL_FIELD_LINE)
+      end
+    end
+    assert_empty offences, "a text field is a well: put it in a wrapper of wells or give it `admin-well`"
+  end
+
+  test "the old-box pattern matches an outlined input, and not a well, a frame or a choice tile" do
+    [ 'text_field_tag :q, nil, class: "block rounded-cs border border-field-line bg-surface px-3"',
+      'class: "w-32 rounded-cs border border-field-line bg-surface focus-visible:outline-2 focus-visible:outline-accent"',
+      '<div class="relative rounded-cs border border-field-line bg-surface focus-within:border-accent">',
+      'element("textarea", "block w-full rounded-cs border border-field-line bg-surface")' ].each do |sample|
+      assert sample.match?(TEXT_INPUT) && sample.match?(FULL_FIELD_LINE), sample
+    end
+    [ 'text_field_tag :q, nil, class: "admin-well block w-56 px-3"', '<input class="rounded-t-field border-0 border-b border-field-line bg-field-fill">',
+      '<div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">',
+      '<label class="border border-field-line has-focus-visible:outline-accent">' ].each do |sample|
+      assert_not sample.match?(TEXT_INPUT) && sample.match?(FULL_FIELD_LINE), sample
+    end
+  end
+
+  test "setup_input_class draws the well: the field fill and a bottom edge" do
+    classes = Object.new.extend(SetupHelper).setup_input_class.split
+    assert_includes classes, "bg-field-fill"
+    assert_includes classes, "border-b"
+    assert_includes classes, "border-0"
+    assert_includes classes, "rounded-t-field"
+  end
+
+  # One type voice: a label is the sans at `text-label` (12px, weight 500), in
+  # sentence case. Capitals with letterspacing is the mono-label voice that
+  # this replaces. A language code (`uppercase` alone) is its own spelling and
+  # is not tracked.
+  UPPER_TRACKED = /(?<![\w-])uppercase(?![\w-])[^"'`]*(?<![\w-])tracking-[\w\[\].-]+|(?<![\w-])tracking-[\w\[\].-]+[^"'`]*(?<![\w-])uppercase(?![\w-])/
+  UPPER_TRACKED_ALLOWED = {
+    "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
+    "CONTENT·SPIEL" => "the product layout's wordmark",
+    "Content·Spiel</span>" => "the setup layout's wordmark"
+  }.freeze
+  # CS Studio's sources, the setup pages and the three layouts around them.
+  # The public site is the theme's and out of scope: its pages keep their look.
+  # The visitor's two layouts (`application`, the public page's, and
+  # `form_send`) are a visitor's page, not CS Studio's.
+  VISITOR_LAYOUTS = %w[application form_send].map { |name| Rails.root.join("app/views/layouts/#{name}.html.erb").to_s }.freeze
+  TYPE_VOICE_SOURCES = (ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS).concat(
+    Dir[Rails.root.join("app/helpers/setup_helper.rb")],
+    Dir[Rails.root.join("app/views/setup/**/*.erb")],
+    Dir[Rails.root.join("app/views/layouts/{product,setup,admin}.html.erb")]
+  ).uniq
+
+  test "one type voice: no capitals with tracking in the sources but the wordmark" do
+    offences = TYPE_VOICE_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next if UPPER_TRACKED_ALLOWED.keys.any? { |marker| line.include?(marker) }
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}" if line.match?(UPPER_TRACKED)
+      end
+    end
+    assert_empty offences
+  end
+
+  test "the type-voice pattern matches tracked capitals in either order, and nothing else" do
+    [ "uppercase tracking-mono", "tracking-wide font-bold uppercase", "font-cs-mono text-label uppercase tracking-mono",
+      "uppercase tracking-[0.1em] text-meta" ].each { |sample| assert_match UPPER_TRACKED, sample }
+    [ "uppercase", "tracking-tight", "text-transform: uppercase; /* note */", "uppercase\" class=\"tracking-mono",
+      "font-cs-mono text-label tracking-mono" ].each { |sample| assert_no_match UPPER_TRACKED, sample }
+  end
+
+  test "every allowed tracked-capitals marker is still there" do
+    UPPER_TRACKED_ALLOWED.each_key { |marker| assert TYPE_VOICE_SOURCES.any? { |path| File.read(path).include?(marker) }, marker }
+  end
+
+  test "the label is 11px for a visitor and 12px under CS Studio's surface" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal [ "11px" ], css.scan(/--cs-t-label:\s*([^;]+);/).flatten.reject { |v| v == "12px" }
+    studio = css.index(/^html\[data-surface="studio"\]\s*\{[^}]*--cs-t-label:\s*12px;/m)
+    assert studio, "the studio rule is `html[data-surface=\"studio\"]`: (0,1,1) beats `:root` (0,1,0)"
+    roots = css.enum_for(:scan, /^:root[^{]*\{[^}]*--cs-t-label/m).map { Regexp.last_match.begin(0) }
+    assert_not_empty roots
+    assert roots.all? { |at| at < studio }, "the studio rule comes after every :root block that sets --cs-t-label"
+    %w[admin product setup].each { |name| assert_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, '<html data-surface="studio"', name }
+    %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
+  end
+
+  # The form-send pages' required word keeps its capitals: a visitor's page,
+  # not CS Studio's. Only a selector under `.form-send-page` is let through: a
+  # CS Studio selector beside it in the same list, or on the same line, is not.
+  def capitals_offences(name, rules = self.class.css_rules(name))
+    rules.flat_map do |selectors, body|
+      next [] unless body.match?(/text-transform:\s*uppercase/)
+
+      selectors.reject { |selector| selector.match?(/\A\.form-send-page(?![\w-])/) }.map { |selector| "#{name}: #{selector}" }
+    end
+  end
+
+  test "the stylesheets set no label in capitals" do
+    %w[content-spiel.tailwind.css admin-rich-text.css].each { |name| assert_empty capitals_offences(name) }
+  end
+
+  test "the capitals check lets through a form-send selector and nothing beside it" do
+    rules = [ [ [ ".form-send-page .form-field__required" ], "text-transform: uppercase;" ],
+              [ [ ".form-send-page .x", ".admin-badge" ], "text-transform: uppercase;" ],
+              [ [ ".form-send-pager" ], "text-transform: uppercase;" ] ]
+    assert_equal [ "x.css: .admin-badge", "x.css: .form-send-pager" ], capitals_offences("x.css", rules)
+  end
+
+  # Mono is for code and for a value a person copies or compares exactly. Everything else (counts, times,
+  # addresses, ⌘K, a field error's "!", language codes, initials, badges, the sidebar's numbers) is the sans.
+  MONO_CODE = /<code|<pre|tag\.code|tag\.pre/
+  MONO_ALLOWED = {
+    "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
+    "app/components/admin/settings_screen/ai_test_result_component.rb" => "the AI 'CONNECTED · n MS' result stays mono capitals",
+    "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
+    "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
+    "app/views/setup/token.html.erb" => "the setup token's input holds a key value",
+    "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
+    "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
+    "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
+    "app/components/admin/audit_screen/event_header_component.html.erb" => "the event header's values (action, subject key)",
+    "app/components/admin/groups_screen/permission_row_component.html.erb" => "`permission.key`",
+    "app/components/admin/groups_screen/toggle_list_component.html.erb" => "`permission.key`"
+  }.freeze
+  MONO_SOURCES = TYPE_VOICE_SOURCES.reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
+
+  test "mono is for code, a token's or key's value and the save status line only" do
+    offences = MONO_SOURCES.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if MONO_ALLOWED.key?(relative)
+
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{relative}:#{index + 1}" if line.include?("font-cs-mono") && !line.match?(MONO_CODE)
+      end
+    end
+    assert_empty offences
+  end
+
+  test "every mono allowance names a file that still writes mono" do
+    MONO_ALLOWED.each_key do |relative|
+      assert MONO_SOURCES.include?(Rails.root.join(relative).to_s), "#{relative} is not a studio source"
+      assert_includes Rails.root.join(relative).read, "font-cs-mono", relative
+    end
+  end
+
+  test "the stylesheets draw mono only for code, an embed and the form-send pages" do
+    %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
+      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+      css.to_enum(:scan, /font-family:\s*var\(--cs-mono\)/).map { Regexp.last_match.begin(0) }.each do |at|
+        selector = css[0...at][/([^{}]*)\{[^{}]*\z/m, 1].to_s.strip
+        ok = selector.split(",").all? { |part| part.strip.match?(/\A(?:\.admin-rich-text-content (?:pre|code)|\.admin-rich-text-embed|\.form-send-page\b.*)\z/) }
+        assert ok, "#{name}: #{selector} draws mono"
+      end
+    end
+  end
+
+  test "the token --text-small is mapped to 13px, and --text-count is 11px for studio and visitor alike" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_includes css, "--text-small: var(--cs-t-small);"
+    assert_includes Rails.root.join("app/assets/tailwind/content-spiel.css").read, "--cs-t-small: 13px"
+    assert_includes css, "--text-count: var(--cs-t-count);"
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal [ "11px" ], tokens.scan(/--cs-t-count:\s*([^;]+);/).flatten
+  end
+
+  # A count is a figure in a pill, `text-count`; the 12px label would grow it
+  # with the label. A line that draws a count (a count helper, a tab's count,
+  # a total, the graph legend's count, the presence marker's) carries no
+  # `text-label`, but where the number is inside words.
+  COUNT_MARKER = /(?<![\w-])(?:count|counts|open_count|count_for|badge_count|presence_marker_count)(?![\w-])|\.total(?![\w-])|tab\[:count\]|data-legend-count/
+  LABEL_CLASS = /(?<![\w-])text-label(?![\w-])/
+  COUNT_LABEL_ALLOWED = {
+    "admin.note_inbox.card.new" => "the inbox card's “3 new” is words with a number in them, not a figure in a pill"
+  }.freeze
+
+  test "a count is text-count, not the 12px label" do
+    offences = TYPE_VOICE_SOURCES.flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        next unless line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS)
+        next if COUNT_LABEL_ALLOWED.keys.any? { |marker| line.include?(marker) }
+
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}"
+      end
+    end
+    assert_empty offences, "a count is `text-count`; words with a number go in COUNT_LABEL_ALLOWED"
+  end
+
+  test "the count pattern matches a count helper, a tab's count, a total and the markers, and not text-count or a word" do
+    [ '<span class="text-label"><%= count %></span>', "<%= open_count %>", "tab[:count]", "@page.total", "data-legend-count", "presence_marker_count(row)", "count_for(name)" ]
+      .each { |sample| assert_match COUNT_MARKER, sample }
+    [ "text-count", "account", "counter", "discount", "totally", "count-down" ].each { |sample| assert_no_match COUNT_MARKER, sample }
+  end
+
+  test "every count-label allowance is still used" do
+    COUNT_LABEL_ALLOWED.each_key do |marker|
+      assert TYPE_VOICE_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS) } },
+        "#{marker} no longer draws a count in the label: drop it from COUNT_LABEL_ALLOWED"
+    end
   end
 
   # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".
@@ -255,5 +579,264 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/@container admin-dashboard \(min-width: 40rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/m, css)
     assert_match(/@container admin-dashboard \(min-width: 60rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/m, css)
     assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
+  end
+
+  # The buttons are tokens only. A Tailwind palette
+  # step (`bg-violet-600`, `text-gray-500`), or white and black as a utility,
+  # is a second source of colour that does not switch with the theme.
+  PALETTE = /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|decoration|accent|caret|shadow|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950)(?![\w-])|(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke)-(?:white|black)(?![\w-])/
+
+  def class_offences(pattern, allowed: {})
+    TYPE_VOICE_SOURCES.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if allowed.key?(relative)
+
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{relative}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
+      end
+    end
+  end
+
+  test "no Tailwind palette colour or white/black utility in CS Studio" do
+    assert_empty class_offences(PALETTE)
+  end
+
+  test "the palette pattern matches a palette step and white, and no token" do
+    [ "bg-violet-600", "text-gray-500", "border-rose-950", "text-white", "hover:bg-black" ].each { |sample| assert_match PALETTE, sample }
+    [ "bg-accent", "text-ink", "bg-white-ish", "text-on-accent", "bg-cat-1" ].each { |sample| assert_no_match PALETTE, sample }
+  end
+
+  ACCENT_FILL = /(?<![\w-])bg-accent(?![\w-])/
+  ACCENT_FILL_ALLOWED = {
+    "app/components/admin/ui/button_component.rb" => "the buttons",
+    "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
+    "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
+    "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the unread bubble",
+    "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
+    "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
+    "app/javascript/notes/merge.js" => "the NEW divider",
+    "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
+    "app/javascript/media/upload_tiles.js" => "a progress bar",
+    "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
+    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser"
+  }.freeze
+
+  test "only a button, the checkbox, a count pill, the unread bubble and a progress bar carry the accent fill" do
+    assert_empty class_offences(ACCENT_FILL, allowed: ACCENT_FILL_ALLOWED)
+  end
+
+  test "every accent-fill allowance is still used" do
+    ACCENT_FILL_ALLOWED.each_key do |relative|
+      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} no longer carries bg-accent: drop it from ACCENT_FILL_ALLOWED"
+    end
+  end
+
+  # The tinted fill with accent words is the secondary button's look; a thing
+  # that is not pressable and wears it reads as a button.
+  TINT_PAIR = /(?=.*(?<![\w-])bg-accent-tint(?![\w-]))(?=.*(?<![\w-])text-accent(?![\w-]))/
+  TINT_PAIR_ALLOWED = {
+    "app/components/admin/ui/button_component.rb" => "the secondary button",
+    "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
+    "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
+    "app/components/admin/ui/icon_chip_component.rb" => "the accent icon chip, not pressable",
+    "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
+    "app/components/admin/notes_screen/body_component.rb" => "your own mention"
+  }.freeze
+
+  test "the tint with accent words is a secondary button's, a chip's, your own mention or the current module's row, and nothing else" do
+    assert_empty class_offences(TINT_PAIR, allowed: TINT_PAIR_ALLOWED)
+  end
+
+  test "every tint-pair allowance is still used" do
+    TINT_PAIR_ALLOWED.each_key do |relative|
+      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} no longer wears the pair: drop it from TINT_PAIR_ALLOWED"
+    end
+  end
+
+  # Icon chips: a family's hue is drawn by one component, so a
+  # restyle of the palette is one file, and a hue never stands for a thing
+  # that is not a type or a module.
+  ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
+  PEOPLE_HUE = /ic-people/
+  ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
+  # Where the people hue may be drawn once built (the spec); none uses it yet.
+  PEOPLE_HUE_ALLOWED = %w[
+    app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
+  ].freeze
+
+  def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+
+  test "an icon's hue is drawn only by the icon chip" do
+    offences = design_offences(ICON_HUE, except: [ ICON_CHIP ])
+    assert_empty offences
+    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip no longer draws a hue: the guard looks at nothing"
+  end
+
+  test "a block type's icon is drawn only through BlockIconComponent" do
+    pattern = /\.icon_for\(|(?<![\w:])definition\.icon\b|\btype\.icon\b/
+    offences = design_offences(pattern, except: [ "app/components/admin/editor_screen/block_icon_component.rb" ])
+    assert_empty offences
+  end
+
+  test "the people hue is drawn only by the icon chip and the people's own components, never by a button" do
+    allowed = PEOPLE_HUE_ALLOWED + Dir[Rails.root.join("app/components/admin/{notes_screen/marker_component*,notes_screen/row_pill_component*,presence_screen/row_marker_component*,editor_screen/hold_strip_component*}")].map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+    assert_empty design_offences(PEOPLE_HUE, except: allowed)
+    assert_no_match PEOPLE_HUE, File.read(Rails.root.join("app/components/admin/ui/button_component.rb"))
+    assert_match PEOPLE_HUE, File.read(Rails.root.join(ICON_CHIP)), "the chip draws the people hue"
+  end
+
+  test "the icon guards' patterns match a hue utility and the token, and not a word" do
+    [ "text-ic-code", "bg-ic-form-bg", "fill-ic-text", "stroke-ic-media", "hover:text-ic-lists", "var(--cs-ic-code)" ].each { |sample| assert_match ICON_HUE, sample }
+    [ "magic-text", "text-dim", "bg-sunken", "topic-codes", "--cs-accent", "logic-people" ].each { |sample| assert_no_match ICON_HUE, sample }
+    assert_match PEOPLE_HUE, "text-ic-people"
+    assert_no_match PEOPLE_HUE, "text-ic-code"
+  end
+
+  # Elevation and radii: a shadow is one of the four elevation tokens and a
+  # radius is one of the radius tokens, so depth and shape are decided in the stylesheet and
+  # not per element. The public site is the theme's and out of scope (its
+  # language switcher keeps `shadow-menu`, which its own stylesheet defines).
+  SHADOW = /(?<![\w-])shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|menu|\[[^\]]*\])(?![\w-])/
+  SHADOW_ALLOWED = {
+    "app/components/admin/pages_screen/tree_node_component.rb" => "the selected row's bar; stage 2 draws it in the accent"
+  }.freeze
+  RADIUS = /(?<![\w-])rounded-(?:(?:[trblse]|tl|tr|bl|br|ss|se|es|ee)-)?(?:xs|sm|md|lg|xl|2xl|3xl|4xl|\[[^\]]*\])(?![\w-])/
+  ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS
+
+  def elevation_offences(pattern, allowed = {})
+    (ELEVATION_SOURCES - allowed.keys.map { |path| Rails.root.join(path).to_s }).flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
+      end
+    end
+  end
+
+  test "a shadow is an elevation token" do
+    assert_empty elevation_offences(SHADOW, SHADOW_ALLOWED)
+  end
+
+  test "a radius is a radius token" do
+    assert_empty elevation_offences(RADIUS)
+  end
+
+  test "the elevation and radius patterns match Tailwind's own and arbitrary values, and not a token or a word" do
+    [ "shadow-sm", "hover:shadow-lg", "shadow-[0_1px_0_red]", "shadow-menu", "shadow-inner" ].each { |sample| assert_match SHADOW, sample }
+    [ "shadow-1", "shadow-4", "shadow-3", "no shadow, no arrow", "box-shadow: x" ].each { |sample| assert_no_match SHADOW, sample }
+    [ "rounded-md", "rounded-t-lg", "rounded-[3px]", "md:rounded-xl", "rounded-bl-2xl" ].each { |sample| assert_match RADIUS, sample }
+    [ "rounded-cs", "rounded-full", "rounded-t-field", "rounded-r-none", "rounded down", "rounded-card", "rounded-tile" ].each { |sample| assert_no_match RADIUS, sample }
+  end
+
+  test "every shadow allowance is still there" do
+    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
+  end
+
+  # A card is told apart by its shadow. These keep an edge because the edge is
+  # the thing: an alert's tint and an error's outline, a drop zone's dashes.
+  CARD_BORDER_ALLOWED = {
+    "app/components/admin/ui/error_summary_component.html.erb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/insecure_notice_component.rb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/mail_failed_notice_component.rb" => "an alert keeps its tinted edge",
+    "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
+  }.freeze
+
+  # `border` as a class of its own, wherever it stands in the string: after a
+  # space and before a space or the closing quote, or first in the string.
+  CARD_BORDER = /rounded-card[^"']*\sborder(?=[\s"'])|(?<=[\s"'])border\s[^"']*rounded-card/
+
+  test "the card-border pattern matches border before, after and last beside rounded-card, and not a border utility" do
+    [ 'class="rounded-card border"', "class='rounded-card bg-surface border'", 'class="border rounded-card"', 'class="p-2 border bg-surface rounded-card"' ]
+      .each { |sample| assert_match CARD_BORDER, sample }
+    [ 'class="rounded-card border-b"', 'class="rounded-card border-line"', 'class="border-t rounded-card"', 'class="rounded-card bg-surface"' ]
+      .each { |sample| assert_no_match CARD_BORDER, sample }
+  end
+
+  test "a card has no border of its own; the tree column and the dragged tile take their elevation from the stylesheet" do
+    assert_empty elevation_offences(CARD_BORDER, CARD_BORDER_ALLOWED)
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_match(/\.admin-shell__tree \{[^}]*box-shadow: var\(--cs-shadow-1\)/, css)
+    assert_no_match(/\.admin-shell__tree \{[^}]*border-right/, css)
+    %w[.admin-drag-chosen .admin-drag-fallback].each do |selector|
+      assert_match(/#{Regexp.escape(selector)} \{[^}]*var\(--cs-shadow-4\)/, css, selector)
+    end
+    assert_no_match(/--shadow-menu/, css)
+  end
+
+  # Status colour belongs to the status components. The Live and Scheduled
+  # fills are the solid chips', so a new use of them is a new state of the
+  # chip; the ok, warn and danger fills are held to the files that draw one
+  # today, a list that may only shrink as screens move their fills into a
+  # status component.
+  LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
+  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb].freeze
+  STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
+  STATUS_FILL_FILES = %w[
+    app/components/admin/dashboard_screen/translation_card_component.html.erb
+    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
+    app/components/admin/editor_screen/changes_overview_component.html.erb
+    app/components/admin/editor_screen/delete_block_dialog_component.rb
+    app/components/admin/editor_screen/hold_strip_component.html.erb
+    app/components/admin/editor_screen/live_region_component.html.erb
+    app/components/admin/editor_screen/no_address_chip_component.html.erb
+    app/components/admin/editor_screen/publish_changes_dialog_component.html.erb
+    app/components/admin/editor_screen/table_controls_component.html.erb
+    app/components/admin/forms_screen/list_component.rb
+    app/components/admin/forms_screen/new_form_dialog_component.html.erb
+    app/components/admin/forms_screen/submission_component.html.erb
+    app/components/admin/groups_screen/permission_matrix_component.html.erb
+    app/components/admin/groups_screen/scope_editor_component.html.erb
+    app/components/admin/notes_screen/thread_component.rb
+    app/components/admin/pages_screen/tree_state_mark_component.rb
+    app/components/admin/settings_screen/language_dialogs_component.html.erb
+    app/components/admin/settings_screen/mail_alert_component.rb
+    app/components/admin/settings_screen/mail_state_component.rb
+    app/components/admin/settings_screen/mail_test_outcome_component.rb
+    app/components/admin/tokens_screen/create_step_component.html.erb
+    app/components/admin/translation_screen/summary_card_component.html.erb
+    app/components/admin/ui/badge_component.rb
+    app/components/admin/ui/button_component.rb
+    app/components/admin/ui/chip_input_component.rb
+    app/components/admin/ui/error_summary_component.html.erb
+    app/components/admin/ui/insecure_notice_component.rb
+    app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/mail_failed_notice_component.rb
+    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/translation_chip_component.rb
+    app/components/admin/ui/unpublished_chip_component.html.erb
+    app/components/admin/ui/word_diff_component.rb
+    app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/javascript/controllers/admin/ui/chip_input_controller.js
+    app/javascript/controllers/password_field_controller.js
+    app/javascript/mind_graph/card.js
+    app/views/admin/accounts/edit.html.erb
+    app/views/admin/passwords/edit.html.erb
+    app/views/admin/passwords/new.html.erb
+    app/views/admin/sessions/new.html.erb
+    app/views/admin/shared/_stale_banner.html.erb
+    app/views/invitations/show.html.erb
+    app/views/setup/_flash.html.erb
+  ].freeze
+
+  test "the live and scheduled fills are drawn only by the status chip" do
+    assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
+    assert File.read(Rails.root.join(LIVE_SCHEDULED_FILES.last)).match?(LIVE_SCHEDULED_FILL), "the chip no longer draws them: the guard looks at nothing"
+  end
+
+  test "the ok, warn and danger fills are in no file beyond today's: a new one goes in a status component" do
+    drawn = relative_sources.select { |path| Rails.root.join(path).read.match?(STATUS_FILL) }
+    assert_empty drawn - STATUS_FILL_FILES, "these files draw a status fill: put it in a status component, not here"
+  end
+
+  test "the status-fill list holds only files that still draw a status fill" do
+    STATUS_FILL_FILES.each do |path|
+      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} no longer draws a status fill: drop it from STATUS_FILL_FILES"
+    end
+  end
+
+  test "the status patterns match a fill utility and not a word or another token" do
+    [ "bg-live", "text-on-live", "hover:border-scheduled", "text-on-scheduled" ].each { |sample| assert_match LIVE_SCHEDULED_FILL, sample }
+    [ "bg-live-ness", "text-delivered", "live-region", "bg-sunken" ].each { |sample| assert_no_match LIVE_SCHEDULED_FILL, sample }
+    [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
+    [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
   end
 end

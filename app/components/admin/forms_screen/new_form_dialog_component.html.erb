@@ -38,7 +38,7 @@
     <%= fields %>
     <div class="mt-4 flex gap-2">
       <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
-      <%= link_to t(".cancel"), cancel_path, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+      <%= link_to t(".cancel"), cancel_path, data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
     </div>
   </div>
 <% else %>
@@ -46,7 +46,7 @@
     <%= fields %>
     <% dialog.with_footer do %>
       <%= tag.form method: "dialog" do %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
       <% end %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
     <% end %>

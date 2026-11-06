@@ -35,10 +35,9 @@ module Admin
 
       def open_notes = (@counts || ::Notes::Counts.for_container(record, user: ::Notes.user_of(viewer))).fetch("total").to_i
 
-      # The shared secondary style of the header (Preview's), as a flex row
-      # for the icon, the word and the count: the one class swapped is the
-      # display, which two utilities can't both set.
-      def notes_button_class = helpers.setup_secondary_link_class.sub("inline-block", "inline-flex")
+      # The shared secondary style of the header (Preview's); its common classes
+      # are already `inline-flex`, the row for the icon, the word and the count.
+      def notes_button_class = helpers.setup_secondary_link_class
 
       private
 

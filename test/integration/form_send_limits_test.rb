@@ -37,6 +37,7 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
       assert_response :too_many_requests
       assert_includes response.headers["Cache-Control"], "no-store"
       assert_nil response.headers["Set-Cookie"]
+      assert_select "html[data-surface=plain]"
       assert_select "h1", text: "Too many messages"
       assert_select "main p", text: TOO_MANY
       assert_select "main a[href='/sign-up']", nil, "the link goes back to the page the send named"

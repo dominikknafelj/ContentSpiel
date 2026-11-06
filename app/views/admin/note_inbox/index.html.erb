@@ -12,7 +12,7 @@
 <% if @pagination.out_of_range? %>
   <div class="max-w-[880px]"><%= render "admin/shared/out_of_range_page", url: admin_notes_path(**admin_url_options) %></div>
 <% else %>
-  <div class="max-w-[880px] rounded-cs border border-line bg-surface">
+  <div class="max-w-[880px] rounded-card bg-surface shadow-1">
     <% if @rows.empty? %>
       <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty")) %>
     <% else %>

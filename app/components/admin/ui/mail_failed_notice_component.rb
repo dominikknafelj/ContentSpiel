@@ -14,7 +14,7 @@ module Admin
     # In the insecure notice's style (`InsecureNoticeComponent`): a warn alert,
     # `role=alert`, never danger on a screen of cards.
     class MailFailedNoticeComponent < AdminComponent
-      BASE_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
+      BASE_CLASS = "rounded-card border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
 
       # `href` is where "Open Mail settings →" goes, resolved by the screen.
       # `class:` places the notice and is added to the component's own.

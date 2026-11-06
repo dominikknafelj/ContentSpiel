@@ -31,7 +31,7 @@
               data: { note_back: true, turbo_frame: "notes", turbo_prefetch: false } do %>
           <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
           <span><%= t(".back") %></span>
-          <% if listing.open_count.positive? %><span class="font-cs-mono text-label text-meta"><%= listing.open_count %></span><% end %>
+          <% if listing.open_count.positive? %><span class="text-count text-meta"><%= listing.open_count %></span><% end %>
         <% end %>
       </div>
       <div class="contents" data-note-actions>
@@ -97,7 +97,7 @@
     <%# What the thread's state is, in words; no line at all for a thread that
         is neither pinned nor resolved. %>
     <% if thread.pinned || thread.resolved? %>
-      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-label uppercase tracking-mono text-meta">
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 text-label text-meta">
         <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
         <% if thread.resolved? %>
           <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::NotesScreen::PersonNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
@@ -123,8 +123,10 @@
       the left of Send (the handoff's decision 3: it ends a conversation, so it
       sits where one finishes writing). Its form is a form of its own BESIDE
       the reply's, never inside it (forms can't nest), and empty: the button
-      stands in the composer and names it (`form=`). %>
-  <div id="<%= dom_id %>-reply" data-note-part="reply" class="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
+      stands in the composer and names it (`form=`). `data-note-jump-class` is
+      the small secondary's classes for the "n new messages" button the
+      script puts on the dock (`notes/merge.js`). %>
+  <div id="<%= dom_id %>-reply" data-note-part="reply" data-note-jump-class="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>" class="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
     <%= form_with url: change_path(thread.resolved? ? "reopen" : "resolve"), id: state_form_id, class: "hidden", data: { turbo_frame: "notes" } do %><% end %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: reply_path, key: key, label: t(".reply"), submit: t(".send_reply"), mentions_url: mentions_path,
           body: reply_failure&.dig(:body).to_s, names: reply_failure&.dig(:names) || {}, errors: reply_failure&.dig(:errors),

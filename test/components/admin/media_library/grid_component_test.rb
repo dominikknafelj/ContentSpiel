@@ -2,7 +2,7 @@ require "test_helper"
 
 # `Admin::MediaLibrary::GridComponent` on its own: the Media screen's grid and
 # the same grid inside the picker. What it decides itself -- each tile's URL
-# with the grid's state kept, which tile is selected, which carry UNUSED (one
+# with the grid's state kept, which tile is selected, which carry Unused (one
 # query for the page), the picker's buttons, and the two empty states with a
 # list still drawn for an upload to land in. A tile's own markup is
 # `TileComponentTest`'s.
@@ -42,7 +42,7 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
     assert_selector "#media-asset-#{first.id} a.border-line:not([aria-current])"
   end
 
-  test "UNUSED is on the tiles nothing uses, from one query for the whole page" do
+  test "Unused is on the tiles nothing uses, from one query for the whole page" do
     used = create_media_asset
     unused = create_media_asset(filename: "wide.png")
     other = create_media_asset
@@ -51,9 +51,9 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
 
     grid(loaded(used, unused, other))
 
-    assert_no_selector "#media-asset-#{used.id}", text: "UNUSED"
-    assert_selector "#media-asset-#{unused.id}", text: "UNUSED"
-    assert_selector "#media-asset-#{other.id}", text: "UNUSED"
+    assert_no_selector "#media-asset-#{used.id}", text: "Unused"
+    assert_selector "#media-asset-#{unused.id}", text: "Unused"
+    assert_selector "#media-asset-#{other.id}", text: "Unused"
 
     two = loaded(used, unused).to_a
     three = loaded(used, unused, other).to_a

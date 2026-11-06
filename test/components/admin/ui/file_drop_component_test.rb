@@ -3,7 +3,8 @@ require "test_helper"
 class Admin::Ui::FileDropComponentTest < ViewComponent::TestCase
   test "a labelled drop zone around a visually hidden file input, with a Choose file button" do
     render_inline(Admin::Ui::FileDropComponent.new(name: "file", id: "upload", multiple: true, hint: "PNG, JPEG, GIF or WebP, up to 10 MB"))
-    assert_selector ".admin-file-drop[data-controller='file-drop']"
+    assert_selector ".admin-file-drop[data-controller='file-drop'].rounded-card.border-dashed.border-field-line"
+    assert_includes page.find(".admin-file-drop")[:class], "data-[dragging]:bg-accent-tint"
     assert_selector "input#upload[type=file][name=file][multiple].sr-only", visible: :all
     assert_selector "label[for=upload]", text: "Choose file"
     assert_text "PNG, JPEG, GIF or WebP, up to 10 MB"

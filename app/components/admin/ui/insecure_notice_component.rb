@@ -26,7 +26,7 @@ module Admin
     # because it is not read out otherwise and the next thing a person does
     # here is type a password.
     class InsecureNoticeComponent < AdminComponent
-      BASE_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
+      BASE_CLASS = "rounded-card border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
 
       # `class:` places the notice in its host (a margin) and is added to the
       # component's own classes, never in place of them.

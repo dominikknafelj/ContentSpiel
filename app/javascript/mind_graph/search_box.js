@@ -80,7 +80,7 @@ export function attachSearch(field, list, { url, text, status, dotClasses }) {
         const words = element("span", "flex min-w-0 flex-col")
         words.append(element("span", "truncate", row.label))
         // A page's address under its title: two pages may share a title.
-        if (row.kind === "page" && row.path) words.append(element("span", "truncate font-cs-mono text-label text-meta", row.path))
+        if (row.kind === "page" && row.path) words.append(element("span", "truncate text-small text-meta", row.path))
         link.append(markOf(row), words)
         item.append(link)
         return item
@@ -91,7 +91,7 @@ export function attachSearch(field, list, { url, text, status, dotClasses }) {
 
         const group = document.createElement("li")
         group.dataset.searchGroup = kind
-        const heading = element("p", "m-0 px-2 pb-0.5 pt-1.5 font-cs-mono text-label uppercase tracking-mono text-meta", text.t(`mind_graph.script.search.groups.${kind}`))
+        const heading = element("p", "m-0 px-2 pb-0.5 pt-1.5 text-label text-meta", text.t(`mind_graph.script.search.groups.${kind}`))
         heading.id = `mind-graph-results-${kind}`
         const items = element("ul", "m-0 list-none p-0")
         items.setAttribute("role", "list")

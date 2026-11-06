@@ -7,6 +7,6 @@
   <%= text_field_tag "site_setting[social_links][#{index}][name]", name, id: "settings-social-#{index}-name", placeholder: "Label, e.g. GitHub",
         autocomplete: "off", aria: { label: "Label" }, class: "#{setup_input_class} !mt-0" %>
   <%= url_field_tag "site_setting[social_links][#{index}][url]", url, id: "settings-social-#{index}-url", placeholder: "https://",
-        autocomplete: "off", aria: { label: "URL" }, class: "#{setup_input_class} !mt-0 font-cs-mono text-[13px]" %>
+        autocomplete: "off", aria: { label: "URL" }, class: "#{setup_input_class} !mt-0 text-small" %>
   <button type="button" class="cursor-pointer text-base text-meta hover:text-ink" aria-label="Remove link" data-action="admin--settings--repeat-rows#remove">×</button>
 </div>

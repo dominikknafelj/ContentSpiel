@@ -1,6 +1,13 @@
 require "test_helper"
 
 class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
+  test "the panel is elevation 3, and the current row is the accent tint" do
+    render_inline(Admin::Ui::MenuComponent.new(label: "More")) { |menu| menu.with_item { "x" } }
+    classes = page.find("[role=menu]", visible: :all)[:class].split
+    %w[bg-popover shadow-3 rounded-card [&_[aria-current]]:bg-accent-tint [&_a:hover]:bg-sunken].each { |name| assert_includes classes, name }
+    assert_empty classes.grep(/\Aborder|shadow-menu/)
+  end
+
   test "a button that owns a hidden menu panel" do
     render_inline(Admin::Ui::MenuComponent.new(label: "More")) do |menu|
       menu.with_item { "<a href='/a'>Rename</a>".html_safe }

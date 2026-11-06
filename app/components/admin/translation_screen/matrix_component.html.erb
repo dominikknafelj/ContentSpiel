@@ -1,11 +1,11 @@
-<div class="rounded-cs border border-line bg-surface">
+<div class="rounded-card bg-surface shadow-1">
   <% if items.empty? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: "Everything is translated.") %>
   <% else %>
     <div class="isolate overflow-x-auto" data-translation-matrix-scroll>
       <table class="w-full min-w-[40rem] border-collapse text-left">
         <thead>
-          <tr class="border-b border-line-strong font-cs-mono text-label uppercase tracking-mono text-meta">
+          <tr class="border-b border-line-strong text-label text-meta">
             <th scope="col" class="sticky left-0 min-w-60 bg-surface px-4 py-2 font-normal">Item</th>
             <th scope="col" class="px-3 py-2 font-normal">Type</th>
             <% locales.each do |locale| %>

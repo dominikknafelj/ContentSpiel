@@ -30,7 +30,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :form do |t|
         t.label "Form"
-        t.icon "clipboard_list"
+        t.icon "clipboard_list", family: :form
         t.field :form_id, :form
         t.component Blocks::FormComponent
         # `form_name` the editor's name for the form (shown to nobody by the

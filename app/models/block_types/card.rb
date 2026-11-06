@@ -26,7 +26,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :card do |t|
         t.label "Card"
-        t.icon "card"
+        t.icon "card", family: :media
         t.uses :image, :alt
         t.field :icon, :theme_choice, of: :icons
         t.field :title, :string, translated: true

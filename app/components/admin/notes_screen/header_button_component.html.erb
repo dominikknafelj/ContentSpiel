@@ -8,12 +8,12 @@
     id `notes-open` is this button's alone. %>
 <% count = open_notes %>
 <%= tag.button type: "button", id: "notes-open",
-      class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
+      class: "#{notes_button_class} items-center gap-2 aria-pressed:border-ink aria-pressed:bg-sunken",
       aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: count) },
       data: { "admin--notes--drawer-target": "opener", action: "admin--notes--drawer#toggle" } do %>
   <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
   <span><%= t(".notes") %></span>
   <%= tag.span count, id: "notes-open-count", hidden: count.zero?,
-        class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
+        class: "text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
         data: { "admin--notes--drawer-target": "total" } %>
 <% end %>

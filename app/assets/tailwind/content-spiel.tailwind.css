@@ -29,6 +29,39 @@
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
   --color-chrome: var(--cs-chrome);
+  --color-field-fill: var(--cs-field-fill);
+  --color-rail: var(--cs-rail);
+  --color-popover: var(--cs-popover);
+  --color-structure: var(--cs-structure);
+  --color-structure-tint: var(--cs-structure-tint);
+  --color-structure-ink: var(--cs-structure-ink);
+  --color-live: var(--cs-live);
+  --color-on-live: var(--cs-on-live);
+  --color-scheduled: var(--cs-scheduled);
+  --color-on-scheduled: var(--cs-on-scheduled);
+  --color-head-action: var(--cs-head-action);
+  --color-head-action-ink: var(--cs-head-action-ink);
+  --color-head-cool: var(--cs-head-cool);
+  --color-head-cool-ink: var(--cs-head-cool-ink);
+  --color-head-warm: var(--cs-head-warm);
+  --color-head-warm-ink: var(--cs-head-warm-ink);
+  --color-type-chip: var(--cs-type-chip);
+  --color-type-chip-ink: var(--cs-type-chip-ink);
+  --color-ic-text: var(--cs-ic-text);
+  --color-ic-text-bg: var(--cs-ic-text-bg);
+  --color-ic-media: var(--cs-ic-media);
+  --color-ic-media-bg: var(--cs-ic-media-bg);
+  --color-ic-code: var(--cs-ic-code);
+  --color-ic-code-bg: var(--cs-ic-code-bg);
+  --color-ic-form: var(--cs-ic-form);
+  --color-ic-form-bg: var(--cs-ic-form-bg);
+  --color-ic-lists: var(--cs-ic-lists);
+  --color-ic-lists-bg: var(--cs-ic-lists-bg);
+  --color-ic-structure: var(--cs-ic-structure);
+  --color-ic-structure-bg: var(--cs-ic-structure-bg);
+  --color-ic-people: var(--cs-ic-people);
+  --color-ic-people-bg: var(--cs-ic-people-bg);
+  --color-on-danger: var(--cs-on-danger);
   --color-cat-1: var(--cs-cat-1);
   --color-cat-2: var(--cs-cat-2);
   --color-cat-3: var(--cs-cat-3);
@@ -44,14 +77,30 @@
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
+  --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
+  --text-count: var(--cs-t-count);
   /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
      read faint); an explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
+  --text-count--font-weight: 500;
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);
-  --shadow-menu: var(--cs-shadow-menu);
+  --radius-field: var(--cs-radius-field);
+  --radius-button: var(--cs-radius-button);
+  --radius-button-sm: var(--cs-radius-button-sm);
+  --radius-chip: var(--cs-radius-chip);
+  --radius-tile: var(--cs-radius-tile);
+  --radius-card: var(--cs-radius-card);
+  --radius-frame: var(--cs-radius-frame);
+  --radius-rail: var(--cs-radius-rail);
+  /* Elevation: 1 a card, 2 a rail or panel, 3 a popover, menu, dialog or a
+     dragged card, 4 what stands over a dialog. */
+  --shadow-1: var(--cs-shadow-1);
+  --shadow-2: var(--cs-shadow-2);
+  --shadow-3: var(--cs-shadow-3);
+  --shadow-4: var(--cs-shadow-4);
   --ease-cs: var(--cs-ease);
 }
 
@@ -132,7 +181,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-sidebar { position: sticky; top: 0; height: 100vh; }
 /* `position: relative` for the divider on its right edge; the drawer rules
    below make the column `fixed`, which holds the (hidden) divider as well. */
-.admin-shell__tree { position: relative; border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+.admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 /* The Translations row's action word sits under the row's stretched link, so it
    is shown by opacity, never visibility (layout points spec, B). */
 .admin-translation-row__action { opacity: 0; }
@@ -304,6 +353,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }
+/* A menu's row under the keyboard and the palette's selected row. Their
+   sunken fill is a hover's, and on the popover it is 1.13:1 in dark: too
+   faint to be the one cue a keyboard user has. So the row also carries a 2px
+   accent bar inside its left edge, as the sidebar's current row stands out in
+   the accent; the accent is 3:1 or better on the popover in both schemes
+   (`test/lib/admin_contrast_test.rb`). Inset, so the row does not move. */
+.admin-menu-panel :is(a, button):focus-visible,
+.admin-palette [role="option"][aria-selected="true"] > a { box-shadow: inset 2px 0 0 var(--cs-accent); }
 /* The media picker (Media::PickerComponent) hangs from a fixed top edge
    instead of being centred, because its height changes while it is open: the
    Library frame is empty until its request answers, and the two tabs' panels
@@ -372,9 +429,11 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    setup's "other languages" -- with nothing to drop down: it keeps the
    border and colours and its native list. */
 .cs-select {
-  border: 1px solid var(--cs-field-line);
-  border-radius: var(--cs-radius);
-  background-color: var(--cs-surface);
+  border-width: 0 0 1px;
+  border-style: solid;
+  border-bottom-color: var(--cs-field-line);
+  border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0;
+  background-color: var(--cs-field-fill);
   color: var(--cs-ink);
   padding: 0.5rem 0.625rem;
 }
@@ -386,8 +445,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
 }
-.cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
-.cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
+.cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 0; background-color: var(--cs-surface); border-bottom-color: transparent; }
+.cs-select[aria-invalid="true"] { border-bottom-color: var(--cs-danger); }
 
 /* A filter bar's one height (Design System: "Controls in one row share one
    height. Forms are 42px; a filter bar is 38px, set by the bar, never by a
@@ -402,6 +461,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-filter-bar input:not(.sr-only),
 .admin-filter-bar select,
 .admin-filter-bar a.inline-block,
+.admin-filter-bar a.inline-flex,
 .admin-filter-bar button,
 .admin-filter-bar [data-subject-chip] {
   min-height: var(--cs-control-compact);
@@ -414,7 +474,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   padding-block: 0;
 }
 
-/* A disclosure whose summary is a mono label ("▸ PAGE SETTINGS", the SEO
+/* A disclosure whose summary is a label ("▸ Page settings", the SEO
    and Shared fields boxes, an audit event's Snapshot). The browser's own
    marker stood against the first letter; this triangle is the
    stylesheet's, 6px from the words, turned when open, and skipped by a
@@ -488,16 +548,41 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    The rich-text popovers (link/image/YouTube, built by JS inside the editor's
    column) reset it too: an invalid body must not redden their inputs. So does an
    AI suggestion box (`.admin-translation-suggestion`), whose editable textarea
-   sits under the field's input inside the same wrapper.
+   sits under the field's input inside the same wrapper, and a list's filter bar
+   (`.admin-filter-bar`, `FilterHelper`), which has no error slot.
 
    Surfaces: native controls, the prefix input's wrapper, and the rich-text
    editor's toolbar and body (the whole editor border). The media column has no
    text input, so it has nothing to colour. Explicit-save forms render their
    class server-side instead. */
-.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
+.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
-:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field),
+.admin-well {
+  background-color: var(--cs-field-fill);
+  border-width: 0 0 1px;
+  border-style: solid;
   border-color: var(--cs-field-invalid-border, var(--cs-field-line));
+  border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0;
+}
+/* A field is a well: a filled ground with a bottom edge only. Focused, the
+   well is lifted onto the surface, rings in the accent (2px, no offset) and its
+   bottom edge goes transparent so the ring is the whole boundary; an invalid
+   field keeps the danger edge under the ring. A checkbox, a toggle and a
+   segmented control are not wells: they keep a full 1px field-line outline.
+   The prefix input's and the chip input's inner inputs are excluded by a
+   zero-specificity `:where`, so the wrapper is the well and the input inside is bare.
+   A text field outside those wrappers (the mind graph's search, a section's
+   anchor, the notes composer, whose wrapper is the well round a bare textarea,
+   and the graph card's note field) carries `.admin-well` itself: there is no
+   second look for a field, compact or not. A filter bar's controls keep the
+   bar's 38px (`--cs-control-compact`, above): the well sets no height. */
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within),
+.admin-well:is(:focus, :focus-within) {
+  background-color: var(--cs-surface);
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 0;
+  border-bottom-color: var(--cs-field-invalid-border, transparent);
 }
 /* The prefix input's wrapper is the one surface with its own focus border
    (`focus-within:border-accent`), which an invalid field must still override,
@@ -506,6 +591,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    border only while unfocused. */
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
+.admin-prefix-input:focus-within { background-color: var(--cs-surface); }
 /* The Media panel's Alt field while the default-language alt is empty (handoff
    §4.6: "warn border when empty"): the warn colour, drawn only while the input
    is empty (it carries a placeholder) so it clears as soon as the editor types,
@@ -518,7 +604,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    would otherwise draw the resting border the input's own `border-transparent`
    utility asks not to have: unlayered CSS wins over a utility. Only the resting,
    valid state is touched -- hover, focus and an error keep their borders. */
-.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; }
+.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; background-color: transparent; }
 
 /* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
@@ -649,7 +735,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-notes-marker {
   display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px;
   width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--cs-radius);
-  color: var(--cs-meta); font-family: var(--cs-mono); font-size: 11px; line-height: 1; white-space: nowrap;
+  color: var(--cs-meta); font-size: 11px; line-height: 1; white-space: nowrap;
   cursor: pointer; opacity: 0;
 }
 .admin-notes-marker:hover { background: var(--cs-sunken); color: var(--cs-ink); }
@@ -743,16 +829,16 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
    outline with its content hidden. The chosen row is the lifted one -- the
-   only drag state that carries a shadow (`--cs-shadow-menu`).
+   only drag state that carries a shadow (`--cs-shadow-4`, the highest: it is above everything in the list).
 
    Both Sortables run with `forceFallback` (Firefox can't start a native drag
    from the `<button>` handles), so what follows the pointer is a clone
    SortableJS appends to `<body>` with `fallbackClass`: styled as the lifted
    row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
-.admin-drag-ghost { border: 1px dashed var(--cs-line-strong); background: transparent; }
+.admin-drag-ghost { border: 1px dashed var(--cs-line-strong); border-radius: var(--cs-radius-tile); background: transparent; }
 .admin-drag-ghost > * { visibility: hidden; }
-.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
-.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius); background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-4); }
+.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-4); }
 /* The placeholder is also the "chosen" element for the length of a mouse
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }
@@ -761,10 +847,19 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    record's fields also marks them as plainly read-only -- sunken and dim,
    the same look a disabled field already has, but on the rich-text editor
    too (a `<fieldset disabled>` doesn't reach a contenteditable). */
-.admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { background: var(--cs-sunken); color: var(--cs-dim); }
+.admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { color: var(--cs-dim); }
+/* The same selector list as the well's rule, so the cascade is a tie that the later
+   rule wins: sunken ground and a full line, not the well's bottom edge. */
+.admin-view-only :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor) {
+  background-color: var(--cs-sunken);
+  border: 1px solid var(--cs-line);
+  border-radius: var(--cs-radius-field);
+}
 /* The chip input's frame is a div around its input, so the rule above misses
    it: sunken too, or it keeps a white frame around a sunken inner field. */
-.admin-view-only .admin-chip-field { background: var(--cs-sunken); }
+.admin-view-only :is(.admin-column, .admin-field) :is(.admin-chip-field, .admin-prefix-input) { background: var(--cs-sunken); border: 1px solid var(--cs-line); border-radius: var(--cs-radius-field); }
+
+.admin-view-only .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-sunken); }
 
 /* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
    `readonly` text stays selectable and keeps full contrast; a control that can only be
@@ -772,8 +867,14 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
 .admin-held :is(input, textarea)[readonly],
 .admin-held :is(select, input, button):disabled,
-.admin-held .admin-rich-text-editor,
-.admin-held .admin-chip-field { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { background: var(--cs-paper); border-color: var(--cs-line); color: var(--cs-ink); opacity: 1; }
+/* The prefix wrapper's resting border rule above is more specific than the held
+   rule, so the held wrapper restates it with the same `:not(:has())` shape. */
+.admin-held .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-paper); }
+/* A held field is not a well: a full line, no fill change, at full contrast. */
+.admin-held :is(input:not([type="checkbox"], [type="radio"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea)[readonly],
+.admin-held select:disabled,
+.admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
@@ -823,12 +924,16 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    answers" page redraws the form with
    the Form block's own input components (`Blocks::FormFields::*`), whose
    classes are the default THEME's (`form-field__label`, ...), so they are
-   styled here, for this page only, in CS Studio's tokens and to the setup
-   inputs' look: a sentence-case label, the field line and fill, 16px text
+   styled here, for this page only, in CS Studio's tokens, as a visitor's
+   field and not CS Studio's well: a box outlined in the field line on the
+   surface, a sentence-case label, 16px text
    (below 16px a phone zooms the page on focus), the required word as a mono
    label, the help line and the error under the control, the error after a
    "!" a screen reader does not say (the `.admin-disclosure` way), and the
-   invalid control's border. The page is CMS-drawn and nothing of a theme's. */
+   invalid control's border. The page is CMS-drawn and nothing of a theme's,
+   so its grounds, lines and words are the tokens' values, as CS Studio's are,
+   and its accent (the button, the focus ring, the checkbox, the back link) is ink
+   (`data-surface="plain"`, content-spiel.css). */
 .form-send-page .form-field { display: flex; flex-direction: column; gap: 0.375rem; min-width: 0; margin: 0; padding: 0; border: 0; }
 .form-send-page .form-field__label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--cs-ink); }
 .form-send-page .form-field__required { margin-left: 0.5rem; font-family: var(--cs-mono); font-size: var(--cs-t-label); font-weight: 500; letter-spacing: var(--cs-track-mono); text-transform: uppercase; color: var(--cs-meta); }

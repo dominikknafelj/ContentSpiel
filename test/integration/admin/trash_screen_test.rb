@@ -222,19 +222,19 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
   test "the retention tag counts calendar days in the site zone and never goes negative" do
     sign_in_as users(:one)
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /IN 30 DAYS/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /In 30 days/
 
     travel_to @now + 29.days
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /IN 1 DAY\b/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /In 1 day\b/
 
     travel_to @now + 30.days
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /Today/
 
     travel_to @now + 45.days # the sweep hasn't run yet
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /Today/
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /-/, count: 0
   end
 
@@ -249,11 +249,11 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{@post.id} [data-retention][class*=danger]", count: 0
   end
 
-  test "retention 0 reads NEVER" do
+  test "retention 0 reads Never" do
     site_settings(:default).update!(trash_retention_days: 0)
     sign_in_as users(:one)
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /NEVER/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /Never/
     assert_select "p", text: /stay in the trash until someone deletes them for good/
   end
 

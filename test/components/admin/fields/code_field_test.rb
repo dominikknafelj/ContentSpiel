@@ -28,10 +28,11 @@ class Admin::Fields::CodeFieldTest < ViewComponent::TestCase
 
     classes = page.find("textarea")[:class].split
     assert_includes classes, "[field-sizing:content]"
-    assert_includes classes, "min-h-[calc(6lh+1rem+2px)]"
-    assert_includes classes, "max-h-[calc(24lh+1rem+2px)]"
+    assert_includes classes, "min-h-[calc(6lh+1rem+1px)]"
+    assert_includes classes, "max-h-[calc(24lh+1rem+1px)]"
     assert_includes classes, "w-full", "the width stays the form's: field-sizing would otherwise follow the longest line"
     assert_includes classes, "py-2", "the 1rem in the two heights is this padding"
+    assert_equal %w[border-0 border-b], classes & %w[border-0 border border-b border-t], "the 1px in the two heights is this one line underneath"
     assert_selector "textarea[rows='12']"
     assert_no_selector "[data-controller*='grow'], textarea[style]"
   end

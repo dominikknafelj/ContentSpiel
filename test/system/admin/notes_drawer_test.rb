@@ -13,8 +13,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
   teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
 
   def open_editor(query = "")
-    visit "/cs-studio/pages/#{@page.id}#{query}"
-    await_admin_controllers
+    visit_screen "/cs-studio/pages/#{@page.id}#{query}"
   end
 
   # "New note" is the drawer's header's, and the one in the drawer (the
@@ -54,7 +53,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the focus left the drawer when the note was sent") { focus_in_drawer? }
     find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list a[data-note-row]", text: "Is this page ready?"
-    assert_selector "#notes-drawer > header", text: "1 OPEN"
+    assert_selector "#notes-drawer > header", text: "1 open"
     assert_eventually(message: "the focus left the drawer on the way back to the list") { focus_in_drawer? }
 
     # A real key on a row focused by script. Cuprite's `send_keys` CLICKS an
@@ -136,16 +135,14 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     find("#notes-open").click
     assert_selector "#notes-list"
 
-    visit "/cs-studio/pages/#{other.id}"
-    await_admin_controllers
+    visit_editor(other)
     assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
     assert_selector "#notes-open[aria-pressed=true]"
     assert_equal false, focus_in_drawer?
 
     find("#notes-drawer button[aria-label='Close']").click
     assert_no_selector "#notes-drawer"
-    visit "/cs-studio/pages/#{@page.id}"
-    await_admin_controllers
+    visit_editor(@page)
     assert_selector "#notes-open[aria-pressed=false]"
     assert_no_selector "#notes-drawer"
   end
@@ -447,8 +444,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
   # scrolls, as before: the thread is in the flow.
   test "on a record's notes page a long thread is in the page's flow: the page scrolls, not the messages" do
     thread = long_thread
-    visit "/cs-studio/notes/page/#{@page.id}/threads/#{thread.id}"
-    await_admin_controllers
+    visit_screen "/cs-studio/notes/page/#{@page.id}/threads/#{thread.id}"
     assert_selector "#note-thread-#{thread.id}"
 
     box = "document.querySelector('#note-thread-#{thread.id}-messages [data-note-scroll]')"
@@ -545,8 +541,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
   end
 
   test "Back after opening and closing the drawer leaves the page" do
-    visit "/cs-studio/tags"
-    await_admin_controllers
+    visit_screen "/cs-studio/tags"
     open_editor
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list"
@@ -697,8 +692,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
 
   test "the post editor's drawer takes a note on the post" do
     post = create_post(title: "Hello")
-    visit "/cs-studio/posts/#{post.id}"
-    await_admin_controllers
+    visit_editor(post)
 
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list[data-notes-container='Post-#{post.id}']"

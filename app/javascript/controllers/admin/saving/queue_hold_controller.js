@@ -128,7 +128,7 @@ export default class extends Controller {
     toast.setAttribute("data-admin--ui--toast-timeout-value", "0")
     toast.setAttribute("data-kind", "error")
     toast.setAttribute("data-action", "mouseenter->admin--ui--toast#pause mouseleave->admin--ui--toast#start focusin->admin--ui--toast#pause focusout->admin--ui--toast#start")
-    toast.className = "admin-toast pointer-events-auto flex items-center gap-3 rounded-cs bg-ink px-4 py-2.5 text-sm text-paper shadow-menu"
+    toast.className = "admin-toast pointer-events-auto flex items-center gap-3 rounded-button bg-ink px-4 py-2.5 text-sm text-paper shadow-3"
     const text = document.createElement("span")
     text.textContent = message
     const dismiss = document.createElement("button")

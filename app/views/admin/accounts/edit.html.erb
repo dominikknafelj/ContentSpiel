@@ -53,7 +53,7 @@
   <% profile = @profile_values || { name: Current.user.name, notes_sound: Current.user.notes_sound, notes_desktop: Current.user.notes_desktop } %>
   <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8",
         data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
-    <section class="mb-4 max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-profile">
+    <section class="mb-4 max-w-[560px] rounded-card bg-surface shadow-1" aria-labelledby="account-profile">
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-profile" class="text-base font-semibold text-ink"><%= t("admin.accounts.profile.title") %></h3>
       </div>
@@ -83,7 +83,7 @@
         hidden and the script shows the one that applies. The permission is
         changed in the browser's own settings too, so it is read again
         whenever the window is looked at again. %>
-    <section class="max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-notes">
+    <section class="max-w-[560px] rounded-card bg-surface shadow-1" aria-labelledby="account-notes">
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-notes" class="text-base font-semibold text-ink"><%= t("admin.accounts.notes.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.notes.description") %></p>
@@ -124,7 +124,7 @@
     <%# Drawn as the password form's own answer, saved or refused (decision
         42): `admin--account--password-answer` puts `#password` in the address, the
         card in view and the focus on the message. %>
-    <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password"
+    <section id="password" class="max-w-[560px] scroll-mt-6 rounded-card bg-surface shadow-1" aria-labelledby="account-password"
              <%= tag.attributes(data: { controller: "admin--account--password-answer" }) if password_answer %>>
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>

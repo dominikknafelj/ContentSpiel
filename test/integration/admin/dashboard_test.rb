@@ -10,6 +10,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_root_url
     follow_redirect!
     assert_select "h1", "Dashboard"
+    assert_select "html[data-surface=studio]"
   end
 
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
@@ -26,7 +27,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
   # users(:editor_branch) is a member of the "Branch editors" group, which
   # (fixtures/access_control/grants.yml) holds no grants at all -- the one
   # fixture user who can read nothing. The dashboard opens for them anyway
-  # (its MODULES entry has `permission: nil`), each of its own lists simply
+  # (its module in `StudioModules` has `permission: nil`), each of its own lists simply
   # coming back empty through the same read scopes every other list uses.
   test "a user who can read nothing still gets the dashboard" do
     sign_in_as users(:editor_branch)

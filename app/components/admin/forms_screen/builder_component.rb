@@ -30,7 +30,7 @@ module Admin
     # summary and stand in that field's slot as well (`error_places`).
     class BuilderComponent < Admin::AdminComponent
       FORM_ID = "form-builder".freeze
-      CARD_CLASS = "admin-settings-card rounded-cs border border-line bg-surface".freeze
+      CARD_CLASS = "admin-settings-card rounded-card bg-surface shadow-1".freeze
       CARD_HEAD_CLASS = "border-b border-line px-4 py-3.5".freeze
 
       def initialize(form:, draft:, locale:, placements:, errors: [], mail_settings: nil, keys: nil, dirty: false,

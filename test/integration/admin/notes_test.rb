@@ -280,7 +280,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       get @base, headers: frame
 
       heading = ->(record) { "section#notes-group-#{Notes.key(record)} h4" }
-      assert_select "#{heading.call(@block)} [data-note-subject-type][class~='font-cs-mono'][class~='uppercase']", text: "Rich text"
+      assert_select "#{heading.call(@block)} [data-note-subject-type][class~='text-label']", text: "Rich text"
       assert_select "#{heading.call(@block)} [data-note-subject-words][class~='text-xs'][class~='text-dim'][class~='truncate']", text: "Our prices start at forty nine…"
       assert_select "#{heading.call(image)} [data-note-subject-type]", text: "Section › Column 2 · Image"
       assert_select "#{heading.call(image)} [data-note-subject-words]", text: "tiny.png"

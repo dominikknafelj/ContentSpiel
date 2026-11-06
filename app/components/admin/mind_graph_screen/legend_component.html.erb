@@ -25,7 +25,7 @@
   <% toggle_groups = [ [ :nodes, node_toggles, t(".show") ], [ :lines, line_toggles, t(".lines") ] ].reject { |_, kinds, _| kinds.empty? } %>
   <% if toggle_groups.any? %>
     <div data-legend-section="show" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
-      <span aria-hidden="true" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= t(".show") %></span>
+      <span aria-hidden="true" class="text-label text-meta"><%= t(".show") %></span>
       <% toggle_groups.each do |group, kinds, name| %>
         <fieldset data-legend-group="<%= group %>" class="m-0 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5 border-0 p-0">
           <legend class="sr-only"><%= name %></legend>
@@ -36,7 +36,7 @@
                     data: { action: "change->admin--mind-graph--graph#filter", name: label }) %>
               <%= render Admin::MindGraphScreen::SwatchComponent.new(swatch_name(group, kind)) %>
               <span><%= label %></span>
-              <span data-legend-count aria-hidden="true" class="font-cs-mono text-label text-meta"></span>
+              <span data-legend-count aria-hidden="true" class="text-count text-meta"></span>
             </label>
           <% end %>
         </fieldset>
@@ -44,7 +44,7 @@
     </div>
   <% end %>
   <div data-legend-section="key" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
-    <span id="mind-graph-legend-key" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= t(".key") %></span>
+    <span id="mind-graph-legend-key" class="text-label text-meta"><%= t(".key") %></span>
     <ul data-legend-keys class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-labelledby="mind-graph-legend-key">
       <% type_names.each do |name| %>
         <li data-legend-type="<%= name %>"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: name) %></li>

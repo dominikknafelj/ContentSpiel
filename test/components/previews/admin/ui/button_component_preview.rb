@@ -18,8 +18,8 @@ module Admin
         render Admin::Ui::ButtonComponent.new(label: "Move to trash", variant: :danger_text)
       end
 
-      def ghost
-        render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost)
+      def tertiary
+        render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary)
       end
 
       def small

@@ -12,6 +12,6 @@
 
   <div class="mt-4 flex gap-2">
     <%= render Admin::Ui::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit", form: form.form_id) %>
-    <%= link_to "Cancel", admin_posts_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+    <%= link_to "Cancel", admin_posts_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
   </div>
 </div>

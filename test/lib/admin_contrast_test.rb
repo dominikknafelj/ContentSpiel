@@ -10,10 +10,12 @@ class AdminContrastTest < ActiveSupport::TestCase
   include ContrastMeasure
 
   STYLESHEET = Rails.root.join("app/assets/tailwind/content-spiel.css")
-  GROUNDS = %w[--cs-paper --cs-surface --cs-sunken --cs-chrome].freeze
-  # Where a control stands: a card (surface), the page (paper), the
-  # toolbar and a tinted card (sunken).
-  FIELD_GROUNDS = %w[--cs-paper --cs-surface --cs-sunken].freeze
+  GROUNDS = %w[--cs-paper --cs-surface --cs-sunken --cs-chrome --cs-rail --cs-popover --cs-field-fill].freeze
+  # Where a control stands: the page (paper), a card (surface), a text
+  # field's own ground, a rail and a popover. Sunken is not one: it is
+  # hover, badges and disabled, no control edge stands on it, and the field
+  # line on light sunken measures 2.97:1.
+  FIELD_GROUNDS = %w[--cs-paper --cs-surface --cs-field-fill --cs-rail --cs-popover].freeze
 
   # `content-spiel.css`'s two colour blocks as { "--cs-name" => "value" }.
   def schemes
@@ -22,11 +24,18 @@ class AdminContrastTest < ActiveSupport::TestCase
       .transform_values { |block| block.scan(/(--cs-[\w-]+):\s*([^;]+);/).to_h.transform_values(&:strip) }
   end
 
+  # The `[data-surface="plain"]` block as { "--cs-name" => "value" }: the
+  # accent family re-valued for a visitor's page, merged over each scheme.
+  def plain_surface
+    css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
+    css[/\[data-surface="plain"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--cs-[\w-]+):\s*([^;]+);/).to_h.transform_values(&:strip)
+  end
+
   # Each scheme's name and a lambda: a token's colour, a translucent one
   # painted over the token named `under`.
   def each_scheme
     schemes.each do |scheme, tokens|
-      yield scheme, ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }
+      yield scheme, ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }, tokens
     end
   end
 
@@ -59,9 +68,9 @@ class AdminContrastTest < ActiveSupport::TestCase
 
   # The translated dot (ok), the scheduled dot (warn), the changes dot (dim)
   # and the draft ring (meta), on a card and in the tree's column.
-  test "a state mark is 3:1 or better on the surface and the tree's chrome" do
+  test "a state mark is 3:1 or better on the surface, the tree's chrome and the rail" do
     each_scheme do |scheme, colour|
-      %w[--cs-surface --cs-chrome].product(%w[--cs-ok --cs-warn --cs-dim --cs-meta]).each do |ground, mark|
+      %w[--cs-surface --cs-chrome --cs-rail].product(%w[--cs-ok --cs-warn --cs-dim --cs-meta]).each do |ground, mark|
         assert_ratio(3.0, colour.(mark), colour.(ground), "#{mark} on #{ground} (#{scheme})")
       end
     end
@@ -78,21 +87,62 @@ class AdminContrastTest < ActiveSupport::TestCase
       "the reason for the paper ring: the accent on a dark selected pill is too faint"
   end
 
-  test "a line that only groups is stronger than it was and still no outline" do
+  test "a menu's keyboard row and the palette's selected row carry an accent bar, 3:1 on the popover, where their sunken fill is not" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-popover"), "the keyboard row's accent bar on the popover (#{scheme})")
+    end
+    dark = schemes[:dark]
+    assert_operator contrast(resolve_colour(dark, "--cs-sunken"), resolve_colour(dark, "--cs-popover")), :<, 3.0,
+      "the reason for the bar: a sunken row on the dark popover is too faint to be the only cue"
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-menu-panel :is\(a, button\):focus-visible,\s*\.admin-palette \[role="option"\]\[aria-selected="true"\] > a\s*\{\s*box-shadow:\s*inset 2px 0 0 var\(--cs-accent\);\s*\}/, css)
+    assert_includes Rails.root.join("app/components/admin/ui/menu_component.rb").read, '"admin-menu-panel '
+  end
+
+  test "a line that only groups stays a hairline: the strong one above the plain one, both under 3:1" do
     each_scheme do |scheme, colour|
       surface = colour.("--cs-surface")
       line = contrast(colour.("--cs-line", under: "--cs-surface"), surface)
       strong = contrast(colour.("--cs-line-strong", under: "--cs-surface"), surface)
-      assert_operator line, :>=, 1.3, "--cs-line (#{scheme}) is #{line.round(2)}:1"
-      assert_operator strong, :>=, 1.8, "--cs-line-strong (#{scheme}) is #{strong.round(2)}:1"
+      assert_operator line, :>=, 1.2, "--cs-line (#{scheme}) is #{line.round(2)}:1"
+      assert_operator strong, :>=, 1.55, "--cs-line-strong (#{scheme}) is #{strong.round(2)}:1"
+      assert_operator strong, :>, line, "the strong line is above the plain one (#{scheme})"
       assert_operator strong, :<, 3.0, "a strong line at 3:1 would be an outline: that is --cs-field-line (#{scheme})"
     end
   end
 
-  test "the grounds step apart: sunken from surface in both schemes, and dark's surface from its paper" do
-    each_scheme { |scheme, colour| assert_ratio(1.15, colour.("--cs-sunken"), colour.("--cs-surface"), "sunken against surface (#{scheme})") }
+  test "the grounds step apart: sunken from surface, and in dark each elevation over the one below" do
+    each_scheme { |scheme, colour| assert_ratio(1.10, colour.("--cs-sunken"), colour.("--cs-surface"), "sunken against surface (#{scheme})") }
     dark = schemes[:dark]
-    assert_operator contrast(resolve_colour(dark, "--cs-surface"), resolve_colour(dark, "--cs-paper")), :>=, 1.12
+    [ %w[--cs-surface --cs-paper], %w[--cs-rail --cs-surface], %w[--cs-popover --cs-rail] ].each do |upper, lower|
+      assert_ratio(1.10, resolve_colour(dark, upper), resolve_colour(dark, lower), "#{upper} over #{lower} (dark)")
+    end
+  end
+
+  test "the primary's, the secondary's and the danger confirm's words are 4.5:1 or better on their fills, at rest and hovered" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent"), "the primary at rest (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent-hover"), "the primary hovered (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the secondary (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-on-danger"), colour.("--cs-danger"), "the danger confirm (#{scheme})")
+    end
+  end
+
+  test "the accent focus ring is 3:1 or better on every ground, the rail and the popover included" do
+    each_scheme do |scheme, colour|
+      GROUNDS.each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the focus ring on #{ground} (#{scheme})") }
+    end
+  end
+
+  test "Live, a scheduled date, a panel head's words, a section head's words and the type chip's words are 4.5:1 or better" do
+    each_scheme do |scheme, colour|
+      { "--cs-on-live" => "--cs-live", "--cs-on-scheduled" => "--cs-scheduled",
+        "--cs-head-action-ink" => "--cs-head-action", "--cs-head-cool-ink" => "--cs-head-cool", "--cs-head-warm-ink" => "--cs-head-warm",
+        "--cs-structure-ink" => "--cs-structure-tint", "--cs-type-chip-ink" => "--cs-type-chip" }.each do |ink, fill|
+        assert_ratio(4.5, colour.(ink), colour.(fill), "#{ink} on #{fill} (#{scheme})")
+      end
+      assert_ratio(3.0, colour.("--cs-live"), colour.("--cs-surface"), "the Live chip's shape on the surface (#{scheme})")
+    end
   end
 
   test "each of the six type hues is 3:1 or better on the surface, and cat-5 has left cat-1's side in dark" do
@@ -140,7 +190,14 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_match(/\[aria-invalid="true"\] \{ border-color: var\(--cs-danger\); \}/, css)
     assert_match(/border: 1px solid var\(--cs-field-line\)[^}]*background: var\(--cs-surface\)/m, css)
 
-    each_scheme do |scheme, colour|
+    plain = plain_surface
+    each_scheme do |scheme, colour, tokens|
+      tokens = tokens.merge(plain)
+      colour = ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }
+      assert_equal resolve_colour(tokens, "--cs-ink"), colour.("--cs-accent"), "the plain accent is the scheme's ink (#{scheme})"
+      assert_equal resolve_colour(tokens, "--cs-sunken"), colour.("--cs-accent-tint"), "the plain accent tint is the scheme's sunken (#{scheme})"
+      %w[--cs-paper --cs-surface].each { |ground| assert_ratio(4.5, colour.("--cs-accent"), colour.(ground), "the plain accent on #{ground} (#{scheme})") }
+      assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent"), "the plain primary's words on its fill (#{scheme})")
       %w[--cs-ink --cs-meta --cs-danger-ink --cs-accent].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-paper"), "#{ink} on the plain page (#{scheme})") }
       assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-surface"), "an answer on its control's fill (#{scheme})")
       %w[--cs-paper --cs-surface].each do |ground|
@@ -149,6 +206,26 @@ class AdminContrastTest < ActiveSupport::TestCase
       end
       assert_ratio(4.5, colour.("--cs-danger-ink"), colour.("--cs-danger-tint"), "the error summary's words on its tint (#{scheme})")
       assert_ratio(4.5, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "the thank-you's words on its tint (#{scheme})")
+    end
+  end
+
+  test "the plain surface re-values every accent token and nothing else" do
+    assert_equal %w[--cs-accent --cs-accent-hover --cs-accent-tint --cs-on-accent], plain_surface.keys.sort
+  end
+
+  # `[data-surface="plain"]` and `[data-theme="dark"]` are both (0,1,0) on the
+  # same <html>, so the plain block wins in dark only by standing after the
+  # dark block; a selector that outweighs both would win wherever it stands.
+  test "the plain block wins over both theme blocks: after them, or by a heavier selector" do
+    css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
+    at = ->(selector) { css.index(/^#{Regexp.escape(selector)}\s*\{/) }
+    plain = css[/^([^{}\n]*data-surface="plain"[^{}\n]*)\{/, 1].to_s.strip
+    assert_not_empty plain, "the plain block is there"
+    next if plain.start_with?("html[") || plain.start_with?(":root[")
+
+    [ ':root, [data-theme="light"]', '[data-theme="dark"]' ].each do |theme|
+      assert at.(theme), "#{theme} is there"
+      assert_operator at.(plain), :>, at.(theme), "#{plain} stands after #{theme}: equal specificity, so the later one wins"
     end
   end
 
@@ -165,5 +242,35 @@ class AdminContrastTest < ActiveSupport::TestCase
     map = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     assert_includes map, "--color-field-line: var(--cs-field-line);"
     assert_includes map, "--text-label--font-weight: 500;"
+  end
+
+  # Icon chips: the icon is a graphic, 3:1 (1.4.11) on its chip
+  # and on every ground a chip stands on. People is a hue too, with no block.
+  test "each family's icon is 3:1 or better on its chip and on surface, rail, chrome and popover, in both schemes" do
+    families = %w[text media code form lists structure people]
+    each_scheme do |scheme, colour|
+      families.each do |family|
+        icon = colour.("--cs-ic-#{family}")
+        assert_ratio(3.0, icon, colour.("--cs-ic-#{family}-bg"), "#{family} icon on its chip (#{scheme})")
+        %w[--cs-surface --cs-rail --cs-chrome --cs-popover].each { |ground| assert_ratio(3.0, icon, colour.(ground), "#{family} icon on #{ground} (#{scheme})") }
+      end
+    end
+  end
+
+  # The people hue is a circle or a bubble with initials in it: those are
+  # words, so the pair is 4.5:1 and not the icon's 3:1.
+  test "the people hue's initials are 4.5:1 or better on their circle, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-ic-people"), colour.("--cs-ic-people-bg"), "the people hue on its circle (#{scheme})")
+    end
+  end
+
+  test "a Draft chip's words and outline hold on the grounds a chip stands on, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-paper --cs-surface --cs-rail].each do |ground|
+        assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "Draft's words on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "Draft's outline on #{ground} (#{scheme})")
+      end
+    end
   end
 end

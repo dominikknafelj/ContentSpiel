@@ -35,7 +35,7 @@ import { UploadTiles, updateCounts } from "media/upload_tiles"
 // tile with the server's reason. No browser dialogs anywhere.
 export default class extends Controller {
   static targets = [ "frame", "file", "status" ]
-  static values = { gridUrl: String, uploadUrl: String }
+  static values = { gridUrl: String, uploadUrl: String, buttonClass: String }
 
   connect() {
     this.opener = null
@@ -46,7 +46,8 @@ export default class extends Controller {
       grid: () => this.frameTarget.querySelector("ul.admin-media-grid"),
       fields: () => this.searchValue ? { q: this.searchValue } : {},
       onUploaded: (done) => this.uploaded(done),
-      announce: (text) => { this.statusTarget.textContent = text }
+      announce: (text) => { this.statusTarget.textContent = text },
+      buttonClass: this.buttonClassValue
     })
   }
 

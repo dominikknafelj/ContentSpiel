@@ -3,12 +3,12 @@
     changes and touches nothing else). `data-live-part`: the list holds a
     cable subscription, and says here whether it has been answered
     (`live/state`). %>
-<%= tag.div class: "overflow-x-auto rounded-cs border border-line bg-surface",
+<%= tag.div class: "overflow-x-auto rounded-card bg-surface shadow-1",
       data: { controller: "admin--presence--list", live_part: "waiting", "admin--presence--list-kind-value": "post", "admin--presence--list-chunk-value": Presence::HERE_IDS,
               "admin--presence--list-url-value": helpers.admin_presence_here_path(kind: "post") } do %>
   <table class="admin-posts-table w-full min-w-[880px] border-collapse text-sm">
     <thead>
-      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+      <tr class="border-b border-line-strong text-left text-label text-meta">
         <% if selectable? %>
           <th scope="col" class="w-10 py-2 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select_all", id: "posts-select-all", aria: { label: "Select all posts on this page" },
@@ -56,7 +56,7 @@
                 <span class="min-w-0 truncate font-medium group-hover/title:underline"><%= title_of(post) %></span>
                 <%= render Admin::Ui::SlotComponent.new(name: "posts.row.title", record: post, viewer: Current.actor, loaded: title_loaded, locale: locale, url_options: url_options) %>
               </span>
-              <span class="truncate font-cs-mono text-label text-meta group-hover/title:underline"><%= path_of(post) || "Not listed" %></span>
+              <span class="truncate text-small text-meta group-hover/title:underline"><%= path_of(post) || "Not listed" %></span>
             <% end %>
           </th>
           <td class="py-2.5 pr-4 text-dim"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: post.content_type) %></td>

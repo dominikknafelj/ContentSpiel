@@ -37,9 +37,9 @@ module Admin
     class TranslateButtonComponent < Admin::AdminComponent
       LABEL = "Translate".freeze
 
-      # Shared with `TranslateAllComponent`'s buttons.
-      BUTTON_CLASS = "inline-flex cursor-pointer items-center gap-1.5 rounded-cs border border-field-line bg-surface px-2 py-0.5 text-sm text-ink " \
-        "hover:bg-sunken disabled:cursor-wait disabled:opacity-70".freeze
+      # The small secondary, shared with `TranslateAllComponent`'s button. While a request runs it is `aria-busy` and
+      # disabled, which keeps the variant's look beside the spinner.
+      BUTTON_CLASS = Admin::Ui::ButtonComponent.classes(:secondary, size: :small).freeze
       SPINNER_CLASS = "inline-block size-3 motion-safe:animate-spin rounded-full border-2 border-current border-t-transparent".freeze
 
       UPDATE_LABEL = "Suggest update".freeze

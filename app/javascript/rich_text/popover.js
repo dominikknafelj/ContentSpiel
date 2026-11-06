@@ -2,7 +2,7 @@
 // and page dialogs are server-rendered, `RichTextDialogsComponent`) -- task 7's "no browser dialogs" ruling: no
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class
-// strings here mirror `SetupHelper#setup_input_class`/`#setup_label_class`
+// strings here are `SetupHelper#setup_input_class`/`#setup_label_class`
 // and `Admin::Ui::ButtonComponent`'s variants, so a popover reads like every
 // other CS Studio form; `app/assets/tailwind/application.css` `@source`s
 // this directory so Tailwind actually generates them.
@@ -15,20 +15,27 @@
 //   have no `name` and never reach the server, so letting them bubble would
 //   only make `admin--saving--autosave` save an unchanged form on every keystroke.
 
-const INPUT_CLASS = "mt-1 block w-full rounded-cs border border-field-line bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
-const LABEL_CLASS = "block font-cs-mono text-label uppercase tracking-mono text-meta"
-const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-3 py-1.5 text-sm font-semibold transition-colors"
+const INPUT_CLASS = "mt-1 block w-full rounded-t-field border-0 border-b border-field-line bg-field-fill px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
+const LABEL_CLASS = "block text-label text-meta"
+// A script cannot render the component, so its classes are written out here:
+// `BUTTON_CLASS` followed by a variant is `Admin::Ui::ButtonComponent.classes(
+// variant, size: :small)`, and `INPUT_CLASS` is `SetupHelper#setup_input_class`,
+// string for string (`test/lib/admin_design_rules_test.rb` compares them). A
+// raised accent primary, a tinted secondary, a tertiary for Cancel, and
+// danger_text for "Remove link" (not a confirm).
+const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button-sm border border-transparent font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta disabled:not-aria-busy:shadow-none aria-busy:cursor-progress px-2 py-0.5 text-sm"
 const BUTTON_VARIANTS = {
-  primary: "bg-accent text-on-accent hover:bg-accent-hover",
-  secondary: "border border-field-line bg-surface text-ink hover:border-ink",
-  danger: "border border-danger bg-danger-tint text-danger-ink hover:bg-danger hover:text-on-accent"
+  primary: "bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 not-disabled:active:translate-y-px not-disabled:active:shadow-none",
+  secondary: "bg-accent-tint text-accent not-disabled:hover:shadow-1",
+  tertiary: "bg-transparent text-accent not-disabled:hover:underline",
+  danger_text: "bg-sunken text-danger-ink not-disabled:hover:shadow-1"
 }
 
 let sequence = 0
 
 export function createPopover({ title, onSubmit, onClose }) {
   const root = document.createElement("div")
-  root.className = "admin-rich-text-popover absolute left-0 right-0 z-20 mt-1 flex flex-col gap-3 rounded-cs border border-line-strong bg-surface p-3 shadow-menu"
+  root.className = "admin-rich-text-popover absolute left-0 right-0 z-20 mt-1 flex flex-col gap-3 rounded-card bg-popover p-3 shadow-3"
   root.setAttribute("role", "dialog")
   root.setAttribute("aria-label", title)
 

@@ -25,7 +25,7 @@ module Admin
       attr_reader :tabs, :label, :link_data
 
       def link_class(current)
-        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper" : "text-meta hover:bg-sunken"}"
+        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper ring-2 ring-inset ring-paper" : "text-meta hover:bg-sunken"}"
       end
     end
   end

@@ -5,7 +5,7 @@
 
   <div>
     <%= label_tag :q, "Search titles", class: "sr-only" %>
-    <%= text_field_tag :q, filters[:q], placeholder: "Search titles", autocomplete: "off", class: "block w-56 rounded-cs border border-field-line bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+    <%= text_field_tag :q, filters[:q], placeholder: "Search titles", autocomplete: "off", class: "block w-56 px-3 py-1.5 text-ink" %>
   </div>
 
   <fieldset class="m-0 min-w-0 border-0 p-0">
@@ -15,7 +15,7 @@
         <label for="posts-scope-<%= name %>" class="<%= SEGMENT_CLASS %>">
           <%= radio_button_tag :scope, name, scope == name, id: "posts-scope-#{name}", class: "sr-only" %>
           <span><%= label %></span>
-          <span class="font-cs-mono text-label"><%= count_for(name) %></span>
+          <span class="text-count"><%= count_for(name) %></span>
         </label>
       <% end %>
     </div>

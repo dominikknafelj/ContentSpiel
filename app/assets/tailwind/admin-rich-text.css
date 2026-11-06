@@ -22,7 +22,7 @@
 .admin-rich-text-content code { font-family: var(--cs-mono); font-size: 0.9em; }
 .admin-rich-text-content hr { border: 0; border-top: 1px solid var(--cs-line-strong); margin: 1em 0; }
 .admin-rich-text-content img { max-width: 100%; max-height: 20rem; height: auto; border-radius: var(--cs-radius); }
-.admin-rich-text-content figcaption { font-family: var(--cs-mono); font-size: var(--cs-t-label); color: var(--cs-meta); margin-top: 0.25em; }
+.admin-rich-text-content figcaption { font-size: var(--cs-t-label); color: var(--cs-meta); margin-top: 0.25em; }
 .admin-rich-text-content iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; }
 
 /* ProseMirror essentials (normally Tiptap's injected CSS). */
@@ -129,7 +129,6 @@
   overflow: hidden;
   white-space: nowrap;
   cursor: pointer;
-  font-family: var(--cs-mono);
   font-size: var(--cs-t-label);
   font-weight: 500;
   color: var(--cs-meta);
@@ -172,3 +171,17 @@
 .admin-table-strip-corner[hidden],
 .admin-table-strip-entry[hidden],
 .admin-table-strip-add[hidden] { display: none; }
+
+/* The editor's box is a well like any field (content-spiel.tailwind.css, "A field
+   is a well"): the editor is the well, and the toolbar above it is the sunken
+   header that owns the top corners, so the well under a toolbar is square-topped.
+   Two classes in front of the toolbar so the rule beats the well's own radius. */
+:is(.admin-column, .admin-field) [role="toolbar"] ~ .admin-rich-text-editor { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+/* The toolbar and the editor are one control (`.admin-rich-text-box`): the focus
+   ring is drawn around both, once, and the editor's own ring is taken off. An
+   invalid field keeps its danger edge: it is the editor's bottom edge, which is
+   the box's bottom. The toolbar is the box's sunken header, never a second well. */
+.admin-rich-text-box { border-radius: var(--cs-radius-field) var(--cs-radius-field) 0 0; }
+.admin-rich-text-box:focus-within { outline: 2px solid var(--cs-accent); outline-offset: 0; }
+:is(.admin-column, .admin-field) .admin-rich-text-box .admin-rich-text-editor:focus-within { outline: 0; }

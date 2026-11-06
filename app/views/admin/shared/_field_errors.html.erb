@@ -13,6 +13,6 @@
     is what a screen reader reads, tied to its input by `aria-describedby`). %>
 <div id="<%= id %>" class="mt-1 text-sm text-danger-ink">
   <% messages.each do |message| %>
-    <p class="flex gap-1.5"><span aria-hidden="true" class="font-cs-mono font-semibold">!</span><span><%= message %></span></p>
+    <p class="flex gap-1.5"><span aria-hidden="true" class="font-semibold">!</span><span><%= message %></span></p>
   <% end %>
 </div>

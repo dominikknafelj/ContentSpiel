@@ -42,6 +42,12 @@ module ContentModel
     # is the Table block's.
     ICONS = %w[pilcrow image code_xml posts columns_2 info lightbulb circle_alert triangle_alert table card clipboard_list].freeze
 
+    # The hue families an icon may be drawn in: the chip behind a
+    # type's icon takes the family's colour pair
+    # (`Admin::Ui::IconChipComponent`). The people hue is not here: it has no
+    # block type. A type that names none is neutral (`#family`).
+    ICON_FAMILIES = %i[text media code form lists structure].freeze
+
     # The columns a block type may name with `uses`: the block card draws and
     # the save services write these four and no other (`BlockCardComponent`'s
     # template, `Admin::ContentBlocksController::TRANSLATED_COLUMNS`), so a
@@ -126,15 +132,27 @@ module ContentModel
     # and tile draw what it answers for that block, in place of the type's
     # (the Note block's kind; note block plan, ruling 12). The picker, which
     # has no block, draws the type's, so the type's should be the icon of
-    # the value a new block starts with.
-    def icon(name = nil, for_block: nil)
-      return @icon if name.nil?
+    # the value a new block starts with. `family:` is one of `ICON_FAMILIES`,
+    # the hue of the chip the icon is drawn on; a type that names none, a
+    # gem's included, is drawn on the neutral chip (`#family`). With no name
+    # it is the reader; `family:` or `for_block:` without a name is refused,
+    # since there is no icon for it to describe and it would be dropped.
+    def icon(name = nil, for_block: nil, family: nil)
+      if name.nil?
+        refuse "`icon family:` and `for_block:` go with an icon's name (`icon \"pilcrow\", family: :text`)" unless family.nil? && for_block.nil?
+        return @icon
+      end
+      refuse "icon family is one of #{ICON_FAMILIES.join(", ")} (the hues of CS Studio's icon chips): #{family.inspect}" unless family.nil? || ICON_FAMILIES.include?(family.to_s.to_sym)
       refuse "icon is one of #{ICONS.join(", ")} (the icons CS Studio draws for a block type): #{name.inspect}" unless ICONS.include?(name.to_s)
       refuse "`icon for_block:` is a callable taking the block and answering one of #{ICONS.join(", ")}" unless for_block.nil? || for_block.respond_to?(:call)
 
       @icon_for_block = for_block
+      @family = family&.to_sym
       @icon = name.to_s
     end
+
+    # The family of the type's icon: the declared one, else `:neutral`.
+    def family = @family || :neutral
 
     # Whether a block's card and tile draw an icon of the block's own
     # (`for_block:`), which a save then has to redraw

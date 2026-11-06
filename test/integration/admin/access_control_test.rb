@@ -30,7 +30,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   test "each group sees only the modules it can open" do
     expectations = {
       # Media library Task 7: the Media module needs only `media.upload`
-      # (design spec §6, `Admin::BaseController::MODULES`), which `two`
+      # (design spec §6, `StudioModules.entries`), which `two`
       # (Admin, every permission) and `author` (`media.upload` is one of
       # its own seeded grants, test/fixtures/access_control/grants.yml)
       # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
@@ -148,9 +148,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  # Dashboard spec Task 2: `BaseController::MODULES` now lists Dashboard
-  # first with `permission: nil`, so `first_admin_module_path` -- the Pages
-  # index's own fallback for someone without `pages.read` -- always resolves
+  # `StudioModules` lists Dashboard first with `permission: nil`, so
+  # `first_admin_module_path` -- the Pages index's own fallback for someone without `pages.read` -- always resolves
   # to it, whatever else the actor can or can't open.
   test "the pages index sends a user without pages.read to the dashboard" do
     access_control_grants(:read_only_pages_read).destroy!
@@ -702,7 +701,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   end
 
   def sidebar_labels
-    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge])").text.strip }
+    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge]):not([aria-hidden])").text.strip }
   end
 
   # Every SQL statement the block issues, answered from the query cache or

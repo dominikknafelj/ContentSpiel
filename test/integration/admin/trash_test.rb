@@ -7,7 +7,7 @@ require "test_helper"
 # for an id that isn't in the trash or isn't of the addressed type.
 class Admin::TrashTest < ActionDispatch::IntegrationTest
   setup do
-    # Midday, so "IN 30 DAYS" can't become 29 on a run that crosses midnight.
+    # Midday, so "In 30 days" can't become 29 on a run that crosses midnight.
     midday = Time.current.change(hour: 12)
     travel_to midday
     Current.actor = users(:one)
@@ -31,7 +31,7 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_select "tr", text: /Section/
     assert_select "tr", text: /Includes 1 subpage: Child/
     assert_select "tr", text: /Gone post/
-    assert_select "[data-retention]", text: /IN 30 DAYS/, minimum: 1
+    assert_select "[data-retention]", text: /In 30 days/, minimum: 1
     assert_select "tr", text: /You · /
 
     titles = css_select("tbody tr").map { |row| row["id"] }

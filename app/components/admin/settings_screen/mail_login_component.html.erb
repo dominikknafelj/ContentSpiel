@@ -41,13 +41,13 @@
       <div class="flex flex-wrap items-center gap-2">
         <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :primary, type: "submit", form: LOGIN_FORM, data: LOCK) %>
         <% if login_set? %>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, data: { action: "admin--settings--mail#cancel" }) %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, data: { action: "admin--settings--mail#cancel" }) %>
         <% end %>
       </div>
     </div>
 
     <div id="settings-mail-login-errors" class="mt-1 text-sm text-danger-ink" role="alert">
-      <% if error.present? %><p class="flex gap-1.5"><span aria-hidden="true" class="font-cs-mono font-semibold">!</span><span><%= error %></span></p><% end %>
+      <% if error.present? %><p class="flex gap-1.5"><span aria-hidden="true" class="font-semibold">!</span><span><%= error %></span></p><% end %>
     </div>
     <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
   <% end %>

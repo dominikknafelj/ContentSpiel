@@ -102,8 +102,8 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
     assert_select "##{dom_id(created)} p", text: "You created “Hello world”"
     assert_select "##{dom_id(created)} p a[href='/cs-studio/posts/#{post.id}']", text: "Hello world"
-    assert_select "##{dom_id(created)} span.font-cs-mono", text: "post.created"
-    assert_select "##{dom_id(created)} .admin-channel-chip", text: "ADMIN"
+    assert_select "##{dom_id(created)} span.text-label", text: "post.created"
+    assert_select "##{dom_id(created)} .admin-channel-chip", text: "Admin"
     assert_select "##{dom_id(failed)} p", text: "Failed sign-in attempt"
     assert_select "##{dom_id(failed)} span.text-warn-ink", text: "session.failed"
     assert_no_match(/who@example\.com/, response.body)
@@ -257,7 +257,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "dd", text: "Post ##{post.id} · Welcome"
     assert_select "dd", text: "7c1e-req"
     assert_select "dd", text: "203.0.113.9"
-    assert_select "dl .admin-channel-chip", text: "ADMIN"
+    assert_select "dl .admin-channel-chip", text: "Admin"
   end
 
   test "a title change in two languages is grouped per language with word diffs" do
@@ -271,8 +271,8 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
       get "/cs-studio/audit_events/#{updated.id}"
 
       assert_response :success
-      assert_select "[data-changes-group=en] p", text: "1 FIELD · ENGLISH"
-      assert_select "[data-changes-group=de] p", text: "2 FIELDS · DEUTSCH"
+      assert_select "[data-changes-group=en] p", text: "1 field · English"
+      assert_select "[data-changes-group=de] p", text: "2 fields · Deutsch"
       assert_select "[data-changes-group=en] tr", text: /title/ do
         assert_select "del", text: /the/
         assert_select "ins", text: /our/
@@ -291,7 +291,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events/#{changes.id}"
 
-    assert_select "p", text: "1 FIELD · FR"
+    assert_select "p", text: "1 field · FR"
   end
 
   test "digest-only, flag and list changes read plainly; bookkeeping and secrets are never shown" do

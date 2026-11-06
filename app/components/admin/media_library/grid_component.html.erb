@@ -6,7 +6,7 @@
   <% end %>
 </ul>
 <% if assets.empty? %>
-  <div class="rounded-cs border border-line bg-surface" data-media-empty>
+  <div class="rounded-card bg-surface shadow-1" data-media-empty>
     <% if filtered? %>
       <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No images match the current search or filter.") do |empty_state| %>
         <% empty_state.with_action do %>

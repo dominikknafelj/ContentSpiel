@@ -22,6 +22,7 @@
 - Added the markup the `form-send` script reads, a promise to a theme's Form template: `data-controller="form-send"` and `data-action="form-send#send"` on the `<form>`, with `data-turbo="false"`; the hidden inputs `locale`, `page_id` and `drawn`; the targets `summary`, `body`, `button`, `status` (optional) and `done`; the values `sending`, `network` and `fields`; and, optional, `data-action="click->form-send#follow"` on the summary. A template without it still posts to the endpoint and lands on its plain page.
 - A public page's ETag now also names whether the site has Active Record encryption keys, which decide whether its forms take answers.
 - A link to an anchor of the same page (the same origin, path and query, with a fragment) is now the browser's on every public page, not a Turbo visit: the page is not drawn again, so what a theme's script wrote into it stays. Another page, or the same path with another query, is still a visit.
+- The form-send pages (the plain pages a form's send answers without JavaScript: Check your answers, the thanks, 404, 429 and 503 pages) are CMS-drawn, not a theme's, and they change: their accent (the button, the focus ring, the checkbox, the back link) is ink instead of blue, in both schemes, and their grounds, lines and words take CS Studio's new token values. A theme has nothing to change; a theme's own pages look as before.
 
 ### Environment
 
@@ -56,6 +57,7 @@
 
 ### For a gem or an outside caller
 
+- For a gem's block type: `t.icon "name", family: :text` (one of `text media code form lists structure`) names the hue of the chip CS Studio draws the icon on; a type that names none is drawn on the neutral chip, and any other value is refused at registration. The chip is CS Studio's only: no public page draws it.
 - Added two hooks beside `ContentSpiel::Plugins.block_types`: `form_field_types` (a form field type's members, `owner/name`) and `form_destinations` (a destination's label, deliverer and settings block, `owner/name`), with the block types' owner rules and replayed after them (`docs/reference/content-blocks-and-types.md`, "Form field types and destinations from outside"). A destination's deliverer answers `deliver(delivery, final_attempt:)`.
 - `AccessControl::Permissions.register` takes `grantable:` (default true); `Permissions.grantable` is what a group may hold. A caller that listed `Permissions.all` to offer or seed grants now reads `grantable`.
 - `ContentModel::FieldTypes` has two more built-ins, `email` and `form`, and `text` takes `max:`.

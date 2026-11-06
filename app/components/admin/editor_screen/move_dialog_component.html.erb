@@ -4,7 +4,7 @@
   <select id="<%= destination_id %>" class="<%= setup_select_class %>" data-admin--editor--blocks-target="destination"></select>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
     <% end %>
     <%= render Admin::Ui::ButtonComponent.new(label: t(".move"), variant: :primary, data: { action: "admin--editor--blocks#moveTo" }) %>
   <% end %>

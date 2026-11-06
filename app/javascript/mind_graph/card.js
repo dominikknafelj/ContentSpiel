@@ -42,9 +42,10 @@
 // "lists 112 posts" is of the page, not of this picture: a neighbour page
 // says it with no line of its own on screen.
 //
-// THE STATUS CHIP is `Admin::Ui::StatusChipComponent`'s, class for class: a
-// dot in the status's token colour AND the word, so the colour is never the
-// only cue. A live record that has more to say carries its second state
+// THE STATUS CHIP draws the look `Admin::Ui::StatusChipComponent` had before
+// its solid Live and Scheduled fills and its outlined Draft, and keeps it until
+// stage 5a redraws the card: a dot in the status's token colour AND the word,
+// so the colour is never the only cue. A live record that has more to say carries its second state
 // after the label (design answer G4, verbatim):
 //   "● Live · Unpublished changes"          no second dot
 //   "● Live · ● Change scheduled 14 Oct"    a warn dot: warn means "scheduled"
@@ -90,6 +91,8 @@ import { cardNotes } from "mind_graph/card_notes"
 import { recordId } from "mind_graph/ids"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 
+// The chip's earlier dots, not `StatusChipComponent`'s current shapes: the
+// card keeps the old look until stage 5a.
 const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
 const DOT = "h-1.5 w-1.5 rounded-full"
 // Which of the five states a node is in (`Publishing::State`'s, as the data
@@ -132,7 +135,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     anchor.href = href
     return anchor
   }
-  const label = (content) => element("span", "font-cs-mono text-label uppercase tracking-mono text-meta", content)
+  const label = (content) => element("span", "text-label text-meta", content)
   // A count in its sentence: the figure grouped as the messages' language
   // groups it ("lists 2,040 posts"); the number only chooses the form.
   const counted = (key, count) => text.t(key, { count, figure: number(count) })
@@ -250,7 +253,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
       ...chipBelow(node),
       title(node),
       ...(known ? [ pairOf(counted("mind_graph.script.card.related", node.related_count ?? 0), counted("mind_graph.script.card.tags", node.tag_count ?? 0)) ] : []),
-      cardNotes(node, { text, type: "post", url: fill(urls.postNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
+      cardNotes(node, { text, buttonClasses, type: "post", url: fill(urls.postNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
       actions(
         openLink(node, "mind_graph.script.card.open_post"),
         link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.postFocus, "__ID__", recordId(node.id)))
@@ -264,11 +267,11 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   // address in the editing language or the default has none written.
   function page(node) {
     return [
-      heading(markCanvas(node), element("span", "min-w-0 truncate font-cs-mono text-label text-meta", node.path || ""), ...chipBeside(node)),
+      heading(markCanvas(node), element("span", "min-w-0 truncate text-small text-meta", node.path || ""), ...chipBeside(node)),
       ...chipBelow(node),
       title(node),
       pairOf(counted("mind_graph.script.card.child_pages", node.child_count ?? 0), counted("mind_graph.script.card.lists_posts", node.listed_count ?? 0)),
-      cardNotes(node, { text, type: "page", url: fill(urls.pageNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
+      cardNotes(node, { text, buttonClasses, type: "page", url: fill(urls.pageNotes, "__ID__", recordId(node.id)), recordUrl: node.url, onChange }),
       actions(
         openLink(node, "mind_graph.script.card.open_page"),
         link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.pageFocus, "__ID__", recordId(node.id)))

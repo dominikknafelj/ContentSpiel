@@ -185,7 +185,7 @@ module Admin
       value.is_a?(Array) ? value.join("\n\n") : value
     end
 
-    # Same keys as the sidebar entry (`MODULES`): either read right opens
+    # Same keys as the sidebar entry (`StudioModules`): either read right opens
     # the screen; the list itself is then narrowed per type.
     def require_read_access
       forbidden! unless holds_any?(%w[pages.read posts.read])

@@ -38,6 +38,11 @@ class CommandPaletteTest < ApplicationSystemTestCase
     second = find("#jump-results [role=option][aria-selected=true]")[:id]
     assert_not_equal first, second
     assert_equal second, input["aria-activedescendant"]
+    # The selected row's cue is the accent bar inside its left edge, not
+    # only the sunken fill, and the row it left has none.
+    bar = ->(id) { page.evaluate_script("getComputedStyle(document.querySelector('##{id} > a')).boxShadow") }
+    assert_match(/inset/, bar.(second))
+    assert_equal "none", bar.(first)
 
     input.set("zzzqqq")
     assert_text "No results for “zzzqqq”."
@@ -145,7 +150,7 @@ class CommandPaletteTest < ApplicationSystemTestCase
     sign_in_via_form users(:one)
     await_admin_controllers
     find("body").send_keys([ :control, "k" ])
-    assert_selector "dialog#command-palette .admin-palette__hints", text: "NEW TAB"
+    assert_selector "dialog#command-palette .admin-palette__hints", text: "New tab"
     assert_selector "dialog#command-palette kbd", text: /esc/i
     assert_selector "#jump-results [role=group] [role=presentation]", text: /sections/i
     within(find("#jump-results [role=group][aria-labelledby]", text: "Settings › Languages")) do
@@ -159,8 +164,7 @@ class CommandPaletteTest < ApplicationSystemTestCase
   test "Ctrl+K does nothing while another dialog is open" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form users(:one)
-    visit "/cs-studio/pages/#{root_page.id}"
-    await_admin_controllers
+    visit_editor(root_page)
 
     find("#tree a", text: "+ New page").click
     assert_selector "dialog#new-page-dialog[open]"

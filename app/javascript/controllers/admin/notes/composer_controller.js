@@ -443,7 +443,7 @@ export default class extends Controller {
       // the server writes the letters (`PersonName.initials`), none is computed here.
       const avatar = document.createElement("span")
       avatar.setAttribute("aria-hidden", "true")
-      avatar.className = "flex size-[22px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-sunken font-cs-mono text-[8px] font-medium uppercase leading-none text-ink"
+      avatar.className = "flex size-[22px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-sunken text-[8px] font-medium uppercase leading-none text-ink"
       avatar.textContent = person.initials
       const name = document.createElement("span")
       name.className = "truncate text-[13px] text-ink"

@@ -1,17 +1,23 @@
 require "test_helper"
 
 class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
-  def modules(*labels) = Admin::BaseController::MODULES.select { |entry| labels.include?(entry[:label]) }
+  def all_modules = StudioModules.entries.map(&:to_row)
 
-  def render_sidebar(labels:, user: users(:one), badges: {})
+  def modules(*labels) = all_modules.select { |entry| labels.include?(entry[:label]) }
+
+  def render_sidebar(labels:, user: users(:one), badges: {}, current_path: "/cs-studio/posts")
     with_request_url "/cs-studio" do
       render_inline(Admin::Shell::SidebarComponent.new(modules: modules(*labels), user: user,
-        current_path: "/cs-studio/posts", url_options: {}, badges: badges))
+        current_path: current_path, url_options: {}, badges: badges))
     end
   end
 
+  def link(label) = page.find("nav[aria-label='#{t("admin.components.shell.sidebar.label")}'] a", text: label, match: :prefer_exact)
+
+  def t(key) = I18n.t(key)
+
   test "modules are grouped under Content, People and System, in the design's order" do
-    render_sidebar(labels: Admin::BaseController::MODULES.map { |entry| entry[:label] })
+    render_sidebar(labels: all_modules.map { |entry| entry[:label] })
     assert_equal %w[Content People System], page.all("nav[aria-label='Modules'] h2").map(&:text)
     content = page.all("nav[aria-label='Modules'] section")[0].all("a").map(&:text).map(&:strip)
     assert_equal [ "Dashboard", "Pages", "Posts", "Media", "Forms", "Translations", "Tags", "Mind graph", "Trash" ], content
@@ -37,15 +43,55 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=page]", text: "Dashboard"
   end
 
-  test "the trash badge shows a count and hides at zero" do
-    render_sidebar(labels: %w[Trash], badges: { admin_trash_path: 3 })
+  test "each module's icon is on its family's chip: Posts lists, Media media, Forms form, the rest neutral" do
+    render_sidebar(labels: all_modules.map { |entry| entry[:label] }, current_path: "/cs-studio/account")
+    chip = ->(label) { link(label).find("span[aria-hidden=true][class~='rounded-chip']") }
+
+    assert_includes chip.call("Posts")[:class].split, "bg-ic-lists-bg"
+    assert_includes chip.call("Media")[:class].split, "bg-ic-media-bg"
+    assert_includes chip.call("Forms")[:class].split, "bg-ic-form-bg"
+    (all_modules.map { |entry| entry[:label] } - %w[Posts Media Forms]).each do |label|
+      assert_includes chip.call(label)[:class].split, "bg-sunken", label
+    end
+  end
+
+  test "the current module's chip is the accent tint, on the accent tint with accent words" do
+    render_sidebar(labels: %w[Dashboard Posts Media])
+
+    current = page.find("a[aria-current=page]")
+    assert_equal "Posts", current.text.strip
+    assert_includes current[:class].split, "bg-accent-tint"
+    assert_includes current[:class].split, "text-accent"
+    assert current.has_selector?("span[aria-hidden=true][class~='bg-accent-tint'][class~='text-accent']")
+    assert_no_selector "a:not([aria-current]) [class~='bg-ic-lists-bg']"
+    # The other rows rest on the column, sunken under the pointer, in 8px corners.
+    other = link("Media")
+    assert_includes other[:class].split, "rounded-button"
+    assert_includes other[:class].split, "hover:bg-sunken"
+    assert_not_includes other[:class].split, "bg-accent-tint"
+  end
+
+  test "the labels and headings are read from keys" do
+    render_sidebar(labels: all_modules.map { |entry| entry[:label] })
+
+    assert_selector "nav[aria-label='#{t("admin.components.shell.sidebar.label")}']"
+    assert_equal StudioModules.groups.map { |group| t("admin.module_groups.#{group}") }, page.all("nav h2").map(&:text)
+    assert_equal StudioModules.entries.map { |entry| t("admin.modules.#{entry.name}") }, page.all("nav section a").map { |a| a.text.strip }
+    assert_selector "button", text: t("admin.components.shell.sidebar.jump")
+    assert_selector "button", text: t("admin.components.shell.sidebar.sign_out")
+    assert_selector ".admin-wordmark", text: t("admin.components.shell.sidebar.wordmark")
+  end
+
+  test "the trash badge shows a count, and is in the page hidden and empty at zero" do
+    render_sidebar(labels: %w[Trash], badges: { trash: 3 })
     assert_selector "a", text: /Trash\s*3/
     assert_selector "a #sidebar-badge-trash[data-badge]", text: "3"
-    # Plain mono text: the sidebar's one filled badge is the Dashboard's.
+    # A plain number in sans: the sidebar's one filled badge is the Dashboard's.
     assert_no_selector "#sidebar-badge-trash[class*=accent]"
-    render_sidebar(labels: %w[Trash], badges: { admin_trash_path: 0 })
+    assert_no_selector "#sidebar-badge-trash[class*=mono]"
+    render_sidebar(labels: %w[Trash], badges: { trash: 0 })
     assert_no_selector "[data-badge]"
-    assert_no_selector "#sidebar-badge-trash"
+    assert_selector "#sidebar-badge-trash[hidden]", visible: :all
   end
 
   # Notes spec §5: the viewer's unread notes, on the Dashboard entry. The
@@ -53,9 +99,10 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
   # zero; accent, the one filled badge, because it means "unread and
   # addressed to you".
   test "the Dashboard badge shows the unread count as a filled accent pill, and is in the page hidden and empty at zero" do
-    render_sidebar(labels: %w[Dashboard Trash], badges: { admin_root_path: 3 })
+    render_sidebar(labels: %w[Dashboard Trash], badges: { dashboard: 3 })
     assert_selector "a[href='/cs-studio'] #sidebar-badge-dashboard[data-badge].bg-accent.text-on-accent.rounded-full", text: "3"
     assert_no_selector "#sidebar-badge-trash"
+    assert_selector "#sidebar-badge-trash[hidden]", visible: :all
 
     render_sidebar(labels: %w[Dashboard Trash], badges: {})
     assert_selector "#sidebar-badge-dashboard", visible: :all, count: 1
@@ -63,8 +110,20 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "#sidebar-badge-dashboard[hidden]:not([data-badge])", visible: :all
   end
 
+  test "a module registered with a filled badge draws it filled, and a plain one plain" do
+    StudioModules.with(StudioModules.entries) do
+      StudioModules.badge(:posts, style: :filled) { |viewer:| 2 }
+      StudioModules.badge(:dashboard) { |viewer:| 1 }
+      render_sidebar(labels: %w[Dashboard Posts], badges: { posts: 2, dashboard: 1 })
+    end
+
+    assert_selector "#sidebar-badge-posts[data-badge].bg-accent.text-on-accent.rounded-full", text: "2"
+    assert_selector "#sidebar-badge-dashboard[data-badge]", text: "1"
+    assert_no_selector "#sidebar-badge-dashboard[class*=accent]"
+  end
+
   test "an entry that has no badge gets none, whatever is handed in" do
-    render_sidebar(labels: %w[Posts], badges: { admin_posts_path: 4 })
+    render_sidebar(labels: %w[Posts], badges: { posts: 4 })
     assert_no_selector "[data-badge]"
   end
 

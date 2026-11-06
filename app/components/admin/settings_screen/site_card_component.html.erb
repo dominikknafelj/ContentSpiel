@@ -1,7 +1,7 @@
 <%# The ids `site`, `languages`, ... sit on the card HEADINGS (the nav's and
     ⌘K's anchors), so a jump lands on the title. The card itself is named by
     its heading. %>
-<section id="settings-site-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="site"
+<section id="settings-site-card" class="admin-settings-card rounded-card bg-surface shadow-1" aria-labelledby="site"
          data-controller="admin--settings--tabs" data-action="click@document->admin--settings--tabs#reveal" data-admin--settings--tabs-current-value="<%= locale %>">
   <%# Where Save (or a refused one) comes back to; `admin--settings--tabs` keeps it on the visible tab. %>
   <%= hidden_field_tag :locale, locale, id: "settings-locale", data: { "admin--settings--tabs-target": "locale" } %>

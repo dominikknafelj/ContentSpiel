@@ -18,7 +18,7 @@
     <% if may_trash? %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button", size: :small, data: dialog_trigger(trash_dialog_id)) %>
     <% end %>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Clear", variant: :ghost, type: "button", size: :small, data: { action: "admin--posts--bulk-select#clear" }) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Clear", variant: :tertiary, type: "button", size: :small, data: { action: "admin--posts--bulk-select#clear" }) %>
   </span>
 </div>
 

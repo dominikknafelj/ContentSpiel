@@ -47,7 +47,7 @@ module Admin
     # to `show`, so this never redirects into a 404. Someone who can't read
     # any page (a group with only tags or settings, say) is sent on to the
     # first module they *can* open rather than shown a 403 -- in practice
-    # always the dashboard now (`BaseController::MODULES`'s first entry,
+    # always the dashboard (`StudioModules`' first entry,
     # open to everyone), same as if they'd signed in fresh.
     #
     # The flash is kept across the redirect: "Starter pages created" is set

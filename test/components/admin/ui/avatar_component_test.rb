@@ -6,7 +6,7 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
   test "initials in a round mono circle, upper-case by style and hidden from a screen reader" do
     render_inline(Admin::Ui::AvatarComponent.new(initials: "dw", size: :md))
 
-    assert_selector "span.flex.shrink-0.items-center.justify-center.rounded-full.font-cs-mono.font-medium.uppercase.leading-none.size-6.text-\\[9px\\]" \
+    assert_selector "span.flex.shrink-0.items-center.justify-center.rounded-full.font-medium.uppercase.leading-none.size-6.text-\\[9px\\]" \
                     ".border.border-line-strong.bg-sunken.text-ink[aria-hidden=true]", text: "dw", exact_text: true
     assert_no_selector ".ring-2"
   end

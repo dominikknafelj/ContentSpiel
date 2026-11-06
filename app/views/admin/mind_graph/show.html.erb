@@ -22,7 +22,7 @@
 
 <% if @content_types.empty? && !@pages %>
   <%# For THIS viewer: a viewer who can read no post and no page sees this, whatever the site holds. %>
-  <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-content"><%= t(".no_content") %></div>
+  <div class="rounded-card bg-surface shadow-1 p-6 text-meta" data-mind-graph-empty="no-content"><%= t(".no_content") %></div>
 <% else %>
   <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
       the legend's row, the canvas) and the LIST. In the document
@@ -129,7 +129,7 @@
        data-button-classes="<%= { primary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
        data-state="loading"
-       class="grid min-h-0 flex-1 overflow-hidden rounded-cs border border-line bg-surface min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
+       class="grid min-h-0 flex-1 overflow-hidden rounded-card bg-surface shadow-1 min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
     <%# The search field: how a page, post or tag the graph doesn't draw is reached.
         Its rows are links to that row's local view, filled in by
         `mind_graph/search_box.js` with text and `href` only. The results are
@@ -141,9 +141,9 @@
       <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
         <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
         <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
-              class: "block w-full rounded-cs border border-field-line bg-surface px-3 py-1.5 text-sm text-ink focus:outline-2 focus:outline-accent" %>
+              class: "admin-well block w-full px-3 py-1.5 text-sm text-ink" %>
         <p data-mind-graph-status role="status" class="sr-only"></p>
-        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-cs border border-line-strong bg-surface p-1 shadow-menu"></ul>
+        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-card bg-popover p-1 shadow-3"></ul>
       </div>
     </div>
     <div class="order-first flex h-[70vh] min-h-[480px] min-w-0 flex-col min-[1100px]:order-none min-[1100px]:col-start-1 min-[1100px]:row-span-2 min-[1100px]:row-start-1 min-[1100px]:h-auto min-[1100px]:min-h-0">
@@ -204,7 +204,7 @@
           <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-field-line bg-surface text-[13px] text-ink">
             <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
             <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
-            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 font-cs-mono text-label text-meta"></span>
+            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 text-label text-meta"></span>
             <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>
             <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph--graph#fit" } %>
           </div>
@@ -227,8 +227,8 @@
             hands it, and is named by its title once it has one. The card's
             links are the only way a selection leads anywhere: a click on the
             canvas never navigates. %>
-        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-10 flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-cs border border-line-strong bg-surface p-3 shadow-menu focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"></aside>
-        <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
+        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-10 flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-card bg-popover p-3 shadow-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"></aside>
+        <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs bg-popover px-2 py-1 text-sm text-ink shadow-3"></div>
       </div>
     </div>
     <%# The list (mind graph canvas spec §5.7; pages spec §7): every node the

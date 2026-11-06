@@ -1,14 +1,14 @@
-<section class="rounded-cs border border-line bg-surface">
+<section class="rounded-card bg-surface shadow-1">
   <h2 class="border-b border-line px-4 py-3 text-h2 text-ink">Changes</h2>
   <% if empty? %>
     <p class="px-4 py-3 text-sm text-meta">No field changes recorded.</p>
   <% end %>
   <% groups.each do |group| %>
     <div class="overflow-x-auto border-b border-line last:border-b-0" data-changes-group="<%= group.code || "fields" %>">
-      <p class="px-4 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group.heading %></p>
+      <p class="px-4 pt-3 text-label text-meta"><%= group.heading %></p>
       <table class="w-full min-w-[640px] border-collapse text-sm">
         <thead>
-          <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+          <tr class="border-b border-line-strong text-left text-label text-meta">
             <th class="w-40 px-4 py-2 font-normal">Field</th>
             <th class="py-2 pr-4 font-normal">Before</th>
             <th class="py-2 pr-4 font-normal">After</th>

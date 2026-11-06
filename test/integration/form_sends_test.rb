@@ -47,7 +47,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_includes response.headers["Cache-Control"], "no-store"
     assert_nil response.headers["Set-Cookie"]
     assert_empty cookies.to_hash
-    assert_select "html[lang=en]"
+    assert_select "html[lang=en][data-surface=plain]"
     assert_select "head title", text: "#{I18n.t("public.forms.pages.sent")} · Test Site"
     assert_select "meta[name=robots][content=noindex]"
     assert_select "meta[name=csrf-token], meta[name=csrf-param], script[type=importmap]", count: 0
@@ -85,6 +85,15 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_equal "en", Forms::Submission.last.locale
   end
 
+  test "the admin layout's html is not the plain surface" do
+    sign_in_as users(:one)
+    get "/cs-studio"
+
+    assert_response :success
+    assert_select "html"
+    assert_select "html[data-surface=plain]", count: 0
+  end
+
   test "invalid answers redraw the form with the errors linked from the summary and the typed values, 422" do
     drawn = aged_drawn(@form)
 
@@ -95,6 +104,8 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_content
     assert_includes response.headers["Cache-Control"], "no-store"
     assert_nil response.headers["Set-Cookie"]
+    assert_select "html[data-surface=plain]"
+    assert_select "html[data-surface=studio]", count: 0
     assert_select "h1", text: I18n.t("public.forms.pages.invalid")
     assert_select "[role=alert][tabindex='-1'][autofocus]" do
       assert_select "p", text: "Please correct 2 answers."
@@ -179,6 +190,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
     assert_nothing_written do
       send_form
       assert_response :not_found
+      assert_select "html[data-surface=plain]"
       assert_select "h1", text: I18n.t("public.forms.pages.gone")
       assert_select "main p", text: "This form is no longer available."
       assert_back_link "/contact-us"
@@ -200,6 +212,7 @@ class FormSendsTest < ActionDispatch::IntegrationTest
         assert_nothing_written do
           send_form
           assert_response :service_unavailable
+          assert_select "html[data-surface=plain]"
           assert_select "h1", text: I18n.t("public.forms.pages.unavailable")
           assert_select "main p", text: "This form can't take answers at the moment. Please try again later."
           assert_back_link "/contact-us"

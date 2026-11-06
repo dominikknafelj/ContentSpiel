@@ -30,7 +30,7 @@
             <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
               <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
               <span><%= label %></span>
-              <span class="font-cs-mono text-label"><%= count %></span>
+              <span class="text-count"><%= count %></span>
             </label>
           <% end %>
         </div>
@@ -49,7 +49,7 @@
 <% else %>
   <%= render Admin::TranslationScreen::MatrixComponent.new(items: @items, locales: @target_locales) %>
   <% if @pagination.total_pages > 1 %>
-    <div class="mt-4 rounded-cs border border-line bg-surface">
+    <div class="mt-4 rounded-card bg-surface shadow-1">
       <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
     </div>
   <% end %>

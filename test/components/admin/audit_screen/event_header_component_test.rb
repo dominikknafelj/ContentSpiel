@@ -20,7 +20,7 @@ class Admin::AuditScreen::EventHeaderComponentTest < ViewComponent::TestCase
     assert_selector "dd", text: "Post #5 · Welcome"
     assert_selector "dd", text: "7c1e"
     assert_selector "dd", text: "203.0.113.9"
-    assert_selector "dl .admin-channel-chip", text: "ADMIN"
+    assert_selector "dl .admin-channel-chip", text: "Admin"
   end
 
   test "blank values read a dash, and a security key is in warn ink" do

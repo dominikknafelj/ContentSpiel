@@ -3,7 +3,7 @@ require "test_helper"
 class Jump::SearchTest < ActiveSupport::TestCase
   setup do
     @owner = users(:one)
-    @modules = Admin::BaseController::MODULES
+    @modules = StudioModules.entries.map(&:to_row)
   end
 
   def search(query, actor: @owner, modules: @modules) = Jump::Search.new(actor: actor, query: query, modules: modules).groups
@@ -102,7 +102,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
 
   test "modules and actions are limited to what the viewer may open" do
     nobody = User.create!(email_address: "nobody2@example.com", password: "a long enough password")
-    open_modules = Admin::BaseController::MODULES.select { |entry| entry[:permission].nil? }
+    open_modules = StudioModules.entries.select { |entry| entry.permission.nil? }.map(&:to_row)
     rows = rows_of(search("", actor: nobody, modules: open_modules)).map { |row| row[:title] }
     assert_includes rows, "Dashboard"
     assert_not_includes rows, "Users"

@@ -667,7 +667,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_equal blanks.size, search.counts.fetch(:missing_alt)
 
     get "/cs-studio/media", params: { filter: "missing_alt" }
-    blanks.each { |asset| assert_select "##{Admin::MediaLibrary::TileComponent.dom_id(asset)}", text: /NO ALT/ }
+    blanks.each { |asset| assert_select "##{Admin::MediaLibrary::TileComponent.dom_id(asset)}", text: /No alt/ }
     assert_select "##{Admin::MediaLibrary::TileComponent.dom_id(described)}", count: 0
   end
 
@@ -683,7 +683,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "input#media-filter-all[checked]"
   end
 
-  test "a tile carries NO ALT while the default-language alt is empty, and UNUSED while nothing uses it" do
+  test "a tile carries No alt while the default-language alt is empty, and Unused while nothing uses it" do
     sign_in_as(users(:one))
     bare = upload_asset(filename: "bare.png")
     covered = upload_asset(filename: "covered.png")
@@ -693,10 +693,10 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media"
 
-    assert_select "#media-asset-#{bare.id}", text: /NO ALT/
-    assert_select "#media-asset-#{bare.id}", text: /UNUSED/
-    assert_select "#media-asset-#{covered.id}", text: /NO ALT/, count: 0
-    assert_select "#media-asset-#{covered.id}", text: /UNUSED/, count: 0
+    assert_select "#media-asset-#{bare.id}", text: /No alt/
+    assert_select "#media-asset-#{bare.id}", text: /Unused/
+    assert_select "#media-asset-#{covered.id}", text: /No alt/, count: 0
+    assert_select "#media-asset-#{covered.id}", text: /Unused/, count: 0
   end
 
   test "the grid's query count stays constant with the chips and counts" do
@@ -748,7 +748,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template li a[aria-current='true']"
     assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template", text: /Renamed/
-    assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template", text: /NO ALT/, count: 0
+    assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template", text: /No alt/, count: 0
     assert_select "turbo-stream[action=update][target='media-count-missing_alt'] template", text: "0"
     assert_select "turbo-stream[action=update][target='media-count-all'] template", text: "1"
     assert_select "turbo-stream[action=update][target='media-panel-title'] template", text: "Renamed"
@@ -832,7 +832,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
   # What the drop zone needs to turn a progress tile into the
   # real one without a reload -- the tile's own markup (a link into the panel,
-  # NO ALT and UNUSED while they hold) and the segment counts.
+  # NO ALT and Unused while they hold) and the segment counts.
   test "an upload answers with the finished tile and the new counts" do
     sign_in_as(users(:one))
     upload_asset(filename: "older.png")
@@ -849,7 +849,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     tile = Nokogiri::HTML.fragment(body["tile"])
     assert_equal "media-asset-#{asset.id}", tile.at_css("li")["id"]
     assert_includes tile.at_css("a")["href"], "selected=#{asset.id}"
-    assert_includes tile.text, "NO ALT"
+    assert_includes tile.text, "No alt"
   end
 
   test "the upload answer's url is a width or the preview, never the original" do

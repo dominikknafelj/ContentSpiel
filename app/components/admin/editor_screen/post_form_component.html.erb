@@ -22,7 +22,7 @@
     line, so that `:empty` holds without a strip. %>
 <% if form_only? %><div id="editor-notice"><%= render hold_strip if held? %></div><% end %>
 
-<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
+<%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-card bg-surface shadow-1 p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
 <%= fields do %>
 
@@ -63,7 +63,7 @@
     <%# Titled with the type's label ("RESUME ENTRY FIELDS", design pass round 2, handoff §9 B23) so the
         type's own fields read as one group between Excerpt and Body rather than more loose columns. %>
     <section class="admin-fields-group flex flex-col gap-1 rounded-cs border border-line p-3" data-editor-fields-group aria-labelledby="<%= field_id("fields-group-title") %>">
-      <h2 id="<%= field_id("fields-group-title") %>" class="font-cs-mono text-label uppercase tracking-mono text-meta" data-fields-group-title><%= fields_group_title %></h2>
+      <h2 id="<%= field_id("fields-group-title") %>" class="text-label text-meta" data-fields-group-title><%= fields_group_title %></h2>
     <% schema_fields.each do |field| %>
       <%= render Admin::Ui::FieldComponent.new(
             field: field, form_name: "post[fields]",

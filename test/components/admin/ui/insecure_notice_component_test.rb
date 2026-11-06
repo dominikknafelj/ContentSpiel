@@ -10,7 +10,7 @@ class Admin::Ui::InsecureNoticeComponentTest < ViewComponent::TestCase
   test "in production over plain HTTP it is a warn alert with the sentence" do
     render_inline(Admin::Ui::InsecureNoticeComponent.new(request: Request.new(false), production: true))
 
-    assert_selector "p#insecure-notice[role=alert].border-warn.bg-warn-tint.text-warn-ink", text: BODY, count: 1
+    assert_selector "p#insecure-notice[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", text: BODY, count: 1
     assert_equal BODY, I18n.t("admin.components.ui.insecure_notice.body")
   end
 

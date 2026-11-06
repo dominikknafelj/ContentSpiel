@@ -1,6 +1,6 @@
-<%= tag.details id: "page-settings", open: true, class: "admin-page-settings #{Admin::EditorScreen::FormColumn.classes(locale)} rounded-cs border border-line bg-surface p-4",
+<%= tag.details id: "page-settings", open: true, class: "admin-page-settings #{Admin::EditorScreen::FormColumn.classes(locale)} rounded-card bg-surface shadow-1 p-4",
       data: { editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks, **template_fields_data } do %>
-  <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
+  <summary class="admin-disclosure cursor-pointer text-label text-meta">Page settings</summary>
   <%# Always there, empty unless the settings are held (`HoldStripComponent.slot_id`). %>
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
   <span class="sr-only" aria-live="polite" data-editing-announcer></span>
@@ -41,7 +41,7 @@
         <div class="admin-column mb-4" data-field-name="slug">
           <span class="<%= setup_label_class %>"><%= t(".address") %></span>
           <div class="mt-1 flex items-center gap-3">
-            <span class="truncate font-cs-mono text-[12px] text-dim" data-page-address><%= address_path %></span>
+            <span class="truncate text-small text-dim" data-page-address><%= address_path %></span>
             <%= render Admin::Ui::ButtonComponent.new(label: t(".change_address"), variant: :secondary, size: :small, type: "button", data: change_address_data) %>
           </div>
         </div>
@@ -90,7 +90,7 @@
     <% end %>
 
     <details class="admin-page-settings__seo">
-      <summary class="admin-disclosure cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">SEO · META TITLE, META DESCRIPTION</summary>
+      <summary class="admin-disclosure cursor-pointer text-label text-meta">SEO · Meta title, meta description</summary>
 
       <div class="mt-3 flex flex-col gap-4">
         <%= render Admin::Columns::PlainColumnComponent.new(

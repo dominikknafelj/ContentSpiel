@@ -9,8 +9,8 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/cs-studio/media?selected=#{asset.id}", unused: true)
 
     assert_selector "li#media-asset-#{asset.id} a[href='/cs-studio/media?selected=#{asset.id}']"
-    assert_text "NO ALT"
-    assert_text "UNUSED"
+    assert_text "No alt"
+    assert_text "Unused"
   end
 
   test "the size shows in mono once the dimensions are known" do
@@ -28,18 +28,18 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
 
-    assert_no_text "NO ALT"
-    assert_no_text "UNUSED"
+    assert_no_text "No alt"
+    assert_no_text "Unused"
   end
 
-  test "an alt text only in another language is still NO ALT" do
+  test "an alt text only in another language is still No alt" do
     with_locales(%w[en de], default: "en")
     asset = create_media_asset
     assert Media::Save.call(asset, translations: { "de" => { alt: "Düne" } }).ok?
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
 
-    assert_text "NO ALT"
+    assert_text "No alt"
   end
 
   test "the selected tile has aria-current and the accent ring; others have neither" do
@@ -73,7 +73,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_includes button["data-action"], "keydown->admin--media--select#key"
     assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "width" => asset.width, "height" => asset.height, "preview" => true, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
       JSON.parse(button["data-admin--media--select-asset-param"]))
-    assert_text "UNUSED"
+    assert_text "Unused"
   end
 
   test "a pick tile draws its selection from aria-pressed, with the same ring the panel's tile has" do

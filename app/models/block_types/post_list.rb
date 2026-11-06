@@ -7,7 +7,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :post_list do |t|
         t.label "Post list"
-        t.icon "posts"
+        t.icon "posts", family: :lists
         t.field :content_type, :content_type, blank: "All types"
         t.field :tag, :string
         t.field :limit, :integer, min: 1

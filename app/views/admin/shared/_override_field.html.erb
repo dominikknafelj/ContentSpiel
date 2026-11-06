@@ -15,7 +15,7 @@
     <span>Media:</span><span class="text-ink" data-admin--ui--override-field-target="text"><%= library %></span>
   </p>
   <div>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Reset", variant: :ghost, size: :small, type: "button", hidden: !overridden,
+    <%= render Admin::Ui::ButtonComponent.new(label: "Reset", variant: :tertiary, size: :small, type: "button", hidden: !overridden,
           data: { "admin--ui--override-field-target": "reset", action: "admin--ui--override-field#reset" }) %>
   </div>
 </div>

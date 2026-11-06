@@ -113,7 +113,7 @@ export function createTargetSearch({ input, listbox, message, url, locale, autoS
     item.append(title)
 
     const where = document.createElement("span")
-    where.className = "shrink-0 font-cs-mono text-label text-meta"
+    where.className = "shrink-0 text-small text-meta"
     where.textContent = [ row.type === "post" ? "Post" : "Page", row.path ].filter(Boolean).join(" · ")
     item.append(where)
 

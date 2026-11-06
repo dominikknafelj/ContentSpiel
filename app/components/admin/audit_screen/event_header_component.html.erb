@@ -3,15 +3,15 @@
   <h1 class="text-h1 text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></h1>
 </div>
 
-<dl class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] rounded-cs border border-line bg-surface">
+<dl class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] rounded-card bg-surface shadow-1">
   <% cells.each do |label, value, mono| %>
     <div class="flex min-w-0 flex-col gap-1 border-b border-r border-line px-4 py-3">
-      <dt class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
+      <dt class="text-label text-meta"><%= label %></dt>
       <dd class="m-0 break-words text-sm <%= mono ? "font-cs-mono" : "" %> <%= label == "Action" ? action_class : "text-ink" %>"><%= value %></dd>
     </div>
   <% end %>
   <div class="flex min-w-0 flex-col gap-1 border-b border-r border-line px-4 py-3">
-    <dt class="font-cs-mono text-label uppercase tracking-mono text-meta">Channel</dt>
+    <dt class="text-label text-meta">Channel</dt>
     <dd class="m-0"><%= render(Admin::Ui::ChannelChipComponent.new(channel: event.channel)).presence || "—" %></dd>
   </div>
 </dl>

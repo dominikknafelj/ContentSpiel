@@ -120,7 +120,7 @@ class Admin::EditorScreen::PageSettingsFormComponentTest < ViewComponent::TestCa
     page.update!(meta_title: "Hello", meta_description: "A description")
     render_settings(page.reload)
 
-    assert_selector "details.admin-page-settings__seo:not([open]) summary", text: "SEO · META TITLE, META DESCRIPTION"
+    assert_selector "details.admin-page-settings__seo:not([open]) summary", text: "SEO · Meta title, meta description"
     assert_selector "[data-controller='admin--ui--char-count'][data-admin--ui--char-count-limit-value='60'] input[name='page[meta_title]']", visible: :all
     assert_selector "[data-controller='admin--ui--char-count'][data-admin--ui--char-count-limit-value='160'] textarea[name='page[meta_description]']", visible: :all
     assert_selector "[data-admin--ui--char-count-target='output']", text: "5 / 60", visible: :all

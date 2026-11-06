@@ -19,7 +19,7 @@ module Admin
     # is what it deletes (`Forms::DeleteSubmissions`, `all: true`).
     class SubmissionsListComponent < Admin::AdminComponent
       DIALOG_ID = "delete-all-submissions-dialog".freeze
-      ROW_LINK_CLASS = "font-cs-mono text-xs text-ink after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none " \
+      ROW_LINK_CLASS = "text-xs text-ink after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none " \
                        "focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent".freeze
 
       def initialize(form:, submissions:, pagination:, total:, page_url:, url_options: {})

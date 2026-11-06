@@ -14,6 +14,6 @@ class Admin::Shell::CommandPaletteComponentTest < ViewComponent::TestCase
   test "an ESC chip beside the input and a key-hint footer" do
     render_inline(Admin::Shell::CommandPaletteComponent.new)
     assert_selector "dialog kbd", text: "ESC", visible: :all
-    assert_selector "dialog .admin-palette__hints", text: "↑↓ MOVE · ↵ OPEN · ⌘↵ NEW TAB", visible: :all
+    assert_selector "dialog .admin-palette__hints", text: "↑↓ Move · ↵ Open · ⌘↵ New tab", visible: :all
   end
 end

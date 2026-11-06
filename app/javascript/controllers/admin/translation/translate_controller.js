@@ -622,8 +622,8 @@ function setBusy(button, busy) {
 // Dismiss, so a client-side error can be cleared like a server-sent one --
 // built from text nodes only. The button is `type="button"`: the box sits
 // inside an autosave form, and a default (submit) button would post it.
-// Its classes mirror `SuggestionComponent::BUTTON_CLASS` (Tailwind only
-// sees class names spelled out in full, here as there).
+// Its classes are `SuggestionComponent::BUTTON_CLASS`, read from the box's
+// `data-dismiss-class` (`_translation_box`), so no copy of them lives here.
 function showError(box, message) {
   if (!box) return
   const wrapper = document.createElement("div")
@@ -637,7 +637,7 @@ function showError(box, message) {
   actions.className = "mt-2"
   const dismiss = document.createElement("button")
   dismiss.type = "button"
-  dismiss.className = "cursor-pointer rounded-cs border border-field-line bg-surface px-2 py-0.5 text-ink hover:bg-sunken"
+  dismiss.className = box.dataset.dismissClass || ""
   dismiss.dataset.action = "admin--translation--translate#discard"
   dismiss.textContent = "Dismiss"
   actions.append(dismiss)

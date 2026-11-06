@@ -47,9 +47,11 @@
 // `reset()` empties on a page Turbo restored. An answer that arrives after
 // that fills a section nobody sees.
 //
-// `cardNotes(node, { text, type, url, recordUrl, onChange })` (`type` is
+// `cardNotes(node, { text, buttonClasses, type, url, recordUrl, onChange })` (`type` is
 // "post" or "page", what the notes are on; `recordUrl` the record's editor,
-// which arrives with its node) answers the section
+// which arrives with its node; `buttonClasses` the card's, `Admin::Ui::
+// ButtonComponent`'s strings handed over by the view, which the Add button
+// takes, and the field is a well, `.admin-well`) answers the section
 // (`section[data-mind-graph-card-notes]`), which the card draws under the
 // title and above its actions (`card.js` says how); a row is `li[data-note-row]`, with
 // `data-unread` while it holds something the viewer has not read -- ink for
@@ -59,7 +61,7 @@
 import { draftKey } from "controllers/admin/notes/composer_controller"
 import { recordId } from "mind_graph/ids"
 
-const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
+const LABEL = "m-0 text-label text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
 const ROWS = 3
 // The person as a round mark with their initials, as the drawer draws one
@@ -67,7 +69,7 @@ const ROWS = 3
 // the letters the server sends as `initials`; the viewer's own is
 // filled ink, everyone else's sunken with a line). Decoration: the name is
 // written beside it.
-const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full font-cs-mono text-[8px] font-medium uppercase leading-none"
+const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full text-[8px] font-medium uppercase leading-none"
 const AVATAR_OWN = "bg-ink text-paper"
 const AVATAR_OTHER = "border border-line-strong bg-sunken text-ink"
 
@@ -78,7 +80,7 @@ function element(tag, className, content) {
   return node
 }
 
-export function cardNotes(node, { text, type = "post", url, recordUrl, onChange }) {
+export function cardNotes(node, { text, buttonClasses, type = "post", url, recordUrl, onChange }) {
   const section = element("section", "flex flex-col gap-2")
   section.dataset.mindGraphCardNotes = ""
   section.setAttribute("data-admin--notes--live-target", "record")
@@ -91,7 +93,7 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
   status.hidden = true
 
   const form = element("form", "flex flex-col items-start gap-1.5")
-  const field = element("textarea", "block w-full rounded-cs border border-field-line bg-surface px-[9px] py-[7px] text-[13px] text-ink placeholder:text-meta focus:outline-2 focus:outline-accent")
+  const field = element("textarea", "admin-well block w-full px-[9px] py-[7px] text-[13px] text-ink placeholder:text-meta")
   field.name = "body"
   field.rows = 2
   field.maxLength = 4000
@@ -101,7 +103,7 @@ export function cardNotes(node, { text, type = "post", url, recordUrl, onChange 
   const fieldLabel = type === "page" ? text.t("mind_graph.script.card.notes.label_page") : text.t("mind_graph.script.card.notes.label")
   field.setAttribute("aria-label", fieldLabel)
   field.placeholder = fieldLabel
-  const submit = element("button", "cursor-pointer rounded-cs border border-field-line bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
+  const submit = element("button", buttonClasses.secondary, text.t("mind_graph.script.card.notes.add"))
   submit.type = "submit"
   form.append(field, submit)
 

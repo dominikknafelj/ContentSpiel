@@ -42,7 +42,7 @@ module BlockTypes
         t.label "Note"
         # The picker's icon is the Note's own, the kind a new block starts
         # with; a block's card and tile show its kind's (plan ruling 12).
-        t.icon "info", for_block: ->(block) { Note.studio_icon(block) }
+        t.icon "info", for_block: ->(block) { Note.studio_icon(block) }, family: :text
         t.field :kind, :select, options: KINDS, default: DEFAULT, control: :segmented
         t.field :title, :string, translated: true, max: TITLE_LENGTH, placeholder_from: :kind,
                 help: "Leave it empty to head the note with its kind."

@@ -14,8 +14,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
   test "an empty slug says the slug the title will give as soon as the editor opens, and follows the title" do
     post = create_post(title: "Notes on Rails", published: false)
     post.update_columns(slug: {}) # version: none (a test's own setup: a draft whose slug was never filled)
-    visit "/cs-studio/posts/#{post.id}"
-    await_admin_controllers
+    visit_editor(post)
 
     slug = find("[data-admin--editor--slug-preview-target=slug]")
     assert_equal "", slug.value
@@ -28,10 +27,9 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
 
   test "a 70-character meta title shows the long counter and still saves" do
     about = create_page(title: "About")
-    visit "/cs-studio/pages/#{about.id}"
-    await_admin_controllers
+    visit_editor(about)
 
-    find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
+    find("summary", text: "SEO · Meta title, meta description").click
     assert_text "0 / 60"
     fill_in "Meta title", with: "x" * 70
 
@@ -43,10 +41,9 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
   # the limit is the one thing said.
   test "the counter announces only the crossing of the limit" do
     about = create_page(title: "About")
-    visit "/cs-studio/pages/#{about.id}"
-    await_admin_controllers
+    visit_editor(about)
 
-    find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
+    find("summary", text: "SEO · Meta title, meta description").click
     announcement = "[data-admin--ui--char-count-target=announcement]"
     assert_no_selector "[data-admin--ui--char-count-target=output][aria-live]", visible: :all
     fill_in "Meta title", with: "x" * 59
@@ -61,8 +58,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
 
   test "choosing Landing shows the hero fields with no reload, keeps what was typed, and Standard hides them again" do
     about = create_page(title: "About")
-    visit "/cs-studio/pages/#{about.id}"
-    await_admin_controllers
+    visit_editor(about)
     assert_no_field "page-hero_alt", visible: true
 
     fill_in "page-subtitle", with: "Typed first"
@@ -83,8 +79,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     landing = Pages::Save.call(attributes: { parent: root_page, template: "landing", published: true, hero_media_asset_id: asset.id },
       translations: { Locales.default => { title: "Landing", hero_alt: "My own alt" } }).record
 
-    visit "/cs-studio/pages/#{landing.id}"
-    await_admin_controllers
+    visit_editor(landing)
 
     assert_field "page-hero_alt", with: "My own alt"
     assert_text "A dog on a beach"
@@ -106,8 +101,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
       end
       post_record = create_post(title: "Launch", content_type: "test/flagged")
 
-      visit "/cs-studio/posts/#{post_record.id}"
-      await_admin_controllers
+      visit_editor(post_record)
 
       assert_selector "[data-fields-group-title]", text: /flagged fields/i
       find("input.cs-toggle[role=switch]").click

@@ -1,5 +1,5 @@
 <% content_for :title, "Mail" %>
-<h1 class="text-h1 font-semibold">Mail <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<h1 class="text-h1 font-semibold">Mail <span class="text-label text-meta">optional</span></h1>
 <p class="mt-2 text-dim">Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider.</p>
 
 <%
@@ -126,7 +126,7 @@
 
   <div class="flex items-center gap-4">
     <%= button_tag "Continue", type: "submit", class: setup_primary_button_class %>
-    <%= link_to "Skip for now", setup_step_path("languages"), class: setup_ghost_link_class %>
+    <%= link_to "Skip for now", setup_step_path("languages"), class: setup_tertiary_link_class %>
     <%= render "setup/back" %>
   </div>
 <% end %>

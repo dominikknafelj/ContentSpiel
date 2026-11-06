@@ -3,13 +3,13 @@
     <p class="admin-stale-grant rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-warn-ink"><%= note %></p>
   <% end %>
 
-  <section class="rounded-cs border border-line bg-surface">
+  <section class="rounded-card bg-surface shadow-1">
     <div class="flex flex-col gap-1 border-b border-line px-4 py-3.5">
       <h2 class="text-h2 text-ink">Content permissions</h2>
       <p class="text-sm text-dim">Each permission has its own scope. No scope means everything.</p>
     </div>
     <% sections.each do |area, permissions| %>
-      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= area %></div>
+      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= area %></div>
       <% permissions.each do |permission| %>
         <%= render row_for(permission) %>
         <% stale_notes(permission).each do |note| %>
