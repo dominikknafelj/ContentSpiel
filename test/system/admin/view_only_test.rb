@@ -37,6 +37,18 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_equal background.call("#post-title"), background.call(".admin-chip-field")
   end
 
+  test "the slug's prefix wrapper is one sunken box with a hairline all round, as every view-only field is" do
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+    wrapper = find(".admin-view-only .admin-column .admin-prefix-input")
+    sunken = page.evaluate_script(<<~JS)
+      (() => { const probe = document.createElement("div"); probe.style.backgroundColor = "var(--cs-sunken)"; document.body.append(probe)
+               const value = getComputedStyle(probe).backgroundColor; probe.remove(); return value })()
+    JS
+    assert_equal sunken, wrapper.evaluate_script("getComputedStyle(this).backgroundColor")
+    assert_equal %w[1px 1px 1px 1px], wrapper.evaluate_script("['Top','Right','Bottom','Left'].map((side) => getComputedStyle(this)['border' + side + 'Width'])")
+  end
+
   test "a read-only user's post editor is view only and never autosaves" do
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
@@ -109,15 +121,6 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_selector ".admin-view-only"
     assert find_field("Title", disabled: true).disabled?
 
-    # The address's prefix wrapper is one sunken box with a hairline all
-    # round, as every view-only field is, not the well's bottom edge.
-    wrapper = find(".admin-view-only .admin-column .admin-prefix-input", visible: :all, match: :first)
-    sunken = page.evaluate_script(<<~JS)
-      (() => { const probe = document.createElement("div"); probe.style.backgroundColor = "var(--cs-sunken)"; document.body.append(probe)
-               const value = getComputedStyle(probe).backgroundColor; probe.remove(); return value })()
-    JS
-    assert_equal sunken, wrapper.evaluate_script("getComputedStyle(this).backgroundColor")
-    assert_equal %w[1px 1px 1px 1px], wrapper.evaluate_script("['Top','Right','Bottom','Left'].map((side) => getComputedStyle(this)['border' + side + 'Width'])")
   end
 
   # Sections spec §1: view only stays view only inside a section too. A tile

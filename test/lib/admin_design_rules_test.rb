@@ -509,7 +509,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "the count pattern matches a count helper, a tab's count, a total and the markers, and not text-count or a word" do
-    [ '<span class="text-label"><%= count %></span>', '<%= open_count %>', "tab[:count]", "@page.total", "data-legend-count", "presence_marker_count(row)", "count_for(name)" ]
+    [ '<span class="text-label"><%= count %></span>', "<%= open_count %>", "tab[:count]", "@page.total", "data-legend-count", "presence_marker_count(row)", "count_for(name)" ]
       .each { |sample| assert_match COUNT_MARKER, sample }
     [ "text-count", "account", "counter", "discount", "totally", "count-down" ].each { |sample| assert_no_match COUNT_MARKER, sample }
   end
