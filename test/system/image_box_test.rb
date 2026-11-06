@@ -73,7 +73,7 @@ class ImageBoxSystemTest < ApplicationSystemTestCase
                  "size": style.backgroundSize, "image": decodeURIComponent(style.backgroundImage) }
       })()
     JS
-    { "light" => "#6c6d72", "dark" => "#8e8f95" }.each do |scheme, colour|
+    { "light" => "#626368", "dark" => "#8e8f95" }.each do |scheme, colour|
       page.execute_script("document.documentElement.dataset.theme = '#{scheme}'")
       mark = page.evaluate_script(read)
       assert_equal "IMG", mark["tag"]
