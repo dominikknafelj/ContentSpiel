@@ -22,6 +22,7 @@ require "rails/test_unit/railtie"
 # `ContentSpiel::Plugins.block_types` whenever its own files are loaded. Plain
 # Ruby, and not reloaded although lib/ is autoloaded (lib/content_spiel/plugins.rb).
 require_relative "../lib/content_spiel/plugins"
+require_relative "../lib/content_spiel/version"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -52,6 +53,11 @@ module ContentSpiel
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks generators])
+
+    # lib/content_spiel/version.rb defines the constants VERSION and IMAGE, not a
+    # `ContentSpiel::Version`, which is what Zeitwerk would expect of that file.
+    # It is required above, so the autoloader is told to leave it alone.
+    Rails.autoloaders.main.ignore(Rails.root.join("lib/content_spiel/version.rb"))
 
     # The locales Mobility and I18n will accept reads and writes for. Mobility
     # reads these back out of this config (not out of I18n directly), and

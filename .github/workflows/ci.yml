@@ -61,6 +61,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Changelog guard
+        if: github.event_name == 'pull_request'
+        run: bin/changelog-guard origin/${{ github.base_ref }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# usage: bin/changelog-guard BASE_REF
+#
+# A pull request that changes the theme contract's ledger or a plugin hook
+# says so in CHANGELOG.md under "## Unreleased" (a line added or changed
+# between that heading and the next "## " one). Compares HEAD with
+# `git merge-base BASE_REF HEAD`; exits 1, naming the guarded files it saw,
+# when one changed and the section did not. Environment changes are not
+# guarded here: the pull request template's checkbox covers them.
+set -euo pipefail
+
+GUARDED=(test/support/contract_ledger.rb lib/content_spiel/plugins.rb)
+
+base_ref=${1:?usage: bin/changelog-guard BASE_REF}
+base=$(git merge-base "$base_ref" HEAD)
+
+changed=$(git diff --name-only "$base" HEAD -- "${GUARDED[@]}")
+[ -z "$changed" ] && exit 0
+
+unreleased() {
+  git show "$1:CHANGELOG.md" 2>/dev/null |
+    awk '/^## /{ inside = ($0 == "## Unreleased"); next } inside'
+}
+
+if [ "$(unreleased "$base")" != "$(unreleased HEAD)" ]; then
+  exit 0
+fi
+
+echo "CHANGELOG.md's \"## Unreleased\" section did not change, but these guarded files did:" >&2
+echo "$changed" | sed 's/^/  /' >&2
+echo "Add a line under \"## Unreleased\" saying what changed." >&2
+exit 1
