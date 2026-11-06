@@ -20,10 +20,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Everything is decided here, before anything is pushed. A VERSION that is
+  # not newer than the newest tag is not a release: green, nothing done. A
+  # VERSION that is newer but fails a later check fails the run loudly.
   decide:
-    # A manual run of Image on main also completes here; it is the same commit
-    # check below that keeps it from releasing twice.
-    if: github.event.workflow_run.conclusion == 'success'
+    # Only a push to main of this repository's own branch (not a manual run of
+    # Image on some other ref, not a fork).
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,20 +45,48 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Compare VERSION with the newest tag
+      - uses: ruby/setup-ruby@v1
+
+      - name: Decide whether this commit is a release
         id: compare
         run: |
           version=$(sed -n 's/^ *VERSION = "\(.*\)"$/\1/p' lib/content_spiel/version.rb)
-          [ -n "$version" ] || { echo "no VERSION in lib/content_spiel/version.rb" >&2; exit 1; }
           newest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          newest=${newest#v}
           echo "VERSION $version, newest tag ${newest:-none}"
-          if [ "v$version" = "$newest" ]; then
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=false" >> "$GITHUB_OUTPUT"
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::VERSION ${version:-(none)} is not MAJOR.MINOR.PATCH"; exit 1
+          fi
+          # Not newer than the newest tag (no tag: newer than 0.0.0): not a release.
+          highest=$(printf '%s\n' "${newest:-0.0.0}" "$version" | sort -V | tail -n 1)
+          if [ "$version" = "${newest:-0.0.0}" ] || [ "$highest" != "$version" ]; then
+            echo "VERSION is not newer than the newest tag: nothing to release."; exit 0
+          fi
+
+          # Newer: from here every failure is loud, and nothing has been pushed.
+          if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+            echo "::error::the tag v$version already exists"; exit 1
+          fi
+          ruby -r ./lib/content_spiel/release -e \
+            'puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ARGV.fetch(0))' "$version" > release-notes.md \
+            || { echo "::error::CHANGELOG.md has no dated section for $version"; exit 1; }
+          [ -s release-notes.md ] || { echo "::error::CHANGELOG.md's section for $version is empty"; exit 1; }
+          for file in install/install.sh install/contentspiel; do
+            [ -f "$file" ] || { echo "::error::$file does not exist"; exit 1; }
+          done
+          echo "release=true" >> "$GITHUB_OUTPUT"
+
+      # The notes the Release will carry, kept for the publish job.
+      - name: Keep the release notes
+        if: steps.compare.outputs.release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
 
   arm64:
     needs: decide
@@ -78,8 +112,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # The same Dockerfile and build arguments as image.yml (it passes none),
-      # pushed under a temporary tag that the manifests below join and that
-      # nothing else names. No provenance: the arm64 image stays a plain image
+      # pushed as `<sha>-arm64`, which the manifests below join. That tag is
+      # permanent: the manifests refer to the image, and it is not deleted. No provenance: the arm64 image stays a plain image
       # manifest for `imagetools create` to join.
       - name: Build and push linux/arm64
         uses: docker/build-push-action@v7
@@ -127,18 +161,14 @@ jobs:
             --tag "$IMAGE:$VERSION" --tag "$IMAGE:stable" \
             "$IMAGE:$SHA" "$IMAGE:$SHA-arm64"
 
-      - uses: ruby/setup-ruby@v1
-
-      # That version's section of CHANGELOG.md, nothing more (ContentSpiel::Release.notes).
-      - name: Extract the release notes
-        run: |
-          ruby -r ./lib/content_spiel/release -e \
-            'puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ENV.fetch("VERSION"))' > "$RUNNER_TEMP/notes.md"
-          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md's section for $VERSION is empty" >&2; exit 1; }
+      - name: Fetch the release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
 
       # Creates the tag vV on the built commit with the Release. install.sh
       # and contentspiel are the installer and the site's command (install/).
       - name: Tag and create the GitHub Release
         run: |
           gh release create "v$VERSION" install/install.sh install/contentspiel \
-            --target "$SHA" --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+            --target "$SHA" --title "$VERSION" --notes-file release-notes.md

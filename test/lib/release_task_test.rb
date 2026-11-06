@@ -20,9 +20,10 @@ class ReleaseTaskTest < ActiveSupport::TestCase
 
       assert_equal "# Changelog\n\n## Unreleased\n\n## 0.2.0 (2026-11-05)\n\n### Added\n\n- Something.\n\n## 0.1.0 (2026-10-01)\n\n- Older.\n",
         File.read("#{root}/CHANGELOG.md")
-      assert_equal File.read(Rails.root.join(VERSION_RB)).sub('"0.1.0"', '"0.2.0"'), File.read("#{root}/#{VERSION_RB}")
+      assert_includes File.read("#{root}/#{VERSION_RB}"), %(VERSION = "0.2.0")
       assert_equal [ "git switch -c release-0.2.0",
         "git commit -am 'chore: release 0.2.0'",
+        "git push -u origin release-0.2.0",
         "gh pr create --title 'Release 0.2.0' --body 'Cuts 0.2.0: merging this tags v0.2.0 and publishes the image.'" ], commands
     end
   end
@@ -88,6 +89,32 @@ class ReleaseTaskTest < ActiveSupport::TestCase
     end
   end
 
+  test "an Unreleased section of sub-headings only is empty" do
+    in_repo do |root, _git|
+      write root, "CHANGELOG.md", "# Changelog\n\n## Unreleased\n\n### Added\n\n### Fixed\n\n## 0.1.0 (2026-10-01)\n\n- Older.\n"
+      commit_all root
+      assert_refused root, "0.2.0", /empty/
+    end
+  end
+
+  test "a CRLF changelog is rewritten like an LF one and keeps its line endings" do
+    in_repo do |root, _git|
+      write root, "CHANGELOG.md", "# Changelog\r\n\r\n## Unreleased\r\n\r\n- Something.\r\n"
+      commit_all root
+      Release.new(root, today: TODAY).prepare("0.2.0")
+      assert_equal "# Changelog\r\n\r\n## Unreleased\r\n\r\n## 0.2.0 (2026-11-05)\r\n\r\n- Something.\r\n", File.binread("#{root}/CHANGELOG.md")
+    end
+  end
+
+  test "a changelog without the heading is refused, not left unchanged" do
+    in_repo do |root, _git|
+      write root, "CHANGELOG.md", "# Changelog\n\n## Unreleased changes\n\n- Something.\n"
+      commit_all root
+      assert_refused root, "0.2.0", /no ## Unreleased/
+      assert_includes File.read("#{root}/#{VERSION_RB}"), '"0.1.0"'
+    end
+  end
+
   test "notes are one version's section, up to the next heading" do
     changelog = "# Changelog\n\n## Unreleased\n\n- Next.\n\n## 0.2.0 (2026-11-05)\n\n### Added\n\n- Two.\n\n## 0.1.0 (2026-10-01)\n\n- One.\n"
     assert_equal "### Added\n\n- Two.", Release.notes(changelog, "0.2.0")
@@ -130,7 +157,8 @@ class ReleaseTaskTest < ActiveSupport::TestCase
     Dir.mktmpdir do |dir|
       root = Pathname.new(dir)
       FileUtils.mkdir_p(root.join("lib/content_spiel"))
-      FileUtils.cp Rails.root.join(VERSION_RB), root.join(VERSION_RB)
+      # The real file's shape, at the number these tests start from.
+      File.write(root.join(VERSION_RB), File.read(Rails.root.join(VERSION_RB)).sub(/VERSION = "[^"]*"/, 'VERSION = "0.1.0"'))
       File.write(root.join("CHANGELOG.md"), "# Changelog\n\n## Unreleased\n\n- Something.\n")
       git = lambda do |*args|
         out, status = Open3.capture2e("git", "-C", dir, "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false",

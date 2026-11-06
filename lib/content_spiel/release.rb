@@ -16,6 +16,9 @@ module ContentSpiel
     class Refused < StandardError; end
 
     UNRELEASED = "## Unreleased".freeze
+    # The one way the heading is found, for the empty check and for the
+    # rewrite alike; LF or CRLF, or the end of the file.
+    UNRELEASED_HEADING = /^## Unreleased[ \t]*(\r?\n|\z)/
     VERSION_LINE = /^(\s*VERSION = ")[^"]*(")/
     NUMBER = /\A\d+\.\d+\.\d+\z/
 
@@ -45,10 +48,17 @@ module ContentSpiel
       end
       refuse "the tag v#{version} already exists" unless git("tag", "-l", "v#{version}").strip.empty?
       changelog = File.read(changelog_path)
-      refuse "#{UNRELEASED} in CHANGELOG.md is empty; there is nothing to release" if unreleased_body(changelog).strip.empty?
+      body = unreleased_body(changelog)
+      # Only sub-headings (### Added) and blank lines: nothing to release.
+      if body.lines.all? { |line| line.strip.empty? || line.start_with?("### ") }
+        refuse "#{UNRELEASED} in CHANGELOG.md is empty; there is nothing to release"
+      end
 
-      File.write(version_path, File.read(version_path).sub(VERSION_LINE) { "#{$1}#{version}#{$2}" })
-      File.write(changelog_path, changelog.sub(/^#{Regexp.escape(UNRELEASED)}\n/) { "#{UNRELEASED}\n\n## #{version} (#{@today.iso8601})\n" })
+      versioned = File.read(version_path).sub(VERSION_LINE) { "#{$1}#{version}#{$2}" }
+      dated = changelog.sub(UNRELEASED_HEADING) { "#{UNRELEASED}#{$1}#{$1}## #{version} (#{@today.iso8601})#{$1}" }
+      refuse "could not rewrite #{UNRELEASED} in CHANGELOG.md" if dated == changelog
+      File.write(version_path, versioned)
+      File.write(changelog_path, dated)
       commands(version)
     end
 
@@ -62,14 +72,14 @@ module ContentSpiel
       [
         "git switch -c release-#{version}",
         "git commit -am 'chore: release #{version}'",
+        "git push -u origin release-#{version}",
         "gh pr create --title 'Release #{version}' --body 'Cuts #{version}: merging this tags v#{version} and publishes the image.'"
       ]
     end
 
     def unreleased_body(changelog)
-      lines = changelog.lines
-      start = lines.index { |line| line.chomp == UNRELEASED } or refuse("CHANGELOG.md has no #{UNRELEASED} section")
-      lines[(start + 1)..].take_while { |line| !line.start_with?("## ") }.join
+      match = changelog.match(UNRELEASED_HEADING) or refuse("CHANGELOG.md has no #{UNRELEASED} section")
+      match.post_match.lines.take_while { |line| !line.start_with?("## ") }.join
     end
 
     def version_path = File.join(@root, "lib/content_spiel/version.rb")

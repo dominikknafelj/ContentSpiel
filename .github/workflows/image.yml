@@ -14,9 +14,9 @@ name: Image
 #
 # The tags: the full commit id, which is what a site pins
 # (`ghcr.io/<owner>/content_spiel:<40 characters>`), and `main` for the newest
-# build of main. A merge that raises `VERSION` is then given its release number
-# by release.yml, which runs when this workflow completes. No `latest`: a site that followed it would change under its
-# owner at the next deploy.
+# build of main. A merge that raises `VERSION` is then given its release
+# number by release.yml, which runs when this workflow completes. No `latest`:
+# a site that followed it would change under its owner at the next deploy.
 on:
   push:
     branches: [ main ]
