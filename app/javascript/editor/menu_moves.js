@@ -9,7 +9,7 @@ import { itemsOf, snapshot, titleOf } from "editor/containers"
 // "Move to column…" (`askWhere`, `moveTo`) and "Move out of section"
 // (`out`). A top-level card's menu has "Move into section…" (`askWhere`
 // again). All of them make the DOM move a drop would have made and then call
-// the one sender, `MoveQueue#move` (`relocate`): a menu move is queued, held
+// the one sender, `admin--editor--blocks#move` (`relocate`): a menu move is queued, held
 // still, refused and put back exactly as a drag is. What a menu move adds is
 // the FOCUS (`MoveQueue#focusMoved`): the item that was picked is hidden
 // with its menu, so without a rule the focus would be on <body>, the top of
@@ -20,12 +20,11 @@ import { itemsOf, snapshot, titleOf } from "editor/containers"
 // where.
 //
 // `host` is the blocks controller: its `destinationTarget`, `cardTargets`,
-// `openLanes()`, `containers()`, `element`, `focusItem(item)` and
+// `openLanes()`, `containers()`, `element`, `move(…)`, `focusItem(item)` and
 // `announce(text)`.
 export class MenuMoves {
-  constructor(host, queue) {
+  constructor(host) {
     this.host = host
-    this.queue = queue
   }
 
   // Swaps the block with its immediate neighbour in its container's own
@@ -121,7 +120,7 @@ export class MenuMoves {
   }
 
   // A MENU'S MOVE: the DOM move a drop would have made, then the same request
-  // (`MoveQueue#move`). The focus goes to the moved block at once -- the item
+  // (`admin--editor--blocks#move`). The focus goes to the moved block at once -- the item
   // that was picked is hidden with its menu, and a DOM move takes the focus
   // off whatever it moves. For a move along one container that is where it
   // stays. A block that changes containers is then held still by the queue
@@ -142,7 +141,7 @@ export class MenuMoves {
     const items = itemsOf(item.parentElement)
     this.host.announce(messages(this.host.element).t(`components.editor_screen.block_moves.${said}`,
       { block: titleOf(item), position: items.indexOf(item) + 1, count: items.length, ...vars }))
-    this.queue.move(item, from, before, { focus: true })
+    this.host.move(item, from, before, { focus: true })
   }
 
   // Shows a card's body if `admin--editor--blocks#toggle` has hidden it.

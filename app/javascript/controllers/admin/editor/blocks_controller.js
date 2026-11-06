@@ -5,7 +5,7 @@ import { makeCloneInert, sortableOptions } from "editor/drag"
 import { MoveQueue, currentGeneration } from "editor/move_queue"
 import { MenuMoves } from "editor/menu_moves"
 import { KeyboardMoves } from "editor/keyboard_moves"
-import { focusCopy, watchWrites } from "editor/adding"
+import { watchWrites } from "editor/adding"
 
 // The page editor's block list (cs-studio spec §5.1/§6.1; sections spec
 // §3.1, §4.4): its targets, its Sortables and the actions its markup names,
@@ -28,9 +28,8 @@ import { focusCopy, watchWrites } from "editor/adding"
 // - `editor/keyboard_moves`: the handle's Space / arrows / Escape path;
 // - `editor/adding`: add, duplicate, delete and Undo held in the queue.
 //
-// `move`, `dragging`, `sayMoving()` and `containers()` are read by the
-// browser tests, and the `moving` and `toggled` events by
-// `admin--editing--live` and `admin--editing--hold`.
+// `move`, `dragging`, `sayMoving()` and `containers()` are read by the browser
+// tests, the `moving` and `toggled` events by `admin--editing--{live,hold}`.
 export default class extends Controller {
   static targets = ["card", "list", "lane", "tile", "announcer", "destination"]
   static values = { reorderUrl: String }
@@ -44,17 +43,17 @@ export default class extends Controller {
   initialize() {
     this.laneSortables = new Map()
     this.queue = new MoveQueue(this)
-    this.menu = new MenuMoves(this, this.queue)
-    this.keyboard = new KeyboardMoves(this, this.queue)
+    this.menu = new MenuMoves(this)
+    this.keyboard = new KeyboardMoves(this)
     this.moveStateObserver = new MutationObserver((mutations) => {
       this.refreshMoveState()
-      focusCopy(this, mutations)
+      this.writes?.focusCopy(mutations)
     })
   }
 
   connect() {
     this.generation = currentGeneration()
-    this.stopWatchingWrites = watchWrites(this)
+    this.writes = watchWrites(this)
     this.moveStateObserver.observe(this.listTarget, { childList: true })
     this.refreshMoveState()
     this.sortable = Sortable.create(this.listTarget, {
@@ -120,11 +119,11 @@ export default class extends Controller {
   }
 
   disconnect() {
-    this.stopWatchingWrites()
+    this.writes.stop()
     this.moveStateObserver.disconnect()
     this.dragging = false
     this.picked = null
-    this.queue.moveHolds = 0
+    this.queue.reset()
     this.sayMoving()
     this.sortable?.destroy()
     // The lanes are told to go after this (`laneTargetDisconnected`), which
@@ -188,9 +187,10 @@ export default class extends Controller {
     this.keyboard.blur(event.currentTarget, this.cardFor(event))
   }
 
-  // THE ONE SENDER of a block's move (`editor/move_queue.js`, which says what
-  // is sent, what is put back and when the answer is drawn): a drop's
-  // `onEnd`, the menu's moves and (through `reorder`) the keyboard path.
+  // THE ONE SENDER of a block's move: a drop's `onEnd`, the menu's moves
+  // (`MenuMoves#relocate`) and, through `reorder`, the keyboard path's drop
+  // all call it. What is sent, what is put back and when the answer is drawn
+  // is `editor/move_queue.js`'s.
   move(item, from, before = null, options = {}) {
     return this.queue.move(item, from, before, options)
   }
@@ -199,9 +199,10 @@ export default class extends Controller {
   putBack() { this.queue.putBack() }
   get reordersQueued() { return this.queue.reordersQueued }
 
-  // The card in someone's hand on the keyboard path (`KeyboardMoves`).
+  // The keyboard path's card in hand, and its release (`MoveQueue#putBack`).
   get picked() { return this.keyboard.picked }
   set picked(card) { this.keyboard.picked = card }
+  letGo() { if (this.picked) this.keyboard.clearPicked(this.picked) }
 
   // LIVE REFRESH (`admin--editing--live`) does not draw the list while a block
   // is in someone's hand or its move has not been answered and drawn. That is

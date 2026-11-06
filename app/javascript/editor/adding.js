@@ -9,9 +9,13 @@ import { holdTurboRequest } from "saving/queue"
 // place. What this module adds is their place in the write queue and, for a
 // Duplicate, where the focus goes.
 //
-// Attaches the listeners to `host` (the blocks controller: its `element`
-// and `reorderUrlValue`) and answers the function that removes them.
+// Attaches the listeners to `host` (the blocks controller: its `element`,
+// `reorderUrlValue` and `focusItem(item)`) and answers `stop`, which removes
+// them, and `focusCopy`, for the containers' observer.
 export function watchWrites(host) {
+  let awaitingCopy = false
+  let copyTimer
+
   // A write (never a GET) waits its turn in the page-level queue
   // (`saving/queue.js`): add, duplicate and delete are held until the
   // request before them has been answered, exactly as an autosave is.
@@ -40,32 +44,33 @@ export function watchWrites(host) {
   const duplicated = (event) => {
     const action = event.detail.formSubmission?.formElement?.getAttribute("action") || ""
     if (!event.detail.success || !new URL(action, window.location.origin).pathname.endsWith("/duplicate")) return
-    host.awaitingCopy = true
-    clearTimeout(host.copyTimer)
-    host.copyTimer = setTimeout(() => { host.awaitingCopy = false }, 2000)
+    awaitingCopy = true
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => { awaitingCopy = false }, 2000)
   }
 
   host.element.addEventListener("turbo:before-fetch-request", holdWrite)
   document.addEventListener("turbo:before-fetch-request", holdUndo)
   host.element.addEventListener("turbo:submit-end", duplicated)
 
-  return () => {
+  // The first card added to the list, or tile added to a lane, after a
+  // Duplicate is the copy. `mutations` are the containers' child-list changes.
+  const focusCopy = (mutations) => {
+    if (!awaitingCopy) return
+    const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
+      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--editor--blocks-target="card"], [data-admin--editor--blocks-target="tile"]'))
+    if (!copy) return
+
+    awaitingCopy = false
+    host.focusItem(copy)
+  }
+
+  const stop = () => {
     host.element.removeEventListener("turbo:before-fetch-request", holdWrite)
     document.removeEventListener("turbo:before-fetch-request", holdUndo)
     host.element.removeEventListener("turbo:submit-end", duplicated)
-    clearTimeout(host.copyTimer)
+    clearTimeout(copyTimer)
   }
-}
 
-// See `duplicated` in `watchWrites`: the first card added to the list, or
-// tile added to a lane, after a Duplicate is the copy. `mutations` are the
-// containers' child-list changes.
-export function focusCopy(host, mutations) {
-  if (!host.awaitingCopy) return
-  const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
-    .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--editor--blocks-target="card"], [data-admin--editor--blocks-target="tile"]'))
-  if (!copy) return
-
-  host.awaitingCopy = false
-  host.focusItem(copy)
+  return { stop, focusCopy }
 }

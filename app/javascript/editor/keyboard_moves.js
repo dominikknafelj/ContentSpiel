@@ -3,18 +3,17 @@ import { itemsOf, titleOf } from "editor/containers"
 
 // The handle's keyboard path (handoff §9 A9). Space on a card's handle picks
 // it up; ArrowUp/ArrowDown move it among the cards; Space drops it
-// (`MoveQueue#reorder`, the request a drag's `onEnd` makes, with the order as
+// (`admin--editor--blocks#reorder`, which sends through `#move`, the request a drag's `onEnd` makes, with the order as
 // it was when the card was picked up, in case it fails) and Escape puts it
 // back without saving. What it says, it says in the live region in the
 // words of the locale (`block_moves.picked_up`, `dropped`, `cancelled` and
 // `position`, served by the screen's `data-messages`).
 //
 // `host` is the blocks controller: its `listTarget`, `element`,
-// `sayMoving()` and `announce(text)`.
+// `reorder(before)`, `sayMoving()` and `announce(text)`.
 export class KeyboardMoves {
-  constructor(host, queue) {
+  constructor(host) {
     this.host = host
-    this.queue = queue
     this.card = null
   }
 
@@ -76,7 +75,7 @@ export class KeyboardMoves {
     // Not said yet: the move that follows holds on (no false in between).
     this.clearPicked(card, { say: false })
     this.announce("dropped", { block: titleOf(card), position: this.positionOf(card) })
-    return this.queue.reorder(this.orderBeforePick)
+    return this.host.reorder(this.orderBeforePick)
   }
 
   // Focus leaving the handle puts a picked card back: the DOM move has saved

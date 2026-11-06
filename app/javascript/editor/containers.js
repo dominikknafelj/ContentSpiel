@@ -1,3 +1,5 @@
+import { messages } from "i18n/messages"
+
 // Pure reads of the page editor's containers (sections spec §3.1, §4.4). The
 // page's list is one place a block can be; each column of each section is
 // another -- a lane (`Admin::EditorScreen::SectionLanesComponent`), whose
@@ -136,7 +138,8 @@ export function refreshMoveState(containers, openLanes) {
 }
 
 // A block's name as its element shows it: the title button of a card, the
-// first line of a tile's face.
+// first line of a tile's face; `block_moves.untitled` for one that shows none.
 export function titleOf(item) {
-  return item.querySelector("[data-action$='admin--editor--blocks#toggle'], .admin-block-tile__face > span")?.textContent.trim() || "block"
+  return item.querySelector("[data-action$='admin--editor--blocks#toggle'], .admin-block-tile__face > span")?.textContent.trim() ||
+    messages(item).t("components.editor_screen.block_moves.untitled")
 }

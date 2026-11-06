@@ -62,7 +62,8 @@ pin_all_from "app/javascript/notes", under: "notes", preload: "admin"
 pin_all_from "app/javascript/editing", under: "editing", preload: "admin"
 # The page editor's plain modules, imported by `admin--editor--blocks`: the
 # reads of its containers, the drag's options, the queued send of a move
-# (`editor/move_queue`, the one sender of a reorder), the menu's moves, the
+# (`editor/move_queue`, behind `admin--editor--blocks#move`, the one sender
+# of a reorder), the menu's moves, the
 # handle's keyboard path and the add / duplicate / delete writes it holds in
 # the queue.
 pin_all_from "app/javascript/editor", under: "editor", preload: "admin"

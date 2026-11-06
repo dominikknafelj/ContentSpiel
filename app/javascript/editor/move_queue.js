@@ -12,16 +12,17 @@ import { isClosed, itemsOf, placeOf, titleOf } from "editor/containers"
 // through this module alone.
 export { currentGeneration }
 
-// The queued send of a block's move, its put-back and its answer: the body
-// of `admin--editor--blocks#move`, the one sender of a reorder. A drop's
-// `onEnd`, the menu's moves (`editor/menu_moves.js`) and (through `reorder`)
-// the keyboard path (`editor/keyboard_moves.js`) all end in `move`.
+// The queued send of a block's move, its put-back and its answer: what
+// `admin--editor--blocks#move`, the one sender of a reorder, hands its move
+// to. A drop's `onEnd`, the menu's moves (`editor/menu_moves.js`) and
+// (through `#reorder`) the keyboard path (`editor/keyboard_moves.js`) all
+// call that action, and nothing else calls this queue's `move`.
 //
 // `host` is the blocks controller. What is read of it: `listTarget`,
-// `containers()`, `reorderUrlValue`, `generation`, `application`, `element`,
-// `picked` and `keyboard` (to let go of a card picked up when everything is
-// put back); what is called: `sayMoving()`, `refreshMoveState()`,
-// `focusItem(item)` and `announce(text)`.
+// `containers()`, `reorderUrlValue`, `generation`, `application` and
+// `element`; what is called: `sayMoving()`, `refreshMoveState()`,
+// `letGo()` (a card picked up on the keyboard, when everything is put
+// back), `focusItem(item)` and `announce(text)`.
 export class MoveQueue {
   constructor(host) {
     this.host = host
@@ -32,6 +33,11 @@ export class MoveQueue {
   // judges (`admin--editor--blocks#sayMoving`).
   get holds() {
     return this.moveHolds
+  }
+
+  // The controller left the page: no move it queued is in anyone's hand.
+  reset() {
+    this.moveHolds = 0
   }
 
   // `item` is the element that was moved -- null for "send the list's order
@@ -494,7 +500,7 @@ export class MoveQueue {
   putBack() {
     const remembered = Array.from(this.restoreTo || []).filter(([ container ]) => container.isConnected)
     this.restoreTo = null
-    if (this.host.picked) this.host.keyboard.clearPicked(this.host.picked)
+    this.host.letGo()
 
     for (const [ container, items ] of remembered) {
       for (const item of items) {

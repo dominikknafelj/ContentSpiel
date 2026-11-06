@@ -97,6 +97,8 @@ en:
           dropped: "Dropped %{block}. %{position}"
           cancelled: "Cancelled. %{block} is back where it was."
           position: "Position %{position} of %{count}."
+          # The `%{block}` of a block whose card or tile shows no name.
+          untitled: "block"
         # The confirmation behind every "Delete block…", in a card and in a
         # tile.
         delete_block_dialog:
