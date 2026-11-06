@@ -67,7 +67,7 @@
             for a screen reader and its tooltip; the header has no room for it in sight. %>
         <%= text_field_tag "block[settings][anchor]", setting("anchor"), id: field_id("anchor"), autocomplete: "off", spellcheck: false,
               placeholder: t(".anchor"), title: t(".anchor_help"), "aria-label": t(".anchor"), "aria-describedby": field_id("anchor-help"),
-              class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 font-cs-mono text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
+              class: "w-32 rounded-cs border border-field-line bg-surface px-2.5 py-1 text-sm text-ink placeholder:text-meta focus-visible:outline-2 focus-visible:outline-accent" %>
         <span id="<%= field_id("anchor-help") %>" class="sr-only"><%= t(".anchor_help") %></span>
         <%= render Admin::Ui::SaveStatusComponent.new(id: status_id, state: :idle, live: page.published_at.present?) %>
         <%# Issue 146: a style may set its own layout, background or width, and the CMS cannot

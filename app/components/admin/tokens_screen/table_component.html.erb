@@ -26,7 +26,7 @@
               <% if token.last_used_at %>
                 <%= render Admin::Ui::TimeAgoComponent.new(time: token.last_used_at) %>
                 <% if token.last_used_ip.present? %>
-                  <span class="block font-cs-mono text-meta"><%= token.last_used_ip %></span>
+                  <span class="block text-meta"><%= token.last_used_ip %></span>
                 <% end %>
               <% else %>
                 Never

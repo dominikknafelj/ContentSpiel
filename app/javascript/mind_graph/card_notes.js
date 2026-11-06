@@ -67,7 +67,7 @@ const ROWS = 3
 // the letters the server sends as `initials`; the viewer's own is
 // filled ink, everyone else's sunken with a line). Decoration: the name is
 // written beside it.
-const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full font-cs-mono text-[8px] font-medium uppercase leading-none"
+const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full text-[8px] font-medium uppercase leading-none"
 const AVATAR_OWN = "bg-ink text-paper"
 const AVATAR_OTHER = "border border-line-strong bg-sunken text-ink"
 

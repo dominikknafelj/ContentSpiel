@@ -23,6 +23,6 @@ class Admin::Fields::DateFieldTest < ViewComponent::TestCase
     field = Field.new(name: "starts_on", type: :date, options: {})
     render_inline Admin::Fields::DateField.new(field:, form_name: "post[fields]", value: "2024-01-01", locale: "en")
 
-    assert_selector "input[type=text][pattern][placeholder='yyyy-mm-dd'][inputmode=numeric][value='2024-01-01'].font-cs-mono"
+    assert_selector "input[type=text][pattern][placeholder='yyyy-mm-dd'][inputmode=numeric][value='2024-01-01']"
   end
 end

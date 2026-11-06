@@ -264,7 +264,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   // address in the editing language or the default has none written.
   function page(node) {
     return [
-      heading(markCanvas(node), element("span", "min-w-0 truncate font-cs-mono text-label text-meta", node.path || ""), ...chipBeside(node)),
+      heading(markCanvas(node), element("span", "min-w-0 truncate text-small text-meta", node.path || ""), ...chipBeside(node)),
       ...chipBelow(node),
       title(node),
       pairOf(counted("mind_graph.script.card.child_pages", node.child_count ?? 0), counted("mind_graph.script.card.lists_posts", node.listed_count ?? 0)),

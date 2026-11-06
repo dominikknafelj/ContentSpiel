@@ -25,7 +25,7 @@ class Admin::NotesScreen::HeaderButtonComponentTest < ViewComponent::TestCase
     assert_no_selector "button#notes-open[class~='inline-block']"
     assert_no_selector "button#notes-open[class*='text-[13px]'], button#notes-open[class~='text-sm']"
     assert_selector "button#notes-open[class~='aria-pressed:bg-sunken'][class~='aria-pressed:border-ink']"
-    assert_selector "#notes-open-count[class~='font-cs-mono'][class~='text-xs'][class~='text-dim'][class~='data-[unread]:bg-accent']"
+    assert_selector "#notes-open-count[class~='text-xs'][class~='text-dim'][class~='data-[unread]:bg-accent']"
     assert_selector "button#notes-open span", text: "Notes"
   end
 

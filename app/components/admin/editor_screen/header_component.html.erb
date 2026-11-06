@@ -104,7 +104,7 @@
   </div>
 
   <% if public_path.present? %>
-    <div class="mt-1 flex items-center gap-2 font-cs-mono text-[12px] text-dim">
+    <div class="mt-1 flex items-center gap-2 text-small text-dim">
       <span class="truncate"><%= public_path %></span>
       <button type="button" data-controller="admin--ui--clipboard" data-admin--ui--clipboard-url-value="<%= public_url %>"
         data-action="click->admin--ui--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-field-line px-2 py-0.5 hover:bg-sunken">Copy</button>

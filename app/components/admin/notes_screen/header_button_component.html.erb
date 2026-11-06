@@ -14,6 +14,6 @@
   <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>
   <span><%= t(".notes") %></span>
   <%= tag.span count, id: "notes-open-count", hidden: count.zero?,
-        class: "font-cs-mono text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
+        class: "text-xs leading-4 text-dim data-[unread]:rounded-full data-[unread]:bg-accent data-[unread]:px-1.5 data-[unread]:text-on-accent",
         data: { "admin--notes--drawer-target": "total" } %>
 <% end %>

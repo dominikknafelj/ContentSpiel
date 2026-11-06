@@ -256,6 +256,60 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
+  # Mono is for code and for a value a person copies or compares exactly. Everything else (counts, times,
+  # addresses, ⌘K, a field error's "!", language codes, initials, badges, the sidebar's numbers) is the sans.
+  MONO_CODE = /<code|<pre|tag\.code|tag\.pre/
+  MONO_ALLOWED = {
+    "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
+    "app/components/admin/settings_screen/ai_test_result_component.rb" => "the AI 'CONNECTED · n MS' result stays mono capitals",
+    "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
+    "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
+    "app/views/setup/token.html.erb" => "the setup token's input holds a key value",
+    "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
+    "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
+    "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
+    "app/components/admin/audit_screen/event_header_component.html.erb" => "the event header's values (action, subject key)",
+    "app/components/admin/groups_screen/permission_row_component.html.erb" => "`permission.key`",
+    "app/components/admin/groups_screen/toggle_list_component.html.erb" => "`permission.key`"
+  }.freeze
+  MONO_SOURCES = TYPE_VOICE_SOURCES.reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
+
+  test "mono is for code, a token's or key's value and the save status line only" do
+    offences = MONO_SOURCES.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if MONO_ALLOWED.key?(relative)
+
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{relative}:#{index + 1}" if line.include?("font-cs-mono") && !line.match?(MONO_CODE)
+      end
+    end
+    assert_empty offences
+  end
+
+  test "every mono allowance names a file that still writes mono" do
+    MONO_ALLOWED.each_key do |relative|
+      assert MONO_SOURCES.include?(Rails.root.join(relative).to_s), "#{relative} is not a studio source"
+      assert_includes Rails.root.join(relative).read, "font-cs-mono", relative
+    end
+  end
+
+  test "the stylesheets draw mono only for code, an embed and the form-send pages" do
+    %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
+      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+      css.to_enum(:scan, /font-family:\s*var\(--cs-mono\)/).map { Regexp.last_match.begin(0) }.each do |at|
+        selector = css[0...at][/([^{}]*)\{[^{}]*\z/m, 1].to_s.strip
+        ok = selector.split(",").all? { |part| part.strip.match?(/\A(?:\.admin-rich-text-content (?:pre|code)|\.admin-rich-text-embed|\.form-send-page\b.*)\z/) }
+        assert ok, "#{name}: #{selector} draws mono"
+      end
+    end
+  end
+
+  test "text-small is the 13px address size and wins over nothing but the size it replaces" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_includes css, "--text-small: var(--cs-t-small);"
+    assert_includes Rails.root.join("app/assets/tailwind/content-spiel.css").read, "--cs-t-small: 13px"
+  end
+
   # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
     assert_empty design_offences(/text-\[10px\]/)

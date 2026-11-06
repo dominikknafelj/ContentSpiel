@@ -47,20 +47,20 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     create_post(title: "Resume", content_type: "resume_entry", published: true)
 
     get "/cs-studio/posts", params: { scope: "drafts" }
-    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "5"
-    assert_select "label[for=posts-scope-live] span.font-cs-mono", text: "2"
-    assert_select "label[for=posts-scope-drafts] span.font-cs-mono", text: "2"
-    assert_select "label[for=posts-scope-scheduled] span.font-cs-mono", text: "1"
+    assert_select "label[for=posts-scope-all] span.text-label", text: "5"
+    assert_select "label[for=posts-scope-live] span.text-label", text: "2"
+    assert_select "label[for=posts-scope-drafts] span.text-label", text: "2"
+    assert_select "label[for=posts-scope-scheduled] span.text-label", text: "1"
     assert_select "input#posts-scope-drafts[checked]"
     assert_equal [ "Draft other", "Draft blog" ].sort, row_titles.sort
 
     get "/cs-studio/posts", params: { scope: "live", tag: "rails" }
     assert_equal [ "Live blog" ], row_titles
-    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "3"
-    assert_select "label[for=posts-scope-drafts] span.font-cs-mono", text: "1"
+    assert_select "label[for=posts-scope-all] span.text-label", text: "3"
+    assert_select "label[for=posts-scope-drafts] span.text-label", text: "1"
 
     get "/cs-studio/posts", params: { type: "resume_entry" }
-    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "1"
+    assert_select "label[for=posts-scope-all] span.text-label", text: "1"
   end
 
   test "the old status param still works, and scope wins when both are sent" do
@@ -154,7 +154,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     as_owner { Trash::Move.call(gone) }
     get "/cs-studio/posts"
     assert_equal [ "Kept" ], row_titles
-    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "1"
+    assert_select "label[for=posts-scope-all] span.text-label", text: "1"
     assert_not_includes response.body, "Gone"
     assert_includes response.body, "/cs-studio/posts/#{kept.id}"
   end
@@ -413,7 +413,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     end
     sign_in_as(scoped)
     get "/cs-studio/posts"
-    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "2"
+    assert_select "label[for=posts-scope-all] span.text-label", text: "2"
     assert_equal 2, row_titles.size
   end
 

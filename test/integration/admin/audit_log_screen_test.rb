@@ -102,7 +102,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
     assert_select "##{dom_id(created)} p", text: "You created “Hello world”"
     assert_select "##{dom_id(created)} p a[href='/cs-studio/posts/#{post.id}']", text: "Hello world"
-    assert_select "##{dom_id(created)} span.font-cs-mono", text: "post.created"
+    assert_select "##{dom_id(created)} span.text-label", text: "post.created"
     assert_select "##{dom_id(created)} .admin-channel-chip", text: "Admin"
     assert_select "##{dom_id(failed)} p", text: "Failed sign-in attempt"
     assert_select "##{dom_id(failed)} span.text-warn-ink", text: "session.failed"

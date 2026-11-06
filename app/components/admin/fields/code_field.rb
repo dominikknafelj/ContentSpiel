@@ -63,7 +63,7 @@ module Admin
         over? ? t(".over", **numbers, over: number(used - limit)) : t(".count", **numbers)
       end
 
-      def counter_class = [ "mt-1 text-right font-cs-mono text-xs", (over? ? "text-danger-ink" : "text-meta") ]
+      def counter_class = [ "mt-1 text-right text-xs", (over? ? "text-danger-ink" : "text-meta") ]
 
       # 1rem + 2px: the field's own padding above and below (`py-2`) and its border.
       def input_class

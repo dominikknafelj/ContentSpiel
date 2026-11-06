@@ -47,7 +47,7 @@
             <% others_lost.each do |entry| %>
               <li data-lost-address>
                 <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
-                <span class="font-cs-mono text-[12px]"><%= entry.path %></span>
+                <span class="text-small"><%= entry.path %></span>
                 <span>(<%= lost_languages(entry) %>)</span>
               </li>
             <% end %>
@@ -68,7 +68,7 @@
                 <% else %>
                   <%= link_to lost_title(entry), lost_url(entry), class: "underline hover:text-ink", data: { turbo_frame: "_top" } %>
                 <% end %>
-                <span class="font-cs-mono text-[12px]"><%= t(".moved_addresses.change", from: entry.path, to: entry.to) %></span>
+                <span class="text-small"><%= t(".moved_addresses.change", from: entry.path, to: entry.to) %></span>
                 <span>(<%= lost_languages(entry) %>)</span>
                 <% unless entry.redirects %><span><%= t(".moved_addresses.no_redirect") %></span><% end %>
               </li>

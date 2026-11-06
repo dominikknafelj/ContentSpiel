@@ -44,7 +44,7 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
     visit admin_audit_events_path
     await_admin_controllers
 
-    find("#audit_event_#{@recent.id} a.font-cs-mono").click
+    find("#audit_event_#{@recent.id} a.text-xs").click
     assert_selector "h1", text: "test.recent"
     assert_text "Older event"
     click_link "Older event"

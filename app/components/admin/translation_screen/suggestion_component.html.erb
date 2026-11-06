@@ -14,7 +14,7 @@
         data: { translation_suggestion: true, action: "input->admin--translation--translate#contain change->admin--translation--translate#contain focusout->admin--translation--translate#contain" } do %>
     <div class="flex items-baseline gap-3">
       <p class="<%= setup_label_class %>" data-suggestion-label><%= self.class::LABEL %></p>
-      <% if model_name %><p class="ml-auto font-cs-mono text-label text-meta" data-suggestion-model><%= model_name %></p><% end %>
+      <% if model_name %><p class="ml-auto text-label text-meta" data-suggestion-model><%= model_name %></p><% end %>
     </div>
     <% if current_text %>
       <p class="mt-1 whitespace-pre-line text-dim" data-suggestion-current>Current: <%= current_text %></p>

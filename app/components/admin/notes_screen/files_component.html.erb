@@ -18,7 +18,7 @@
           <span data-admin--notes--gif-target="icon" class="flex"><%= helpers.render "admin/shared/icon", name: :play, size: "size-3" %></span>
           <span data-admin--notes--gif-target="label"><%= t(".play") %></span>
         <% end %>
-        <span class="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[calc(100%-12px)] truncate font-cs-mono text-label text-dim"><%= t(".gif", name: name) %></span>
+        <span class="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[calc(100%-12px)] truncate text-label text-dim"><%= t(".gif", name: name) %></span>
       <% end %>
     <% elsif image?(attachment) %>
       <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "#{PICTURE_BOX_CLASS} focus-visible:outline-2 focus-visible:outline-accent",

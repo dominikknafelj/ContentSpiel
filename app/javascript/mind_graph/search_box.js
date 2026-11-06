@@ -80,7 +80,7 @@ export function attachSearch(field, list, { url, text, status, dotClasses }) {
         const words = element("span", "flex min-w-0 flex-col")
         words.append(element("span", "truncate", row.label))
         // A page's address under its title: two pages may share a title.
-        if (row.kind === "page" && row.path) words.append(element("span", "truncate font-cs-mono text-label text-meta", row.path))
+        if (row.kind === "page" && row.path) words.append(element("span", "truncate text-small text-meta", row.path))
         link.append(markOf(row), words)
         item.append(link)
         return item

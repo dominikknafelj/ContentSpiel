@@ -34,7 +34,7 @@ module Admin
         style = STYLES.fetch(@state)
         mark = style[:mark] && tag.span("", class: "inline-block shrink-0 #{style[:mark]}", aria: { hidden: true }, data: { translation_mark: @state })
         tag.span(safe_join([ @locale, mark || (" #{style[:glyph]}" if style[:glyph]) ].compact),
-          class: "admin-translation-chip inline-flex items-center gap-1 rounded-cs border px-1 font-cs-mono text-label uppercase #{style[:classes]}",
+          class: "admin-translation-chip inline-flex items-center gap-1 rounded-cs border px-1 text-label uppercase #{style[:classes]}",
           role: "img", title: tooltip,
           aria: { label: t(".aria_label.#{@state}", language: ::Locales.name(@locale, native: true)) },
           data: { locale: @locale, translation_state: @state })

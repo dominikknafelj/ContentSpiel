@@ -63,6 +63,7 @@
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
+  --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
   /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
      read faint); an explicit `font-*` class beside it still wins. */
@@ -683,7 +684,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-notes-marker {
   display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px;
   width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--cs-radius);
-  color: var(--cs-meta); font-family: var(--cs-mono); font-size: 11px; line-height: 1; white-space: nowrap;
+  color: var(--cs-meta); font-size: 11px; line-height: 1; white-space: nowrap;
   cursor: pointer; opacity: 0;
 }
 .admin-notes-marker:hover { background: var(--cs-sunken); color: var(--cs-ink); }

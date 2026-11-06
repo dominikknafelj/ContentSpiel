@@ -225,7 +225,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
-    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 font-cs-mono text-label text-meta", figure(node))
+    const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-label text-meta", figure(node))
     button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), trailing)
     item.append(button)
     rows.set(node.id, button)
@@ -251,7 +251,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     // what they see names it (WCAG 2.5.3, label in name).
     button.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "", words: pill.title }))
     button.style.paddingInlineStart = `${ROW_PADDING + PILL_INDENT}px`
-    button.append(element("span", "min-w-0 flex-1 truncate font-cs-mono text-label text-dim", pill.title))
+    button.append(element("span", "min-w-0 flex-1 truncate text-label text-dim", pill.title))
     item.append(button)
     rows.set(pill.id, button)
     return item

@@ -15,8 +15,8 @@
           </span>
           <% if group.description.present? %><span class="text-sm text-dim"><%= group.description %></span><% end %>
         </span>
-        <span class="font-cs-mono text-sm <%= count_class(members(group)) %>" data-column="members"><%= members(group) %><span class="sr-only"> <%= "member".pluralize(members(group)) %></span></span>
-        <span class="font-cs-mono text-sm <%= count_class(tokens(group)) %>" data-column="tokens"><%= tokens(group) %><span class="sr-only"> <%= "token".pluralize(tokens(group)) %></span></span>
+        <span class="text-sm <%= count_class(members(group)) %>" data-column="members"><%= members(group) %><span class="sr-only"> <%= "member".pluralize(members(group)) %></span></span>
+        <span class="text-sm <%= count_class(tokens(group)) %>" data-column="tokens"><%= tokens(group) %><span class="sr-only"> <%= "token".pluralize(tokens(group)) %></span></span>
         <span class="text-meta" aria-hidden="true">›</span>
       </li>
     <% end %>

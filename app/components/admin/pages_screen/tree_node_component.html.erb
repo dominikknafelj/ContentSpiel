@@ -58,12 +58,12 @@
       <% if translation_total(:outdated).positive? %>
         <%= tag.span "↻#{translation_total(:outdated)}", data: { translation_marker: "outdated" }, role: "img",
               title: translation_tooltip(:outdated), aria: { label: translation_label(:outdated) },
-              class: "shrink-0 font-cs-mono text-label text-warn-ink" %>
+              class: "shrink-0 text-label text-warn-ink" %>
       <% end %>
       <% if translation_total(:missing).positive? %>
         <%= tag.span "○#{translation_total(:missing)}", data: { translation_marker: "missing" }, role: "img",
               title: translation_tooltip(:missing), aria: { label: translation_label(:missing) },
-              class: "shrink-0 font-cs-mono text-label text-meta" %>
+              class: "shrink-0 text-label text-meta" %>
       <% end %>
 
       <%# What features register at `tree.row.markers`, after the translation
@@ -85,7 +85,7 @@
             collapsed row shows it at rest. %>
         <%= tag.span child_count, data: { child_count: true }, role: "img", aria: { label: pluralize(child_count, "subpage") },
               title: pluralize(child_count, "subpage"),
-              class: "sr-only shrink-0 font-cs-mono text-label text-meta group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only" %>
+              class: "sr-only shrink-0 text-label text-meta group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only" %>
       <% end %>
 
       <% if can_add_child? %>

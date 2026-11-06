@@ -1,7 +1,7 @@
 <%= tag.li class: "flex flex-col gap-1", data: { "admin--forms--builder-target": "choice", row: choice.row, key: choice.key.presence } do %>
   <% if (line = reference) %><p class="pl-7 text-[13px] text-meta"><%= line %></p><% end %>
   <div class="flex items-center gap-2">
-    <span class="w-5 shrink-0 text-right font-cs-mono text-label text-meta" aria-hidden="true" data-admin--forms--builder-target="choiceNumber"><%= number %></span>
+    <span class="w-5 shrink-0 text-right text-label text-meta" aria-hidden="true" data-admin--forms--builder-target="choiceNumber"><%= number %></span>
     <%= label_tag input_id, t(".number", number: number), class: "sr-only", data: { "admin--forms--builder-target": "choiceLabel" } %>
     <% if structure? %><%= hidden_field_tag name(:key), choice.key, id: nil %><% end %>
     <%= text_field_tag name(:label, locale), choice.label[locale], id: input_id, autocomplete: "off", class: "#{setup_input_class} !mt-0 min-w-0 flex-1",

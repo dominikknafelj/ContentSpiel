@@ -677,6 +677,6 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[role=group][class~='border-field-line'][class~='text-[13px]'] button[data-action='admin--mind-graph--graph#zoomIn'][class~='h-7']"
-    assert_select "[data-mind-graph-zoom][class~='text-label'][class~='font-cs-mono']"
+    assert_select "[data-mind-graph-zoom][class~='text-label']"
   end
 end

@@ -35,7 +35,7 @@ module Admin
 
       def call
         tag.span(@initials, aria: { hidden: true },
-          class: class_names("flex shrink-0 items-center justify-center rounded-full font-cs-mono font-medium uppercase leading-none", @size, @tone, @ring))
+          class: class_names("flex shrink-0 items-center justify-center rounded-full font-medium uppercase leading-none", @size, @tone, @ring))
       end
     end
   end

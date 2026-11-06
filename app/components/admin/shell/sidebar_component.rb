@@ -75,9 +75,9 @@ module Admin
       # "Sidebar badge"): accent means "unread and addressed to you" and
       # nothing else (notes spec §4.5). Trash's stays the plain mono number.
       def badge_class(entry)
-        return "ml-auto rounded-full bg-accent px-1.5 font-cs-mono text-label leading-4 text-on-accent" if entry[:path] == :admin_root_path
+        return "ml-auto rounded-full bg-accent px-1.5 text-label leading-4 text-on-accent" if entry[:path] == :admin_root_path
 
-        "ml-auto font-cs-mono text-label text-meta"
+        "ml-auto text-label text-meta"
       end
     end
   end
