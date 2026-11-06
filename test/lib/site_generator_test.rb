@@ -263,8 +263,8 @@ class SiteGeneratorTest < ActiveSupport::TestCase
     end
   end
 
-  test "the commands of later tasks say they are not available yet and end 1" do
-    %w[generate check upgrade dev-files dev].each do |command|
+  test "upgrade is not available yet and dev is not run inside the image: each says so and ends 1" do
+    %w[upgrade dev].each do |command|
       out, status = entrypoint(command)
       assert_equal 1, status.exitstatus, command
       assert_match(/not (yet available|run inside the image)/, out, command)

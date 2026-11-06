@@ -1,0 +1,86 @@
+# What `contentspiel dev` runs: this site on this machine, in development,
+# drawn by the folder theme/ as it is now. Written by ContentSpiel <%= version %>
+# (`contentspiel dev-files`) at every `contentspiel dev`, so a change made here
+# is lost at the next start: it is the pinned version's file, never the site's.
+#
+# Three services:
+# - web: the CMS at the pinned version, in development (templates are read
+#   again at each reload), with theme/ mounted where the site's Dockerfile
+#   puts it. Its first start makes the database and fills it with the
+#   development seed: the built-in groups, two accounts and sample pages.
+# - css: the stylesheet watch of the same image (`theme_css:watch`), which
+#   builds the public stylesheet for theme/ and again at each change. It
+#   writes into the volume `builds`, which web serves from.
+# - db: Postgres <%= postgres_version %>, its data in the volume `db`, reached
+#   by the site only.
+#
+# Only 127.0.0.1:3000 is published: the site is not reachable from another
+# machine. The containers run as the image's own user (uid 1000), which
+# reads theme/ and never writes it.
+#
+# CONTENTSPIEL_IMAGE replaces the image's name, as it does for the
+# contentspiel command; the version is always <%= version %>.
+#
+# `docker compose -f .contentspiel/compose.yml down -v`, from the site's
+# folder, removes the containers and the volumes: the database with them.
+name: <%= project %>
+
+services:
+<% %w[web css].each do |service| -%>
+  <%= service %>:
+    image: "<%= image %>"
+    environment:
+      RAILS_ENV: development
+      THEME_PATH: <%= theme_path %>
+      DATABASE_URL: postgres://contentspiel:contentspiel@db:5432/content_spiel_development
+<% if service == "web" -%>
+      # Rails listens on localhost alone by default; here that is the
+      # container's own, so it listens on every address of the container
+      # and the port below is published on 127.0.0.1 only.
+      BINDING: 0.0.0.0
+<% end -%>
+    volumes:
+      - ../theme:<%= theme_path %>:ro
+      - builds:/rails/app/assets/builds
+<% if service == "web" -%>
+      - storage:/rails/storage
+    # The image holds the production build of the assets, and with its
+    # manifest there Propshaft would serve those files and never the
+    # stylesheet the watch builds: an empty folder takes their place.
+    tmpfs:
+      - /rails/public/assets
+    # The image's entrypoint prepares the database (db:prepare: create,
+    # load the schema, seed) before `./bin/rails server`.
+    command: ["./bin/rails", "server"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+<% else -%>
+    command: ["./bin/rails", "theme_css:watch"]
+    # Tailwind's watcher ends when its input closes; this keeps it open.
+    stdin_open: true
+<% end -%>
+<% end -%>
+  db:
+    image: postgres:<%= postgres_version %>
+    environment:
+      POSTGRES_USER: contentspiel
+      POSTGRES_PASSWORD: contentspiel
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "contentspiel"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  # Named with the version: a new volume is filled from the image it is
+  # first mounted from, so a site moved to another version starts from that
+  # version's build of the admin's stylesheet and not the last one's.
+  builds:
+    name: <%= project %>_builds_<%= version.tr(".", "_") %>
+  storage:
+  db:

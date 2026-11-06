@@ -63,8 +63,12 @@ module ContentSpiel
     # is required by path by bin/contentspiel BEFORE the application starts
     # (it refuses a bad name without starting it), so it is not the
     # autoloader's; lib/site_template holds its `.tt` files and no Ruby.
+    # The same holds for what the other site commands require by path:
+    # theme_generators.rb (`generate`) and dev_files.rb (`dev-files`).
     Rails.autoloaders.main.ignore(
       Rails.root.join("lib/content_spiel/site_generator.rb"),
+      Rails.root.join("lib/content_spiel/theme_generators.rb"),
+      Rails.root.join("lib/content_spiel/dev_files.rb"),
       Rails.root.join("lib/site_template")
     )
 

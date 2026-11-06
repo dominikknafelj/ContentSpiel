@@ -54,9 +54,32 @@ git commit -m "A new ContentSpiel site"
 contentspiel dev
 ```
 
-This starts the site with its theme and a database of its own, in development. Open http://localhost:3000. The first visit asks you to finish the setup; follow what the page and the terminal say. Edit files in `theme/` and reload the page to see the change. Stop it with Ctrl-C.
+This starts three containers from the site's folder: the CMS <%= version %> in development with `theme/` mounted, the stylesheet watch, and a database of its own (Postgres 17). The first start makes the database and fills it with sample pages and posts, which takes a minute; it is ready when the terminal shows `Listening on http://0.0.0.0:3000`. Leave the terminal open: Ctrl-C stops it all.
 
-You should see: the site, drawn by the theme in `theme/`.
+Open http://localhost:3000.
+
+You should see: the sample home page, drawn by the theme in `theme/`.
+
+To use CS Studio, the CMS's editor, open http://localhost:3000/cs-studio/sign-in and sign in as `admin@example.com` with the password `password12345`. This account and the sample content exist on this machine only: they are made for development and never reach the server, where the setup wizard makes the first account (step 4.2).
+
+Edit a file in `theme/` and reload the page to see the change. A change to `theme/assets/stylesheets/theme.css` is built by the watch within a few seconds; a change to `theme/theme.yml` needs a new start (Ctrl-C, then `contentspiel dev`).
+
+The database is kept between starts. To start again from an empty one, stop the site, then run `docker compose -f .contentspiel/compose.yml down -v` in this folder.
+
+If the terminal says `THEME_PATH: ... cannot be read`: the containers read `theme/` as their own user (uid 1000), not as you, so every file in it must be readable by everyone and every folder open to everyone (on Linux a strict umask makes them yours alone; Docker Desktop on a Mac does not ask this). Run `chmod -R a+rX theme` and start again.
+
+If port 3000 is taken by another program, stop that program first: the site is always at port 3000.
+
+### Add a section style or a page template
+
+```sh
+contentspiel generate section_style banner "Banner"
+contentspiel generate page_template project "Project"
+```
+
+The first adds a style an editor can pick for a section: an entry in `theme/theme.yml` and the rule `.content-section--style-banner` at the end of `theme/assets/stylesheets/theme.css`, to fill in. The second adds a template an editor can pick for a page: an entry in `theme/theme.yml` and `theme/views/pages/templates/_project.html.erb`, a copy of the Standard template to change. A name is lowercase letters, digits and underscores, a letter first; the label in quotes is what CS Studio shows.
+
+You should see: `Added the section style banner: theme/theme.yml and theme/assets/stylesheets/theme.css.` (or the page template's files), and the next step. Then restart `contentspiel dev`, since `theme/theme.yml` changed.
 
 ## Step 3. Check the theme
 
@@ -66,7 +89,7 @@ contentspiel check
 
 You should see: one line that ends in `no problems.`
 
-If it lists problems instead, each line names a file in `theme/`, says what is wrong and what to do. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
+If it lists problems instead, each line names a file in `theme/`, says what is wrong and what to do, and the last line says how many. Fix them and run it again. A theme with problems does not build: the image build runs the same check.
 
 ## Step 4. Deploy
 
