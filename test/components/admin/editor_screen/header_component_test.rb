@@ -448,11 +448,11 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     def call = tag.b("actions", data: { slot_probe: "actions" })
   end
 
-  test "a live record's Discard changes… is a ghost beside the one primary, and View on site is a plain link" do
+  test "a live record's Discard changes… is a tertiary beside the one primary, and View on site is a plain link" do
     record = create_page(title: "About", published: true)
     render_header(record)
 
-    assert_selector "header button.text-dim", text: "Discard changes…", visible: :all
+    assert_selector "header button.text-accent", text: "Discard changes…", visible: :all
     assert_no_selector "header button[class~='border-field-line']", text: "Discard changes…", visible: :all
     link = page.find("a[href='/about']", text: "View on site")
     assert_includes link["class"].split, "text-accent"

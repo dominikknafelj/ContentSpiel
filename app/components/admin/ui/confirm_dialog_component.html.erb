@@ -7,7 +7,7 @@
   <% end %>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: cancel_label, variant: :ghost, type: "submit", autofocus: destructive) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: cancel_label, variant: :tertiary, type: "submit", autofocus: destructive) %>
     <% end %>
     <%= confirm_action %>
   <% end %>

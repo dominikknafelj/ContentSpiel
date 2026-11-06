@@ -15,18 +15,21 @@ module SetupHelper
     "block text-label text-meta"
   end
 
+  # The wizard's buttons are links drawn as the component's buttons: the same
+  # strings (`Admin::Ui::ButtonComponent.classes`), whose common classes carry
+  # the `inline-flex` a link needs to be one.
   def setup_primary_button_class
-    "inline-block cursor-pointer rounded-cs bg-accent px-4 py-2 font-semibold text-on-accent hover:bg-accent-hover"
+    Admin::Ui::ButtonComponent.classes(:primary)
   end
 
   def setup_secondary_link_class
-    "inline-block cursor-pointer rounded-cs border border-field-line px-4 py-2 text-ink hover:border-ink"
+    Admin::Ui::ButtonComponent.classes(:secondary)
   end
 
-  # "Skip" on an optional step: no border, no fill, so Continue stays the one
-  # emphasised action (same look as Admin::Ui::ButtonComponent's :ghost).
-  def setup_ghost_link_class
-    "inline-flex cursor-pointer items-center justify-center rounded-cs px-4 py-2 font-semibold text-dim hover:bg-sunken hover:text-ink"
+  # "Skip" on an optional step: accent words, no fill, so Continue stays the
+  # one emphasised action (the component's :tertiary).
+  def setup_tertiary_link_class
+    Admin::Ui::ButtonComponent.classes(:tertiary)
   end
 
   # The wizard's step list is "done" for every step before the current one:

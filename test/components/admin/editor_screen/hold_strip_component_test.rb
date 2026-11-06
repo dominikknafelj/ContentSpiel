@@ -31,18 +31,18 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=alert]"
   end
 
-  test "Take over and Copy my text are the outlined secondary small button, Discard and Remove the small ghost one (handoff 2, 14; the design system's default button)" do
+  test "Take over and Copy my text are the tinted secondary small button, Discard and Remove the small tertiary one (handoff 2, 14; the design system's default button)" do
     strip
-    assert_selector "button.border.border-field-line.bg-surface.text-ink.px-2.py-0\\.5", text: "Take over"
+    assert_selector "button.bg-accent-tint.text-accent.px-2.py-0\\.5", text: "Take over"
     assert_no_selector "button.bg-accent"
 
     strip(kind: :lost)
-    assert_selector "button.border-field-line.bg-surface", text: "Copy my text"
-    assert_selector "button.text-dim", text: "Discard"
+    assert_selector "button.bg-accent-tint", text: "Copy my text"
+    assert_selector "button.text-accent", text: "Discard"
     assert_no_selector "button.bg-accent"
 
     strip(kind: :deleted, hold: nil)
-    assert_selector "button.text-dim", text: "Remove"
+    assert_selector "button.text-accent", text: "Remove"
   end
 
   test "viewer says whose hold it is: the viewer's own is the own-tab strip without being told" do

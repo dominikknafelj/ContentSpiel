@@ -118,7 +118,7 @@
       <% end %>
       <% dialog.with_footer do %>
         <%= tag.form method: "dialog" do %>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.cancel"), variant: :ghost, type: "submit") %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.cancel"), variant: :tertiary, type: "submit") %>
         <% end %>
         <%# Disabled until a target is chosen (`admin--tags--dialogs#targetChanged`). %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".merge_dialog.submit"), variant: :primary, type: "submit", form: "merge-tag-form", disabled: true,

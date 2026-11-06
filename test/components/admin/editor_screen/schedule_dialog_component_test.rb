@@ -26,7 +26,7 @@ class Admin::EditorScreen::ScheduleDialogComponentTest < ViewComponent::TestCase
     assert_selector "form[action='/cs-studio/pages/#{page_record.id}/schedule'][data-turbo-frame='_top'][novalidate]", visible: :all
   end
 
-  test "a scheduled record: the field shows its schedule in site time, and Remove schedule is a ghost submit at the left" do
+  test "a scheduled record: the field shows its schedule in site time, and Remove schedule is a tertiary submit at the left" do
     site_settings(:default).update!(time_zone: "Berlin")
     post_record = create_post(title: "Later", published: false)
     as_owner { Posts::Save.call(post_record, attributes: { published_at: Time.utc(2030, 1, 15, 8, 30) }) }

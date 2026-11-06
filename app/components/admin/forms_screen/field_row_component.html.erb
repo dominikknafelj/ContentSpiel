@@ -7,9 +7,9 @@
     <span class="text-xs text-meta" data-admin--forms--builder-target="requiredMark" <%= "hidden" unless row.required %>><%= t(".required") %></span>
     <% if structure? %>
       <span class="ml-auto flex items-center gap-1">
-        <%= render Admin::Ui::ButtonComponent.new(label: "↑", variant: :ghost, size: BUTTON_SIZE, disabled: first?, aria: { label: t(".up", label: spoken_label) },
+        <%= render Admin::Ui::ButtonComponent.new(label: "↑", variant: :tertiary, size: BUTTON_SIZE, disabled: first?, aria: { label: t(".up", label: spoken_label) },
               data: { action: "admin--forms--builder#up", "admin--forms--builder-target": "up" }) %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "↓", variant: :ghost, size: BUTTON_SIZE, disabled: last?, aria: { label: t(".down", label: spoken_label) },
+        <%= render Admin::Ui::ButtonComponent.new(label: "↓", variant: :tertiary, size: BUTTON_SIZE, disabled: last?, aria: { label: t(".down", label: spoken_label) },
               data: { action: "admin--forms--builder#down", "admin--forms--builder-target": "down" }) %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: BUTTON_SIZE, aria: { label: t(".remove_label", label: spoken_label) },
               data: { action: "admin--forms--builder#remove" }) %>

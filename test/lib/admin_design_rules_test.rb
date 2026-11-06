@@ -380,4 +380,75 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/@container admin-dashboard \(min-width: 60rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/m, css)
     assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
   end
+
+  # E4 (Stage 1, Task 5): the buttons are tokens only. A Tailwind palette
+  # step (`bg-violet-600`, `text-gray-500`), or white and black as a utility,
+  # is a second source of colour that does not switch with the theme.
+  PALETTE = /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|divide|decoration|accent|caret|shadow|placeholder)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|[1-9]00|950)(?![\w-])|(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke)-(?:white|black)(?![\w-])/
+
+  def class_offences(pattern, allowed: {})
+    TYPE_VOICE_SOURCES.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if allowed.key?(relative)
+
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{relative}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
+      end
+    end
+  end
+
+  test "no Tailwind palette colour or white/black utility in CS Studio" do
+    assert_empty class_offences(PALETTE)
+  end
+
+  test "the palette pattern matches a palette step and white, and no token" do
+    [ "bg-violet-600", "text-gray-500", "border-rose-950", "text-white", "hover:bg-black" ].each { |sample| assert_match PALETTE, sample }
+    [ "bg-accent", "text-ink", "bg-white-ish", "text-on-accent", "bg-cat-1" ].each { |sample| assert_no_match PALETTE, sample }
+  end
+
+  ACCENT_FILL = /(?<![\w-])bg-accent(?![\w-])/
+  ACCENT_FILL_ALLOWED = {
+    "app/components/admin/ui/button_component.rb" => "the buttons",
+    "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
+    "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
+    "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the unread bubble",
+    "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
+    "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
+    "app/javascript/notes/merge.js" => "the NEW divider",
+    "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
+    "app/javascript/media/upload_tiles.js" => "a progress bar",
+    "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
+    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser"
+  }.freeze
+
+  test "only a button, the checkbox, a count pill, the unread bubble and a progress bar carry the accent fill" do
+    assert_empty class_offences(ACCENT_FILL, allowed: ACCENT_FILL_ALLOWED)
+  end
+
+  test "every accent-fill allowance is still used" do
+    ACCENT_FILL_ALLOWED.each_key do |relative|
+      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} no longer carries bg-accent: drop it from ACCENT_FILL_ALLOWED"
+    end
+  end
+
+  # The tinted fill with accent words is the secondary button's look; a thing
+  # that is not pressable and wears it reads as a button.
+  TINT_PAIR = /(?=.*(?<![\w-])bg-accent-tint(?![\w-]))(?=.*(?<![\w-])text-accent(?![\w-]))/
+  TINT_PAIR_ALLOWED = {
+    "app/components/admin/ui/button_component.rb" => "the secondary button",
+    "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
+    "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
+    "app/components/admin/notes_screen/body_component.rb" => "your own mention"
+  }.freeze
+
+  test "the tint with accent words is a secondary button's, a chip's or your own mention, and nothing else" do
+    assert_empty class_offences(TINT_PAIR, allowed: TINT_PAIR_ALLOWED)
+  end
+
+  test "every tint-pair allowance is still used" do
+    TINT_PAIR_ALLOWED.each_key do |relative|
+      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} no longer wears the pair: drop it from TINT_PAIR_ALLOWED"
+    end
+  end
 end

@@ -97,7 +97,7 @@ module Admin
 
       def frame_form = { data: { turbo_frame: "notes" } }
 
-      def action_class(variant = :ghost) = "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
+      def action_class(variant = :tertiary) = "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
 
       def key = "thread-#{thread.id}"
 

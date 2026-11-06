@@ -103,7 +103,7 @@
     <%# Every panel can be closed, an unavailable block's too: `admin--editor--section#close`,
         like Escape and a second press on the tile. %>
     <% if panel? %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".close"), variant: :ghost, size: :small, data: { action: "admin--editor--section#close" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".close"), variant: :tertiary, size: :small, data: { action: "admin--editor--section#close" }) %>
     <% end %>
   </div>
 

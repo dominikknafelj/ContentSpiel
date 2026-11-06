@@ -7,7 +7,7 @@
   <%= render Admin::Ui::DialogComponent.new(id: IMAGE, title: "Image", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Remove image", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text--dialog#remove", "admin--rich-text--dialog-target": "imageRemove" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, data: { action: "admin--rich-text--dialog#cancel" }) %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Insert image", type: "submit", form: "rich-text-image-form", data: { "admin--rich-text--dialog-target": "imageSubmit" }) %>
     <% end %>
     <form id="rich-text-image-form" class="flex flex-col gap-4" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="image">
@@ -27,7 +27,7 @@
 
   <%= render Admin::Ui::DialogComponent.new(id: YOUTUBE, title: "YouTube video", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, data: { action: "admin--rich-text--dialog#cancel" }) %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Insert video", type: "submit", form: "rich-text-youtube-form") %>
     <% end %>
     <form id="rich-text-youtube-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="youtube">
@@ -43,7 +43,7 @@
   <%= render Admin::Ui::DialogComponent.new(id: PAGE, title: "Page link", width: :form) do |dialog| %>
     <% dialog.with_footer do %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Remove link", variant: :danger_text, class: "mr-auto", hidden: true, data: { action: "admin--rich-text--dialog#remove", "admin--rich-text--dialog-target": "pageRemove" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--rich-text--dialog#cancel" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, data: { action: "admin--rich-text--dialog#cancel" }) %>
     <% end %>
     <form id="rich-text-page-form" class="flex flex-col gap-2" novalidate data-action="submit->admin--rich-text--dialog#submit" data-kind="page">
       <label class="<%= setup_label_class %>" for="rich-text-page-search">Search pages and posts</label>

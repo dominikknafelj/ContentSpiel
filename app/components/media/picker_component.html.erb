@@ -41,7 +41,7 @@
       <%# What is chosen, said in words and announced as it changes. %>
       <p class="text-sm text-meta" role="status" aria-live="polite" data-admin--media--select-target="status">No image selected</p>
       <div class="flex items-center gap-2">
-        <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "button", data: { action: "admin--media--picker#dismiss" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, type: "button", data: { action: "admin--media--picker#dismiss" }) %>
         <%= render Admin::Ui::ButtonComponent.new(label: "Use image", variant: :primary, type: "button", disabled: true,
               data: { "admin--media--select-target": "use", action: "admin--media--select#confirm" }) %>
       </div>

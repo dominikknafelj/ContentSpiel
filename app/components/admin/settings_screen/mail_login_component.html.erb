@@ -41,7 +41,7 @@
       <div class="flex flex-wrap items-center gap-2">
         <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :primary, type: "submit", form: LOGIN_FORM, data: LOCK) %>
         <% if login_set? %>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, data: { action: "admin--settings--mail#cancel" }) %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, data: { action: "admin--settings--mail#cancel" }) %>
         <% end %>
       </div>
     </div>

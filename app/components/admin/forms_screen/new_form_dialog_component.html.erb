@@ -46,7 +46,7 @@
     <%= fields %>
     <% dialog.with_footer do %>
       <%= tag.form method: "dialog" do %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :ghost, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, type: "submit") %>
       <% end %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit", form: FORM_ID) %>
     <% end %>

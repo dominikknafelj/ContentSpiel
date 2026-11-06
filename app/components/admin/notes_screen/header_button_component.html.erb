@@ -8,7 +8,7 @@
     id `notes-open` is this button's alone. %>
 <% count = open_notes %>
 <%= tag.button type: "button", id: "notes-open",
-      class: "#{notes_button_class} items-center gap-2 focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-ink aria-pressed:bg-sunken",
+      class: "#{notes_button_class} items-center gap-2 aria-pressed:border-ink aria-pressed:bg-sunken",
       aria: { controls: "notes-drawer", expanded: "false", pressed: "false", label: t(".notes_label", count: count) },
       data: { "admin--notes--drawer-target": "opener", action: "admin--notes--drawer#toggle" } do %>
   <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-4" %>

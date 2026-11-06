@@ -25,7 +25,7 @@
             <%= render Admin::Ui::FieldComponent.new(field: subfield, form_name: row_form_name(index), value: subfield_value(row_value, subfield), original: subfield_original(index, subfield), locale: locale) %>
           <% end %>
         </div>
-        <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--editor--groups#remove" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :tertiary, type: "button", "aria-label": remove_label, data: { action: "click->admin--editor--groups#remove" }) %>
       </div>
     <% end %>
   </div>
@@ -38,7 +38,7 @@
           <%= render Admin::Ui::FieldComponent.new(field: subfield, form_name: row_form_name("__INDEX__"), value: nil, locale: locale) %>
         <% end %>
       </div>
-      <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :ghost, type: "button", "aria-label": remove_label, data: { action: "click->admin--editor--groups#remove" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "×", variant: :tertiary, type: "button", "aria-label": remove_label, data: { action: "click->admin--editor--groups#remove" }) %>
     </div>
   </template>
 
