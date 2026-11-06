@@ -31,7 +31,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{about.id}"
     await_admin_controllers
 
-    find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
+    find("summary", text: "SEO · Meta title, meta description").click
     assert_text "0 / 60"
     fill_in "Meta title", with: "x" * 70
 
@@ -46,7 +46,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{about.id}"
     await_admin_controllers
 
-    find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
+    find("summary", text: "SEO · Meta title, meta description").click
     announcement = "[data-admin--ui--char-count-target=announcement]"
     assert_no_selector "[data-admin--ui--char-count-target=output][aria-live]", visible: :all
     fill_in "Meta title", with: "x" * 59

@@ -19,7 +19,7 @@ class Posts::DetailComponentTest < ActiveSupport::TestCase
   # The tags are one sentence, not a list (plan ruling 3): a mono label, then the
   # names exactly as stored, joined by commas, in the small sans. No transform on
   # the names, no links.
-  test "a post's tags are one line: a Tagged label, then the names as stored, joined by commas, in the small sans" do
+  test "a post's tags are one line: a mono Tagged label, then the names as stored, joined by commas, in the small sans" do
     post = Post.create!(content_type: :blog, title: "Tagged", published_at: Time.zone.local(2026, 9, 12),
       body: rich_doc("Body text"))
     post.tags << Tag.create!(name: "rails")
@@ -29,7 +29,7 @@ class Posts::DetailComponentTest < ActiveSupport::TestCase
 
     assert_selector "p.post-tags"
     assert_equal "Tagged rails, iOS", page.find("p.post-tags").text.squish
-    assert_selector "p.post-tags span.text-label", text: "Tagged", exact_text: true
+    assert_selector "p.post-tags span.font-cs-mono", text: "Tagged", exact_text: true
     assert_selector "p.post-tags span.font-cs.text-small.text-meta", text: "rails, iOS", exact_text: true
     assert_no_selector "p.post-tags .uppercase.font-cs"
     assert_no_selector "p.post-tags", text: "RAILS"

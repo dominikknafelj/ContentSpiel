@@ -200,15 +200,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # One type voice: a label is the sans at `text-label` (12px, weight 500), in
   # sentence case. Capitals with letterspacing is the mono-label voice that
   # this replaces. A language code (`uppercase` alone) is its own spelling and
-  # is not tracked. The scan reads the public templates too, which draw the
-  # same labels and sit outside CS Studio's source directories.
+  # is not tracked.
   UPPER_TRACKED = /(?<![\w-])uppercase(?![\w-])[^"'`]*(?<![\w-])tracking-[\w\[\].-]+|(?<![\w-])tracking-[\w\[\].-]+[^"'`]*(?<![\w-])uppercase(?![\w-])/
   UPPER_TRACKED_ALLOWED = {
     "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
     "CONTENT·SPIEL" => "the product layout's wordmark",
     "Content·Spiel</span>" => "the setup layout's wordmark"
   }.freeze
-  TYPE_VOICE_SOURCES = Dir[Rails.root.join("app/{views,components,javascript,helpers}/**/*.{erb,rb,js}")]
+  # CS Studio's sources, the setup pages and the three layouts around them.
+  # The public site is the theme's and out of scope: its pages keep their look.
+  TYPE_VOICE_SOURCES = (ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")]).concat(
+    Dir[Rails.root.join("app/helpers/setup_helper.rb")],
+    Dir[Rails.root.join("app/views/setup/**/*.erb")],
+    Dir[Rails.root.join("app/views/layouts/{product,setup,admin}.html.erb")]
+  ).uniq
 
   test "one type voice: no capitals with tracking in the sources but the wordmark" do
     offences = TYPE_VOICE_SOURCES.flat_map do |path|
@@ -233,7 +238,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "the stylesheets set no label in capitals" do
     %w[content-spiel.tailwind.css admin-rich-text.css].each do |name|
-      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+      # The form-send pages are the public site's: their rules keep their look.
+      css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "").lines.grep_v(/\A\.form-send-page/).join
       assert_no_match(/text-transform:\s*uppercase/, css, name)
     end
   end

@@ -3,7 +3,7 @@
 <% links = language_links(@post || @page) %>
 <% if links.size > 1 %>
   <% if links.size <= 3 %>
-    <ul aria-label="Language" class="flex items-center gap-1 font-cs-mono text-label uppercase">
+    <ul aria-label="Language" class="flex items-center gap-1 font-cs-mono text-label uppercase tracking-mono">
       <% links.each do |link| %>
         <li>
           <%= link_to link.code, link.path, hreflang: link.code, lang: link.code,
@@ -13,7 +13,7 @@
       <% end %>
     </ul>
   <% else %>
-    <details class="relative font-cs-mono text-label uppercase">
+    <details class="relative font-cs-mono text-label uppercase tracking-mono">
       <summary class="cursor-pointer text-dim hover:text-ink"><%= I18n.locale %></summary>
       <ul aria-label="Language" class="absolute right-0 z-10 mt-2 rounded-cs border border-line bg-surface p-2 shadow-menu">
         <% links.each do |link| %>
