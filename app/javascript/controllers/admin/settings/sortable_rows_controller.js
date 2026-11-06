@@ -37,9 +37,10 @@ export default class extends Controller {
   connect() {
     this.element.dataset.sortable = "pending"
     // `import()` here and not `editor/drag`: a module folder serves one topic.
+    const token = this.loadToken = {}
     import("sortablejs").then(({ default: Sortable }) => {
-      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
-      if (!this.element.isConnected || this.sortable) return
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
 
       this.Sortable = Sortable
       this.makeSortable()
@@ -66,6 +67,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.loadToken = null
     this.sortable?.destroy()
     this.sortable = null
     delete this.element.dataset.sortable

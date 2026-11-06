@@ -10,8 +10,13 @@
 // element in `connect` and `"ready"` once its Sortables exist (what
 // `await_sortables` in the browser tests waits on), and makes none when its
 // element left the document before the import resolved.
+//
+// `window.contentSpielSortableLoader` is the one test seam: a function
+// returning the module's promise, set only by a browser test that must settle
+// the import itself.
 export function loadSortable() {
-  return import("sortablejs").then((module) => module.default)
+  const load = window.contentSpielSortableLoader || (() => import("sortablejs"))
+  return load().then((module) => module.default)
 }
 
 // `put` is what the container takes from another one (`true` for the list,

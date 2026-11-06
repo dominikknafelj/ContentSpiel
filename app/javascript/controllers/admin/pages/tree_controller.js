@@ -55,9 +55,10 @@ export default class extends Controller {
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     this.element.dataset.sortable = "pending"
     // `import()` here and not `editor/drag`: a module folder serves one topic.
+    const token = this.loadToken = {}
     import("sortablejs").then(({ default: Sortable }) => {
-      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
-      if (!this.element.isConnected || this.sortables) return
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
 
       this.sortables = this.listTargets.map((list) =>
         Sortable.create(list, {
@@ -92,6 +93,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.loadToken = null
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = null

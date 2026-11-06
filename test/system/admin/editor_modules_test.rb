@@ -133,19 +133,22 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
   test "a controller disconnected before SortableJS arrives creates no Sortable and throws nothing" do
     result = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
-      import("sortablejs").then(async ({ default: Sortable }) => {
+      import("sortablejs").then(async (module) => {
+        const Sortable = module.default
+        let arrive
+        window.contentSpielSortableLoader = () => new Promise((resolve) => { arrive = () => resolve(module) })
         const section = document.createElement("section")
         section.setAttribute("data-controller", "admin--editor--blocks")
         section.innerHTML = '<ul data-admin--editor--blocks-target="list"></ul>'
         document.body.append(section)
         const list = section.querySelector("ul")
         // Stimulus connects in a mutation observer's microtask, and `connect` marks the element pending.
-        let turns = 0
-        while (section.dataset.sortable !== "pending" && turns++ < 1000) await null
-        const seenPending = section.dataset.sortable === "pending"
+        while (section.dataset.sortable !== "pending") await new Promise((resolve) => setTimeout(resolve, 5))
         section.remove()
-        await new Promise((resolve) => setTimeout(resolve, 300))
-        done({ seenPending, sortable: Sortable.get(list) ? "made" : "none", mark: section.dataset.sortable || null })
+        delete window.contentSpielSortableLoader
+        arrive()
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        done({ seenPending: true, sortable: Sortable.get(list) ? "made" : "none", mark: section.dataset.sortable || null })
       }).catch((error) => done({ error: String(error) }))
     JS
 

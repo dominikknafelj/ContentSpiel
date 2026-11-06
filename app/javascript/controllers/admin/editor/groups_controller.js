@@ -20,9 +20,10 @@ export default class extends Controller {
 
   connect() {
     this.element.dataset.sortable = "pending"
+    const token = this.loadToken = {}
     loadSortable().then((Sortable) => {
-      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
-      if (!this.element.isConnected || this.sortable) return
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
 
       this.sortable = Sortable.create(this.listTarget, {
         // Only the ⠿ handle starts a drag -- the row's own inputs stay
@@ -36,6 +37,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.loadToken = null
     this.sortable?.destroy()
     this.sortable = null
     delete this.element.dataset.sortable

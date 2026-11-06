@@ -56,9 +56,10 @@ export default class extends Controller {
     this.moveStateObserver.observe(this.listTarget, { childList: true })
     this.refreshMoveState()
     this.element.dataset.sortable = "pending"
+    const token = this.loadToken = {}
     this.sortableLoaded = loadSortable().then((Sortable) => {
-      // Gone before SortableJS arrived: nothing to make, nothing to destroy.
-      if (!this.element.isConnected || this.sortable) return
+      // Disconnected (or connected again) before SortableJS arrived: nothing to make.
+      if (this.loadToken !== token) return
 
       this.Sortable = Sortable
       this.sortable = Sortable.create(this.listTarget, {
@@ -135,6 +136,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.loadToken = null
     this.writes.stop()
     this.moveStateObserver.disconnect()
     this.dragging = false
