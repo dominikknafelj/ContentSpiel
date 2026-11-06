@@ -24,11 +24,18 @@ class AdminContrastTest < ActiveSupport::TestCase
       .transform_values { |block| block.scan(/(--cs-[\w-]+):\s*([^;]+);/).to_h.transform_values(&:strip) }
   end
 
+  # The `[data-surface="plain"]` block as { "--cs-name" => "value" }: the
+  # accent family re-valued for a visitor's page, merged over each scheme.
+  def plain_surface
+    css = STYLESHEET.read.gsub(%r{/\*.*?\*/}m, "")
+    css[/\[data-surface="plain"\]\s*\{(.*?)\}/m, 1].to_s.scan(/(--cs-[\w-]+):\s*([^;]+);/).to_h.transform_values(&:strip)
+  end
+
   # Each scheme's name and a lambda: a token's colour, a translucent one
   # painted over the token named `under`.
   def each_scheme
     schemes.each do |scheme, tokens|
-      yield scheme, ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }
+      yield scheme, ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }, tokens
     end
   end
 
@@ -171,7 +178,14 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_match(/\[aria-invalid="true"\] \{ border-color: var\(--cs-danger\); \}/, css)
     assert_match(/border: 1px solid var\(--cs-field-line\)[^}]*background: var\(--cs-surface\)/m, css)
 
-    each_scheme do |scheme, colour|
+    plain = plain_surface
+    each_scheme do |scheme, colour, tokens|
+      tokens = tokens.merge(plain)
+      colour = ->(name, under: nil) { resolve_colour(tokens, name, under: under && resolve_colour(tokens, under)) }
+      assert_equal resolve_colour(tokens, "--cs-ink"), colour.("--cs-accent"), "the plain accent is the scheme's ink (#{scheme})"
+      assert_equal resolve_colour(tokens, "--cs-sunken"), colour.("--cs-accent-tint"), "the plain accent tint is the scheme's sunken (#{scheme})"
+      %w[--cs-paper --cs-surface].each { |ground| assert_ratio(4.5, colour.("--cs-accent"), colour.(ground), "the plain accent on #{ground} (#{scheme})") }
+      assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent"), "the plain primary's words on its fill (#{scheme})")
       %w[--cs-ink --cs-meta --cs-danger-ink --cs-accent].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-paper"), "#{ink} on the plain page (#{scheme})") }
       assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-surface"), "an answer on its control's fill (#{scheme})")
       %w[--cs-paper --cs-surface].each do |ground|
@@ -181,6 +195,10 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(4.5, colour.("--cs-danger-ink"), colour.("--cs-danger-tint"), "the error summary's words on its tint (#{scheme})")
       assert_ratio(4.5, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "the thank-you's words on its tint (#{scheme})")
     end
+  end
+
+  test "the plain surface re-values every accent token and nothing else" do
+    assert_equal %w[--cs-accent --cs-accent-hover --cs-accent-tint --cs-on-accent], plain_surface.keys.sort
   end
 
   test "the measuring can fail: the grouping line is no outline, a translucent colour needs a ground, and an unread notation is refused" do

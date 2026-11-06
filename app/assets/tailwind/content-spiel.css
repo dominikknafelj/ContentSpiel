@@ -163,6 +163,17 @@
   --cs-shadow-stuck: 0 -6px 16px rgba(0,0,0,0.35);
 }
 
+/* A visitor's page carries no CMS colour: the form-send pages share this
+   stylesheet (there is no second one), so under `data-surface="plain"` the
+   accent family is re-valued to ink on paper in both schemes, with var()
+   only. After both theme blocks, so it wins in both. */
+[data-surface="plain"] {
+  --cs-accent: var(--cs-ink);
+  --cs-accent-hover: var(--cs-ink);
+  --cs-accent-tint: var(--cs-sunken);
+  --cs-on-accent: var(--cs-paper);
+}
+
 :root {
   --cs-font: "Archivo", system-ui, sans-serif;
   --cs-mono: "IBM Plex Mono", ui-monospace, monospace;
