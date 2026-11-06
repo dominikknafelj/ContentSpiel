@@ -152,7 +152,7 @@ class Admin::SectionsRemovingSystemTest < Admin::SectionsSystemTestCase
     find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-expanded]", text: "Section").click
 
     assert_no_selector "#section-#{@section.id}-lanes"
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks"
+    assert_selector "#section-#{@section.id}-summary", text: "2 blocks"
   end
 
   # Carried from the lane picker's review. The form of a block another tab
@@ -175,7 +175,7 @@ class Admin::SectionsRemovingSystemTest < Admin::SectionsSystemTestCase
 
     assert_selector "#content-blocks-alert", text: "isn't a column of this section"
     assert_selector "#{panel(far)}[data-mark='kept']", text: "Image · column 2"
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 3 blocks", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "3 blocks", exact_text: true
     assert_selector "#{face(far)}[aria-expanded='true']"
     assert_eventually(message: "the focus is not on the last lane's +") { focus_is_on("#block-picker-#{@section.id}-2 button[aria-haspopup=menu]") }
   end
@@ -186,7 +186,7 @@ class Admin::SectionsRemovingSystemTest < Admin::SectionsSystemTestCase
     within(tile(@section)) { press "Section" }
 
     assert_no_selector "#section-#{@section.id}-lanes"
-    assert_selector "#{tile(@section)} > div:first-child", text: /Section\s·\s2 columns · 2 blocks/
+    assert_selector "#{tile(@section)} > div:first-child", text: /Section\s+2 columns.*2 blocks/m
 
     within(tile(@section)) { press "Section" }
 

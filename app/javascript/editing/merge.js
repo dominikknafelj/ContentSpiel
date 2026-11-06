@@ -70,7 +70,8 @@
 // back around a merge (`withState`): which cards are collapsed, which panel
 // of a section is open (a section reads that from its panels' `hidden`, so
 // the panel's `hidden` is what is restored, and its tile's `aria-expanded`),
-// and where the focus is. A CLEAN FORM THAT HAS THE FOCUS IS STILL REPLACED
+// whether a section's settings region is open (its `hidden`, and its words'
+// `aria-expanded`), and where the focus is. A CLEAN FORM THAT HAS THE FOCUS IS STILL REPLACED
 // (a hold by someone else must be able to make it read-only): the focus goes
 // back to the same control once it exists (an editor mounts a moment after
 // its card arrives, so this waits for it, until the person focuses or
@@ -103,6 +104,8 @@
 
 const UNIT = "[data-editing-unit]"
 const PANEL = "[data-admin--editor--section-target~='panel']"
+// A section's settings region: opened by its head's words, closed as drawn.
+const SETTINGS = "[data-admin--editor--section-target~='settings']"
 const FOCUSABLE = "input:not([type=hidden]), textarea, select, button, a[href], summary, [tabindex]:not([tabindex='-1']), [contenteditable=true]"
 // Set by a script on an element that stays, and not the server's to take away.
 const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gone" ]
@@ -336,6 +339,7 @@ function syncAttributes(live, twin) {
 function withState(root, draw) {
   const collapsed = [ ...root.querySelectorAll("[data-block-body].hidden") ].map((body) => body.id).filter(Boolean)
   const open = [ ...root.querySelectorAll(`${PANEL}:not([hidden])`) ].map((panel) => panel.id).filter(Boolean)
+  const settings = [ ...root.querySelectorAll(`${SETTINGS}:not([hidden])`) ].map((region) => region.id).filter(Boolean)
   const focus = focusOf(root)
 
   draw()
@@ -351,6 +355,12 @@ function withState(root, draw) {
     if (!panel || !root.contains(panel)) continue
     panel.hidden = false
     root.querySelector(`.admin-block-tile__face[aria-controls="${CSS.escape(id)}"]`)?.setAttribute("aria-expanded", "true")
+  }
+  for (const id of settings) {
+    const region = document.getElementById(id)
+    if (!region || !root.contains(region)) continue
+    region.hidden = false
+    root.querySelectorAll(`[aria-controls="${CSS.escape(id)}"]`).forEach((word) => word.setAttribute("aria-expanded", "true"))
   }
   restoreFocus(root, focus)
 }

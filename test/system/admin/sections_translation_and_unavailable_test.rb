@@ -102,7 +102,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
 
     assert_no_selector tile(@left)
     assert_not ContentBlock.exists?(@left.id)
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "1 block", exact_text: true
   end
 
   def lose_the_sections_type
@@ -113,7 +113,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
     lose_the_sections_type
     open_editor
 
-    assert_selector "#{section_card}.border-danger", text: "Unavailable type — gone/section"
+    assert_selector "#{section_card}[data-card-edge='unavailable']", text: "Unavailable type — gone/section"
     assert_selector section_card, text: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
     assert_equal [ @left.id ], tiles_in(1)
     assert_equal [ @right.id ], tiles_in(2)
@@ -259,7 +259,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
     within("#{section_card} > div:first-child") { press "Remove section, keep blocks" }
 
     assert_selector "#toasts #toast-queue-hold[role=alert]", text: "Your last change wasn't saved, so this didn't run."
-    assert_selector "#{section_card}.border-danger"
+    assert_selector "#{section_card}[data-card-edge='unavailable']"
     assert_field caption(@left), with: "Mine, refused"
     assert_equal @section.id, @left.reload.section_id
     assert_selector "#{section_card} > div:first-child button:not([disabled])", text: "Remove section, keep blocks"

@@ -263,8 +263,8 @@ module Admin
       # column a block is in, and they are brought up to date together or the
       # screen contradicts itself: the lanes with their tiles; the heading of
       # each block's form under them ("Image · column 2"), whether it is open
-      # or not; and the header's count of columns and blocks, with the delete
-      # dialog's. So nothing draws the lanes alone.
+      # or not; and the head's column word and its count of blocks, with the
+      # delete dialog's. So nothing draws the lanes alone.
       #
       # NEVER A PANEL. A block's form is in the page from the start and stays
       # (`Admin::EditorScreen::SectionCardComponent`): it may hold text that is
@@ -292,13 +292,14 @@ module Admin
         titles = blocks.map do |inner|
           turbo_stream.update(Admin::EditorScreen::BlockCardComponent.panel_title_id(inner), Admin::EditorScreen::PanelTitleComponent.new(block: inner))
         end
-        [ turbo_stream.replace(Admin::EditorScreen::SectionCardComponent.lanes_id(fresh), lanes), *titles, *section_count_streams(fresh, count: blocks.size) ]
+        card = Admin::EditorScreen::SectionCardComponent
+        [ turbo_stream.replace(card.lanes_id(fresh), lanes), *titles, words_stream(fresh), *section_count_streams(fresh, count: blocks.size) ]
       end
 
       # What a saved section's answer adds to the status line, the error slots
-      # and the base every block's save gets. Each part only when the save
-      # changed what it shows, because each is something a person may be using
-      # when the answer lands: a save of the background is sent as the select
+      # and the base every block's save gets. The menu and the lanes only when
+      # the save changed what they show, because each is something a person
+      # may be using when the answer lands: a save of the background is sent as the select
       # is left, and where the person went from it may well be the layout menu
       # or a tile.
       #
@@ -317,6 +318,13 @@ module Admin
       # menu) moves no block, and the lanes it would redraw are tiles a person
       # may have the focus on, a menu open in or be dragging.
       #
+      # The head's words, always (with the structure when it is redrawn, and
+      # on their own otherwise): they say what is stored, and every saved
+      # setting is one of them. A word is a button that may hold the focus
+      # (`admin--editor--section#wordsTargetConnected` puts it back, and says
+      # whether the settings are open). The settings region is never in an
+      # answer: it is the form, which may hold text.
+      #
       # Both "before"s are the section as the request loaded it, which the
       # stale-save guard has vouched for; the "after"s are read from the saved
       # record.
@@ -325,15 +333,22 @@ module Admin
         if stored_layout(section) != layout_before
           streams << turbo_stream.replace(Admin::EditorScreen::SectionLayoutMenuComponent.dom_id(section), Admin::EditorScreen::SectionCardComponent.layout_menu(section: section))
         end
-        streams.concat(section_structure_streams(section)) if section.column_count != columns_before
-        streams
+        structure = section.column_count == columns_before ? [] : section_structure_streams(section)
+        streams.concat(structure.empty? ? [ words_stream(section) ] : structure)
+      end
+
+      # The section's head words (`SectionCardComponent.words`), never the
+      # region they open.
+      def words_stream(section)
+        card = Admin::EditorScreen::SectionCardComponent
+        turbo_stream.replace(card.words_id(section), card.words(section: section))
       end
 
       def stored_layout(block) = BlockDrawing.stored_layout(block)
 
       # The two counts of a section's card, after a write that changed how many
       # blocks it holds (an add into a column, a delete out of one) or how many
-      # columns: the header's "2 columns · 3 blocks", and the number of blocks
+      # columns: the head's "3 blocks", and the number of blocks
       # its delete dialog says go with it. Counted after the write unless the
       # caller has just read the blocks, and only those two lines are replaced
       # (`SectionCardComponent.summary` and `.delete_count`, the lines the card

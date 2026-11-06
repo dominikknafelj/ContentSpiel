@@ -1095,9 +1095,13 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     open_page
     delay_next("POST", CLAIM)
     background = "#content_block_#{section.id} select[name='block[settings][background]']"
+    # The settings are under the head, opened by its words.
+    open_settings = -> { find("#section-#{section.id}-words button[data-admin--editor--section-field-param='background']").click }
+    open_settings.()
     find(background).find("option[value=tinted]").select_option
     await_delayed
     using_session(:dana) do
+      open_settings.()
       find(background).find("option[value=tinted]").select_option
       assert_writes_settled
     end

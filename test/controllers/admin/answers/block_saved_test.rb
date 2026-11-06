@@ -113,6 +113,30 @@ class Admin::Answers::BlockSavedTest < ActionView::TestCase
     assert_equal [ [ "replace", "block-status" ], [ "replace", chip ] ], streams_of(top)
   end
 
+  # The region is a form that may hold text a person is typing: a save
+  # replaces the head's words, which say what was saved, and never the region.
+  test "a saved section setting replaces the words, never the region" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    card = Admin::EditorScreen::SectionCardComponent
+    section.update!(settings: { "layout" => "two", "background" => "tinted" })
+
+    background = saved.updated(section, autosave: [], layout_before: "two", columns_before: 2)
+    assert_equal [ [ "replace", card.words_id(section) ], [ "replace", chip ] ], streams_of(background)
+    assert_includes stream_nodes(background).first.inner_html, "Tinted background"
+
+    section.update!(settings: { "layout" => "three", "background" => "tinted" })
+    layout = saved.updated(section, autosave: [], layout_before: "two", columns_before: 2)
+    targets = streams_of(layout).map(&:last)
+    assert_includes targets, card.words_id(section)
+    assert_includes targets, Admin::EditorScreen::SectionLayoutMenuComponent.dom_id(section)
+    assert_includes stream_nodes(layout).find { |node| node["target"] == card.words_id(section) }.inner_html, "3 columns"
+    [ background, layout ].each do |answer|
+      assert_not_includes streams_of(answer).map(&:last), card.settings_id(section)
+      assert_not_includes answer.streams.join, %(id="#{card.settings_id(section)}")
+      assert_not_includes answer.streams.join, %(id="section-#{section.id}-form")
+    end
+  end
+
   test "a removed block takes its card away and tells the page's note counts" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     block.destroy!

@@ -221,7 +221,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # is an outline inside its edge, drawn by the stylesheet from an attribute,
   # so nothing changes size and no shadow is overwritten; a border utility on
   # the wrapper or the head would be a second edge beside it.
-  EDITOR_CARDS = %w[block_card_component.html.erb block_tile_component.html.erb].map { |f| "app/components/admin/editor_screen/#{f}" }.freeze
+  EDITOR_CARDS = %w[block_card_component.html.erb block_tile_component.html.erb section_card_component.html.erb].map { |f| "app/components/admin/editor_screen/#{f}" }.freeze
   EDITOR_CARD_WRAPPER = /class[=:].*(?<![\w-])admin-block-(?:card|tile)(?:__head)?(?![\w-])/
   BORDER_EDGE = /(?<![\w-])border(?:-(?:line|line-strong|danger|accent|field-line))?(?=[\s"'])/
   # In the order they win by: the later rule, at one weight.
@@ -242,6 +242,29 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
     order = CARD_EDGES.keys.map { |selector| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == [ selector ] } }
     assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
+  end
+
+  # A section is a frame of the structure colour around its lanes, not a
+  # card: no ground of its own, the frame's radius, a 1.5px edge, danger
+  # when its type is gone. Its head is tinted and its words are the head's
+  # ink, thinned behind them under the pointer or the focus.
+  test "a section is a structure frame with a tinted head, and its words are the head's ink" do
+    frame = single_rule(".admin-section-card")
+    assert_match(/border:\s*1\.5px solid var\(--cs-structure\)/, frame)
+    assert_match(/border-radius:\s*var\(--cs-radius-frame\)/, frame)
+    assert_match(/background:\s*transparent/, frame)
+    assert_match(/border-color:\s*var\(--cs-danger\)/, single_rule('.admin-section-card[data-card-edge="unavailable"]'))
+    head = single_rule(".admin-section-card__head")
+    assert_match(/background:\s*var\(--cs-structure-tint\)/, head)
+    assert_match(/color:\s*var\(--cs-structure-ink\)/, head)
+    assert_match(/border-radius:\s*calc\(var\(--cs-radius-frame\) - 1\.5px\) calc\(var\(--cs-radius-frame\) - 1\.5px\) 0 0/, head)
+    assert_match(/padding:\s*10px 12px/, head)
+    word = single_rule(".admin-section-word")
+    assert_match(/color:\s*var\(--cs-structure-ink\)/, word)
+    assert_match(/font-size:\s*13px/, word)
+    assert_match(/border-radius:\s*var\(--cs-radius\)/, word)
+    assert_match(/background:\s*color-mix\(in srgb, var\(--cs-structure-ink\) 12%, transparent\)/, single_rule(".admin-section-word:is(:hover, :focus-visible)"))
+    assert_match(/outline:\s*2px solid var\(--cs-accent\)/, single_rule(".admin-section-word:focus-visible"))
   end
 
   # A tile's states are drawn by elevation (`.admin-block-tile`): at rest

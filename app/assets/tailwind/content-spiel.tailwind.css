@@ -656,11 +656,9 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    on the lanes element by `Admin::EditorScreen::SectionLanesComponent`. A
    lane keeps a minimum height so an empty column still has a place on screen
    -- and under the pointer: it is what a block is dropped into (`admin--editor--blocks`).
-   The open tile -- the one whose form is showing under the lanes -- is marked
-   by its border, read from the face's own `aria-expanded`, so the look cannot
-   drift from what `admin--editor--section` tells a screen reader. */
-.admin-section-card { container-type: inline-size; }
-.admin-section-lanes { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
+   The gap between lanes is the lanes element's own utility. The card is
+   the container its lanes ask (`.admin-section-card`, below). */
+.admin-section-lanes { display: grid; grid-template-columns: minmax(0, 1fr); }
 .admin-section-lane > [data-admin--editor--blocks-target="lane"] { display: flex; flex-direction: column; gap: 0.5rem; min-height: 2.5rem; }
 .admin-section-lane__label { display: block; }
 @container (min-width: 40rem) {
@@ -696,6 +694,37 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-layout-choice[aria-current="true"] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-layout-choice[aria-current="true"] .admin-layout-diagram > span { background: var(--cs-accent); }
 .admin-section-errors:not(:has(p)) { display: none; }
+/* A section is structure, not content (`Admin::EditorScreen::SectionCardComponent`):
+   a 1.5px frame in the structure colour around its lanes, with no ground of
+   its own, so the tiles in it stand on the canvas. The frame only groups
+   (2.6:1 on the canvas); its states are edges a state's 3:1 holds, from
+   `data-card-edge` as a block card's: its type gone turns the frame danger
+   (and the card's danger outline below lies over it), held by someone else
+   is the card's field-line outline over the frame. The head is the
+   structure tint with the structure ink, its top corners the frame's less
+   the frame's width, and all four when the body is collapsed and the head
+   is the whole card. A word of the head (`SectionSettingsWordsComponent`)
+   is a button in the head's ink, its own ground the ink thinned to 12%
+   under the pointer or the keyboard's focus, which also rings it in the
+   accent; every pair is measured in `test/lib/admin_contrast_test.rb`. The
+   settings region (`__settings`) stands under the head on the rail's cool
+   ground, and the lanes under it need no padding of their own above. */
+.admin-section-card { container-type: inline-size; border: 1.5px solid var(--cs-structure); border-radius: var(--cs-radius-frame); background: transparent; }
+.admin-section-card[data-card-edge="unavailable"] { border-color: var(--cs-danger); }
+.admin-section-card__head {
+  background: var(--cs-structure-tint); color: var(--cs-structure-ink);
+  border-radius: calc(var(--cs-radius-frame) - 1.5px) calc(var(--cs-radius-frame) - 1.5px) 0 0;
+  padding: 10px 12px;
+}
+.admin-section-card:has(> [data-block-body].hidden) > .admin-section-card__head { border-radius: calc(var(--cs-radius-frame) - 1.5px); }
+.admin-section-card__settings { margin-top: 0.75rem; }
+.admin-section-card__settings:not([hidden]) ~ [data-block-body] { padding-top: 0; }
+.admin-section-word {
+  font-size: 13px; line-height: 1.25rem; color: var(--cs-structure-ink); white-space: nowrap;
+  padding: 2px 6px; border-radius: var(--cs-radius);
+}
+.admin-section-word:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--cs-structure-ink) 12%, transparent); }
+.admin-section-word:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 /* A block card's state edge (`Admin::EditorScreen::BlockCardComponent`): a 2px
    outline inside the card's edge, so the card keeps its size and its shadow.
    Held by someone else is the field line, its type gone is danger, its thread

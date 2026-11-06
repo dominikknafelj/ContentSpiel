@@ -1,5 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 
+// The setting a head word opens (its Stimulus param).
+const FIELD = "data-admin--editor--section-field-param"
+
 // One block's form open per section (sections spec §4.3).
 //
 // EVERY FORM IS ALREADY IN THE PAGE. A section renders each of its blocks'
@@ -48,8 +51,23 @@ import { Controller } from "@hotwired/stimulus"
 //   nearest thing to what was pressed.
 // A panel is never replaced -- its form holds unsaved text and its place in
 // the write queue -- only its heading's text, which names the column.
+//
+// THE SECTION'S OWN SETTINGS (`settings`, `#section-<id>-settings`) are one
+// region under the head holding the section's autosave form, hidden until a
+// word of the head (`words`, "3 columns ▾") opens it, focused on the word's
+// own setting (`openSettings`). Before it opens, the cancelable
+// `admin--editor--section:open-settings` is dispatched on the card with the
+// region itself in its detail: a controller that shows the region somewhere
+// else (the editor's rail at wide widths) cancels it, and with nobody
+// listening the region opens here, in place. Whether it is open is read from
+// the region's `hidden`, as a panel's is, and the word that opened it is
+// remembered by its setting's name, not its element: a save's answer
+// replaces the words (`wordsTargetConnected` says again what they control
+// and where the focus was). Closing sends what the form holds
+// (`closeSettings`), as closing a panel does. The region is never removed or
+// copied here: it is the one element the form lives in.
 export default class extends Controller {
-  static targets = ["tile", "panel", "lanes", "layoutMenu"]
+  static targets = ["tile", "panel", "lanes", "layoutMenu", "settings", "words"]
 
   // A block added to a column opens at once: the server marks its panel
   // `data-open`. Tile and panel arrive in one answer but as two streams, so
@@ -146,6 +164,85 @@ export default class extends Controller {
 
   get nothingFocused() { return !document.activeElement || document.activeElement === document.body }
 
+  // ---- The section's own settings.
+
+  get settingsOpen() { return this.hasSettingsTarget && !this.settingsTarget.hidden }
+
+  // A word pressed: a second press of the word that opened the settings
+  // closes them; any other opens them (or keeps them open) on its setting.
+  openSettings(event) {
+    if (!this.hasSettingsTarget) return
+    const field = event.params.field
+    if (this.settingsOpen && this.openedBy === field) return this.closeSettings()
+
+    const region = this.settingsTarget
+    const asked = this.dispatch("open-settings", { detail: { sectionId: this.element.dataset.blockId, region, field }, cancelable: true })
+    if (asked.defaultPrevented) return
+
+    region.hidden = false
+    this.openedBy = field
+    this.markWords(true)
+    this.focusSetting(field)
+  }
+
+  // Also the region's own Close button and Escape inside the card. The form
+  // is told to send what it holds now (an edit inside its debounce would
+  // otherwise go a second later with nothing on screen to say so), and the
+  // focus goes back to the word that opened the region: what had it is about
+  // to be hidden.
+  closeSettings() {
+    if (!this.settingsOpen) return
+    const form = this.settingsTarget.querySelector("form[data-controller~='admin--saving--autosave']")
+    if (form) this.application.getControllerForElementAndIdentifier(form, "admin--saving--autosave")?.saveNow()
+    this.settingsTarget.hidden = true
+    this.markWords(false)
+    this.wordFor(this.openedBy)?.focus()
+    this.openedBy = null
+  }
+
+  // The named setting's control, or the layout menu's button for the layout
+  // (its input is hidden). A reader's controls are disabled and take no
+  // focus: the region's Close button has it then.
+  focusSetting(field) {
+    const region = this.settingsTarget
+    const control = field === "layout"
+      ? region.querySelector("[data-admin--editor--section-target~='layoutMenu'] [aria-haspopup=menu]")
+      : region.querySelector(`[name='block[settings][${CSS.escape(field)}]']`)
+    const target = control && !control.matches(":disabled") ? control : region.querySelector("[data-action~='admin--editor--section#closeSettings']")
+    target?.focus()
+  }
+
+  markWords(open) {
+    this.wordsTargets.forEach((words) => words.querySelectorAll("button").forEach((word) => word.setAttribute("aria-expanded", String(open))))
+  }
+
+  wordFor(field) {
+    const words = this.hasWordsTarget ? [ ...this.wordsTarget.querySelectorAll("button") ] : []
+    return words.find((word) => word.getAttribute(FIELD) === field) || words[0]
+  }
+
+  // The words a save's answer brought are drawn closed: they say again
+  // whether the region is open, and a word that had the focus as the old
+  // ones left gets it back (in the new words, by its setting), unless the
+  // person has gone somewhere else meanwhile. Which word had it is noted as
+  // the focus comes and goes (`wordFocused`, `wordLeft`), because by the
+  // time a removed element's target disconnects the focus has already
+  // fallen to <body>. Leaving for another element forgets it; the focus
+  // falling with no new element (the words removed) does not.
+  wordFocused(event) { this.focusedWord = event.target.getAttribute(FIELD) }
+  wordLeft(event) { if (event.relatedTarget) this.focusedWord = null }
+
+  wordsTargetDisconnected(words) { this.wordsGone = words }
+
+  wordsTargetConnected(words) {
+    words.querySelectorAll("button").forEach((word) => word.setAttribute("aria-expanded", String(this.settingsOpen)))
+    const replaced = this.wordsGone && this.wordsGone !== words
+    const field = this.focusedWord
+    this.wordsGone = null
+    this.focusedWord = null
+    if (replaced && field && this.nothingFocused) this.wordFor(field)?.focus()
+  }
+
   // The block whose form is showing, or undefined. A panel marked
   // `data-editing-gone` is not "the open one": `editing/merge` shows it because
   // its block went (deleted, or moved out) and its tile with it, and it holds
@@ -198,9 +295,10 @@ export default class extends Controller {
     if (refocus) face?.focus()
   }
 
-  // Escape closes the form -- unless it was meant for something open inside
-  // it: a menu, a suggestion list or a dialog closes itself on Escape, and
-  // the same key press must not also take the form away. Their listeners sit
+  // Escape closes the section's settings when they are open, and otherwise
+  // the open form -- unless it was meant for something open inside them: a
+  // menu, a suggestion list or a dialog closes itself on Escape, and the
+  // same key press must not also take the settings or the form away. Their listeners sit
   // on descendants of the card, so they have run by the time this one does,
   // and each marks the press as handled (`admin--ui--menu#keydown`, the rich-text
   // popover and `admin--editor--blocks#key` for a picked-up card call
@@ -213,9 +311,14 @@ export default class extends Controller {
     const target = event.target
     const orphan = target.closest?.("[data-editing-gone]")
     const id = orphan ? orphan.dataset.blockId : this.openId
-    if (!id || event.defaultPrevented) return
+    if ((!id && !this.settingsOpen) || event.defaultPrevented) return
     if (target.closest("[role=menu], [role=listbox], dialog[open]")) return
     if (target.closest("[data-controller~='admin--ui--menu']")?.querySelector("[aria-expanded=true]")) return
+    if (this.settingsOpen) {
+      if (this.settingsTarget.querySelector("[role=listbox]:not([hidden])")) return
+      event.preventDefault()
+      return this.closeSettings()
+    }
     if (this.panelFor(id)?.querySelector("[role=listbox]:not([hidden])")) return
 
     event.preventDefault()

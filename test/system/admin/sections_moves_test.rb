@@ -37,7 +37,7 @@ class Admin::SectionsMovesSystemTest < Admin::SectionsSystemTestCase
     assert_field caption(@left), with: "Typed, then moved across"
     assert_selector "#{face(@left)}[aria-expanded='true']"
     assert_equal [ 2, "Typed, then moved across" ], @left.reload.then { |block| [ block.section_column, block.caption ] }
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks"
+    assert_selector "#section-#{@section.id}-summary", text: "2 blocks"
   end
 
   test "a tile moved within its lane is saved in its new place, with no Undo offered" do
@@ -59,7 +59,7 @@ class Admin::SectionsMovesSystemTest < Admin::SectionsSystemTestCase
 
     assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{@left.id}'] form[data-controller~='admin--saving--autosave']"
     assert_no_selector panel(@left), visible: :all
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block"
+    assert_selector "#section-#{@section.id}-summary", text: "1 block"
     assert_nil @left.reload.section_id
     assert_equal [ @section.id, @left.id ], @page.content_blocks.top_level.reorder(:position).ids
 
@@ -81,7 +81,7 @@ class Admin::SectionsMovesSystemTest < Admin::SectionsSystemTestCase
     assert_selector "#block-#{card.id}-panel", visible: :all
     assert_no_selector "#block-#{card.id}-panel"
     assert_equal [ @section.id, 1, 1 ], card.reload.then { |b| [ b.section_id, b.section_column, b.position ] }
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 3 blocks"
+    assert_selector "#section-#{@section.id}-summary", text: "3 blocks"
     assert_selector "#content-blocks-list > [data-block-id]", count: 1
 
     find(face(card)).click
@@ -127,8 +127,8 @@ class Admin::SectionsMovesSystemTest < Admin::SectionsSystemTestCase
     assert_selector "#section-#{other.id}-panels > #{panel(@left)}", visible: :all
     assert_no_selector "#section-#{@section.id}-panels > #{panel(@left)}", visible: :all
     assert_selector "#{lane(1, other)} > .admin-block-tile[data-block-id='#{@left.id}']"
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block"
-    assert_selector "#section-#{other.id}-summary", text: "2 columns · 1 block"
+    assert_selector "#section-#{@section.id}-summary", text: "1 block"
+    assert_selector "#section-#{other.id}-summary", text: "1 block"
     assert_equal [ other.id, 1 ], @left.reload.then { |b| [ b.section_id, b.section_column ] }
 
     find(face(@left)).click

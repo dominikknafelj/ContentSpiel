@@ -18,7 +18,8 @@ class Admin::Answers::BlockRefusedTest < ActionView::TestCase
 
     assert_equal :unprocessable_entity, answer.status
     assert_equal [ [ "replace", "content-blocks-alert" ], [ "replace", Admin::EditorScreen::SectionCardComponent.lanes_id(section) ],
-      [ "update", Admin::EditorScreen::BlockCardComponent.panel_title_id(inside) ], *section_counts(section) ], streams_of(answer)
+      [ "update", Admin::EditorScreen::BlockCardComponent.panel_title_id(inside) ], [ "replace", Admin::EditorScreen::SectionCardComponent.words_id(section) ],
+      *section_counts(section) ], streams_of(answer)
     assert_includes stream_nodes(answer).first.inner_html, "Something is off"
 
     denied = refused.created(failure(denied: true), section: section)

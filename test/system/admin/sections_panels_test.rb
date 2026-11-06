@@ -6,6 +6,7 @@ class Admin::SectionsPanelsSystemTest < Admin::SectionsSystemTestCase
       open_editor
       note = "[data-template-field='style-note']"
       assert_selector note, visible: :hidden
+      open_settings
       find("select[aria-label=Style]").select("Six-column grid")
       assert_selector note, text: "This style may set its own layout, background or width.", visible: :visible
       find("select[aria-label=Style]").select("Default")
@@ -240,7 +241,7 @@ class Admin::SectionsPanelsSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']"
     assert_not ContentBlock.exists?(gone.id)
     # The header counted three; the delete's answer brings the new count.
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "2 blocks", exact_text: true
 
     find(face(@left)).click
 

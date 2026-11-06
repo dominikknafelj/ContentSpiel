@@ -24,8 +24,9 @@
 // knows its controller. The form is marked `data-editing-frozen="true"`,
 // which the translation controls read (`translate_controller.js`). The block
 // card it is on takes the held edge (`data-card-edge="held"`, as the server
-// draws a card someone else holds), unless it already shows another; a
-// section's card is no block card and takes none.
+// draws a card someone else holds), unless it already shows another: the
+// nearest card, so a panel's form marks its panel and a section's settings
+// form the section's frame.
 const GUARD = '<button type="submit" disabled hidden tabindex="-1" data-held-guard></button>'
 
 // `click:stop->admin--x#go:once@window` is `admin--x#go`: the event with its
@@ -52,7 +53,7 @@ export function freeze(form, { lock = () => {}, rules = sharedRules() } = {}) {
   const hidden = new Set(rules?.hidden_types || [])
   form.dataset.editingFrozen = "true"
   form.querySelectorAll("fieldset").forEach((fieldset) => fieldset.classList.add("admin-held"))
-  const card = form.closest(".admin-block-card:not(.admin-section-card)")
+  const card = form.closest(".admin-block-card")
   if (card && !card.hasAttribute("data-card-edge")) card.setAttribute("data-card-edge", "held")
 
   for (const field of form.querySelectorAll("textarea")) field.readOnly = true

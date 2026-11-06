@@ -361,8 +361,14 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{card(@second)} [data-block-body].hidden", visible: :all
   end
 
+  def section_word(field) = "#section-#{@section.id}-words button[data-admin--editor--section-field-param='#{field}']"
+
+  def settings_region = "#section-#{@section.id}-settings"
+
   test "a section's own unsaved setting stays while its lanes take a colleague's new tile" do
     form = "#section-#{@section.id}-form"
+    find(section_word("background")).click
+    assert_selector settings_region, visible: :visible
     raise_debounce(form)
     find("#{form} #block-#{@section.id}-background").find("option[value=strong]").select_option
     keep(form, "__a")
@@ -376,6 +382,45 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert_selector "#section-#{@section.id}-lanes [data-column='2'] [data-block-id='#{added.id}']"
     assert_selector "#block-#{added.id}-panel", visible: :all
     assert_equal 1, page.evaluate_script("document.querySelectorAll('#section-#{@section.id}-form').length")
+  end
+
+  # The region is closed with the text in it unsent (`raise_debounce` took
+  # `saveNow` away, so closing sends nothing): the catch-up keeps the form,
+  # its region stays closed and its words say so, and the next press opens
+  # the same form with the text.
+  test "a section's settings holding unsaved text survive a catch-up with their region closed, and open again with the text" do
+    form = "#section-#{@section.id}-form"
+    find(section_word("layout")).click
+    assert_selector settings_region, visible: :visible
+    raise_debounce(form)
+    fill_in id: "block-#{@section.id}-anchor", with: "about-us"
+    find("#block-#{@section.id}-anchor").send_keys(:escape)
+    assert_selector settings_region, visible: :hidden
+    keep(form, "__a")
+    added = colleague { add_block(section_id: @section.id, section_column: 2) }
+
+    result = merge_list(only_changed: true)
+
+    assert_includes result["kept"], "section-#{@section.id}-form"
+    assert same?("__a", form)
+    assert_selector settings_region, visible: :hidden
+    assert_selector "#section-#{@section.id}-lanes [data-column='2'] [data-block-id='#{added.id}']"
+    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "false", each["aria-expanded"] }
+
+    find(section_word("layout")).click
+    assert_selector settings_region, visible: :visible
+    assert_equal "about-us", find("#block-#{@section.id}-anchor").value
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#section-#{@section.id}-form').length")
+  end
+
+  test "an open section's settings are open after a merge, and its words say so" do
+    find(section_word("width")).click
+    assert_selector settings_region, visible: :visible
+
+    merge_list
+
+    assert_selector settings_region, visible: :visible
+    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "true", each["aria-expanded"] }
   end
 
   test "two cards that both hold unsaved text keep both texts when their order changed" do

@@ -238,6 +238,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/section_group_component.rb
     app/components/admin/editor_screen/section_group_component.html.erb
     app/components/admin/editor_screen/section_summary_component.rb
+    app/components/admin/editor_screen/section_settings_words_component.rb
     app/components/admin/editor_screen/section_layout_menu_component.rb
     app/components/admin/editor_screen/section_layout_menu_component.html.erb
     app/components/admin/editor_screen/section_delete_count_component.rb

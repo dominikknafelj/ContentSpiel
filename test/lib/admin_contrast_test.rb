@@ -131,6 +131,33 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A section's head (`.admin-section-card__head`): its words in the
+  # structure ink on the structure tint, and a word under the pointer or
+  # focused on the ink thinned to 12% over that tint (`.admin-section-word`).
+  # The name, the handle and the count stand on the same tint.
+  test "a section head's words and its hovered word are 4.5:1 or better on the structure tint" do
+    each_scheme do |scheme, colour|
+      tint = colour.("--cs-structure-tint")
+      hovered = mix(colour.("--cs-structure-ink"), tint, 0.12)
+      assert_ratio(4.5, colour.("--cs-structure-ink"), tint, "a word on the head (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-structure-ink"), hovered, "a hovered word (#{scheme})")
+      %w[--cs-ink --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), tint, "#{ink} on the head (#{scheme})") }
+      assert_ratio(3.0, colour.("--cs-accent"), hovered, "a focused word's ring (#{scheme})")
+    end
+  end
+
+  # A section's frame only groups (2.6:1 on the canvas, held above that
+  # floor); its state edges, held and unavailable, are a state's 3:1 on the
+  # canvas outside it and on the head's tint and the settings' rail inside.
+  test "a section's frame groups, and its held and unavailable edges are 3:1 or better on the canvas, the head and the settings" do
+    each_scheme do |scheme, colour|
+      assert_operator contrast(colour.("--cs-structure"), colour.("--cs-paper")), :>=, 2.6, "the frame on the canvas (#{scheme})"
+      %w[--cs-field-line --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
+        assert_ratio(3.0, colour.(edge), colour.(ground), "the section's #{edge} edge on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   # An open or focused tile (`content-spiel.tailwind.css`, `.admin-block-tile`)
   # is ringed in the accent outside its edge, where it stands on the section
   # frame's tint or, in a lane at the page's own width, on the canvas.

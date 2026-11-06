@@ -51,6 +51,16 @@ class Admin::SectionsSystemTestCase < ApplicationSystemTestCase
   def section_card = "##{ActionView::RecordIdentifier.dom_id(@section)}"
   def layout_button = "#{section_card} button[aria-label='Layout']"
 
+  # A word of the section's head ("2 columns", "No background"), which opens
+  # the settings under the head focused on that setting.
+  def word(field, section = @section) = "#section-#{section.id}-words button[data-admin--editor--section-field-param='#{field}']"
+  def settings_region(section = @section) = "#section-#{section.id}-settings"
+
+  def open_settings(field = "layout", section = @section)
+    find(word(field, section)).click
+    assert_selector settings_region(section), visible: :visible
+  end
+
   def focus_is_on(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
 
   def blocks_controller = "window.Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=\"admin--editor--blocks\"]'), 'admin--editor--blocks')"

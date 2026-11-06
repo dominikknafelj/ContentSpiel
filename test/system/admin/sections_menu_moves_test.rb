@@ -104,6 +104,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
     assert_selector "#{tile(@left)} button[data-move='column'][disabled]", visible: :all
     assert_selector "#{tile(@right)} button[data-move='column'][disabled]", visible: :all
 
+    open_settings
     find(layout_button).click
     find("#{section_card} [role=menuitem][data-admin--editor--section-layout-param='two']").click
 
@@ -224,7 +225,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
     assert_equal [ @left.id, copy.id, below.id ], @page.content_blocks.in_column(@section, 1).reorder(:position).ids
     assert_equal [ @left.id, copy.id, below.id ], tiles_in(1)
     assert_equal [ @section.id ], cards_in_list
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 4 blocks", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "4 blocks", exact_text: true
     assert_selector "#section-#{@section.id}-panels > #{panel(copy)}", visible: :all
     assert_no_selector panel(copy)
     assert_selector panel(@right)
@@ -264,7 +265,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector tile(@left)
     assert_no_selector panel(@left), visible: :all
     assert_no_selector "[id='delete-block-#{@left.id}']", visible: :all
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 1 block", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "1 block", exact_text: true
     assert_writes_settled
     assert_not ContentBlock.exists?(@left.id)
   end
@@ -371,7 +372,7 @@ class Admin::SectionsMenuMovesSystemTest < Admin::SectionsSystemTestCase
     assert_nil gone.reload.section_id
     assert_no_selector panel(gone), visible: :all
     assert_equal [ @left.id ], tiles_in(1)
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks", exact_text: true
+    assert_selector "#section-#{@section.id}-summary", text: "2 blocks", exact_text: true
   end
 
   # The focus lands on a button every tile names the same, "Block actions":

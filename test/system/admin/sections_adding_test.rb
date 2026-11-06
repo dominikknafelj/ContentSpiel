@@ -16,7 +16,7 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     block = section.section_blocks.reload.sole
     assert_selector "#block-#{block.id}-panel", text: "Image · column 2"
     assert_selector "#{face(block)}[aria-expanded='true']"
-    assert_selector "#section-#{section.id}-summary", text: "2 columns · 1 block"
+    assert_selector "#section-#{section.id}-summary", text: "1 block"
     # The menu closed on the pick, and the form's first field has the focus.
     assert_no_selector "#block-picker-#{section.id}-2 [role=menu]"
     assert_equal true, page.evaluate_script("document.getElementById(#{"block-#{block.id}-panel".to_json}).contains(document.activeElement)")
@@ -44,7 +44,7 @@ class Admin::SectionsAddingSystemTest < Admin::SectionsSystemTestCase
     assert_no_selector panel(@left)
     assert_selector "#{face(@left)}[aria-expanded='false']"
     assert_selector "#section-#{@section.id}-panels > [data-admin--editor--section-target='panel']", count: 1
-    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 3 blocks"
+    assert_selector "#section-#{@section.id}-summary", text: "3 blocks"
     assert_writes_settled
     assert_equal "Held when the next block was added", @left.reload.caption
   end
