@@ -20,12 +20,13 @@ const LABEL_CLASS = "block text-label text-meta"
 // A script cannot render the component, so its classes are written out here
 // and held to `Admin::Ui::ButtonComponent`'s by hand (the small button, no
 // size of its own beyond the padding): a raised accent primary, a tinted
-// secondary, and the danger as the component's solid red.
+// secondary, a tertiary for Cancel, and danger_text for "Remove link" (not a confirm).
 const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button border border-transparent px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
 const BUTTON_VARIANTS = {
   primary: "bg-accent text-on-accent shadow-2 hover:bg-accent-hover hover:shadow-3 active:translate-y-px active:shadow-none",
   secondary: "bg-accent-tint text-accent hover:shadow-1",
-  danger: "bg-danger text-on-danger hover:opacity-90"
+  tertiary: "bg-transparent text-accent hover:underline",
+  danger_text: "bg-sunken text-danger-ink hover:shadow-1"
 }
 
 let sequence = 0
