@@ -18,18 +18,48 @@
     (`contents`, so it doesn't affect the form's layout) disables every
     field at once for a view-only one.
 
-    The form holds both of the post's columns: the settings panel (the
+    The form holds both of the post's columns: `.admin-post-main` (the
+    title, the address and the body) and then the settings panel (the
     excerpt, the type's own fields, the tags and the related posts, in the
-    rail where it docks) and `.admin-post-main` (the title, the address and
-    the body). It is one form at every width, so one autosave, one base and
-    one `data-editing-subject="record"` unit cover both, and a record merge
-    replaces or keeps the two together. %>
+    rail where it docks). It is one form at every width, so one autosave,
+    one base and one `data-editing-subject="record"` unit cover both, and a
+    record merge replaces or keeps the two together.
+
+    The main column comes first in the document because a post's title is
+    not a setting: a person writing a post starts at its title, so below the
+    threshold it reads title, address, body, then the settings, and the
+    focus follows what is seen at both widths (docked, the grid places each
+    column explicitly, so the order moves nothing on screen). %>
 <% form = capture do %>
 <%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-card bg-surface shadow-1 p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
 <%= fields do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+  <div class="admin-post-main admin-rail__main flex flex-col gap-4">
+  <%# Wraps title + slug only, for `admin--editor--slug-preview` -- same pairing
+      `Admin::EditorScreen::PageSettingsFormComponent` already uses. %>
+  <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "title", id: field_id("title"), html_name: field_html_name("title"),
+          value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"), **translation(:title),
+          data: { "admin--editor--slug-preview-target": "title" }
+        ) %>
+
+    <%= render Admin::Columns::SlugColumnComponent.new(
+          name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
+          value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale, errors: field_errors("slug"),
+          data: { "admin--editor--slug-preview-target": "slug" }, help: "The last part of the post’s address. Changing it leaves a redirect from the old address."
+        ) %>
+  </div>
+
+  <%= render Admin::Columns::RichTextColumnComponent.new(
+        name: "body", id: field_id("body"), html_name: field_html_name("body"),
+        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
+        editable: editable? && !read_only_hold?, **translation(:body)
+      ) %>
+  </div>
 
   <%= render Admin::Ui::RailPanelComponent.new(rail_id: RAIL_ID, key: "post", current: true) do %>
   <div class="flex flex-col gap-4">
@@ -81,30 +111,6 @@
       ) %>
   </div>
   <% end %>
-
-  <div class="admin-post-main admin-rail__main flex flex-col gap-4">
-  <%# Wraps title + slug only, for `admin--editor--slug-preview` -- same pairing
-      `Admin::EditorScreen::PageSettingsFormComponent` already uses. %>
-  <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
-    <%= render Admin::Columns::PlainColumnComponent.new(
-          name: "title", id: field_id("title"), html_name: field_html_name("title"),
-          value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"), **translation(:title),
-          data: { "admin--editor--slug-preview-target": "title" }
-        ) %>
-
-    <%= render Admin::Columns::SlugColumnComponent.new(
-          name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
-          value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale, errors: field_errors("slug"),
-          data: { "admin--editor--slug-preview-target": "slug" }, help: "The last part of the post’s address. Changing it leaves a redirect from the old address."
-        ) %>
-  </div>
-
-  <%= render Admin::Columns::RichTextColumnComponent.new(
-        name: "body", id: field_id("body"), html_name: field_html_name("body"),
-        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
-        editable: editable? && !read_only_hold?, **translation(:body)
-      ) %>
-  </div>
 <% end %>
 <% end %>
 <% end %>
@@ -113,13 +119,12 @@
 <%# The rail (`Admin::Ui::RailTabsComponent`, `RailPanelComponent`, `admin--ui--rail`), as in
     the page editor: where the editor area has the room, the post's settings stand in the
     rail under the one heading Post, right of the main column; below it, and on a
-    translation tab (`--folded`, whose pairs need the width), they stand above the main
-    column. Settings come first in the document at every width, and only the grid places
-    them. The fetched answer (`form_only`) is the notice area and the form alone, which
-    the record merge replaces or keeps whole, the settings panel with it; the rail
-    re-applies its current tab to a panel that connects. The notice area is on one line,
-    so that `:empty` holds without a strip: `admin--editing--live` merges the strip around
-    an alert already there. %>
+    translation tab (`--folded`, whose pairs need the width), they stand below the main
+    column, where the document puts them. Only the grid places them. The fetched answer
+    (`form_only`) is the notice area and the form alone, which the record merge replaces
+    or keeps whole, the settings panel with it; the rail re-applies its current tab to a
+    panel that connects. The notice area is on one line, so that `:empty` holds without a
+    strip: `admin--editing--live` merges the strip around an alert already there. %>
 <% if form_only? %>
 <div id="editor-notice"><%= render hold_strip if held? %></div>
 <%= form %>

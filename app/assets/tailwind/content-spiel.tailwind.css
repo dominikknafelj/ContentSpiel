@@ -727,9 +727,12 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    (`Admin::Ui::RailTabsComponent`), the panels
    (`Admin::Ui::RailPanelComponent`) and the blocks column: settings come
    before the blocks at every width, and only the grid places them, so the
-   focus goes header, tabs, settings, blocks. Below the threshold it is one
-   column: no tabs, every panel in the page but a docked-only one, each
-   where the document puts it.
+   focus goes header, tabs, settings, blocks. The post editor is the one
+   exception: its main column (title, address, body) comes before its
+   settings in the document, because a post's title is not a setting, so
+   there the focus goes header, main column, settings. Below the threshold
+   it is one column: no tabs, every panel in the page but a docked-only one,
+   each where the document puts it.
 
    Docked, the blocks column stands at the content's left edge and the rail
    `--cs-rail-gap` right of it; spare width falls right of the rail, since

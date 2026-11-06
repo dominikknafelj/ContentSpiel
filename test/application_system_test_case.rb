@@ -384,6 +384,10 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'", wait: wait)
   end
 
+  # Records the part of every live merge from here on (`admin--editing--live:merged`
+  # on `#editing`) in `window.__merged`, for `await_js("window.__merged...")`.
+  def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
+
   # `as` for a colleague whose save the open editor is NOT told of: the
   # signal that makes an editor fetch what someone else saved
   # (`Editing::Signals` -> `Live::Signals.later`) is dropped. For the tests of

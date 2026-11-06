@@ -22,11 +22,16 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
 
-    assert_no_selector "#editor-grid[data-rail-docked]"
+    # The rail's controller writes `data-rail-docked` only while docked, so
+    # its absence says "not docked" only once the controller has connected.
+    await_js("window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editor-grid'), 'admin--ui--rail') !== null")
+    assert_equal false, page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')"), "the rail docked at 1400px"
     form = box("#post-form")
     assert_in_delta 760, form[2] - form[0], 1
     assert_in_delta content_left, form[0], 1
-    assert_operator box(".admin-editor-header")[2], :>, form[2] + 200
+    # The header bleeds through the content column's padding to the shell's right edge.
+    assert_in_delta box(".admin-shell__main")[2], box(".admin-editor-header")[2], 1, "the header does not keep its full width"
+    assert_operator box(".admin-editor-header")[2], :>, 1300
   ensure
     page.driver.resize(1400, 1400)
   end

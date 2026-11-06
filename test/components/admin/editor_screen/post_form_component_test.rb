@@ -108,7 +108,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
     assert_selector "form#post-form.admin-form-column.admin-form-column--pair"
   end
 
-  test "the post's settings panel is inside the form and before the main column" do
+  test "the post's settings panel is inside the form and after the main column" do
     as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "en") }
 
     assert_selector "#editor-grid.admin-rail-grid[data-controller~='admin--ui--rail']:not(.admin-rail-grid--folded)"
@@ -124,7 +124,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
     assert_no_selector "#{panel} #post-title"
 
     ids = Capybara.string(rendered_content).all("#post-form #editor-grid-panel-post, #post-form .admin-post-main").map { |node| node[:id] || node[:class] }
-    assert_equal "editor-grid-panel-post", ids.first, "the settings panel comes before the main column"
+    assert_equal "editor-grid-panel-post", ids.last, "the main column comes before the settings panel"
     assert_equal 2, ids.size
   end
 

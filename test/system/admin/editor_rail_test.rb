@@ -4,9 +4,10 @@ require "application_system_test_case"
 # `.admin-rail-grid`, `admin--ui--rail`): where the editor area has 1200px, the
 # page settings stand in a 360px rail 28px right of a 900px blocks column, with
 # a Page and a Section tab, and a post's settings in the same rail beside its
-# title, address and body, under the one heading Post; below that they stand
-# above the blocks (or the post's main column) at 760px, as one column. The editor area is the container, so a folded tree docks the rail
-# at a window that would not otherwise. Each rule that overrides a base rule
+# title, address and body, under the one heading Post; below that the page
+# settings stand above the blocks and a post's settings below its main
+# column, at 760px, as one column. The editor area is the container, so a
+# folded tree docks the rail at a window that would not otherwise. Each rule that overrides a base rule
 # while docked (the 900px column over 760px, the forced-open settings over a
 # folded `<details>`) is measured at both widths here.
 class Admin::EditorRailSystemTest < ApplicationSystemTestCase
@@ -336,37 +337,56 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "a post's settings stand above its body below the threshold, in document order" do
+  # Where the focus goes from the last language tab, Tab by Tab, until it
+  # has been in the post's settings: "header", "main", "settings" or "other",
+  # each once in a row.
+  def post_focus_path
+    page.execute_script("[ ...document.querySelectorAll('.admin-language-tabs a[href]') ].pop().focus()")
+    seen = []
+    80.times do
+      keyboard.type(:tab)
+      where = page.evaluate_script(<<~JS)
+        (() => {
+          const active = document.activeElement
+          if (active.closest(".admin-editor-header")) return "header"
+          if (active.closest(#{POST_PANEL.to_json})) return "settings"
+          if (active.closest(#{POST_MAIN.to_json})) return "main"
+          return "other"
+        })()
+      JS
+      seen << where unless seen.last == where
+      break if where == "settings"
+    end
+    seen.drop_while { |where| where == "header" }
+  end
+
+  test "below the threshold a post reads title, address, body, then its settings" do
     at_window(NARROW) do
       open_post
       assert_docked(false)
 
-      assert_equal true, page.evaluate_script("Boolean(document.querySelector(#{POST_PANEL.to_json}).compareDocumentPosition(document.querySelector(#{POST_MAIN.to_json})) & Node.DOCUMENT_POSITION_FOLLOWING)"),
-        "the settings come before the main column in the document"
+      assert_equal true, page.evaluate_script("Boolean(document.querySelector(#{POST_MAIN.to_json}).compareDocumentPosition(document.querySelector(#{POST_PANEL.to_json})) & Node.DOCUMENT_POSITION_FOLLOWING)"),
+        "the main column comes before the settings in the document"
       form = box("#post-form")
       assert_in_delta 760, form[2] - form[0], 1
-      assert_operator box(POST_PANEL)[3], :<=, box(POST_MAIN)[1], "the settings stand above the main column"
+      assert_operator box(POST_MAIN)[3], :<=, box(POST_PANEL)[1], "the main column stands above the settings"
+      assert_operator box("#post-title")[1], :<, box("#post-slug")[1]
+      assert_operator box("#post-slug")[1], :<, box("#{POST_MAIN} [data-field-name='body']")[1]
       assert_no_selector "#editor-grid-tab-post", visible: :visible
       assert_not_equal "contents", page.evaluate_script("getComputedStyle(document.getElementById('post-form')).display")
 
-      page.execute_script("[ ...document.querySelectorAll('.admin-language-tabs a[href]') ].pop().focus()")
-      seen = []
-      60.times do
-        keyboard.type(:tab)
-        where = page.evaluate_script(<<~JS)
-          (() => {
-            const active = document.activeElement
-            if (active.closest(".admin-editor-header")) return "header"
-            if (active.closest(#{POST_PANEL.to_json})) return "settings"
-            if (active.closest(#{POST_MAIN.to_json})) return "main"
-            return "other"
-          })()
-        JS
-        seen << where unless seen.last == where
-        break if where == "main"
-      end
+      path = post_focus_path
+      assert_equal %w[main settings], path, "the focus went #{path.inspect}"
+    end
+  end
 
-      assert_equal %w[settings main], seen.drop_while { |where| where == "header" }, "the focus went #{seen.inspect}"
+  test "at a wide window the focus goes from a post's main column to its settings in the rail" do
+    at_window(WIDE) do
+      open_post
+      assert_docked
+
+      path = post_focus_path
+      assert_equal %w[main settings], path, "the focus went #{path.inspect}"
     end
   end
 
@@ -397,8 +417,6 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     assert_selector POST_PANEL, visible: :hidden
   end
 
-  def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
-
   def colleague_saves_excerpt(text)
     as(users(:two), channel: :admin) { assert Posts::Save.call(@post.reload, translations: { "en" => { excerpt: text } }).ok? }
   end
@@ -420,9 +438,6 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_selector "#editor-grid [role=tabpanel][data-current]", count: 1, visible: :all
       assert_selector "#editor-grid-panel-probe[data-current]"
       assert_selector "#{POST_PANEL}:not([data-current])", visible: :hidden
-
-      find("#editor-grid-tab-probe").execute_script("this.remove()")
-      find("#editor-grid-panel-probe").execute_script("this.remove()")
     end
   end
 
