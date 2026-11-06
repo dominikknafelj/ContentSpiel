@@ -41,7 +41,11 @@ jobs:
       # ActiveStorage's vips variant processor at initialization -- same
       # native dependency the test jobs below install.
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips
+        # Install first, update only if that fails: the runner image ships apt lists
+        # (the logs show `Hit:` on them), and `apt-get update` is the step whose time
+        # varies from ten seconds to nearly five minutes on a slow mirror, while the
+        # packages themselves are small. A stale list that 404s falls back to it.
+        run: sudo apt-get install --no-install-recommends -y libvips || { sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips; }
 
       - name: Checkout code
         uses: actions/checkout@v7
@@ -113,7 +117,11 @@ jobs:
 
     steps:
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+        # Install first, update only if that fails: the runner image ships apt lists
+        # (the logs show `Hit:` on them), and `apt-get update` is the step whose time
+        # varies from ten seconds to nearly five minutes on a slow mirror, while the
+        # packages themselves are small. A stale list that 404s falls back to it.
+        run: sudo apt-get install --no-install-recommends -y libpq-dev libvips || { sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips; }
 
       - name: Checkout code
         uses: actions/checkout@v7
@@ -247,7 +255,11 @@ jobs:
 
     steps:
       - name: Install packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+        # Install first, update only if that fails: the runner image ships apt lists
+        # (the logs show `Hit:` on them), and `apt-get update` is the step whose time
+        # varies from ten seconds to nearly five minutes on a slow mirror, while the
+        # packages themselves are small. A stale list that 404s falls back to it.
+        run: sudo apt-get install --no-install-recommends -y libpq-dev libvips || { sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips; }
 
       - name: Checkout code
         uses: actions/checkout@v7
