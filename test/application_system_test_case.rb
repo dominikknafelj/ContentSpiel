@@ -460,3 +460,5 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert_empty missing, "these controllers never connected within #{wait} s: #{missing.join(", ")}"
   end
 end
+
+require_relative "support/sections_system_test_case" # a subclass, so it is read after the class above
