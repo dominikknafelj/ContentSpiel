@@ -41,6 +41,12 @@
 ### Removed
 
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
+- The old password-reset link `GET <admin>/password/:token/edit`: it is a 404 now. The mailed link is `<admin>/password/edit#<token>`; ask for a new one.
+- `SITEMAP_HOST`, the old name of `PUBLIC_HOST`: set `PUBLIC_HOST`; `SITEMAP_HOST` is no longer read.
+- The `after_id` parameter of the block create request (`POST …/blocks`): the block is appended; to place it, create it and move it.
+- The comma-separated string for a post's `tag_names` in the post form's autosave (`post[tag_names]=a, b`): send an Array, `post[tag_names][]=a&post[tag_names][]=b`, as the chip input does. A string leaves the tags as they were.
+- The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start.
+- Telemetry's scrubbing of a token segment in `<admin>/password/…` paths: the reset token is in no path, and every query string is still cut from a span.
 
 ### For a gem or an outside caller
 
