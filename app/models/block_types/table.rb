@@ -14,7 +14,7 @@ module BlockTypes
     def self.register
       BlockTypes.register :table do |t|
         t.label "Table"
-        t.icon "table"
+        t.icon "table", family: :code
         t.uses :body, :caption
         t.body_content :table
         t.component Blocks::TableComponent

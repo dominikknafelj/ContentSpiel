@@ -455,6 +455,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/button_component.rb" => "the secondary button",
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
     "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
+    "app/components/admin/ui/icon_chip_component.rb" => "the accent icon chip, not pressable",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention"
   }.freeze
 
@@ -466,5 +467,44 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     TINT_PAIR_ALLOWED.each_key do |relative|
       assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} no longer wears the pair: drop it from TINT_PAIR_ALLOWED"
     end
+  end
+
+  # Icon chips (E4, task 7): a family's hue is drawn by one component, so a
+  # restyle of the palette is one file, and a hue never stands for a thing
+  # that is not a type or a module.
+  ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
+  PEOPLE_HUE = /ic-people/
+  ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
+  # Where the people hue may be drawn once built (the spec); none uses it yet.
+  PEOPLE_HUE_ALLOWED = %w[
+    app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
+  ].freeze
+
+  def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+
+  test "an icon's hue is drawn only by the icon chip" do
+    offences = design_offences(ICON_HUE, except: [ ICON_CHIP ])
+    assert_empty offences
+    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip no longer draws a hue: the guard looks at nothing"
+  end
+
+  test "a block type's icon is drawn only through BlockIconComponent" do
+    pattern = /\.icon_for\(|(?<![\w:])definition\.icon\b|\btype\.icon\b/
+    offences = design_offences(pattern, except: [ "app/components/admin/editor_screen/block_icon_component.rb" ])
+    assert_empty offences
+  end
+
+  test "the people hue is drawn only by the icon chip and the people's own components, never by a button" do
+    allowed = PEOPLE_HUE_ALLOWED + Dir[Rails.root.join("app/components/admin/{notes_screen/marker_component*,notes_screen/row_pill_component*,presence_screen/row_marker_component*,editor_screen/hold_strip_component*}")].map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+    assert_empty design_offences(PEOPLE_HUE, except: allowed)
+    assert_no_match PEOPLE_HUE, File.read(Rails.root.join("app/components/admin/ui/button_component.rb"))
+    assert_match PEOPLE_HUE, File.read(Rails.root.join(ICON_CHIP)), "the chip draws the people hue"
+  end
+
+  test "the icon guards' patterns match a hue utility and the token, and not a word" do
+    [ "text-ic-code", "bg-ic-form-bg", "fill-ic-text", "stroke-ic-media", "hover:text-ic-lists", "var(--cs-ic-code)" ].each { |sample| assert_match ICON_HUE, sample }
+    [ "magic-text", "text-dim", "bg-sunken", "topic-codes", "--cs-accent", "logic-people" ].each { |sample| assert_no_match ICON_HUE, sample }
+    assert_match PEOPLE_HUE, "text-ic-people"
+    assert_no_match PEOPLE_HUE, "text-ic-code"
   end
 end

@@ -215,4 +215,17 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_includes map, "--color-field-line: var(--cs-field-line);"
     assert_includes map, "--text-label--font-weight: 500;"
   end
+
+  # Icon chips (E4, task 7): the icon is a graphic, 3:1 (1.4.11) on its chip
+  # and on every ground a chip stands on. People is a hue too, with no block.
+  test "each family's icon is 3:1 or better on its chip and on surface, rail, chrome and popover, in both schemes" do
+    families = %w[text media code form lists structure people]
+    each_scheme do |scheme, colour|
+      families.each do |family|
+        icon = colour.("--cs-ic-#{family}")
+        assert_ratio(3.0, icon, colour.("--cs-ic-#{family}-bg"), "#{family} icon on its chip (#{scheme})")
+        %w[--cs-surface --cs-rail --cs-chrome --cs-popover].each { |ground| assert_ratio(3.0, icon, colour.(ground), "#{family} icon on #{ground} (#{scheme})") }
+      end
+    end
+  end
 end

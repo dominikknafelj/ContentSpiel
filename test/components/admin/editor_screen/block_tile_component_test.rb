@@ -22,7 +22,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   test "the tile shows the type's icon in place of its name, and the face is still named by the type" do
     render_tile
 
-    assert_selector ".admin-block-tile__face [data-block-icon=image][class~='text-meta'] svg[class~='size-3']"
+    assert_selector ".admin-block-tile__face [data-block-icon=image][class~='size-5.5'] svg[class~='size-3.5']"
     assert_selector ".admin-block-tile__face .sr-only", text: "Image"
     assert_selector ".admin-block-tile__face > span:first-child.sr-only", text: "Image"
     assert_no_selector ".admin-block-tile__face span.font-semibold", text: "Image"
@@ -34,7 +34,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
     render_tile(block)
 
-    assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='text-meta'] svg[class~='size-3']"
+    assert_selector ".admin-block-tile__face span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='size-5.5'] svg[class~='size-3.5']"
     assert_selector ".admin-block-tile__face [data-block-icon]", count: 1
     assert_selector ".admin-block-tile__face .sr-only", text: "Note"
     assert_selector ".admin-block-tile__face", text: /Warning · Empty/

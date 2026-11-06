@@ -12,7 +12,7 @@ module BlockTypes
         t.field :text, :text, translated: true
         t.component Blocks::<%= class_name %>Component
         t.theme_methods :block, :page
-        # t.icon "pilcrow"   # optional: one of ContentModel::BlockTypeDefinition::ICONS, drawn in the picker, on the card and on the tile
+        # t.icon "pilcrow", family: :text   # optional: one of ContentModel::BlockTypeDefinition::ICONS, drawn in the picker, on the card and on the tile on a chip in the hue of family: (ICON_FAMILIES; none is neutral)
         t.stylesheet "<%= file_name %>.css"
         t.sample translations: { "en" => { text: "A sample <%= human_name.downcase %>" } }, shows: [ "A sample <%= human_name.downcase %>" ]
       end

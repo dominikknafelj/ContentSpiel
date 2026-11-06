@@ -87,6 +87,23 @@
   --cs-head-warm-ink: #7a4a12;
   --cs-type-chip: #e6ecfb;
   --cs-type-chip-ink: #2b50c8;
+  /* Icon hues (E4): a block-type family's icon and its chip, drawn only by
+     Admin::Ui::IconChipComponent. Each icon is 5.06:1 or better on its chip, the
+     surface, the rail, the chrome and the popover. */
+  --cs-ic-text: #2a4fc6;
+  --cs-ic-text-bg: #e7ecfb;
+  --cs-ic-media: #a14a06;
+  --cs-ic-media-bg: #fbeedd;
+  --cs-ic-code: #0b6a73;
+  --cs-ic-code-bg: #dcf0f1;
+  --cs-ic-form: #1b7339;
+  --cs-ic-form-bg: #e0f2e5;
+  --cs-ic-lists: #6a35c9;
+  --cs-ic-lists-bg: #efe8fb;
+  --cs-ic-structure: #7a4a12;
+  --cs-ic-structure-bg: #f4e6d4;
+  --cs-ic-people: #8c1d5c;
+  --cs-ic-people-bg: #fbe6ef;
   /* The words on the danger fill: white in light, dark in dark, where
      white measures 3.11:1. */
   --cs-on-danger: #ffffff;
@@ -155,6 +172,21 @@
   --cs-head-warm-ink: #f0c48f;
   --cs-type-chip: #24304f;
   --cs-type-chip-ink: #9db4ff;
+  /* Icon hues, dark. */
+  --cs-ic-text: #9db4ff;
+  --cs-ic-text-bg: #24304f;
+  --cs-ic-media: #f0b06a;
+  --cs-ic-media-bg: #3a2a17;
+  --cs-ic-code: #6fd0d6;
+  --cs-ic-code-bg: #14353a;
+  --cs-ic-form: #7fd39a;
+  --cs-ic-form-bg: #183622;
+  --cs-ic-lists: #c4a8ff;
+  --cs-ic-lists-bg: #30264a;
+  --cs-ic-structure: #e8b77e;
+  --cs-ic-structure-bg: #40301c;
+  --cs-ic-people: #ffb8d6;
+  --cs-ic-people-bg: #3d2030;
   --cs-on-danger: #1a0b0b;
   --cs-shadow-1: inset 0 1px 0 rgba(255,255,255,0.04);
   --cs-shadow-2: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.35);

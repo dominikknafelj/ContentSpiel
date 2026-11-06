@@ -271,6 +271,28 @@ class ContentModel::BlockTypeDefinitionTest < ActiveSupport::TestCase
     saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
+  test "a block type declares its icon's family, one of six, and one that names none is neutral" do
+    assert_equal %i[text media code form lists structure], ContentModel::BlockTypeDefinition::ICON_FAMILIES
+    definition = ContentModel::BlockTypeDefinition.new("x")
+    assert_equal :neutral, definition.family, "a bare definition"
+    definition.icon "pilcrow"
+    assert_equal :neutral, definition.family, "an icon with no family"
+    definition.icon "pilcrow", family: :text
+    assert_equal :text, definition.family
+    definition.icon "pilcrow", family: "lists"
+    assert_equal :lists, definition.family
+    %i[people purple neutral].each do |bad|
+      error = assert_raises(ArgumentError, bad.to_s) { ContentModel::BlockTypeDefinition.new("x").icon "pilcrow", family: bad }
+      assert_match(/\Ax: icon family is one of text, media, code, form, lists, structure/, error.message)
+    end
+  end
+
+  test "every built-in block type declares the family the design gives it" do
+    families = { "rich_text" => :text, "note" => :text, "image" => :media, "card" => :media, "code" => :code, "table" => :code,
+                 "form" => :form, "post_list" => :lists, "section" => :structure }
+    assert_equal families, BlockTypes.all.to_h { |type| [ type.name, type.family ] }.slice(*BuiltInBlockTypes.names)
+  end
+
   test "a block type's icon is one CS Studio draws, or none" do
     definition = ContentModel::BlockTypeDefinition.new("x")
     assert_nil definition.icon
