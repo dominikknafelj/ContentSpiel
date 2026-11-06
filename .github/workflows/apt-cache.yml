@@ -1,0 +1,37 @@
+name: Apt cache
+
+# Fills the cache of downloaded .debs that ci.yml's jobs restore
+# (.github/actions/apt-packages). CI runs only for pull requests, and a pull
+# request's cache is visible to that pull request alone: a cache saved on the
+# default branch is what every new pull request can restore from. A merge to
+# main does not run CI, so nothing would ever save one there, and every pull
+# request's first run would download the packages again from a slow mirror.
+# This workflow runs the same install on main, so the entries exist. GitHub
+# evicts a cache entry not used for 7 days, hence the weekly run; a new runner
+# image (the key holds its version) is a new entry, saved by the next run.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/ci.yml
+      - .github/workflows/apt-cache.yml
+      - .github/actions/apt-packages/action.yml
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The package sets ci.yml installs: scan_js, and the unit and browser jobs.
+        packages: [ "libvips", "libpq-dev libvips" ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/apt-packages
+        with:
+          packages: ${{ matrix.packages }}

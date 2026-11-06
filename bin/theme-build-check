@@ -21,8 +21,9 @@
 #      must be refused.
 #
 # Not in the test suite: it writes app/assets/builds, which every other test
-# reads, so it is never run while tests run. CI runs it after the unit
-# tests (.github/workflows/ci.yml). On the way out it builds the default
+# reads, so it is never run while tests run. CI runs it once, as the last
+# step of unit shard 0, after that shard's tests and never beside them
+# (.github/workflows/ci.yml; the other shard would only repeat it). On the way out it builds the default
 # stylesheet again, so a laptop is left with the default theme's (under a
 # THEME_PATH of the shell's own, build again: bin/rails tailwindcss:build);
 # when that rebuild fails the script says so and ends non-zero, whatever
