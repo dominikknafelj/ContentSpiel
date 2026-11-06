@@ -9,7 +9,7 @@
   </div>
 </div>
 
-<div class="rounded-cs border border-line bg-surface">
+<div class="rounded-card bg-surface shadow-1">
   <% if submissions.empty? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".#{empty_key}.title"), description: t(".#{empty_key}.description")) %>
   <% else %>

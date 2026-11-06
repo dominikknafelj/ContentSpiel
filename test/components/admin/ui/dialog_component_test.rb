@@ -1,6 +1,13 @@
 require "test_helper"
 
 class Admin::Ui::DialogComponentTest < ViewComponent::TestCase
+  test "the panel is elevation 3: the popover ground, shadow 3, the card radius and no border" do
+    render_inline(Admin::Ui::DialogComponent.new(id: "d0", title: "t")) { "Body" }
+    classes = page.find("dialog#d0", visible: :all)[:class].split
+    %w[bg-popover shadow-3 rounded-card].each { |name| assert_includes classes, name }
+    assert_empty classes.grep(/\Aborder|shadow-menu/)
+  end
+
   test "a titled dialog with a close button, labelled by its title" do
     render_inline(Admin::Ui::DialogComponent.new(id: "d1", title: "New post", width: :form)) { "Body" }
     assert_selector "dialog#d1.admin-dialog[aria-labelledby='d1-title'][data-dialog-width=form]"

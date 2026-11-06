@@ -77,10 +77,10 @@ module Admin
       def button_classes = button_class || "inline-flex cursor-pointer items-center gap-1 rounded-cs px-2 py-1 text-sm text-meta hover:bg-sunken hover:text-ink"
 
       def panel_classes
-        [ "absolute z-30 mt-1 min-w-44 rounded-cs border border-line bg-surface p-1 shadow-menu",
+        [ "absolute z-30 mt-1 min-w-44 rounded-card bg-popover p-1 shadow-3",
           ("focus:outline-none focus-visible:outline-2 focus-visible:outline-accent" if list),
           align == :right ? "right-0" : "left-0",
-          "[&_a]:block [&_a]:rounded-cs [&_a]:px-2 [&_a]:py-1 [&_a:hover]:bg-sunken [&_a:focus-visible]:bg-sunken",
+          "[&_[aria-current]]:bg-accent-tint [&_a]:block [&_a]:rounded-cs [&_a]:px-2 [&_a]:py-1 [&_a:hover]:bg-sunken [&_a:focus-visible]:bg-sunken",
           "[&_button]:block [&_button]:w-full [&_button]:cursor-pointer [&_button]:rounded-cs [&_button]:px-2 [&_button]:py-1 [&_button]:text-left [&_button:hover]:bg-sunken [&_button:focus-visible]:bg-sunken" ].compact.join(" ")
       end
     end

@@ -29,7 +29,7 @@ class Admin::TrashScreen::ListComponentTest < ViewComponent::TestCase
 
   test "an empty list is the empty state for its tab, inside the card" do
     list([])
-    assert_selector "div.rounded-cs.border", text: "The trash is empty"
+    assert_selector "div.rounded-card.bg-surface.shadow-1", text: "The trash is empty"
     assert_text "Deleted pages, posts and images show up here until they're deleted for good."
     assert_no_selector "table"
 
@@ -58,7 +58,7 @@ class Admin::TrashScreen::ListComponentTest < ViewComponent::TestCase
     assert_selector "tbody tr", count: 2
     assert_selector "tbody tr#trash-post-#{post.id}"
     assert_selector "tbody tr#trash-media-#{asset.id}"
-    assert_selector "div.rounded-cs.border", text: "PAGE FOOTER"
+    assert_selector "div.rounded-card.bg-surface.shadow-1", text: "PAGE FOOTER"
   end
 
   test "who: You for the viewer's own trashing, the name for someone else's, System when nobody is recorded" do

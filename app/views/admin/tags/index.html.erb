@@ -13,11 +13,11 @@
 <p class="mb-4 text-meta"><%= t(".intro") %></p>
 
 <% if @tags.empty? %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-card bg-surface shadow-1">
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) %>
   </div>
 <% else %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-card bg-surface shadow-1">
     <table class="admin-tags-table admin-card-table w-full border-collapse text-sm">
       <thead>
         <tr class="border-b border-line-strong text-left text-label text-meta">

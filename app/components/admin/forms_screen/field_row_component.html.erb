@@ -1,4 +1,4 @@
-<%= tag.div id: id("row"), class: "admin-form-field-row rounded-cs border border-line bg-surface",
+<%= tag.div id: id("row"), class: "admin-form-field-row rounded-card bg-surface shadow-1",
       data: { "admin--forms--builder-target": "row", row: row.row, key: row.key.presence } do %>
   <div class="flex flex-wrap items-center gap-2 border-b border-line p-3">
     <%= render Admin::Ui::BadgeComponent.new(label: type_label) %>

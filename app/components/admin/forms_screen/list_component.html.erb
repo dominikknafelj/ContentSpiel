@@ -25,7 +25,7 @@
   </div>
 <% end %>
 
-<div class="rounded-cs border border-line bg-surface">
+<div class="rounded-card bg-surface shadow-1">
   <% if forms.empty? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) do |empty| %>
       <% if manage? %>

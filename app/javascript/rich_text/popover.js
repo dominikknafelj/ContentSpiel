@@ -33,7 +33,7 @@ let sequence = 0
 
 export function createPopover({ title, onSubmit, onClose }) {
   const root = document.createElement("div")
-  root.className = "admin-rich-text-popover absolute left-0 right-0 z-20 mt-1 flex flex-col gap-3 rounded-cs border border-line-strong bg-surface p-3 shadow-menu"
+  root.className = "admin-rich-text-popover absolute left-0 right-0 z-20 mt-1 flex flex-col gap-3 rounded-card bg-popover p-3 shadow-3"
   root.setAttribute("role", "dialog")
   root.setAttribute("aria-label", title)
 

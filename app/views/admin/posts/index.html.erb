@@ -46,7 +46,7 @@
   <% if @pagination.out_of_range? %>
     <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
   <% elsif @posts.empty? %>
-    <div class="rounded-cs border border-line bg-surface">
+    <div class="rounded-card bg-surface shadow-1">
       <% if filtered %>
         <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "status" => :status, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
           <% empty_state.with_action do %>

@@ -210,7 +210,7 @@ export class UploadTiles {
     li.dataset.uploadTile = ""
     // The group role is on the card, not the <li>: it would replace the item's
     // listitem role and the grid would stop being a list.
-    const card = element("div", "flex flex-col overflow-hidden rounded-cs border border-line bg-surface")
+    const card = element("div", "flex flex-col overflow-hidden rounded-card bg-surface shadow-1")
     card.setAttribute("role", "group")
     card.setAttribute("aria-label", name)
     const preview = element("div", "flex aspect-[4/3] w-full flex-col justify-end bg-sunken")

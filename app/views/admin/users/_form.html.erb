@@ -28,7 +28,7 @@
     <% if user.persisted? %>
       <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "user-base-updated-at", value: params[:base_updated_at].presence || user.updated_at.iso8601(6) } %>
     <% end %>
-    <section class="flex flex-col gap-4 rounded-cs border border-line bg-surface p-[18px]">
+    <section class="flex flex-col gap-4 rounded-card bg-surface shadow-1 p-[18px]">
       <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
         <div>
           <%= label_tag "user_name", "Name", class: setup_label_class %>

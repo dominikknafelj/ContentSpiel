@@ -10,7 +10,7 @@
 <% event_path = ->(event) { admin_audit_event_path(event, **@filter.to_params.symbolize_keys, **admin_url_options) } %>
 
 <% if @entries.empty? %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-card bg-surface shadow-1">
     <% if @filter.active? %>
       <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No events match these filters.") do |empty_state| %>
         <% empty_state.with_action do %>

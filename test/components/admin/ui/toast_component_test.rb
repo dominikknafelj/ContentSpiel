@@ -1,6 +1,12 @@
 require "test_helper"
 
 class Admin::Ui::ToastComponentTest < ViewComponent::TestCase
+  test "a toast keeps its inverted look and takes shadow 3 and the button radius" do
+    render_inline(Admin::Ui::ToastComponent.new(message: "Saved."))
+    classes = page.find(".admin-toast")[:class].split
+    %w[bg-ink text-paper shadow-3 rounded-button].each { |name| assert_includes classes, name }
+  end
+
   test "success is a status that hides after four seconds" do
     render_inline(Admin::Ui::ToastComponent.new(message: "Saved."))
     assert_selector ".admin-toast[role=status][data-controller='admin--ui--toast'][data-admin--ui--toast-timeout-value='4000']", text: "Saved."

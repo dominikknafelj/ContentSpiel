@@ -162,7 +162,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
     colours.each { |name| assert_includes map, "--color-#{name}: var(--cs-#{name});" }
     (1..4).each { |n| assert_includes map, "--shadow-#{n}: var(--cs-shadow-#{n});" }
-    assert_includes map, "--shadow-menu: var(--cs-shadow-3);"
+    assert_not_includes map, "--shadow-menu", "the menus say shadow-3"
     %w[field button button-sm chip tile card frame rail].each do |name|
       assert_match(/--cs-radius-#{name}: \d+px;/, css, "--cs-radius-#{name} missing from the scheme-independent block")
       assert_includes map, "--radius-#{name}: var(--cs-radius-#{name});"

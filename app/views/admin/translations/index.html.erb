@@ -49,7 +49,7 @@
 <% else %>
   <%= render Admin::TranslationScreen::MatrixComponent.new(items: @items, locales: @target_locales) %>
   <% if @pagination.total_pages > 1 %>
-    <div class="mt-4 rounded-cs border border-line bg-surface">
+    <div class="mt-4 rounded-card bg-surface shadow-1">
       <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) %>
     </div>
   <% end %>

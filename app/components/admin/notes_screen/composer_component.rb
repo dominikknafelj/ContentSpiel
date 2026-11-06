@@ -54,7 +54,7 @@ module Admin
       # a row. A message's "Add a reaction" chip opens the same panel with
       # the same buttons (`Admin::NotesScreen::ReactionsComponent`): one
       # picker, drawn from here. Which edge it hangs from is its user's.
-      EMOJI_PANEL_CLASS = "absolute z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
+      EMOJI_PANEL_CLASS = "absolute z-30 grid w-56 grid-cols-6 gap-0.5 rounded-card bg-popover p-1 shadow-3".freeze
       EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
       # `disabled:` is the shared button's own disabled look
       # (`Admin::Ui::ButtonComponent::COMMON_CLASS`): the paperclip and the

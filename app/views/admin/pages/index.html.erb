@@ -11,7 +11,7 @@
     #create` puts a page with no parent named. %>
 <% offer_new_page = can?("pages.create", Page.new(parent: root_page)) %>
 
-<div class="rounded-cs border border-line bg-surface">
+<div class="rounded-card bg-surface shadow-1">
 <%= render Admin::Ui::EmptyStateComponent.new(title: "Choose a page from the tree.", description: (offer_new_page ? "Or add a new one." : nil)) do |empty_state| %>
   <% if offer_new_page %>
     <% empty_state.with_action do %>

@@ -508,4 +508,53 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match PEOPLE_HUE, "text-ic-people"
     assert_no_match PEOPLE_HUE, "text-ic-code"
   end
+
+  # Elevation and radii: a shadow is one of the four elevation tokens and a
+  # radius is one of E4's, so depth and shape are decided in the stylesheet and
+  # not per element. The public site is the theme's and out of scope (its
+  # language switcher keeps `shadow-menu`, which its own stylesheet defines).
+  SHADOW = /(?<![\w-])shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|menu|\[[^\]]*\])(?![\w-])/
+  SHADOW_ALLOWED = {
+    "app/components/admin/pages_screen/tree_node_component.rb" => "the selected row's bar; stage 2 draws it in the accent"
+  }.freeze
+  RADIUS = /(?<![\w-])rounded-(?:(?:[trblse]|tl|tr|bl|br|ss|se|es|ee)-)?(?:xs|sm|md|lg|xl|2xl|3xl|4xl|\[[^\]]*\])(?![\w-])/
+  ELEVATION_SOURCES = ADMIN_SOURCES - Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")]
+
+  def elevation_offences(pattern, allowed = {})
+    (ELEVATION_SOURCES - allowed.keys.map { |path| Rails.root.join(path).to_s }).flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
+      end
+    end
+  end
+
+  test "a shadow is an elevation token" do
+    assert_empty elevation_offences(SHADOW, SHADOW_ALLOWED)
+  end
+
+  test "a radius is a radius token" do
+    assert_empty elevation_offences(RADIUS)
+  end
+
+  test "the elevation and radius patterns match Tailwind's own and arbitrary values, and not a token or a word" do
+    [ "shadow-sm", "hover:shadow-lg", "shadow-[0_1px_0_red]", "shadow-menu", "shadow-inner" ].each { |sample| assert_match SHADOW, sample }
+    [ "shadow-1", "shadow-4", "shadow-3", "no shadow, no arrow", "box-shadow: x" ].each { |sample| assert_no_match SHADOW, sample }
+    [ "rounded-md", "rounded-t-lg", "rounded-[3px]", "md:rounded-xl", "rounded-bl-2xl" ].each { |sample| assert_match RADIUS, sample }
+    [ "rounded-cs", "rounded-full", "rounded-t-field", "rounded-r-none", "rounded down", "rounded-card", "rounded-tile" ].each { |sample| assert_no_match RADIUS, sample }
+  end
+
+  test "every shadow allowance is still there" do
+    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
+  end
+
+  test "a card has no border of its own; the tree column and the dragged tile take their elevation from the stylesheet" do
+    assert_empty elevation_offences(/rounded-card[^"']*\sborder\s|\sborder\s[^"']*rounded-card/)
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_match(/\.admin-shell__tree \{[^}]*box-shadow: var\(--cs-shadow-1\)/, css)
+    assert_no_match(/\.admin-shell__tree \{[^}]*border-right/, css)
+    %w[.admin-drag-chosen .admin-drag-fallback].each do |selector|
+      assert_match(/#{Regexp.escape(selector)} \{[^}]*var\(--cs-shadow-4\)/, css, selector)
+    end
+    assert_no_match(/--shadow-menu/, css)
+  end
 end
