@@ -297,6 +297,20 @@ A site's forms ask three things of its host (`docs/reference/forms.md`).
 
 **Forms behind a CDN.** The per-visitor rate limit (5 sends in 10 minutes) counts `request.remote_ip`, an IPv6 address by its /64, which is right only behind proxies Rails trusts. Rails skips private and loopback hops in `X-Forwarded-For`, so kamal-proxy on the same host needs nothing. **A CDN in front (Cloudflare, which `config/deploy.yml` plans for) is a public address Rails does not trust**: every visitor then arrives "from" the CDN's edge, they all share one counter, and the sixth visitor in ten minutes is refused with "Too many messages". Such a site adds the CDN's published ranges to `config.action_dispatch.trusted_proxies` (in an initializer of the site's image, or `config/environments/production.rb`; Rails' own defaults are kept by adding to `ActionDispatch::RemoteIp::TRUSTED_PROXIES`). Nothing detects the mistake (`Forms::SendLimit`'s comment, "WHO THE VISITOR IS"); the per-form limit (30 in 10 minutes) is unaffected.
 
+## Releases
+
+The CMS is released as numbered images that a site names (`ContentSpiel::VERSION` in `lib/content_spiel/version.rb`, `ContentSpiel::IMAGE` for the image's name). **The numbering rule:** `0.x.y` before 1.0. A breaking change to what themes or plugins rely on (the theme contract, the plugin hooks, an environment variable, a migration that needs action) raises the minor number; anything else raises the patch. The changelog section lists breaking changes first. Everything between releases is the commit image `ghcr.io/<owner>/content_spiel:<40-character sha>` that `image.yml` pushes on every merge to `main`.
+
+**Cutting one.** From a clean `main`:
+
+```sh
+bin/rails 'release:prepare[0.5.0]'
+```
+
+It refuses a dirty tree, a number that is not greater than `VERSION`, a tag `v0.5.0` that exists, and an empty `## Unreleased` in `CHANGELOG.md`. Otherwise it rewrites the `VERSION` line, renames `## Unreleased` to `## 0.5.0 (today's date)` with a fresh empty `## Unreleased` above it, and prints three commands: `git switch -c release-0.5.0`, the commit, and `gh pr create`. It runs none of them and touches no file but those two (`ContentSpiel::Release`, `test/lib/release_task_test.rb`). Run the commands, review the pull request, merge it.
+
+**What the merge does.** `image.yml` builds the merge commit's amd64 image as for any merge. When it completes successfully on `main`, `.github/workflows/release.yml` (a `workflow_run`, so it never races that build) compares the commit's `VERSION` with the newest `v*` tag and stops when they match, which is every merge but a release. For a new number it builds `linux/arm64` from the same Dockerfile on an arm runner under a temporary tag, joins that and the commit's amd64 image into the manifests `0.5.0` and `stable` (`docker buildx imagetools create`), tags the commit `v0.5.0` and creates the GitHub Release, whose notes are the changelog section of that version and whose assets are `install/install.sh` and `install/contentspiel`. There is no `latest`, for the reason `image.yml` gives. **Unproven until the first release is cut**: nothing in a test runs the workflow.
+
 ## What a change can break silently
 
 - **A `..._url` helper or `request.base_url` in a public view** prints the host the client sent into a cacheable page. The guard refuses the line; it does not see an address handed in from a controller outside the scanned set or a `PublicSite::Urls` built with another host.

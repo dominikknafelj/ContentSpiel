@@ -1,0 +1,144 @@
+name: Release
+
+# Gives a merge that raised `VERSION` its release number
+# (`docs/reference/hosting.md`, "Releases"): the manifests `V` and `stable`
+# (amd64 and arm64), the tag `vV` and the GitHub Release.
+#
+# When: after `image.yml` has completed successfully on main, never beside it:
+# the amd64 image of the commit is built there, and this workflow needs it to
+# exist. The commit is `workflow_run.head_sha`, the one that was built, not
+# whatever main has become. A merge whose `VERSION` is the newest `v*` tag's
+# does nothing, which is every merge but a release.
+on:
+  workflow_run:
+    workflows: [ Image ]
+    types: [ completed ]
+    branches: [ main ]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    # A manual run of Image on main also completes here; it is the same commit
+    # check below that keeps it from releasing twice.
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.compare.outputs.release }}
+      version: ${{ steps.compare.outputs.version }}
+      image: ${{ steps.compare.outputs.image }}
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compare VERSION with the newest tag
+        id: compare
+        run: |
+          version=$(sed -n 's/^ *VERSION = "\(.*\)"$/\1/p' lib/content_spiel/version.rb)
+          [ -n "$version" ] || { echo "no VERSION in lib/content_spiel/version.rb" >&2; exit 1; }
+          newest=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          echo "VERSION $version, newest tag ${newest:-none}"
+          if [ "v$version" = "$newest" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/content_spiel" >> "$GITHUB_OUTPUT"
+
+  arm64:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same Dockerfile and build arguments as image.yml (it passes none),
+      # pushed under a temporary tag that the manifests below join and that
+      # nothing else names. No provenance: the arm64 image stays a plain image
+      # manifest for `imagetools create` to join.
+      - name: Build and push linux/arm64
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ needs.decide.outputs.image }}:${{ github.event.workflow_run.head_sha }}-arm64
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,scope=arm64,mode=max
+
+  publish:
+    needs: [ decide, arm64 ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      IMAGE: ${{ needs.decide.outputs.image }}
+      VERSION: ${{ needs.decide.outputs.version }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the built commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The commit's amd64 image (image.yml's tag, the 40-character sha) and
+      # the arm64 one, one manifest each under V and stable.
+      - name: Join amd64 and arm64 into V and stable
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:$VERSION" --tag "$IMAGE:stable" \
+            "$IMAGE:$SHA" "$IMAGE:$SHA-arm64"
+
+      - uses: ruby/setup-ruby@v1
+
+      # That version's section of CHANGELOG.md, nothing more (ContentSpiel::Release.notes).
+      - name: Extract the release notes
+        run: |
+          ruby -r ./lib/content_spiel/release -e \
+            'puts ContentSpiel::Release.notes(File.read("CHANGELOG.md"), ENV.fetch("VERSION"))' > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md's section for $VERSION is empty" >&2; exit 1; }
+
+      # Creates the tag vV on the built commit with the Release. install.sh
+      # and contentspiel are the installer and the site's command (install/).
+      - name: Tag and create the GitHub Release
+        run: |
+          gh release create "v$VERSION" install/install.sh install/contentspiel \
+            --target "$SHA" --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
