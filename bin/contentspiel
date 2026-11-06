@@ -37,8 +37,8 @@
 # application code. It starts the application from /rails and writes by
 # absolute path into the folder it was started in. In the image that is
 # production, with SECRET_KEY_BASE_DUMMY (no secret is needed to copy files,
-# as none is to build assets) and the log at warn, so the boot's own lines do
-# not bury what the command says.
+# as none is to build assets) and the log at fatal, so the boot's own lines
+# do not bury what the command says.
 #
 # Exit codes: 0 done; 1 refused or failed, with a sentence that says why;
 # 2 no such command, with the usage.
@@ -74,7 +74,11 @@ start_application = lambda do
   if (ENV["RAILS_ENV"] || ENV["RACK_ENV"]) == "production"
     ENV["SECRET_KEY_BASE_DUMMY"] ||= "1"
   end
-  ENV["RAILS_LOG_LEVEL"] ||= "warn"
+  # fatal: production logs to the terminal, and loading the application
+  # logs a line for each partial its template digests cannot follow, at
+  # error, hundreds of them. A boot that fails raises, and that is printed
+  # whatever the level.
+  ENV["RAILS_LOG_LEVEL"] ||= "fatal"
   cache = File.join(root, "tmp/cache")
   writable = File.exist?(cache) ? File.writable?(cache) : File.writable?(File.join(root, "tmp"))
   ENV["BOOTSNAP_READONLY"] ||= "1" unless writable
@@ -112,11 +116,11 @@ when "new"
 
   start_application.call
   begin
-    written = generator.write
+    generator.write
   rescue ContentSpiel::SiteGenerator::Refused => error
     refuse.(error.message)
   end
-  puts "Wrote #{written.size} files into #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."
+  puts "Wrote the site #{name}/, pinned to ContentSpiel #{ContentSpiel::VERSION}."
   puts "Next: cd #{name}, then follow README.md, from step 1: fill in the placeholders at the top of config/deploy.yml."
 when "generate", "check", "upgrade", "dev-files"
   not_yet.(command)

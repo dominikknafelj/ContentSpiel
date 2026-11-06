@@ -1,4 +1,3 @@
-require "erb"
 require "fileutils"
 require "pathname"
 require_relative "version"
@@ -96,11 +95,11 @@ module ContentSpiel
       reason = refusal
       raise Refused, reason if reason
 
-      written = FILES.map do |file, template|
-        put(file, render(TEMPLATES.join(template)))
-        file
-      end
-      written + Theme::Scaffold.write(target.join(THEME)).map { |file| "#{THEME}/#{file}" }
+      # Every template is rendered before the first file is written, so a
+      # template that fails writes nothing.
+      rendered = FILES.transform_values { |template| render(TEMPLATES.join(template)) }
+      rendered.each { |file, content| put(file, content) }
+      rendered.keys + Theme::Scaffold.write(target.join(THEME)).map { |file| "#{THEME}/#{file}" }
     end
 
     private
@@ -120,7 +119,15 @@ module ContentSpiel
 
     # The templates are ERB, `-%>` trimming its line. Kamal's own ERB in
     # deploy.yml is written `<%%= … %>` there, which this renders as `<%= … %>`.
-    def render(template) = ERB.new(template.read, trim_mode: "-").result(binding)
+    #
+    # ERB is required here and not at the top: the entrypoint loads this
+    # file BEFORE Bundler is set up, and erb is a gem the bundle locks, so
+    # loading it then could activate another version than the lock's and
+    # end the boot in "already activated". By `write` the bundle is set up.
+    def render(template)
+      require "erb"
+      ERB.new(template.read, trim_mode: "-").result(binding)
+    end
 
     # What the templates may ask for.
     def version = ContentSpiel::VERSION
