@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# The test files of one CI shard, one per line: `bin/test-shard system 2 4` is
+# the third of four shards of the browser suite, `bin/test-shard unit 0 2` the
+# first of two of the unit suite (every test file outside test/system/). CI runs
+# both suites as several jobs side by side (.github/workflows/ci.yml), because a
+# GitHub runner has two cores and the browser suite on two processes takes half
+# an hour, the unit suite on two about nine minutes. The files are dealt so the
+# shards take about the same TIME, not the same number of tests (a mind graph
+# test costs seven seconds, a toast test one): heaviest file first, each to the
+# shard that is lightest so far, by the seconds in the suite's own table
+# (test/system_test_seconds.yml, test/unit_test_seconds.yml). One dealing for
+# both suites: only the files and the table differ.
+# Every file lands in exactly one shard (test/lib/test_shards_test.rb).
+require "yaml"
+
+module TestShard
+  SUITES = {
+    "system" => { pattern: "test/system/**/*_test.rb", seconds: "test/system_test_seconds.yml" },
+    "unit" => { pattern: "test/**/*_test.rb", except: "test/system/", seconds: "test/unit_test_seconds.yml" }
+  }.freeze
+
+  ROOT = File.expand_path("..", __dir__)
+
+  def self.files(suite, root = ROOT)
+    spec = SUITES.fetch(suite)
+    Dir[File.join(root, spec[:pattern])].map { |path| path.delete_prefix("#{root}/") }
+      .reject { |path| spec[:except] && path.start_with?(spec[:except]) }.sort
+  end
+
+  def self.tests_in(path, root)
+    File.read(File.join(root, path)).scan(/^\s*(?:test\s+["']|def\s+test_)/).size
+  end
+
+  def self.measured(suite, root)
+    YAML.load_file(File.join(root, SUITES.fetch(suite)[:seconds])) || {}
+  end
+
+  # What each file weighs: its measured seconds, or, for a file nobody has
+  # measured yet, its number of tests at the average pace of those that were.
+  def self.weights(suite, root = ROOT)
+    measured = measured(suite, root)
+    files = files(suite, root)
+    known = files.select { |path| measured.key?(path) }
+    pace = known.empty? ? 1.0 : known.sum { |path| measured[path] }.to_f / [ known.sum { |path| tests_in(path, root) }, 1 ].max
+    files.to_h { |path| [ path, (measured[path] || tests_in(path, root) * pace).to_f ] }
+  end
+
+  def self.shards(suite, total, root = ROOT)
+    loads = Array.new(total, 0.0)
+    weights(suite, root).sort_by { |path, weight| [ -weight, path ] }.each_with_object(Array.new(total) { [] }) do |(path, weight), shards|
+      lightest = loads.each_with_index.min.last
+      shards[lightest] << path
+      loads[lightest] += weight
+    end
+  end
+end
+
+if $PROGRAM_NAME == __FILE__
+  suite, index, total = ARGV[0], *ARGV[1..].to_a.map { |arg| Integer(arg) }
+  abort "usage: bin/test-shard (system|unit) INDEX TOTAL (INDEX from 0)" unless TestShard::SUITES.key?(suite) && index && total && total.positive? && (0...total).cover?(index)
+  puts TestShard.shards(suite, total).fetch(index).sort
+end
