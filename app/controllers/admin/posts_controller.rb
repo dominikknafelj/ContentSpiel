@@ -158,9 +158,9 @@ module Admin
     # (`split_fields`, mirroring `Admin::ContentBlocksController
     # #split_settings`) since which of them are translated depends on the
     # registered type, not a fixed allowlist; `tag_names` arrives as an Array
-    # (the chip input's `tag_names[]`) or as one legacy comma-separated
-    # string, split into the Array `Posts::Save` expects here, not in the service -- the
-    # service is also used by MCP/seeds, which already hand it a real Array.
+    # (the chip input's `tag_names[]`), cleaned into the Array `Posts::Save`
+    # expects here, not in the service -- the service is also used by
+    # MCP/seeds, which already hand it a real Array.
     #
     # `content_type` is never accepted here at all (not even silently
     # ignored -- it simply isn't in `TRANSLATED_COLUMNS` nor built into
@@ -447,33 +447,24 @@ module Admin
     # `Posts::Save` expects an Array of names (its own `assign_tags` calls
     # `Array(...)` on whatever it's handed, which would treat one
     # comma-separated string as a single, comma-laden tag name rather than
-    # several) -- the comma-separated input is this controller's own UI
-    # concern (spec §5.2), so the split happens here, once, rather than
-    # teaching the service two different shapes for the same attribute.
-    # Blanks are dropped here too (fix round 1 review) rather than left for
-    # `Posts::Save#assign_tags`'s own `compact_blank`: a stray double comma
-    # or trailing comma while typing (e.g. "a, , b") is exactly the kind of
-    # input a comma-separated field invites, and this is the one place that
-    # already knows the raw string is comma-separated at all -- `assign_tags`
-    # only ever sees a plain Array by the time it runs.
+    # several), so the params are cleaned here, once, rather than teaching the
+    # service two different shapes for the same attribute.
     #
     # The chip input (`Admin::Ui::ChipInputComponent`) submits `post[tag_names][]`
-    # instead -- one element per tag, plus an empty sentinel so an emptied list
-    # still arrives.
+    # -- one element per tag, plus an empty sentinel so an emptied list still
+    # arrives. Blanks (the sentinel) are dropped here rather than left for
+    # `Posts::Save#assign_tags`'s own `compact_blank`.
     #
     # An element is split on commas too (defence in depth): the chip input
     # already splits pasted text before it makes a chip, and a client that
-    # sent "ruby, rails" as one element means two tags, same as the string.
-    # Anything that is neither a String nor an Array of Strings (a hash, nested
-    # arrays) answers nil -- "no usable tag list", so `update` leaves the tags
-    # alone rather than clearing them; non-String elements of an Array are ignored.
+    # sent "ruby, rails" as one element means two tags.
+    # Anything that is not an Array (a string, a hash) answers nil -- "no
+    # usable tag list", so `update` leaves the tags alone rather than clearing
+    # them; non-String elements of an Array are ignored.
     def split_tag_names(raw)
-      parts = case raw
-      when String then [ raw ]
-      when Array then raw.grep(String)
-      end
-      return nil unless parts
-      parts.flat_map { |part| part.split(",") }.map(&:strip).reject(&:blank?)
+      return nil unless raw.is_a?(Array)
+
+      raw.grep(String).flat_map { |part| part.split(",") }.map(&:strip).reject(&:blank?)
     end
 
     # A `groups` field's raw params need straightening into an ordered Array

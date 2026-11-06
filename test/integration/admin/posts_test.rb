@@ -103,7 +103,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     travel 2.seconds
     as(users(:two), channel: :admin) { Posts::Save.call(post_record, attributes: { tag_names: [ "ruby", "rails" ] }) }
 
-    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { tag_names: "ruby" } }, as: :turbo_stream
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { tag_names: [ "ruby" ] } }, as: :turbo_stream
     assert_response :conflict
     assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
   end
@@ -231,7 +231,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
   # Defence in depth: the chip input splits pasted text before it makes a
   # chip, but a client that sends "ruby, rails" as one element means two tags.
-  test "an array element containing a comma is split like the legacy string" do
+  test "an array element containing a comma is split into two tags" do
     post_record = create_post(title: "Chips")
     patch "/cs-studio/posts/#{post_record.id}",
       params: { post: { tag_names: [ "rails, ruby", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
@@ -239,10 +239,15 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
   end
 
-  test "a tag_names value that is neither a string nor an array of strings leaves the tags alone" do
+  test "a tag_names value that is not an array (a string, a hash) leaves the tags alone" do
     post_record = create_post(title: "Chips", tags: [ "keep" ])
     patch "/cs-studio/posts/#{post_record.id}",
       params: { post: { tag_names: { "0" => "evil" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: "evil, worse" }, base_updated_at: post_record.reload.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
   end
@@ -299,7 +304,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   test "typed fields and tags autosave" do
     post_record = create_post(title: "Engineer", content_type: "resume_entry")
     patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { fields: { company: "Acme", role_type: "lead" }, tag_names: "ruby, rails" }, base_updated_at: post_record.updated_at.iso8601(6) },
+      params: { post: { fields: { company: "Acme", role_type: "lead" }, tag_names: [ "ruby", "rails" ] }, base_updated_at: post_record.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
     assert_equal "Acme", post_record.reload.fields.company
@@ -422,12 +427,12 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "[data-original-for=body] strong", text: "there"
   end
 
-  # Fix round 1 (minor): a stray double/trailing comma while typing a
-  # comma-separated tag list must not create a blank-named `Tag`.
+  # A blank element (a stray comma in a pasted element, or the chip input's
+  # sentinel) must not create a blank-named `Tag`.
   test "blank segments in the tag input are dropped" do
     post_record = create_post(title: "Engineer")
     patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { tag_names: "a, , b" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { post: { tag_names: [ "a, , b", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
     assert_equal %w[a b], post_record.reload.tags.map(&:name).sort
   end
