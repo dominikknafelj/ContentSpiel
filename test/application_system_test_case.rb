@@ -22,12 +22,26 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # `JsErrorCollector::IGNORED`.
   # `no-sandbox` because GitHub's runners (and most containers) can't give
   # Chrome its user-namespace sandbox.
+  #
+  # `blink-settings`: the browser is a desktop with a mouse, the device CS
+  # Studio is drawn for, on every machine. Headless Chrome takes its pointer
+  # and hover capabilities from the host: a Mac answers `(hover: hover)`, a
+  # GitHub runner has no pointing device and answers `(hover: none)` and
+  # `(pointer: none)`, and Tailwind puts every `hover:` and `group-hover:`
+  # style inside `@media (hover: hover)`, which such a browser never applies
+  # however Cuprite moves the mouse. The values are Blink's
+  # `HoverType` (2, hover) and `PointerType` (4, fine) enums; the available
+  # ones are bitmasks of the same values. `Emulation.setEmulatedMedia`
+  # cannot do this: Chrome ignores `hover` and `pointer` there.
   driven_by :cuprite, screen_size: [ 1400, 1400 ], options: {
     headless: true,
     js_errors: false,
     process_timeout: 30,
     timeout: 15,
-    browser_options: { "no-sandbox" => nil }
+    browser_options: {
+      "no-sandbox" => nil,
+      "blink-settings" => "primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4"
+    }
   }
 
   # A node whose page has been replaced is stale AT ONCE.
@@ -154,8 +168,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # changes what the test exercises. Every call carries a one-line comment
   # naming which:
   #   - the element is inside a closed menu the test reaches by other means;
-  #   - the control is shown only by a `hover:` style, which CI's headless
-  #     Chrome (no hover device) never applies;
+  #   - the control is shown only by a `hover:` style and the test is not
+  #     about that style (a test of the hover itself moves the pointer);
   #   - a native click would change the thing under test (a `mousedown` that
   #     starts an autosave and moves the target; ProseMirror's node
   #     selection), or the test builds a same-tick race on purpose.

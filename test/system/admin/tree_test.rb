@@ -13,12 +13,15 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
 
   # The markers rest hidden (`sr-only`, so a screen reader still reads them) and
   # show on the row's hover and while the focus is in it. A Cuprite hover is a
-  # real pointer move, so `:hover` applies.
+  # real pointer move, so `:hover` applies, and the browser is a mouse device
+  # (`blink-settings` in `ApplicationSystemTestCase`), so the
+  # `@media (hover: hover)` around Tailwind's `group-hover:` matches.
   test "a row's markers show when the pointer is on it and when it has the focus" do
     with_locales(%w[en de], default: "en") do
       row = create_page(title: "Counted")
       visit "/cs-studio/pages"
       await_admin_controllers
+      assert page.evaluate_script("matchMedia('(hover: hover)').matches"), "the test browser reports it cannot hover"
 
       marker = "li[data-page-id='#{row.id}'] > div [data-translation-marker=missing]"
       assert_selector marker, text: "○1", visible: :all
