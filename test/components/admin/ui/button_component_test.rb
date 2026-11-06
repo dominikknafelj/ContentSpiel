@@ -159,6 +159,21 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_equal %w[svg span], button.native.children.reject { |node| node.text? && node.text.strip.empty? }.map(&:name), "an icon button shows no words beside its icon and the hidden tooltip"
   end
 
+  test "an icon button refuses a blank label: it would have no name" do
+    [ nil, "", "  " ].each do |label|
+      assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: label, icon: :x) }
+    end
+  end
+
+  test "an icon button refuses an aria-label of the caller's: its label is its one name" do
+    [ { "aria-label": "Other" }, { "aria-label" => "Other" }, { aria: { label: "Other" } }, { aria: { "label" => "Other" } } ].each do |html|
+      assert_raises(ArgumentError, html.inspect) { Admin::Ui::ButtonComponent.new(label: "Close", icon: :x, **html) }
+    end
+    # Without an icon a caller's aria-label passes through, as it always has.
+    render_inline Admin::Ui::ButtonComponent.new(label: "⋯", "aria-label": "More")
+    assert_equal "More", page.find("button")["aria-label"]
+  end
+
   test "a button without an icon is its label alone, with no tooltip" do
     render_inline Admin::Ui::ButtonComponent.new(label: "Save")
 

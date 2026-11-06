@@ -969,8 +969,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # from then on; a third writer would lay the column out by a rule neither
   # of them knows. A write is a `setProperty` or `removeProperty` of the
   # property, a `setAttribute`, `toggleAttribute` or `removeAttribute` of an
-  # attribute, or a `dataset` assignment or delete, each named by its string
-  # or by a constant the same file binds to that string.
+  # attribute, or a `dataset` assignment or delete (`.treeFits` or
+  # `["treeFits"]`), each named by its string or by a constant the same file
+  # binds to that string. Not seen: a name imported or computed, and an
+  # attribute the server draws on <html> (CLAUDE.md names both).
   TREE_STATE_NAMES = %w[--admin-tree-width data-tree-fits data-tree-folded].freeze
   TREE_STATE_WRITERS = %w[app/views/admin/shared/_tree_head.html.erb app/javascript/controllers/admin/shell/tree_width_controller.js].freeze
   TREE_STATE_SOURCES = Dir[Rails.root.join("app/{javascript,views,components}/**/*.{erb,rb,js}")]
@@ -980,7 +982,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     constants = source.scan(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["'`](#{TREE_STATE_NAMES.map { |name| Regexp.escape(name) }.join("|")})["'`]/).map(&:first)
     named = Regexp.union(quoted.map { |pattern| Regexp.new(pattern) } + constants.map { |name| /(?<![\w$])#{Regexp.escape(name)}(?![\w$])/ })
     source.match?(/\b(?:setProperty|removeProperty|setAttribute|toggleAttribute|removeAttribute)\(\s*(?:#{named.source})/) ||
-      source.match?(/\bdataset\.tree(?:Fits|Folded)\s*=(?!=)|\bdelete\s+[\w$.]*dataset\.tree(?:Fits|Folded)\b/)
+      source.match?(/\bdataset(?:\.tree(?:Fits|Folded)|\[\s*["'`]tree(?:Fits|Folded)["'`]\s*\])\s*=(?!=)|\bdelete\s+[\w$.]*dataset(?:\.tree(?:Fits|Folded)\b|\[\s*["'`]tree(?:Fits|Folded)["'`]\s*\])/)
   end
 
   test "the tree's width, fits and fold are written by the head script and the tree-width controller alone" do
@@ -1000,7 +1002,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       %(const FOLDED = "data-tree-folded"\nthis.root.setAttribute(FOLDED, "")),
       %(const FOLDED = "data-tree-folded"\nthis.root.removeAttribute( FOLDED )),
       %(document.documentElement.dataset.treeFolded = ""),
-      %(delete document.documentElement.dataset.treeFits)
+      %(root.dataset.treeFits = "true"),
+      %(root.dataset["treeFolded"] = ""),
+      %(root.dataset['treeFits']="1"),
+      %(delete document.documentElement.dataset.treeFits),
+      %(delete root.dataset["treeFolded"])
     ].each { |sample| assert self.class.tree_state_write?(sample), "not seen as a write: #{sample}" }
 
     [
@@ -1010,7 +1016,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       %(const FOLDED = "data-tree-folded"\nif (root.hasAttribute(FOLDED)) open()),
       %(const OTHER = "data-other"\nroot.setAttribute(OTHER, "")),
       %(root.setAttribute("data-tree-resizing", "")),
-      %(if (root.dataset.treeFolded === "") fold())
+      %(if (root.dataset.treeFolded === "") fold()),
+      %(if (root.dataset["treeFits"] == null) fold())
     ].each { |sample| assert_not self.class.tree_state_write?(sample), "seen as a write: #{sample}" }
   end
 end

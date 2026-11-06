@@ -69,10 +69,19 @@ module Admin
       # its `aria-label` and as the shared tooltip's text
       # (`Admin::Ui::TooltipComponent`), so a mouse reads what a screen
       # reader hears. The tooltip's controller and actions come before the
-      # caller's own `data: { controller:, action: }`, which are kept.
+      # caller's own `data: { controller:, action: }`, which are kept. Its name
+      # is the label alone: a blank label (a button with no name) and a
+      # caller's own `aria-label` (a second, competing name) are refused.
       def initialize(label:, variant: :primary, type: "button", size: :regular, icon: nil, **html)
         raise ArgumentError, "unknown button variant #{variant.inspect}" unless VARIANT_CLASSES.key?(variant)
         raise ArgumentError, "unknown button size #{size.inspect}" unless %i[regular small].include?(size)
+        if icon
+          raise ArgumentError, "an icon button needs a label: it is the button's only name" if label.blank?
+          aria = html.fetch(:aria, {})
+          if html.key?(:"aria-label") || html.key?("aria-label") || aria.key?(:label) || aria.key?("label")
+            raise ArgumentError, "an icon button is named by its label: pass no aria-label of your own"
+          end
+        end
 
         @label = label
         @variant = variant

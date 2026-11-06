@@ -111,6 +111,10 @@ A rule a test holds is in the reference file for its area, under this same headi
 - `everything=1` is a parameter of the graph's data, never of its page. **No guard** for a link elsewhere that is built with `everything=1` on the page's address and expected to work. A test of the graph pins no measured layout figure and waits out no script call of more than about two seconds: **no guard**, a convention.
 - Whatever can be pressed on the canvas has a row in the list beside it. **No guard** for a new kind of thing that is pressed on the canvas and has no row.
 
+**Page tree's width, `docs/reference/cs-studio-shell-and-dashboard.md`:**
+
+- `--admin-tree-width`, `data-tree-fits` and `data-tree-folded` on `<html>`: `admin_design_rules_test` holds the two writers (the head script and `admin--shell--tree-width`) by string and same-file constant. **No guard** for a write through an imported or computed name, or for an attribute the server draws on `<html>`.
+
 **`docs/reference/live-editing.md`:**
 
 - Every claim, release, withdrawal, take-over, hand-over and save of an editor goes through `app/javascript/saving/queue.js`, but for what `pagehide` sends: browser tests hold it, with no static guard.

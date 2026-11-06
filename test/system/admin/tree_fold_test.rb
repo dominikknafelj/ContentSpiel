@@ -45,6 +45,15 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
 
   def focused_label = page.evaluate_script("document.activeElement?.getAttribute('aria-label')")
 
+  # A drawer moves the focus to its first control that is drawn: in the tree's
+  # drawer that is "+ New page", never the strip's button, which comes first
+  # in the column but is not drawn in a drawer, and never <body>.
+  def assert_focus_on_new_page
+    assert_eventually(message: -> { "the focus is on #{page.evaluate_script("document.activeElement.outerHTML.slice(0, 120)")}" }) do
+      page.evaluate_script("(() => { const active = document.activeElement; return active.matches('#tree-column #tree a[href]') && active.textContent.trim() === '+ New page' })()")
+    end
+  end
+
   def assert_tree(width)
     assert_eventually(message: -> { "the tree column is #{tree_width}px wide, not #{width}px" }) { (tree_width - width).abs <= 1 }
   end
@@ -138,6 +147,7 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
         assert_no_selector HIDE
         find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]", text: "Pages").click
         assert_selector "#tree-column[data-open]"
+        assert_focus_on_new_page
         assert_tree 272
         within("#tree-column") { assert_selector "#tree a", text: "Documentation" }
         assert_no_selector SHOW
@@ -172,8 +182,9 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
   # Folded, the strip is what stands beside the notes: 44 + 400 + 640 is
   # 1084px with the sidebar a drawer, so at 1060px even the strip does not
   # fit, and the tree is the drawer beside the notes. That drawer shows the
-  # whole tree, as the one below 1024px does: the fold's rules give way to it.
-  test "a folded tree that does not fit beside the open notes is their ordinary drawer, and the strip again where it fits" do
+  # whole tree, as the one below 1024px does: the fold's rules give way to it,
+  # and "Hide page tree" is not offered in it.
+  test "a folded tree that does not fit beside the open notes is their ordinary drawer, with no fold in it, and the strip again where it fits" do
     at_window(1600) do
       open_editor
       find(HIDE).click
@@ -188,8 +199,12 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
 
         find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]", text: "Pages").click
         assert_selector "#tree-column[data-open]"
+        assert_focus_on_new_page
         within("#tree-column") { assert_selector "#tree a", text: "Documentation" }
         assert_no_selector SHOW
+        # Folding a drawer means nothing: the fold is not offered in it.
+        assert_selector HIDE, visible: :all
+        assert_no_selector HIDE
         assert_operator tree_width, :>, 200, "the drawer is the tree, not the strip"
         page.driver.browser.keyboard.type(:escape)
         assert_no_selector "#tree-column"

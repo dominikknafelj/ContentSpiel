@@ -242,7 +242,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    drawer beside the open notes (`:root[data-notes-open]:not([data-tree-fits])
    body:has(#notes-drawer)`, further down: even the strip does not fit there):
    that drawer shows the whole tree, as the one below 1024px does. Both
-   buttons are drawn from 1024px only. */
+   buttons are drawn from 1024px only, and in neither drawer (the notes'
+   drawer hides "Hide page tree" with its divider, further down): folding a
+   drawer means nothing. */
 :root { --admin-tree-strip: 2.75rem; }
 .admin-tree-fold, .admin-tree-hide { display: none; }
 @media (min-width: 1024px) {
@@ -359,6 +361,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-divider { display: none; }
+  /* A drawer is not folded: the fold's button is not offered in it. */
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-hide { display: none; }
   /* The scrim of the folded tree: the two rules above hide it from 1024px
      unless the modules sidebar is the open drawer, and at all from 1280px. */
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }

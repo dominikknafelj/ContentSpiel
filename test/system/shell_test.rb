@@ -9,6 +9,15 @@ class ShellTest < ApplicationSystemTestCase
     find("button[aria-label='Open navigation']").click
     assert_selector "#sidebar[data-open]"
     assert_selector "button[aria-label='Open navigation'][aria-expanded=true]"
+    # The drawer moves the focus to its first control that is drawn.
+    assert_eventually(message: "the focus is not on the sidebar's first drawn control") do
+      page.evaluate_script(<<~JS)
+        (() => {
+          const first = Array.from(document.querySelectorAll("#sidebar a[href], #sidebar button:not([disabled]), #sidebar input:not([disabled]), #sidebar [tabindex]:not([tabindex='-1'])")).find((control) => control.checkVisibility())
+          return first !== undefined && document.activeElement === first
+        })()
+      JS
+    end
     find("body").send_keys(:escape)
     assert_no_selector "#sidebar[data-open]"
     find("button[aria-label='Open navigation']").click
