@@ -39,7 +39,11 @@ class Admin::ReviewPublishTest < ActionDispatch::IntegrationTest
     assert_select OPEN, 0
   end
 
-  test "a save's answer draws the post header without the dialog opening, review=publish or not" do
+  # The answer streams the publishing chip and no header, so this holds that
+  # no answer opens the dialog; the GET-only guard on the header itself is
+  # held by `header_component_test.rb` ("review=publish opens Publish
+  # changes from a GET and not from a PATCH").
+  test "a save's answer, review=publish or not, carries no dialog that opens on load" do
     record = create_post(title: "Post")
     assert Posts::Save.call(record, translations: { "en" => { title: "Post, edited" } }).ok?
 
