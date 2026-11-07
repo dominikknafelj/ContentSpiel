@@ -145,9 +145,14 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:dana, @dana)
     assert_selector shown(tree_marker), wait: LIVE
-    # The icon at 12px in meta, alone for one person, last
-    # of the row's markers and 6px after what stands before it.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(tree_marker))
+    # The icon at 12px in meta, alone for one person, last of the row's
+    # markers, and at the row's end: the trailing parts stand there, past the
+    # title and its state, with room left for the "+".
+    seen = look(tree_marker)
+    assert_operator seen.delete("after"), :>, 6
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
+    at_end = page.evaluate_script("(() => { const row = document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row'); return row.getBoundingClientRect().right - document.querySelector(#{tree_marker.to_json}).getBoundingClientRect().right })()")
+    assert_operator at_end, :<=, 40, "the marker stands at the row's end, not after the title"
     # Nobody marks themselves: Dana's own tree marks where I am, not her page.
     using_session(:dana) do
       assert_selector shown(tree_marker(@elsewhere)), wait: LIVE
@@ -161,8 +166,8 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector "#{shown(tree_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
     # From two the count, in 11px, 4px after the icon; the names in
     # order of arrival.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => { "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 },
-                   "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker))
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => { "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 },
+                   "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker).except("after"))
 
     leave(:dana)
     assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "reader is here", exact_text: true, visible: :all, wait: LIVE
@@ -274,23 +279,23 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     # at this width, so it may reach over the column's edge).
     whole = page.evaluate_script("(() => { const tip = document.querySelector(#{tree_marker.to_json} + ' [data-tooltip]').getBoundingClientRect(); return tip.left >= 0 && tip.right <= document.documentElement.clientWidth && tip.width <= 240 })()")
     assert_equal true, whole
-    # The tree is a column here (not a drawer), the bubble reaches past it
-    # over the content, and it is the bubble that is on top there. The
+    # The tree is a column here (not a drawer), the bubble stands whole in it
+    # (the column scrolls, so it is held inside), and it is the bubble that is
+    # on top there. The
     # bubble lets the pointer through (`pointer-events: none`), and
     # `elementFromPoint` skips such an element: switched on for the question.
     top = page.evaluate_script(<<~JS)
       (() => {
         const tip = document.querySelector(#{tree_marker.to_json} + " [data-tooltip]")
-        const [ box, column ] = [ tip.getBoundingClientRect(), document.querySelector("#tree-column").getBoundingClientRect() ]
+        const box = tip.getBoundingClientRect()
         tip.style.pointerEvents = "auto"
         const point = (x) => document.elementFromPoint(x, box.top + box.height / 2) === tip
-        const answer = { column: getComputedStyle(document.querySelector("#tree-column")).position !== "fixed", past: box.right > column.right,
-                         centre: point(box.left + box.width / 2), overContent: point(box.right - 2), viewport: box.top >= 0 && box.bottom <= document.documentElement.clientHeight }
+        const answer = { column: getComputedStyle(document.querySelector("#tree-column")).position !== "fixed",                          centre: point(box.left + box.width / 2), overContent: point(box.right - 2), viewport: box.top >= 0 && box.bottom <= document.documentElement.clientHeight }
         tip.style.pointerEvents = ""
         return answer
       })()
     JS
-    assert_equal({ "column" => true, "past" => true, "centre" => true, "overContent" => true, "viewport" => true }, top)
+    assert_equal({ "column" => true, "centre" => true, "overContent" => true, "viewport" => true }, top)
     find("main h1").hover
     assert_no_selector "#{tree_marker} [data-tooltip]"
 
