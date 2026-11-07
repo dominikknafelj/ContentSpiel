@@ -194,6 +194,68 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
     assert_equal 0, result["gone"]
     assert_equal false, result["marked"]
+    assert_equal false, result["connected"]
+  end
+
+  # Runs one list merge of `html` against `answer` (markup of the test's own)
+  # with nothing unsaved and the options given, and answers what `script`
+  # (a JS expression of `root`, `out` and the elements `before` noted by id)
+  # makes of the result.
+  def merge_built(html, answer, script, options: "{}")
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      window.__merge.then((merge) => {
+        const root = document.createElement("div")
+        root.innerHTML = #{html.to_json}
+        document.body.append(root)
+        const before = Object.fromEntries(Array.from(root.querySelectorAll("[id]")).map((element) => [ element.id, element ]))
+        const fresh = document.createElement("div")
+        fresh.innerHTML = #{answer.to_json}
+        const out = merge.mergeBlockList(root, fresh, { unsaved: () => false, ...#{options} })
+        const value = #{script}
+        root.remove()
+        done(value)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+  end
+
+  test "a part the caller holds that the answer lacks is removed, and not marked gone" do
+    result = merge_built(
+      '<div id="t" data-editing-part data-editing-subject="block-9" data-editing-version="1"><span>open</span></div>',
+      '<div id="u" data-editing-part data-editing-subject="block-8" data-editing-version="1"></div>',
+      "({ connected: before.t.isConnected, gone: out.gone.length, ids: Array.from(root.children).map((child) => child.id) })",
+      options: "{ hold: () => true }"
+    )
+
+    assert_equal({ "connected" => false, "gone" => 0, "ids" => %w[u] }, result)
+  end
+
+  test "a notice that shows an alert stays as it is where the answer has its slot, and goes where the answer lacks it" do
+    slot = ->(id, words) { %(<div id="#{id}" data-editing-strip-slot><p role="alert">#{words}</p></div>) }
+    kept = merge_built(
+      %(<div id="card">#{slot.call('s', 'Changed elsewhere')}<p id="title">Old</p></div>),
+      %(<div id="card"><div id="s" data-editing-strip-slot></div><p id="title">New</p></div>),
+      '({ same: root.querySelector("#s") === before.s, words: before.s.textContent, title: root.querySelector("#title").textContent, gone: out.gone.length })'
+    )
+    lacked = merge_built(
+      %(<div id="card">#{slot.call('s', 'Changed elsewhere')}<p id="title">Old</p></div>),
+      %(<div id="card"><p id="title">New</p></div>),
+      '({ connected: before.s.isConnected, gone: out.gone.length, inside: Array.from(root.querySelector("#card").children).map((child) => child.id) })'
+    )
+
+    assert_equal({ "same" => true, "words" => "Changed elsewhere", "title" => "New", "gone" => 0 }, kept)
+    assert_equal({ "connected" => false, "gone" => 0, "inside" => %w[title] }, lacked)
+  end
+
+  test "an answer that holds an id twice is read by its first copy, for a catch-up's same and for where it stands alike" do
+    result = merge_built(
+      '<div id="p"><div id="x" data-editing-part data-editing-subject="block-9" data-editing-version="1"><span id="inner">mine</span></div></div><div id="q"></div>',
+      '<div id="q"><div id="x" data-editing-part data-editing-subject="block-9" data-editing-version="1"></div></div><div id="p"><div id="x" data-editing-part data-editing-subject="block-9" data-editing-version="1"><span id="inner">answer</span></div></div>',
+      '({ same: out.same.map((element) => element.id), replaced: root.querySelector("#p > #x") !== before.x, words: root.querySelector("#p > #x").textContent })',
+      options: "{ onlyChanged: true }"
+    )
+
+    assert_equal({ "same" => [], "replaced" => true, "words" => "answer" }, result)
   end
 
   test "a part the caller holds is left as it is, and the part is not marked gone" do

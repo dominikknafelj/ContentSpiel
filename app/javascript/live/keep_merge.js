@@ -68,7 +68,8 @@ function reconcile(container, fresh, options, orphans) {
   for (const child of [ ...container.children ]) {
     const twin = (child.id && twins.get(child.id)) || null
     if (kept.has(child) || within(child, twin)) {
-      if (twin) matched.set(child.id, child)
+      // Of two elements of one id on screen, the first is the one matched.
+      if (twin && !matched.has(child.id)) matched.set(child.id, child)
       else { stays.push({ element: child, anchor }); orphans.push(child) }
     } else {
       child.remove()

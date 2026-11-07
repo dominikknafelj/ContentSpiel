@@ -229,7 +229,9 @@ const reachable = (element, root) => {
 function unchanged(root, fresh, keep, { containers }) {
   const versions = new Map()
   for (const twin of fresh.querySelectorAll("[data-editing-version]")) {
-    if (twin.id) versions.set(`${twin.id}|${twin.matches(UNIT)}`, twin)
+    // The first copy of an id, as `atHome` reads it.
+    const key = `${twin.id}|${twin.matches(UNIT)}`
+    if (twin.id && !versions.has(key)) versions.set(key, twin)
   }
   return [ ...root.querySelectorAll("[data-editing-version]") ].filter((live) => {
     if (keep.has(live) || !live.id || !reachable(live, root)) return false
@@ -371,7 +373,8 @@ function reconcile(container, fresh, keep, moved, gone, extra = new Set()) {
 }
 
 // Whether the answer has `element`'s id in the same container (`root` and
-// `fresh` standing for each other).
+// `fresh` standing for each other), read by the id's first copy, as
+// `unchanged` reads it.
 function atHome(element, root, fresh) {
   if (!element.id) return false
   const twin = fresh.querySelector(`#${CSS.escape(element.id)}`)

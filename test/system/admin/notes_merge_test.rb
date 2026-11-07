@@ -232,6 +232,59 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-list #notes-new", count: 1
   end
 
+  # The list merge on markup of the test's own, which the server would draw
+  # only in a moment (an answer without `#notes-new`: the block the note is on
+  # went): a view holding a field with typed text, and an answer for it.
+  # Answers the ids (or the role) of the view's children in order, whether
+  # the field is the same element with its text, and how many "New note"
+  # links the view holds.
+  def merge_built_list(answer_parts)
+    page.evaluate_async_script(<<~JS, answer_parts)
+      const [ parts, done ] = arguments
+      import("notes/merge").then((merge) => {
+        const view = document.createElement("div")
+        view.dataset.notesView = "list"
+        view.innerHTML = '<p id="old-counts" hidden></p><div id="notes-new"><textarea>Mine</textarea></div><ul id="old-rows"></ul>'
+        document.body.append(view)
+        const field = view.querySelector("#notes-new")
+        const answer = document.createElement("div")
+        answer.dataset.notesView = "list"
+        answer.innerHTML = parts
+        const merged = merge.mergeNoteList(view, answer)
+        const out = {
+          order: Array.from(view.children).map((child) => child.id || child.getAttribute("role") || (child.hidden ? "hidden" : child.tagName)),
+          same: view.querySelector("#notes-new") === field && field.querySelector("textarea").value === "Mine",
+          links: view.querySelectorAll("[data-note-new-link]").length,
+          kept: merged.kept.length
+        }
+        view.remove()
+        done(out)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+  end
+
+  test "an answer without the field's place puts the field after the counts and the sentence, and no second New note beside it" do
+    open_list
+
+    result = merge_built_list('<p id="counts" hidden></p><p role="status">Gone</p><div id="link-row"><a data-note-new-link href="#">New note</a></div><ul id="rows"></ul>')
+
+    assert_nil result["error"]
+    assert_equal %w[counts status notes-new rows], result["order"]
+    assert_equal true, result["same"]
+    assert_equal 0, result["links"]
+    assert_equal 1, result["kept"]
+  end
+
+  test "an answer with nothing but hidden parts and status lines puts the field at the end" do
+    open_list
+
+    result = merge_built_list('<p id="counts" hidden></p><p role="status">Gone</p>')
+
+    assert_nil result["error"]
+    assert_equal %w[counts status notes-new], result["order"]
+    assert_equal true, result["same"]
+  end
+
   # With a message being worked in: that is the path where a second merge
   # could do harm (the kept message put into the copy once more, doubled or
   # sent to the end), and markup alone shows neither which element it is nor

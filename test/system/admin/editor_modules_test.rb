@@ -1,8 +1,9 @@
 require "application_system_test_case"
 
-# The editor's own modules (`app/javascript/editor/`), and the merge core the
-# editor's live refresh stands on (`app/javascript/live/keep_merge.js`),
-# imported in the browser from the page editor: the project has no JavaScript test runner, and these
+# The editor's own modules (`app/javascript/editor/`), and the merge core
+# (`app/javascript/live/keep_merge.js`) that both `editing/merge` and
+# `notes/merge` draw an answer with, imported in the browser from the page
+# editor: the project has no JavaScript test runner, and these
 # are plain modules the import map resolves, so a system test can call them
 # directly against the page's real containers (as `mind_graph_modules_test`
 # does for the graph's). The keyboard path is driven through its handle,
@@ -123,6 +124,23 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
     assert_equal %w[s], result["synced"]
     assert_equal true, result["replacedOther"]
     assert_equal 0, result["orphans"]
+  end
+
+  test "keepMerge takes the first of two elements of one id on screen as the one matched" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const box = build('<p id="a">1</p><p id="a">2</p><p id="b">old b</p>')
+      document.body.append(box)
+      const [ first, second ] = box.children
+      mod.keepMerge(box, Array.from(build('<p id="b">new b</p><p id="a">answer</p>').children), { kept: new Set([ first, second ]) })
+      const out = { texts: Array.from(box.children).map((child) => child.textContent), firstAfterB: box.children[1] === first }
+      box.remove()
+      return out
+    JS
+
+    assert_nil result["error"]
+    assert_equal [ "new b", "1", "2" ], result["texts"]
+    assert_equal true, result["firstAfterB"]
   end
 
   test "keepMerge moves the kept element without the focus when two swap" do
