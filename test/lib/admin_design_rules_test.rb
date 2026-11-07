@@ -799,12 +799,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
   end
 
-  # StudioRail: the docked rail's ground is as tall as the tabs and the
+  # The docked rail's ground is as tall as the tabs and the
   # current panel, never the blocks column, and the three stick under the
   # editor's header; a panel taller than the window scrolls inside itself.
   test "the rail's ground spans the tabs' and the panel's rows only, and the rail sticks under the header" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-top:\s*calc\(var\(--admin-top-offset\) \+ var\(--admin-editor-header-height, 0px\)\);/, css, "one top for every rail item, from the header's measured height")
+    assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-top:\s*calc\(var\(--admin-top-offset\) \+ var\(--admin-editor-header-height, 0px\) \+ var\(--admin-editor-header-gap\)\);/, css, "one top for every rail item, from the header's measured height and its gap")
+    assert_equal 1, css.scan(/--admin-editor-header-gap:\s*1\.5rem;/).size, "the header's gap is written once"
+    assert_includes Rails.root.join("app/components/admin/editor_screen/header_component.html.erb").read, "mb-(--admin-editor-header-gap)", "the header's margin is the gap"
     docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/).first
     grid = docked[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)\s*\{([^}]*)\}/, 1]
     assert_match(/grid-template-rows:\s*auto auto 1fr;/, grid, "the tabs, the panel, then a row that takes the canvas's remaining height")
@@ -934,9 +936,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tag-usage\s*\{[^}]*height:\s*4px;[^}]*background:\s*var\(--cs-paper\);/, tailwind)
   end
 
-  # A container query cannot read a custom property, so the threshold is a
-  # number written in three places; this holds them to one.
-  # FoundationLayout's one rule for spare width: a docked composition is a
+  # The one rule for spare width: a docked composition is a
   # main column that takes what the rail leaves and the rail at its right,
   # left-aligned (no `justify-content` of its own, so the grid's start), and
   # the whole stops at `--cs-content-max`.
@@ -984,6 +984,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\.(?:admin-block-card|admin-section-card|admin-section-lanes)[^{]*\{[^}]*max-width/, css, "a wide block takes the column")
   end
 
+  # A container query cannot read a custom property, so the threshold is a
+  # number written in three places; this holds them to one.
   test "the editors' rail, the dashboard's and the lists' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     editor = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten.uniq
@@ -1519,7 +1521,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty offences, "the notes' open state is the rail's current tab, and the tree never folds for the notes"
   end
 
-  # Button card: a hover a touch screen keeps after a tap is a stuck
+  # A hover a touch screen keeps after a tap is a stuck
   # highlight, so every button's hover stands under `@media (hover: hover)`.
   # Tailwind's `hover:` variant writes it so; read from the BUILT stylesheet,
   # so a redefined variant, or a class that never reached the build, fails.

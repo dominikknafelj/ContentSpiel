@@ -9,7 +9,8 @@ import { float } from "ui/float"
 // (`enter`), something inside the button may show it on hover (`reveal`),
 // and it closes when neither the pointer nor the focus is on it (`leave`).
 // Open inside a docked rail panel that scrolls, the panel is lifted out of
-// the panel's clip (`ui/float`) and put back when it closes.
+// the panel's clip (`ui/float`) and put back when it closes; it closes when
+// the menu scrolls out of the panel, and before Turbo caches the page.
 export default class extends Controller {
   static targets = [ "button", "panel" ]
 
@@ -81,9 +82,22 @@ export default class extends Controller {
 
   // The panel hangs from the menu's own box, at its left edge or, for a
   // right-aligned menu (`right-0`), at its right.
+  // It hangs from the menu's own box, as its absolute panel does (the box's
+  // line, a little taller than the button, included). When that box scrolls
+  // out of the panel the menu closes, and the focus, if it was in the menu,
+  // goes back to the button.
   lift() {
     if (this.release) return
-    this.release = float(this.panelTarget, this.element, { align: this.panelTarget.classList.contains("right-0") ? "right" : "left" })
+    this.release = float(this.panelTarget, this.element, {
+      align: this.panelTarget.classList.contains("right-0") ? "right" : "left",
+      leave: () => this.close({ refocus: this.element.contains(document.activeElement) })
+    })
+  }
+
+  // `turbo:before-cache` on the document: a menu lifted out of a panel is
+  // closed, so no snapshot keeps it fixed at a place that has moved.
+  cache() {
+    if (this.release?.floated) this.close()
   }
 
   // A list panel's button, pressed: the list is shown and takes the focus,

@@ -65,7 +65,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # FoundationLayout's figures. The page editor with the tree folded: the
+  # The figures of the one rule for spare width. The page editor with the
+  # tree folded: the
   # editor area is the window less the sidebar (240), the strip (44), the
   # scrollbar's gutter and `<main>`'s padding (48), so a window of 1600px of
   # content is 1600 + 347 wide. Running text keeps its measure (72ch, about
@@ -133,7 +134,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # StudioRail: the docked rail stays in view down a long page. Its ground is
+  # The docked rail stays in view down a long page. Its ground is
   # the grid's `::before`, measured through its computed height.
   def ground_height = page.evaluate_script("parseFloat(getComputedStyle(document.getElementById('editor-grid'), '::before').height)")
 
@@ -170,7 +171,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       tabs = box(".admin-rail__tabs")
       panel = box("#editor-grid-panel-page")
-      assert_in_delta header_bottom, tabs[1], 1, "the tabs stick under the editor's header"
+      assert_in_delta header_bottom + 24, tabs[1], 1, "the tabs stick under the editor's header, the header's gap below it"
       assert_in_delta tabs[3], panel[1], 1, "the panel sticks under the tabs"
       assert_operator panel[3], :<=, page.evaluate_script("window.innerHeight"), "the panel ends inside the window"
       assert_operator ground_height, :<=, (panel[3] - tabs[1]) + 1, "the ground is no taller than the tabs and the panel"
@@ -186,7 +187,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       panel = "#editor-grid-panel-page"
       sizes = page.evaluate_script("(() => { const panel = document.querySelector(#{panel.to_json}); return [panel.scrollHeight, panel.clientHeight] })()")
       assert_operator sizes[0], :>, sizes[1], "the Page panel is taller than the room under the tabs"
-      assert_operator box(panel)[3] - box(".admin-rail__tabs")[1], :<=, 520 - header_bottom - 22 + 1, "the tabs and the panel fit under the header, --cs-sp-4 above the window's bottom"
+      assert_in_delta 520 - 22, box(panel)[3], 1, "before the page scrolls the panel ends --cs-sp-4 above the window's bottom"
       page.execute_script("document.querySelector(#{panel.to_json}).scrollTop = 10000")
       assert_operator page.evaluate_script("document.querySelector(#{panel.to_json}).scrollTop"), :>, 0, "the panel scrolls inside itself"
       assert_equal 0, page.evaluate_script("window.scrollY"), "and the page does not move"
@@ -195,29 +196,64 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
   # A menu inside a panel that scrolls is drawn over what is below it, not
   # cut at the panel's edge: the section's layout menu, opened in the
-  # Section panel of a short window.
+  # Section panel, whose settings are shorter than the menu.
+  def layout_menu(where) = "#{where} [data-controller~='admin--ui--menu']"
+
+  def open_layout_menu(menu)
+    find("#section-#{@section.id}-words button[data-admin--editor--section-field-param='layout']").click
+    find("#{menu} button[aria-haspopup]").click
+    assert_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+  end
+
+  # The gap between a menu and its button, as the menu's own classes draw it.
+  def menu_gap(menu) = box("#{menu} [data-admin--ui--menu-target=panel]")[1] - box("#{menu} button[aria-haspopup]")[3]
+
   test "a menu in a scrolling rail panel opens whole, over what is below the panel" do
-    at_window(WIDE, height: 460) do
+    outside = nil
+    at_window(NARROW) do
+      visit_editor(@page)
+      assert_docked(false)
+      open_layout_menu(layout_menu("#section-#{@section.id}-settings"))
+      outside = menu_gap(layout_menu("#section-#{@section.id}-settings"))
+    end
+    at_window(WIDE, height: 600) do
       visit_editor(@page)
       assert_docked
-      find("#section-#{@section.id}-words button[data-admin--editor--section-field-param='layout']").click
-      assert_selector "#editor-grid-panel-section #section-#{@section.id}-settings", visible: :visible
-      menu = "#editor-grid-panel-section [data-controller~='admin--ui--menu']"
-      find("#{menu} button[aria-haspopup]").click
-      assert_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      menu = layout_menu("#editor-grid-panel-section")
+      open_layout_menu(menu)
       items = "#{menu} [data-admin--ui--menu-target=panel] [role=menuitem]"
       assert_operator box(items.sub("[role=menuitem]", ""))[3], :>, box("#editor-grid-panel-section")[3], "the menu reaches past the panel's bottom"
       page.execute_script("document.querySelectorAll(#{items.to_json}).forEach((item, index, all) => { if (index === all.length - 1) item.id = 'last-layout' })")
       assert hit?("#last-layout"), "the menu's last item is drawn over what is below the panel"
       menu_box = box("#{menu} [data-admin--ui--menu-target=panel]")
       button_box = box("#{menu} button[aria-haspopup]")
-      assert_in_delta button_box[3] + 4, menu_box[1], 1, "the menu hangs 4px under its button"
+      assert_in_delta outside, menu_box[1] - button_box[3], 1, "the menu hangs as far under its button as it does outside a panel"
       assert_in_delta button_box[0], menu_box[0], 1, "at its button's left edge"
       page.execute_script("document.querySelector('#editor-grid-panel-section').scrollTop = 30")
-      assert_in_delta box("#{menu} button[aria-haspopup]")[3] + 4, box("#{menu} [data-admin--ui--menu-target=panel]")[1], 1, "and follows it as the panel scrolls"
+      assert_in_delta outside, menu_gap(menu), 1, "and follows it as the panel scrolls"
       find("#{menu} button[aria-haspopup]").click
       assert_no_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
       assert_equal "", page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).style.position"), "closed, the menu is the absolute box its classes draw"
+    end
+  end
+
+  # A window so short that the Section panel scrolls, and that the layout
+  # menu has no room under its button: it hangs above it.
+  test "a floated menu closes when its anchor scrolls out of the panel" do
+    at_window(WIDE, height: 360) do
+      visit_editor(@page)
+      assert_docked
+      panel = "#editor-grid-panel-section"
+      menu = layout_menu(panel)
+      open_layout_menu(menu)
+      assert page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).contains(document.activeElement)"), "the focus is in the menu"
+      assert_in_delta box(menu)[1] - 4, box("#{menu} [data-admin--ui--menu-target=panel]")[3], 1, "with no room below, the menu hangs above it, its own margin away"
+      assert_operator page.evaluate_script("(() => { const p = document.querySelector('#{panel}'); return p.scrollHeight - p.clientHeight })()"), :>, 40, "the Section panel scrolls"
+      page.execute_script("document.querySelector('#{panel}').scrollTop = 10000")
+      assert_no_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      assert_equal "false", find("#{menu} button[aria-haspopup]", visible: :all)["aria-expanded"]
+      assert page.evaluate_script("document.activeElement === document.querySelector(#{(menu + " button[aria-haspopup]").to_json})"), "the focus is back on the menu's button"
+      assert_equal "", page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).style.position")
     end
   end
 

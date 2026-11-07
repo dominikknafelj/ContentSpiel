@@ -35,7 +35,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
        not-disabled:active:translate-y-px not-disabled:active:shadow-none].each { |name| assert_includes classes, name }
   end
 
-  # Button card (the owner, 2026-11-07): a tinted fill alone is no shape on
+  # The owner's decision of 2026-11-07: a tinted fill alone is no shape on
   # a rail, so the secondary carries an edge at rest, and its hover is a
   # stronger fill with the neutral lift.
   test "the secondary is a tinted fill with accent words inside a field-line edge, hovered to the press fill and shadow 2" do
@@ -182,9 +182,12 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "solid danger stays the dialog confirm" do
+  test "solid danger stays the dialog confirm, hovered to the darker danger fill and shadow 2" do
     render_inline Admin::Ui::ButtonComponent.new(label: "Delete", variant: :danger)
     assert_selector "button.bg-danger", text: "Delete"
+    classes = page.find("button")["class"].split
+    %w[not-disabled:hover:bg-danger-hover not-disabled:hover:shadow-2].each { |name| assert_includes classes, name }
+    assert_empty classes.grep(/opacity/), "the hover is a fill, never a fade"
   end
 
   test "small swaps the padding for a compact one and keeps the variant" do

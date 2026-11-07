@@ -119,7 +119,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select ".admin-empty-state", count: 0
   end
 
-  # Button card: the rail's "… →" links are small tertiary buttons, so they
+  # The rail's "… →" links are small tertiary buttons, so they
   # are underlined at rest and take the button's hover and focus.
   test "the rail's Drafts → and Full audit log → are small tertiary buttons" do
     with_locales(%w[en], default: "en")

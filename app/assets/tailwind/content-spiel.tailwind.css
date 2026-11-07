@@ -30,6 +30,7 @@
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
   --color-danger-press: var(--cs-danger-press);
+  --color-danger-hover: var(--cs-danger-hover);
   --color-chrome: var(--cs-chrome);
   --color-field-fill: var(--cs-field-fill);
   --color-rail: var(--cs-rail);
@@ -135,6 +136,11 @@
    the media panel (and its max-height) -- so none slides under the bar. */
 :root { --admin-top-offset: 0px; }
 @media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
+/* The space under the editor's sticky header (`Admin::EditorScreen::HeaderComponent`'s
+   bottom margin), which the editors' rail keeps under the header when it
+   sticks too (`--admin-rail-top`), so the rail stands where it stood before
+   the page scrolled and its height holds both ways. */
+:root { --admin-editor-header-gap: 1.5rem; }
 /* A save footer sticks to the bottom of the window; toasts rise above it, or
    on a narrow window (where the form's column is the window) they cover Save.
    By the footer's MEASURED height (`admin--saving--save-bar` writes it: a footer that
@@ -834,12 +840,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    right of it; the whole grows to `--cs-content-max` and no further, so on
    a wider window the spare width falls right of the rail. Inside the grown
    column a field of running text keeps a measure (THE MEASURE, below),
-   and a wide block takes the column. The rail is two rows,
-   the tabs and the one current panel, in the second column. The blocks
-   column opts in with `.admin-rail__main`, in the first column across both
-   rows, so the rail's rows never push the blocks down; nothing else is
-   placed, so a stray grid item falls into a row of its own below rather
-   than over the blocks. Every one of the three is matched anywhere inside
+   and a wide block takes the column. The rail is the tabs and
+   the one current panel, the first two rows of the second column. The
+   blocks column opts in with `.admin-rail__main`, in the first column
+   across every row, so the rail's rows never push the blocks down; nothing else is
+   placed, so a stray grid item lands in the first free cell, the third
+   row's under the rail, rather than over the blocks. Every one of the three is matched anywhere inside
    the grid, not only as a child, so each may stand inside an element that
    is `display: contents` in the grid (the post form) and stay inside it.
    The rail's ground is the grid's own `::before` across the tabs' and the
@@ -849,9 +855,11 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    and a third, empty one that takes the rest of the blocks column's height,
    so the ground is only as tall as the tabs and the panel. The ground, the
    tabs and the panel stick under the editor's sticky header
-   (`--admin-rail-top`: the shell's top offset and the header's height,
-   which `admin--ui--rail` measures onto the grid as
-   `--admin-editor-header-height`), the panel under the tabs' fixed height
+   (`--admin-rail-top`: the shell's top offset, the header's height, which
+   `admin--ui--rail` measures onto the grid as
+   `--admin-editor-header-height`, and the header's gap,
+   `--admin-editor-header-gap`, so they stick where they stood before the
+   page scrolled), the panel under the tabs' fixed height
    (`--admin-rail-tabs-height`), and a panel taller than the window below
    them scrolls inside itself. A popover inside a panel that scrolls would be
    cut at its edge, so the panels' popovers are lifted out of it while open
@@ -861,7 +869,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    and writes onto the grid as `data-rail-docked`; the query alone sets it.
    `--folded` (an editor's translation tab) never docks. */
 .admin-editor-area { container: admin-editor / inline-size; }
-.admin-rail-grid { --admin-rail-docked: 0; --admin-rail-top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); --admin-rail-tabs-height: 3rem; display: grid; grid-template-columns: minmax(0, 1fr); }
+.admin-rail-grid { --admin-rail-docked: 0; --admin-rail-top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px) + var(--admin-editor-header-gap)); --admin-rail-tabs-height: 3rem; display: grid; grid-template-columns: minmax(0, 1fr); }
 /* The canvas is a stacking context of its own, at every width, at
    `--cs-z-lift`: what it raises (a block's menus, a table strip's open
    entry, the rich-text popover) stays inside it, so the notes slide-over and

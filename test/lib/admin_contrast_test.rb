@@ -245,10 +245,11 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent-hover"), "the primary hovered (#{scheme})")
       assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the secondary (#{scheme})")
       assert_ratio(4.5, colour.("--cs-on-danger"), colour.("--cs-danger"), "the danger confirm (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-on-danger"), colour.("--cs-danger-hover"), "the danger confirm hovered (#{scheme})")
     end
   end
 
-  # Button card (the owner, 2026-11-07): a non-primary button's fill is no
+  # The owner's decision of 2026-11-07: a non-primary button's fill is no
   # shape on any ground (1.00 to 1.26:1), so its edge carries it, measured on
   # every ground a button stands on. The tokens are read from the classes
   # the component draws.
@@ -281,8 +282,9 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_equal "--cs-accent-press", hover_fill.(:secondary)
     assert_equal "--cs-accent-press", hover_fill.(:tertiary)
     assert_equal "--cs-danger-press", hover_fill.(:danger_text)
+    assert_equal "--cs-danger-hover", hover_fill.(:danger)
     each_scheme do |scheme, colour|
-      { secondary: "--cs-accent-tint", danger_text: "--cs-sunken" }.each do |variant, rest|
+      { secondary: "--cs-accent-tint", danger_text: "--cs-sunken", danger: "--cs-danger" }.each do |variant, rest|
         fill = hover_fill.(variant)
         assert_equal rest, button_token(variant, :regular, "bg"), "#{variant}'s rest fill"
         assert_ratio(1.2, colour.(fill), colour.(rest), "#{variant}'s hover fill #{fill} against its rest #{rest} (#{scheme})")

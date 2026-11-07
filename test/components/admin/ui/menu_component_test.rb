@@ -67,7 +67,7 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
     assert_no_selector "button[aria-controls]"
     assert_selector "[role=list][hidden][tabindex='-1'][aria-label='Everyone with this open'] > [role=listitem]", count: 2, visible: :all
     assert_no_selector "[role=menu], [role=none]", visible: :all
-    assert_equal %w[click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave],
+    assert_equal %w[click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown turbo:before-cache@document->admin--ui--menu#cache mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave],
       page.find("[data-controller='admin--ui--menu']")["data-action"].split
   end
 
@@ -81,7 +81,7 @@ class Admin::Ui::MenuComponentTest < ViewComponent::TestCase
   test "an ordinary menu has none of the hover and focus actions" do
     render_inline(Admin::Ui::MenuComponent.new(label: "More")) { |menu| menu.with_item { "x" } }
 
-    assert_equal "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown", page.find("[data-controller='admin--ui--menu']")["data-action"]
+    assert_equal "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown turbo:before-cache@document->admin--ui--menu#cache", page.find("[data-controller='admin--ui--menu']")["data-action"]
     assert_selector "button[data-action='admin--ui--menu#toggle']"
     assert_selector "[role=menu] > [role=none]", visible: :all
     assert_no_selector "[role=menu][tabindex], [role=menu][aria-label]", visible: :all

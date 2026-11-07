@@ -173,11 +173,23 @@ export default class extends Controller {
 
   // Inside a docked rail panel that scrolls, the list is lifted out of the
   // panel's clip (`ui/float`), under the field and as wide as it, until it
-  // closes.
+  // closes; it closes when the field scrolls out of the panel (the focus, if
+  // it was in the list, back to the input), and before Turbo caches the page.
   open() {
     this.listboxTarget.hidden = false
-    this.release ||= float(this.listboxTarget, this.listboxTarget.parentElement, { width: true })
+    this.release ||= float(this.listboxTarget, this.listboxTarget.parentElement, { width: true, leave: () => this.leaveFloat() })
     this.inputTarget.setAttribute("aria-expanded", "true")
+  }
+
+  leaveFloat() {
+    const inside = this.listboxTarget.contains(document.activeElement)
+    this.close()
+    if (inside) this.inputTarget.focus()
+  }
+
+  // `turbo:before-cache` on the document.
+  cache() {
+    if (this.release?.floated) this.close()
   }
 
   close() {

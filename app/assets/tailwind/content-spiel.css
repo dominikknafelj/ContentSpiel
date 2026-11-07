@@ -51,6 +51,9 @@
   --cs-warn-ink: oklch(0.45 0.11 70);
   --cs-warn-tint: oklch(0.95 0.05 80);
   --cs-danger: oklch(0.53 0.19 25);
+  /* The danger confirm's fill under the pointer, a step from the danger fill
+     with its on-danger words still text on it. */
+  --cs-danger-hover: #a21921;
   --cs-danger-ink: oklch(0.42 0.15 25);
   --cs-danger-tint: oklch(0.96 0.03 25);
   /* A danger text button's fill under the pointer, a step from sunken. */
@@ -165,6 +168,7 @@
   --cs-warn-ink: oklch(0.84 0.11 75);
   --cs-warn-tint: oklch(0.30 0.05 70);
   --cs-danger: oklch(0.68 0.17 25);
+  --cs-danger-hover: #fa8880;
   --cs-danger-ink: oklch(0.80 0.12 25);
   --cs-danger-tint: oklch(0.29 0.06 25);
   --cs-danger-press: #552b33;

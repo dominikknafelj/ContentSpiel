@@ -9,7 +9,7 @@
      data-admin--ui--chip-input-lowercase-value="<%= lowercase %>"
      data-admin--ui--chip-input-exclude-value="<%= exclude.to_json %>"
      <% if max_length %>data-admin--ui--chip-input-max-length-value="<%= max_length %>"<% end %>
-     data-action="input->admin--ui--chip-input#swallow change->admin--ui--chip-input#swallow">
+     data-action="input->admin--ui--chip-input#swallow change->admin--ui--chip-input#swallow turbo:before-cache@document->admin--ui--chip-input#cache">
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= label %></label>
 
   <%# The sentinel -- see this component's own class comment. It is also the control

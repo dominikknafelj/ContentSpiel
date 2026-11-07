@@ -35,9 +35,10 @@ module Admin
       # THE HOVER is a stronger fill and a neutral lift, never accent around
       # the button: an accent ring or glow is what the focus ring is, and two
       # buttons would look focused at once. The secondary and the danger text
-      # take their press fill and shadow 2, the tertiary the accent press fill
-      # under its underline and no lift (a text button does not rise), the
-      # primary its darker accent and shadow 3. Each press fill's step from its
+      # take their press fill and shadow 2, the danger confirm its darker
+      # danger and shadow 2, the tertiary the accent press fill under its
+      # underline and no lift (a text button does not rise), the primary its
+      # darker accent and shadow 3. Each press fill's step from its
       # rest and its words on it are measured (`admin_contrast_test`).
       VARIANT_CLASSES = {
         primary: "border-transparent bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 " \
@@ -46,7 +47,7 @@ module Admin
         tertiary: "border-transparent bg-transparent text-accent not-disabled:hover:bg-accent-press not-disabled:hover:underline",
         # Solid red: a dialog's destructive confirm only. `on-danger` is the
         # token for the words on it (white in light, near-black in dark).
-        danger: "border-transparent bg-danger text-on-danger not-disabled:hover:opacity-90",
+        danger: "border-transparent bg-danger text-on-danger not-disabled:hover:bg-danger-hover not-disabled:hover:shadow-2",
         # The trigger for a destructive action: sunken, red words.
         danger_text: "border-field-line bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
       }.freeze
