@@ -13,7 +13,9 @@ module Dashboard
   # `records:` narrows the read to those records' threads (the merged panel
   # asks which of its unpublished records are also discussed); nil reads
   # every record. The narrowing is inside the readable threads, so a record
-  # handed in that the viewer may not read still has no row.
+  # handed in that the viewer may not read still has no row. The records
+  # handed in are already loaded (and kept: the caller read them through
+  # the read scope), so they are not read again.
   #
   # `last_author` is that person as a user, `last_author_id` their id when
   # the user is gone (the row then says "a deleted user"); both nil once the
@@ -38,7 +40,7 @@ module Dashboard
         threads = Notes::Thread.arel_table
         newest = threads[:last_message_at].maximum
         groups = unresolved.group(:container_type, :container_id)
-          .order(newest.desc, threads[:container_id].desc).limit(@limit).pluck(:container_type, :container_id, Arel.star.count, newest)
+          .order(newest.desc, threads[:container_id].desc, threads[:container_type].desc).limit(@limit).pluck(:container_type, :container_id, Arel.star.count, newest)
         records = records_of(groups)
         author_ids = last_author_ids(groups)
         authors = author_ids.values.compact.then { |ids| ids.empty? ? {} : User.where(id: ids.uniq).index_by(&:id) }
@@ -82,6 +84,8 @@ module Dashboard
     end
 
     def records_of(groups)
+      return @records.index_by { |record| [ record.class.base_class.name, record.id ] } if @records
+
       groups.group_by(&:first).flat_map do |type, list|
         type.constantize.kept.where(id: list.map { |row| row[1] }).map { |record| [ [ type, record.id ], record ] }
       end.to_h

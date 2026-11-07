@@ -200,8 +200,10 @@ module Dashboard
       [ name, *Audit::Event::LEGACY_POLYMORPHIC_TYPES.filter_map { |old, current| old if current == name } ]
     end
 
-    def newest_first(records, attribute, limit) = records.max_by(limit) { |r| [ r.public_send(attribute), r.id ] }
+    # Ties go by id, then by model: a page and a post may share both a time
+    # and an id, and `max_by` and `min_by` are not stable.
+    def newest_first(records, attribute, limit) = records.max_by(limit) { |r| [ r.public_send(attribute), r.id, r.class.base_class.name ] }
 
-    def soonest_first(records, attribute, limit) = records.min_by(limit) { |r| [ r.public_send(attribute), r.id ] }
+    def soonest_first(records, attribute, limit) = records.min_by(limit) { |r| [ r.public_send(attribute), r.id, r.class.base_class.name ] }
   end
 end

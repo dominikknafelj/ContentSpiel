@@ -26,8 +26,13 @@ module Dashboard
   # scoped `pluck` of ids per model among the unpublished rows, skipped for
   # a model with none. Both sources are read-scoped (`AccessControl.scope`,
   # `Notes.readable_threads`, which hide the trash), and so is the pluck: a
-  # record outside the viewer's scope leaves no row. The statements are the
-  # same for one row as for five.
+  # record outside the viewer's scope leaves no row. The statements are
+  # bounded by the kinds of record, never by the rows: the narrowed thread
+  # read runs only when a row came from the feed alone, and each pluck only
+  # for a model with an unpublished row.
+  #
+  # Ties go by the record's id, then its model (`#rank`): a page and a post
+  # may share a time and an id, and `max_by` and `sort_by` are not stable.
   #
   # A row's routes are names (`Audit::Sentence::Route`), resolved by the
   # component that draws the row, which also picks the words.
@@ -64,7 +69,7 @@ module Dashboard
         else completed(merged)
         end
         publishable = publishable_ids(entries.select { |entry| entry[:unpublished] }.map { |entry| entry[:record] })
-        entries.map { |entry| row(entry, publishable) }.sort_by { |row| [ row.at, row.record.id ] }.reverse
+        entries.map { |entry| row(entry, publishable) }.sort_by { |row| rank(row.at, row.record) }.reverse
       end
     end
 
@@ -79,7 +84,7 @@ module Dashboard
       entries = {}
       threads.each { |row| (entries[key(row.record)] ||= { record: row.record })[:thread] = row }
       unpublished.each { |record| (entries[key(record)] ||= { record: })[:unpublished] = true }
-      entries.values.max_by(@limit) { |entry| [ newest(entry), entry[:record].id ] }
+      entries.values.max_by(@limit) { |entry| rank(newest(entry), entry[:record]) }
     end
 
     # Each kept entry with the reason its source did not bring.
@@ -117,6 +122,8 @@ module Dashboard
     def publishable_kind?(record) = PUBLISH.key?(record.class.base_class.name)
 
     def newest(entry) = [ entry[:thread]&.at, (entry[:record].unpublished_changes_at if entry[:unpublished]) ].compact.max
+
+    def rank(at, record) = [ at, record.id, record.class.base_class.name ]
 
     def key(record) = [ record.class.base_class.name, record.id ]
   end

@@ -128,6 +128,23 @@ class Dashboard::WaitingForYouTest < ActiveSupport::TestCase
     assert_equal [ kept, blog, resume ].to_set, waiting(users(:two)).rows.map(&:record).to_set
   end
 
+  test "a page and a post with the same id and the same time are ranked by their model, at the cut and in the order" do
+    page = create_page(title: "Same id")
+    post = create_post(title: "Same id")
+    Post.where(id: post.id).update_all(id: page.id) if post.id != page.id
+    post = Post.find(page.id)
+    [ page, post ].each { |record| mark(record, @base) }
+    newer = Array.new(3) { |n| create_post(title: "Newer #{n}") }
+    newer.each_with_index { |record, n| mark(record, @base + (n + 1).minutes) }
+
+    assert_equal [ post, page ], waiting.rows.last(2).map(&:record)
+    assert_equal [ post, page ], waiting(filter: "unpublished").rows.last(2).map(&:record)
+
+    mark(create_post(title: "Newest"), @base + 10.minutes)
+    assert_equal post, waiting.rows.last.record
+    assert_not_includes waiting.rows.map(&:record), page
+  end
+
   test "the same statements for one row of each as for five" do
     pages = Array.new(5) { |n| create_page(title: "Discussed #{n}") }
     posts = Array.new(5) { |n| create_post(title: "Marked #{n}") }

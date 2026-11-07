@@ -61,7 +61,9 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     note(asset)
     narrowed = Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, records: [ @page, @quiet, asset ])
 
+    statements = capture_sql { narrowed.rows }
     assert_equal [ [ @quiet, 1 ], [ @page, 2 ], [ asset, 1 ] ].to_set, narrowed.rows.map { |row| [ row.record, row.count ] }.to_set
+    assert_empty statements.grep(/\ASELECT "(pages|posts|media_assets)"\.\*/), "the records handed in are not read again"
     assert_equal @quiet, narrowed.rows.first.record
     assert_equal 4, narrowed.total
     assert_empty Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, records: []).rows
