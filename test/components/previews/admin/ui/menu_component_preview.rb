@@ -1,8 +1,9 @@
 module Admin
   module Ui
-    # `Admin::Ui::MenuComponent`: the popover menu, aligned right (default) and left.
+    # `Admin::Ui::MenuComponent`: the closed menu at rest, aligned right (the
+    # default), and aligned left. Opening it is `admin--ui--menu`'s.
     class MenuComponentPreview < ViewComponent::Preview
-      def default
+      def rest
         render Admin::Ui::MenuComponent.new(label: "More ▾") do |menu|
           menu.with_item { "<a href=\"#\">Rename</a>".html_safe }
           menu.with_item { "<a href=\"#\">Delete…</a>".html_safe }

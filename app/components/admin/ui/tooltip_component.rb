@@ -28,12 +28,13 @@ module Admin
         widths: :fluid,
         interface: %i[text],
         limits: [
-          "It is drawn hidden: showing, placing and hiding it is admin--ui--tooltip's, on the host that carries host_data.",
+          "It is drawn hidden, so a static render shows nothing of it: showing, placing and hiding it is admin--ui--tooltip's, on the host that carries host_data.",
           "It has no arrow and no shadow, and is at most 240px wide.",
           "Its bubble is a target of admin--ui--tooltip, which its host attaches through host_data."
         ],
-        states: %i[rest],
+        states: [],
         script_states: {
+          rest: [ "test/system/admin/presence_test.rb", "a circle's tooltip: after 300ms on hover, 6px under the circle and centred, at once from one circle to the next, and gone on Escape or a press" ],
           shown: [ "test/system/admin/presence_test.rb", "a circle's tooltip: after 300ms on hover, 6px under the circle and centred, at once from one circle to the next, and gone on Escape or a press" ]
         },
         keys: [],

@@ -13,24 +13,25 @@ require "ripper"
 # accessibility sentence, the motion, the content edges, the widths and the
 # limits.
 module UiContract
-  # The 44 components of app/components/admin/ui when the contract came. A
-  # component on it may declare `keyboard: nil`; one made after it names its
-  # keyboard browser test. Frozen: it only shrinks, when a component on it
-  # gains its keyboard test or is deleted, and nothing is ever added.
+  # The components of app/components/admin/ui made before the contract that
+  # name no keyboard browser test yet: one on it may declare `keyboard: nil`,
+  # and every other component names its test. Frozen: it only shrinks, when a
+  # component on it declares its keyboard test or is deleted, and nothing is
+  # ever added (test/lib/component_parts_test.rb).
   MADE_BEFORE_CONTRACT = %w[
     Admin::Ui::ActorAvatarComponent Admin::Ui::AvatarComponent Admin::Ui::BadgeComponent Admin::Ui::ButtonComponent
-    Admin::Ui::ChannelChipComponent Admin::Ui::CheckboxComponent Admin::Ui::ChipInputComponent
+    Admin::Ui::ChannelChipComponent Admin::Ui::CheckboxComponent
     Admin::Ui::ConfirmDialogComponent Admin::Ui::ContentTypeDotComponent Admin::Ui::DialogComponent
     Admin::Ui::EmptyStateComponent Admin::Ui::ErrorSummaryComponent Admin::Ui::FieldComponent
     Admin::Ui::FileDropComponent Admin::Ui::IconChipComponent Admin::Ui::InsecureNoticeComponent
     Admin::Ui::LanguageTabsComponent Admin::Ui::LibraryImageComponent Admin::Ui::ListStateComponent
-    Admin::Ui::MailFailedNoticeComponent Admin::Ui::MenuComponent Admin::Ui::PaginationComponent
+    Admin::Ui::MailFailedNoticeComponent Admin::Ui::PaginationComponent
     Admin::Ui::PasswordFieldComponent Admin::Ui::PrefixInputComponent Admin::Ui::RailPanelComponent
-    Admin::Ui::RailSlotComponent Admin::Ui::RailTabComponent Admin::Ui::RailTabsComponent
+    Admin::Ui::RailSlotComponent Admin::Ui::RailTabComponent
     Admin::Ui::SaveBarComponent Admin::Ui::SaveStatusComponent Admin::Ui::ScheduledDateComponent
     Admin::Ui::SlotComponent Admin::Ui::StatusChipComponent Admin::Ui::SystemCheckRowComponent
     Admin::Ui::TabLinksComponent Admin::Ui::ThemeSwitchComponent Admin::Ui::TimeAgoComponent
-    Admin::Ui::ToastComponent Admin::Ui::ToastRegionComponent Admin::Ui::TooltipComponent
+    Admin::Ui::ToastComponent Admin::Ui::ToastRegionComponent
     Admin::Ui::TranslationChipComponent Admin::Ui::UnpublishedChipComponent Admin::Ui::UserNameComponent
     Admin::Ui::WordDiffComponent
   ].freeze

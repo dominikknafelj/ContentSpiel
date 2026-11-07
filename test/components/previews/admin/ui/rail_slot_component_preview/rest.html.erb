@@ -1,0 +1,15 @@
+<%# The panel is registered for this template's render alone: `render_with_template` only describes what to render, so `Admin::Slots.with` goes here, round the render itself. %>
+<%= Admin::Slots.with("editor.rail.tabs" => [ Admin::Ui::RailSlotComponentPreview::PanelComponent ]) do
+      slot = Admin::Ui::RailSlotComponent.new(rail_id: "preview-rail", record: nil, viewer: nil, reserved: %w[page])
+      tag.div(class: "admin-editor-area") do
+        tag.div(id: "preview-rail", class: "admin-rail-grid", data: { controller: "admin--ui--rail" }) do
+          safe_join([
+            render(Admin::Ui::RailTabsComponent.new(rail_id: "preview-rail", tabs: [ Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: "Page") ],
+              slot_tabs: slot.tabs, current: slot.current_key || "page")),
+            render(Admin::Ui::RailPanelComponent.new(rail_id: "preview-rail", key: "page")) { tag.p("The page's settings stand here.", class: "text-sm text-dim") },
+            render(slot),
+            tag.div(class: "admin-rail__main admin-form-column min-h-40 rounded-card bg-surface p-4 shadow-1")
+          ])
+        end
+      end
+    end %>

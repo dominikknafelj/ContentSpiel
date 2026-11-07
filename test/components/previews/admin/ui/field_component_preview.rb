@@ -1,27 +1,33 @@
 module Admin
   module Ui
-    # `Admin::Ui::FieldComponent` (cs-studio spec §4.3/§6.2): one example per
-    # dispatch outcome the wrapper chrome cares about (a plain field, errors,
-    # a translated field's read-only original, the untranslated hint), plus
-    # one example that renders every field type from a test-only definition
-    # built entirely in memory -- proof the dispatcher covers every type
-    # `ContentModel::Definition::Field` supports, the same "open-type proof"
-    # spirit as `test/support/test_types.rb`.
+    # `Admin::Ui::FieldComponent`: one example per state the wrapper chrome
+    # draws (a plain field, errors, a translated field's read-only original,
+    # an original that changed since, the untranslated hint), plus one example
+    # that renders every field type from a test-only definition built entirely
+    # in memory -- proof the dispatcher covers every type
+    # `ContentModel::Definition::Field` supports, in the same spirit as
+    # `test/support/test_types.rb`.
     class FieldComponentPreview < ViewComponent::Preview
       Field = ContentModel::Definition::Field
 
-      def plain
+      def rest
         render Admin::Ui::FieldComponent.new(field: Field.new(name: "subtitle", type: :string, options: {}), form_name: "page", value: "A shorter, secondary line", locale: "en")
       end
 
-      def required_with_errors
+      def invalid
         field = Field.new(name: "venue", type: :string, options: { required: true })
         render Admin::Ui::FieldComponent.new(field:, form_name: "post[fields]", value: nil, locale: "en", errors: [ "can't be blank" ])
       end
 
-      def translated_with_original
+      def translated
         field = Field.new(name: "headline", type: :string, options: { translated: true })
         render Admin::Ui::FieldComponent.new(field:, form_name: "post[fields]", value: nil, original: "Willkommen", locale: "de")
+      end
+
+      def outdated
+        field = Field.new(name: "headline", type: :string, options: { translated: true })
+        render Admin::Ui::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de", translation_state: :outdated,
+          translation_confirm: { record_type: "Post", record_id: 4, field: "headline", locale: "de" })
       end
 
       def untranslated_hint
@@ -32,8 +38,8 @@ module Admin
       # A definition covering every scalar and group type at once. `group`/
       # `groups` need a real `FieldGroups` entry to resolve their `of:`, so
       # this hands a sidecar template (`every_field_type.html.erb`) the field
-      # list and lets *it* register a test-only group (`test/…`, spec §3.2a's
-      # reserved prefix), render every field, then restore the registries --
+      # list and lets *it* register a test-only group (`test/…`, the prefix
+      # kept for tests), render every field, then restore the registries --
       # `render`/`render_with_template` only ever return a description of
       # what to render (the actual rendering happens later, inside
       # `ComponentPreviewsController`), so registering here and cleaning up in

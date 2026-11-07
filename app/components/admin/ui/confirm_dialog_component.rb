@@ -27,10 +27,10 @@ module Admin
         motion: :reduced,
         content_edges: %i[short long],
         widths: :fixed,
-        interface: %i[id title body cancel_label destructive],
+        interface: %i[id title body cancel_label destructive open_on_load],
         limits: [
           "The confirm action is the caller's slot: it performs no write of its own.",
-          "It opens only through admin--ui--dialog, like every dialog."
+          "It opens only through admin--ui--dialog, like every dialog: by its id, or marked by open_on_load."
         ],
         states: %i[rest destructive hover focus],
         script_states: {
@@ -46,17 +46,20 @@ module Admin
       # what it affects (deleting a group names the tokens it revokes).
       renders_one :details
 
-      def initialize(id:, title:, body: nil, cancel_label: nil, destructive: false)
+      # `open_on_load:` is the shared dialog's: the dialog opens as soon as the
+      # page appears.
+      def initialize(id:, title:, body: nil, cancel_label: nil, destructive: false, open_on_load: false)
         @id = id
         @title = title
         @body = body
         @cancel_label = cancel_label
         @destructive = destructive
+        @open_on_load = open_on_load
       end
 
       private
 
-      attr_reader :id, :title, :body, :destructive
+      attr_reader :id, :title, :body, :destructive, :open_on_load
 
       # A default argument can't ask `t`: nothing is rendering yet at `initialize`.
       def cancel_label = @cancel_label || t(".cancel")

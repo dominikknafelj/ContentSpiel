@@ -7,10 +7,11 @@ module Admin
     # - `states:` the states a static render draws, each but the pointer and
     #   keyboard ones (`STATES_NOT_PREVIEWED`) a preview example of the same
     #   name.
-    # - `script_states:` a state only a script reaches (a dialog's `open`),
-    #   mapped to the `[file, test name]` of the browser test that holds it. A
-    #   static render of it would look like `rest`, so it is never in
-    #   `states:` and has no example.
+    # - `script_states:` a state only a script reaches (a dialog's `open`), or
+    #   one a static render draws invisibly (a tooltip's hidden bubble), mapped
+    #   to the `[file, test name]` of the browser test that holds it. A static
+    #   render shows nothing of it, so it is never in `states:` and has no
+    #   example.
     # - `keys:` the key paths it owns under `admin.components.ui.<name>`, a
     #   plural (`one`, `other`) being one.
     # - `slots:` its ViewComponent slots.

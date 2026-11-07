@@ -1,14 +1,14 @@
 module Admin
   module Ui
-    # `Admin::Ui::SystemCheckRowComponent` (design pass round 3): the System status
-    # rows, an OK one, a warning with a copyable command, and the setup
-    # wizard's variant without the Copy button.
+    # `Admin::Ui::SystemCheckRowComponent`: the System status rows, an OK
+    # one, a warning with a copyable command, and the setup wizard's variant
+    # without the Copy button.
     class SystemCheckRowComponentPreview < ViewComponent::Preview
       def ok
         render Admin::Ui::SystemCheckRowComponent.new(result: Setup::SystemCheck::Result.new(label: "File storage", status: :ok, message: "Uploads can be stored and read back."))
       end
 
-      def warning_with_command
+      def warning
         render Admin::Ui::SystemCheckRowComponent.new(result: mail_warning)
       end
 

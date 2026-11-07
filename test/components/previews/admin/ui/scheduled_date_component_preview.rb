@@ -3,7 +3,7 @@ module Admin
     # `Admin::Ui::ScheduledDateComponent`: a scheduled date's amber block,
     # the month over the day.
     class ScheduledDateComponentPreview < ViewComponent::Preview
-      def default
+      def rest
         render Admin::Ui::ScheduledDateComponent.new(at: 5.days.from_now)
       end
     end

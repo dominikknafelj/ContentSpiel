@@ -1,10 +1,16 @@
 module Admin
   module Ui
-    # `Admin::Ui::SaveBarComponent` (design pass spec §4). The footer is always
-    # there; `admin--saving--save-bar` writes its count and enables Save, so the preview
-    # wraps it in the controller with one field: type in it to see both change.
+    # `Admin::Ui::SaveBarComponent`. The footer is always there;
+    # `admin--saving--save-bar` writes its count and enables Save, so each
+    # example wraps it in the controller with one field: type in it to see
+    # both change. `rest` is a form's footer, `contained` the footer of one
+    # card, under a line inside it.
     class SaveBarComponentPreview < ViewComponent::Preview
-      def default
+      def rest
+        render_with_template
+      end
+
+      def contained
         render_with_template
       end
     end
