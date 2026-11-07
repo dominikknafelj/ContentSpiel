@@ -60,7 +60,8 @@ module Admin
         },
         keys: [],
         slots: %i[items],
-        controller: "admin--ui--menu"
+        controller: "admin--ui--menu",
+        keyboard: [ "test/system/admin/editor_header_test.rb", "the menu skips a disabled item: ArrowDown wraps past the homepage's disabled Move to trash" ]
       )
 
       renders_many :items

@@ -14,7 +14,10 @@ module Admin
     # - `keys:` the key paths it owns under `admin.components.ui.<name>`, a
     #   plural (`one`, `other`) being one.
     # - `slots:` its ViewComponent slots.
-    # - `controller:` the Stimulus identifier it stands on, or nil.
+    # - `controller:` the Stimulus identifier it attaches itself
+    #   (`data-controller` on its own markup), or nil. A component that is only
+    #   a target or an action of a controller someone else attaches declares
+    #   nil and says whose in its `limits:`.
     # - `keyboard:` the `[file, test name]` of its keyboard browser test, or
     #   nil for a component made before the contract.
     module Contract

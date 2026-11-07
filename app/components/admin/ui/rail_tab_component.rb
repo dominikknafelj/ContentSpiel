@@ -22,12 +22,13 @@ module Admin
         interface: %i[rail_id tab current contents],
         limits: [
           "Its current is only the first draw's: from then on the rail's script decides it.",
-          "With contents it draws only the label and the count, for a stream to put into the tab."
+          "With contents it draws only the label and the count, for a stream to put into the tab.",
+          "Its press and keys are actions of admin--ui--rail, which the editor's rail attaches, not this tab."
         ],
         states: %i[rest current count hover focus],
         keys: [],
         slots: [],
-        controller: "admin--ui--rail"
+        controller: nil
       )
 
       def initialize(rail_id:, tab:, current: false, contents: false)

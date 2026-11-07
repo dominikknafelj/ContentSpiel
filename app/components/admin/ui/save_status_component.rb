@@ -26,15 +26,16 @@ module Admin
         interface: %i[id state at count live holder viewer],
         limits: [
           "It turns a state into its one sentence and decides no state itself: a stream or admin--saving--autosave chooses it.",
-          "Its Retry works only on the copy the autosave script writes, outside whose form this element stands."
+          "Its Retry works only on the copy the autosave script writes, outside whose form this element stands.",
+          "It serves admin--saving--autosave, which its form attaches; Retry is that controller's action."
         ],
-        states: %i[idle saving saved error stale held saved_over offline retrying signed_out forbidden],
+        states: %i[idle saving saved error stale held saved_over offline retrying signed_out forbidden hover focus],
         keys: %w[
           saving saving_live saved saved_at saved_live saved_live_at error forbidden retrying offline
           stale held held_own_tab held_unknown saved_over signed_out retry
         ],
         slots: [],
-        controller: "admin--saving--autosave"
+        controller: nil
       )
 
       # `signed_out` is never rendered by any

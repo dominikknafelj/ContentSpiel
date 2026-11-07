@@ -169,6 +169,11 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: "") }
     assert_match "controller", failure.message
 
+    # A target and an action of the controller are not its attachment.
+    serves = 'data-admin--ui--dialog-target="panel" data-action="click->admin--ui--dialog#open"'
+    failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: serves) }
+    assert_match "not attached in its own markup", failure.message
+
     failure = assert_raises(Minitest::Assertion) { assert_contract_interface(Class.new { def self.name = "UiContractBareComponent" }) }
     assert_match "UiContractBareComponent", failure.message
   end
@@ -196,7 +201,7 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
       RUBY
       load path
       failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractFromFileComponent) }
-      assert_match "not named in its own source", failure.message
+      assert_match "not attached in its own markup", failure.message
 
       File.write(path.sub(/\.rb\z/, ".html.erb"), %(<div data-controller="admin--ui--dialog"></div>))
       assert_contract(UiContractFromFileComponent)

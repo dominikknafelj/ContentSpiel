@@ -19,12 +19,13 @@ module Admin
         interface: %i[rail_id key current docked_only],
         limits: [
           "Its content is drawn once and never cloned; which panel shows is the rail's script from the first draw on.",
-          "A docked_only panel is hidden below the rail's threshold."
+          "A docked_only panel is hidden below the rail's threshold.",
+          "It is a target of admin--ui--rail, which the editor's rail attaches, not this panel."
         ],
         states: %i[rest current docked_only],
         keys: [],
         slots: [],
-        controller: "admin--ui--rail"
+        controller: nil
       )
 
       def initialize(rail_id:, key:, current: false, docked_only: false)

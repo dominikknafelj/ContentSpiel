@@ -42,7 +42,8 @@ module Admin
         },
         keys: %w[label],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/editor_rail_test.rb", "Page and Section are tabs: arrows move between them, Home and End go to the ends" ]
       )
 
       Tab = Data.define(:key, :label, :count, :count_data) do

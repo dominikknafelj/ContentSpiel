@@ -4,7 +4,7 @@ require "ripper"
 # its contract (`Admin::Ui::Contract`, app/components/admin/ui/contract.rb),
 # and `assert_contract` holds the declaration to the code: the keywords of
 # `initialize`, the ViewComponent slots, the keys it owns in ui.en.yml, its
-# controller's file and its name in the component's source, and the browser
+# controller's file and that the component attaches it itself, and the browser
 # tests its script-held states and its keyboard name. The components are
 # derived from the files, so a new one is in every check from the day its
 # file is written.
@@ -62,6 +62,16 @@ module UiContract
       depth = nil if depth.zero? && type == :on_rparen
       true
     end
+  end
+
+  # Whether `source` attaches `identifier` itself: in a `data-controller`
+  # attribute's list, or as the value of a `controller:` key of a tag's
+  # `data:`. A target or an action of it (`data-<identifier>-target`,
+  # `click->identifier#act`) is not an attachment.
+  def self.attaches?(source, identifier)
+    name = /(?<![\w-])#{Regexp.escape(identifier)}(?![\w-])/
+    source.scan(/data-controller=["']([^"']*)["']/).flatten.any? { |list| list.match?(name) } ||
+      source.match?(/controller:\s*["']#{Regexp.escape(identifier)}["']/)
   end
 
   # What the controller check reads of a component: its templates whole, and
@@ -127,7 +137,8 @@ module UiContract
     file = Rails.root.join("app/javascript/controllers/#{identifier.gsub('--', '/').tr('-', '_')}_controller.js")
     assert File.exist?(file), "#{klass.name}'s contract controller #{identifier} has no file: #{file.relative_path_from(Rails.root)}"
     source ||= UiContract.own_source(klass)
-    assert_includes source, identifier, "#{klass.name}'s contract controller #{identifier} is not named in its own source, outside its declaration and its comments"
+    assert UiContract.attaches?(source, identifier),
+      "#{klass.name}'s contract controller #{identifier} is not attached in its own markup (a data-controller or a controller: key), outside its declaration and its comments"
   end
 
   # A state in both `states:` and `script_states:` is refused by the

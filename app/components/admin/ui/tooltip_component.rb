@@ -29,7 +29,8 @@ module Admin
         interface: %i[text],
         limits: [
           "It is drawn hidden: showing, placing and hiding it is admin--ui--tooltip's, on the host that carries host_data.",
-          "It has no arrow and no shadow, and is at most 240px wide."
+          "It has no arrow and no shadow, and is at most 240px wide.",
+          "Its bubble is a target of admin--ui--tooltip, which its host attaches through host_data."
         ],
         states: %i[rest],
         script_states: {
@@ -37,7 +38,8 @@ module Admin
         },
         keys: [],
         slots: [],
-        controller: "admin--ui--tooltip"
+        controller: nil,
+        keyboard: [ "test/system/admin/presence_test.rb", "a tooltip's host that takes the focus shows it at once for the keyboard, and Escape hides it with the focus still there" ]
       )
 
       HOST = "relative".freeze

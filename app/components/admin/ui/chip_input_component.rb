@@ -80,7 +80,8 @@ module Admin
           added removed
         ],
         slots: [],
-        controller: "admin--ui--chip-input"
+        controller: "admin--ui--chip-input",
+        keyboard: [ "test/system/admin/chip_input_test.rb", "a chip's remove button is reachable by keyboard, and focus lands on a neighbour" ]
       )
 
       def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil, track: false)

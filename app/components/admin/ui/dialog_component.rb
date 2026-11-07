@@ -34,7 +34,7 @@ module Admin
         script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },
         keys: %w[close],
         slots: %i[footer],
-        controller: "admin--ui--dialog"
+        controller: nil
       )
 
       WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880 }.freeze

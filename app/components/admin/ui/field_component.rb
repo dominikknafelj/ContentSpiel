@@ -36,7 +36,7 @@ module Admin
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
           "Whether the original is shown is the caller's: it is shown only when an original is handed over."
         ],
-        states: %i[rest invalid translated outdated focus],
+        states: %i[rest invalid translated outdated hover focus],
         keys: [],
         slots: [],
         controller: nil

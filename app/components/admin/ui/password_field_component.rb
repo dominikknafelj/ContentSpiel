@@ -32,7 +32,7 @@ module Admin
           "The password is never drawn back: the input has no value.",
           "Its words (Show, Hide, the rule line and the meter's hints) are English in the template and the script, not keys."
         ],
-        states: %i[rest meter invalid focus],
+        states: %i[rest meter invalid hover focus],
         script_states: {
           revealed: [ "test/system/password_field_test.rb", "the change-password form shows the meter, toggles visibility and blocks a short password" ],
           measured: [ "test/system/password_field_test.rb", "the change-password form shows the meter, toggles visibility and blocks a short password" ]

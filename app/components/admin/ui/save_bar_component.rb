@@ -21,7 +21,8 @@ module Admin
         interface: %i[form_id cancel_url save_label save_data contained],
         limits: [
           "The count, the blocked hint and Save's disabled state are written by admin--saving--save-bar on the form; without JavaScript Save is a plain working submit.",
-          "It must stand inside the form that carries admin--saving--save-bar."
+          "It must stand inside the form that carries admin--saving--save-bar.",
+          "Its parts are targets of admin--saving--save-bar, which the form around it attaches."
         ],
         states: %i[rest contained hover focus],
         script_states: {
@@ -31,7 +32,7 @@ module Admin
         },
         keys: %w[save cancel changes unsaved no_changes blocked],
         slots: [],
-        controller: "admin--saving--save-bar"
+        controller: nil
       )
 
       # `contained: true` is the footer of ONE card, drawn inside it: under a line, within the card's padding, on the
