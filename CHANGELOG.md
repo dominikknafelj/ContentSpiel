@@ -49,6 +49,9 @@
 ### Changed
 
 - CS Studio's dashboard is redrawn. Its panels are headed by their job: Waiting for you (open threads and unpublished changes in one list, a record with both in one row, filtered by Everything, Open threads or Unpublished changes, with "Review and publish…" for whoever may publish), Notes for you, Pick up where you left off (the viewer's drafts as tiles), and, in a rail beside them when the dashboard is 1200px wide, Publishing on its own, Languages behind … and What changed recently. "New page…" and "New post…" stand in the heading row. An editor's address with `?review=publish` opens Publish changes on load. Back to the dashboard shows it as it is now, never as it was left, and a filter pressed from the keyboard keeps the focus.
+- Switching between light and dark cross-fades: in CS Studio over 250ms, ease-out; on the public site's footer toggle by the browser's default fade, which a theme may style with `::view-transition-old(root)` and `::view-transition-new(root)` in its own stylesheet. There is no fade under reduced motion, where the browser has no view transitions, or on first paint.
+- Every module in CS Studio's sidebar stands on a chip of its own colour family (Dashboard, Pages and Mind graph structure, Posts and Tags lists, Media media, Forms form, Translations text, Users and Groups people, the system modules code); the current module's chip keeps its colour on the accent-tint row.
+- CS Studio's layers are one scale: the save bar takes the lowest page layer, the media library's drop overlay and the shell's scrim over an open menu, and the rich-text popover and the mind graph's search results at the menus' layer. A menu inside the editor's canvas scrolls under the editor's header and the top bar.
 
 ### Removed
 
