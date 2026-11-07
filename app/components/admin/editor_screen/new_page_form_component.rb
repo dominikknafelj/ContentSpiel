@@ -35,6 +35,8 @@ module Admin
       TITLE_ID = "new-page-title".freeze
       INSIDE_ID = "new-page-inside".freeze
       TEMPLATE_ID = "new-page-template".freeze
+      # The URL line's and the note's words, shared with the script (`NewRecordMessages`).
+      NEW_RECORD = "admin.components.editor_screen.new_record".freeze
 
       # The refusal a create answers when the chosen parent went meanwhile
       # (trashed or purged after the form was drawn), on the Inside field.
@@ -118,12 +120,12 @@ module Admin
 
       def title_value = title
 
-      def initial_url = t(".url", path: "#{selected_choice&.path}/#{title.parameterize}")
+      def initial_url = t("#{NEW_RECORD}.url", path: "#{selected_choice&.path}/#{title.parameterize}")
 
       def initial_note
         return t(".home_note") unless selected_choice
 
-        t(".note", title: selected_choice.title)
+        t("#{NEW_RECORD}.page_note", title: selected_choice.title)
       end
 
       def error_summary

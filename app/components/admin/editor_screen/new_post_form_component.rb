@@ -25,6 +25,8 @@ module Admin
       FORM_ID = "new-post-form".freeze
       TITLE_ID = "new-post-title".freeze
       TYPE_ID = "new-post-type".freeze
+      # The URL line's words, shared with the script (`NewRecordMessages`).
+      NEW_RECORD = "admin.components.editor_screen.new_record".freeze
 
       Choice = Struct.new(:name, :label, :path, keyword_init: true)
 
@@ -76,18 +78,20 @@ module Admin
 
       def initial_url
         path = selected_choice.path
-        path ? t(".url", path: "#{path}/#{title.parameterize}") : t(".not_listed")
+        path ? t("#{NEW_RECORD}.url", path: "#{path}/#{title.parameterize}") : t("#{NEW_RECORD}.not_listed")
       end
 
       def note
-        t(single_type? ? ".note_typed" : ".note", type: selected_choice.label.downcase, language: ::Locales.name(locale))
+        t(single_type? ? ".note_typed" : ".note", type: selected_choice.label, language: ::Locales.name(locale))
       end
 
       def error_summary
         @error_summary ||= NewRecordErrors.summarise(errors)
       end
 
-      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "content_type" => TYPE_ID }
+      # With one creatable type the type is a hidden input, which a summary
+      # link cannot focus: a refused type then points at Title, the one field.
+      def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "content_type" => (single_type? ? TITLE_ID : TYPE_ID) }
 
       def title_invalid? = error_summary.is_a?(Hash) && (error_summary.key?("title") || error_summary.key?("slug"))
 

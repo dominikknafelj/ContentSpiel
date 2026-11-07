@@ -1,8 +1,9 @@
 require "test_helper"
 
-# The New page and New post dialogs: where they are rendered, what `create` accepts (`page[template]`, `post[content_type]`),
-# and how a refusal comes back -- a Turbo Stream replacing just the dialog's
-# form for a Turbo submission, the standalone page for a plain request.
+# The New page and New post dialogs: where they are rendered, what `create`
+# accepts (`page[template]`, `post[content_type]`), and how a refusal comes
+# back -- a Turbo Stream replacing just the dialog's form for a Turbo
+# submission, the standalone page for a plain request.
 class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)

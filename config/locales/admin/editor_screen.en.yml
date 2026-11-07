@@ -413,9 +413,9 @@ en:
         # The New post and New page dialogs' shells (`new_*_dialog`), their
         # forms (`new_*_form`), and the three sentences their shared script
         # rewrites as the person types (`new_record`, handed over as
-        # `Admin::EditorScreen::NewRecordMessages::KEYS`). A form's own `url`
-        # and `not_listed` are the server's first drawing of the same line,
-        # so they read as `new_record`'s do.
+        # `Admin::EditorScreen::NewRecordMessages::KEYS`). The forms draw the
+        # URL line and the New page note from `new_record` too, so the
+        # server's first drawing and the script's are one source.
         new_post_dialog:
           title: "New post"
           loading: "Loading…"
@@ -427,12 +427,10 @@ en:
         new_post_form:
           title: "Title"
           type: "Type"
-          url: "URL: %{path}"
-          not_listed: "Not listed on any page yet"
           # With a Type select the select names the type; with one creatable
           # type there is no select, and the note names it.
           note: "Created as a draft in %{language}. Everything can be changed in the editor."
-          note_typed: "Created as a %{type} draft in %{language}. Everything can be changed in the editor."
+          note_typed: "Created as a draft (%{type}) in %{language}. Everything can be changed in the editor."
         new_page_dialog:
           title: "New page"
           loading: "Loading…"
@@ -448,8 +446,6 @@ en:
           untitled: "(untitled)"
           # The error a create answers when the chosen parent went meanwhile.
           gone: "Choose a page that still exists."
-          url: "URL: %{path}"
-          note: "Created as a draft at the end of %{title}. Drag it in the tree to move it."
           home_note: "Created as the home page."
         new_record:
           url: "URL: %{path}"

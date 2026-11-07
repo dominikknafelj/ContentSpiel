@@ -95,7 +95,33 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
     assert_no_selector "select#new-post-type"
     assert_no_selector "label[for=new-post-type]"
     assert_selector "input#new-post-type[type=hidden][name='post[content_type]'][value=now_update][data-admin--editor--new-record-target=type]", visible: :all
-    assert_text "Created as a now update draft in English. Everything can be changed in the editor."
+    assert_text "Created as a draft (Now update) in English. Everything can be changed in the editor."
+  end
+
+  test "with one creatable type a refused type's summary link goes to Title, never to the hidden input" do
+    only_now_update_for_branch_editors
+    post_record = Post.new
+    post_record.errors.add(:content_type, "is not allowed")
+    render_form(users(:editor_branch), errors: post_record.errors)
+    assert_selector ".admin-error-summary a[href='#new-post-title']"
+    assert_no_selector ".admin-error-summary a[href='#new-post-type']"
+
+    post_record = Post.new
+    post_record.errors.add(:content_type, "is not allowed")
+    render_form(errors: post_record.errors)
+    assert_selector ".admin-error-summary a[href='#new-post-type']"
+  end
+
+  test "the URL line is drawn from the script's own keys" do
+    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { new_record: { url: "Address %{path}", not_listed: "Nowhere yet" } } } })
+    render_form
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Nowhere yet"
+
+    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { new_record: { page_note: "Under %{title}" } } } })
+    create_page(title: "About")
+    as(users(:one), channel: :admin) { render_inline(Admin::EditorScreen::NewPageFormComponent.new) }
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Address /"
+    assert_selector "[data-admin--editor--new-record-target=note]", text: "Under "
   end
 
   test "the first type is preselected unless one is asked for" do

@@ -1,8 +1,9 @@
 require "application_system_test_case"
 
 # The New page and New post dialogs in a real browser: opened from the tree's
-# "+", the pages empty state, ⌘K and the posts list; preset Inside, a live URL line, a refusal that stays inside the open
-# dialog, and a create that never loses typing still waiting in the editor.
+# "+", the pages empty state, ⌘K and the posts list; preset Inside, a live URL
+# line, a refusal that stays inside the open dialog, and a create that never
+# loses typing still waiting in the editor.
 class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
