@@ -10,7 +10,7 @@
 // order, each a list named by its heading and left out when it is empty.
 // A row carries its kind's mark -- a page's small card (`swatches.js`,
 // drawn by the graph's renderer), a post's type dot, a tag's square -- and
-// a page its ADDRESS under its title, in the small mono style: two pages
+// a page its ADDRESS under its title, in the small meta style: two pages
 // may share a title. There is no fourth group: a row opens a local view,
 // and a post type has none (the owner's decision of 2026-10-12).
 //

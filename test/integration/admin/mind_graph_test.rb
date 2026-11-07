@@ -180,7 +180,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     held = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key.to_s ] }
     assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
     # The design answer's words, verbatim: a page's card (part one §5), the
-    # chip's second part (G4) and the whole chip for a screen reader (H6).
+    # chip's second part (G4) and the whole chip for a screen reader.
     assert_equal [ "Open page", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
                  messages.values_at(*%w[open_page status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
     # A list row's name says its chips' own words, from the chips' own keys.

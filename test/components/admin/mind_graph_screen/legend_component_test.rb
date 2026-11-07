@@ -82,7 +82,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
 
   # Status is not a filter (the third design answers): the five looks are a
   # key that switches nothing, on the legend's row after Key, in the chip's
-  # words (H6: one set of words; `test/lib/mind_graph_guards_test.rb` holds
+  # words (one set of words; `test/lib/mind_graph_guards_test.rb` holds
   # them to the chips'), each with the canvas's own drawing of it.
   test "the legend's Status group holds the five looks in the chip's words, each with its canvas swatch, after the keys" do
     legend

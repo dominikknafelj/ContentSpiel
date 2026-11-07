@@ -61,7 +61,7 @@
 # short date format, so the script formats no date. That row is for the
 # eye; `live_with_changes` and `live_change_scheduled` are the whole state
 # as a screen reader is given it, the legend's status words with the day
-# added (H6: one set of words). `card.child_pages` and `card.lists_posts` are the
+# added (one set of words). `card.child_pages` and `card.lists_posts` are the
 # two halves of a page's line of counts ("4 child pages · lists 112 posts");
 # a post type's card says its posts with `card.tag_posts`. In every count of
 # the card `%{figure}` is the count as the messages' language groups it

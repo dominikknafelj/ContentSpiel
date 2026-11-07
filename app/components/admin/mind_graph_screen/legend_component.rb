@@ -26,9 +26,9 @@ module Admin
     # takes both back. A checkbox's state is the person's choice and is what
     # the graph shows.
     #
-    # STATUS IS NOT A FILTER (the third design answers): the five looks are
-    # a key on the legend's row, after Key, with no control among them. Their
-    # names are THE CHIP'S WORDS (H6: one set of words): "Live, unpublished
+    # STATUS IS NOT A FILTER: the five looks are a key on the legend's row,
+    # after Key, with no control among them. Their names are THE CHIP'S
+    # WORDS, one set of words: "Live, unpublished
     # changes" and "Live, change scheduled", with the day of a scheduled
     # change only on a card's chip (`test/lib/mind_graph_guards_test.rb`
     # holds the words to the chips' and the card's).

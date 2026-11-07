@@ -283,8 +283,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
     }
     return item
   }
-  // A pill's row: the pill's own words, in the small mono style they have
-  // on the canvas, and its whole name. No mark: the row above is what it
+  // A pill's row: the pill's own words, in the label style, and its whole
+  // name. No mark: the row above is what it
   // hangs off.
   const pillRow = (pill) => {
     const item = document.createElement("li")

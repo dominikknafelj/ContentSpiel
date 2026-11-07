@@ -244,7 +244,7 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     assert_equal tokens_read.fetch(retired_key), utility_token(component_retired), "the component's unregistered type is border-#{component_retired}, the canvas draws it in theme.#{retired_key}"
   end
 
-  # THE STATUS WORDS ARE ONE SET (H6), written in three files: the legend's
+  # THE STATUS WORDS ARE ONE SET, written in three files: the legend's
   # five looks (`legend.states`, `mind_graph_screen.en.yml`), the shared
   # chips' labels (`status_chip.labels` and `unpublished_chip.label`,
   # `ui.en.yml`), which are the card's words for a record in one state and
@@ -255,6 +255,8 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
   # is the Live chip's word, a comma and the second chip's word as the
   # sentence goes on ("Live, unpublished changes"). That join is English's,
   # and the guard reads the English files, the only ones CS Studio has.
+  # English only: a second admin locale needs its own words check, because
+  # this join rule is English's.
   def status_words
     {
       legend: I18n.t("admin.components.mind_graph_screen.legend.states", locale: :en),

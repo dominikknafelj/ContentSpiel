@@ -928,10 +928,10 @@ Correctness, each small:
 
 No guard, by name:
 
-- **A post's dot and a tag's square outside the canvas are a second drawing**: in the list's rows, the search's results and a post's or a tag's card they are CSS spans (CS Studio's type dot and tag square), not the renderer's canvases as a page's and a post type's marks are. A change of a post's or a tag's look in `mind_graph/marks.js` leaves them as they were. On purpose (a list can hold two thousand posts); closed by drawing them from the same table, or by a test that holds the two against each other.
+- **A post's dot and a tag's square outside the canvas are a second drawing**: in the list's rows, the search's results and a post's or a tag's card they are CSS spans (CS Studio's type dot and tag square), not the renderer's canvases as a page's and a post type's marks are. Their colours are held to the canvas's tokens (`test/lib/mind_graph_guards_test.rb`), but a change of a post's or a tag's shape or size in `mind_graph/marks.js` leaves them as they were. On purpose (a list can hold two thousand posts); closed by drawing them from the same table, or by a test that holds the two against each other.
 - **The server reads a list target's kind by the literal prefix `"tag-"`** in five lines of `PostGraph::Local` and `PostGraph::Builder`, beside `PostGraph.node_id`, which writes it. Closed by a `PostGraph.tag_id_of(target)` those lines call.
 - **`PostGraph::Kinds` is a hand-written table**, held equal to what the builders answer by a test on a site built to contain every kind: a new kind of node or line needs a row there, and the test fails only if its site draws that kind.
-- **The status key's five names and the chip's are two locale keys** (`status_key.states`, `script.card.status`) that must be changed together.
+- **The status words are held in English only**: the guard ties the legend's `legend.states`, the chips' labels and `script.card.status` together by English's join rule ("Live, " and the second word, lower-cased), so a second admin language needs a check of its own.
 - **The label rule's `free` set is wired by `app.js` and seen only on a graph with more free nodes than the zoom's budget**: no browser test is big enough. `chooseLabels` has no default for it, so a caller that forgets it throws in every frame.
 - **Something new a script writes into the page and `reset()` does not take back** passes every test that waits for `[data-settled]` on the snapshot.
 

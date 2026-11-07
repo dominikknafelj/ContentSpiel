@@ -1198,8 +1198,8 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
   padding-right: 14px;
 }
 
-/* The mind graph's LEGEND and its STATUS KEY. The graph is drawn on a canvas, which no stylesheet reaches: it reads
-   the `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
+/* The mind graph's LEGEND and its status looks. The graph is drawn on a
+   canvas, which no stylesheet reaches: it reads the `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
    the marks in `mind_graph/marks.js` and the lines in `mind_graph/
    renderer.js`. A SWATCH IS DRAWN THE SAME WAY, by the same code, on a small
    canvas of its own (`Admin::MindGraphScreen::SwatchComponent`,

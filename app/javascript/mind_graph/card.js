@@ -54,7 +54,7 @@
 // whose `data-status` (`live_with_changes`, `live_change_scheduled`) names
 // the state: a chip is never changed after it is cloned. That row is for
 // the eye, and hidden from a screen reader, which is given the legend's
-// status words in one sentence (H6: one set of words) at the end of the first
+// status words in one sentence (one set of words) at the end of the first
 // row: "Live, unpublished changes", "Live, change scheduled 14 Oct". The
 // state is the data's `status` and `changes` (`Publishing::State`'s), never
 // worked out here.
