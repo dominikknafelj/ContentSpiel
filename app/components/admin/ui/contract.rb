@@ -29,6 +29,8 @@ module Admin
       Declaration = Data.define(*ComponentContract::COMMON, *STUDIO)
 
       def self.included(base)
+        raise ArgumentError, "#{base.name} includes both contracts: a class includes one" if base.include?(Blocks::Contract)
+
         base.include(ComponentContract)
         base.extend(ClassMethods)
       end

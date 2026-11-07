@@ -11,12 +11,13 @@
 # - `widths:` how it takes its width: from its container, fluid, or fixed
 #   (`WIDTHS`).
 #
+# - `interface:` what a caller hands it or calls on it.
+# - `limits:` at least one sentence of what it does not do.
+#
 # The stylesheets scan a component's file as they scan any source, so no
 # word of a declaration may be a Tailwind utility (`from_container`, not
 # `container`), or the declaration adds a rule to a stylesheet
 # (test/components/component_contract_test.rb).
-# - `interface:` what a caller hands it or calls on it.
-# - `limits:` at least one sentence of what it does not do.
 #
 # A declaration it cannot read is refused when the class loads, with the
 # keyword and the class named, so a mistyped edge never reaches a test as a

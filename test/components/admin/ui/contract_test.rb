@@ -118,26 +118,33 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
   teardown { I18n.reload! }
 
   test "every Admin::Ui component includes the contract and declares it" do
+    assert_operator ui_components.size, :>=, 44
+    assert ui_components.none? { it.include?(Blocks::Contract) }, "a shared component includes one contract, CS Studio's"
     ui_components.each { |klass| assert_contract(klass) }
   end
 
   test "the contract's interface is the component's keywords" do
+    assert_operator ui_components.size, :>=, 44
     ui_components.each { |klass| assert_contract_interface(klass) }
   end
 
   test "the contract's slots are the component's slots" do
+    assert_operator ui_components.size, :>=, 44
     ui_components.each { |klass| assert_contract_slots(klass) }
   end
 
   test "the contract's keys are the leaves the component owns in ui.en.yml" do
+    assert_operator ui_components.size, :>=, 44
     ui_components.each { |klass| assert_contract_keys(klass) }
   end
 
   test "the contract's controller exists and is named in the component's own source" do
+    assert_operator ui_components.size, :>=, 44
     ui_components.each { |klass| assert_contract_controller(klass) }
   end
 
   test "a script-held state names a browser test that is there" do
+    assert_operator ui_components.size, :>=, 44
     ui_components.each { |klass| assert_contract_script_states(klass) }
   end
 
@@ -234,6 +241,12 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     ensure
       Object.send(:remove_const, :UiContractFromCodeComponent) if Object.const_defined?(:UiContractFromCodeComponent, false)
     end
+  end
+
+  test "a class that includes both contracts is refused" do
+    both = ->(first, second) { Class.new(ViewComponent::Base) { include first; include second } }
+    assert_raises(ArgumentError) { both.(Admin::Ui::Contract, Blocks::Contract) }
+    assert_raises(ArgumentError) { both.(Blocks::Contract, Admin::Ui::Contract) }
   end
 
   test "a state both drawn and held by a script is refused when the class declares" do

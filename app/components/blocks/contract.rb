@@ -6,7 +6,8 @@ module Blocks
   # widths, interface, limits) and one keyword of its own:
   #
   # - `words:` the `public.*` keys its own Ruby and its default template read
-  #   (`string`, `site_string`, `Forms::PublicField#word`, `PublicStrings.read`),
+  #   (`string`, `fixed_word`, `site_string`, `PublicStrings.read`,
+  #   `Forms::PublicField#word` and `#error_text`),
   #   a read with an interpolated key as its prefix and `*`
   #   (`public.blocks.note.kinds.*`). `[]` for one that reads none.
   #
@@ -28,6 +29,8 @@ module Blocks
     Declaration = Data.define(*ComponentContract::COMMON, *PUBLIC)
 
     def self.included(base)
+      raise ArgumentError, "#{base.name} includes both contracts: a class includes one" if base.include?(Admin::Ui::Contract)
+
       base.include(ComponentContract)
       base.extend(ClassMethods)
     end
