@@ -18,6 +18,8 @@ class Admin::DashboardScreen::WaitingPanelComponentTest < ViewComponent::TestCas
       assert_selector "header h2#dashboard-waiting-title", exact_text: "Waiting for you"
       assert_selector "header .admin-dashboard-panel__line", exact_text: "Open threads and changes that are not on the site yet."
       assert_selector "header nav[aria-label=Show] a[data-turbo-frame=dashboard-waiting]", count: 3
+      # A prefetched filter would answer the live reload of the frame's `src`.
+      assert_selector "header nav a[data-turbo-prefetch=false]", count: 3
       assert_equal [ "Everything", "Open threads", "Unpublished changes" ], page.all("nav a").map { |link| link.text.strip }
       assert_equal %w[/cs-studio/dashboard/waiting?filter=everything /cs-studio/dashboard/waiting?filter=threads /cs-studio/dashboard/waiting?filter=unpublished],
         page.all("nav a").map { |link| link[:href] }

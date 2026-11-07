@@ -36,8 +36,16 @@ module Admin
 
       def filter = waiting.filter
 
+      # `turbo_prefetch: false`: a filter's address is the frame's `src`
+      # once pressed, and Turbo answers ANY GET of an address it prefetched
+      # in the last 10 seconds with that prefetch, the live reload's
+      # (`frame.reload()`) included. The pointer rests on the link it
+      # pressed, which the answer draws anew under it, so Turbo prefetches
+      # the current filter right after the press; a note arriving in those
+      # 10 seconds then redrew the rows from before it, and nothing else
+      # would correct them.
       def filter_data
-        { turbo_frame: FRAME, action: "turbo:click->admin--dashboard--waiting#press", "admin--dashboard--waiting-target": "filter" }
+        { turbo_frame: FRAME, turbo_prefetch: false, action: "turbo:click->admin--dashboard--waiting#press", "admin--dashboard--waiting-target": "filter" }
       end
 
       def tabs
