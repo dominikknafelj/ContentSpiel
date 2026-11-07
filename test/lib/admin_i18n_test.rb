@@ -230,6 +230,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_node_component.html.erb
     app/components/admin/pages_screen/tree_row_component.rb
     app/components/admin/pages_screen/tree_row_component.html.erb
+    app/components/admin/pages_screen/tree_component.rb
+    app/components/admin/pages_screen/tree_component.html.erb
+    app/javascript/controllers/admin/pages/tree_controller.js
     app/javascript/controllers/admin/presence/list_controller.js
     app/components/admin/ui/menu_component.rb
     app/components/admin/ui/menu_component.html.erb

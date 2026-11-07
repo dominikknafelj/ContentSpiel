@@ -29,7 +29,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Claude Design, 2026-10-13, T1. The divider is the tree column's last
+  # The divider is the tree column's last
   # child, outside the frame a move replaces, on a screen with a tree only;
   # the head script that lays the column out at the remembered width before
   # the first paint is on every CS Studio screen, since a Turbo visit keeps
@@ -72,7 +72,6 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Handoff §10 C34.
   test "/pages opens Home's editor for someone who can open it" do
     get "/cs-studio/pages"
     assert_redirected_to "/cs-studio/pages/#{root_page.id}"
@@ -104,14 +103,12 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target=tree] template turbo-frame#tree li[data-page-id='#{@b.id}']"
   end
 
-  # Final fix wave 1 (reviews A I1 / B I1): `Pages::Move` saves the moved
-  # page, so its `updated_at` moves -- and the page settings form of that same
-  # page, open next to the tree, used to hold that as its autosave base: its
-  # next save was refused as "Changed elsewhere" against the editor's own
-  # move. The tree then forwarded the form's new base. Since live editing's
-  # final review (I1) the form's base is `settings_changed_at` and a move does
-  # not move it at all, so the form's own base is still good after the move,
-  # and after its Undo.
+  # `Pages::Move` saves the moved page, so its `updated_at` moves; the page
+  # settings form of that same page, open next to the tree, bases its
+  # autosave on `settings_changed_at`, which a move does not move, so the
+  # form's own base is still good after the move, and after its Undo, and its
+  # next save is never refused as "Changed elsewhere" against the editor's
+  # own move.
   test "moving the open page leaves its settings form's base where it was, so its next save isn't stale" do
     base = @child.reload.settings_changed_at
     travel 1.minute
@@ -170,8 +167,8 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The forwarding of the page base the tree had (`X-Page-Base-Updated-At` in,
-  # the hidden field's stream out) went with I1: a move no longer moves the base.
+  # A move moves no base of the settings form, so it reads no base sent with
+  # it (`X-Page-Base-Updated-At`) and answers none.
   test "a move answers no base of the page settings form, whatever a client sends" do
     patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 },
       headers: { "X-Page-Base-Updated-At" => @child.settings_changed_at.iso8601(6) }, as: :turbo_stream
@@ -249,7 +246,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_equal @a, @child.reload.parent
   end
 
-  # Handoff §10 B24: "↻N" for outdated and "○N" for missing fields, summed
+  # "↻N" for outdated and "○N" for missing fields, summed
   # over the target languages, the tooltip naming them; nothing at zero.
   test "the tree counts missing translations, naming the languages" do
     with_locales(%w[en de es], default: "en")
@@ -305,7 +302,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
       assert_nil rows.first.at_css("[data-presence-marker]")
     end
     assert_select "turbo-frame#tree [data-presence-marker='page-#{root_page.id}']", count: 0
-    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div > [data-presence-marker='page-#{@a.id}']"
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div > .admin-tree-row__trailing > [data-presence-marker='page-#{@a.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]"
   end
 end

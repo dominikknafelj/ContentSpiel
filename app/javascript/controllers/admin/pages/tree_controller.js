@@ -5,8 +5,9 @@ import { orderErrorToast, sendOrder } from "saving/order_request"
 import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
 import { loadSortable } from "editor/drag"
+import { messages } from "i18n/messages"
 
-// Drives the page tree column (cs-studio spec §4.2). Every page's own
+// Drives the page tree column. Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
 // share one `group`, so a node can be dropped under any other page in the
 // tree, not just reordered among its current siblings -- a nested-list
@@ -40,7 +41,7 @@ import { loadSortable } from "editor/drag"
 export default class extends Controller {
   static targets = ["list", "announcer", "row"]
   static values = { moveUrl: String }
-  static classes = ["selected", "selectedTitle", "markerAtRest"]
+  static classes = ["selected", "markerAtRest"]
 
   connect() {
     this.holdUndo = (event) => {
@@ -65,8 +66,8 @@ export default class extends Controller {
           // Only the ⠿ handle starts a drag -- the row's own title stays a
           // normal, clickable link.
           handle: ".admin-tree-node__handle",
-          // The drag look (handoff §9 A9): a dashed placeholder where the row
-          // would land, and the lifted row itself with a shadow.
+          // The drag look: a dashed placeholder where the row would land, and
+          // the lifted row itself with a shadow.
           ghostClass: "admin-drag-ghost",
           chosenClass: "admin-drag-chosen",
           // SortableJS's own pointer-driven drag instead of native HTML5
@@ -178,7 +179,7 @@ export default class extends Controller {
     origin.list.insertBefore(item, origin.next)
   }
 
-  // ---- Keyboard path (handoff §9 A9) -------------------------------------
+  // ---- Keyboard path ------------------------------------------------------
   //
   // Space on a row's handle picks the row up; ArrowUp/ArrowDown move it among
   // its siblings, ArrowRight nests it under the sibling above, ArrowLeft moves
@@ -229,7 +230,7 @@ export default class extends Controller {
     this.origin = { list: row.parentElement, next: row.nextElementSibling }
     row.dataset.picked = "true"
     row.classList.add("admin-drag-chosen")
-    this.announce(`Picked up ${this.titleOf(row)}. ${this.positionOf(row)}`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.picked_up", { title: this.titleOf(row), position: this.positionOf(row) }))
   }
 
   step(row, direction) {
@@ -272,13 +273,13 @@ export default class extends Controller {
     const list = row.parentElement
     const index = Array.from(list.children).indexOf(row)
     const id = row.dataset.pageId
-    this.announce(`Dropped ${this.titleOf(row)}. ${this.positionOf(row)}`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.dropped", { title: this.titleOf(row), position: this.positionOf(row) }))
     await this.save(row, list, index, origin)
     // The answer replaces the whole tree (this controller's own element with
     // it), so the row the editor was on is a new element: give focus back to
     // its handle so the keyboard user isn't dropped at the top of the page.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
+    document.querySelector(`li[data-page-id='${id}'] > [data-tree-row] .admin-tree-node__handle`)?.focus()
   }
 
   // ---- The selected row -------------------------------------------------
@@ -295,12 +296,12 @@ export default class extends Controller {
   // keeps what this marked, which is right for the URL it is kept under,
   // and a restored one is marked again as its rows connect.
   //
-  // The marks are the server's own classes, handed over as Stimulus classes
-  // (`TreeRowComponent::SELECTED_CLASS`, `SELECTED_TITLE_CLASS`,
-  // `MARKER_AT_REST`): the row's ground and bar, the title's weight with
-  // `aria-current="page"`, and the translation markers shown rather than at
-  // rest. Only rows that can be selected are `row` targets (a context-only
-  // row never is).
+  // The marks are the shared row's own classes, handed over as Stimulus
+  // classes (`TreeItemComponent::CLASSES[:row_selected]` and `[:reveal]`):
+  // the row's selection (its ground, its bar and its title's weight), the
+  // title's `aria-current="page"`, and the translation markers shown rather
+  // than at rest. Only rows that can be selected are `row` targets (a
+  // context-only row never is).
   rowTargetConnected(row) {
     this.mark(row, row.dataset.pageId === this.openPageId())
   }
@@ -319,11 +320,8 @@ export default class extends Controller {
   mark(row, selected) {
     this.selectedClasses.forEach((name) => row.classList.toggle(name, selected))
     const title = row.querySelector(`#tree-link-${row.dataset.pageId}`)
-    if (title) {
-      this.selectedTitleClasses.forEach((name) => title.classList.toggle(name, selected))
-      if (selected) title.setAttribute("aria-current", "page")
-      else title.removeAttribute("aria-current")
-    }
+    if (selected) title?.setAttribute("aria-current", "page")
+    else title?.removeAttribute("aria-current")
     row.querySelectorAll("[data-translation-marker]").forEach((marker) => {
       this.markerAtRestClasses.forEach((name) => marker.classList.toggle(name, !selected))
     })
@@ -345,7 +343,7 @@ export default class extends Controller {
     this.origin.list.insertBefore(row, this.origin.next)
     this.clearPicked(row)
     if (refocus) this.focusHandle(row)
-    this.announce(`Cancelled. ${this.titleOf(row)} is back where it was.`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.cancelled", { title: this.titleOf(row) }))
   }
 
   clearPicked(row) {
@@ -355,17 +353,21 @@ export default class extends Controller {
     this.origin = null
   }
 
+  // A row's parts are found from its `<li>` through the shared row's own
+  // hook (`[data-tree-row]`), never by the markup's shape.
   focusHandle(row) {
-    row.querySelector(":scope > div .admin-tree-node__handle")?.focus()
+    row.querySelector(":scope > [data-tree-row] .admin-tree-node__handle")?.focus()
   }
 
+  // The whole title the server drew the row with (`data-tree-title`).
   titleOf(row) {
-    return row.querySelector(":scope > div a")?.textContent.trim() || "page"
+    return row.querySelector(":scope > [data-tree-row]")?.dataset.treeTitle?.trim() ||
+      messages(this.element).t("components.pages_screen.tree_row.untitled")
   }
 
   positionOf(row) {
     const siblings = row.parentElement.children
-    return `Position ${Array.from(siblings).indexOf(row) + 1} of ${siblings.length}.`
+    return messages(this.element).t("components.pages_screen.tree.moves.position", { position: Array.from(siblings).indexOf(row) + 1, count: siblings.length })
   }
 
   announce(message) {

@@ -73,8 +73,8 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
 
   # The selected look has two writers: the server's drawing here, and
   # `admin--pages--tree#mark`, which moves it in the browser with the marks it
-  # is handed (`SELECTED_CLASS`, `SELECTED_TITLE_CLASS`, `MARKER_AT_REST`) and
-  # `aria-current`. So the server's selected row must differ from its
+  # is handed (`TreeItemComponent::CLASSES[:row_selected]` and `[:reveal]`)
+  # and `aria-current`. So the server's selected row must differ from its
   # unselected one by exactly those, element by element, or the script would
   # leave something of a selection behind, or miss something of one.
   test "a selected row differs from an unselected one by the marks the tree's script moves, and nothing else" do
@@ -89,7 +89,7 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
 
       pairs = selected.css("*").to_a.unshift(selected).zip(unselected.css("*").to_a.unshift(unselected))
       assert pairs.all? { |on, off| off && on.name == off.name }, "the two rows are not the same elements"
-      row = Admin::PagesScreen::TreeRowComponent
+      row = Admin::Ui::TreeItemComponent::CLASSES
       differences = pairs.filter_map do |on, off|
         on_classes, off_classes = [ on, off ].map { |node| node["class"].to_s.split }
         names = (on.attributes.keys | off.attributes.keys) - %w[class]
@@ -101,11 +101,40 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
 
       marker = selected.at_css("[data-translation-marker]")["data-translation-marker"]
       assert_equal [
-        { node: "tree-row-#{parent.id}", added: row::SELECTED_CLASS.split, removed: [], attributes: [] },
-        { node: "tree-link-#{parent.id}", added: row::SELECTED_TITLE_CLASS.split, removed: [], attributes: %w[aria-current] },
-        { node: marker, added: [], removed: row::MARKER_AT_REST.split, attributes: [] }
+        { node: "tree-row-#{parent.id}", added: [ row[:row_selected] ], removed: [], attributes: [] },
+        { node: "tree-link-#{parent.id}", added: [], removed: [], attributes: %w[aria-current] },
+        { node: marker, added: [], removed: [ row[:reveal] ], attributes: [] }
       ], differences
       assert_equal "page", selected.at_css("#tree-link-#{parent.id}")["aria-current"]
+    end
+  end
+
+  # Pages draws the one row both trees draw: every part of a page's row is
+  # the shared row's, in its order, and the row hands it no class of its own.
+  test "a row is the shared row: its parts are TreeItemComponent's classes" do
+    with_locales(%w[en de], default: "en") do
+      parent = create_page(title: "Parent")
+      create_page(title: "Child", parent: parent)
+      parent.reload
+      parts = Admin::Ui::TreeItemComponent::CLASSES
+
+      render_inline(Admin::PagesScreen::TreeRowComponent.for_page(parent, selected: nil, locale: "en", url_options: {}))
+
+      row = page.find("div#tree-row-#{parent.id}")
+      assert_equal [ parts[:row] ], row[:class].split
+      assert_equal parent.id.to_s, row["data-page-id"]
+      assert_equal "row", row["data-admin--pages--tree-target"]
+      assert_equal [ parts[:handle], parts[:disclosure], parts[:mark], parts[:title], parts[:trailing] ],
+        row.native.element_children.map { |part| part["class"].split.first }
+      assert_selector "#tree-row-#{parent.id} > .#{parts[:title]}[title='Parent'] > a#tree-link-#{parent.id}[data-tree-focus][data-turbo-frame=content]", text: "Parent"
+      assert_selector "#tree-row-#{parent.id} > button.#{parts[:disclosure]}[aria-controls='tree-children-#{parent.id}'][aria-expanded=true]"
+      trailing = page.find("#tree-row-#{parent.id} > .#{parts[:trailing]}", visible: :all)
+      assert trailing.find("[data-translation-marker=missing]", visible: :all)[:class].split.include?(parts[:reveal])
+      assert_equal [ parts[:count], parts[:reveal] ], trailing.find("[data-child-count]", visible: :all)[:class].split
+      assert trailing.find("a[aria-label='Add a page under Parent']", visible: :all)[:class].split.include?(parts[:reveal_opacity])
+      own = row.native.element_children.flat_map { |part| part["class"].split } + [ row.native.at_css("#tree-link-#{parent.id}")["class"].to_s ]
+      assert_empty own.reject(&:empty?) - parts.values,
+        "a row draws its geometry, ground and weight through the tree's classes, not utilities"
     end
   end
 end

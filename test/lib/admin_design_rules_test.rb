@@ -1578,7 +1578,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   TREE_LENGTHS = %w[--cs-tree-row --cs-tree-disclosure --cs-tree-mark --cs-tree-step].freeze
   # A tree file let through both tree rules, with the reason.
   TREE_RULES_NOT_YET = {
-    "app/components/admin/pages_screen/tree_node_component.html.erb" => "the Pages rows are not on the shared row yet",
     "app/javascript/mind_graph/node_list.js" => "the graph's list is not on the shared row yet"
   }.freeze
   TREE_INDENT = /(?<![\w-])(?:[\w\[\]-]+:)*-?(?:ml|pl|ms|ps)-|(?<![\w-])(?:margin|padding)-(?:left|inline-start)(?![\w-])|\b(?:margin|padding)(?:Left|InlineStart)\b/

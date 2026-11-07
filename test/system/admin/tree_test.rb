@@ -1,8 +1,9 @@
 require "application_system_test_case"
 
-# The page tree's own drag-to-move (cs-studio spec §4.2/§9): dropping a node
-# under a different parent PATCHes `Admin::TreeController#update` and
-# re-renders the whole tree from the database.
+# The page tree in a real browser: its drag-to-move (dropping a node under a
+# different parent PATCHes `Admin::TreeController#update` and re-renders the
+# whole tree from the database), the selected row, what a row shows on hover
+# and focus, and its one focus ring.
 class Admin::TreeSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -11,36 +12,34 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     @beta = create_page(title: "Beta")
   end
 
-  # The markers rest hidden (`sr-only`, so a screen reader still reads them) and
-  # show on the row's hover and while the focus is in it. A Cuprite hover is a
-  # real pointer move, so `:hover` applies, and the browser is a mouse device
-  # (`blink-settings` in `ApplicationSystemTestCase`), so the
-  # `@media (hover: hover)` around Tailwind's `group-hover:` matches.
+  # The markers rest clipped (`.admin-tree-row__reveal`, so a screen reader
+  # still reads them) and show on the row's hover and while the focus is in
+  # it. A Cuprite hover is a real pointer move, so `:hover` applies, and the
+  # browser is a mouse device (`blink-settings` in
+  # `ApplicationSystemTestCase`), so no coarse pointer shows them at rest.
   test "a row's markers show when the pointer is on it and when it has the focus" do
     with_locales(%w[en de], default: "en") do
       row = create_page(title: "Counted")
-      visit "/cs-studio/pages"
-      await_admin_controllers
+      visit_screen "/cs-studio/pages"
       assert page.evaluate_script("matchMedia('(hover: hover)').matches"), "the test browser reports it cannot hover"
 
       marker = "li[data-page-id='#{row.id}'] > div [data-translation-marker=missing]"
       assert_selector marker, text: "○1", visible: :all
       assert_equal "1px", page.find(marker, visible: :all).evaluate_script("getComputedStyle(this).width")
 
-      page.find("li[data-page-id='#{row.id}'] > div a[title='Counted']").hover
+      page.find("#tree-link-#{row.id}").hover
       await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on hover"
 
-      page.find("li[data-page-id='#{@alpha.id}'] > div a[title='Alpha']").hover
+      page.find("#tree-link-#{@alpha.id}").hover
       await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width === '1px'", message: "the marker did not hide again"
 
-      page.execute_script("document.querySelector(\"li[data-page-id='#{row.id}'] > div a[title='Counted']\").focus()")
+      page.execute_script("document.querySelector('#tree-link-#{row.id}').focus()")
       await_js "getComputedStyle(document.querySelector(#{marker.to_json})).width !== '1px'", message: "the marker did not show on focus"
     end
   end
 
   test "dragging a page onto another node reparents it and persists" do
-    visit "/cs-studio/pages"
-    await_admin_controllers
+    visit_screen "/cs-studio/pages"
 
     assert_selector "li[data-page-id='#{@alpha.id}']"
     assert_selector "ul[data-parent-id='#{@beta.id}']"
@@ -82,8 +81,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   # "Changed elsewhere" against the editor's own move. The toast's Undo is
   # the same request.
   test "moving the page that is open, and undoing it, leaves its editor able to save" do
-    visit "/cs-studio/pages/#{@alpha.id}"
-    await_admin_controllers
+    visit_editor(@alpha)
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
       window.__inFlight = 0
@@ -132,8 +130,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   # Moving another page than the open one says nothing to the open form: it
   # keeps its base, and keeps saving.
   test "moving another page than the open one leaves the open editor able to save" do
-    visit "/cs-studio/pages/#{@beta.id}"
-    await_admin_controllers
+    visit_editor(@beta)
     base = page.evaluate_script("document.getElementById('page-base-updated-at').value")
 
     page.execute_script(<<~JS)
@@ -162,7 +159,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     current = "#tree a[aria-current=page]"
     assert_selector "#{selected}#tree-row-#{@alpha.id}", count: 1
 
-    find("#tree-row-#{@beta.id} a[title='Beta']").click
+    find("#tree-link-#{@beta.id}").click
     assert_selector "#content h1", text: "Beta"
     assert_selector selected, count: 1
     assert_selector "#{selected}#tree-row-#{@beta.id}"
@@ -181,7 +178,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   # tree is drawn again for the page it opened.
   test "a page opened from the tree by the keyboard keeps the focus on its link" do
     visit_editor(@alpha)
-    page.execute_script("document.querySelector(\"#tree-row-#{@beta.id} a[title='Beta']\").focus()")
+    page.execute_script("document.querySelector('#tree-link-#{@beta.id}').focus()")
     page.send_keys(:enter)
     assert_selector "#content h1", text: "Beta"
     assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected"
@@ -192,9 +189,9 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
   # to a page opened from the tree shows that page's row as the one selected.
   test "Back to a page opened from the tree selects that page's row" do
     visit_editor(@alpha)
-    find("#tree-row-#{@beta.id} a[title='Beta']").click
+    find("#tree-link-#{@beta.id}").click
     assert_selector "#content h1", text: "Beta"
-    find("#tree-row-#{@alpha.id} a[title='Alpha']").click
+    find("#tree-link-#{@alpha.id}").click
     assert_selector "#content h1", text: "Alpha"
     assert_selector "#tree .admin-tree-row--selected#tree-row-#{@alpha.id}", count: 1
 
@@ -203,5 +200,48 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "#tree .admin-tree-row--selected", count: 1
     assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected a[aria-current=page]"
     assert_selector "#tree a[aria-current=page]", count: 1
+  end
+
+  # One ring, on what has the focus: a Pages row holds several controls, so
+  # the row draws no outline and the focused control draws the tree's 2px
+  # accent ring inside its own box. Each control is reached by the keyboard
+  # from the row's link, so `:focus-visible` applies, with the pointer away
+  # from the tree.
+  test "a focused control in a Pages row draws one ring, its own, and the row none" do
+    Current.set(actor: users(:one)) { create_page(title: "Child", parent: @alpha) }
+    visit_screen "/cs-studio/pages"
+    page.driver.browser.mouse.move(x: 900, y: 700)
+    accent = page.evaluate_script(<<~JS)
+      (() => { const probe = document.createElement("span"); probe.style.color = "var(--cs-accent)"; document.body.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return color })()
+    JS
+
+    row = "#tree-row-#{@alpha.id}"
+    # Each control, and the key that walks to it from the link: the link
+    # itself is reached back from the control after it.
+    {
+      "#tree-link-#{@alpha.id}" => [ :tab, [ :shift, :tab ] ],
+      "#{row} > button[aria-label='Move Alpha']" => [ nil, [ :shift, :tab ] ],
+      "#{row} a[aria-label='Add a page under Alpha']" => [ nil, :tab ]
+    }.each do |control, (first, key)|
+      page.execute_script("document.querySelector('#tree-link-#{@alpha.id}').focus()")
+      page.driver.browser.keyboard.type(first) if first
+      6.times do
+        break if page.evaluate_script("document.activeElement.matches(#{control.to_json})")
+
+        page.driver.browser.keyboard.type(key)
+      end
+
+      seen = page.evaluate_script(<<~JS, control)
+        (() => {
+          const ring = (element) => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor] }
+          const focused = document.querySelector(arguments[0])
+          return { active: document.activeElement === focused, visible: focused.matches(":focus-visible"), own: ring(focused), row: ring(focused.closest("[data-tree-row]")) }
+        })()
+      JS
+      assert seen["active"], "#{control} has the focus"
+      assert seen["visible"], "#{control} has the keyboard's focus"
+      assert_equal [ "solid", "2px", "-2px", accent ], seen["own"], "#{control} draws the tree's ring"
+      assert_equal "none", seen["row"].first, "the row of #{control} draws no outline"
+    end
   end
 end

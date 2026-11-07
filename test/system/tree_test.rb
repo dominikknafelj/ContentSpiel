@@ -1,9 +1,10 @@
 require "application_system_test_case"
 
-# The page tree's keyboard drag path and Undo in a real browser (cs-studio
-# design pass, Task 11): Space picks a row up, the arrows move it, Space drops
-# it through the same request a mouse drop makes, and the "Moved" toast's Undo
-# puts it back through the same service.
+# The page tree's keyboard drag path and Undo in a real browser: Space picks
+# a row up, the arrows move it, Space drops it through the same request a
+# mouse drop makes, and the "Moved" toast's Undo puts it back through the
+# same service. Each step is announced in the words the frame hands the
+# tree's script.
 class TreeSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -19,7 +20,7 @@ class TreeSystemTest < ApplicationSystemTestCase
   end
 
   # A row's drag handle. It stands in the row's gutter and is shown only on
-  # hover or focus (`Admin::PagesScreen::TreeNodeComponent`); a test never
+  # hover or focus (`Admin::PagesScreen::TreeRowComponent`); a test never
   # waits for what only a hover reveals, so it is found whatever it shows.
   def handle(title) = find("button[aria-label='Move #{title}']", visible: :all)
 
@@ -31,8 +32,7 @@ class TreeSystemTest < ApplicationSystemTestCase
 
   test "Space, ArrowDown, Space moves a page down; Undo puts it back" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     handle("Alpha").send_keys(:space)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Alpha. Position 1 of 3/, visible: :all
@@ -43,12 +43,10 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Alpha./, wait: 10
     assert_equal %w[Beta Alpha Gamma], children_titles
 
-    visit admin_pages_path
-    assert_equal %w[Beta Alpha Gamma], tree_order
-
     # Undo posts the toast's own button. Make a second move so there is a
     # fresh toast on this page load, then undo it.
-    await_admin_controllers
+    visit_screen admin_pages_path
+    assert_equal %w[Beta Alpha Gamma], tree_order
     handle("Gamma").send_keys(:space, :up, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Gamma./, wait: 10
     assert_equal %w[Beta Gamma Alpha], children_titles
@@ -66,8 +64,7 @@ class TreeSystemTest < ApplicationSystemTestCase
   # so the pointer has to travel in steps and rest before the release.
   test "dragging a page by its handle with the mouse moves it, and a clone follows the pointer" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     centre = lambda do |label|
       page.evaluate_script(<<~JS, label)
@@ -92,19 +89,18 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal %w[Beta Gamma Alpha], tree_order
   end
 
-  # The handle is nothing at rest (`opacity-0`, which Cuprite counts as not
+  # The handle is nothing at rest (opacity 0, which Cuprite counts as not
   # visible) and shows while it has the focus. Reached as a keyboard reaches
   # it -- it is the control before its row's link -- and with the pointer far
   # from the row, so no hover is what shows it; found WITHOUT `visible: :all`.
   test "a row's handle is not shown at rest, and Shift+Tab from the row's link shows it: Space then picks the row up" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
     page.driver.browser.mouse.move(x: 900, y: 700)
     assert_no_selector "button[aria-label='Move Alpha']"
     assert_selector "button[aria-label='Move Alpha']", visible: :all
 
-    page.execute_script("document.querySelector('#tree a[title=Alpha]').focus()")
+    page.execute_script("document.querySelector('#tree-link-#{@alpha.id}').focus()")
     page.driver.browser.keyboard.type([ :shift, :tab ])
 
     assert_selector "button[aria-label='Move Alpha']"
@@ -119,8 +115,7 @@ class TreeSystemTest < ApplicationSystemTestCase
 
   test "Escape puts a picked page back without saving" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     handle("Alpha").send_keys(:space, :down, :escape)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Cancelled/, visible: :all
@@ -131,8 +126,7 @@ class TreeSystemTest < ApplicationSystemTestCase
 
   test "ArrowRight nests a page under the one above and ArrowLeft moves it out again" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     handle("Beta").send_keys(:space, :right, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
@@ -142,8 +136,7 @@ class TreeSystemTest < ApplicationSystemTestCase
   test "ArrowLeft moves a nested page out one level, after its old parent" do
     Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     handle("Child").send_keys(:space, :left, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Child./, wait: 10
@@ -153,8 +146,7 @@ class TreeSystemTest < ApplicationSystemTestCase
 
   test "a picked page is put back when focus leaves its handle" do
     sign_in_via_form(users(:one))
-    visit admin_pages_path
-    await_admin_controllers
+    visit_screen admin_pages_path
 
     handle("Alpha").send_keys(:space, :down)
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
@@ -162,5 +154,28 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_selector "[data-admin--pages--tree-target=announcer]", text: /Picked up Gamma/, visible: :all
     assert_equal %w[Alpha Beta Gamma], tree_order
     assert_equal %w[Alpha Beta Gamma], children_titles
+  end
+
+  # The words are the locale file's, handed to the script by the frame
+  # (`data-messages`): a language the admin is in is the language a move is
+  # announced in, with the script's English nowhere.
+  test "a picked-up row is announced in the page's words" do
+    assert_equal "Pages", I18n.t("admin.components.pages_screen.tree.heading") # the files are loaded, so what is stored stays
+    I18n.backend.store_translations(:en, admin: { components: { pages_screen: { tree: { moves: {
+      picked_up: "%{title} aufgenommen. %{position}", dropped: "%{title} abgelegt. %{position}",
+      position: "Stelle %{position} von %{count}.", cancelled: "Abgebrochen. %{title} steht wieder an seinem Platz."
+    } } } } })
+    sign_in_via_form(users(:one))
+    visit_screen admin_pages_path
+
+    announcer = "[data-admin--pages--tree-target=announcer]"
+    handle("Alpha").send_keys(:space)
+    assert_selector announcer, exact_text: "Alpha aufgenommen. Stelle 1 von 3.", visible: :all
+    handle("Alpha").send_keys(:down)
+    assert_selector announcer, exact_text: "Stelle 2 von 3.", visible: :all
+    handle("Alpha").send_keys(:escape)
+    assert_selector announcer, exact_text: "Abgebrochen. Alpha steht wieder an seinem Platz.", visible: :all
+  ensure
+    I18n.reload!
   end
 end

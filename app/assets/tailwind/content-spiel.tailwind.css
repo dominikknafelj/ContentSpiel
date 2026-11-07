@@ -301,6 +301,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-row__mark { flex: none; display: grid; place-items: center; width: var(--cs-tree-mark); height: var(--cs-tree-mark); margin-inline-end: 8px; color: var(--cs-meta); }
 .admin-tree-row__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--cs-t-small); line-height: 1.25rem; font-weight: 400; color: var(--cs-ink); }
 .admin-tree-row--context-only .admin-tree-row__title { color: var(--cs-meta); }
+/* A title that is a link (Pages) is cut inside its own box, never wider
+   than the title's, so its focus ring is whole on a long title too. */
+.admin-tree-row__title > a { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
 /* The state dot stands 6px after the title, so a cut title's ellipsis
    never touches it. */
 .admin-tree-row__state { flex: none; display: inline-flex; align-items: center; margin-inline-start: 6px; }
