@@ -17,10 +17,11 @@ require "test_helper"
 # the word, comments included. The places that still name notes directly are
 # listed with the trigger that would make each a slot.
 #
-# What the screen guard covers is COMPONENTS. The views that assemble a screen
-# (`app/views/admin/pages/show.html.erb`, `posts/show.html.erb`) may name the
-# features on it, and do: they hand the drawer's counts through the header's
-# `slot_context:`. The shared components may not.
+# The views that assemble the two editors (`app/views/admin/pages/show.html.erb`,
+# `posts/show.html.erb`) are hosts like the components: the notes reach them
+# through the header's `editor.header.actions` and the rail's
+# `editor.rail.tabs`, and what the views hand every slot is generic (`reads:`,
+# a Hash the screen's slot components share, and the request's `query:`).
 class NotesBoundaryTest < ActiveSupport::TestCase
   CONTENT_SOURCES = %w[
     app/models/page.rb app/models/page/**/*.rb app/models/post.rb app/models/post/**/*.rb app/models/content_block.rb
@@ -104,6 +105,14 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_row_component.html.erb
     app/components/admin/posts_screen/table_component.rb
     app/components/admin/shell/sidebar_component.rb
+    app/components/admin/ui/rail_tabs_component.rb
+    app/components/admin/ui/rail_tabs_component.html.erb
+    app/components/admin/ui/rail_tab_component.rb
+    app/components/admin/ui/rail_panel_component.rb
+    app/components/admin/ui/rail_slot_component.rb
+    app/controllers/admin/answers/rail_tab_streams.rb
+    app/views/admin/pages/show.html.erb
+    app/views/admin/posts/show.html.erb
   ].freeze
 
   # "note" or "notes" at the start of a word or after an underscore, digit, colon or hyphen
@@ -135,8 +144,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       "the posts table's Notes column HEADER (its icon and its name): the column is notes' alone, and a header mechanism for slots (a second slot) is more than two features justify; the CELL is the posts.row.markers slot, and the column becomes a slot's when a second feature wants a column of its own"
   }.freeze
 
-  test "the editors' header and the media panel do not name notes: they draw their slots" do
-    assert_equal 12, SLOT_HOSTS.size
+  test "the editors' header, the media panel, the rail and the two editor views do not name notes: they draw their slots" do
+    assert_equal 20, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end

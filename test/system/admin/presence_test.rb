@@ -499,7 +499,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the row of a closed panel stayed") { Presence::Mark.where(user_id: @dana.id).none? }
   end
 
-  test "at a narrow window the header shows one circle and the count, which lists everyone, and the notes sheet shows nobody" do
+  test "at a narrow window the header shows one circle and the count, which lists everyone, and keeps them while the notes are open" do
     original = page.current_window.size
     open_page
     join(:dana, @dana)
@@ -543,14 +543,14 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_no_selector list
     assert_selector "#{group}[aria-expanded=false]"
 
-    # Below 1024px the notes are a sheet over the editor (15): the people are
-    # not shown, and not there for a keyboard or a screen reader either.
+    # Below the rail's threshold the notes are a slide-over over the canvas,
+    # not a modal: the header keeps its people for a keyboard and a screen
+    # reader, and they are where they were when the notes close.
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list"
-    assert_no_selector ".admin-editor-header .admin-presence"
-    assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('.admin-editor-header .admin-presence')).display")
-    # Closed again, they are back.
-    within("#notes-drawer") { find("button", text: /Back to/).click }
+    assert_not_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('.admin-editor-header .admin-presence')).display")
+    within("#notes-drawer") { find("button[aria-label='Close']").click }
+    assert_no_selector "#notes-drawer"
     assert_selector circle(@reader)
   ensure
     page.current_window.resize_to(*original)

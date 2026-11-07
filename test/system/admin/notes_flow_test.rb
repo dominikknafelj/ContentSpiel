@@ -251,7 +251,10 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # Each is read through the notes action, by its attachment's id; no
     # Active Storage address is in the page.
     files_path = %r{\A/cs-studio/notes/page/#{@page.id}/threads/#{note.thread_id}/messages/#{note.id}/files/\d+\z}
-    all("#notes-drawer [data-note-files] a").each { |link| assert_match files_path, URI(link[:href]).path }
+    # Read in one call: a live refresh may draw the links again meanwhile.
+    hrefs = page.evaluate_script("Array.from(document.querySelectorAll('#notes-drawer [data-note-files] a'), (link) => link.href)")
+    assert_equal 2, hrefs.size
+    hrefs.each { |href| assert_match files_path, URI(href).path }
     assert_no_selector "#notes-drawer [src*='/rails/active_storage'], #notes-drawer [href*='/rails/active_storage']", visible: :all
 
     # Nobody has reacted: the add control in the meta line shows on hover or
@@ -351,7 +354,10 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # The text is the person's draft, back when the field is drawn again.
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    assert_selector "#notes-drawer #notes-list" # open was remembered
+    # Remembered "open" opens the Notes tab of a docked rail only: here the
+    # rail does not dock, so the notes are asked for again.
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
     within("#notes-drawer") { press "New note" }
     assert_equal "Half a thought", new_note_field.value
   end

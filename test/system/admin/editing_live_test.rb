@@ -132,6 +132,21 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
   def live_controller_js = "window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--live')"
 
+  # The content signals the live controller has handled, as "reason" or
+  # "reason:block id", in order (`window.__heard`). Each signal is a broadcast
+  # of its own, delivered on the cable's time, not the test's: waiting for one
+  # signal's effect says nothing of the next.
+  def watch_signals
+    page.execute_script(<<~JS)
+      const live = #{live_controller_js}
+      const heard = Object.getPrototypeOf(live).heard
+      window.__heard = []
+      live.heard = (signal) => {
+        if (signal.kind === "content") window.__heard.push([ signal.reason, signal.content_block_id ].filter((each) => each != null).join(":"))
+        return heard.call(live, signal)
+      }
+    JS
+  end
 
   def set_value(name, value) = page.execute_script("document.getElementById('editing').setAttribute('data-admin--editing--live-#{name}-value', #{value.to_json})")
 
@@ -407,13 +422,19 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
   test "a hidden tab fetches nothing, and catches up once when it is seen" do
     open_page
     count_requests
+    watch_signals
     hide_document
 
     dana_saves(@block, "First")
     dana_saves(@block, "Second")
     added = add_block(by: @dana)
-    # Nothing on a hidden page changes to wait on but what it owes.
-    await_js("#{live_controller_js}.owed.has('blocks') && #{live_controller_js}.owed.has('record')", wait: LIVE)
+    # Nothing on a hidden page changes to wait on but what it owes, and the
+    # first signal already owes the list and the record: the tab is shown only
+    # once it has heard all three, or a late one (the structure signal) is
+    # heard by a visible tab, which rightly fetches the list a second time.
+    expected = [ "saved:#{@block.id}", "saved:#{@block.id}", "structure" ]
+    assert_eventually(wait: LIVE, message: -> { "the hidden tab heard #{page.evaluate_script("window.__heard").inspect}" }) { page.evaluate_script("window.__heard") == expected }
+    assert page.evaluate_script("#{live_controller_js}.owed.has('blocks') && #{live_controller_js}.owed.has('record')"), "the hidden tab owes the list and the record"
     assert_equal [], page.evaluate_script("window.__seen")
 
     show_document

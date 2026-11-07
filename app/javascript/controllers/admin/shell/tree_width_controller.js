@@ -3,7 +3,7 @@ import { messages } from "i18n/messages"
 
 // The page tree's column (`aside#tree-column`, with its data from
 // `Admin::Shell::TreeDividerComponent.column_data`; Claude Design,
-// 2026-10-13, T1 and T3): the column is as wide as the person made it with
+// 2026-10-13, T1): the column is as wide as the person made it with
 // its divider (the `divider` target), between a minimum and a maximum, it
 // folds to a strip and back (the `fold` and `unfold` targets), and both
 // choices are remembered in this browser.
@@ -29,15 +29,13 @@ import { messages } from "i18n/messages"
 // browser is set to 20px has a 340px tree beside a 300px sidebar. So the
 // values this controller is handed are the figures at 16px, and every one is
 // multiplied by `scale` (the root's computed font size over 16) before it is
-// used: `least`, `most`, `standard`, `editor`, `sidebar`, the strip, and the
-// keys' steps. The one exception is the notes column, which the stylesheet
-// makes 400px at any font size (`--admin-notes-width`), and so does this.
-// What is written (the property, the storage) and what is said
+// used: `least`, `most`, `standard`, `editor`, `sidebar` and the
+// keys' steps. What is written (the property, the storage) and what is said
 // (`aria-valuenow`, the tooltip) are CSS pixels of the real column. Counted
 // as pixels, the figures go wrong at any other font size: at 20px the
 // separator would say 272 for a 340px column, the first arrow key would make
 // it 52px narrower on "wider", a drag would begin with a jump, and the tree
-// would be said to fit beside the notes 128px too early
+// would be allowed 80px more than the grid draws
 // (`test/system/admin/tree_column_test.rb`: "at a browser font size of
 // 20px…").
 //
@@ -46,8 +44,8 @@ import { messages } from "i18n/messages"
 // 40rem), and the choice is kept for when there is room again; `width` is
 // what is shown, and what the separator says as its value and the arrow keys
 // step from. `ceiling` is the widest the column may be right now: the
-// maximum, or less where sidebar + tree + the editor's least (+ the notes
-// column while it stands beside the editor) would not fit the window. A key
+// maximum, or less where sidebar + tree + the editor's least would not fit
+// the window. A key
 // that asks for more than the ceiling while the choice is already wider than
 // what is shown writes nothing: it moved nothing, and must not throw away the
 // wider choice. The window's width is the document's less its scrollbar's
@@ -56,23 +54,6 @@ import { messages } from "i18n/messages"
 // stylesheet's own in its own unit, so this arithmetic and the stylesheet's
 // agree at any font size and with a classic scrollbar (to the rounding of a
 // whole pixel where a rem figure is not one).
-//
-// BESIDE THE NOTES (T3). `data-tree-fits` on <html> says whether the tree AT
-// ITS CHOSEN WIDTH (folded: the strip) still fits beside the notes column
-// with the editor's least left. The stylesheet folds the tree into its
-// drawer while the notes are open and that attribute is absent ("THE PAGE
-// TREE STAYS BESIDE THE EDITOR WHILE IT FITS, AND FOLDS WHEN IT DOES NOT"),
-// since no media query can read the property. It is said whether or not the
-// notes are open (the stylesheet asks it only then), kept current here on a
-// resize and on every change of the width and of the fold, and by the head
-// script before the first paint.
-// Studio never narrows the tree to make it fit: it folds, and the column is
-// back at the same width when the notes close. While the notes are open and
-// the tree is a column, the divider stops at the width that still fits, so a
-// drag never folds the tree under the pointer that drags it. A RESET is the
-// one thing that may: Enter and a double click ask for the default, and
-// where the default does not fit beside the notes the tree folds, like any
-// other width that does not fit.
 //
 // THE FOLD, a third state of the width. "Hide page tree" (`fold`, in the
 // tree's head) and "Show page tree" (`unfold`, the strip's one button,
@@ -84,9 +65,7 @@ import { messages } from "i18n/messages"
 // property; `--admin-tree-strip`), from 1024px only: below, the tree is a
 // drawer and the fold means nothing. The CHOSEN width is untouched by a
 // fold: `--admin-tree-width` keeps its one meaning, so an unfold reads
-// nothing from the storage and the column comes back at it. While folded
-// the strip (`strip` × `scale`) stands in the fits sum in place of the
-// chosen width, since the strip is what stands beside the notes. Each press
+// nothing from the storage and the column comes back at it. Each press
 // moves the focus to the other button, which is the one shown afterwards,
 // and both say the column's state (`aria-expanded`, written in `sync`, and
 // as a `fold` button arrives with a replaced tree).
@@ -132,15 +111,14 @@ import { messages } from "i18n/messages"
 // WHAT IS TAKEN BACK. The two attributes on the divider and the one on <html>
 // that say "a pointer is at work" go when the pointer does, and again in
 // `rest` (before Turbo copies the page) and on disconnect, so no snapshot and
-// no next screen is left in the middle of a drag. The width,
-// `data-tree-fits`, the fold and the two remembered keys are NOT taken back:
+// no next screen is left in the middle of a drag. The width, the fold and
+// the two remembered keys are NOT taken back:
 // they are the state of the document, not of this element. What the
 // separator and the two buttons say of themselves (its three values, the
 // tooltip's sentence, their `aria-expanded`) is written again on connect, so
 // a copy that Turbo kept from before a resize or a fold is right as soon as
 // it is shown.
 const PROPERTY = "--admin-tree-width"
-const FITS = "data-tree-fits"
 const FOLDED = "data-tree-folded"
 const RESIZING = "data-tree-resizing"
 const HOVER_DELAY = 150
@@ -151,24 +129,17 @@ const STRIDE = 64
 
 export default class extends Controller {
   static targets = ["divider", "fold", "unfold"]
-  static values = { min: Number, default: Number, max: Number, editor: Number, sidebar: Number, notes: Number, strip: Number, key: String, foldKey: String }
+  static values = { min: Number, default: Number, max: Number, editor: Number, sidebar: Number, key: String, foldKey: String }
 
   connect() {
     this.pointer = null
     this.moved = (event) => this.drag(event)
     this.released = (event) => this.release(event)
     this.cancelled = (event) => this.cancel(event)
-    // The notes drawer opening or closing changes how far the divider may go.
-    // It says so on <html> (`data-notes-open`); nothing is dispatched when it
-    // closes, so the attribute is watched.
-    this.observer = new MutationObserver(() => this.sync())
-    this.observer.observe(this.root, { attributes: true, attributeFilter: [ "data-notes-open" ] })
     this.sync()
   }
 
   disconnect() {
-    this.observer?.disconnect()
-    this.observer = null
     this.rest()
   }
 
@@ -291,10 +262,7 @@ export default class extends Controller {
 
   // The default again (a double click, Enter): the property and the stored
   // choice both go, so the stylesheet's own 17rem is what draws the column,
-  // at any font size, and "the default" is what is remembered. Where the
-  // default does not fit beside the open notes the tree folds, as it does for
-  // any other width that does not fit: Studio never narrows the tree itself,
-  // and a person who asked for the default gets the default.
+  // at any font size, and "the default" is what is remembered.
   reset() {
     this.root.style.removeProperty(PROPERTY)
     try {
@@ -336,19 +304,13 @@ export default class extends Controller {
     }
   }
 
-  // Everything that follows from the width, the fold, the window and the
-  // notes drawer, said again: whether the tree fits beside the notes (for the
-  // stylesheet; folded, the strip is what stands there), whether the column
-  // is expanded (both fold buttons), and what the separator tells a screen
-  // reader and its tooltip. Called on connect, on every change of the width
-  // and of the fold, on `resize`, when the notes open or close, when a frame
-  // has loaded (an editor with a drawer may have arrived in `#content`) and
-  // when the divider takes the focus.
+  // Everything that follows from the width, the fold and the window, said
+  // again: whether the column is expanded (both fold buttons), and what the
+  // separator tells a screen reader and its tooltip. Called on connect, on
+  // every change of the width and of the fold, on `resize`, when a frame has
+  // loaded and when the divider takes the focus.
   sync() {
     const folded = this.folded
-    const tree = folded ? this.stripValue * this.scale : this.chosen
-    const room = this.sidebar + tree + this.notesValue + this.editor
-    this.root.toggleAttribute(FITS, this.windowWidth >= room)
     this.foldTargets.concat(this.unfoldTargets).forEach((button) => button.setAttribute("aria-expanded", String(!folded)))
 
     if (!this.hasDividerTarget) return
@@ -411,10 +373,9 @@ export default class extends Controller {
   }
 
   // The widest the column may be now, never under the minimum: the editor
-  // keeps its least beside the sidebar (where that is a column) and beside
-  // the notes (while they are).
+  // keeps its least beside the sidebar (where that is a column).
   get ceiling() {
-    const room = this.windowWidth - this.sidebar - this.editor - (this.notesBeside ? this.notesValue : 0)
+    const room = this.windowWidth - this.sidebar - this.editor
     return Math.max(this.least, Math.min(this.most, Math.floor(room)))
   }
 
@@ -430,12 +391,5 @@ export default class extends Controller {
   // query's, in pixels at any font size; the column is 15rem.
   get sidebar() {
     return window.matchMedia("(min-width: 1280px)").matches ? this.sidebarValue * this.scale : 0
-  }
-
-  // The notes as a column beside the editor: exactly what the stylesheet
-  // asks (`:root[data-notes-open] body:has(#notes-drawer)`, from 1024px,
-  // below which this divider is not shown at all).
-  get notesBeside() {
-    return this.root.hasAttribute("data-notes-open") && document.getElementById("notes-drawer") !== null
   }
 }

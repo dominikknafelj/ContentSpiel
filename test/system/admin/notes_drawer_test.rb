@@ -69,14 +69,19 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
   end
 
+  # Docked, the notes are the rail's Notes tab beside the editor.
   test "the editor stays usable beside the open drawer: it is not modal and has no scrim" do
+    at_window(1900) { usable_beside }
+  end
+
+  def usable_beside
     open_editor
     find("#notes-open").click
     assert_selector "#notes-list"
 
     assert_no_selector ".admin-shell__scrim", visible: true
     assert_equal false, page.evaluate_script("document.querySelector('.admin-content-blocks').inert")
-    # The drawer starts below the header: the button that opened it is still
+    # The notes stand below the header: the button that opened them is still
     # there to be pressed, and shows that it is.
     assert_operator page.evaluate_script("document.querySelector('#notes-open').getBoundingClientRect().bottom"), :<=,
       page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().top")
@@ -129,8 +134,13 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list"
   end
 
+  # Remembered "open" opens the Notes tab of a docked rail only.
   test "open is remembered for the next editor in this browser without taking the focus, and Close forgets it" do
     other = create_page(title: "Other")
+    at_window(1900) { remembered_and_forgotten(other) }
+  end
+
+  def remembered_and_forgotten(other)
     open_editor
     find("#notes-open").click
     assert_selector "#notes-list"
@@ -177,6 +187,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     open_editor("?notes=open&thread=#{thread.id}")
     assert_selector "#note-thread-#{thread.id}"
+    await_notes_still
 
     boxes = lambda do |*selectors|
       selectors.map { |selector| page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return [ box.left, box.top, box.right, box.bottom ] })()") }
@@ -246,17 +257,16 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "#notes-drawer"
     assert_selector "#notes-open[aria-expanded=false][aria-pressed=false]"
     assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
-    assert_no_selector "html[data-notes-open]"
   end
 
-  # The handoff's decision 17: below 1024px the sheet's header goes too while
+  # The handoff's decision 17: under 640px the sheet's header goes too while
   # a thread is open, and the thread's first row is all there is: "← All
   # notes 4", the Notify link, and "Back to page" as a text button on the
   # right, which does what the sheet header's Back does.
-  test "below 1024px a thread hides the sheet's header: its first row has All notes, Notify and Back to the page" do
+  test "under 640px a thread hides the sheet's header: its first row has All notes, Notify and Back to the page" do
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     original = page.current_window.size
-    page.current_window.resize_to(900, 800)
+    page.current_window.resize_to(600, 800)
     open_editor
     find("#notes-open").click
     assert_selector "#notes-drawer > header button", text: "Back to Pricing"
@@ -305,11 +315,11 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  test "below 1024px leaving a thread for the editor puts the editor back where it was scrolled to" do
+  test "under 640px leaving a thread for the editor puts the editor back where it was scrolled to" do
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     8.times { |index| @page.content_blocks.create!(block_type: "rich_text", position: index + 1) }
     original = page.current_window.size
-    page.current_window.resize_to(900, 800)
+    page.current_window.resize_to(600, 800)
     open_editor
     page.execute_script("window.scrollTo(0, 300)")
     assert_eventually(message: "the editor did not scroll") { page.evaluate_script("window.scrollY") == 300 }
@@ -325,9 +335,9 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  # From 1024px the row's own way back to the page is not shown (Close is),
-  # and neither is it where there is no drawer at all.
-  test "Back to the page stands only in the sheet: not in the drawer from 1024px, not on a record's notes page" do
+  # From 640px the row's own way back to the page is not shown (Close is),
+  # and neither is it where there is no editor's notes at all.
+  test "Back to the page stands only in the sheet: not in the slide-over or the tab from 640px, not on a record's notes page" do
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     open_editor("?notes=open&thread=#{thread.id}")
     assert_selector "#notes-drawer #note-thread-#{thread.id} button[data-note-close]"
@@ -371,6 +381,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     thread = long_thread
     open_editor("?notes=open&thread=#{thread.id}")
     assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    await_notes_still
 
     assert_operator scroll_messages_to_end(thread), :>, 200, "the messages did not scroll"
     # The drawer's own body does not scroll under a thread.
@@ -399,12 +410,13 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list"
   end
 
-  test "below 1024px the sheet's thread keeps its row at the top too: All notes and Back to page are pressable at the end of the messages" do
+  test "under 640px the sheet's thread keeps its row at the top too: All notes and Back to page are pressable at the end of the messages" do
     thread = long_thread
     original = page.current_window.size
-    page.current_window.resize_to(900, 800)
+    page.current_window.resize_to(600, 800)
     open_editor("?notes=open&thread=#{thread.id}")
     assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    await_notes_still
 
     assert_operator scroll_messages_to_end(thread), :>, 200, "the messages did not scroll"
     drawer_top = page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().top")
@@ -562,12 +574,17 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
   # must not be given `notes=open`.
   test "a remembered drawer puts notes=open into the address of the editor it opened on, not of the page before it" do
     other = create_page(title: "Other")
+    at_window(1900) { remembered_into_the_next_address(other) }
+  end
+
+  # Docked, where "open" from memory opens the Notes tab.
+  def remembered_into_the_next_address(other)
     open_editor
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{@page.id}']"
     assert_eventually { address == "/cs-studio/pages/#{@page.id}?notes=open" }
 
-    click_frame_link { find(".admin-shell__tree a", text: "Other", visible: :all).execute_script("this.click()") } # press_by_script: the tree is folded away while the notes column is open
+    click_frame_link { within("#tree-column") { click_link "Other" } }
 
     assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
     assert_eventually(message: "the next editor's address does not say its notes are open") { address == "/cs-studio/pages/#{other.id}?notes=open" }
@@ -609,11 +626,11 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
   end
 
-  # Below 1024px the notes are a sheet over the whole editor: opened from
-  # memory it would hide the page a person has just picked in the tree.
-  test "below 1024px a remembered open does not put the sheet over the editor, and ?notes=open still does" do
+  # Below the rail's threshold the notes are a slide-over over the editor:
+  # opened from memory it would cover the page a person has just picked.
+  test "below the rail's threshold a remembered open does not put the slide-over over the editor, and ?notes=open still does" do
     original = page.current_window.size
-    page.current_window.resize_to(900, 800)
+    page.current_window.resize_to(1100, 800)
     open_editor
     page.execute_script("window.localStorage.setItem('cs-notes-open', '1')")
 
@@ -662,16 +679,17 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  # Spec §7 "The drawer and the shell's drawers". Below 1024px the notes are a
+  # Spec §7 "The drawer and the shell's drawers". Under 640px the notes are a
   # full-screen sheet under the top bar, and the page tree is a drawer too.
-  test "below 1024px the notes are a sheet with a way back, and the sheet and the page-tree drawer close each other" do
+  test "under 640px the notes are a sheet with a way back, and the sheet and the page-tree drawer close each other" do
     original = page.current_window.size
-    page.current_window.resize_to(900, 800)
+    page.current_window.resize_to(600, 800)
     open_editor
     find("#notes-open").click
     assert_selector "#notes-drawer #notes-list"
-    # The sheet fills the width under the top bar; the drawer's × is the
-    # 400px drawer's, and here "Back to <title>" stands for it.
+    await_notes_still
+    # The sheet fills the width under the top bar; the × is the slide-over's
+    # and the tab's, and here "Back to <title>" stands for it.
     # The width is the window's less the scrollbar's gutter, which CS Studio keeps.
     assert_equal [ 0, 48, page.evaluate_script("document.documentElement.getBoundingClientRect().width") ], page.evaluate_script("(() => { const box = document.querySelector('#notes-drawer').getBoundingClientRect(); return [ box.left, box.top, box.width ] })()")
     assert_no_selector "#notes-drawer button[aria-label='Close']"

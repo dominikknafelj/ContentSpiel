@@ -1,5 +1,5 @@
 <% count = ->(tab) do %>
-  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero? %><% end %>
+  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero?, data: tab.count_data %><% end %>
 <% end %>
 <% if single? %>
   <% tab = tabs.first %>
@@ -7,8 +7,7 @@
 <% else %>
   <div class="admin-rail__tabs" role="tablist" aria-label="<%= t(".label") %>">
     <% tabs.each do |tab| %>
-      <%= tag.button type: "button", role: "tab", id: tab_id(tab), class: "admin-rail__tab text-sm",
-            aria: { selected: current?(tab).to_s, controls: panel_id(tab) }, tabindex: (current?(tab) ? 0 : -1), data: tab_data(tab) do %><%= tab.label %><% count.(tab) %><% end %>
+      <%= render Admin::Ui::RailTabComponent.new(rail_id: @rail_id, tab: tab, current: current?(tab)) %>
     <% end %>
   </div>
 <% end %>

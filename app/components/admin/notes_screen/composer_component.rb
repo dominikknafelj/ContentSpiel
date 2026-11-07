@@ -43,6 +43,10 @@ module Admin
     # (decision 30): its `title` and `aria-keyshortcuts`. The server writes
     # the Ctrl form; on an Apple platform the script writes "Send (⌘↵)".
     #
+    # `variant` is the submit's: primary where the composer is the screen's one
+    # action (a new note, an edit), secondary for the thread's Reply, which stands
+    # beside Resolve (also secondary).
+    #
     # `secondary` is a control drawn in the bottom row, 8px to the left of the
     # submit: the thread's Resolve / Reopen, which belongs to a form of its
     # own and names it with `form=` (this component only gives it the place).
@@ -69,7 +73,8 @@ module Admin
       # with something else -- a refused edit comes back holding what was
       # typed -- so the script still measures a draft against what is stored.
       def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2, edit: false,
-        files: true, files_lost: [], saved: nil)
+        files: true, files_lost: [], saved: nil, variant: :primary)
+        @variant = variant
         @url = url
         @key = key
         @label = label

@@ -172,6 +172,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/rail_tabs_component.rb
     app/components/admin/ui/rail_tabs_component.html.erb
     app/components/admin/ui/rail_panel_component.rb
+    app/components/admin/ui/rail_tab_component.rb
+    app/components/admin/ui/rail_slot_component.rb
     app/components/admin/ui/pagination_component.rb
     app/components/admin/ui/pagination_component.html.erb
     app/components/admin/ui/time_ago_component.rb
@@ -304,8 +306,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/files_component.rb
     app/components/admin/notes_screen/files_component.html.erb
     app/javascript/controllers/admin/notes/gif_controller.js
-    app/components/admin/notes_screen/drawer_component.rb
-    app/components/admin/notes_screen/drawer_component.html.erb
+    app/components/admin/notes_screen/rail_panel_component.rb
+    app/components/admin/notes_screen/rail_panel_component.html.erb
     app/javascript/controllers/admin/notes/drawer_controller.js
     app/javascript/controllers/admin/notes/live_controller.js
     app/javascript/controllers/admin/notes/inbox_controller.js

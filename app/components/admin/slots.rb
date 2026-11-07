@@ -25,10 +25,24 @@ module Admin
   #   `url_options:`, and for a screen that has already read something the
   #   feature would read again, that). EVERY slot component must accept `**`
   #   for the context it does not use: a screen may hand through more than
-  #   one feature needs (the editors pass `counts:`);
+  #   one feature needs (the editors pass `reads:`, a Hash the screen's slot
+  #   components share, so that two parts of one feature on one screen read
+  #   what they both draw once);
   # - `options` are the registration's own (`register(name, component,
   #   size: :panel)`), merged after the context, so they win on a clash.
   # `render?` decides whether it draws; one that says no leaves no markup.
+  #
+  # A PANEL slot, `editor.rail.tabs`, is drawn by `Admin::Ui::RailSlotComponent`
+  # and `Admin::Ui::RailTabsComponent`, not by `SlotComponent`: each entry is a
+  # tab AND its panel. Beside the slot component's arguments it answers
+  # `tab_key` (a String of lowercase letters), `tab_label`, `tab_count` (an
+  # Integer, or nil for none), optionally `tab_count_data` (the figure's
+  # `data-` attributes) and `tab_current?` (the request asks for this tab to
+  # be the one shown as the page is drawn), and `render?`; drawn, it is the panel's content.
+  # The editors hand it `query:` (the request's query parameters), so a panel
+  # reads its own parameters without the host naming them. The tab's contents
+  # are drawn again by a save's answer (`Admin::Answers::RailTabStreams`), the
+  # panel never, since it may hold typed text.
   #
   # A list slot's `loader` is called ONCE per render of the list with all its
   # records and the viewer (`Slots.load`), so a row costs no query of its own:
@@ -54,7 +68,7 @@ module Admin
       editor.header.people editor.header.actions
       media.panel.header media.panel.sections
       tree.row.markers posts.row.markers posts.row.title
-      editor.block.markers
+      editor.block.markers editor.rail.tabs
     ].freeze
 
     # The slot's own constructor arguments: an option of these names would replace

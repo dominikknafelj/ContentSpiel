@@ -1,9 +1,11 @@
+import { keepMerge } from "live/keep_merge"
+
 // The merge of a notes view with the server's fresh markup for it (notes
 // spec §6.3). THE RULE: WHAT IS READ IS REPLACED; WHAT IS TYPED IS NEVER
 // TOUCHED. This file is the one owner of that rule: every path that draws a
 // list or a thread again -- a live refresh after a signal, and the answer to
 // one of the tab's own buttons (`controllers/admin/notes/live_controller.js`:
-// `fetchPart`, `answered`) -- goes through `mergeList`, `mergeThread` and
+// `fetchPart`, `answered`) -- goes through `mergeNoteList`, `mergeThread` and
 // `mergeGone`, and nothing else replaces a part of a view that is on screen.
 //
 // WHAT COUNTS AS TYPED, and stays the element it is:
@@ -20,7 +22,12 @@
 // HOW.
 // - The list view: everything in `#notes-list` is replaced AROUND a new-note
 //   field that is on screen. The field is not moved, not even within the
-//   list, so its text, its names, its open picker and the focus stay.
+//   list, so its text, its names, its open picker and the focus stay. It is
+//   the one kept element of the merge core this module shares with live
+//   editing (`live/keep_merge.js`, whose header holds how an answer is drawn
+//   around what is kept); the answer's own `#notes-new` gives the field its place,
+//   and an answer without one puts it before its first part that is not
+//   `[hidden]` or `[role=status]` (the counts and the list's sentence).
 // - The thread view: its `messages` part is replaced -- Back, the heading,
 //   Notify, Close and Pin are in it (its two rows, which in the drawer stay
 //   at the top while the messages under them scroll: the handoff's decision
@@ -88,7 +95,7 @@ const nearBottom = (scroller) => scroller.scrollHeight - scroller.scrollTop - sc
 //
 // Answers null for an answer that is not a list (nothing was touched), or
 // `{ kept }`: the new-note field that stayed where it was, if there is one.
-export function mergeList(view, answer) {
+export function mergeNoteList(view, answer) {
   if (answer.dataset.notesView !== "list") return null
   const next = document.importNode(answer, true)
   const field = view.querySelector(":scope > #notes-new")
@@ -97,22 +104,16 @@ export function mergeList(view, answer) {
   const top = scroller.scrollTop
   const resolved = view.querySelector("#notes-resolved-section")?.open
 
-  if (field) {
-    // Around the field, which stays where it is: what the answer has
-    // before the field's place goes before it, the rest after. In an
-    // answer without the place (the block the note is on went a moment
-    // ago) the counts and the list's sentence go before it.
-    const place = next.querySelector(":scope > #notes-new")
-    const parts = [ ...next.children ]
-    const at = place ? parts.indexOf(place) : parts.findIndex((part) => !part.matches("[hidden], [role='status']"))
-    // Not the field's own place, and no second "New note" beside the field.
-    const drawn = (part) => part !== place && !part.querySelector("[data-note-new-link]")
-    ;[ ...view.children ].forEach((part) => { if (part !== field) part.remove() })
-    field.before(...(at < 0 ? parts : parts.slice(0, at)).filter(drawn))
-    field.after(...(at < 0 ? [] : parts.slice(at)).filter(drawn))
-  } else {
-    view.replaceChildren(...next.children)
-  }
+  // The field takes the place of the answer's `#notes-new`, whose copy is
+  // dropped, and beside it no second "New note" is drawn. In an answer
+  // without that place (the block the note is on went a moment ago) the
+  // counts and the list's sentence go before the field, the rest after it.
+  const all = [ ...next.children ]
+  const own = next.querySelector(":scope > #notes-new")
+  const parts = field ? all.filter((part) => part === own || !part.querySelector("[data-note-new-link]")) : all
+  const at = all.findIndex((part) => !part.matches("[hidden], [role='status']"))
+  const place = () => at < 0 ? null : all.slice(at).find((part) => parts.includes(part)) || null
+  keepMerge(view, parts, { kept: new Set(field ? [ field ] : []), place })
 
   const section = view.querySelector("#notes-resolved-section")
   if (resolved && section) section.open = true

@@ -16,7 +16,7 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
   end
 
   teardown do
-    page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
+    page.execute_script("try { window.localStorage.removeItem('cs-notes-open'); window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
   end
 
   def card_of(section) = "##{ActionView::RecordIdentifier.dom_id(section)}"
@@ -230,6 +230,50 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
       assert_writes_settled
       assert_equal "intro", @section.reload.settings["anchor"]
       assert_no_text "Changed elsewhere"
+    end
+  end
+
+  # Docked, the notes opened and then a section chosen: the rail's tab last
+  # left is Notes. Undocking conceals the Section tab, and the rail would go
+  # back to Notes, which below the threshold is a slide-over over the editor
+  # nobody asked for. It goes to the host's own tab instead.
+  {
+    "the window narrowed" => -> { page.current_window.resize_to(NARROW, 900) },
+    "the tree unfolded" => -> { find("button[aria-label='Show page tree']").click }
+  }.each do |how, undock|
+    test "undocking with a section chosen after the notes opened, by #{how}, opens no slide-over" do
+      width = how == "the tree unfolded" ? 1600 : WIDE
+      at_window(width) do
+        open_editor
+        if how == "the tree unfolded"
+          find("button[aria-label='Hide page tree']").click
+          assert_selector "button[aria-label='Show page tree']"
+        end
+        assert_docked
+        find("#notes-open").click
+        assert_selector "#notes-drawer #notes-list"
+        find(word("width")).click
+        assert_selector in_rail, visible: :visible
+
+        instance_exec(&undock)
+
+        assert_docked(false)
+        assert_selector at_home, visible: :visible
+        await_frames
+        assert_no_selector "#notes-drawer", visible: :visible
+        assert_no_selector "#editor-grid-panel-notes[data-current]", visible: :all
+        assert_selector "#notes-open[aria-pressed=false]"
+        assert_current_path "/cs-studio/pages/#{@page.id}"
+
+        if how == "the window narrowed"
+          page.current_window.resize_to(WIDE, 900)
+        else
+          find("button[aria-label='Hide page tree']").click
+        end
+        assert_docked
+        assert_selector "#editor-grid-tab-page[aria-selected=true]"
+        assert_selector "#editor-grid-panel-page[data-current]"
+      end
     end
   end
 

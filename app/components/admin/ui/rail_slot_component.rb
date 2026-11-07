@@ -1,0 +1,67 @@
+module Admin
+  module Ui
+    # The panels registered at `editor.rail.tabs` (`Admin::Slots`): each entry
+    # that renders is one tab (`#tabs`, which the rail's tablist draws after its
+    # own through `RailTabsComponent`'s `slot_tabs:`) and one panel (`#call`,
+    # drawn in the rail's grid after the host's own panels). The shape an entry
+    # answers is in `Admin::Slots`' header. With nothing registered there is no
+    # tab and no markup.
+    #
+    # The entries are built once, so a tab and its panel come from one object.
+    class RailSlotComponent < AdminComponent
+      KEY = /\A[a-z]+\z/
+
+      def initialize(rail_id:, record:, viewer:, reserved: [], **context)
+        @reserved = reserved
+        @rail_id = rail_id
+        @record = record
+        @viewer = viewer
+        @context = context
+      end
+
+      def tabs
+        panels.map do |panel|
+          RailTabsComponent::Tab.new(key: panel.tab_key, label: panel.tab_label, count: panel.tab_count,
+            count_data: (panel.tab_count_data if panel.respond_to?(:tab_count_data)))
+        end
+      end
+
+      def render? = panels.any?
+
+      # The key of the entry that asks to be the current tab as the page is
+      # drawn (`tab_current?`, an entry opened by the request's own address),
+      # or nil. The host draws its own default current tab only without one,
+      # so the first paint already shows the asked-for panel.
+      def current_key = panels.find { |panel| panel.respond_to?(:tab_current?) && panel.tab_current? }&.tab_key
+
+      def call
+        safe_join(panels.map do |panel|
+          render(RailPanelComponent.new(rail_id: @rail_id, key: panel.tab_key, current: panel.tab_key == current_key)) { render(panel) }
+        end)
+      end
+
+      private
+
+      # Two tabs of one key would be two elements of one id, so a key that is
+      # the host's own (`reserved:`) or another entry's is refused.
+      def unique!(taken, key, component)
+        raise ArgumentError, "#{component} answers tab_key #{key.inspect}, which another tab of this rail already has" if taken.include?(key)
+
+        taken << key
+      end
+
+      def panels
+        taken = @reserved.map(&:to_s)
+        @panels ||= Admin::Slots.entries("editor.rail.tabs").filter_map do |entry|
+          panel = entry.component.new(record: @record, viewer: @viewer, data: nil, **@context, **entry.options)
+          next unless panel.render?
+          raise ArgumentError, "#{entry.component} answers tab_key #{panel.tab_key.inspect}; a tab key is lowercase letters" unless KEY.match?(panel.tab_key.to_s)
+
+          unique!(taken, panel.tab_key.to_s, entry.component)
+
+          panel
+        end
+      end
+    end
+  end
+end

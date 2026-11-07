@@ -11,6 +11,8 @@ Rails.application.config.to_prepare do
   Admin::Slots.register "media.panel.header", Admin::PresenceScreen::PeopleComponent, size: :panel
 
   Admin::Slots.register "editor.header.actions", Admin::NotesScreen::HeaderButtonComponent
+  # The editors' rail: the Notes tab, after the rail's own.
+  Admin::Slots.register "editor.rail.tabs", Admin::NotesScreen::RailPanelComponent
   Admin::Slots.register "media.panel.sections", Admin::NotesScreen::MediaSectionComponent
 
   # The lists' rows: the pill's loader reads each list's counts once for all rows.

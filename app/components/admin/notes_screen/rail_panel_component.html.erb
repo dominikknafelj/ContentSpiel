@@ -1,0 +1,45 @@
+<%# Where it stands and how wide is the stylesheet's (`.admin-notes-drawer`,
+    "THE NOTES PANEL"): the Notes tab's content where the rail docks, a
+    slide-over below it, a sheet under 640px. Escape is heard here and
+    nowhere wider: it closes the notes only while the focus is inside them.
+    It is a `record` of `admin--notes--live` (notes spec §6): that controller
+    subscribes to this record's signals and, when one comes, fetches the
+    frame's view again -- or, while nobody can see the notes, only the
+    counts, from `data-notes-counts-url`. %>
+<%= tag.div id: "notes-drawer", tabindex: -1, role: "region", aria: { label: t(".title") },
+      class: "admin-notes-drawer focus:outline-none",
+      data: { "admin--notes--drawer-target": "drawer", "admin--notes--live-target": "record", notes_type: helpers.note_args(record).first, notes_id: record.id,
+              notes_counts_url: helpers.admin_record_note_counts_path(*helpers.note_args(record)),
+              src: src, path: path, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes--drawer#close" } do %>
+  <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3">
+    <%# The sheet's way back, under 640px only (handoff "Full-screen sheet"). %>
+    <%= tag.button type: "button", class: "admin-notes-drawer__back mr-1 #{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)}",
+          data: { action: "admin--notes--drawer#close" } do %>
+      <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %><span class="max-w-[40vw] truncate"><%= t(".back", title: title) %></span>
+    <% end %>
+    <h2 class="text-[15px] font-semibold text-ink"><%= t(".title") %></h2>
+    <%# Nothing at zero (the system's rule for a count): the number hides
+        itself, and the line with it. %>
+    <% if counts %><p class="text-count text-meta has-[[hidden]]:hidden"><%= open_count %></p><% end %>
+    <div class="ml-auto flex items-center gap-1">
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes--drawer#compose" }) %>
+      <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { action: "admin--notes--drawer#close" },
+            class: "admin-notes-drawer__close inline-flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" do %>
+        <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+      <% end %>
+    </div>
+  </header>
+  <%# The one scroller of the notes: the list's position in it is what
+      `admin--notes--drawer` keeps for the way back from a thread, and a
+      thread's reply sticks to its bottom. `overscroll-contain`: the editor
+      underneath stays where it is when the list reaches its end. The frame
+      is centred and at most 720px wide, which only the sheet is wide enough
+      to show. %>
+  <div class="flex min-h-0 flex-1 justify-center overflow-y-auto overscroll-contain" data-notes-scroller>
+    <%= tag.turbo_frame id: "notes", class: "block min-h-full w-full max-w-[720px]",
+          data: { "admin--notes--drawer-target": "frame", action: "turbo:frame-load->admin--notes--drawer#loaded turbo:before-fetch-request->admin--notes--drawer#leaving" } do %>
+      <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".loading") %></p>
+    <% end %>
+  </div>
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: counts, id: "notes-counts") if counts %>
+<% end %>

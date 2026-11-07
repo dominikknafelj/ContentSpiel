@@ -292,7 +292,12 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 **Tests.** `admin_design_rules_test` (the grid rule), dashboard component and query tests, `admin_i18n_test`; browser: `dashboard_test`, `note_inbox_test`, `unpublished_changes_test`, `drafts_test`, `presence_lists_test`.
 
-**Size.** 3 to 5 days. **Guide.** The dashboard.
+**Two shell changes, added by the owner on 2026-11-06.** They ride with this stage because it is the next one built; neither touches the dashboard.
+
+- *The theme switch fades.* Switching between light and dark cross-fades the whole page through the View Transitions API (`document.startViewTransition`), about 250ms, ease-out; the duration and easing are a token written once, in the `::view-transition-old(root)` and `::view-transition-new(root)` rules. It is instant where the API is missing and under `prefers-reduced-motion: reduce`, and the first paint (`shared/_theme_head`) never fades. `aria-checked` and the focus change at once, not after the fade. It covers CS Studio's three-way switch, the public footer's toggle (`theme_controller.js` serves both; if the public build cannot carry the rule without touching the theme contract, the public toggle takes the browser's default cross-fade) and an OS change while the choice is Auto. Tests: a browser test that pressing Dark calls the transition (a spy on `startViewTransition`) and that reduced motion does not; the theme tests never wait on an animation. +half a day.
+- *Every sidebar module has a colour family.* No chip in the sidebar is neutral. From the seven families (accent stays reserved for the current module and "unread and addressed to you"): Dashboard, Pages and Mind graph structure; Posts and Tags lists; Media media; Forms form; Translations text; Users and Groups people; Trash, Settings, AI assistant, System status and Audit log code. `StudioModules.register` refuses a module without a family, so a gem's module declares one; the selected row keeps its chip's colour; `admin_contrast_test` measures every family's chip on the sidebar's ground at 3:1 in both themes. +half a day.
+
+**Size.** 4 to 6 days. **Guide.** The dashboard; the sidebar's screenshots.
 
 ### Stage 5: the screens drawn on E4More and E4Setup (three PRs)
 

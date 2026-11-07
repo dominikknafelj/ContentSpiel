@@ -29,7 +29,11 @@ class Admin::SlotsTest < ViewComponent::TestCase
   def entry(component, loader: nil, **options) = Admin::Slots::Entry.new(component:, loader:, options:)
 
   test "the names a screen may put a slot at" do
-    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers], Admin::Slots::NAMES
+    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers editor.rail.tabs], Admin::Slots::NAMES
+  end
+
+  test "editor.rail.tabs is a name a screen may put a slot at" do
+    assert_includes Admin::Slots::NAMES, "editor.rail.tabs"
   end
 
   test "an unknown name is refused at registration" do

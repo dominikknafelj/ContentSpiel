@@ -384,6 +384,15 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     await_js("document.body.dataset.notesLive === 'connected'", wait: wait)
   end
 
+  # Below the rail's threshold the editors' notes slide in from the right
+  # (200ms, `admin-notes-in`), and a box measured or a point pressed during
+  # the slide is not where the panel stays: this waits until the slide has
+  # run out. Nothing to wait for where nothing slides (docked, reduced motion).
+  def await_notes_still(wait: 5)
+    await_js("(() => { const notes = document.getElementById('notes-drawer'); return !notes || notes.getAnimations().length === 0 })()", wait: wait,
+      message: "the notes are still sliding in")
+  end
+
   # Records the part of every live merge from here on (`admin--editing--live:merged`
   # on `#editing`) in `window.__merged`, for `await_js("window.__merged...")`.
   def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")

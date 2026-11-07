@@ -191,7 +191,7 @@ class SourceLayoutTest < ActiveSupport::TestCase
   # named after its topic. i18n, live and search are the named exceptions.
   SHARED_MODULE_FOLDERS = {
     "i18n" => "the script messages every screen reads (messages(element).t), no one topic's",
-    "live" => "the cable connection, shared by the notes and presence topics",
+    "live" => "the cable connection and the merge core (keep_merge), shared by the notes, presence and editing topics",
     "search" => "the title and tag search every picker shares, no one topic's"
   }.freeze
 

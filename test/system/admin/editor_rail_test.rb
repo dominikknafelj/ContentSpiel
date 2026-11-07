@@ -22,7 +22,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   end
 
   teardown do
-    page.execute_script("try { window.localStorage.removeItem('cs-tree-folded'); window.localStorage.removeItem('cs-tree-width') } catch (error) {}")
+    page.execute_script("try { window.localStorage.removeItem('cs-tree-folded'); window.localStorage.removeItem('cs-tree-width'); window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
   end
 
   # `[left, top, right, bottom]` of the first element the selector finds.
@@ -58,7 +58,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_in_delta blocks[2] + 28, rail[0], 1, "the rail stands 28px right of the blocks"
       assert_in_delta 360, rail[2] - rail[0], 1
       assert_in_delta blocks[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the blocks start at one height"
-      assert_selector "#editor-grid [role=tablist] [role=tab]", count: 2
+      # Page and Section, then the registered Notes tab (`editor.rail.tabs`).
+      assert_equal %w[editor-grid-tab-page editor-grid-tab-section editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
     end
   end
 
@@ -188,6 +189,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  NOTES_TAB = "#editor-grid-tab-notes".freeze
+
   test "Page and Section are tabs: arrows move between them, Home and End go to the ends" do
     at_window(WIDE) do
       visit_editor(@page)
@@ -202,13 +205,17 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_selector "#editor-grid-panel-section", visible: :visible, text: "Choose a section"
       assert_selector "#page-settings", visible: :hidden
 
+      # The Notes tab is the last of them, and Right from it goes round to Page.
+      keyboard.type(:right)
+      assert_selector "#{NOTES_TAB}[aria-selected=true]"
+      assert focus_is_on(NOTES_TAB)
       keyboard.type(:right)
       assert_selector "#{PAGE_TAB}[aria-selected=true]"
       assert focus_is_on(PAGE_TAB)
 
       keyboard.type(:end)
-      assert_selector "#{SECTION_TAB}[aria-selected=true]"
-      assert focus_is_on(SECTION_TAB)
+      assert_selector "#{NOTES_TAB}[aria-selected=true]"
+      assert focus_is_on(NOTES_TAB)
 
       keyboard.type(:home)
       assert_selector "#{PAGE_TAB}[aria-selected=true]"
@@ -308,7 +315,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_selector "#post-form input[name='base_updated_at']", count: 1, visible: :all
       assert_equal "contents", page.evaluate_script("getComputedStyle(document.getElementById('post-form')).display")
       assert_equal [ "form", false ], post_form_ax, "the form keeps its role while it generates no box"
-      assert_selector "h2#editor-grid-tab-post", text: "Post"
+      assert_selector "#editor-grid [role=tablist] #editor-grid-tab-post[role=tab]", text: "Post"
 
       area = box("#editing")
       main = box(POST_MAIN)
@@ -317,7 +324,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_in_delta 900, main[2] - main[0], 1
       assert_in_delta main[2] + 28, rail[0], 1, "the rail stands 28px right of the main column"
       assert_in_delta 360, rail[2] - rail[0], 1
-      assert_in_delta main[1], box("#editor-grid-tab-post")[1], 1, "the rail's heading and the main column start at one height"
+      assert_in_delta main[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the main column start at one height"
 
       listen_to_post_form
       find("#post-tag_names").send_keys("alpha", :enter)
@@ -390,30 +397,11 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # A second tab and panel the rail controller takes as its own, outside the
-  # post form, as a slot's tab would stand; chosen, so the Post panel is not
-  # current.
-  def choose_a_second_tab
-    page.execute_script(<<~JS)
-      const grid = document.getElementById("editor-grid")
-      const tab = document.createElement("button")
-      Object.assign(tab, { type: "button", id: "editor-grid-tab-probe", textContent: "Probe" })
-      tab.setAttribute("role", "tab")
-      tab.setAttribute("data-admin--ui--rail-target", "tab")
-      tab.dataset.key = "probe"
-      tab.dataset.action = "admin--ui--rail#select"
-      const panel = document.createElement("div")
-      panel.id = "editor-grid-panel-probe"
-      panel.className = "admin-rail__panel"
-      panel.setAttribute("role", "tabpanel")
-      panel.setAttribute("data-admin--ui--rail-target", "panel")
-      panel.dataset.key = "probe"
-      panel.textContent = "Probe panel"
-      grid.prepend(tab)
-      grid.append(panel)
-    JS
-    find("#editor-grid-tab-probe").click
-    assert_selector "#editor-grid-panel-probe[data-current]", text: "Probe panel"
+  # The post rail's other tab, the Notes tab (`editor.rail.tabs`), outside the
+  # post form; chosen, so the Post panel is not current.
+  def choose_the_notes_tab
+    find("#editor-grid-tab-notes").click
+    assert_selector "#editor-grid-panel-notes[data-current] #notes-list"
     assert_selector POST_PANEL, visible: :hidden
   end
 
@@ -426,7 +414,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       open_post
       await_notes_live
       assert_docked
-      choose_a_second_tab
+      choose_the_notes_tab
       page.execute_script("document.getElementById('post-form').dataset.probe = 'old'")
       listen_merged
 
@@ -436,7 +424,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_equal "A colleague's excerpt", find_field(id: "post-excerpt", visible: :all).value
 
       assert_selector "#editor-grid [role=tabpanel][data-current]", count: 1, visible: :all
-      assert_selector "#editor-grid-panel-probe[data-current]"
+      assert_selector "#editor-grid-panel-notes[data-current]"
+      assert_selector "#editor-grid-tab-notes[aria-selected=true]"
       assert_selector "#{POST_PANEL}:not([data-current])", visible: :hidden
     end
   end

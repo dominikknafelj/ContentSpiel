@@ -17,15 +17,14 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   end
 
   test "the numbers are the design's, and the default is the 17rem the column always was" do
-    assert_equal [ 220, 272, 480, 640, 240, 400, 44 ], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR, Divider::NOTES, Divider::STRIP ]
+    assert_equal [ 220, 272, 480, 640, 240, 44 ], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR, Divider::STRIP ]
     assert_equal 17 * Divider::BASE, Divider::DEFAULT
-    # The design's own sum: at the default the tree stays beside the notes from a 1552px window.
-    assert_equal 1552, Divider::SIDEBAR + Divider::DEFAULT + Divider::NOTES + Divider::EDITOR
+    assert_not Divider.const_defined?(:NOTES, false), "the tree never folds for the notes: nothing counts them beside it"
   end
 
   # The figures are pixels at a 16px root font, and the stylesheet lays them
   # out in rem: each of them as a rem literal is in the shell's rules, and none
-  # is left there as pixels (the notes column's 400px is the one that is).
+  # is left there as pixels.
   test "the stylesheet holds every figure in rem, as the constants over the base: none as pixels" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
     rules = css[/^:root \{\n  --admin-tree-room:.*?^\.admin-shell--tree \{[^\n]*\n/m]
@@ -37,7 +36,7 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
     assert_includes rules, "--admin-tree-column: clamp(#{rem.(Divider::MIN)}, var(--admin-tree-width, #{rem.(Divider::DEFAULT)}), max(#{rem.(Divider::MIN)}, min(#{rem.(Divider::MAX)}, var(--admin-tree-room))));"
     assert_includes rules, "@media (max-width: 1279px) { :root { --admin-tree-room: calc(100% - #{rem.(Divider::EDITOR)}); } }"
     assert_no_match(/\d+px(?! \{)/, rules.gsub("1279px", ""), "a pixel length among the tree column's rules")
-    assert_match(/^:root \{ --admin-notes-width: #{Divider::NOTES}px; \}/, css)
+    assert_no_match(/--admin-notes-width/, css)
     assert_match(/^:root \{ --admin-tree-strip: #{rem.(Divider::STRIP)}; \}/, css)
   end
 
@@ -45,9 +44,10 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
     data = Divider.column_data
 
     assert_equal "admin--shell--tree-width", data[:controller]
-    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, notes: 400, strip: 44, key: "cs-tree-width", "fold-key": "cs-tree-folded" }.each do |name, value|
+    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, key: "cs-tree-width", "fold-key": "cs-tree-folded" }.each do |name, value|
       assert_equal value, data[:"admin--shell--tree-width-#{name}-value"], name.to_s
     end
+    assert_empty data.keys.grep(/notes|strip/), "the script counts neither the notes nor the strip"
     assert_equal %w[resize@window->admin--shell--tree-width#sync turbo:frame-load@document->admin--shell--tree-width#sync
                     turbo:before-cache@document->admin--shell--tree-width#rest], data[:action].split
   end

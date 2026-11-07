@@ -51,23 +51,20 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_select ".admin-tree-divider", count: 0
   end
 
-  test "the head script applies the remembered width and fold and says whether the tree fits beside the notes, on every screen, guarded, in the stylesheet's unit" do
+  test "the head script applies the remembered width and fold, on every screen, guarded, in the stylesheet's unit" do
     [ "/cs-studio/pages/#{@b.id}", "/cs-studio/posts" ].each do |path|
       get path
       script = css_select("head script").map(&:text).find { |text| text.include?("--admin-tree-width") }
       assert script, "#{path} has no head script for the tree's width"
       assert_includes script, %(try { stored = parseFloat(localStorage.getItem("cs-tree-width")); } catch (e) {})
-      # Every figure but the notes' is multiplied by the root's font size over 16.
+      # The limits are multiplied by the root's font size over 16.
       assert_includes script, "var scale = size > 0 ? size / 16 : 1;"
       assert_includes script, "stored >= 220 * scale && stored <= 480 * scale"
-      assert_includes script, "var width = 272 * scale;"
-      assert_includes script, "240 * scale : 0"
       assert_includes script, %(try { folded = localStorage.getItem("cs-tree-folded") === "1"; } catch (e) {})
       assert_includes script, %(if (folded) root.setAttribute("data-tree-folded", "");)
-      # Folded, the strip stands beside the notes, not the chosen width.
-      assert_includes script, "var tree = folded ? 44 * scale : width;"
-      assert_includes script, "sidebar + tree + 400 + 640 * scale"
-      assert_includes script, %(root.setAttribute("data-tree-fits", ""))
+      # The tree never folds for the notes: nothing sums it beside them.
+      assert_not_includes script, "data-tree-fits"
+      assert_not_includes script, "400"
       # After the stylesheet's link (a script waits for the stylesheets before
       # it, so the font size it reads is the page's) and still in <head>.
       head = response.body[/<head>.*<\/head>/m]

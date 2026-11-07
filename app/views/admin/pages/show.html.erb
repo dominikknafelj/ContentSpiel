@@ -26,19 +26,17 @@
     selected row"). %>
 <div hidden data-tree-open-page="<%= @page.id %>"></div>
 
-<%# The page's open notes (notes spec §4.3): two queries for the drawer's
-    counts, every marker's and which of them hold something unread for the
-    viewer. Here in the view, because every way this screen is rendered needs
-    them. The header's Notes button is a slot component (`Admin::Slots`) and
-    is handed the same counts rather than reading them again. %>
-<% note_counts = Notes::Counts.for_container(@page, user: Current.user) %>
+<%# What every slot of this screen is handed beside the record (`Admin::Slots`): `reads`
+    is one Hash the screen's slot components share, so that a feature drawn in two of
+    them (the header's actions and the rail's tabs) reads what both draw once. %>
+<% slot_context = { reads: {} } %>
 
 <%# One read of the page's reservations for the whole screen (`Editing::Holds`): the header's
     bulk translate, every card, tile and form below ask this object, so the editor costs the
     same statements for 3 blocks as for 30. %>
 <% holds = Editing::Holds.on(@page, viewer: Current.user, tab: Current.editing_tab) %>
 
-<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, slot_context: { counts: note_counts }) do |header| %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options, slot_context: slot_context) do |header| %>
   <% header.with_suggest do %>
     <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4): only
         in a non-default language, for a viewer who may edit the page, with AI
@@ -49,7 +47,7 @@
 <% end %>
 
 <%# The element the live editing scripts stand on (`Admin::EditorScreen::LiveRegionComponent`):
-    the settings and the blocks, not the header or the notes drawer. %>
+    the rail and the blocks, not the header. %>
 <%= render Admin::EditorScreen::LiveRegionComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do %>
 <%# The rail (`Admin::Ui::RailTabsComponent`, `RailPanelComponent`, `admin--ui--rail`): the
     settings first in the document, then the blocks, at every width; where the editor area
@@ -60,6 +58,9 @@
     into the Section panel when its words are pressed and back under its head when it
     closes (`admin--editor--section-choice`, which says what moves it and when). %>
 <% rail_id = "editor-grid" %>
+<%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
+<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
+                                                query: request.query_parameters, **slot_context) %>
 <%= tag.div id: rail_id, class: [ "admin-rail-grid", ("admin-rail-grid--folded" unless admin_locale.to_s == Locales.default.to_s) ],
       data: { controller: "admin--ui--rail admin--editor--section-choice",
               action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal " \
@@ -69,22 +70,23 @@
                       "turbo:before-cache@document->admin--editor--section-choice#cache " \
                       "turbo:before-stream-render@document->admin--editor--section-choice#streamed " \
                       "admin--editing--live:merged@document->admin--editor--section-choice#merged" } do %>
-<%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: "page", tabs: [
+<%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: rail_slot.current_key || "page", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: t("admin.components.editor_screen.rail.tabs.page")),
       Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: t("admin.components.editor_screen.rail.tabs.section"))
-    ]) %>
-<%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: true) do %>
+    ], slot_tabs: rail_slot.tabs) %>
+<%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: rail_slot.current_key.nil?) do %>
   <%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 <% end %>
 <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "section", docked_only: true) do %>
   <%# The chosen section's settings region stands here; nothing is drawn in it. %>
   <div data-admin--editor--section-choice-target="slot"
-       data-action="focusin->admin--editor--section-choice#noteFocus focusout->admin--editor--section-choice#noteBlur"></div>
+       data-action="focusin->admin--editor--section-choice#keepFocus focusout->admin--editor--section-choice#keepBlur"></div>
   <div class="admin-section-choice__empty" data-admin--editor--section-choice-target="empty">
     <p class="text-sm font-medium text-ink"><%= t("admin.components.editor_screen.section_choice.empty") %></p>
     <p class="mt-1 text-sm text-meta"><%= t("admin.components.editor_screen.section_choice.help") %></p>
   </div>
 <% end %>
+<%= render rail_slot %>
 
 <%# `data-messages`: the two sentences `admin--editor--blocks` says itself (a block not
     moved because its form holds an unsaved edit; a refused move whose list was
@@ -159,10 +161,3 @@
     in a form is invalid, and the write queue would read it as part of the
     autosaving one). Nothing for a draft or the homepage. %>
 <%= render Admin::EditorScreen::SlugDialogComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
-
-<%# The notes drawer (notes spec §4.1): once per screen, after everything
-    else and outside every form. `?notes=open` (a link from the inbox, the
-    posts list) opens it on load, at `?thread=` when there is one. %>
-<%= render Admin::NotesScreen::DrawerComponent.new(container: @page, counts: note_counts,
-      title: Locales.read(@page, :title, locale: admin_locale).presence || t("admin.components.notes_screen.drawer.untitled"),
-      open: params[:notes] == "open", thread: params[:thread], url_options: admin_url_options) %>
