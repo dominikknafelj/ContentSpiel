@@ -273,7 +273,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
 
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
-      assert_select "a[href='/cs-studio/tags/#{tag.id}'][data-turbo-frame=tag-detail][data-turbo-prefetch=false][aria-label='Details of “music”'][data-tag-details]", text: "Details"
+      assert_select "a#tag-#{tag.id}-details[href='/cs-studio/tags/#{tag.id}'][data-turbo-frame=tag-detail][data-turbo-prefetch=false][aria-label='Details of “music”'][data-tag-details]", text: "Details"
     end
     assert_select "tbody [role=menu]", count: 0
     assert_select "tbody [data-admin--ui--dialog-id-param], tbody .bg-danger", count: 0, message: "the dialogs' triggers stand in the detail, not in a row"
@@ -295,6 +295,15 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_includes detail, "id=\"tag-detail-#{tag.id}-name\""
     assert_match(%r{data-tag-detail-heading[^>]*>ruby</h2>}, detail)
     assert_includes detail, "data-tag-name=\"ruby\""
+
+    # The row's Details and its name's label say the new name; the input is never replaced.
+    link = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action=replace][target='tag-#{tag.id}-details'] template a#tag-#{tag.id}-details")
+    assert link, "the rename answers the row's Details"
+    assert_equal "Details of “ruby”", link["aria-label"]
+    assert_equal "tag-detail", link["data-turbo-frame"]
+    label = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action=replace][target='tag-#{tag.id}-name-label'] template label#tag-#{tag.id}-name-label[for='tag-#{tag.id}-name']")
+    assert_equal "Name of ruby", label&.text
+    assert_no_match(/target="tag-#{tag.id}-name"/, response.body, "the input being typed in is not replaced")
 
     patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "" }, base_updated_at: tag.reload.updated_at.iso8601(6) }, as: :turbo_stream
     assert_no_match(/target="tag-detail-#{tag.id}"/, response.body, "a refused rename draws no detail")

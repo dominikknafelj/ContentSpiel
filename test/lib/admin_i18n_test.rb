@@ -248,6 +248,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/tags/index.html.erb
     app/views/admin/tags/show.html.erb
     app/views/admin/tags/_empty.html.erb
+    app/views/admin/tags/_details_link.html.erb
+    app/views/admin/tags/_name_label.html.erb
     app/components/admin/tags_screen/detail_component.rb
     app/components/admin/tags_screen/detail_component.html.erb
     app/components/admin/tags_screen/empty_detail_component.rb

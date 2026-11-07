@@ -41,7 +41,7 @@
       the empty line back from the template and the focus on the row's
       Details. %>
   <div class="admin-list-rail__grid" data-controller="admin--tags--detail"
-       data-action="turbo:click->admin--tags--detail#chose turbo:frame-load->admin--tags--detail#loaded">
+       data-action="turbo:click->admin--tags--detail#chose turbo:frame-load->admin--tags--detail#loaded turbo:before-fetch-request->admin--tags--detail#hold">
     <template data-admin--tags--detail-target="empty"><%= render Admin::TagsScreen::EmptyDetailComponent.new %></template>
 
     <section class="admin-list-rail__rail admin-tag-detail" aria-label="<%= t(".rail_label") %>" data-action="keydown.esc->admin--tags--detail#close">
@@ -84,9 +84,7 @@
                           } do %>
                       <%= render partial: "admin/shared/base_updated_at_field",
                             locals: { id: "tag-#{row.id}-base-updated-at", value: row.updated_at.iso8601(6) } %>
-                      <%# Named per row: fifty inputs all called "Name" tell a screen
-                          reader's list of fields nothing. %>
-                      <%= label_tag "tag-#{row.id}-name", t(".name_label", name: row.name), class: "sr-only" %>
+                      <%= render "name_label", tag: row %>
                       <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
                             class: "block w-full px-2 py-1 font-medium text-ink" %>
                       <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
@@ -108,13 +106,7 @@
                   <td class="py-1.5 pr-4"><%= render Admin::Ui::SaveStatusComponent.new(id: "tag-#{row.id}-save-status", state: :idle) %></td>
 
                   <td class="py-1.5 text-right">
-                    <%# Into the rail's frame, never prefetched: the pointer rests on
-                        the link it pressed, and a prefetch answers the next press
-                        for ten seconds, so a second press after a rename would draw
-                        the name the tag had before it. %>
-                    <%= link_to t(".details"), admin_tag_path(row, **admin_url_options),
-                          class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), aria: { label: t(".details_label", name: row.name) },
-                          data: { turbo_frame: Admin::TagsScreen::DetailComponent::FRAME_ID, turbo_prefetch: "false", tag_details: "" } %>
+                    <%= render "details_link", tag: row %>
                   </td>
                 </tr>
               <% end %>

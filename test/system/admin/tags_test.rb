@@ -195,7 +195,8 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
       end
       assert_text "No tags yet"
       assert_no_selector "table.admin-tags-table"
-      assert_selector "#tag-detail-empty"
+      # The rail holds its empty line, and with no tag left it takes no room.
+      assert_selector "#tag-detail-empty", visible: :all
       assert_nil page.evaluate_script("window.__tagsVisit"), "the empty state was drawn by a visit, not by the answer"
     end
   end
@@ -344,6 +345,64 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
 
     rail_button(@gear, "Delete tag…")
     within("dialog#delete-tag-dialog[open]") { assert_selector "h2", text: "Delete “kit”?" }
+  end
+
+  # The press blurs the input, whose `focusout` sends the save, and the
+  # frame's GET goes out beside it: `admin--tags--detail#hold` keeps the GET
+  # until this tab's writes are done, so it reads the committed name. Two of
+  # this tab's requests are slowed to force the losing order every time
+  # (every other request is handed to the real `fetch` untouched): the
+  # row's PATCH waits 300ms before it is sent, and the detail's GET answer
+  # waits 900ms after it arrived. Without the hold the GET is read before
+  # the rename, the rename's answer finds no detail to replace, and the
+  # GET's answer then draws the name the tag had.
+  test "a Details pressed while its tag's rename is still saving draws the new name" do
+    Current.set(actor: users(:one)) { 8.times { |n| create_post(title: "More gear #{n}", tags: [ "gear" ]) } }
+    visit_screen admin_tags_path
+    page.execute_script(<<~JS, "/cs-studio/tags/#{@gear.id}")
+      const path = arguments[0]
+      const real = window.fetch
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      window.fetch = (input, init = {}) => {
+        const url = new URL(typeof input === "string" ? input : input.url, location.href)
+        if (url.pathname !== path) return real(input, init)
+        const method = (init.method || "GET").toUpperCase()
+        if (method === "PATCH") return wait(300).then(() => real(input, init))
+        if (method === "GET") return real(input, init).then((response) => wait(900).then(() => response))
+        return real(input, init)
+      }
+    JS
+    find("#tag-#{@gear.id}-name").set("kit")
+    find(details_link(@gear)).click
+
+    assert_selector "#tag-detail-#{@gear.id}-name", text: "kit", wait: 8
+    assert_selector "#tag-detail-#{@gear.id} a[data-tag-detail-show-all][href$='tag=kit']"
+    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
+    assert_selector "#tag-#{@gear.id}-details[aria-label='Details of “kit”'][aria-current=true]"
+  end
+
+  def rail_display = page.evaluate_script("getComputedStyle(document.querySelector('.admin-tag-detail')).display")
+
+  test "with no tags the rail takes no room, docked or not, and deleting the last tag takes it away" do
+    Tag.destroy_all
+    [ 1600, 1100 ].each do |width|
+      at_window(width) do
+        visit_screen admin_tags_path
+        assert_text "No tags yet"
+        assert_equal "none", rail_display, "no tag at #{width}px"
+      end
+    end
+
+    tag = Tag.create!(name: "gear")
+    at_window(1600) do
+      visit_screen admin_tags_path
+      assert_equal "block", rail_display, "a tag to choose: the docked rail shows its empty line"
+      details(tag)
+      rail_button(tag, "Delete tag…")
+      within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
+      assert_text "No tags yet"
+      assert_eventually(message: "the rail stayed after the last delete") { rail_display == "none" }
+    end
   end
 
   test "a 50-character tag name and long post titles stay inside the rail" do

@@ -59,7 +59,10 @@ module Admin
     # depends on. A saved rename also draws the tag's detail again, by the
     # tag's id: when it is the one open in the rail, its heading, "Show all"'s
     # address and the dialogs' triggers then name the new name; when it is
-    # not, the stream finds no target and does nothing.
+    # not, the stream finds no target and does nothing. The row's Details
+    # link and its name's label for a screen reader are drawn again too, so
+    # both name the tag as it is called now; the input itself is never
+    # replaced, since it is what is being typed in.
     def update
       tag = Tag.find(params[:id])
       result = Tags::Rename.call(tag, name: params.dig(:tag, :name))
@@ -72,7 +75,11 @@ module Admin
         base_updated_at: params[:base_updated_at],
         fields: { name: [ :name ] }
       )
-      streams << turbo_stream.replace(detail_id(tag), detail_component(result.record)) if result.ok?
+      if result.ok?
+        streams << turbo_stream.replace(detail_id(tag), detail_component(result.record))
+        streams << turbo_stream.replace("tag-#{tag.id}-details", partial: "admin/tags/details_link", locals: { tag: result.record })
+        streams << turbo_stream.replace("tag-#{tag.id}-name-label", partial: "admin/tags/name_label", locals: { tag: result.record })
+      end
 
       render turbo_stream: streams, status: autosave_status(result)
     end

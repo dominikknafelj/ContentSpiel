@@ -1,0 +1,9 @@
+<%# A row's Details, into the rail's frame, never prefetched: the pointer
+    rests on the link it pressed, and a prefetch answers the next press for
+    ten seconds, so a second press after a rename would draw the name the tag
+    had before it. A saved rename's answer replaces it by its id, so its
+    label names the tag as it is called now; `admin--tags--detail` marks it
+    again (`aria-current`) when it is the chosen row's. %>
+<%= link_to t("admin.tags.index.details"), admin_tag_path(tag, **admin_url_options), id: "tag-#{tag.id}-details",
+      class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), aria: { label: t("admin.tags.index.details_label", name: tag.name) },
+      data: { turbo_frame: Admin::TagsScreen::DetailComponent::FRAME_ID, turbo_prefetch: "false", tag_details: "", "admin--tags--detail-target": "link" } %>
