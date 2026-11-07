@@ -861,9 +861,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
     assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
     assert_match(/justify-content:\s*start;/, grid, "left-aligned: spare width falls right of the rail")
+    assert_match(/grid-template-rows:\s*auto 1fr;/, grid, "a rail taller than the bar grows the list's row, never the bar's")
     rail = docked.first[/\.admin-list-rail__rail\s*\{([^}]*)\}/, 1]
     assert rail, "the docked block grounds .admin-list-rail__rail"
-    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2].each do |declaration|
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*span\s*2].each do |declaration|
       assert_match(/#{declaration};/, rail)
     end
     assert_no_match(/>\s*\.admin-list-rail__rail/, css, "the rail is matched anywhere in the grid, not only as a child")

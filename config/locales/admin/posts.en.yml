@@ -14,19 +14,17 @@ en:
         new_type: "New %{type}"
         # The ▾ half's name for a screen reader.
         other_types: "Choose another type of post"
-        # A filtered list with no rows. `%{filters}` names the active
-        # filters, each by its name below and its value: "type blog and
-        # scope drafts".
+        # A filtered list with no rows. `%{filters}` names what the person
+        # chose, in the filter form's own words (`Admin::PostsListHelper`):
+        # "Drafts, Type: Blog, Tag: music, and Title contains “launch”".
+        # `filter` is one filter, `%{label}` the form's label for it and
+        # `%{value}` the option chosen; the search is a phrase of its own.
         no_matches:
           title: "No matches."
           description: "No posts match the current filters (%{filters})."
           clear: "Clear filters"
-        filter_names:
-          scope: "scope"
-          type: "type"
-          tag: "tag"
-          translation: "translation"
-          q: "title"
+          filter: "%{label}: %{value}"
+          title_contains: "Title contains “%{text}”"
         # No post at all.
         empty:
           title: "No posts yet."

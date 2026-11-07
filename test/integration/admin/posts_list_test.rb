@@ -469,6 +469,17 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--posts--bulk-select'] tbody tr", 1
   end
 
+  # Each filter in the form's own words: the segment's name, then a label
+  # and its chosen option; a value the form has no word for, as sent.
+  test "No matches names what was chosen, in the words the filter form showed" do
+    create_post(title: "One", published: false)
+    get "/cs-studio/posts", params: { scope: "drafts", type: "resume_entry", tag: "gone", translation: "outdated", q: "zzz" }
+    assert_select "p", text: "No matches. No posts match the current filters (Drafts, Type: Resume entry, Tag: gone, Translation: Outdated, and Title contains “zzz”)."
+
+    get "/cs-studio/posts", params: { type: "nonesuch", translation: "needs" }
+    assert_select "p", text: "No matches. No posts match the current filters (Type: nonesuch and Translation: Needs translation)."
+  end
+
   test "the split button's divider is the on-accent colour at 40 percent" do
     get "/cs-studio/posts"
     assert_select "button[aria-label='Choose another type of post'][class~='border-on-accent/40']"

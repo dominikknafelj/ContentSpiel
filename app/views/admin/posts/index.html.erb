@@ -37,8 +37,8 @@
   </div>
 
   <div class="admin-list-rail__grid">
-    <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags,
-          filters: { q: params[:q], type: params[:type], tag: params[:tag], translation: params[:translation] }.transform_values { |value| value.is_a?(String) ? value : nil },
+    <% filters = { q: params[:q], type: params[:type], tag: params[:tag], translation: params[:translation] }.transform_values { |value| value.is_a?(String) ? value : nil } %>
+    <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags, filters: filters,
           url_options: admin_url_options, locale: admin_locale) %>
 
     <% page_url = ->(page) { admin_posts_path(list_params(*Admin::PostsController::LIST_KEYS).merge("page" => page)) } %>
@@ -52,7 +52,7 @@
       <% elsif @posts.empty? %>
         <div class="rounded-card bg-surface shadow-1">
           <% if filtered %>
-            <% summary = filter_summary(%i[scope type tag translation q].to_h { |key| [ t(".filter_names.#{key}"), key ] }) %>
+            <% summary = posts_filter_summary(scope: @scope, filters: filters, content_types: @content_types) %>
             <%= render Admin::Ui::EmptyStateComponent.new(title: t(".no_matches.title"), description: t(".no_matches.description", filters: summary)) do |empty_state| %>
               <% empty_state.with_action do %>
                 <%= link_to t(".no_matches.clear"), admin_posts_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:secondary), data: { turbo_frame: "content", turbo_action: "replace" } %>
