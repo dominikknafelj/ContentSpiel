@@ -245,14 +245,18 @@
      (`admin_design_rules_test.rb` refuses any other value; `auto` is no
      layer and stays allowed).
 
-     The first three are LOCAL layers. They mean something only inside a
-     stacking context their component makes, and are never compared with a
-     page layer: `lift`, a focused control over its neighbours (a table
+     The first three are LOCAL layers, for raising a thing over its
+     neighbours: `lift`, a focused control over its neighbours (a table
      strip's button); `raised`, over its own row or cell (a row's second
      link over its stretched one, a matrix cell's link, a table strip's
-     entry and its "+", the mind graph's card and tooltip); `raised-top`,
-     over `raised` in the same context (the matrix's sticky title cell, an
-     open or focused strip entry).
+     entry and its "+", the mind graph's card and tooltip) and an editor's
+     rail panel over the canvas; `raised-top`, over `raised` in the same
+     context (the matrix's sticky title cell, an open or focused strip
+     entry). Not every user of `lift` and `raised` makes a stacking context
+     of its own (a row's second link meets the page's layers), so both stay
+     under the lowest page layer. `raised-top` does not, and is used only
+     inside a component's own stacking context (the matrix's `isolate`, the
+     canvas).
 
      The rest are PAGE layers, lowest first, each over the one before it
      wherever the two meet: the save bar (`sticky`; a configuration screen

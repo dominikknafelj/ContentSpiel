@@ -536,6 +536,25 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A rail panel other than the notes' is a context of its own at `raised`
+  # (`.admin-rail__panel`), so the post's settings, outside the canvas,
+  # raise their popovers under the slide-over too.
+  test "the slide-over covers the post settings' tag suggestions" do
+    Tag.create!(name: "rails")
+    post = create_post(title: "Chips", published: false)
+    at_window(MID) do
+      visit_editor(post)
+      assert_docked(false)
+      open_notes
+
+      find("#post-tag_names").execute_script("this.scrollIntoView({ block: 'center' }); this.focus()")
+      keyboard.type("ra")
+      assert_selector "#post-tag_names-listbox [role=option]", text: "rails"
+      assert_selector "#notes-drawer #notes-list"
+      assert_equal true, covered_by_notes?("#post-tag_names-listbox"), "the tag suggestions stand over the slide-over"
+    end
+  end
+
   test "a post's tabs stand in the rail above its panels, after its main column in the document" do
     post = create_post(title: "Hello", published: false)
     at_window(WIDE) do

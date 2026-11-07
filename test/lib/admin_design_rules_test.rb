@@ -999,13 +999,27 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # The layers: a z-index is one of the `--cs-z-*` tokens of THE LAYERS
   # (`content-spiel.css`), so which layer covers which is decided in one list
   # and not per element. A class writes `z-(--cs-z-<name>)`; a stylesheet
-  # writes `z-index: var(--cs-z-<name>)`, or `auto`, which is no layer. The
-  # public site is the theme's and out of scope, as for elevation (its
-  # language switcher and the preview bar keep their own values).
+  # writes `z-index: var(--cs-z-<name>)`, or `auto`, which is no layer. Any
+  # other spelling of a z-index is refused wherever CS Studio's code is: a
+  # Tailwind value, another custom property, an arbitrary property, an
+  # inline style, a script's `style.zIndex`, an `@apply`. The public site is
+  # the theme's and out of scope, as for elevation: its components and
+  # layouts (the language switcher and the preview bar keep their own
+  # values), its entry script `site.js` and the theme folders.
   RAW_Z_UTILITY = /(?<![\w-])-?z-(?:\d+|\[[^\]]*\]|auto)(?![\w-])/
+  Z_OTHER_PROPERTY = /(?<![\w-])-?z-\((?!--cs-z-[a-z-]+\))/
+  # Outside a stylesheet a z-index has no spelling but the utility: the
+  # property's name in any form (an inline style, `cssText`, `setProperty`,
+  # an arbitrary `[z-index:…]`) and a script's `zIndex` are each one.
+  Z_PROPERTY_OUTSIDE_STYLESHEETS = /(?<![\w-])z-index(?![\w-])|(?<!\w)zIndex(?!\w)/
   Z_TOKEN_UTILITY = /(?<![\w-])z-\(--cs-z-([a-z-]+)\)/
   Z_TOKEN_VAR = /var\(--cs-z-([a-z-]+)\)/
-  Z_STYLESHEETS = %w[application.css content-spiel.tailwind.css admin-rich-text.css].freeze
+  Z_CODE_SOURCES = (Dir[Rails.root.join("app/javascript/**/*.js")] + Dir[Rails.root.join("app/helpers/**/*.rb")] +
+                    Dir[Rails.root.join("app/{components,views}/**/*.{rb,erb}")] -
+                    Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS -
+                    [ Rails.root.join("app/javascript/site.js").to_s ]).freeze
+  Z_STYLESHEET_SOURCES = (Dir[Rails.root.join("app/assets/{tailwind,stylesheets}/**/*.css")] - Dir[Rails.root.join("app/assets/tailwind/themes/**/*")]).freeze
+  Z_STYLESHEETS = Z_STYLESHEET_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root.join("app/assets/tailwind")).to_s }.freeze
   # Lowest first; each covers the one before it wherever the two meet.
   LOCAL_LAYERS = %w[lift raised raised-top].freeze
   PAGE_LAYERS = %w[sticky slide-over header sheet divider top-bar popover drop scrim drawer toast].freeze
@@ -1015,8 +1029,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # `[name, value]` of every `--cs-z-*` the scale writes, in its order.
   def z_scale = self.class.stylesheet_without_comments("content-spiel.css").scan(/--cs-z-([a-z-]+):\s*([^;]+);/).map { |name, value| [ name, value.strip ] }
 
+  def z_offences(paths, pattern, strip_comments: false)
+    paths.flat_map do |path|
+      text = File.read(path)
+      text = text.gsub(%r{/\*.*?\*/}m) { |comment| "\n" * comment.count("\n") } if strip_comments
+      text.lines.each_with_index.filter_map do |line, index|
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
+      end
+    end
+  end
+
   test "no z-index is a raw value outside the scale, in a stylesheet or a class" do
-    assert_empty elevation_offences(RAW_Z_UTILITY)
+    assert_empty z_offences(Z_CODE_SOURCES, Regexp.union(RAW_Z_UTILITY, Z_OTHER_PROPERTY, Z_PROPERTY_OUTSIDE_STYLESHEETS))
+    assert_empty z_offences(Z_STYLESHEET_SOURCES, Regexp.union(RAW_Z_UTILITY, Z_OTHER_PROPERTY, /\[z-index/), strip_comments: true), "a stylesheet's @apply"
     Z_STYLESHEETS.each do |name|
       values = self.class.stylesheet_without_comments(name).scan(/z-index:\s*([^;}]+)/).flatten.map(&:strip)
       assert_empty values.grep_v(/\A(?:var\(--cs-z-[a-z-]+\)|auto)\z/), "#{name}: a z-index is a --cs-z-* token or auto"
@@ -1027,8 +1052,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal names.uniq, names, "each --cs-z-* is written once"
   end
 
+  test "the z guard reads every place CS Studio's code is" do
+    %w[app/javascript/editor/drag.js app/javascript/admin.js app/helpers/setup_helper.rb app/components/admin/ui/menu_component.rb
+       app/views/admin/media/index.html.erb].each { |path| assert_includes Z_CODE_SOURCES, Rails.root.join(path).to_s, path }
+    %w[application.css content-spiel.css content-spiel.tailwind.css admin-rich-text.css].each { |name| assert_includes Z_STYLESHEETS, name }
+    assert_not_includes Z_CODE_SOURCES, Rails.root.join("app/components/public/preview_bar_component.html.erb").to_s
+    assert Z_STYLESHEETS.none? { |name| name.start_with?("themes/") }, "a theme's stylesheet is the theme's"
+  end
+
   test "every z token used is one the scale defines" do
-    used = ELEVATION_SOURCES.flat_map { |path| File.read(path).scan(Z_TOKEN_UTILITY).flatten }
+    used = Z_CODE_SOURCES.flat_map { |path| File.read(path).scan(Z_TOKEN_UTILITY).flatten }
     used += Z_STYLESHEETS.flat_map { |name| self.class.stylesheet_without_comments(name).scan(Z_TOKEN_VAR).flatten }
     assert_not_empty used
     assert_empty used.uniq - z_scale.map(&:first), "a z token that THE LAYERS does not define"
@@ -1041,11 +1074,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       order = layers.map { |name| values.fetch(name) }
       assert_equal order.sort.uniq, order, "lowest first, strictly increasing: #{layers.zip(order).to_h}"
     end
+    # `raised` is used where it meets the page layers (a row's second link,
+    # the rail's panels), so it stays under the lowest of them.
+    assert_operator values.fetch("raised"), :<, values.fetch(PAGE_LAYERS.first), "raised stands under every page layer"
   end
 
   test "the z patterns match a raw value and not a token or a word" do
-    [ "z-30", "-z-10", "z-[60]", "md:z-20", "z-auto" ].each { |sample| assert_match RAW_Z_UTILITY, sample }
+    [ "z-30", "-z-10", "z-[60]", "md:z-20", "z-auto", "@apply z-30;" ].each { |sample| assert_match RAW_Z_UTILITY, sample }
     [ "z-(--cs-z-popover)", "size-10", "fuzz-1", '"Zoom"' ].each { |sample| assert_no_match RAW_Z_UTILITY, sample }
+    [ "z-(--my-layer)", "md:-z-(--other)" ].each { |sample| assert_match Z_OTHER_PROPERTY, sample }
+    [ "z-(--cs-z-popover)", "md:z-(--cs-z-toast)", "size-(--x)" ].each { |sample| assert_no_match Z_OTHER_PROPERTY, sample }
+    [ 'class="[z-index:30]"', 'style="z-index: 30"', "el.style.zIndex = 5", 'el.style.setProperty("z-index", "3")', 'tag.div(style: "z-index:2")' ]
+      .each { |sample| assert_match Z_PROPERTY_OUTSIDE_STYLESHEETS, sample }
+    [ "zoom", "size-10", "fuzzIndex" ].each { |sample| assert_no_match Z_PROPERTY_OUTSIDE_STYLESHEETS, sample }
     assert_equal [ [ "popover" ] ], "absolute z-(--cs-z-popover) mt-1".scan(Z_TOKEN_UTILITY)
   end
 
@@ -1055,6 +1096,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # cover all of them whatever their tokens.
   test "the canvas is its own stacking context" do
     assert_match(/isolation:\s*isolate/, single_rule(".admin-rail__main"))
+  end
+
+  # The rail's other panels raise their popovers (the tags' and related
+  # posts' suggestions) inside a context at `raised`: over the canvas, under
+  # the slide-over. The notes' panel holds the slide-over and stays out.
+  test "every rail panel but the notes' is a context of its own at raised" do
+    rule = single_rule(".admin-rail__panel:not(:has(> .admin-notes-drawer))")
+    assert_match(/position:\s*relative/, rule)
+    assert_match(/z-index:\s*var\(--cs-z-raised\)/, rule)
   end
 
   # A card is told apart by its shadow. These keep an edge because the edge is

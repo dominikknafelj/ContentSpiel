@@ -763,8 +763,18 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    popover) stays inside it, so the notes slide-over and the editor's sticky
    header, page layers outside it, cover all of it (THE LAYERS,
    `content-spiel.css`). Without it, a canvas popover at or above the
-   slide-over's layer would stand over the slide-over. */
+   slide-over's layer would stand over the slide-over. The canvas comes
+   before the rail's panels in the post editor and after them in the page
+   editor; nothing it raises overflows into the docked rail, and anything
+   that did would paint under the rail's panels.
+   Every rail panel but the notes' is a context of its own too, at
+   `--cs-z-raised`: over the canvas, so a settings popover that drops into
+   the blocks below the threshold stays over them, and under every page
+   layer, so the slide-over and the header cover what it raises (the tags'
+   and related posts' suggestions). The notes' panel is left out: the
+   slide-over inside it is a page layer and must not be trapped. */
 .admin-rail__main { isolation: isolate; }
+.admin-rail__panel:not(:has(> .admin-notes-drawer)) { position: relative; z-index: var(--cs-z-raised); }
 .admin-rail__tabs { display: none; }
 .admin-rail__panel--docked-only { display: none; }
 .admin-rail__tab { display: inline-flex; align-items: center; gap: 0.375rem; padding-block: 0.5rem; color: var(--cs-meta); cursor: pointer; }
