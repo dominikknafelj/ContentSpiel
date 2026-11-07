@@ -39,9 +39,7 @@ module UiContract
   # A new component whose keyboard browser test comes in a later task of the
   # same pull request, mapped to the reason, so no commit between the two is
   # red. Empty when a pull request is merged.
-  KEYBOARD_NOT_YET = {
-    "Admin::Ui::TreeItemComponent" => "its disclosure folds by keyboard once its controller exists"
-  }.freeze
+  KEYBOARD_NOT_YET = {}.freeze
 
   PLURAL_KEYS = %i[zero one two few many other].freeze
 

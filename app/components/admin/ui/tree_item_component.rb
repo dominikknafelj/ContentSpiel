@@ -17,8 +17,10 @@ module Admin
     # open (`aria-expanded`) and naming the list it folds (`controls:`, the
     # children list's id); a leaf keeps the disclosure's empty box so the
     # marks line up, and `flat:` draws neither (the graph's posts, tags and
-    # post types). The button carries no action: the tree's script folds the
-    # branch. `folded:` is what the server drew; the script toggles it after.
+    # post types). The button's press is `admin--tree--disclosure#toggle`, the
+    # controller the tree it stands in carries, which folds the branch and
+    # writes the open set. `folded:` is what the server drew; the script
+    # toggles it after.
     #
     # `with_add` draws the row's "+", a part of the row like the disclosure:
     # the screen hands it only its name, the address it opens and its
@@ -45,7 +47,8 @@ module Admin
         states: %i[rest hover focus selected folded open leaf context_only flat root],
         keys: %w[fold unfold],
         slots: %i[handle mark title state trailings add],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/tree_test.rb", "a row's disclosure folds and unfolds its branch by mouse and by keyboard" ]
       )
 
       # The class names of the `.admin-tree` block, by part and state.

@@ -16,6 +16,15 @@ module Admin
     # and `paths` are read once by the tree the same way; each row is handed
     # its slice.
     #
+    # A FOLD is drawn on the node: a parent whose branch is folded
+    # (`TreeOpenSet#open?`, with the root and the selected page's path,
+    # `path_ids`) carries `data-folded` and its children list is `hidden`, so
+    # the row's disclosure and the list say the same from the first paint. A
+    # page without children is never folded: its empty list stays a drop
+    # target. The root's `<li>` carries `data-tree-root` and each ancestor of
+    # the selected page `data-tree-on-path`, which `admin--tree--disclosure`
+    # reads to know where a branch is open by default.
+    #
     # The homepage's own `<li>` is never itself inside a Sortable list --
     # only the *children* list nested inside it is a real drop target.
     #
@@ -28,8 +37,10 @@ module Admin
     # isn't the real one. For the same reason a row under a context-only page
     # has no handle (`TreeRowComponent#movable?`).
     class TreeNodeComponent < AdminComponent
-      def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_counts: {}, loaded: {}, paths: {}, selected: nil, locale:, url_options: {})
+      def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_counts: {}, loaded: {}, paths: {}, selected: nil, locale:, url_options: {}, open_set: TreeOpenSet::EMPTY, path_ids: Set.new)
         @page = page
+        @open_set = open_set
+        @path_ids = path_ids
         @children_by_parent = children_by_parent
         @context_only_ids = context_only_ids
         @translation_counts = translation_counts
@@ -59,9 +70,15 @@ module Admin
 
       def drop_target? = !context_only?
 
+      def root? = page.parent_id.nil?
+
+      def on_path? = path_ids.include?(page.id)
+
+      def folded? = child_count.positive? && !open_set.open?(page.id, root: root?, on_path: on_path?)
+
       private
 
-      attr_reader :page, :children_by_parent, :context_only_ids, :translation_counts, :loaded, :paths, :selected, :locale, :url_options
+      attr_reader :page, :children_by_parent, :context_only_ids, :translation_counts, :loaded, :paths, :selected, :locale, :url_options, :open_set, :path_ids
     end
   end
 end

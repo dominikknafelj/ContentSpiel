@@ -34,7 +34,7 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     render_row(parent: true, controls: "tree-children-1")
     assert_selector "button.admin-tree-row__disclosure[type=button][aria-expanded=true][aria-controls='tree-children-1'][aria-label='Fold About us']"
     assert_selector "button.admin-tree-row__disclosure svg[aria-hidden=true]"
-    assert_no_selector "button.admin-tree-row__disclosure[data-action]"
+    assert_selector "button.admin-tree-row__disclosure[data-action='admin--tree--disclosure#toggle']"
 
     render_row
     assert_no_selector "button"

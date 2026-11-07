@@ -34,9 +34,11 @@ module Admin
     # targets jump).
     #
     # A parent draws the disclosure, naming its children list
-    # (`children_list_id`). The tree's script gives it its press; until then
-    # a press does nothing and the branch stays drawn open, as the button
-    # says (`aria-expanded="true"`).
+    # (`children_list_id`), open or `folded:` as the node around it is drawn
+    # (`TreeNodeComponent#folded?`); `admin--tree--disclosure` answers its
+    # press. A row drawn alone (`for_page`) reads the open set from the
+    # cookie it is handed, so a save's redrawn row says what the branch
+    # under it shows.
     #
     # The homepage (the one page without a parent: `only_one_root_page`) is
     # never moved (`Pages::Move` refuses it), so its row has no handle.
@@ -79,7 +81,12 @@ module Admin
       # children are counted through the same read scope the tree's
       # visibility uses; read scopes are whole branches, so every child of a
       # readable page is readable and the count is the tree's.
-      def self.for_page(page, selected:, locale:, url_options:)
+      #
+      # `open_cookie` is the raw `cs_tree_open`, read for this page and its
+      # ancestors (the branch the preload above put on it, so no statement of
+      # its own); the page is on the path when it is an ancestor of
+      # `selected`, which the editor's own page never is of itself.
+      def self.for_page(page, selected:, locale:, url_options:, open_cookie: nil)
         actor = Current.actor
         page = ::PageTree.row(page) || page
         AccessControl.preload_branches([ page ])
@@ -88,8 +95,11 @@ module Admin
         public_path = ::PageTree.paths([ page.id ], locale: locale)[page.id]
         translation_counts = Translations.target_locales.empty? ? {} : Translations::StateIndex.counts_for([ page ]).fetch(page, {})
         loaded = Admin::Slots.load("tree.row.markers", [ page ], viewer: actor)
+        on_path = selected.present? && selected.id != page.id && AccessControl.page_branch_ids(selected).include?(page.id)
+        open_set = TreeOpenSet.parse(open_cookie, readable_ids: AccessControl.page_branch_ids(page))
+        folded = child_count.positive? && !open_set.open?(page.id, root: page.parent_id.nil?, on_path: on_path)
 
-        new(page:, child_count:, translation_counts:, loaded:, selected:, locale:, url_options:, parent_context_only:, public_path:)
+        new(page:, child_count:, translation_counts:, loaded:, selected:, locale:, url_options:, parent_context_only:, public_path:, folded:)
       end
 
       def self.dom_id(page) = "tree-row-#{page.id}"
@@ -97,8 +107,9 @@ module Admin
       # The id of `page`'s children list, which its disclosure names.
       def self.children_list_id(page) = "tree-children-#{page.id}"
 
-      def initialize(page:, child_count:, translation_counts:, loaded:, selected:, locale:, url_options:, context_only: false, parent_context_only: false, public_path: nil)
+      def initialize(page:, child_count:, translation_counts:, loaded:, selected:, locale:, url_options:, context_only: false, parent_context_only: false, public_path: nil, folded: false)
         @page = page
+        @folded = folded
         @child_count = child_count
         @translation_counts = translation_counts
         @loaded = loaded
@@ -141,6 +152,8 @@ module Admin
       def context_only? = @context_only
 
       def parent? = child_count.positive?
+
+      def folded? = @folded
 
       # The row's hooks for the tree's script: a selectable row is a `row`
       # target named by its page. A context-only row is neither.

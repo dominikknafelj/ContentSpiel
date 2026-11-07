@@ -3,7 +3,9 @@ require "application_system_test_case"
 # The page tree in a real browser: its drag-to-move (dropping a node under a
 # different parent PATCHes `Admin::TreeController#update` and re-renders the
 # whole tree from the database), the selected row, what a row shows on hover
-# and focus, and its one focus ring.
+# and focus, its one focus ring, and its folds: a disclosure folds a branch,
+# the open set keeps it in the cookie `cs_tree_open`, the server draws it
+# from the first paint, and the path to the open page is always drawn open.
 class Admin::TreeSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -200,6 +202,176 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "#tree .admin-tree-row--selected", count: 1
     assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected a[aria-current=page]"
     assert_selector "#tree a[aria-current=page]", count: 1
+  end
+
+  def disclosure(record) = find("#tree-row-#{record.id} > .admin-tree-row__disclosure", visible: :all)
+
+  def children_hidden?(record) = page.evaluate_script("document.getElementById('tree-children-#{record.id}').hidden")
+
+  # The open set as the browser holds it, its entries in order.
+  def open_set = page.evaluate_script("document.cookie").to_s[/(?:^|; )cs_tree_open=([^;]*)/, 1].to_s.split(".")
+
+  def make_branch
+    Current.set(actor: users(:one)) do
+      @child = create_page(title: "Child", parent: @alpha)
+      @grandchild = create_page(title: "Grandchild", parent: @child)
+    end
+  end
+
+  test "a row's disclosure folds and unfolds its branch by mouse and by keyboard" do
+    make_branch
+    visit_editor(@child)
+    assert_equal "true", disclosure(@alpha)["aria-expanded"]
+    assert_selector "#tree-row-#{@child.id}"
+
+    disclosure(@alpha).click
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=false][aria-label='Unfold Alpha']"
+    assert children_hidden?(@alpha)
+    assert_no_selector "#tree-row-#{@child.id}"
+    assert_includes open_set, "-#{@alpha.id}", "a fold of a branch open by default is stored"
+
+    # Tab from the row's handle, the control before it.
+    page.execute_script("document.querySelector('#tree-row-#{@alpha.id} .admin-tree-node__handle').focus()")
+    page.driver.browser.keyboard.type(:tab)
+    assert page.evaluate_script("document.activeElement.matches('#tree-row-#{@alpha.id} > .admin-tree-row__disclosure')"), "Tab reaches the disclosure"
+
+    page.driver.browser.keyboard.type(:enter)
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true][aria-label='Fold Alpha']"
+    assert_not children_hidden?(@alpha)
+    assert_selector "#tree-row-#{@child.id}"
+    assert_not_includes open_set, "-#{@alpha.id}"
+
+    page.driver.browser.keyboard.type(:space)
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=false][aria-label='Unfold Alpha']"
+    assert children_hidden?(@alpha)
+  end
+
+  # The server draws a fold from the cookie: after a reload and after a
+  # Turbo visit, the first `turbo:load` finds the branch folded, and no
+  # script ever changed the list's `hidden`.
+  test "a fold is kept across a reload and a Turbo visit, drawn folded from the first paint" do
+    visit_screen "/cs-studio/pages"
+    root = root_page
+    disclosure(root).click
+    assert children_hidden?(root)
+    assert_equal [ "-#{root.id}" ], open_set
+
+    spy = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: <<~JS)
+      (() => {
+        window.__changes = []
+        window.__loads = []
+        new MutationObserver((records) => records.forEach((record) => {
+          if (record.target.id === "tree-children-#{root.id}") window.__changes.push(record.target.hidden)
+        })).observe(document, { subtree: true, attributes: true, attributeFilter: ["hidden"] })
+        document.addEventListener("turbo:load", () => window.__loads.push(document.getElementById("tree-children-#{root.id}")?.hidden ?? null))
+      })()
+    JS
+    page.refresh
+    await_admin_controllers
+    assert_eventually { page.evaluate_script("window.__loads.length") >= 1 }
+    assert_equal true, page.evaluate_script("window.__loads[0]"), "the first turbo:load found the branch open"
+    assert_equal [], page.evaluate_script("window.__changes"), "a script changed the folded list's hidden"
+    assert_equal "false", disclosure(root)["aria-expanded"]
+
+    page.execute_script("window.__loads = []; Turbo.visit('/cs-studio')")
+    assert_current_path "/cs-studio"
+    page.execute_script("Turbo.visit('/cs-studio/pages')")
+    assert_selector "#tree-children-#{root.id}", visible: :all
+    await_admin_controllers
+    assert_equal true, page.evaluate_script("window.__loads.at(-1)")
+    assert_equal [], page.evaluate_script("window.__changes")
+    assert children_hidden?(root)
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: spy["identifier"]) if spy
+  end
+
+  test "a full load of a page under a folded ancestor draws its path open and its row selected, and the fold is forgotten" do
+    make_branch
+    visit_editor(@grandchild)
+    disclosure(@alpha).click
+    assert_no_selector "#tree-row-#{@grandchild.id}"
+    assert_includes open_set, "-#{@alpha.id}"
+
+    page.refresh
+    await_admin_controllers
+    assert_selector "#tree-row-#{@grandchild.id}.admin-tree-row--selected a[aria-current=page]"
+    assert_not children_hidden?(@alpha)
+    assert_not children_hidden?(@child)
+    assert_selector "li[data-page-id='#{@alpha.id}'][data-tree-on-path]"
+    assert_not_includes open_set, "-#{@alpha.id}", "the fold on the open page's path is forgotten"
+  end
+
+  test "Alt+click opens the whole branch" do
+    make_branch
+    Current.set(actor: users(:one)) { create_page(title: "Great-grandchild", parent: @grandchild) }
+    visit_screen "/cs-studio/pages"
+    assert children_hidden?(@alpha)
+    assert children_hidden?(@child)
+
+    disclosure(@alpha).click(:alt)
+    assert_selector "#tree-row-#{@grandchild.id}"
+    [ @alpha, @child, @grandchild ].each do |record|
+      assert_not children_hidden?(record), "#{record.title}'s branch is open"
+      assert_includes open_set, record.id.to_s, "#{record.title}'s open is stored"
+    end
+    assert_selector "li[data-page-id='#{@child.id}'] > [data-tree-row] > .admin-tree-row__disclosure[aria-expanded=true][aria-label='Fold Child']"
+  end
+
+  # Below 1024px the tree is a drawer that scrolls on its own, so the
+  # selected row is scrolled into view inside it: the column moves, the
+  # window does not. The drawer is shut, so its controls are pressed by
+  # script.
+  test "Back to a page whose branch was folded opens its path and selects its row, scrolled into the column" do
+    Current.set(actor: users(:one)) do
+      30.times { |index| create_page(title: format("Filler %02d", index)) }
+      @deep = create_page(title: "Deep")
+      @target = create_page(title: "Target", parent: @deep)
+    end
+    at_window(900, height: 500) do
+      visit_editor(@target)
+      assert_operator page.evaluate_script("document.getElementById('tree-column').scrollTop"), :>, 0, "the selected row was not scrolled into the column"
+
+      disclosure(@deep).execute_script("this.click()")
+      assert children_hidden?(@deep)
+      find("#tree-link-#{@alpha.id}", visible: :all).execute_script("this.click()")
+      assert_selector "#content h1", text: "Alpha"
+      await_admin_controllers
+      assert children_hidden?(@deep)
+      window_before = page.evaluate_script("window.scrollY")
+
+      page.go_back
+      assert_selector "#content h1", text: "Target"
+      assert_selector "#tree-row-#{@target.id}.admin-tree-row--selected a[aria-current=page]", visible: :all
+      assert_selector "#tree .admin-tree-row--selected", count: 1, visible: :all
+      assert_eventually { !children_hidden?(@deep) }
+      assert_eventually(message: "the column was not scrolled to the selected row") { page.evaluate_script("document.getElementById('tree-column').scrollTop") > 0 }
+      assert_equal window_before, page.evaluate_script("window.scrollY"), "the window was scrolled"
+      in_view = page.evaluate_script(<<~JS)
+        (() => { const column = document.getElementById("tree-column").getBoundingClientRect(); const row = document.getElementById("tree-row-#{@target.id}").getBoundingClientRect(); return row.top >= column.top && row.bottom <= column.bottom })()
+      JS
+      assert in_view, "the selected row is inside the column's view"
+    end
+  end
+
+  # A folded parent says how many pages it hides, at rest; open, the count
+  # rests out of sight like the row's other markers.
+  test "a folded parent shows its subpage count at rest" do
+    make_branch
+    visit_screen "/cs-studio/pages"
+    page.driver.browser.mouse.move(x: 900, y: 700)
+    count = "#tree-row-#{@alpha.id} [data-child-count]"
+    # At rest the count is clipped out of the row's flow (`__reveal`), shown
+    # it stands in it.
+    shown = -> { page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{count.to_json})); return style.position === 'static' && style.clipPath === 'none' })()") }
+
+    assert_selector count, text: "1"
+    assert shown.call, "a folded parent's count is not shown at rest"
+
+    disclosure(@alpha).click
+    page.driver.browser.mouse.move(x: 900, y: 700)
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true]"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually(message: "an open parent's count still shows at rest") { !shown.call }
   end
 
   # One ring, on what has the focus: a Pages row holds several controls, so

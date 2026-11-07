@@ -1,4 +1,4 @@
-<%= render Admin::Ui::TreeItemComponent.new(id: dom_id, title: title, parent: parent?, folded: false, controls: children_list_id,
+<%= render Admin::Ui::TreeItemComponent.new(id: dom_id, title: title, parent: parent?, folded: folded?, controls: children_list_id,
       selected: selected?, context_only: context_only?, root: root?, node_id: page.id, path: (public_path unless context_only?), data: row_data) do |item| %>
   <% if context_only? %>
     <%# Shown only as the path to a readable page below it: not a link, no

@@ -81,6 +81,10 @@ pin_all_from "app/javascript/search", under: "search", preload: "admin"
 # rail panel that scrolls, so the panel's edge does not cut it.
 pin_all_from "app/javascript/ui", under: "ui", preload: "admin"
 
+# The page trees' shared modules: `tree/open_set`, the one writer of the open
+# set (the cookie `cs_tree_open`), read by the Pages tree's controllers.
+pin_all_from "app/javascript/tree", under: "tree", preload: "admin"
+
 # The strings a script shows, read from the server's `data-messages`
 # (`Admin::MessagesHelper`; docs/reference/i18n.md). Only CS Studio's
 # controllers import it today.

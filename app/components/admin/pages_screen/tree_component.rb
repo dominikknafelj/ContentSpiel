@@ -57,13 +57,25 @@ module Admin
     # kept page: offered only when `StarterContents::Add` would get past its
     # own permission checks, so the button and the refusal can't disagree.
     #
+    # WHICH BRANCHES ARE OPEN is drawn here from the first paint, so a fold
+    # never flickers in after the script runs: `open_cookie` is the raw
+    # `cs_tree_open` (`TreeOpenSet::COOKIE`), read against the pages this tree
+    # draws, and each node is open or folded by `TreeOpenSet#open?`, with the
+    # root and the selected page's ancestors (`path_ids`, walked once through
+    # the loaded pages) handed to it. So by default Home is open and every
+    # branch below its children folded, and the selected row is never drawn
+    # inside a folded branch.
+    #
     # `root` is swapped for its copy in the loaded list, so the checks on the
     # homepage's own row use the preload too. With no visible root (no pages,
     # or none the actor may see) there's nothing to hang the tree on, and
     # the empty state shows instead.
     class TreeComponent < AdminComponent
-      def initialize(root:, selected: nil, locale:, url_options: {})
+      def initialize(root:, selected: nil, locale:, url_options: {}, open_cookie: nil)
         @selected = selected
+        @open_cookie = open_cookie
+        @open_set = TreeOpenSet::EMPTY
+        @path_ids = Set.new
         @locale = locale
         @url_options = url_options
         @children_by_parent = {}
@@ -84,7 +96,7 @@ module Admin
 
       private
 
-      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :loaded, :paths
+      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :loaded, :paths, :open_set, :path_ids
 
       def load_visible(root)
         visibility = AccessControl.tree_visibility(Current.actor)
@@ -98,7 +110,23 @@ module Admin
         # The row markers features register, read once for the readable rows.
         @loaded = Admin::Slots.load("tree.row.markers", readable, viewer: Current.actor)
         @paths = ::PageTree.paths(readable.map(&:id), locale: locale)
+        @open_set = TreeOpenSet.parse(@open_cookie, readable_ids: visible_ids)
+        @path_ids = ancestor_ids_of(selected, pages)
         pages.find { |page| page.id == root.id }
+      end
+
+      # The ids of `page`'s ancestors among the loaded `pages`, walked up
+      # their parents: the path drawn open to the selected row.
+      def ancestor_ids_of(page, pages)
+        return Set.new unless page
+
+        parent_of = pages.to_h { |each| [ each.id, each.parent_id ] }
+        ids = Set.new
+        id = parent_of[page.id]
+        while id && ids.add?(id)
+          id = parent_of[id]
+        end
+        ids
       end
 
       def translation_counts_for(pages)

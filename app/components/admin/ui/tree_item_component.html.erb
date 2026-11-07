@@ -1,7 +1,8 @@
 <%= tag.div id: @id, class: row_class, data: row_data do %>
   <%= handle if handle? %>
   <% if disclosure? %>
-    <%= tag.button type: "button", class: CLASSES[:disclosure], aria: { expanded: !@folded, controls: @controls, label: disclosure_label } do %>
+    <%= tag.button type: "button", class: CLASSES[:disclosure], aria: { expanded: !@folded, controls: @controls, label: disclosure_label },
+          data: { action: "admin--tree--disclosure#toggle" } do %>
       <%= render "admin/shared/tree_glyph", name: :chevron %>
     <% end %>
   <% elsif empty_disclosure? %>

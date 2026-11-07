@@ -137,6 +137,9 @@ class TreeSystemTest < ApplicationSystemTestCase
     Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
     sign_in_via_form(users(:one))
     visit_screen admin_pages_path
+    # Alpha's branch is folded by default: opened as a person opens it.
+    find("#tree-row-#{@alpha.id} > .admin-tree-row__disclosure").click
+    assert_selector "#tree-row-#{@child.id}"
 
     handle("Child").send_keys(:space, :left, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Child./, wait: 10

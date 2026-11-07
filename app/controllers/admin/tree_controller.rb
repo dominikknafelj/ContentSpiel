@@ -1,28 +1,30 @@
 module Admin
-  # The page tree's own move endpoint (cs-studio spec §4.2): dragging a node
+  # The page tree's own move endpoint: dragging a node
   # PATCHes here with the moved page, its new parent and its new rank among
   # that parent's other children, and the response is always a fresh render
   # of the whole tree from the database -- success or failure alike, since a
   # single move can renumber siblings the dragged node never touched
   # (`Page::TreeRanking`), so nothing short of a real re-render is
-  # trustworthy afterward. See `app/javascript/controllers/admin/
-  # tree_controller.js` for the client side this answers.
+  # trustworthy afterward. See `app/javascript/controllers/admin/pages/
+  # tree_controller.js` for the client side this answers. The redrawn tree
+  # reads the person's open set from the request's cookie
+  # (`TreeOpenSet::COOKIE`), so its folds are the ones the browser shows, and
+  # the path to the moved page is drawn open.
   #
   # A move is a write to the moved page (`Pages::Move` saves it, so its
   # `updated_at` moves), made from OUTSIDE that page's editor forms -- and the
   # page settings form of that very page may be open next to the tree, in this
   # tab or a colleague's. It keeps saving: a move is not a change of the page's
-  # settings, so it does not move that form's base (`Page::SETTINGS_BASE_IGNORES`,
-  # final review I1). The forwarding this controller had for the mover's own
-  # tab (the header `X-Page-Base-Updated-At` in, the hidden field's stream out)
-  # went with that ruling: it had nothing left to move.
+  # settings, so it does not move that form's base
+  # (`Page::SETTINGS_BASE_IGNORES`), and this answer sends the mover's tab no
+  # base of its own.
   class TreeController < BaseController
     include AutosaveResponses
 
     #
-    # Both pages are loaded through the read scope (access-control design
-    # spec §3.3), so naming one the actor can't read lands in the same
-    # "no longer exists" answer below as a deleted one -- a 404 that
+    # Both pages are loaded through the read scope (`admin_scope`), so
+    # naming one the actor can't read lands in the same
+    # not-found answer below as a deleted one -- a 404 that
     # discloses nothing. `Pages::Move` decides the move itself (`pages.move`
     # on the page, `pages.create` under the target); a refusal is a 403.
     def update
@@ -48,7 +50,7 @@ module Admin
       # this PATCH landing -- not a bug in the drag itself, just a stale
       # client. The tree as the database has it right now is still a
       # perfectly good answer; `selected: nil` since whichever id went
-      # missing can no longer be looked up to highlight.
+      # missing has nothing to highlight.
       render turbo_stream: tree_stream(selected: nil, message: "That page no longer exists — the tree was refreshed"),
         status: :not_found
     end
@@ -88,7 +90,8 @@ module Admin
 
     def tree_stream(selected:, message: nil)
       [
-        turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
+        turbo_stream.replace("tree", Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options,
+          open_cookie: cookies[TreeOpenSet::COOKIE])),
         turbo_stream.replace("tree-status", partial: "admin/tree/status", locals: { message: message })
       ]
     end

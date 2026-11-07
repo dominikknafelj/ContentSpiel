@@ -199,7 +199,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
       render_tree
       assert_selector "#tree-row-#{root_page.id}[data-tree-row][data-tree-title='#{root_page.title}'][data-tree-path='/'][data-tree-id='#{root_page.id}']"
       assert_selector "#tree-row-#{about.id}[data-tree-title='About'][data-tree-path='/about'][data-tree-id='#{about.id}']"
-      assert_selector "#tree-row-#{team.id}[data-tree-title='Team'][data-tree-path='/about/team']"
+      assert_selector "#tree-row-#{team.id}[data-tree-title='Team'][data-tree-path='/about/team']", visible: :all
       assert_selector "ul#tree-list.#{ROW[:tree]} > li[data-tree-node][data-page-id='#{root_page.id}']"
 
       render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, locale: "de"))
@@ -386,9 +386,80 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
     disclosure = page.find("#tree-row-#{parent.id} > button.#{ROW[:disclosure]}")
     assert_equal "tree-children-#{parent.id}", disclosure["aria-controls"]
-    assert_equal "true", disclosure["aria-expanded"]
-    assert_nil disclosure["data-action"], "the disclosure folds nothing yet"
-    assert_no_selector "li[data-page-id='#{parent.children.first.id}'] > div > button.#{ROW[:disclosure]}"
+    assert_equal "admin--tree--disclosure#toggle", disclosure["data-action"]
+    assert_no_selector "li[data-page-id='#{parent.children.first.id}'] > div > button.#{ROW[:disclosure]}", visible: :all
+  end
+
+  def render_tree_with(selected: nil, open_cookie: nil)
+    render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: selected, locale: "en", open_cookie: open_cookie))
+  end
+
+  def folded?(page) = page_node(page).native.key?("data-folded")
+
+  def page_node(page) = self.page.find("li[data-page-id='#{page.id}']", visible: :all)
+
+  def disclosure_of(page) = self.page.find("#tree-row-#{page.id} > button.#{ROW[:disclosure]}", visible: :all)
+
+  # The default fold: the root's branch is open, so Home's children are
+  # shown, and each of their branches is folded, its children list
+  # `hidden` and its button saying so. A leaf is never folded.
+  test "Home is open and its children shown; every deeper branch is folded, with hidden children" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    create_page(title: "People", parent: team)
+    leaf = create_page(title: "Leaf")
+    render_tree_with
+
+    home = page_node(root_page)
+    assert home.native.key?("data-tree-root")
+    assert_not folded?(root_page)
+    assert_equal "true", disclosure_of(root_page)["aria-expanded"]
+    assert_selector "#tree-row-#{about.id}"
+    assert_selector "#tree-row-#{leaf.id}"
+
+    assert folded?(about)
+    assert_equal "false", disclosure_of(about)["aria-expanded"]
+    assert_equal "Unfold About", disclosure_of(about)["aria-label"]
+    assert page.find("ul#tree-children-#{about.id}", visible: :all).native.key?("hidden")
+    assert_no_selector "#tree-row-#{team.id}"
+    assert folded?(team), "a branch inside a folded one is folded too"
+    assert_not folded?(leaf), "a page without children is never folded"
+    assert_not page.find("ul#tree-children-#{leaf.id}", visible: :all).native.key?("hidden")
+    assert_no_selector "li[data-tree-on-path]", visible: :all
+  end
+
+  # The path to the selected page is drawn open whatever the cookie says,
+  # and each ancestor on it is marked for the scripts.
+  test "the open path to the selected page is drawn open, even under a folded ancestor" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    people = create_page(title: "People", parent: team)
+    render_tree_with(selected: people, open_cookie: "-#{about.id}.-#{root_page.id}")
+
+    [ root_page, about, team ].each do |ancestor|
+      assert page_node(ancestor).native.key?("data-tree-on-path"), "#{ancestor.title} is on the path"
+      assert_not folded?(ancestor), "#{ancestor.title} is drawn open"
+      assert_equal "true", disclosure_of(ancestor)["aria-expanded"]
+    end
+    assert_selector "#tree-row-#{people.id}.#{ROW[:row_selected]}"
+    assert_not page_node(people).native.key?("data-tree-on-path"), "the selected page is not its own ancestor"
+  end
+
+  test "the cookie's opens and folds are honoured, and junk in it is ignored" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    create_page(title: "People", parent: team)
+    render_tree_with(open_cookie: "#{about.id}.junk.-#{root_page.id}.999999.-")
+
+    assert folded?(root_page), "a fold folds the root"
+    assert_equal "false", disclosure_of(root_page)["aria-expanded"]
+    assert_not folded?(about), "an open opens a branch the default folds"
+    assert_equal "Fold About", disclosure_of(about)["aria-label"]
+    assert folded?(team)
+
+    render_tree_with(open_cookie: "x" * 5000)
+    assert_not folded?(root_page)
+    assert folded?(about)
   end
 
   test "the drag handle stands in the row's gutter by the tree's own classes, and rests transparent" do

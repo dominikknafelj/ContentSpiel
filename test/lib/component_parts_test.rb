@@ -35,7 +35,7 @@ class ComponentPartsTest < ActiveSupport::TestCase
   # number of new components of the open pull request whose keyboard test
   # comes in a later commit of it, raised with the component and lowered
   # with its test, and 0 when the pull request is merged.
-  LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 1 }.freeze
+  LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
 
   # What a list holds over its limit, as a sentence, or nil.
   def self.over_limit(name, listed, limit)

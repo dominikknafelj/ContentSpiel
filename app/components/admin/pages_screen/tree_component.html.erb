@@ -63,9 +63,15 @@
   <p data-admin--pages--tree-target="announcer" aria-live="assertive" class="sr-only"></p>
 
   <% if root %>
-    <%# The tree: the list a find narrows and names (`aria-controls`). %>
-    <ul id="tree-list" class="<%= Admin::Ui::TreeItemComponent::CLASSES[:tree] %>">
-      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options) %>
+    <%# The tree: the list a find narrows and names (`aria-controls`), and
+        the element its scripts know as the tree. It folds and unfolds its
+        branches (`admin--tree--disclosure`), writing the open set on the
+        admin path only (`data-tree-open-path`; the constant has no slash),
+        and names each button in the words it is handed. %>
+    <ul id="tree-list" class="<%= Admin::Ui::TreeItemComponent::CLASSES[:tree] %>" data-controller="admin--tree--disclosure"
+        data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>" data-tree-locale="<%= locale %>"
+        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold") %>">
+      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options, open_set: open_set, path_ids: path_ids) %>
     </ul>
   <% else %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty")) %>

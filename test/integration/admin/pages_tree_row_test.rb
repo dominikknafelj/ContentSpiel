@@ -34,6 +34,21 @@ class Admin::PagesTreeRowTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The row answer is drawn under the node the browser keeps, so it says
+  # what the person's open set says about the branch below it.
+  test "a settings save's row answer reads the open set from the cookie" do
+    parent = create_page(title: "Parent")
+    create_page(title: "Child", parent: parent)
+
+    cookies[TreeOpenSet::COOKIE] = parent.id.to_s
+    save_settings(parent, title: "Parent, opened")
+    assert_select "turbo-stream[target='tree-row-#{parent.id}'] template button.admin-tree-row__disclosure[aria-expanded='true']", count: 1
+
+    cookies[TreeOpenSet::COOKIE] = "-#{root_page.id}"
+    save_settings(parent, title: "Parent, folded")
+    assert_select "turbo-stream[target='tree-row-#{parent.id}'] template button.admin-tree-row__disclosure[aria-expanded='false']", count: 1
+  end
+
   # The statements of a whole-tree answer were already the same at any size;
   # what grew with the site was the tree read into it and drawn: every
   # visible page's row, sent with every save. So the answer is held at both

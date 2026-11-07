@@ -109,6 +109,28 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
     end
   end
 
+  # A save's row is drawn alone, under a node the browser keeps: it reads
+  # the open set from the cookie the request carried, as the whole tree does.
+  test "for_page draws the disclosure from the open cookie handed in, folded or open" do
+    parent = create_page(title: "Parent")
+    create_page(title: "Child", parent: parent)
+    draw = ->(cookie) { render_inline(Admin::PagesScreen::TreeRowComponent.for_page(parent.reload, selected: parent, locale: "en", url_options: {}, open_cookie: cookie)) }
+    disclosure = "#tree-row-#{parent.id} > button.admin-tree-row__disclosure"
+
+    draw.call(nil)
+    assert_selector "#{disclosure}[aria-expanded=false][aria-label='Unfold Parent']"
+
+    draw.call("#{parent.id}")
+    assert_selector "#{disclosure}[aria-expanded=true][aria-label='Fold Parent']"
+
+    draw.call("-#{root_page.id}.#{parent.id + 1000}")
+    assert_selector "#{disclosure}[aria-expanded=false]"
+
+    whole = render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: parent, locale: "en", open_cookie: "#{parent.id}"))
+    alone = render_inline(Admin::PagesScreen::TreeRowComponent.for_page(parent.reload, selected: parent, locale: "en", url_options: {}, open_cookie: "#{parent.id}"))
+    assert_equal row_html(whole, parent), row_html(alone, parent)
+  end
+
   # Pages draws the one row both trees draw: every part of a page's row is
   # the shared row's, in its order, and the row hands it no class of its own.
   test "a row is the shared row: its parts are TreeItemComponent's classes" do
@@ -127,7 +149,7 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
       assert_equal [ parts[:handle], parts[:disclosure], parts[:mark], parts[:title], parts[:trailing], parts[:add] ],
         row.native.element_children.map { |part| part["class"].split.first }
       assert_selector "#tree-row-#{parent.id} > .#{parts[:title]}[title='Parent'] > a#tree-link-#{parent.id}[data-tree-focus][data-turbo-frame=content]", text: "Parent"
-      assert_selector "#tree-row-#{parent.id} > button.#{parts[:disclosure]}[aria-controls='tree-children-#{parent.id}'][aria-expanded=true]"
+      assert_selector "#tree-row-#{parent.id} > button.#{parts[:disclosure]}[aria-controls='tree-children-#{parent.id}'][aria-expanded=false]"
       trailing = page.find("#tree-row-#{parent.id} > .#{parts[:trailing]}", visible: :all)
       assert trailing.find("[data-translation-marker=missing]", visible: :all)[:class].split.include?(parts[:reveal])
       assert_equal [ parts[:count], parts[:reveal] ], trailing.find("[data-child-count]", visible: :all)[:class].split

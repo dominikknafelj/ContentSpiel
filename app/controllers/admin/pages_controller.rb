@@ -345,7 +345,8 @@ module Admin
     # editor that saved it is the page the tree has selected (see `update`).
     def tree_row_stream
       turbo_stream.replace(Admin::PagesScreen::TreeRowComponent.dom_id(@page),
-        Admin::PagesScreen::TreeRowComponent.for_page(@page, selected: @page, locale: admin_locale, url_options: admin_url_options))
+        Admin::PagesScreen::TreeRowComponent.for_page(@page, selected: @page, locale: admin_locale, url_options: admin_url_options,
+          open_cookie: cookies[TreeOpenSet::COOKIE]))
     end
 
     def redirect_after(result, success:)

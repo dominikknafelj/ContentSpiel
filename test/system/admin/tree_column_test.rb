@@ -76,16 +76,24 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     assert_equal width, value(:now)
   end
 
-  # The keyboard's own way to the divider: Tab from the tree's last control.
-  # (A focus given by script is not always a keyboard's focus to the browser,
-  # and the tooltip shows for a keyboard's only.)
+  # The keyboard's own way to the divider: Tab from the tree's last control
+  # that is drawn (one in a folded branch is not in the Tab order). (A focus
+  # given by script is not always a keyboard's focus to the browser, and the
+  # tooltip shows for a keyboard's only.)
   def focus_divider
-    page.execute_script("(() => { const all = document.querySelectorAll('#tree a[href], #tree button'); all[all.length - 1].focus() })()")
+    page.execute_script("(() => { const all = Array.from(document.querySelectorAll('#tree a[href], #tree button')).filter((control) => control.checkVisibility()); all[all.length - 1].focus() })()")
     keys(:tab)
     assert_eventually(message: "Tab from the tree's last control did not reach the divider") { on_divider? }
   end
 
   def keys(*pressed) = page.driver.browser.keyboard.type(*pressed)
+
+  # Opens `record`'s branch, folded by default below Home's children, by its
+  # disclosure.
+  def open_branch(record)
+    find("#tree-row-#{record.id} > .admin-tree-row__disclosure[aria-expanded=false]").click
+    assert_selector "#tree-row-#{record.id} > .admin-tree-row__disclosure[aria-expanded=true]"
+  end
 
   # Presses on the divider and walks the pointer until the column would be
   # `width` wide; the caller asserts what it expects mid-drag and releases
@@ -311,6 +319,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     keys([ :shift, :right ])
     assert_tree 336
 
+    open_branch(@docs)
     click_frame_link { within("#tree") { click_link "Guides and tutorials" } }
     assert_current_path "/cs-studio/pages/#{@guides.id}"
     assert_tree 336
@@ -486,6 +495,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     keys(:right)
     assert_tree 288
     # The document holds the choice for as long as it lives.
+    open_branch(@docs)
     click_frame_link { within("#tree") { click_link "Guides and tutorials" } }
     assert_tree 288
 

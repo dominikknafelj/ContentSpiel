@@ -6,6 +6,7 @@ import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
 import { loadSortable } from "editor/drag"
 import { messages } from "i18n/messages"
+import { isFolded, openPathIn, setFolded } from "tree/open_set"
 
 // Drives the page tree column. Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
@@ -53,6 +54,7 @@ export default class extends Controller {
       holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
+    this.arrive()
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
     loadSortable().then((Sortable) => {
@@ -302,8 +304,16 @@ export default class extends Controller {
   // title's `aria-current="page"`, and the translation markers shown rather
   // than at rest. Only rows that can be selected are `row` targets (a
   // context-only row never is).
+  //
+  // A row redrawn alone (a save's answer) stands under a node whose fold the
+  // person may have changed since the server drew the row: its disclosure is
+  // drawn again from the node. Every row that connects is told to the tree's
+  // other scripts (`tree:changed` on the tree).
   rowTargetConnected(row) {
     this.mark(row, row.dataset.pageId === this.openPageId())
+    const node = row.closest("[data-tree-node]")
+    if (node) setFolded(node, isFolded(node))
+    row.closest(".admin-tree")?.dispatchEvent(new CustomEvent("tree:changed", { bubbles: true }))
   }
 
   follow(event) {
@@ -311,6 +321,35 @@ export default class extends Controller {
 
     const open = this.openPageId()
     this.rowTargets.forEach((row) => this.mark(row, row.dataset.pageId === open))
+    this.arrive()
+  }
+
+  // ARRIVING AT A PAGE (a full load, a restored snapshot, a redrawn tree, a
+  // page opened from the tree) opens the path to it, forgetting the folds on
+  // that path (`openPathIn`), so the selected row is never inside a folded
+  // branch, and scrolls the selected row into view inside the column.
+  arrive() {
+    const tree = this.element.querySelector(".admin-tree")
+    if (!tree) return
+
+    const open = this.openPageId()
+    openPathIn(tree, open)
+    this.scrollToRow(open)
+  }
+
+  // Inside the tree's column only (`#tree-column`'s `scrollTop`), and only as
+  // far as needed; never the window, so the editor beside it stays where it
+  // is. A column that is not a scroller (the desktop's, as tall as the page)
+  // does not move.
+  scrollToRow(id) {
+    const column = document.getElementById("tree-column")
+    const row = id == null ? null : this.element.querySelector(`#tree-row-${CSS.escape(id)}`)
+    if (!column || !row) return
+
+    const box = column.getBoundingClientRect()
+    const rowBox = row.getBoundingClientRect()
+    if (rowBox.top < box.top) column.scrollTop -= box.top - rowBox.top
+    else if (rowBox.bottom > box.bottom) column.scrollTop += rowBox.bottom - box.bottom
   }
 
   openPageId() {
