@@ -227,6 +227,10 @@
   --cs-radius-field: 6px; --cs-radius-button: 8px; --cs-radius-button-sm: 7px; --cs-radius-chip: 7px;
   --cs-radius-tile: 12px; --cs-radius-card: 14px; --cs-radius-frame: 16px; --cs-radius-rail: 18px;
   --cs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The cross-fade between light and dark (theme_controller.js), read by the
+     root's view-transition rules under CS Studio's surface below. */
+  --cs-theme-fade-duration: 250ms;
+  --cs-theme-fade-easing: ease-out;
   /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
   --cs-control-compact: 2.375rem;
   /* The editors' and Settings' form column (layout points spec, decision 1),
@@ -308,4 +312,17 @@
 html[data-surface="studio"] {
   --cs-t-label: 12px;
   scrollbar-gutter: stable;
+}
+
+/* The theme switch's cross-fade: the browser's own fade-out of the old
+   snapshot and fade-in of the new, at the fade's length and easing. Only the
+   duration and the timing function are set, never the `animation` shorthand,
+   which would drop those keyframes. The pseudo-elements are drawn over the
+   whole document, top layer included, so they take no layer of THE LAYERS.
+   A visitor's page reads its theme's stylesheet, not this one, and takes the
+   browser's default fade. */
+html[data-surface="studio"]::view-transition-old(root),
+html[data-surface="studio"]::view-transition-new(root) {
+  animation-duration: var(--cs-theme-fade-duration);
+  animation-timing-function: var(--cs-theme-fade-easing);
 }

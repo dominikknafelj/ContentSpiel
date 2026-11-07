@@ -546,6 +546,26 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal 1, css.scan(/scrollbar-gutter/).size, "the gutter is the studio surface's alone"
   end
 
+  # The theme switch's cross-fade (theme_controller.js) is timed by two
+  # tokens written once, and its two rules set only the duration and the
+  # easing: an `animation` shorthand would reset the browser's own fade-out
+  # and fade-in keyframes to none.
+  test "the theme fade is two tokens written once, read by the root's old and new view-transition rules" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal [ "250ms" ], css.scan(/--cs-theme-fade-duration:\s*([^;]+);/).flatten
+    assert_equal [ "ease-out" ], css.scan(/--cs-theme-fade-easing:\s*([^;]+);/).flatten
+    rules = self.class.css_rules("content-spiel.css").select { |selectors, _| selectors.any? { |selector| selector.include?("::view-transition") } }
+    assert_equal 1, rules.size, "one rule for the fade"
+    selectors, body = rules.first
+    assert_equal [ 'html[data-surface="studio"]::view-transition-old(root)', 'html[data-surface="studio"]::view-transition-new(root)' ], selectors
+    assert_match(/animation-duration:\s*var\(--cs-theme-fade-duration\);/, body)
+    assert_match(/animation-timing-function:\s*var\(--cs-theme-fade-easing\);/, body)
+    assert_no_match(/(?<![\w-])animation:/, body, "no shorthand: it would drop the browser's fade keyframes")
+    assert_equal 4, css.scan(/--cs-theme-fade-/).size, "two definitions and the fade rule's two reads"
+    other = Dir[Rails.root.join("app/assets/tailwind/**/*.css")].reject { |path| path.end_with?("/content-spiel.css") }
+    assert_empty other.select { |path| File.read(path).include?("--cs-theme-fade-") }, "the tokens are content-spiel.css's alone"
+  end
+
   # The form-send pages' required word keeps its capitals: a visitor's page,
   # not CS Studio's. Only a selector under `.form-send-page` is let through: a
   # CS Studio selector beside it in the same list, or on the same line, is not.
