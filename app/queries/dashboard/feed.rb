@@ -1,13 +1,14 @@
 module Dashboard
-  # The two *personal* lists on the CS Studio dashboard -- "Your drafts" and
-  # "Going live next" (design pass round 2, Task 16) -- read-scoped through
+  # The dashboard's lists of pages and posts -- "Your drafts", "Going live
+  # next" and the unpublished changes "Waiting for you" merges with open
+  # threads (`Dashboard::WaitingForYou`) -- read-scoped through
   # `AccessControl.scope` (which already hides trashed records) and built in
   # a constant number of queries, whatever the data size: one limited query
   # per model per list (pages and posts), merged and cut to the list's limit
   # in Ruby. (The "Recent activity" feed is `Dashboard::Activity`; the
   # "Needs translation" numbers come from `Translations::StateIndex`.)
   #
-  # "Mine" (spec §4.2): a post I authored, or any page/post whose *newest*
+  # "Mine": a post I authored, or any page/post whose *newest*
   # audit event is mine. Pages have no author, so for a page only the last
   # change counts -- someone editing it after me takes it off my drafts.
   # "Me" is the human: an event's `user_id`, which `Audit.record` fills for
@@ -24,14 +25,14 @@ module Dashboard
   class Feed
     LIMITS = { drafts: 5, going_live_next: 5, unpublished_changes: 5 }.freeze
 
-    # Events that never count as "the newest change" (final fix wave, I1):
+    # Events that never count as "the newest change":
     # `ApplicationService#denied` records `access.denied` with the refused
     # record as its subject -- and it coalesces -- so without this a user
     # merely *refused* on someone else's page would take it over as "mine".
     # The LATERAL join excludes exactly this list. (`Dashboard::Activity`
     # never lists the action either: it only lists content events.) A note's
     # events have the page, post or block as their subject too, and are no
-    # change to it either (notes spec §3.5): "Mine" and "Changed by"
+    # change to it either: "Mine" and "Changed by"
     # (`Audit::ChangeSince` reads this list) ignore them. Nor is a form's
     # submission arriving or being deleted: its subject
     # is the form, never a page or a post, and a visitor or the system is
@@ -79,9 +80,13 @@ module Dashboard
     # read); one limited query per model. The mark may be set when the net
     # difference is nothing (typed and typed back): the row is listed until
     # someone opens "Publish changes", which finds out.
-    def unpublished_changes
-      @unpublished_changes ||= page_and_post_relations { |r| r.with_unpublished_changes.reorder(unpublished_changes_at: :desc, id: :desc).limit(LIMITS[:unpublished_changes]) }
-        .flat_map(&:to_a).then { |records| newest_first(records, :unpublished_changes_at, LIMITS[:unpublished_changes]) }
+    #
+    # `limit:` is the dashboard's five unless a caller needs more (the
+    # merged panel reads each of its sources at its own limit); each limit
+    # is read once per feed.
+    def unpublished_changes(limit: LIMITS[:unpublished_changes])
+      (@unpublished_changes ||= {})[limit] ||= page_and_post_relations { |r| r.with_unpublished_changes.reorder(unpublished_changes_at: :desc, id: :desc).limit(limit) }
+        .flat_map(&:to_a).then { |records| newest_first(records, :unpublished_changes_at, limit) }
     end
 
     # Whether a record `#going_live_next` returned is mine (a post I wrote,
@@ -103,8 +108,7 @@ module Dashboard
       ].map(&narrow)
     end
 
-    # Scheduled (spec §10.4 of the CMS spec: a future `published_at`),
-    # soonest first.
+    # Scheduled (a future `published_at`), soonest first.
     def scheduled_soonest_first(relation)
       relation.scheduled.reorder(published_at: :asc, id: :asc)
     end
@@ -130,9 +134,9 @@ module Dashboard
     #
     # For a block owner (a page or post) the newest event is the newer of
     # two: its own newest, and the newest about any block it currently owns
-    # (final fix wave, I3 -- a block event's subject is the block, but
-    # editing a block is editing its page, so it counts towards "mine" and
-    # "by" exactly like a title edit). Each half is its own `LIMIT 1`, so
+    # (a block event's subject is the block, but editing a block is editing
+    # its page, so it counts towards "mine" and "by" exactly like a title
+    # edit). Each half is its own `LIMIT 1`, so
     # both stay index lookups.
     # An event about a block deleted since can't be traced back to its owner
     # any more (the block row is gone) -- its edit still shows through the

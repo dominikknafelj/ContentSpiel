@@ -1248,6 +1248,18 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal 6, Notes::Delivery.unread.where(user: users(:two)).count # the trashed records keep theirs
   end
 
+  test "Waiting for you hides a trashed record's open threads and its unpublished changes" do
+    later_gone = create_page(title: "Later gone")
+    [ @kept_page, later_gone ].each { |page| create_note_for_reader(page) }
+    [ @kept_page, @kept_post, later_gone, @gone_page, @gone_post ].each { |record| record.update_columns(unpublished_changes_at: Time.current) }
+    later_gone.update!(trashed_at: Time.current)
+    waiting = ->(filter) { Dashboard::WaitingForYou.new(actor: users(:two), filter:, channel: :admin).rows.map(&:record) }
+
+    assert_equal [ @kept_page, @kept_post ].to_set, waiting.("everything").to_set
+    assert_equal [ @kept_page ], waiting.("threads")
+    assert_equal [ @kept_page, @kept_post ].to_set, waiting.("unpublished").to_set
+  end
+
   # Through the services, not a column: what `Trash::Move` hides,
   # `Trash::Restore` brings back, unread as it was left.
   test "a trashed record's notes leave the inbox, the full list and the unread count, and are back when it is restored" do

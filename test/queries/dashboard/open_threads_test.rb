@@ -52,6 +52,22 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal [ asset, "media", :admin_media_path, [], { selected: asset.id } ], [ row.record, row.kind, row.route.name, row.route.args, row.route.params ]
   end
 
+  test "narrowed to records, only their open threads are counted" do
+    note(@page)
+    note(@block)
+    note(@post)
+    travel_to(1.minute.from_now) { note(@quiet) }
+    asset = create_media_asset
+    note(asset)
+    narrowed = Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, records: [ @page, @quiet, asset ])
+
+    assert_equal [ [ @quiet, 1 ], [ @page, 2 ], [ asset, 1 ] ].to_set, narrowed.rows.map { |row| [ row.record, row.count ] }.to_set
+    assert_equal @quiet, narrowed.rows.first.record
+    assert_equal 4, narrowed.total
+    assert_empty Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, records: []).rows
+    assert_equal 5, Dashboard::OpenThreads.new(actor: users(:two), channel: :admin).total
+  end
+
   test "five rows, read-scoped, in a constant number of statements" do
     posts = Array.new(7) { |index| create_post(title: "Post #{index}") }
     posts.first(2).each { |post| note(post) }
