@@ -1,6 +1,6 @@
 # Screen slots: the pattern, and how it works here
 
-> Describes: `app/components/admin/slots.rb`, `app/components/admin/ui/slot_component.rb`, `config/initializers/admin_slots.rb`.
+> Describes: `app/components/admin/slots.rb`, `app/components/admin/ui/slot_component.rb`, `app/components/admin/ui/rail_slot_component.rb`, `config/initializers/admin_slots.rb`.
 
 This file explains the pattern for someone who has not met it. The exact contract (every slot's name and place, the arguments, the guards) is in `docs/reference/presence.md`, "`Admin::Slots`: named places on a screen"; where the two differ, that section and the code are right.
 
@@ -72,7 +72,7 @@ Its own `render?` decides whether it draws anything.
 
 ## What exists
 
-The names are `Admin::Slots::NAMES`, and `presence.md` has the table of where each is drawn and what stands in it: `editor.header.people` and `editor.header.actions`, `media.panel.header` and `media.panel.sections`, `tree.row.markers`, `posts.row.markers` and `posts.row.title`, and `editor.block.markers`, drawn by a block's card and by a section's tile: the holder's avatar (on a tile only) and the notes marker, in that order.
+The names are `Admin::Slots::NAMES`, and `presence.md` has the table of where each is drawn and what stands in it: `editor.header.people` and `editor.header.actions`, `media.panel.header` and `media.panel.sections`, `tree.row.markers`, `posts.row.markers` and `posts.row.title`, and `editor.block.markers`, drawn by a block's card and by a section's tile: the holder's avatar (on a tile only) and the notes marker, in that order. `editor.rail.tabs` is the one PANEL slot (below).
 
 ## Lists: the loader
 
@@ -95,6 +95,18 @@ The list's component calls `Admin::Slots.load("tree.row.markers", pages, viewer:
 4. The people component draws its frame; from there on it is presence's own (`presence.md`).
 
 The header's template holds no line that says "presence".
+
+## A panel slot: the rail's tabs
+
+`editor.rail.tabs` is not drawn by `SlotComponent`: each entry is a tab and its panel, and the two stand in different places of the editor's rail (`#editor-grid`), so the editors draw it through `Admin::Ui::RailSlotComponent`.
+
+1. **The entry answers four more things.** Built like every slot component (`record:, viewer:, data: nil, **context`), it answers `tab_key` (a String, lowercase letters only; anything else raises), `tab_label`, `tab_count` (an Integer, or nil for no figure) and `render?`. Drawn, it is the panel's content.
+2. **The editor makes one `RailSlotComponent` and uses it twice.** `#tabs` goes to `RailTabsComponent` as `slot_tabs:`, which puts them after the rail's own tabs; `render rail_slot` draws each panel in a `RailPanelComponent` after the host's own panels. The entries are built once, so a tab and its panel come from one object. The page editor's rail is Page, Section, then the slot's; the post editor's is Post, then the slot's.
+3. **One tab is a heading, two are a tablist.** A rail with only its own tab is an `h2`. When an entry renders, the rail is a real tablist with the entry's tab in it; the host does not decide.
+4. **The editors hand the slot `query:`**, the request's query parameters, with `locale:`, `url_options:` and what the screen has read (`counts:`), so a panel reads its own parameters (`?notes=open`) without the host naming them.
+5. **A save's answer replaces the tab and never the panel.** `Admin::Answers::RailTabStreams.for(record, view:, viewer:, rail_id: "editor-grid", **context)` returns one `turbo_stream.replace("<rail_id>-tab-<key>", …)` per entry that renders, appended by `PagesController#update` and `PostsController#update` on a successful save. A panel may hold typed text. The rail re-applies its current tab to a tab that connects (`admin--ui--rail`), so the replaced tab does not change which one is shown.
+
+The rail's components, the answer and the post form do not name the feature: `test/lib/notes_boundary_test.rb`. Tests: `test/components/admin/ui/rail_slot_component_test.rb`, `test/controllers/admin/answers/rail_tab_streams_test.rb`, and in `test/components/admin/editor_screen/post_form_component_test.rb` the post rail becoming a tablist.
 
 ## Doing it yourself
 

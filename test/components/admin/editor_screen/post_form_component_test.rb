@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "../../../support/rail_tab_probe"
 
 # A post is held as a whole (live-editing handoff 8): the strip stands in the header's
 # notice area, and the form is read-only.
@@ -13,6 +14,23 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
 
   def render_for(viewer, tab, **options)
     as_viewer(viewer, tab: tab) { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "en", **options) }
+  end
+
+  test "a registered rail tab makes the post rail a tablist of two, with its panel after the form" do
+    Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe ]) do
+      render_for(users(:one), "tab-aaaaaaaa")
+      assert_selector "#editor-grid [role=tablist] [role=tab]", count: 2
+      assert_selector "#editor-grid-tab-post[aria-selected=true]"
+      assert_selector "#editor-grid-tab-probe", text: "Probe"
+      assert_no_selector "h2#editor-grid-tab-post", wait: 0
+      assert_selector "#editor-grid > form#post-form ~ #editor-grid-panel-probe"
+    end
+  end
+
+  test "with nothing registered the post rail is a heading" do
+    render_for(users(:one), "tab-aaaaaaaa")
+    assert_selector "h2#editor-grid-tab-post"
+    assert_no_selector "[role=tablist]", wait: 0
   end
 
   def controls = form_controls(within: "#post-form")

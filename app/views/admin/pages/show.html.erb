@@ -60,6 +60,9 @@
     into the Section panel when its words are pressed and back under its head when it
     closes (`admin--editor--section-choice`, which says what moves it and when). %>
 <% rail_id = "editor-grid" %>
+<%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
+<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, locale: admin_locale, url_options: admin_url_options,
+                                                query: request.query_parameters, counts: note_counts) %>
 <%= tag.div id: rail_id, class: [ "admin-rail-grid", ("admin-rail-grid--folded" unless admin_locale.to_s == Locales.default.to_s) ],
       data: { controller: "admin--ui--rail admin--editor--section-choice",
               action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal " \
@@ -72,7 +75,7 @@
 <%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: "page", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: t("admin.components.editor_screen.rail.tabs.page")),
       Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: t("admin.components.editor_screen.rail.tabs.section"))
-    ]) %>
+    ], slot_tabs: rail_slot.tabs) %>
 <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: true) do %>
   <%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 <% end %>
@@ -85,6 +88,7 @@
     <p class="mt-1 text-sm text-meta"><%= t("admin.components.editor_screen.section_choice.help") %></p>
   </div>
 <% end %>
+<%= render rail_slot %>
 
 <%# `data-messages`: the two sentences `admin--editor--blocks` says itself (a block not
     moved because its form holds an unsaved edit; a refused move whose list was

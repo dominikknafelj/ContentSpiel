@@ -104,6 +104,12 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_row_component.html.erb
     app/components/admin/posts_screen/table_component.rb
     app/components/admin/shell/sidebar_component.rb
+    app/components/admin/ui/rail_tabs_component.rb
+    app/components/admin/ui/rail_tabs_component.html.erb
+    app/components/admin/ui/rail_tab_component.rb
+    app/components/admin/ui/rail_panel_component.rb
+    app/components/admin/ui/rail_slot_component.rb
+    app/controllers/admin/answers/rail_tab_streams.rb
   ].freeze
 
   # "note" or "notes" at the start of a word or after an underscore, digit, colon or hyphen
@@ -135,8 +141,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       "the posts table's Notes column HEADER (its icon and its name): the column is notes' alone, and a header mechanism for slots (a second slot) is more than two features justify; the CELL is the posts.row.markers slot, and the column becomes a slot's when a second feature wants a column of its own"
   }.freeze
 
-  test "the editors' header and the media panel do not name notes: they draw their slots" do
-    assert_equal 12, SLOT_HOSTS.size
+  test "the editors' header, the media panel and the rail do not name notes: they draw their slots" do
+    assert_equal 18, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end
