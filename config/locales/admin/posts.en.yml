@@ -1,0 +1,34 @@
+# The posts list's own keys (docs/reference/i18n.md): `admin.posts.index` is
+# the view's lazy-lookup scope (`app/views/admin/posts/index.html.erb`). The
+# whole view is converted; its filter form's words are the toolbar
+# component's (`admin.components.posts_screen.toolbar`).
+en:
+  admin:
+    posts:
+      index:
+        title: "Posts"
+        # The split button's halves: "New blog post" for a type named in one
+        # word, "New resume entry" for one named in more. `%{type}` is the
+        # type's label in lower case.
+        new_type_post: "New %{type} post"
+        new_type: "New %{type}"
+        # The ▾ half's name for a screen reader.
+        other_types: "Choose another type of post"
+        # A filtered list with no rows. `%{filters}` names the active
+        # filters, each by its name below and its value: "type blog and
+        # scope drafts".
+        no_matches:
+          title: "No matches."
+          description: "No posts match the current filters (%{filters})."
+          clear: "Clear filters"
+        filter_names:
+          scope: "scope"
+          type: "type"
+          tag: "tag"
+          translation: "translation"
+          q: "title"
+        # No post at all.
+        empty:
+          title: "No posts yet."
+          description: "Choose a content type to create your first post."
+          new_post: "+ New post"

@@ -135,6 +135,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
+    app/views/admin/posts/index.html.erb
+    app/components/admin/posts_screen/toolbar_component.rb
+    app/components/admin/posts_screen/toolbar_component.html.erb
     app/components/admin/dashboard_screen/panel_component.rb
     app/components/admin/dashboard_screen/panel_component.html.erb
     app/components/admin/dashboard_screen/translation_panel_component.rb

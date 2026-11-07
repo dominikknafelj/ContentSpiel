@@ -26,13 +26,13 @@ class Admin::DashboardScreen::PanelComponentTest < ViewComponent::TestCase
   end
 
   test "caps its rows at five and links on with the arrow" do
-    panel(link: [ "/cs-studio/posts?status=draft", "All drafts" ]) do |card|
+    panel(link: [ "/cs-studio/posts?scope=drafts", "All drafts" ]) do |card|
       8.times { |i| card.with_row { "Row #{i}" } }
     end
 
     assert_selector "li", count: 5
     assert_no_text "Row 5"
-    assert_selector "header a[href='/cs-studio/posts?status=draft'][aria-label='All drafts']", text: "→"
+    assert_selector "header a[href='/cs-studio/posts?scope=drafts'][aria-label='All drafts']", text: "→"
   end
 
   test "an explicit limit raises the cap" do

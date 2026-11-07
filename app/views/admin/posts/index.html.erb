@@ -1,7 +1,11 @@
-<%# The Posts module's list: a toolbar (search, All/Live/Drafts/Scheduled
-    with counts, Type, Tag, Translation), a table with a checkbox per row and
-    a bulk bar (Publish, Move to trash), 50 rows to a page. Filters are query
-    params, read by `Posts::List`; rows are read-scoped and kept only. %>
+<%# The Posts module's list, in the list rail (`.admin-list-rail`): the
+    heading row with New post, then the grid of the filter form
+    (`Admin::PostsScreen::ToolbarComponent`: the bar, then the filter panel,
+    which the grid docks beside the list at 1200px of the list's own width)
+    and the list (a table with a checkbox per row, a bulk bar with Publish
+    and Move to trash, 50 rows to a page). The filter form comes before the
+    list at every width, so the focus does too. Filters are query params,
+    read by `Posts::List`; rows are read-scoped and kept only. %>
 <%# "New post" only with `posts.create` somewhere; the rows are already
     narrowed to readable posts (`Posts::List`). The split button's default is
     the first type the viewer may create, the menu holds the others; each
@@ -9,62 +13,67 @@
 <% may_create = can?("posts.create") %>
 <% creatable_types = may_create ? @content_types.select { |type| can?("posts.create", Post.new(content_type: type.name)) } : [] %>
 <%# "New blog post", "New resume entry": a one-word type name reads better with "post" after it. %>
-<% new_label = ->(type) { type.label.split.one? ? "New #{type.label.downcase} post" : "New #{type.label.downcase}" } %>
+<% new_label = ->(type) { type.label.split.one? ? t(".new_type_post", type: type.label.downcase) : t(".new_type", type: type.label.downcase) } %>
 <% new_post_trigger = ->(type) { dialog_trigger("new-post-dialog").merge(turbo_frame: "content", "new-post-type-param": type.name) } %>
 
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-h1 text-ink">Posts</h1>
-  <% if creatable_types.any? %>
-    <div class="flex">
-      <% default_type, *other_types = creatable_types %>
-      <%= link_to new_label.call(default_type), new_admin_post_path(type: default_type.name, **admin_url_options),
-            data: new_post_trigger.call(default_type), class: "#{setup_primary_button_class} rounded-r-none" %>
-      <% if other_types.any? %>
-        <%= render Admin::Ui::MenuComponent.new(label: "▾", aria_label: "Choose another type of post", close_on_select: true,
-              button_class: "inline-flex h-full cursor-pointer items-center rounded-button rounded-l-none border-l border-on-accent/40 bg-accent px-2.5 text-on-accent shadow-2 hover:bg-accent-hover hover:shadow-3") do |menu| %>
-          <% other_types.each do |type| %>
-            <% menu.with_item { link_to new_label.call(type), new_admin_post_path(type: type.name, **admin_url_options), data: new_post_trigger.call(type) } %>
-          <% end %>
-        <% end %>
-      <% end %>
-    </div>
-  <% end %>
-</div>
-
-<%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags,
-      filters: { q: params[:q], type: params[:type], tag: params[:tag], translation: params[:translation] }.transform_values { |value| value.is_a?(String) ? value : nil },
-      url_options: admin_url_options, locale: admin_locale) %>
-
-<% page_url = ->(page) { admin_posts_path(list_params(*Admin::PostsController::LIST_KEYS).merge("page" => page)) } %>
-<% filtered = @scope != "all" || filters_active?(%i[q type tag translation]) %>
-
-<div data-controller="admin--posts--bulk-select">
-  <%= render Admin::PostsScreen::BulkBarComponent.new(list_fields: list_params(*Admin::PostsController::LIST_KEYS)) %>
-
-  <% if @pagination.out_of_range? %>
-    <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
-  <% elsif @posts.empty? %>
-    <div class="rounded-card bg-surface shadow-1">
-      <% if filtered %>
-        <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
-          <% empty_state.with_action do %>
-            <%= link_to "Clear filters", admin_posts_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
-          <% end %>
-        <% end %>
-      <% else %>
-        <%= render Admin::Ui::EmptyStateComponent.new(title: "No posts yet.", description: (creatable_types.any? ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
-          <% if creatable_types.any? %>
-            <% empty_state.with_action do %>
-              <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: dialog_trigger("new-post-dialog").merge(turbo_frame: "content"), class: setup_primary_button_class %>
+<div class="admin-list-rail">
+  <div class="admin-list-rail__head">
+    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    <% if creatable_types.any? %>
+      <div class="flex">
+        <% default_type, *other_types = creatable_types %>
+        <%= link_to new_label.call(default_type), new_admin_post_path(type: default_type.name, **admin_url_options),
+              data: new_post_trigger.call(default_type), class: "#{Admin::Ui::ButtonComponent.classes(:primary)} rounded-r-none" %>
+        <% if other_types.any? %>
+          <%= render Admin::Ui::MenuComponent.new(label: "▾", aria_label: t(".other_types"), close_on_select: true,
+                button_class: "inline-flex h-full cursor-pointer items-center rounded-button rounded-l-none border-l border-on-accent/40 bg-accent px-2.5 text-on-accent shadow-2 hover:bg-accent-hover hover:shadow-3") do |menu| %>
+            <% other_types.each do |type| %>
+              <% menu.with_item { link_to new_label.call(type), new_admin_post_path(type: type.name, **admin_url_options), data: new_post_trigger.call(type) } %>
             <% end %>
           <% end %>
         <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="admin-list-rail__grid">
+    <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags,
+          filters: { q: params[:q], type: params[:type], tag: params[:tag], translation: params[:translation] }.transform_values { |value| value.is_a?(String) ? value : nil },
+          url_options: admin_url_options, locale: admin_locale) %>
+
+    <% page_url = ->(page) { admin_posts_path(list_params(*Admin::PostsController::LIST_KEYS).merge("page" => page)) } %>
+    <% filtered = @scope != "all" || filters_active?(%i[q type tag translation]) %>
+
+    <div data-controller="admin--posts--bulk-select">
+      <%= render Admin::PostsScreen::BulkBarComponent.new(list_fields: list_params(*Admin::PostsController::LIST_KEYS)) %>
+
+      <% if @pagination.out_of_range? %>
+        <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+      <% elsif @posts.empty? %>
+        <div class="rounded-card bg-surface shadow-1">
+          <% if filtered %>
+            <% summary = filter_summary(%i[scope type tag translation q].to_h { |key| [ t(".filter_names.#{key}"), key ] }) %>
+            <%= render Admin::Ui::EmptyStateComponent.new(title: t(".no_matches.title"), description: t(".no_matches.description", filters: summary)) do |empty_state| %>
+              <% empty_state.with_action do %>
+                <%= link_to t(".no_matches.clear"), admin_posts_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:secondary), data: { turbo_frame: "content", turbo_action: "replace" } %>
+              <% end %>
+            <% end %>
+          <% else %>
+            <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: (creatable_types.any? ? t(".empty.description") : nil)) do |empty_state| %>
+              <% if creatable_types.any? %>
+                <% empty_state.with_action do %>
+                  <%= link_to t(".empty.new_post"), new_admin_post_path(**admin_url_options), data: dialog_trigger("new-post-dialog").merge(turbo_frame: "content"), class: Admin::Ui::ButtonComponent.classes(:primary) %>
+                <% end %>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+      <% else %>
+        <%= render Admin::PostsScreen::TableComponent.new(posts: @posts, paths: @paths, translation_states: @translation_states,
+              url_options: admin_url_options, locale: admin_locale) do |table| %>
+          <% table.with_footer { render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
+        <% end %>
       <% end %>
     </div>
-  <% else %>
-    <%= render Admin::PostsScreen::TableComponent.new(posts: @posts, paths: @paths, translation_states: @translation_states,
-          url_options: admin_url_options, locale: admin_locale) do |table| %>
-      <% table.with_footer { render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
-    <% end %>
-  <% end %>
+  </div>
 </div>

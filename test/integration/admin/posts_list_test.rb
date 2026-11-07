@@ -457,6 +457,18 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "the posts screen stands in the list rail: the heading row, then one filter form, then the list" do
+    create_post(title: "One")
+    get "/cs-studio/posts"
+    assert_select ".admin-list-rail", 1
+    assert_select ".admin-list-rail > .admin-list-rail__head:first-child h1", text: "Posts"
+    assert_select ".admin-list-rail > .admin-list-rail__head + .admin-list-rail__grid"
+    assert_select ".admin-list-rail__grid > form#posts-filters:first-child + [data-controller='admin--posts--bulk-select']"
+    assert_select "form#posts-filters > .admin-filter-bar + fieldset.admin-list-rail__rail.admin-filter-panel"
+    assert_select "fieldset.admin-filter-panel form", 0
+    assert_select "[data-controller='admin--posts--bulk-select'] tbody tr", 1
+  end
+
   test "the split button's divider is the on-accent colour at 40 percent" do
     get "/cs-studio/posts"
     assert_select "button[aria-label='Choose another type of post'][class~='border-on-accent/40']"

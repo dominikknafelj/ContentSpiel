@@ -1,27 +1,33 @@
 module Admin
   module PostsScreen
-    # The posts list's toolbar:
-    # title search, a segmented control with counts -- "All 128 · Live 96 ·
-    # Drafts 20 · Scheduled 12" -- and Type, Tag and Translation drop-downs.
-    # One GET form that applies as it changes (`admin--ui--auto-submit`, no
-    # Filter button; `FilterHelper#filter_form_options`), reloading only the
-    # `content` frame. "Clear" appears when anything is active.
+    # The posts list's filter form: one GET form (`FORM_ID`) that applies as
+    # it changes (`admin--ui--auto-submit`, no Filter button;
+    # `FilterHelper#filter_form_options`), reloading only the `content`
+    # frame. It is drawn `display: contents` and holds two parts, which the
+    # list rail places (`.admin-list-rail` in `content-spiel.tailwind.css`):
+    # the bar (title search, the segmented control with counts -- "All 128 ·
+    # Live 96 · Drafts 20 · Scheduled 12" -- and "Clear", which appears when
+    # anything is active) and the filter panel (Type, Tag and Translation,
+    # each under a visible label), which stands in the rail beside the list
+    # where the list has the room and under the bar where it has not. Both
+    # parts are one form, so a change in the panel is the form's `change` and
+    # the focus is restored by id after the reload, wherever it was.
     #
     # The segmented control is a radio group (`scope`), so it is one tab stop,
     # arrow keys move it and a screen reader says "3 of 4" -- the visual
     # buttons are the radios' labels, the checked one drawn by `:has(:checked)`.
-    # The counts are `Posts::List#counts`: they respect every
-    # other filter, but not the scope itself, so "Drafts 20" is what choosing
-    # Drafts would list.
+    # The segments are `Posts::List::SCOPES`, the scopes the list reads. The
+    # counts are `Posts::List#counts`: they respect every other filter, but
+    # not the scope itself, so "Drafts 20" is what choosing Drafts would list.
     class ToolbarComponent < Admin::AdminComponent
-      SCOPES = [ [ "all", "All" ], [ "live", "Live" ], [ "drafts", "Drafts" ], [ "scheduled", "Scheduled" ] ].freeze
-      TRANSLATIONS = [ [ "Needs translation", "needs" ], [ "Outdated", "outdated" ], [ "Complete", "complete" ] ].freeze
+      FORM_ID = "posts-filters".freeze
+      TRANSLATIONS = %w[needs outdated complete].freeze
 
-      # Selected is INVERTED (contrast and buttons spec, D1): ink with paper
-      # words and count, the system's segmented look; the group around the
-      # pills is outlined in the field line. The keyboard's ring is the
-      # accent on a pill at rest and PAPER, 4px inside, on the selected one:
-      # the accent on dark ink is 1.96:1 (`test/lib/admin_contrast_test.rb`).
+      # Selected is INVERTED: ink with paper words and count, the system's
+      # segmented look; the group around the pills is outlined in the field
+      # line. The keyboard's ring is the accent on a pill at rest and PAPER,
+      # 4px inside, on the selected one: the accent on dark ink is 1.96:1
+      # (`test/lib/admin_contrast_test.rb`).
       SEGMENT_CLASS = "flex cursor-pointer items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken " \
                       "has-[:checked]:bg-ink has-[:checked]:font-semibold has-[:checked]:text-paper has-[:checked]:hover:bg-ink " \
                       "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent " \
@@ -41,7 +47,11 @@ module Admin
 
       def path = helpers.admin_posts_path(**url_options)
 
-      def form_options = helpers.filter_form_options(path)
+      def form_options = helpers.filter_form_options(path, bar: false).merge(id: FORM_ID)
+
+      def bar_class = Admin::FilterHelper::BAR_CLASS
+
+      def scopes = Posts::List::SCOPES
 
       # Anything the viewer has set (the scope too: "Clear" goes back to All).
       def active? = scope != "all" || filters.values.any?(&:present?)
@@ -51,6 +61,18 @@ module Admin
       def count_for(name) = counts.fetch(name)
 
       def type_options = content_types.map { |type| [ type.label, type.name ] }
+
+      # The tags' names, and the filter's own name when no tag has it (a tag
+      # renamed or deleted since the address was made): the list is then
+      # filtered to nothing, and the select says by what, so the filter can
+      # be seen and cleared rather than read as "Any" over an empty list.
+      def tag_options
+        names = tags.map(&:name)
+        wanted = filters[:tag]
+        wanted.present? && !names.include?(wanted) ? names + [ wanted ] : names
+      end
+
+      def translation_options = TRANSLATIONS.map { |value| [ t(".translations.#{value}"), value ] }
 
       private
 
