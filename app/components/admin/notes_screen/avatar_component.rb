@@ -1,8 +1,8 @@
 module Admin
   module NotesScreen
     # A person as a round avatar with their initials (handoff "Message",
-    # "Thread row in the list"; the dashboard's activity row draws the same
-    # shape, still with one letter until its own plan). Two letters: a two-word name gives each word's first, a one-word name its first two (`PersonName.initials`). The viewer's own is filled ink; everyone else's
+    # "Thread row in the list"; an audit sentence's actor is drawn by
+    # `Admin::Ui::ActorAvatarComponent`, on the same shared circle). Two letters: a two-word name gives each word's first, a one-word name its first two (`PersonName.initials`). The viewer's own is filled ink; everyone else's
     # is sunken with a line. Decoration only: the name is always written
     # beside it, so it is hidden from a screen reader.
     class AvatarComponent < Admin::AdminComponent

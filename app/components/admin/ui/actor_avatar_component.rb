@@ -33,13 +33,12 @@ module Admin
         end
       end
 
-      # The two letters of a user's circle; nil for anyone who is not drawn
-      # as one.
-      def initials = actor.user && ::PersonName.initials(::PersonName.of(actor.user))
-
       private
 
       attr_reader :actor
+
+      # The two letters of a user's circle.
+      def initials = ::PersonName.initials(::PersonName.of(actor.user))
     end
   end
 end

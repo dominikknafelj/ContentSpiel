@@ -1,6 +1,6 @@
 module Admin
   module AuditScreen
-    # One event in the audit log (design pass round 3, Task 15): the time
+    # One event in the audit log: the time
     # ("16:05", or "16:05–16:31" for a coalesced span), the actor's mark
     # (`Admin::Ui::ActorAvatarComponent`, the dashboard's too), the sentence
     # (`Audit::Sentence`, drawn by `SentenceComponent`), the channel chip and the

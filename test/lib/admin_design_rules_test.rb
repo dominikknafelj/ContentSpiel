@@ -1031,7 +1031,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A circle of a person's letters is `Admin::Ui::AvatarComponent`, so one
   # person has one size, tone and pair of letters wherever they are drawn. A
   # hand-built one is a round element whose own line draws letters: upper-case
-  # or a person's initial(s).
+  # or a person's initial(s). It is a line heuristic and misses a circle whose
+  # class string is wrapped onto another line, whose letters are written on a
+  # line of their own, or that says neither `uppercase` nor `initial(s)`
+  # (`<%= name[0] %>`).
   HAND_BUILT_AVATAR = /(?<![\w-])rounded-full(?![\w-]).*(?:(?<![\w-])uppercase(?![\w-])|\binitials?\b)|\binitials?\b.*(?<![\w-])rounded-full(?![\w-])/
   AVATAR_COMPONENT = "app/components/admin/ui/avatar_component.rb".freeze
   # The circles still drawn by hand, each with the reason it is not the
