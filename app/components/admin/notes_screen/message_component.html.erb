@@ -61,7 +61,7 @@
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink" data-note-delete-question>
       <span><%= t(".delete_question") %></span>
       <%= button_to t(".delete_confirm"), message_path, method: :delete,
-            class: "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(:danger_text)}", form: { data: { turbo_frame: "notes" } } %>
+            class: Admin::Ui::ButtonComponent.classes(:danger_text, size: :small), form: { data: { turbo_frame: "notes" } } %>
       <%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %>
     </div>
   <% end %>

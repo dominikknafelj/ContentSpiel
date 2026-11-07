@@ -1519,6 +1519,29 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty offences, "the notes' open state is the rail's current tab, and the tree never folds for the notes"
   end
 
+  # Button card: a hover a touch screen keeps after a tap is a stuck
+  # highlight, so every button's hover stands under `@media (hover: hover)`.
+  # Tailwind's `hover:` variant writes it so; read from the BUILT stylesheet,
+  # so a redefined variant, or a class that never reached the build, fails.
+  test "a button's hover is under @media (hover: hover)" do
+    sources = Dir[Rails.root.join("app/assets/tailwind/**/*.css")].sum("") { |path| File.read(path) }
+    assert_no_match(/@custom-variant\s+hover\b/, sources, "Tailwind's own hover variant, under (hover: hover), is the one a button uses")
+    built = Rails.root.join("app/assets/builds/tailwind.css")
+    assert built.file?, "run bin/rails tailwindcss:build first"
+    css = built.read.gsub(%r{/\*.*?\*/}m, "")
+    hovers = Admin::Ui::ButtonComponent::VARIANT_CLASSES.keys.product(%i[regular small])
+      .flat_map { |variant, size| Admin::Ui::ButtonComponent.classes(variant, size: size).split }.grep(/hover:/).uniq
+    assert_operator hovers.size, :>, 5, "the buttons' hovers were found"
+    hovers.each do |name|
+      escaped = ".#{name.gsub(/([:\[\](),.\/])/) { "\\#{Regexp.last_match(1)}" }}"
+      at = css.index(escaped)
+      assert at, "#{name} is in the built stylesheet"
+      enclosing = []
+      css[0...at].scan(/([^{};]*)\{|\}/).each { |(prelude)| prelude ? enclosing.push(prelude.strip) : enclosing.pop }
+      assert enclosing.any? { |prelude| prelude.match?(/\A@media \(hover:\s*hover\)\z/) }, "#{name} stands under #{enclosing.inspect}"
+    end
+  end
+
   # A row's closing verb, when it is words: dim at rest, so a read row holds
   # no accent, and accent only under the pointer or the focus. Read from the
   # BUILT stylesheet (CI builds it before the unit shards), so a class name

@@ -18,6 +18,7 @@
   --color-accent: var(--cs-accent);
   --color-accent-hover: var(--cs-accent-hover);
   --color-accent-tint: var(--cs-accent-tint);
+  --color-accent-press: var(--cs-accent-press);
   --color-on-accent: var(--cs-on-accent);
   --color-ok: var(--cs-ok);
   --color-ok-ink: var(--cs-ok-ink);
@@ -28,6 +29,7 @@
   --color-danger: var(--cs-danger);
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
+  --color-danger-press: var(--cs-danger-press);
   --color-chrome: var(--cs-chrome);
   --color-field-fill: var(--cs-field-fill);
   --color-rail: var(--cs-rail);

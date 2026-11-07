@@ -119,6 +119,23 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select ".admin-empty-state", count: 0
   end
 
+  # Button card: the rail's "… →" links are small tertiary buttons, so they
+  # are underlined at rest and take the button's hover and focus.
+  test "the rail's Drafts → and Full audit log → are small tertiary buttons" do
+    with_locales(%w[en], default: "en")
+    sign_in_as users(:one)
+    get admin_root_path
+
+    small_tertiary = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split
+    drafts = css_select("section[aria-labelledby=dashboard-going-live-next] a[href='#{admin_posts_path(scope: "drafts")}']").first
+    audit = css_select("a[href='#{admin_audit_events_path}']").find { |link| link.text.include?("Full audit log") }
+    [ drafts, audit ].each do |link|
+      assert link, "the link is drawn"
+      assert_empty small_tertiary - link["class"].split, link.text.squish
+      assert_not_includes link["class"].split, "text-ink"
+    end
+  end
+
   test "someone who may create nothing reads No drafts. alone, and Drafts → only with posts.read" do
     sign_in_as users(:reader)
     get admin_root_path

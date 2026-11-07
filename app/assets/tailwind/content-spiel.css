@@ -40,6 +40,9 @@
   --cs-accent: #6236d9;
   --cs-accent-hover: #5831c3;
   --cs-accent-tint: #ece6fd;
+  /* A secondary's and a tertiary's fill under the pointer: a step from the
+     tint (and from the rail) that is seen, with accent words on it. */
+  --cs-accent-press: #d6cbfa;
   --cs-on-accent: #ffffff;
   --cs-ok: oklch(0.52 0.12 150);
   --cs-ok-ink: oklch(0.42 0.11 150);
@@ -50,6 +53,8 @@
   --cs-danger: oklch(0.53 0.19 25);
   --cs-danger-ink: oklch(0.42 0.15 25);
   --cs-danger-tint: oklch(0.96 0.03 25);
+  /* A danger text button's fill under the pointer, a step from sunken. */
+  --cs-danger-press: #efc6c8;
   --cs-ph-a: #dddbd3;
   --cs-ph-b: #c9c7bd;
   --cs-chrome: #ffffff;              /* sidebar / tree column */
@@ -151,6 +156,7 @@
   --cs-accent: #b49cff;
   --cs-accent-hover: #bca6ff;
   --cs-accent-tint: #2c2350;
+  --cs-accent-press: #3d3070;
   --cs-on-accent: #140c2e;
   --cs-ok: oklch(0.70 0.13 150);
   --cs-ok-ink: oklch(0.80 0.12 150);
@@ -161,6 +167,7 @@
   --cs-danger: oklch(0.68 0.17 25);
   --cs-danger-ink: oklch(0.80 0.12 25);
   --cs-danger-tint: oklch(0.29 0.06 25);
+  --cs-danger-press: #552b33;
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
   --cs-chrome: #181a21;

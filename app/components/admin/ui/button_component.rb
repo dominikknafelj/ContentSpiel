@@ -5,10 +5,10 @@ module Admin
     # the tree's "+", and so on (spec §4.3). Five variants only: `:primary`
     # (the one emphasized action per screen: a solid accent fill raised to
     # shadow 2), `:secondary` (everything else: an accent tint, accent words,
-    # no outline), `:tertiary` (accent words, no fill: a dialog's Cancel;
+    # inside an edge), `:tertiary` (accent words, no fill: a dialog's Cancel;
     # `:ghost` is no variant and raises), `:danger_text` (the trigger for a
-    # destructive action: sunken, with danger-coloured words, because red
-    # words on the violet tint would fight)
+    # destructive action: sunken, with danger-coloured words inside an edge,
+    # because red words on the violet tint would fight)
     # and `:danger` (solid red, only for the confirm button inside a
     # `Ui::ConfirmDialogComponent`). Anything else a caller needs on the tag --
     # `data-action` for a Stimulus controller, `disabled`, `form`, a `name`
@@ -21,31 +21,59 @@ module Admin
     # caller asks for is the one place to move a button's look: a button that
     # throws work away (Discard changes…) is `:danger_text`.
     class ButtonComponent < AdminComponent
-      # Every hover is `not-disabled:hover:` (contrast and buttons spec, D1): a
-      # disabled button never answers the pointer.
+      # Every hover is `not-disabled:hover:`: a disabled button never answers
+      # the pointer. Tailwind's `hover:` stands under `@media (hover: hover)`,
+      # so a touch screen keeps no stuck hover (`admin_design_rules_test`).
+      #
+      # THE EDGE. A secondary's tint and a danger text's sunken fill are no
+      # shape on any ground (1.00 to 1.26:1), so both draw an edge at rest:
+      # `field-line` regular, the mark of anything pressed, and the variant's
+      # own ink small, where there is less fill to see. The others keep a
+      # transparent edge. No hover changes the edge: the hover is the fill and
+      # the lift, the outline outside is the focus ring.
+      #
+      # THE HOVER is a stronger fill and a neutral lift, never accent around
+      # the button: an accent ring or glow is what the focus ring is, and two
+      # buttons would look focused at once. The secondary and the danger text
+      # take their press fill and shadow 2, the tertiary the accent press fill
+      # under its underline and no lift (a text button does not rise), the
+      # primary its darker accent and shadow 3. Each press fill's step from its
+      # rest and its words on it are measured (`admin_contrast_test`).
       VARIANT_CLASSES = {
-        primary: "bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 " \
-                 "not-disabled:active:translate-y-px not-disabled:active:shadow-none",
-        # The design draws no hover for it: the lift to shadow 1 is the
-        # only change, so a secondary never moves or changes colour.
-        secondary: "bg-accent-tint text-accent not-disabled:hover:shadow-1",
-        tertiary: "bg-transparent text-accent not-disabled:hover:underline",
+        primary: "border-transparent bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 " \
+                 "not-disabled:active:translate-y-px not-disabled:active:shadow-none motion-reduce:not-disabled:active:translate-y-0",
+        secondary: "border-field-line bg-accent-tint text-accent not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2",
+        tertiary: "border-transparent bg-transparent text-accent not-disabled:hover:bg-accent-press not-disabled:hover:underline",
         # Solid red: a dialog's destructive confirm only. `on-danger` is the
         # token for the words on it (white in light, near-black in dark).
-        danger: "bg-danger text-on-danger not-disabled:hover:opacity-90",
-        # The trigger for a destructive action (spec §7): sunken, red words.
-        danger_text: "bg-sunken text-danger-ink not-disabled:hover:shadow-1"
+        danger: "border-transparent bg-danger text-on-danger not-disabled:hover:opacity-90",
+        # The trigger for a destructive action: sunken, red words.
+        danger_text: "border-field-line bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
       }.freeze
 
-      # Every variant carries `border border-transparent` at rest, so that no
-      # state changes the size (a button script-toggled disabled, the save
-      # bar's Save). DISABLED is one look for every variant (D1): sunken, meta
-      # words, no shadow, no hairline and no opacity, so it can't read as a
+      # A small button's variant: the same, but for the edge, which is the
+      # variant's own ink, and the tertiary, which is underlined at rest
+      # (3px under its words) and thickens its line to 2px under the pointer.
+      # Whole strings, which Tailwind sees.
+      SMALL_VARIANT_CLASSES = VARIANT_CLASSES.merge(
+        secondary: "border-accent bg-accent-tint text-accent not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2",
+        tertiary: "border-transparent bg-transparent text-accent underline underline-offset-3 not-disabled:hover:bg-accent-press not-disabled:hover:decoration-2",
+        danger_text: "border-danger bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
+      ).freeze
+
+      # Every variant carries a 1px `border` at rest, transparent or its edge,
+      # so that no state changes the size (a button script-toggled disabled,
+      # the save bar's Save). DISABLED is one look for every variant: sunken,
+      # meta words, no shadow, no edge and no opacity, so it can't read as a
       # weak primary. A BUSY button (`admin--ui--busy` sets `aria-busy`) is
-      # disabled too but keeps its variant's look beside its spinner.
-      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button border border-transparent font-semibold transition-colors " \
+      # disabled too but keeps its variant's look beside its spinner. The fill
+      # and the lift change over 120ms on `--cs-ease`, and at once under
+      # reduced motion, where the primary's press does not move either (it is
+      # told by its shadow going).
+      COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button border font-semibold " \
+                     "transition-[background-color,box-shadow] duration-120 ease-(--cs-ease) motion-reduce:transition-none " \
                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent " \
-                     "disabled:cursor-not-allowed disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta " \
+                     "disabled:cursor-not-allowed disabled:not-aria-busy:border-transparent disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta " \
                      "disabled:not-aria-busy:shadow-none aria-busy:cursor-progress".freeze
 
       BASE_CLASS = "#{COMMON_CLASS} px-4 py-2".freeze
@@ -61,7 +89,7 @@ module Admin
         VARIANT_CLASSES.fetch(variant) { raise ArgumentError, "unknown button variant #{variant.inspect}" }
         raise ArgumentError, "unknown button size #{size.inspect}" unless %i[regular small].include?(size)
 
-        [ (size == :small ? SMALL_CLASS : BASE_CLASS), VARIANT_CLASSES.fetch(variant) ].join(" ")
+        size == :small ? "#{SMALL_CLASS} #{SMALL_VARIANT_CLASSES.fetch(variant)}" : "#{BASE_CLASS} #{VARIANT_CLASSES.fetch(variant)}"
       end
 
       # `icon:` (a name of the shared icon partial, `admin/shared/icon`) makes

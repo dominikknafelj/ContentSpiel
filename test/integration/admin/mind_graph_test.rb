@@ -243,8 +243,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     element = css_select("[data-controller='admin--mind-graph--graph']").first
     buttons = JSON.parse(element["data-button-classes"])
-    assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:primary]}", buttons["primary"]
-    assert_equal "#{Admin::Ui::ButtonComponent::SMALL_CLASS} #{Admin::Ui::ButtonComponent::VARIANT_CLASSES[:secondary]}", buttons["secondary"]
+    assert_equal Admin::Ui::ButtonComponent.classes(:primary, size: :small), buttons["primary"]
+    assert_equal Admin::Ui::ButtonComponent.classes(:secondary, size: :small), buttons["secondary"]
     assert_equal Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS, JSON.parse(element["data-dot-classes"])
   end
 
