@@ -12,7 +12,8 @@ module Admin
     # names the person beside it or on the element around it, so it is hidden
     # from a screen reader.
     #
-    # `size`: `:md` is 24px with 9px letters, `:sm` 20px with 8px.
+    # `size`: `:lg` is 28px with 11px letters (an activity row's actor, on the
+    # dashboard and in the audit log), `:md` 24px with 9px, `:sm` 20px with 8px.
     # `tone`: `:other` is anybody (sunken, a strong line, ink); `:own` is the
     # viewer in a note (filled ink); `:away` is someone whose tab is hidden or
     # idle (presence handoff 4: no fill, the plain line, meta letters -- never
@@ -21,7 +22,7 @@ module Admin
     # circles that overlap: `:paper` (an editor's header) or `:surface` (the
     # media panel).
     class AvatarComponent < Admin::AdminComponent
-      SIZES = { md: "size-6 text-[9px]", sm: "size-5 text-[8px]" }.freeze
+      SIZES = { lg: "size-7 text-count", md: "size-6 text-[9px]", sm: "size-5 text-[8px]" }.freeze
       TONES = { other: "border border-line-strong bg-sunken text-ink", own: "bg-ink text-paper", away: "border border-line bg-paper text-meta" }.freeze
 
       RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface" }.freeze

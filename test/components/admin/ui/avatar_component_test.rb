@@ -11,6 +11,13 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_no_selector ".ring-2"
   end
 
+  test "lg is 28px with 11px letters" do
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "dw", size: :lg))
+
+    assert_selector "span.rounded-full.font-medium.uppercase.size-7.text-count.border.border-line-strong.bg-sunken.text-ink[aria-hidden=true]", exact_text: "dw"
+    assert_no_selector ".size-6, .text-\\[9px\\]"
+  end
+
   test "the small size, the viewer's own filled tone and the unfilled away tone" do
     render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, tone: :own))
     assert_selector "span.size-5.text-\\[8px\\].bg-ink.text-paper"

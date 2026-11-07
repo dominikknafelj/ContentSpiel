@@ -1028,6 +1028,52 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match PEOPLE_HUE, File.read(Rails.root.join(ICON_CHIP)), "the chip draws the people hue"
   end
 
+  # A circle of a person's letters is `Admin::Ui::AvatarComponent`, so one
+  # person has one size, tone and pair of letters wherever they are drawn. A
+  # hand-built one is a round element whose own line draws letters: upper-case
+  # or a person's initial(s). It is a line heuristic and misses a circle whose
+  # class string is wrapped onto another line, whose letters are written on a
+  # line of their own, or that says neither `uppercase` nor `initial(s)`
+  # (`<%= name[0] %>`).
+  HAND_BUILT_AVATAR = /(?<![\w-])rounded-full(?![\w-]).*(?:(?<![\w-])uppercase(?![\w-])|\binitials?\b)|\binitials?\b.*(?<![\w-])rounded-full(?![\w-])/
+  AVATAR_COMPONENT = "app/components/admin/ui/avatar_component.rb".freeze
+  # The circles still drawn by hand, each with the reason it is not the
+  # component yet. The list may only shrink.
+  HAND_BUILT_AVATAR_ALLOWED = {
+    "app/components/admin/users_screen/list_component.html.erb" => "the users list's one-letter circle, redrawn with the list",
+    # Scripts that build a circle in the browser from the letters the server
+    # sends; the component draws on the server only.
+    "app/javascript/mind_graph/card_notes.js" => "a note's author on the mind graph's card",
+    "app/javascript/controllers/admin/notes/composer_controller.js" => "the mention picker's people"
+  }.freeze
+
+  test "nobody draws a circle of initials but AvatarComponent" do
+    assert_empty design_offences(HAND_BUILT_AVATAR, except: [ AVATAR_COMPONENT, *HAND_BUILT_AVATAR_ALLOWED.keys ]),
+      "a person's circle is Admin::Ui::AvatarComponent, never a hand-built span"
+    assert_match HAND_BUILT_AVATAR, File.read(Rails.root.join(AVATAR_COMPONENT)), "the component no longer matches: the guard looks at nothing"
+  end
+
+  test "every hand-built circle allowed still draws one" do
+    HAND_BUILT_AVATAR_ALLOWED.each_key do |path|
+      assert_match HAND_BUILT_AVATAR, Rails.root.join(path).read, "#{path} no longer draws a circle by hand: drop it from HAND_BUILT_AVATAR_ALLOWED"
+    end
+  end
+
+  test "the hand-built circle pattern matches a span of letters, and not a dot, a chip or the component's render" do
+    [
+      %(<span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sunken text-xs font-semibold text-ink" aria-hidden="true"><%= initial %></span>),
+      %(<span class="size-7 rounded-full uppercase bg-sunken"><%= initials %></span>),
+      %(avatar.className = "flex size-5 items-center rounded-full font-medium uppercase"),
+      %(tag.span(initials, class: "rounded-full bg-ink"))
+    ].each { |sample| assert_match HAND_BUILT_AVATAR, sample }
+    [
+      %(<span aria-hidden="true" class="size-2 rounded-full bg-ok"></span>),
+      %(<%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: :md) %>),
+      %(class_names(TooltipComponent::HOST, "flex-none rounded-full")),
+      %(<span class="rounded-full-ish uppercase">)
+    ].each { |sample| assert_no_match HAND_BUILT_AVATAR, sample }
+  end
+
   test "the icon guards' patterns match a hue utility and the token, and not a word" do
     [ "text-ic-code", "bg-ic-form-bg", "fill-ic-text", "stroke-ic-media", "hover:text-ic-lists", "var(--cs-ic-code)" ].each { |sample| assert_match ICON_HUE, sample }
     [ "magic-text", "text-dim", "bg-sunken", "topic-codes", "--cs-accent", "logic-people" ].each { |sample| assert_no_match ICON_HUE, sample }

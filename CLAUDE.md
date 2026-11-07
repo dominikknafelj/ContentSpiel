@@ -146,6 +146,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 - The status-fill list (`STATUS_FILL_FILES`) holds only `bg-ok`, `bg-warn` and `bg-danger` utilities (and tints): **no guard** for a status colour drawn as `text-`, `border-` or a `var(--cs-ok)` in a stylesheet or a script's string. A file that stops drawing a fill fails the stale-entry test, but the list only shrinks by hand.
 - Which elevation a thing takes (1 a card, the tree column and a hover; 2 the primary at rest; 3 a menu, popover, dialog and toast; 4 what is dragged) is read from `docs/reference/design-system.md`; the guard holds only that a shadow is one of the four tokens. Likewise accent: the selected tree row's bar is a selection and not a marker, and **no guard** keeps a new marker from using accent for something other than "unread and addressed to you".
 - A browser test begins on `visit_editor` or `visit_screen`. **No guard** reads a test for a bare `visit` followed by its own wait; the helpers' tests hold only the helpers.
+- A person's circle of letters is `Admin::Ui::AvatarComponent` (in a feed, through `Admin::Ui::ActorAvatarComponent`); the guard reads one line at a time. **No guard** for a hand-built circle whose class string is wrapped onto another line, whose letters stand on a line of their own, or that writes neither `uppercase` nor `initial(s)` (`<%= name[0] %>`).
 
 **`docs/reference/theming.md`:**
 

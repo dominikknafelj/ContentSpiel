@@ -342,6 +342,7 @@ module Audit
 
       def block_parts(verb)
         noun = (type = block_type) ? "#{type} block" : "block"
+        one = indefinite(noun)
         if @count > 1
           counted = @mixed || !type ? "#{@number} blocks" : "#{@number} #{type} blocks"
           return subject_parts(verb == "created" ? "added #{counted} to " : "edited #{counted} on ")
@@ -351,11 +352,11 @@ module Audit
         if target
           before, after =
             case verb
-            when "created" then [ "added a #{noun} to ", "" ]
-            when "updated" then [ "edited a #{noun} on ", "" ]
-            when "deleted" then [ "deleted a #{noun} from ", "" ]
+            when "created" then [ "added #{one} to ", "" ]
+            when "updated" then [ "edited #{one} on ", "" ]
+            when "deleted" then [ "deleted #{one} from ", "" ]
             when "reordered" then [ "reordered the blocks on ", "" ]
-            when "taken_over" then [ "#{handed_over? ? "handed over" : "took over"} editing a #{noun} on ", "" ]
+            when "taken_over" then [ "#{handed_over? ? "handed over" : "took over"} editing #{one} on ", "" ]
             else CONTENT_VERBS.fetch("translation_confirmed")
             end
           subject_parts(before, after)
@@ -367,6 +368,13 @@ module Audit
           end
         end
       end
+
+      # "an Image block", "a Rich text block": "an" before a vowel letter, "a"
+      # before anything else, read from the label itself, so a gem's type with
+      # a label nothing here knows is spelled by the same rule. It goes by the
+      # letter, not the sound: a label like "Unicode" or "Hour" would read
+      # wrong, and no registered type has one.
+      def indefinite(noun) = noun.match?(/\A[aeiou]/i) ? "an #{noun}" : "a #{noun}"
 
       # A take-over event's actor is whoever called the service: the holder
       # who answered (`answered: true`, they gave it up) or the requester who

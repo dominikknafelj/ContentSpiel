@@ -1,14 +1,14 @@
 module Admin
   module DashboardScreen
-    # One line of "What changed recently": an avatar (round, with the
-    # person's two letters, a token's change included), one sentence --
-    # "<name> published “<title>”", the title a link to the record's editor --
-    # a status chip when the record is not Live, and a relative time. A
+    # One line of "What changed recently": the actor's mark
+    # (`Admin::Ui::ActorAvatarComponent`, the audit log's too), one sentence
+    # -- "<name> published “<title>”", the title a link to the record's
+    # editor -- a status chip when the record is not Live, and a relative time. A
     # coalesced burst of edits shows the time it last extended, with the
     # whole span as its tooltip.
     #
     # A change through a token names the token's *user*, with the user's own
-    # round avatar, and says "via <token name>" beside an MCP chip. The name
+    # avatar, and says "via <token name>" beside an MCP chip. The name
     # is the one recorded on the event (the sentence's actor), escaped like any
     # text; no part of the token's value is ever rendered, and the row does
     # not even carry the token. The wording is the audit log's own
@@ -21,19 +21,6 @@ module Admin
       end
 
       def sentence = row.sentence
-
-      # The circle's letters: the two-letter rule of the name the circle is
-      # named by, drawn upper-case by the template. A user is named by
-      # `PersonName.of` (their name, else the part of the address before the
-      # at sign), as notes and presence name them; a deleted user and System
-      # are the label the row shows. The sentence beside the circle keeps the
-      # full address. The circle is this row's own 28px one, not
-      # `Admin::Ui::AvatarComponent`.
-      def initials
-        actor = sentence.actor
-        name = actor.user ? PersonName.of(actor.user) : Admin::Ui::UserNameComponent.new(user: nil, user_id: actor.user_id).label
-        PersonName.initials(name.to_s)
-      end
 
       def via_token? = sentence.actor.via_label.present?
 
@@ -52,10 +39,6 @@ module Admin
       end
 
       def shown_at = row.span_end || row.at
-
-      def avatar_class
-        "rounded-full bg-sunken text-ink"
-      end
 
       private
 
