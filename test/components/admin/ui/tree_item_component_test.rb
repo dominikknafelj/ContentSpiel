@@ -44,7 +44,7 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     assert_selector "div.admin-tree-row.admin-tree-row--flat"
     assert_no_selector ".admin-tree-row__disclosure"
 
-    render_row(parent: true, flat: true, controls: "tree-children-1")
+    render_row(parent: true, flat: true)
     assert_no_selector ".admin-tree-row__disclosure"
   end
 
@@ -88,7 +88,8 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     end
 
     parts = page.find("div.admin-tree-row").native.element_children.map { |child| child["data-part"] || child["class"].split.first }
-    assert_equal %w[handle admin-tree-row__disclosure admin-tree-row__mark admin-tree-row__title state admin-tree-row__trailing], parts
+    assert_equal %w[handle admin-tree-row__disclosure admin-tree-row__mark admin-tree-row__title admin-tree-row__state admin-tree-row__trailing], parts
+    assert_selector ".admin-tree-row__state > [data-part=state]"
     assert_equal %w[first second], page.all(".admin-tree-row__trailing > span").map { |span| span["data-part"] }
     assert_selector ".admin-tree-row__title[title='About us'] > a[data-tree-focus]", text: "About us"
   end
@@ -100,6 +101,22 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     render_row
     assert_no_selector "[data-tree-path], [data-tree-id]"
     assert_no_selector "div.admin-tree-row__trailing"
+  end
+
+  test "the state stands 6px after the title, so a cut title's ellipsis never touches it" do
+    render_row { |item| item.with_state { %(<span data-part="state"></span>).html_safe } }
+    assert_selector ".admin-tree-row__title + .admin-tree-row__state > [data-part=state]"
+    assert_match(/\.admin-tree-row__state\s*\{[^}]*margin-inline-start:\s*6px;/, stylesheet)
+
+    render_row
+    assert_no_selector ".admin-tree-row__state"
+  end
+
+  test "a parent's disclosure names the list it folds: a parent without controls is refused" do
+    assert_raises(ArgumentError) { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true) }
+    assert_raises(ArgumentError) { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true, controls: "") }
+    assert_nothing_raised { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true, flat: true) }
+    assert_nothing_raised { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true, controls: "tree-children-1") }
   end
 
   test "a screen cannot hand the row a class" do

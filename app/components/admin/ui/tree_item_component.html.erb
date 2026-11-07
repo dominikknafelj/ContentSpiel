@@ -12,7 +12,9 @@
   </span>
   <%# `title`: the whole title, for a row the column cuts short. %>
   <span class="<%= CLASSES[:title] %>" title="<%= whole_title %>"><%= title %></span>
-  <%= state if state? %>
+  <% if state? %>
+    <span class="<%= CLASSES[:state] %>"><%= state %></span>
+  <% end %>
   <% if trailings? %>
     <span class="<%= CLASSES[:trailing] %>"><% trailings.each do |part| %><%= part %><% end %></span>
   <% end %>

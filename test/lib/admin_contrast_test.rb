@@ -105,9 +105,12 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A match is drawn on a row at rest (the chrome), hovered or selected (sunken).
   test "a match's tint keeps the title's ink at 4.5:1 or better in both schemes" do
     each_scheme do |scheme, colour|
-      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint", under: "--cs-chrome"), "a match's title ink on its tint (#{scheme})")
+      %w[--cs-chrome --cs-sunken].each do |ground|
+        assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint", under: ground), "a match's title ink on its tint over #{ground} (#{scheme})")
+      end
     end
   end
 

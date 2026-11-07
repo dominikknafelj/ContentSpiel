@@ -301,6 +301,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-row__mark { flex: none; display: grid; place-items: center; width: var(--cs-tree-mark); height: var(--cs-tree-mark); margin-inline-end: 8px; color: var(--cs-meta); }
 .admin-tree-row__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--cs-t-small); line-height: 1.25rem; font-weight: 400; color: var(--cs-ink); }
 .admin-tree-row--context-only .admin-tree-row__title { color: var(--cs-meta); }
+/* The state dot stands 6px after the title, so a cut title's ellipsis
+   never touches it. */
+.admin-tree-row__state { flex: none; display: inline-flex; align-items: center; margin-inline-start: 6px; }
 .admin-tree-row__trailing { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; }
 .admin-tree-row__count { min-width: 14px; text-align: end; font-size: var(--cs-t-count); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--cs-meta); }
 /* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
@@ -332,11 +335,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    the parent's guide, on the chrome, so it covers the guide while shown. */
 .admin-tree-node__handle { position: absolute; inset-block: 0; inset-inline-start: calc(-1 * var(--cs-tree-step)); width: var(--cs-tree-step); display: grid; place-items: center; border-radius: var(--cs-radius); background: var(--cs-chrome); color: var(--cs-meta); cursor: grab; user-select: none; }
 .admin-tree-node__handle:hover { color: var(--cs-ink); }
-/* Focus is drawn on the row, whichever of its controls holds it (Pages), or
-   on the treeitem's row (the graph's list), whose own outline is none. */
-.admin-tree-row:has(:focus-visible),
-[role="treeitem"]:focus-visible > .admin-tree-row { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
-.admin-tree [role="treeitem"]:focus-visible { outline: none; }
+/* Focus is one ring, on the focused element and never on the row: in
+   Pages the control inside the row that holds it (the title's link, the
+   disclosure, the handle, "+"), in the graph's list the treeitem, its row's
+   one control. The ring is drawn inside the element's own box (-2px), so
+   neither the 28px row nor the column clips it; the selected bar may stand
+   beside it. */
+.admin-tree-row :focus-visible,
+.admin-tree [role="treeitem"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 /* The selected row: `--cs-sunken` and a 3px accent bar on its left edge,
    3:1 on the sunken ground and the chrome in both schemes
    (`admin_contrast_test.rb`). An inset shadow and not a border, so the

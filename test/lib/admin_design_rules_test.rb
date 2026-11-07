@@ -1581,7 +1581,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/pages_screen/tree_node_component.html.erb" => "the Pages rows are not on the shared row yet",
     "app/javascript/mind_graph/node_list.js" => "the graph's list is not on the shared row yet"
   }.freeze
-  TREE_INDENT = /(?<![\w-])(?:[\w-]+:)*(?:ml|pl)-|padding-inline-start|paddingInlineStart/
+  TREE_INDENT = /(?<![\w-])(?:[\w\[\]-]+:)*-?(?:ml|pl|ms|ps)-|(?<![\w-])(?:margin|padding)-(?:left|inline-start)(?![\w-])|\b(?:margin|padding)(?:Left|InlineStart)\b/
   TREE_TINT = /(?<![\w-])(?:[\w\[\]-]+:)*bg-accent-tint(?![\w-])/
 
   # A tree file's text without its comments: ERB's `<%# %>`, Ruby's `#`, and
@@ -1642,8 +1642,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "the tree patterns match an indent and a tint, and not a token, a margin of another side or a comment" do
-    [ "ml-2", "pl-[7px]", "hover:pl-1", "padding-inline-start: 4px", "button.style.paddingInlineStart = x" ].each { |sample| assert_match TREE_INDENT, sample }
-    [ "html-", "mr-2", "pr-1", "url-path", "margin-inline-start: 13px" ].each { |sample| assert_no_match TREE_INDENT, sample }
+    [ "ml-2", "pl-[7px]", "hover:pl-1", "ms-2", "ps-1", "-ml-4", "-pl-1", "-ms-2", "md:-ps-1", "padding-inline-start: 4px", "margin-inline-start: 13px",
+      "margin-left: 4px", "padding-left: 2px", "button.style.paddingInlineStart = x", "el.style.marginInlineStart = x", "el.style.marginLeft = x",
+      "el.style.paddingLeft = x" ].each { |sample| assert_match TREE_INDENT, sample }
+    [ "html-", "mr-2", "pr-1", "me-2", "pe-1", "url-path", "items-center", "steps-2", "margin-inline-end: 8px", "padding-right: 2px",
+      "el.style.marginRight = x", "admin-tree-row__mark" ].each { |sample| assert_no_match TREE_INDENT, sample }
     [ "bg-accent-tint", "aria-[current]:bg-accent-tint" ].each { |sample| assert_match TREE_TINT, sample }
     [ "bg-accent", "text-accent-tint", "bg-accent-tint-strong" ].each { |sample| assert_no_match TREE_TINT, sample }
     Dir.mktmpdir do |dir|
@@ -1653,6 +1656,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
         assert_no_match TREE_INDENT, self.class.without_comments(path), name
       end
     end
+  end
+
+  # One ring, on the focused element: a row never draws an outline from a
+  # focus inside it, which would stand beside the control's own.
+  test "no tree row draws an outline from :has(:focus-visible)" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    from_inside = rules.select { |selectors, body| body.match?(/(?<![\w-])outline(?:-[\w-]+)?:/) && selectors.any? { |selector| selector.match?(/:has\([^)]*:focus/) && selector.include?("admin-tree") } }
+    assert_empty from_inside.map(&:first), "a tree row draws no outline for a focus inside it"
+    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible' ])
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, ring)
+    assert_match(/outline-offset:\s*-2px;/, ring)
+    assert_empty rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
+      "no tree rule takes a focused element's ring away"
   end
 
   test "the tree's rules are one block" do

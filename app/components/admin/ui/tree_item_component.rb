@@ -53,6 +53,7 @@ module Admin
         disclosure: "admin-tree-row__disclosure",
         mark: "admin-tree-row__mark",
         title: "admin-tree-row__title",
+        state: "admin-tree-row__state",
         trailing: "admin-tree-row__trailing",
         count: "admin-tree-row__count",
         reveal: "admin-tree-row__reveal",
@@ -68,7 +69,7 @@ module Admin
       renders_one :mark
       # The link or the label; the component wraps it in the title's box.
       renders_one :title
-      # The state dot, right after the title.
+      # The state dot, 6px after the title, in the state's box.
       renders_one :state
       # Markers, presence, the count and "+", in order, each given with
       # `with_trailing`. The plural name is ViewComponent's: `renders_many
@@ -77,6 +78,7 @@ module Admin
 
       def initialize(id:, title:, parent: false, folded: false, controls: nil, selected: false, context_only: false, flat: false, root: false, path: nil, node_id: nil, data: {})
         raise ArgumentError, "a tree row takes no class from its screen: its look is the .admin-tree block's" if data.key?(:class) || data.key?("class")
+        raise ArgumentError, "a parent's disclosure names the list it folds: give controls:" if parent && !flat && controls.blank?
 
         @id = id
         @whole_title = title
