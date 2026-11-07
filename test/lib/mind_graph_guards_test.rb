@@ -216,8 +216,9 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
   end
 
   # THE MARKS DRAWN IN CSS OUTSIDE THE CANVAS (the card's and a row's type
-  # dot and tag square) are a second drawing of `marks.js`'s: each is held
-  # to the token the canvas draws the same mark in.
+  # dot and tag square, and `ContentTypeDotComponent`'s dots, rings and
+  # unregistered ring) are a second drawing of `marks.js`'s: each is held to
+  # the token the canvas draws the same mark in.
   def utility_token(name) = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read[/^\s*--color-#{Regexp.escape(name)}: var\((--cs-[\w-]+)\);/, 1]
   def function_body(source, name) = source[/^function #{name}\(.*?^\}/m]
 
@@ -233,9 +234,13 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     assert_equal tokens_read.fetch(retired_key), utility_token(retired_border), "a retired type's ring is border-#{retired_border}, the canvas draws it in theme.#{retired_key}"
 
     assert_includes script("theme.js"), "read(`--cs-cat-${index + 1}`)", "theme.categories[i] is --cs-cat-(i + 1)"
-    Admin::Ui::ContentTypeDotComponent::FILLED.each_with_index do |utility, index|
-      assert_equal "bg-cat-#{index + 1}", utility
+    dots = Admin::Ui::ContentTypeDotComponent
+    dots::FILLED.zip(dots::RINGS).each_with_index do |(fill, ring), index|
+      assert_equal "bg-cat-#{index + 1}", fill, "slot #{index + 1}'s dot is theme.categories[#{index}]"
+      assert_equal "border border-cat-#{index + 1}", ring, "slot #{index + 7}'s ring is drawn in theme.categories[#{index}]"
       assert_equal "--cs-cat-#{index + 1}", utility_token("cat-#{index + 1}")
     end
+    component_retired = Rails.root.join("app/components/admin/ui/content_type_dot_component.rb").read[/def mark = .*: "border border-([\w-]+)"/, 1]
+    assert_equal tokens_read.fetch(retired_key), utility_token(component_retired), "the component's unregistered type is border-#{component_retired}, the canvas draws it in theme.#{retired_key}"
   end
 end

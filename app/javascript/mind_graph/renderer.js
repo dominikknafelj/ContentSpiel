@@ -27,9 +27,10 @@
 //   at the mark's top-right. It is drawn with the node, at the node's
 //   strength, whatever else the node is.
 // - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's):
-//   the count in a small badge, in the count's sans, on the mark's top-LEFT corner, opposite
-//   the pin, so a node can carry both: the badge keeps its right edge where
-//   it is and grows to the LEFT with its text, away from the pin. A card's
+//   the count in a small badge, in the count's sans, on the mark's top-LEFT
+//   corner, opposite the pin, so a node can carry both: the badge keeps its
+//   right edge where it is and grows to the LEFT with its text, away from
+//   the pin. A card's
 //   badge stands OUTSIDE it, over whatever it lands on, on a 2px ring of the
 //   ground (`marks.js`, `notesPill`). Not a ring:
 //   a ring means hovered, selected or focused. Drawn after the labels, at
@@ -243,8 +244,9 @@ function drawPin(context, theme, x, y, corner) {
 
 // A neutral pill, like the count badges of the lists: surface, a line, ink
 // (handoff: `bg-surface border-line-strong text-ink`), whatever the viewer
-// has read. The count is the sans (`theme.countFont`, as `text-count`). Never the only cue: the node's card says the count in words.
-// More than ninety-nine reads "99+". It stands on a ring of the canvas's
+// has read. The count is the sans (`theme.countFont`, as `text-count`).
+// Never the only cue: the node's card says the count in words. More than
+// ninety-nine reads "99+". It stands on a ring of the canvas's
 // ground (`NOTES_RING`), which is what lets it cover a neighbour cleanly.
 //
 // THE RIGHT EDGE IS FIXED and the pill grows to the left (`marks.js`): the

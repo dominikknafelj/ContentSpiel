@@ -70,7 +70,7 @@
      written as `rgba()`: a canvas takes that, and not `color-mix()`. */
   --cs-graph-page: var(--cs-ink);
   --cs-graph-tag: var(--cs-ic-structure);
-  --cs-graph-line-tree: rgba(74,79,90,0.7);       /* dim */
+  --cs-graph-line-tree: rgba(74,79,90,0.71);      /* dim */
   --cs-graph-line-related: rgba(23,25,31,0.55);   /* ink */
   --cs-graph-line-tag: rgba(90,96,112,0.8);       /* meta */
   --cs-graph-line-lists: var(--cs-dim);
@@ -170,7 +170,7 @@
   --cs-graph-page: var(--cs-dim);
   --cs-graph-tag: var(--cs-ic-structure);
   --cs-graph-line-tree: rgba(176,182,196,0.7);    /* dim */
-  --cs-graph-line-related: rgba(227,229,236,0.5); /* ink */
+  --cs-graph-line-related: rgba(227,229,236,0.51); /* ink */
   --cs-graph-line-tag: rgba(156,162,178,0.8);     /* meta */
   --cs-graph-line-lists: var(--cs-dim);
   --cs-graph-line-brings: var(--cs-line);
