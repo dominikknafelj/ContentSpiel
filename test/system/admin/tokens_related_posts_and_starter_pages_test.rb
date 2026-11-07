@@ -4,8 +4,8 @@ require "application_system_test_case"
 # file: the token reveal's copy button (and its visible select-the-text
 # fallback), the related-posts picker saving through the post form's own
 # autosave, and "Create starter pages" refreshing the tree. (The mind graph's
-# tests are in `test/system/admin/mind_graph_test.rb` and
-# `mind_graph_modules_test.rb`.)
+# tests are in `test/system/admin/mind_graph_*_test.rb`, the base they share in
+# `test/support/mind_graph_system_test_case.rb`.)
 class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
