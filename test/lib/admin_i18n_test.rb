@@ -43,8 +43,10 @@ require "ripper"
 #   (b) no call to a method that makes English: `humanize titleize pluralize
 #   to_sentence time_ago_in_words distance_of_time_in_words number_to_human*
 #   strftime to_fs to_formatted_s` (use `I18n.l`, `t` with `count`).
-#   Excluded: comments (the lexer never reports them) and a line that starts
-#   `raise` (a message for a developer).
+#   Excluded: comments (the lexer never reports them), a line that starts
+#   `raise` (a message for a developer) and the arguments of a component's
+#   `contract(...)` declaration (`ComponentContract`: read by the tests
+#   alone, never drawn).
 # - JavaScript: (a) no string literal that reads as a sentence: a capitalised
 #   word (with its apostrophe) then a lower-case word, `${` or an opening quote
 #   ("Couldn't save", "Create ${x} “..."), an all-capitals phrase ("NOT
@@ -454,7 +456,20 @@ class AdminI18nTest < ActiveSupport::TestCase
   # which carry an ERB marker.
   def ruby_offences(source, first_line: 1, ok_lines: [])
     lines = source.lines
+    # The parentheses still open in a `contract(` call, while inside one.
+    contract_depth = nil
     Ripper.lex(source).filter_map do |(line, _column), type, text|
+      if contract_depth.nil? && type == :on_ident && text == "contract" && lines[line - 1].to_s.strip.start_with?("contract(")
+        contract_depth = 0
+        next
+      end
+      unless contract_depth.nil?
+        contract_depth += 1 if type == :on_lparen
+        contract_depth -= 1 if type == :on_rparen
+        contract_depth = nil if contract_depth.zero? && type == :on_rparen
+        next
+      end
+
       reported = nil
       if type == :on_tstring_content && copy?(text)
         reported = text.strip.inspect
@@ -647,6 +662,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ "1: call to pluralize" ], ruby_offences(%(pluralize(n, "post")\n))
     assert_empty ruby_offences(%(# label = "Cancel"\n))
     assert_empty ruby_offences(%(raise ArgumentError, "Unknown thing"\n))
+    assert_equal [ %(4: "Cancel") ], ruby_offences(%(contract(\n  limits: [ "It does not (yet) draw this." ]\n)\nlabel = "Cancel"\n)),
+      "a contract's sentences are not copy, and what follows it is read again"
     assert_empty ruby_offences(%(x = "Cancel" # i18n-ok: a product name, never translated\n))
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok: no\n)), "a reason under ten characters does not count"
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok\n))

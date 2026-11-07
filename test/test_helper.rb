@@ -18,7 +18,7 @@ if ENV["COVERAGE"].present? && ENV["COVERAGE"] != "0"
 end
 
 # THE SUITE DOES NOT DEPEND ON THE SHELL'S SITE ADDRESS. Someone who has
-# `PUBLIC_HOST` (or its old name) exported, as the hosting documents tell a
+# `PUBLIC_HOST` exported, as the hosting documents tell a
 # person to try locally, would otherwise run every test under that address:
 # head tags, the sitemap and MCP's URLs carry it, and five tests that expect
 # "no address configured" failed that way. Removed here, once, before the
@@ -45,6 +45,7 @@ require_relative "support/component_test_helper"
 require_relative "support/test_types"
 require_relative "support/gallery_album"
 require_relative "support/block_samples"
+require_relative "support/ui_contract"
 require_relative "support/built_in_block_types"
 require_relative "support/contract_ledger"
 require_relative "support/site_address_helper"
@@ -106,7 +107,7 @@ module ActiveSupport
     # as one and fail.
     fixtures(*Dir[Rails.root.join("test/fixtures/**/*.yml")].map { |file| file.delete_prefix("#{Rails.root.join("test/fixtures")}/").delete_suffix(".yml") }.reject { |name| name.start_with?("themes/") }.sort)
 
-    # Builds pages/posts through the write-path services (spec §11) instead
+    # Builds pages/posts through the write-path services instead
     # of fixtures -- see test/support/content_helper.rb.
     include ContentHelper
 
@@ -137,16 +138,16 @@ module ActiveSupport
     # test/support/theme_test_helper.rb.
     include ThemeTestHelper
 
-    # Setup.required? memoizes "setup is done" per process (spec §6.1), reset
+    # Setup.required? memoizes "setup is done" per process, reset
     # by SiteSetting after every commit -- but a test that clears the table
     # with `delete_all`/`destroy_all` bypasses callbacks entirely, and the
     # memo would otherwise leak a stale "done" from whichever earlier test in
-    # this worker last completed setup. Resetting before every test, the way
-    # the spec calls for, keeps that leak from ever being observable.
+    # this worker last completed setup. Resetting before every test keeps
+    # that leak from ever being observable.
     setup { Setup.reset! }
 
     # Runs the block as `actor` (a User or ApiToken) on `channel`, the way
-    # a CS Studio request would (access-control design spec §3.3) -- so a
+    # a CS Studio request would -- so a
     # service called inside it is authorized and audited for that actor.
     # Outside one, tests run with a nil actor and nil channel, which the
     # checker trusts like the console; tests about permissions say who's
