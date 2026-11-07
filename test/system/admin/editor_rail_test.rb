@@ -2,13 +2,14 @@ require "application_system_test_case"
 
 # The editors' rail (`admin/pages/show` and `Admin::EditorScreen::PostFormComponent`,
 # `.admin-rail-grid`, `admin--ui--rail`): where the editor area has 1200px, the
-# page settings stand in a 360px rail 28px right of a 900px blocks column, with
+# page settings stand in a 360px rail 28px right of a blocks column that takes
+# the rest, up to 1680px for the whole (`--cs-content-max`), with
 # a Page and a Section tab, and a post's settings in the same rail beside its
 # title, address and body, under the one heading Post; below that the page
 # settings stand above the blocks and a post's settings below its main
 # column, at 760px, as one column. The editor area is the container, so a
 # folded tree docks the rail at a window that would not otherwise. Each rule that overrides a base rule
-# while docked (the 900px column over 760px, the forced-open settings over a
+# while docked (the grown column over 760px, the forced-open settings over a
 # folded `<details>`) is measured at both widths here.
 class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   WIDE = 1900
@@ -45,7 +46,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   PAGE_TAB = "#editor-grid-tab-page".freeze
   SECTION_TAB = "#editor-grid-tab-section".freeze
 
-  test "at a wide window the rail stands right of a 900px blocks column, left-aligned, 28px apart" do
+  test "at a wide window the rail stands right of a blocks column that takes the rest, left-aligned, 28px apart" do
     at_window(WIDE) do
       visit_editor(@page)
       assert_docked
@@ -54,12 +55,230 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       blocks = box(".admin-content-blocks")
       rail = box("#editor-grid-panel-page")
       assert_in_delta area[0], blocks[0], 1, "the blocks column starts at the content's left edge"
-      assert_in_delta 900, blocks[2] - blocks[0], 1
       assert_in_delta blocks[2] + 28, rail[0], 1, "the rail stands 28px right of the blocks"
       assert_in_delta 360, rail[2] - rail[0], 1
+      assert_operator area[2] - area[0], :<, 1680, "the window leaves the editor less than the content max"
+      assert_in_delta area[2], rail[2], 1, "the blocks column takes what the rail leaves"
       assert_in_delta blocks[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the blocks start at one height"
       # Page and Section, then the registered Notes tab (`editor.rail.tabs`).
       assert_equal %w[editor-grid-tab-page editor-grid-tab-section editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
+    end
+  end
+
+  # The figures of the one rule for spare width. The page editor with the
+  # tree folded: the
+  # editor area is the window less the sidebar (240), the strip (44), the
+  # scrollbar's gutter and `<main>`'s padding (48), so a window of 1600px of
+  # content is 1600 + 347 wide. Running text keeps its measure (72ch, about
+  # 650px in Archivo at 16px), the Code field the code measure (100ch), and
+  # an image field and a table take the column.
+  def content_window(content) = content + 240 + 44 + 48 + page.evaluate_script("Math.round(window.innerWidth - document.documentElement.getBoundingClientRect().width)")
+
+  def wide_blocks
+    @text = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    @code = @page.content_blocks.create!(block_type: "code", position: 2)
+    @table = @page.content_blocks.create!(block_type: "table", position: 3)
+    @image = @page.content_blocks.create!(block_type: "image", position: 4)
+  end
+
+  def fold_tree = page.execute_script("window.localStorage.setItem('cs-tree-folded', '1')")
+
+  def in_block(block, selector) = "[data-block-id='#{block.id}'] #{selector}"
+
+  test "at a 1600px content width the blocks column is 1212px, a rich-text box about 650px and a table the column's width" do
+    wide_blocks
+    visit_editor(@page)
+    fold_tree
+    at_window(content_window(1600)) do
+      visit_editor(@page)
+      assert_docked
+
+      area = box("#editing")
+      assert_in_delta 1600, area[2] - area[0], 1
+      assert_in_delta 1212, width_of(".admin-content-blocks"), 1
+      assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
+      assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
+
+      card = box("[data-block-id='#{@text.id}']")
+      assert_in_delta 1212, card[2] - card[0], 1, "a block card takes the column"
+      text = width_of(in_block(@text, ".admin-rich-text-box"))
+      assert_in_delta 650, text, 30, "a rich-text box keeps the text measure"
+      assert_in_delta text, width_of(in_block(@text, ".admin-column > p")), 1, "its label takes the same cap"
+      code = width_of(in_block(@code, ".admin-code-input"))
+      assert_operator code, :>, text + 200, "the Code field is wider than running text"
+      assert_operator code, :<, 1000, "and keeps the code measure"
+      inner = card[2] - card[0] - 24
+      assert_in_delta inner, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table takes the column"
+      assert_in_delta inner, width_of(in_block(@image, "[data-controller~='admin--media--field']")), 2, "an image field takes the column"
+      section = box(".admin-section-card")
+      assert_in_delta 1212, section[2] - section[0], 1, "a section's frame takes the column"
+    end
+  end
+
+  test "at a 2400px content width the editor stops at the content max, at the left edge" do
+    wide_blocks
+    visit_editor(@page)
+    fold_tree
+    at_window(content_window(2400)) do
+      visit_editor(@page)
+      assert_docked
+
+      area = box("#editing")
+      grid = box("#editor-grid")
+      assert_in_delta area[0], grid[0], 1, "the composition stands at the content's left edge"
+      assert_in_delta 1680, grid[2] - grid[0], 1, "and stops at the content max"
+      assert_in_delta 1292, width_of(".admin-content-blocks"), 1
+      assert_in_delta grid[2], box("#editor-grid-panel-page")[2], 1, "the rail ends the composition"
+      assert_in_delta 650, width_of(in_block(@text, ".admin-rich-text-box")), 30, "running text keeps its measure"
+      assert_in_delta 1292 - 24, width_of(in_block(@table, ".admin-rich-text-box")), 2, "a table takes the column"
+    end
+  end
+
+  # The docked rail stays in view down a long page. Its ground is
+  # the grid's `::before`, measured through its computed height.
+  def ground_height = page.evaluate_script("parseFloat(getComputedStyle(document.getElementById('editor-grid'), '::before').height)")
+
+  def header_bottom = box(".admin-editor-header")[3]
+
+  def long_page(count = 30)
+    count.times { |index| @page.content_blocks.create!(block_type: "rich_text", position: index + 1) }
+  end
+
+  def scroll_to_end = page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+
+  # Whether the element is drawn where it stands: the point at its centre
+  # hits it, or something inside it, and is inside the window.
+  def hit?(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.querySelector(#{selector.to_json})
+        const box = element.getBoundingClientRect()
+        const x = box.left + box.width / 2, y = box.top + box.height / 2
+        if (y < 0 || y > window.innerHeight) return false
+        const top = document.elementFromPoint(x, y)
+        return element === top || element.contains(top)
+      })()
+    JS
+  end
+
+  test "scrolled to the last block of a long page, the rail's tabs and its panel are in view under the header and its ground is no taller than they are" do
+    long_page
+    at_window(WIDE) do
+      visit_editor(@page)
+      assert_docked
+      scroll_to_end
+      assert_eventually(message: "the page did not scroll") { page.evaluate_script("window.scrollY") > 1000 }
+
+      tabs = box(".admin-rail__tabs")
+      panel = box("#editor-grid-panel-page")
+      assert_in_delta header_bottom + 24, tabs[1], 1, "the tabs stick under the editor's header, the header's gap below it"
+      assert_in_delta tabs[3], panel[1], 1, "the panel sticks under the tabs"
+      assert_operator panel[3], :<=, page.evaluate_script("window.innerHeight"), "the panel ends inside the window"
+      assert_operator ground_height, :<=, (panel[3] - tabs[1]) + 1, "the ground is no taller than the tabs and the panel"
+      assert hit?("#editor-grid-tab-page"), "the Page tab can be pressed down the page"
+      assert_operator box(".admin-content-blocks")[3] - box(".admin-content-blocks")[1], :>, ground_height * 2, "the blocks column is far taller than the rail"
+    end
+  end
+
+  test "a panel taller than the window scrolls inside the rail" do
+    at_window(WIDE, height: 520) do
+      visit_editor(@page)
+      assert_docked
+      panel = "#editor-grid-panel-page"
+      sizes = page.evaluate_script("(() => { const panel = document.querySelector(#{panel.to_json}); return [panel.scrollHeight, panel.clientHeight] })()")
+      assert_operator sizes[0], :>, sizes[1], "the Page panel is taller than the room under the tabs"
+      assert_in_delta 520 - 22, box(panel)[3], 1, "before the page scrolls the panel ends --cs-sp-4 above the window's bottom"
+      page.execute_script("document.querySelector(#{panel.to_json}).scrollTop = 10000")
+      assert_operator page.evaluate_script("document.querySelector(#{panel.to_json}).scrollTop"), :>, 0, "the panel scrolls inside itself"
+      assert_equal 0, page.evaluate_script("window.scrollY"), "and the page does not move"
+    end
+  end
+
+  # A menu inside a panel that scrolls is drawn over what is below it, not
+  # cut at the panel's edge: the section's layout menu, opened in the
+  # Section panel, whose settings are shorter than the menu.
+  def layout_menu(where) = "#{where} [data-controller~='admin--ui--menu']"
+
+  def open_layout_menu(menu)
+    find("#section-#{@section.id}-words button[data-admin--editor--section-field-param='layout']").click
+    find("#{menu} button[aria-haspopup]").click
+    assert_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+  end
+
+  # The gap between a menu and its button, as the menu's own classes draw it.
+  def menu_gap(menu) = box("#{menu} [data-admin--ui--menu-target=panel]")[1] - box("#{menu} button[aria-haspopup]")[3]
+
+  test "a menu in a scrolling rail panel opens whole, over what is below the panel" do
+    outside = nil
+    at_window(NARROW) do
+      visit_editor(@page)
+      assert_docked(false)
+      open_layout_menu(layout_menu("#section-#{@section.id}-settings"))
+      outside = menu_gap(layout_menu("#section-#{@section.id}-settings"))
+    end
+    at_window(WIDE, height: 600) do
+      visit_editor(@page)
+      assert_docked
+      menu = layout_menu("#editor-grid-panel-section")
+      open_layout_menu(menu)
+      items = "#{menu} [data-admin--ui--menu-target=panel] [role=menuitem]"
+      assert_operator box(items.sub("[role=menuitem]", ""))[3], :>, box("#editor-grid-panel-section")[3], "the menu reaches past the panel's bottom"
+      page.execute_script("document.querySelectorAll(#{items.to_json}).forEach((item, index, all) => { if (index === all.length - 1) item.id = 'last-layout' })")
+      assert hit?("#last-layout"), "the menu's last item is drawn over what is below the panel"
+      menu_box = box("#{menu} [data-admin--ui--menu-target=panel]")
+      button_box = box("#{menu} button[aria-haspopup]")
+      assert_in_delta outside, menu_box[1] - button_box[3], 1, "the menu hangs as far under its button as it does outside a panel"
+      assert_in_delta button_box[0], menu_box[0], 1, "at its button's left edge"
+      page.execute_script("document.querySelector('#editor-grid-panel-section').scrollTop = 30")
+      assert_in_delta outside, menu_gap(menu), 1, "and follows it as the panel scrolls"
+      find("#{menu} button[aria-haspopup]").click
+      assert_no_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      assert_equal "", page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).style.position"), "closed, the menu is the absolute box its classes draw"
+    end
+  end
+
+  # A window so short that the Section panel scrolls, and that the layout
+  # menu has no room under its button: it hangs above it.
+  test "a floated menu closes when its anchor scrolls out of the panel" do
+    at_window(WIDE, height: 360) do
+      visit_editor(@page)
+      assert_docked
+      panel = "#editor-grid-panel-section"
+      menu = layout_menu(panel)
+      open_layout_menu(menu)
+      assert page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).contains(document.activeElement)"), "the focus is in the menu"
+      assert_in_delta box(menu)[1] - 4, box("#{menu} [data-admin--ui--menu-target=panel]")[3], 1, "with no room below, the menu hangs above it, its own margin away"
+      assert_operator page.evaluate_script("(() => { const p = document.querySelector('#{panel}'); return p.scrollHeight - p.clientHeight })()"), :>, 40, "the Section panel scrolls"
+      page.execute_script("document.querySelector('#{panel}').scrollTop = 10000")
+      assert_no_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      assert_equal "false", find("#{menu} button[aria-haspopup]", visible: :all)["aria-expanded"]
+      assert page.evaluate_script("document.activeElement === document.querySelector(#{(menu + " button[aria-haspopup]").to_json})"), "the focus is back on the menu's button"
+      assert_equal "", page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).style.position")
+    end
+  end
+
+  # A tall window, so the Post panel is shorter than the room it may take
+  # and its last field, Related posts, stands near its bottom edge, with the
+  # window below.
+  test "the related posts' suggestions in a scrolling post panel open whole" do
+    %w[Alpha Beta Gamma Delta Epsilon].each { |name| create_post(title: "Linked #{name}") }
+    at_window(WIDE, height: 1400) do
+      open_post
+      assert_docked
+      assert_equal "auto", page.evaluate_script("getComputedStyle(document.querySelector('#{POST_PANEL}')).overflowY")
+      field = find("#post-related_post_ids")
+      field.send_keys("Linked")
+      listbox = "#post-related_post_ids-listbox"
+      assert_selector "#{listbox} [role=option]", minimum: 5
+      assert_operator box(listbox)[3], :>, box(POST_PANEL)[3], "the suggestions reach past the panel's bottom"
+      assert_operator box(listbox)[3], :<, 1400, "and stay inside the window"
+      page.execute_script("document.querySelectorAll('#{listbox} [role=option]').forEach((option, index, all) => { if (index === all.length - 1) option.id = 'last-suggestion' })")
+      assert hit?("#last-suggestion"), "the last suggestion is drawn over what is below the panel"
+      wrapper = page.evaluate_script("(() => { const box = document.querySelector('#{listbox}').parentElement.getBoundingClientRect(); return [box.left, box.bottom, box.width] })()")
+      assert_in_delta wrapper[0], box(listbox)[0], 1, "under the field, at its left edge"
+      assert_in_delta wrapper[2], box(listbox)[2] - box(listbox)[0], 1, "as wide as the field"
+      field.send_keys(:escape)
+      assert_no_selector listbox, visible: :visible
     end
   end
 
@@ -113,8 +332,9 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       find("button[aria-label='Hide page tree']").click
       assert_docked
-      # The room left of a 360px rail, up to 900px.
+      # The room left of a 360px rail.
       assert_operator width_of(".admin-content-blocks"), :>, 760
+      assert_in_delta box("#editing")[2], box("#editor-grid-panel-page")[2], 1, "the rail ends at the editor's right edge"
       assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
       assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
 
@@ -321,9 +541,9 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       main = box(POST_MAIN)
       rail = box(POST_PANEL)
       assert_in_delta area[0], main[0], 1, "the main column starts at the content's left edge"
-      assert_in_delta 900, main[2] - main[0], 1
       assert_in_delta main[2] + 28, rail[0], 1, "the rail stands 28px right of the main column"
       assert_in_delta 360, rail[2] - rail[0], 1
+      assert_in_delta area[2], rail[2], 1, "the main column takes what the rail leaves"
       assert_in_delta main[1], box(".admin-rail__tabs")[1], 1, "the rail's tabs and the main column start at one height"
 
       listen_to_post_form

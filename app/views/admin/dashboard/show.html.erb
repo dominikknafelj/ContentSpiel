@@ -84,7 +84,7 @@
           id: "dashboard-going-live-next", empty: t(".going_live.empty"), link: posts_list.call("scheduled", t(".going_live.all"))) do |card| %>
       <% if can?("posts.read") %>
         <% card.with_empty_action do %>
-          <%= link_to t(".going_live.drafts_html", arrow:), admin_posts_path(scope: "drafts", **admin_url_options), class: "text-ink underline", data: { turbo_frame: "_top" } %>
+          <%= link_to t(".going_live.drafts_html", arrow:), admin_posts_path(scope: "drafts", **admin_url_options), class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), data: { turbo_frame: "_top" } %>
         <% end %>
       <% end %>
       <% going_live.each do |record| %>
@@ -102,7 +102,7 @@
         <% end %>
       <% end %>
       <% if can?("audit.view") %>
-        <%= link_to t(".activity.audit_log_html", arrow:), admin_audit_events_path(**admin_url_options), class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
+        <%= link_to t(".activity.audit_log_html", arrow:), admin_audit_events_path(**admin_url_options), class: "self-end #{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)}", data: { turbo_frame: "_top" } %>
       <% end %>
     </div>
   </aside>

@@ -143,12 +143,33 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
       assert_in_delta boxes["main"]["right"] + 28, boxes["rail"]["left"], 1, "the rail stands --cs-rail-gap right of the main column"
       assert_in_delta 360, boxes["rail"]["width"], 1, "the rail is --cs-rail-width"
       assert_in_delta boxes["dashboard"]["left"], boxes["main"]["left"], 1, "the main column starts at the dashboard's left edge"
-      assert_operator boxes["dashboard"]["right"] - boxes["rail"]["right"], :>, 2, "spare width falls right of the rail"
+      assert_operator boxes["dashboard"]["width"], :<, 1680, "the window leaves the dashboard less than the content max"
+      assert_in_delta boxes["dashboard"]["right"], boxes["rail"]["right"], 1, "the main column fills to the rail"
       assert_in_delta boxes["rail"]["right"], boxes["head"]["right"], 1, "the heading row ends where the rail does"
       assert_equal boxes["rail_token"], boxes["rail_background"]
       assert_equal 3, boxes["panel_shadows"].size, "Publishing on its own, Languages behind and What changed recently"
       assert_equal [ "none" ], boxes["panel_shadows"].uniq, "no card on the rail"
       assert_equal "rgba(0, 0, 0, 0)", boxes["head_background"], "no band on the rail"
+    end
+  end
+
+  # The draft tiles' columns, counted from the computed grid.
+  def tile_columns = page.evaluate_script("getComputedStyle(document.querySelector('.admin-draft-tiles')).gridTemplateColumns.split(' ').length")
+
+  test "at 2400px the dashboard stops at the content max, at the left edge, with four draft tiles a row" do
+    fill_dashboard
+    sign_in_via_form(users(:one))
+    at_window(2400) do
+      visit_screen admin_root_path
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      assert_in_delta boxes["dashboard"]["left"], boxes["main"]["left"], 1, "the main column starts at the dashboard's left edge"
+      assert_in_delta 1680, boxes["rail"]["right"] - boxes["main"]["left"], 1, "the composition stops at the content max"
+      assert_in_delta 1292, boxes["main"]["width"], 1
+      assert_in_delta 360, boxes["rail"]["width"], 1
+      assert_operator boxes["dashboard"]["right"] - boxes["rail"]["right"], :>, 300, "the spare width falls right of the rail"
+      assert_in_delta boxes["rail"]["right"], boxes["head"]["right"], 1, "the heading row stops with the composition"
+      assert_equal 4, tile_columns, "the tiles take four columns from 64rem of the main column"
     end
   end
 

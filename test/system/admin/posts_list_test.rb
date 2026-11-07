@@ -250,8 +250,36 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
       assert_in_delta boxes["container"]["left"], boxes["list"]["left"], 1, "the list starts at the content's left edge"
       assert_in_delta boxes["bar"]["bottom"] + 16, boxes["list"]["top"], 1, "the rail's height goes to the list's row, not the bar's"
       assert_in_delta boxes["panel"]["right"], boxes["head"]["right"], 1, "the heading row ends where the rail does"
+      assert_operator boxes["container"]["width"], :<, 1680, "the window leaves the list less than the content max"
+      assert_in_delta boxes["container"]["right"], boxes["panel"]["right"], 1, "the list fills to the rail"
       assert_equal boxes["rail_token"], boxes["panel_background"]
       assert_operator legend_width, :>, 1, "the legend is shown on the rail"
+    end
+  end
+
+  test "at 2400px the list stops at the content max, at the left edge" do
+    at_window(2400) do
+      visit_screen admin_posts_path
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      assert_in_delta boxes["container"]["left"], boxes["list"]["left"], 1, "the list starts at the content's left edge"
+      assert_in_delta 1680, boxes["panel"]["right"] - boxes["list"]["left"], 1, "the composition stops at the content max"
+      assert_in_delta 1292, boxes["list"]["width"], 1
+      assert_operator boxes["container"]["right"] - boxes["panel"]["right"], :>, 300, "the spare width falls right of the rail"
+      assert_in_delta boxes["panel"]["right"], boxes["head"]["right"], 1, "the heading row stops with the composition"
+    end
+  end
+
+  test "scrolled down a long list, the docked filters stay in view under the window's top" do
+    30.times { |index| create_post(title: "Long list #{index}", published: false) }
+    at_window(1600, height: 600) do
+      visit_screen admin_posts_path
+      assert docked?(layout), layout.inspect
+      page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+      assert_eventually(message: "the list did not scroll") { page.evaluate_script("window.scrollY") > 300 }
+      panel = layout["panel"]
+      assert_in_delta 22, panel["top"], 1, "the rail sticks --cs-sp-4 under the window's top"
+      assert_operator panel["bottom"], :<=, 600 - 22 + 1, "and ends inside the window"
     end
   end
 

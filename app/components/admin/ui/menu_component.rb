@@ -64,7 +64,7 @@ module Admin
 
       attr_reader :label, :align, :button_class, :aria_label, :close_on_select, :list, :list_label, :panel_id, :columns, :heading
 
-      ACTIONS = "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown".freeze
+      ACTIONS = "click@window->admin--ui--menu#closeOutside keydown->admin--ui--menu#keydown turbo:before-cache@document->admin--ui--menu#cache".freeze
       LIST_ACTIONS = "mouseleave->admin--ui--menu#leave focusout->admin--ui--menu#leave".freeze
 
       def actions = list ? "#{ACTIONS} #{LIST_ACTIONS}" : ACTIONS

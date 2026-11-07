@@ -21,14 +21,15 @@ const LABEL_CLASS = "block text-label text-meta"
 // `BUTTON_CLASS` followed by a variant is `Admin::Ui::ButtonComponent.classes(
 // variant, size: :small)`, and `INPUT_CLASS` is `SetupHelper#setup_input_class`,
 // string for string (`test/lib/admin_design_rules_test.rb` compares them). A
-// raised accent primary, a tinted secondary, a tertiary for Cancel, and
-// danger_text for "Remove link" (not a confirm).
-const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button-sm border border-transparent font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta disabled:not-aria-busy:shadow-none aria-busy:cursor-progress px-2 py-0.5 text-sm"
+// raised accent primary, a tinted secondary inside its accent edge, an
+// underlined tertiary for Cancel, and danger_text for "Remove link" (not a
+// confirm).
+const BUTTON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-button-sm border font-semibold transition-[background-color,box-shadow] duration-120 ease-(--cs-ease) motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:not-aria-busy:border-transparent disabled:not-aria-busy:bg-sunken disabled:not-aria-busy:text-meta disabled:not-aria-busy:shadow-none aria-busy:cursor-progress px-2 py-0.5 text-sm"
 const BUTTON_VARIANTS = {
-  primary: "bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 not-disabled:active:translate-y-px not-disabled:active:shadow-none",
-  secondary: "bg-accent-tint text-accent not-disabled:hover:shadow-1",
-  tertiary: "bg-transparent text-accent not-disabled:hover:underline",
-  danger_text: "bg-sunken text-danger-ink not-disabled:hover:shadow-1"
+  primary: "border-transparent bg-accent text-on-accent shadow-2 not-disabled:hover:bg-accent-hover not-disabled:hover:shadow-3 not-disabled:active:translate-y-px not-disabled:active:shadow-none motion-reduce:not-disabled:active:translate-y-0",
+  secondary: "border-accent bg-accent-tint text-accent not-disabled:hover:bg-accent-press not-disabled:hover:shadow-2",
+  tertiary: "border-transparent bg-transparent text-accent underline underline-offset-3 not-disabled:hover:bg-accent-press not-disabled:hover:decoration-2",
+  danger_text: "border-danger bg-sunken text-danger-ink not-disabled:hover:bg-danger-press not-disabled:hover:shadow-2"
 }
 
 let sequence = 0

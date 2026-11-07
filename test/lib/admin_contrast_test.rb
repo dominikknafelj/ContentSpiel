@@ -245,6 +245,55 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(4.5, colour.("--cs-on-accent"), colour.("--cs-accent-hover"), "the primary hovered (#{scheme})")
       assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the secondary (#{scheme})")
       assert_ratio(4.5, colour.("--cs-on-danger"), colour.("--cs-danger"), "the danger confirm (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-on-danger"), colour.("--cs-danger-hover"), "the danger confirm hovered (#{scheme})")
+    end
+  end
+
+  # The owner's decision of 2026-11-07: a non-primary button's fill is no
+  # shape on any ground (1.00 to 1.26:1), so its edge carries it, measured on
+  # every ground a button stands on. The tokens are read from the classes
+  # the component draws.
+  BUTTON_GROUNDS = %w[--cs-rail --cs-surface --cs-paper --cs-popover].freeze
+
+  def button_token(variant, size, prefix)
+    classes = Admin::Ui::ButtonComponent.classes(variant, size: size)
+    utility_token(classes.split.reject { |name| name.include?(":") }.join(" "), prefix)
+  end
+
+  test "a secondary's and a danger text's edge is 3:1 or better on every ground in both schemes, and a small one's is the variant's ink" do
+    assert_equal "--cs-field-line", button_token(:secondary, :regular, "border")
+    assert_equal "--cs-field-line", button_token(:danger_text, :regular, "border")
+    assert_equal "--cs-accent", button_token(:secondary, :small, "border")
+    assert_equal "--cs-danger", button_token(:danger_text, :small, "border")
+    each_scheme do |scheme, colour|
+      %i[secondary danger_text].product(%i[regular small]).each do |variant, size|
+        edge = button_token(variant, size, "border")
+        BUTTON_GROUNDS.each { |ground| assert_ratio(3.0, colour.(edge), colour.(ground), "#{variant} #{size}'s edge #{edge} on #{ground} (#{scheme})") }
+      end
+      # The small tertiary has no edge: its words, underlined at rest, are its shape.
+      BUTTON_GROUNDS.each { |ground| assert_ratio(4.5, colour.("--cs-accent"), colour.(ground), "a small tertiary's words on #{ground} (#{scheme})") }
+    end
+  end
+
+  # A hover is a stronger fill (and a neutral lift): the fill alone has to be
+  # seen to change, 1.2:1 from the rest it replaces, and its words stay text.
+  test "a hover fill moves 1.2:1 or more from its rest and keeps its words at 4.5:1" do
+    hover_fill = ->(variant) { Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(variant)[/not-disabled:hover:bg-([\w-]+)/, 1].then { |name| "--cs-#{name}" } }
+    assert_equal "--cs-accent-press", hover_fill.(:secondary)
+    assert_equal "--cs-accent-press", hover_fill.(:tertiary)
+    assert_equal "--cs-danger-press", hover_fill.(:danger_text)
+    assert_equal "--cs-danger-hover", hover_fill.(:danger)
+    each_scheme do |scheme, colour|
+      { secondary: "--cs-accent-tint", danger_text: "--cs-sunken", danger: "--cs-danger" }.each do |variant, rest|
+        fill = hover_fill.(variant)
+        assert_equal rest, button_token(variant, :regular, "bg"), "#{variant}'s rest fill"
+        assert_ratio(1.2, colour.(fill), colour.(rest), "#{variant}'s hover fill #{fill} against its rest #{rest} (#{scheme})")
+        assert_ratio(4.5, colour.(button_token(variant, :regular, "text")), colour.(fill), "#{variant}'s words on #{fill} (#{scheme})")
+      end
+      # A tertiary's rest is the ground it stands on; the rail is where the
+      # small ones stand ("Drafts →", "Full audit log →").
+      assert_ratio(1.2, colour.("--cs-accent-press"), colour.("--cs-rail"), "the tertiary's hover fill against the rail (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-press"), "a tertiary's words on its hover fill (#{scheme})")
     end
   end
 

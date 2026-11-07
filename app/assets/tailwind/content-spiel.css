@@ -40,6 +40,9 @@
   --cs-accent: #6236d9;
   --cs-accent-hover: #5831c3;
   --cs-accent-tint: #ece6fd;
+  /* A secondary's and a tertiary's fill under the pointer: a step from the
+     tint (and from the rail) that is seen, with accent words on it. */
+  --cs-accent-press: #d6cbfa;
   --cs-on-accent: #ffffff;
   --cs-ok: oklch(0.52 0.12 150);
   --cs-ok-ink: oklch(0.42 0.11 150);
@@ -48,8 +51,13 @@
   --cs-warn-ink: oklch(0.45 0.11 70);
   --cs-warn-tint: oklch(0.95 0.05 80);
   --cs-danger: oklch(0.53 0.19 25);
+  /* The danger confirm's fill under the pointer, a step from the danger fill
+     with its on-danger words still text on it. */
+  --cs-danger-hover: #a21921;
   --cs-danger-ink: oklch(0.42 0.15 25);
   --cs-danger-tint: oklch(0.96 0.03 25);
+  /* A danger text button's fill under the pointer, a step from sunken. */
+  --cs-danger-press: #efc6c8;
   --cs-ph-a: #dddbd3;
   --cs-ph-b: #c9c7bd;
   --cs-chrome: #ffffff;              /* sidebar / tree column */
@@ -151,6 +159,7 @@
   --cs-accent: #b49cff;
   --cs-accent-hover: #bca6ff;
   --cs-accent-tint: #2c2350;
+  --cs-accent-press: #3d3070;
   --cs-on-accent: #140c2e;
   --cs-ok: oklch(0.70 0.13 150);
   --cs-ok-ink: oklch(0.80 0.12 150);
@@ -159,8 +168,10 @@
   --cs-warn-ink: oklch(0.84 0.11 75);
   --cs-warn-tint: oklch(0.30 0.05 70);
   --cs-danger: oklch(0.68 0.17 25);
+  --cs-danger-hover: #fa8880;
   --cs-danger-ink: oklch(0.80 0.12 25);
   --cs-danger-tint: oklch(0.29 0.06 25);
+  --cs-danger-press: #552b33;
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
   --cs-chrome: #181a21;
@@ -260,12 +271,21 @@
      (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
-  /* The editors' rail where it docks: the blocks column, the rail beside it
-     and the space between them, one left-aligned group. Read by
-     `.admin-rail-grid` in content-spiel.tailwind.css; CS Studio's alone. */
-  --cs-editor-column: 900px;
+  /* A docked composition (the editors' blocks column, the dashboard's main
+     column, a list, each with a rail beside it): the rail, the space
+     between, and the widest the whole may grow, one left-aligned group whose
+     main column takes what the rail leaves. Read by `.admin-rail-grid`,
+     `.admin-dashboard__grid` and `.admin-list-rail__grid` in
+     content-spiel.tailwind.css; CS Studio's alone. */
   --cs-rail-width: 360px;
   --cs-rail-gap: 28px;
+  --cs-content-max: 1680px;
+  /* Inside the editors' grown blocks column, the widest a field of running
+     text draws (its label, well, help and error lines), and the Code field's,
+     whose lines are read whole. Wide blocks (an image, a table, a section's
+     lanes, a group's rows) take the column. */
+  --cs-text-measure: 72ch;
+  --cs-code-measure: 100ch;
   /* THE LAYERS: every z-index in CS Studio is one of these, written as
      `z-index: var(--cs-z-…)` or the utility `z-(--cs-z-…)`
      (`admin_design_rules_test.rb` refuses any other value; `auto` is no

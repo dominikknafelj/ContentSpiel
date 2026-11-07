@@ -196,7 +196,8 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
       open_editor
       assert_docked
       open_notes
-      assert_equal "sticky", computed("#notes-drawer", "position")
+      assert_equal "sticky", computed(NOTES_PANEL, "position"), "docked, the notes stick with their panel"
+      assert_equal "static", computed("#notes-drawer", "position")
       assert_equal "none", computed("#notes-drawer", "boxShadow")
       rail = box(NOTES_PANEL)
       drawer = box("#notes-drawer")

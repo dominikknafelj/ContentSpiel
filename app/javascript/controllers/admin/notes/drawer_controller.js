@@ -37,10 +37,10 @@ import { messages } from "i18n/messages"
 // slide-over, and the notes opening tells the shell's drawers to stand aside
 // (`admin--notes--drawer:opened`).
 //
-// THE HEADER'S HEIGHT. Docked, the notes stick under the editor's sticky
-// header, whose height is whatever its rows come to (a "Changed elsewhere"
-// bar or a wrapped row makes it taller): `measure`, kept current by a
-// ResizeObserver, writes it on the panel as `--admin-editor-header-height`.
+// THE HEADER'S HEIGHT. Docked, the notes stick with the rail's panel under
+// the editor's sticky header, and below the threshold the slide-over starts
+// under it: both read `--admin-editor-header-height`, which `admin--ui--rail`
+// measures onto the grid the notes stand in.
 //
 // THE FOCUS stays where the person put it. The frame's answers move it only
 // when an opener asked (a press on the header's button, a marker, a link with
@@ -134,12 +134,6 @@ export default class extends Controller {
   // There only an explicit ask opens it -- a press, or a link with
   // `?notes=open`. The choice stays remembered for a wider window.
   drawerTargetConnected(drawer) {
-    this.header = document.querySelector(".admin-editor-header")
-    if (this.header && "ResizeObserver" in window) {
-      this.headerObserver = new ResizeObserver(() => this.measure())
-      this.headerObserver.observe(this.header)
-    }
-    this.measure()
     this.arriving = drawer
     queueMicrotask(() => this.arrive())
   }
@@ -164,9 +158,6 @@ export default class extends Controller {
   // The editor was replaced (another record in `#content`, another screen):
   // what was asked of the old panel is nobody's any more.
   drawerTargetDisconnected() {
-    this.headerObserver?.disconnect()
-    this.headerObserver = null
-    this.header = null
     this.arriving = null
     this.pending = null
     this.returnTo = null
@@ -531,14 +522,6 @@ export default class extends Controller {
     const history = window.Turbo?.session?.history
     if (history?.restorationIdentifier) history.replace(url, history.restorationIdentifier)
     else window.history.replaceState(window.history.state, "", url.href)
-  }
-
-  // Where the docked notes stick: under the editor's sticky header, whose
-  // height is whatever its rows come to. Written on the panel, read by its
-  // `top` and its height.
-  measure() {
-    if (!this.hasDrawerTarget || !this.header?.isConnected) return
-    this.drawerTarget.style.setProperty("--admin-editor-header-height", `${this.header.getBoundingClientRect().height}px`)
   }
 
   // A frame's `src` as a path and query: Turbo writes the whole URL there

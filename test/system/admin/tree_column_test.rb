@@ -515,4 +515,27 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_no_selector ".admin-tree-divider"
     end
   end
+
+  # Folded, the tree's track is the 44px strip and `<main>` keeps its 24px
+  # padding: the editor's column starts 68px right of the sidebar, at a width
+  # where the rail docks and at one past the content max, whatever width was
+  # chosen before the fold.
+  test "folded, the editor's column starts 68px right of the sidebar at 1600 and 2600px windows" do
+    open_editor
+    page.execute_script("window.localStorage.setItem('#{WIDTH_KEY}', '480'); window.localStorage.setItem('cs-tree-folded', '1')")
+    [ 1600, 2600 ].each do |width|
+      at_width(width) do
+        open_editor
+        assert page.evaluate_script("document.documentElement.hasAttribute('data-tree-folded')"), "the head script folded the tree"
+        sidebar = box("#sidebar")[2]
+        assert_in_delta sidebar + 44, box("#tree-column")[2], 1, "at #{width}px the folded column is the strip"
+        [ "#editing", "#editor-grid", ".admin-rail__main", ".admin-content-blocks" ].each do |part|
+          assert_in_delta sidebar + 68, box(part)[0], 1, "at #{width}px #{part} starts 68px right of the sidebar"
+        end
+        assert page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')"), "at #{width}px the rail docks"
+      end
+    end
+  ensure
+    page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
+  end
 end

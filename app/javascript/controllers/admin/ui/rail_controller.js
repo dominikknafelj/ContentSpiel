@@ -9,6 +9,14 @@ import { Controller } from "@hotwired/stimulus"
 // and this controller only reads the computed property. It never measures a
 // width and never decides a threshold of its own.
 //
+// THE HEADER'S HEIGHT. Docked, the rail's ground, tabs and panel stick
+// under the editor's sticky header, whose height is whatever its rows come
+// to (a "Changed elsewhere" bar or a wrapped row makes it taller): a
+// `ResizeObserver` on the header writes it on the grid as
+// `--admin-editor-header-height`, from which the stylesheet takes the rail's
+// one top (`--admin-rail-top`) and the notes' slide-over its top. This is the
+// property's one writer.
+//
 // WHAT IT WRITES. `data-current` on the current panel, `aria-selected` and
 // the roving `tabindex` on the tabs (the tabs' look keys on `aria-selected`,
 // so no class is edited), and `data-rail-docked` on the grid, present while
@@ -68,12 +76,21 @@ export default class extends Controller {
     this.measure()
     this.observer = new ResizeObserver(() => this.measure())
     this.observer.observe(this.element)
+    this.header = document.querySelector(".admin-editor-header")
+    if (this.header) {
+      this.measureHeader()
+      this.headerObserver = new ResizeObserver(() => this.measureHeader())
+      this.headerObserver.observe(this.header)
+    }
     this.dispatch("connected")
   }
 
   disconnect() {
     this.observer?.disconnect()
     this.observer = null
+    this.headerObserver?.disconnect()
+    this.headerObserver = null
+    this.header = null
     this.wasDocked = undefined
   }
 
@@ -149,6 +166,11 @@ export default class extends Controller {
       tab.tabIndex = selected ? 0 : -1
     })
     this.panelTargets.forEach((panel) => panel.toggleAttribute("data-current", panel.dataset.key === key))
+  }
+
+  measureHeader() {
+    if (!this.header?.isConnected) return
+    this.element.style.setProperty("--admin-editor-header-height", `${this.header.getBoundingClientRect().height}px`)
   }
 
   measure() {

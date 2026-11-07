@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { float } from "ui/float"
 import { createSuggestions } from "search/suggestions"
 import { messages } from "i18n/messages"
 
@@ -67,6 +68,8 @@ export default class extends Controller {
   disconnect() {
     clearTimeout(this.announceTimer)
     this.suggestions?.destroy()
+    this.release?.()
+    this.release = null
   }
 
   // --- Events that must not reach the form ---------------------------------
@@ -168,14 +171,32 @@ export default class extends Controller {
     if (!this.createValue) this.announce(this.text("components.ui.chip_input.search_failed"))
   }
 
+  // Inside a docked rail panel that scrolls, the list is lifted out of the
+  // panel's clip (`ui/float`), under the field and as wide as it, until it
+  // closes; it closes when the field scrolls out of the panel (the focus, if
+  // it was in the list, back to the input), and before Turbo caches the page.
   open() {
     this.listboxTarget.hidden = false
+    this.release ||= float(this.listboxTarget, this.listboxTarget.parentElement, { width: true, leave: () => this.leaveFloat() })
     this.inputTarget.setAttribute("aria-expanded", "true")
+  }
+
+  leaveFloat() {
+    const inside = this.listboxTarget.contains(document.activeElement)
+    this.close()
+    if (inside) this.inputTarget.focus()
+  }
+
+  // `turbo:before-cache` on the document.
+  cache() {
+    if (this.release?.floated) this.close()
   }
 
   close() {
     // A request still in flight must not reopen the list once it answers.
     this.suggestions.cancel()
+    this.release?.()
+    this.release = null
     this.listboxTarget.hidden = true
     this.inputTarget.setAttribute("aria-expanded", "false")
     this.inputTarget.removeAttribute("aria-activedescendant")

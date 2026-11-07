@@ -59,6 +59,9 @@
 - The posts list's Tag filter offers only the tags on posts you can open that are not in the trash, and a Type the site no longer has shows as the chosen Type, so the filter can be seen and cleared.
 - On Tags, each tag shows a bar for how many posts use it. Details opens the tag in a panel beside the list (above it in a narrow window) with its newest posts, Merge into… and Delete tag…. The row has no ⋯ menu.
 - Added `GET <admin>/tags/:id`, the tag panel. It answers only the Tags screen's panel and otherwise sends back to the list.
+- On a wide window CS Studio uses the room: the dashboard, the posts list, Tags and the page and post editors stand at the content's left edge and grow with the window up to 1680px, the rail staying 360px at their right. In the editors a field of running text keeps a readable width (about 72 characters, a Code field about 100), while images, tables, sections and a card's or form's rows take the whole column. The dashboard's Pick up where you left off shows four drafts a row where it has the room.
+- The editors' rail stays in view down a long page: its tabs and the current panel stick under the editor's header on a ground only as tall as they are, and a panel taller than the window scrolls inside the rail, its menus and suggestions opening over what is below it. The posts list's filters and the Tags screen's detail stick in the same way beside a long list.
+- CS Studio's secondary and danger text buttons have an edge at rest on every screen (a grey line, or for a small button the button's own colour), and a small text button is underlined. Under the pointer a button's fill deepens and it lifts a little; nothing changes on a touch screen, and under reduced motion the change is instant and the primary's press does not move. The dashboard's "Drafts →" and "Full audit log →" are drawn as small text buttons.
 
 ### Removed
 
