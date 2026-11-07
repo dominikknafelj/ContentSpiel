@@ -79,6 +79,7 @@
 
 ### For a gem or an outside caller
 
+- Added `Blocks::Contract`: a gem's block or form component may include it and declare, with `contract(...)`, what it promises a visitor (accessibility, motion, content edges, widths, its interface, its `public.*` words and its limits). It adds a class method and changes nothing a template can call or a site draws. `bin/rails generate block_type` writes the include and a declaration for the component it generates. Nothing else changes for a site.
 - SortableJS is no longer preloaded in CS Studio; a script that imports `sortablejs` fetches it on demand (the editor, the page tree, Settings' language rows and a groups field's rows do).
 - For a gem's block type: `t.preview ->(block, locale:) { ContentModel::Preview.new(heading: …, text: …, mono: false) }` declares the heading and the few words CS Studio's tile shows of a closed block, as plain text (the text is cut at 240 characters, the heading at 80). It is optional: a type that declares none is drawn from its `summary`, and a callable that is not a callable taking the block and `locale:` is refused at registration. No public template or theme reads it.
 - For a gem's block type: `t.icon "name", family: :text` (one of `text media code form lists structure`) names the hue of the chip CS Studio draws the icon on; a type that names none is drawn on the neutral chip, and any other value is refused at registration. The chip is CS Studio's only: no public page draws it.

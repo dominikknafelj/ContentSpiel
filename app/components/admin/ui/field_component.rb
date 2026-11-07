@@ -1,7 +1,7 @@
 module Admin
   module Ui
     # Renders one `ContentModel::Definition::Field` as a labelled input, plus
-    # everything around it every field type shares (spec §4.3/§6.2): the
+    # everything around it every field type shares: the
     # reference card with the original-language value (beside the field, or
     # above it when narrow) and its translate slot for a translated field in a
     # non-default locale (an untranslated field isn't rendered there at all: the
@@ -24,6 +24,24 @@ module Admin
     # to compare against (a brand new translated field, no default-locale
     # value yet) simply passes `original: nil` and gets no column.
     class FieldComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A label tied to its input by for and id (an input that names itself draws its own), the help line and the error slot beside it; the keyboard is the input's.",
+        motion: :reduced,
+        content_edges: %i[none short long],
+        widths: :from_container,
+        interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder],
+        limits: [
+          "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",
+          "Whether the original is shown is the caller's: it is shown only when an original is handed over."
+        ],
+        states: %i[rest invalid translated outdated hover focus],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       # Turns a bracketed form name prefix into an id-safe one, e.g.
       # `"post[fields]"` -> `"post_fields"`, `"post[fields][speakers][0]"` ->
       # `"post_fields_speakers_0"`. Shared by every field's input id and its
@@ -40,17 +58,16 @@ module Admin
       # `id_prefix:` overrides the id-derivation `dom_id_prefix(form_name)`
       # otherwise falls back to -- needed the moment a single literal
       # `form_name` (e.g. block cards all naming their schema fields
-      # `"block[settings]"`, cs-studio spec §5.1/Task 5) is shared by more
+      # `"block[settings]"`) is shared by more
       # than one instance of the same form on one screen: the submitted field
       # *name* has to stay that one literal string (so the server-side split
       # in `Admin::ContentBlocksController` sees a plain `params[:block]`
       # regardless of which card posted it), but the rendered *ids* still have
       # to be document-unique, or a Turbo Stream error-slot replace (and a
       # `label for=`/`id=` pairing) for one card could silently land on
-      # another card's identically-named field instead. Defaulting to nil
-      # (falling back to the old `dom_id_prefix(form_name)` behaviour) keeps
-      # every existing single-instance-per-page caller (the post/group fields
-      # this component already serves) unchanged.
+      # another card's identically-named field instead. Left nil, the ids
+      # are `dom_id_prefix(form_name)`'s, which is right for a form drawn
+      # once on a screen (the post and group fields).
       #
       # `translation_state:`/`translation_confirm:` drive the "Original
       # changed" note beside the original -- the same contract
@@ -117,8 +134,7 @@ module Admin
         )
       end
 
-      # Text types only get the AI **Translate** button (translation helpers
-      # spec §6.4): a group's original is a nested value no provider is
+      # Text types only get the AI **Translate** button: a group's original is a nested value no provider is
       # handed (`AI::Translate` skips it), and no other scalar type is
       # translated prose. Which types are prose is each type's own answer
       # (`ContentModel::FieldType#translatable`); this list of their names is

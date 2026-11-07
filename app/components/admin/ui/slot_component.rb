@@ -16,6 +16,24 @@ module Admin
     # There is no template on purpose: the markup is the entries' alone, and a
     # template's own whitespace would be between them.
     class SlotComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "No role, name or keyboard of its own: each registered entry's component brings its own.",
+        motion: :none,
+        content_edges: %i[none many],
+        widths: :from_container,
+        interface: %i[name record viewer loaded],
+        limits: [
+          "It draws no wrapper and no markup of its own: with nothing registered it renders nothing.",
+          "It draws a place's entries in registration order and never reorders or filters them."
+        ],
+        states: %i[rest],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(name:, record:, viewer:, loaded: nil, **context)
         @name = name
         @record = record

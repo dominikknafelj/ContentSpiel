@@ -1,24 +1,44 @@
 module Admin
   module Ui
-    # The autosave status line every form-with-autosave renders one of (spec
-    # §6.1) -- a Turbo Stream replaces this element wholesale by its `id` as a
-    # save moves through its states, so the text for each state has to be
-    # exactly the wording global constraints pins down (a save controller in a
-    # later task assembles the state from the fetch response; this component
-    # only ever turns a state into the one sentence it's allowed to show).
+    # The autosave status line every form-with-autosave renders one of -- a Turbo Stream replaces this element wholesale by its
+    # `id` as a save moves through its states. The state is chosen by the
+    # answer or by `admin--saving--autosave`; this component only ever turns a
+    # state into the one sentence it's allowed to show.
     # `idle` -- nothing has changed yet, or the record just loaded -- renders
     # an empty element rather than an empty string with visible chrome around
     # it, so the header note it sits in doesn't visibly flash on load.
     #
     # That empty element still keeps one line's height (`min-h-[1lh]`), so
-    # the first save doesn't push everything below it down a line. It used
-    # to collapse to nothing, and a first save started by a click's own
-    # mousedown (the `focusout` that blurring a field sends straight to
-    # `admin--saving--autosave#saveNow`) moved the page between that mousedown and
-    # its mouseup: the mouseup landed beside the button, the browser fired
-    # no `click`, and the related-posts picker silently dropped the pick.
+    # the first save doesn't push everything below it down a line. A collapsed
+    # line would move the page under a click: a first save started by the
+    # click's own mousedown (the `focusout` that blurring a field sends straight
+    # to `admin--saving--autosave#saveNow`) would grow it between that mousedown
+    # and its mouseup, the mouseup would land beside the button, the browser
+    # would fire no `click`, and the related-posts picker would drop the pick.
     class SaveStatusComponent < AdminComponent
-      # `signed_out` (final-fixes round, finding 4) is never rendered by any
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A status line (role=status) whose words are the save's state; offline offers a Retry button.",
+        motion: :none,
+        content_edges: %i[none long],
+        widths: :fluid,
+        interface: %i[id state at count live holder viewer],
+        limits: [
+          "It turns a state into its one sentence and decides no state itself: a stream or admin--saving--autosave chooses it.",
+          "Its Retry works only on the copy the autosave script writes, outside whose form this element stands.",
+          "It serves admin--saving--autosave, which its form attaches; Retry is that controller's action."
+        ],
+        states: %i[idle saving saved error stale held saved_over offline retrying signed_out forbidden hover focus],
+        keys: %w[
+          saving saving_live saved saved_at saved_live saved_live_at error forbidden retrying offline
+          stale held held_own_tab held_unknown saved_over signed_out retry
+        ],
+        slots: [],
+        controller: nil
+      )
+
+      # `signed_out` is never rendered by any
       # server response -- `autosave_controller.js` sets this text itself, the
       # moment it notices a save's own response redirected (an expired
       # session), rather than a server ever answering a Turbo Stream that
@@ -28,26 +48,25 @@ module Admin
       # Lookbook preview or a future server-side use of it has somewhere to
       # read the exact text from.
       # `:forbidden` is a save a service refused for want of permission
-      # (access-control design spec §3.4) -- an editor that's view only never
+      # -- an editor that's view only never
       # sends one, so it only shows for a stale tab whose rights changed.
       STATES = %i[idle saving saved error stale held saved_over offline retrying signed_out forbidden].freeze
 
       #
-      # Wording (design pass round 2, handoff §4.1): the saved/saving/offline
+      # Wording: the saved/saving/offline
       # lines are mono capitals ("SAVED 10:42"). A save of a published or
-      # scheduled record is NOT a publication (drafts spec §3): its line reads
-      # "SAVED · NOT PUBLISHED 10:42", in the neutral colour and without the
-      # dot the "SAVED TO SITE" line had, which said "this is on the site" in
-      # the ok colour and is no longer true. `live:` is that question, and
-      # keeps its name: a page or post with a `published_at`. The
+      # scheduled record is NOT a publication: its line reads
+      # "SAVED · NOT PUBLISHED 10:42", in the neutral colour and with no dot
+      # in the ok colour, which would say "this is on the site". `live:` is
+      # that question: a page or post with a `published_at`. The
       # capitals are literal text, not a CSS `uppercase`, so what a test or a
       # screen reader reads is exactly what is shown. `live:` also rides on the
       # element (`data-live`) so `autosave_controller.js`, which writes the
       # "saving" line itself, picks the same wording. Every string here that
       # the controller also writes is the same key (`messages_data` hands
       # them to it from <body>), so the two cannot drift.
-      # `:held` is a save refused because ANOTHER tab holds the subject
-      # (live-editing spec §4.2, handoff 25): "● NOT SAVED · DANA WEISS IS
+      # `:held` is a save refused because ANOTHER tab holds the subject:
+      # "● NOT SAVED · DANA WEISS IS
       # EDITING", or for the person's own other tab "● NOT SAVED · OPEN IN YOUR
       # OTHER TAB". `holder:` is the reservation (a user and a tab), nil when
       # it lapsed between the refusal and this answer; `viewer:` says whose

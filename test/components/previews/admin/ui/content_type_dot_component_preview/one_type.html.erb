@@ -1,0 +1,13 @@
+<%
+  # Registered here, not in the preview's own Ruby method: `render_with_template`
+  # returns a description of what to render, so the type must be registered
+  # while this template draws, and the registries are put back after it.
+  ContentTypes.register("test/preview_dot") do |t|
+    t.label "Event"
+    t.colour_index = colour_index
+    t.list_component Posts::BlogListComponent
+    t.detail_component Posts::DetailComponent
+  end
+%>
+<div class="p-4"><%= render Admin::Ui::ContentTypeDotComponent.new(content_type: "test/preview_dot") %></div>
+<% Rails.application.reloader.prepare! %>

@@ -1,7 +1,7 @@
 module Admin
   module Ui
-    # `Admin::Ui::SaveStatusComponent` (cs-studio spec §6.1): every autosave state,
-    # exact wording from Global Constraints.
+    # `Admin::Ui::SaveStatusComponent`: every autosave state, in its own
+    # words.
     class SaveStatusComponentPreview < ViewComponent::Preview
       def idle
         render Admin::Ui::SaveStatusComponent.new(id: "save-status-idle", state: :idle)
@@ -33,6 +33,24 @@ module Admin
 
       def stale
         render Admin::Ui::SaveStatusComponent.new(id: "save-status-stale", state: :stale)
+      end
+
+      # Another tab of someone else's holds the record; with no holder handed
+      # over, the line says only that it is held.
+      def held
+        render Admin::Ui::SaveStatusComponent.new(id: "save-status-held", state: :held)
+      end
+
+      def saved_over
+        render Admin::Ui::SaveStatusComponent.new(id: "save-status-saved-over", state: :saved_over)
+      end
+
+      def signed_out
+        render Admin::Ui::SaveStatusComponent.new(id: "save-status-signed-out", state: :signed_out)
+      end
+
+      def forbidden
+        render Admin::Ui::SaveStatusComponent.new(id: "save-status-forbidden", state: :forbidden)
       end
     end
   end

@@ -1,8 +1,7 @@
 <%# One mark per state, shared by a tab and an overflow entry. Colour is never
     the only cue: the shape differs (hollow ring vs solid dot) and an
     `sr-only` sentence is what a screen reader announces. Neither uses red --
-    translation states are never errors. The `title` keeps the hover text the
-    old switcher had. %>
+    translation states are never errors. The `title` names the state on hover. %>
 <% marks = ->(code) do %>
   <%# The `sr-only` sentence lives INSIDE the mark (no `aria-hidden` on it),
       so when "Still correct — mark up to date" streams the marker away by id the

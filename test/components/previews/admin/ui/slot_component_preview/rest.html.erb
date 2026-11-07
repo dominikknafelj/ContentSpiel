@@ -1,0 +1,6 @@
+<%# The marker is registered for this template's render alone: `render_with_template` only describes what to render, so `Admin::Slots.with` goes here, round the render itself. %>
+<div class="flex items-center gap-2 p-4">
+  <%= Admin::Slots.with("editor.block.markers" => [ Admin::Ui::SlotComponentPreview::MarkerComponent, Admin::Ui::SlotComponentPreview::MarkerComponent ]) do
+        render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: nil, viewer: nil)
+      end %>
+</div>

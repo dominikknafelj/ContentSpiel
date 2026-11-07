@@ -1,8 +1,7 @@
 module Admin
   module Ui
-    # A person as a round circle with their initials: THE ONE DRAWING of it
-    # (the notes handoff's "Message" and "Thread row", the presence handoff's
-    # item 1, which calls it "the existing actor avatar"). Notes draws its
+    # A person as a round circle with their initials: THE ONE DRAWING of it,
+    # in a note's message and thread row and among a record's people. Notes draws its
     # authors through it (`Admin::NotesScreen::AvatarComponent`, which knows
     # who the viewer is and what a deleted user is called) and presence the
     # people on a record (`Admin::PresenceScreen::PeopleComponent`).
@@ -16,12 +15,30 @@ module Admin
     # dashboard and in the audit log), `:md` 24px with 9px, `:sm` 20px with 8px.
     # `tone`: `:other` is anybody (sunken, a strong line, ink); `:own` is the
     # viewer in a note (filled ink); `:away` is someone whose tab is hidden or
-    # idle (presence handoff 4: no fill, the plain line, meta letters -- never
+    # idle (no fill, the plain line, meta letters -- never
     # a lower opacity, which would take the letters below contrast).
     # `ring`: a 2px ring in the colour of what the circles stand on, for
     # circles that overlap: `:paper` (an editor's header) or `:surface` (the
     # media panel).
     class AvatarComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Decoration hidden from a screen reader, with no role and no focus: whoever draws it names the person beside it.",
+        motion: :none,
+        content_edges: %i[short],
+        widths: :fixed_width,
+        interface: %i[initials size tone ring],
+        limits: [
+          "It is told the initials and knows nothing of users.",
+          "It draws three sizes, three tones and two rings, and anything else is refused."
+        ],
+        states: %i[other own away],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       SIZES = { lg: "size-7 text-count", md: "size-6 text-[9px]", sm: "size-5 text-[8px]" }.freeze
       TONES = { other: "border border-line-strong bg-sunken text-ink", own: "bg-ink text-paper", away: "border border-line bg-paper text-meta" }.freeze
 

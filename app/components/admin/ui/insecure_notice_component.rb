@@ -1,8 +1,7 @@
 module Admin
   module Ui
     # "This connection is not encrypted": the one sentence CS Studio shows
-    # when it is reached over plain HTTP in production (spec "safe on a
-    # public address"). A password typed on such a page, and the session
+    # when it is reached over plain HTTP in production. A password typed on such a page, and the session
     # cookie sent with every request after it, can be read by anyone on the
     # way, and nothing else on the screen says so.
     #
@@ -26,6 +25,24 @@ module Admin
     # because it is not read out otherwise and the next thing a person does
     # here is type a password.
     class InsecureNoticeComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "An alert (role=alert) of one sentence, with no focus of its own.",
+        motion: :none,
+        content_edges: %i[long],
+        widths: :from_container,
+        interface: %i[request production],
+        limits: [
+          "It shows only in production on a request that is not HTTPS, and decides nothing of who sees it in the shell.",
+          "It says what is unsafe and offers no action of its own."
+        ],
+        states: %i[rest],
+        keys: %w[body],
+        slots: [],
+        controller: nil
+      )
+
       BASE_CLASS = "rounded-card border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
 
       # `class:` places the notice in its host (a margin) and is added to the

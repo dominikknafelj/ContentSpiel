@@ -1,7 +1,6 @@
 module Admin
   module Ui
-    # One language's translation state (design pass spec §4, handoff §2.3 and
-    # §9 B14), in the posts list's "Languages" column and each row of the
+    # One language's translation state, in the posts list's "Languages" column and each row of the
     # Translations overview. Three cues besides colour: the border (solid,
     # dashed, warn), a mark (a filled `ok` dot, a field-line ring, the ↻ glyph) and an aria-label -- and no red: a
     # missing translation isn't a failure.
@@ -10,9 +9,30 @@ module Admin
     # `role="img"` with an `aria-label` naming the language and the state, and a
     # `title` for a sighted hover. The language code beside the glyph is visual
     # only, covered by that label. `data-locale` and `data-translation-state`
-    # are read by tests and must stay as they were on the old badge.
+    # are read by tests.
     class TranslationChipComponent < AdminComponent
-      # The mark after the language code (contrast and buttons spec, C1): a
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "An image (role=img) named by its aria-label, the language and its state, with a title for a sighted hover; it takes no focus.",
+        motion: :none,
+        content_edges: %i[short],
+        widths: :fluid,
+        interface: %i[state locale],
+        limits: [
+          "A missing translation is never drawn as a failure: no red.",
+          "It draws three states, and another is refused."
+        ],
+        states: %i[complete missing outdated],
+        keys: %w[
+          aria_label.complete aria_label.missing aria_label.outdated tooltip.complete tooltip.missing
+          tooltip.outdated
+        ],
+        slots: [],
+        controller: nil
+      )
+
+      # The mark after the language code: a
       # translated language a filled dot in `ok`, a missing one a 1.5px ring
       # in the field line (3:1, a state mark), an outdated one the ↻ glyph.
       # The chip's own border is decoration. The mark is `aria-hidden`: the

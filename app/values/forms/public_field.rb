@@ -18,6 +18,12 @@ module Forms
     # The errors `Forms::Answers` reports, each a key of `public.forms.errors`.
     ERRORS = %i[blank invalid inclusion too_long].freeze
 
+    # Where `word` and `error_text` read (config/locales/public.en.yml), the
+    # scopes test/values/theme/component_contract_test.rb names an input's
+    # words by.
+    WORD_SCOPE = "public.forms".freeze
+    ERROR_WORDS = "#{WORD_SCOPE}.errors".freeze
+
     attr_reader :field, :locale, :form_id, :place
 
     delegate :key, :choices, to: :field
@@ -74,13 +80,13 @@ module Forms
 
     # A word a visitor reads that no editor typed, in the form's language
     # (English where it has none): `public.forms.<key>`.
-    def word(key, **options) = PublicStrings.read("public.forms.#{key}", locale: locale, **options)
+    def word(key, **options) = PublicStrings.read("#{WORD_SCOPE}.#{key}", locale: locale, **options)
 
     # The sentence of an error `Forms::Answers` found (`:blank`, `:invalid`,
     # `:inclusion`, `:too_long`), in the form's language; one it does not
     # know reads as `invalid`. The input components and the endpoint's JSON
     # answer say the same words through this.
-    def error_text(error) = word("errors.#{ERRORS.include?(error&.to_sym) ? error.to_sym : :invalid}")
+    def error_text(error) = PublicStrings.read("#{ERROR_WORDS}.#{ERRORS.include?(error&.to_sym) ? error.to_sym : :invalid}", locale: locale)
 
     # The choices a visitor is shown: those with a label in the form's
     # language or the default's. A choice with none is left out rather than

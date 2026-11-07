@@ -1,13 +1,31 @@
 module Admin
   module Ui
     # "51–100 OF 312" on the left, Previous / page numbers / Next on the right
-    # (design pass spec §4, handoff §9 A6), at the foot of a list's card. The
+    # at the foot of a list's card. The
     # arithmetic is `Pagination`'s; `url:` is the caller's `->(page) { path }`,
     # which keeps the list's own filters (callers merge `page` into
     # `list_params(...)`, `Admin::ListLinksHelper` -- the filter keys that list
     # names, never `request.query_parameters` wholesale). Nothing renders on a
     # single page.
     class PaginationComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A navigation named Pagination, its links Previous, Next and the page numbers, the current page aria-current; the gap is aria-hidden.",
+        motion: :none,
+        content_edges: %i[many],
+        widths: :from_container,
+        interface: %i[pagination url],
+        limits: [
+          "Nothing renders on a single page or past the last.",
+          "The arithmetic is Pagination's and the addresses are the caller's url."
+        ],
+        states: %i[first_page middle_page last_page hover focus],
+        keys: %w[nav_label range previous next],
+        slots: [],
+        controller: nil
+      )
+
       LINK_CLASS = "rounded-button px-2 py-0.5 text-sm text-dim hover:bg-sunken".freeze
       CURRENT_CLASS = "rounded-button bg-sunken px-2 py-0.5 text-sm text-ink".freeze
 

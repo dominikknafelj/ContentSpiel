@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # A popover menu (handoff §10): a button that owns a hidden `role="menu"`
+    # A popover menu: a button that owns a hidden `role="menu"`
     # panel, with what a native `<details>` lacks -- arrow-key movement,
     # Escape, closing on an outside click. It is what new menus use (the
     # rich-text toolbar's Insert menu, the language tabs' overflow, the editor
@@ -13,11 +13,11 @@ module Admin
     # `aria_label` names an icon-only trigger (the editor header's "⋯": the label
     # is the glyph, the name is "More actions"). `close_on_select` closes the
     # panel after a pick (`admin--ui--menu#select`), for a menu whose items open a
-    # dialog or reveal a panel and so would otherwise stay open behind it; the
-    # older menus keep their panel open, as before.
+    # dialog or reveal a panel and so would otherwise stay open behind it;
+    # without it the panel stays open after a pick.
     #
     # `list: true` is a panel that LISTS things and offers nothing to pick
-    # (everyone who has a record open, presence handoff 6, 21 and 23): the
+    # (everyone who has a record open): the
     # panel is a `role="list"` of `listitem`s named by `list_label`, not a
     # menu, and its rows are plain text. Pressing the button opens it AND
     # MOVES THE FOCUS INTO IT, as one thing a screen reader reads through
@@ -42,6 +42,28 @@ module Admin
     # the button, for a menu at the end of a row); `button_class` replaces the
     # default button look, for a trigger that has to read as a tab or a link.
     class MenuComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A button with aria-haspopup and aria-expanded that opens a role=menu panel of menuitems (or a named list, which takes the focus), walked with the arrow keys, closed by Escape or a click outside.",
+        motion: :none,
+        content_edges: %i[short long many],
+        widths: :fluid,
+        interface: %i[label align button_class aria_label close_on_select list list_label panel_id columns heading],
+        limits: [
+          "Each item is the caller's own link or button: the menu gives it its role and its keyboard.",
+          "It lays items out in one column, two or three, and another count is refused."
+        ],
+        states: %i[rest hover focus],
+        script_states: {
+          open: [ "test/system/admin/editor_header_test.rb", "the menu skips a disabled item: ArrowDown wraps past the homepage's disabled Move to trash" ]
+        },
+        keys: [],
+        slots: %i[items],
+        controller: "admin--ui--menu",
+        keyboard: [ "test/system/admin/editor_header_test.rb", "the menu skips a disabled item: ArrowDown wraps past the homepage's disabled Move to trash" ]
+      )
+
       renders_many :items
 
       def initialize(label:, align: :right, button_class: nil, aria_label: nil, close_on_select: false, list: false, list_label: nil, panel_id: nil, columns: nil, heading: nil)

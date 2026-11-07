@@ -1,4 +1,4 @@
-# Shared sample data for every Lookbook preview (open-types spec §5). A block
+# Shared sample data for every Lookbook preview. A block
 # or content-type component's `page_url_path`/`post_url_path` link needs a
 # *real* canonical page to resolve -- an unsaved or already-rolled-back
 # record has none, and `link_to(name, nil)` raises `ArgumentError` rather
@@ -42,17 +42,40 @@ module PreviewFixtures
     Post.create!(content_type: content_type, title: "#{title} #{SecureRandom.hex(4)}", published_at: 1.day.ago, **attributes)
   end
 
-  # A rich-text body document Hash (design spec §3.1) for `body:` --
+  # A rich-text body document Hash for `body:` --
   # previews write fixed Markdown, so conversion warnings can't occur.
   def rich_doc(markdown) = RichText::Document.from_markdown(markdown).first.to_h
 
-  # A library image (media library design spec §3.1) -- what a page hero or
-  # an image block references since Task 4. `public/icon.png` is a real PNG,
-  # so it passes `Media::Asset`'s byte-sniffing validation.
+  # A library image, what a page hero or an image block references: saving
+  # it decodes its size and its ~24px preview, and no width is made yet.
+  # `public/icon.png` is a real PNG, so it passes `Media::Asset`'s
+  # byte-sniffing validation.
   def media_asset
     asset = Media::Asset.new
     asset.file.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
     asset.save!
+    asset
+  end
+
+  # A library image whose widths are recorded as made (no file is made), so
+  # it has a real `srcset`. `wide.png` (`test/fixtures/files`) is a real
+  # 3000x2000 PNG, so every configured width is smaller than the original
+  # and is in the `srcset`.
+  def processed_media_asset
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(Rails.root.join("test/fixtures/files/wide.png")), filename: "wide.png")
+    asset.save!
+    asset.file.analyze
+    metadata = asset.file.blob.metadata || {}
+    asset.update_columns(width: metadata["width"], height: metadata["height"])
+    settings = ImageSettings.current
+    files = Media::Renditions.widths_for(original_width: asset.width, configured: settings.widths).map do |width|
+      variation = ActiveStorage::Variation.wrap(Media::Renditions.transformations(
+        width: width, format: settings.format, quality: settings.quality, content_type: asset.content_type
+      ))
+      { "width" => width, "key" => variation.key, "digest" => variation.digest }
+    end
+    asset.update_columns(renditions: { "current" => { "fingerprint" => settings.fingerprint, "files" => files } }) # version: none (a preview's recorded generation)
     asset
   end
 end

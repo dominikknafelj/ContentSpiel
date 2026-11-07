@@ -14,6 +14,21 @@ module Blocks
   # AN EMPTY NOTE DRAWS NOTHING (decision 5): no text in the visitor's
   # language and none along the site's fallback, whatever its title.
   class NoteComponent < ApplicationComponent
+    include Blocks::Contract
+
+    contract(
+      accessibility: "An aside named by its h3 heading, never an alert; the icon is hidden from a screen reader, and under an editor's title the kind's word stands first, visually hidden.",
+      motion: :none,
+      content_edges: %i[short long missing],
+      widths: :from_container,
+      interface: %i[block page kind heading titled? word icon body],
+      words: %w[public.blocks.note.kinds.*],
+      limits: [
+        "Four kinds, each with its icon; a kind it does not know is drawn as a note.",
+        "An empty body renders nothing."
+      ]
+    )
+
     def initialize(block:, page:)
       @block = block
       @page = page

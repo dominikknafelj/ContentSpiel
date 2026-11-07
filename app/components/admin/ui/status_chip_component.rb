@@ -11,6 +11,24 @@ module Admin
     # renders nothing and only the exceptions -- draft, scheduled -- stand out.
     # The editors' headers leave it off, because there the state is the point.
     class StatusChipComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Inline text with no role, named by its word (the dot or ring is hidden from a screen reader, and a scheduled chip's date is its title); it takes no focus.",
+        motion: :none,
+        content_edges: %i[short],
+        widths: :fluid,
+        interface: %i[status at hide_live],
+        limits: [
+          "It says a page's or a post's publish state and nothing else: unpublished changes are the unpublished chip's.",
+          "With hide_live a Live chip renders nothing at all."
+        ],
+        states: %i[draft scheduled live],
+        keys: %w[labels.draft labels.scheduled labels.live],
+        slots: [],
+        controller: nil
+      )
+
       STATUSES = %w[draft scheduled live].freeze
 
       BASE_CLASS = "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs px-2 py-0.5 text-xs".freeze

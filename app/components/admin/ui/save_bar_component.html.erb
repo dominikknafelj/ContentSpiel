@@ -7,7 +7,7 @@
     JavaScript nothing disables it, so it is a plain working submit button.
 
     Cancel is a link into the content frame, which the leave guard asks about
-    like any other (round 3) -- except this one: `data-save-bar-cancel` marks
+    like any other -- except this one: `data-save-bar-cancel` marks
     it as the way to discard, so it leaves without "Leave without saving?". %>
 <div data-admin--saving--save-bar-target="bar" class="<%= bar_class %>">
   <%= render Admin::Ui::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--saving--save-bar-target": "save")) %>

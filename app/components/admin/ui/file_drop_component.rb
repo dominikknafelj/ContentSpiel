@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # A drop zone around a visually hidden file input (design pass spec §4): a
+    # A drop zone around a visually hidden file input: a
     # dashed box saying "Drop an image here or", a "Choose file" button that is
     # really the input's `<label>` (so it works with no JavaScript at all and
     # keyboard focus on the hidden input lights the button through `peer`), and
@@ -19,6 +19,27 @@ module Admin
     # Whoever owns the upload (the media library's `admin--media--upload`) listens
     # to the input's own `change`; this component never uploads anything.
     class FileDropComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A visually hidden file input named by its label (or by its Choose file label), whose label is drawn as a button and rings when the input has the keyboard's focus; a polite live region says the chosen file's name.",
+        motion: :reduced,
+        content_edges: %i[none short long],
+        widths: :from_container,
+        interface: %i[name id accept multiple hint label],
+        limits: [
+          "It never uploads: whoever owns the upload listens to the input's change.",
+          "Its words (Drop an image here or, Choose file) are English in the template, not keys."
+        ],
+        states: %i[rest with_hint hover focus],
+        script_states: {
+          chosen: [ "test/system/setup_wizard_test.rb", "a fresh install goes from the token to a live homepage" ]
+        },
+        keys: [],
+        slots: [],
+        controller: "file-drop"
+      )
+
       def initialize(name:, id:, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","), multiple: false, hint: nil, label: nil, **input_html)
         @name = name
         @id = id

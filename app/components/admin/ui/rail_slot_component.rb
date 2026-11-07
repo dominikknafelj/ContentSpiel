@@ -9,6 +9,24 @@ module Admin
     #
     # The entries are built once, so a tab and its panel come from one object.
     class RailSlotComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "No role or name of its own: each registered entry's panel is a tabpanel named by its tab, and brings its own content.",
+        motion: :none,
+        content_edges: %i[none many],
+        widths: :from_container,
+        interface: %i[rail_id record viewer reserved],
+        limits: [
+          "With nothing registered it draws no tab and no markup.",
+          "A tab key that is another tab's, or not lowercase letters, is refused."
+        ],
+        states: %i[rest],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       KEY = /\A[a-z]+\z/
 
       def initialize(rail_id:, record:, viewer:, reserved: [], **context)

@@ -1,11 +1,20 @@
 module Admin
   module Ui
-    # `Admin::Ui::ConfirmDialogComponent` (cs-studio spec §5.1/§5.3): rendered
-    # `[open]` for the preview, since Lookbook has no trigger button to call
-    # `showModal()` for it.
+    # `Admin::Ui::ConfirmDialogComponent`. `rest` and `destructive` are marked
+    # `open_on_load`, so `admin--ui--dialog` opens them as the page appears
+    # where the admin's script runs; the others are closed until a trigger
+    # opens them (`document.getElementById(id).showModal()` in the console).
     class ConfirmDialogComponentPreview < ViewComponent::Preview
-      def delete_page
-        render(Admin::Ui::ConfirmDialogComponent.new(id: "delete-page-preview", title: "Delete this page?", body: "This can't be undone.", destructive: true)) do |component|
+      def rest
+        render(Admin::Ui::ConfirmDialogComponent.new(id: "turn-off-preview", title: "Turn off Deutsch?", open_on_load: true,
+          body: "Its translations are kept, and come back when it is turned on again.")) do |component|
+          component.with_confirm_action { render(Admin::Ui::ButtonComponent.new(label: "Turn off", type: "submit")) }
+        end
+      end
+
+      def destructive
+        render(Admin::Ui::ConfirmDialogComponent.new(id: "delete-page-preview", title: "Delete this page?", body: "This can't be undone.", destructive: true,
+          open_on_load: true)) do |component|
           component.with_confirm_action { render(Admin::Ui::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit")) }
         end
       end

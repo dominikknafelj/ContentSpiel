@@ -1,7 +1,7 @@
 module Admin
   module Ui
-    # `Admin::Ui::ChannelChipComponent` (design pass round 3): MCP in accent, the
-    # other four channels in meta.
+    # `Admin::Ui::ChannelChipComponent`: MCP in accent, the other channels in
+    # meta, and a channel it does not know, drawn as its value.
     class ChannelChipComponentPreview < ViewComponent::Preview
       def admin = render(Admin::Ui::ChannelChipComponent.new(channel: "admin"))
 
@@ -12,6 +12,8 @@ module Admin
       def console = render(Admin::Ui::ChannelChipComponent.new(channel: "console"))
 
       def system = render(Admin::Ui::ChannelChipComponent.new(channel: "system"))
+
+      def unknown = render(Admin::Ui::ChannelChipComponent.new(channel: "public"))
     end
   end
 end

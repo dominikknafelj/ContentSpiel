@@ -7,7 +7,7 @@ require "generators/block_type/block_type_generator"
 # and the shared samples, and passes the guards as written. The whole suite
 # cannot run in a test, so the generated files are written into a temporary
 # folder, loaded, registered and put through the derived checks here; the
-# whole suite is run once with a generated type by hand (the plan's Task 11).
+# whole suite is run once with a generated type by hand.
 #
 # Every case generates `generated_callout`, never `callout`: the hand run
 # generates `callout` into the application, where the generator then refuses
@@ -55,7 +55,7 @@ class BlockTypeGeneratorTest < Rails::Generators::TestCase
     assert_file "app/models/block_types/generated_callout.rb", /BlockTypes.register :generated_callout/, /t.theme_methods :block, :page/,
                 /t.stylesheet "generated_callout.css"/, /t.sample /, /#{BlockTypeGenerator::GENERATED}/
     assert_file "config/initializers/types.rb", /\n    BlockTypes::GeneratedCallout.register\n    # bin\/rails generate block_type adds/
-    assert_file "app/components/blocks/generated_callout_component.rb", /def initialize\(block:, page:\)/, /def render\?/
+    assert_file "app/components/blocks/generated_callout_component.rb", /include Blocks::Contract/, /contract\(/, /def initialize\(block:, page:\)/, /def render\?/
     assert_file "app/components/blocks/generated_callout_component.html.erb", /content-block content-block--generated_callout/
     assert_file "app/assets/tailwind/themes/default/generated_callout.css", /\.content-block--generated_callout/, /#{BlockTypeGenerator::GENERATED}/
     assert_file "config/locales/public.en.yml", /adds a type's scope below this line.\n\s+generated_callout: \{\}/
@@ -121,7 +121,7 @@ class BlockTypeGeneratorTest < Rails::Generators::TestCase
   # Destroy removes only what this generator wrote and nobody has taken as
   # theirs: the Code block's definition, a stylesheet of the default theme,
   # and a generated type whose definition lost its line are left whole.
-  test "destroy refuses a built-in, a stylesheet of the default theme, a constant and a type that is no longer the generator's, and removes nothing" do
+  test "destroy refuses a built-in, a stylesheet of the default theme, a constant and a type that is not the generator's, and removes nothing" do
     code = %w[app/models/block_types/code.rb app/components/blocks/code_component.rb app/components/blocks/code_component.html.erb app/assets/tailwind/themes/default/code.css
               app/assets/tailwind/themes/default/tokens.css test/components/blocks/code_component_test.rb]
     code.each { |file| copy_in(file) }
@@ -153,6 +153,9 @@ class BlockTypeGeneratorTest < Rails::Generators::TestCase
     BlockTypes::GeneratedCallout.register
 
     assert_equal %w[block page], Theme::Contract.components.fetch("blocks/generated_callout_component")
+    declared = Blocks::GeneratedCalloutComponent.contract
+    assert_equal Theme::Contract.components.fetch("blocks/generated_callout_component").map(&:to_sym), declared.interface, "the generated declaration restates the type's theme_methods"
+    assert_empty declared.words, "the generated component reads no public word"
     assert_includes sampled_types.map(&:name), NAME, "every shared test builds the type from its sample"
     page = create_page(title: "Callout")
     block = sample_block(page, NAME)

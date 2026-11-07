@@ -1,7 +1,6 @@
 module Admin
   module Ui
-    # The box at the top of an explicit-save form after a 422 (design pass spec
-    # §4): "N things need fixing" and one line per message, each linking to the
+    # The box at the top of an explicit-save form after a 422: "N things need fixing" and one line per message, each linking to the
     # field it is about. `role="alert"` + `tabindex="-1"` + `autofocus` so a
     # screen reader announces it and keyboard focus lands on it when Turbo
     # renders the 422.
@@ -21,6 +20,24 @@ module Admin
     # ends with a full stop, or already starts with the humanized field name, or
     # belongs to `base`; otherwise prefixed.
     class ErrorSummaryComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "An alert that takes the focus when it is drawn (role=alert, tabindex -1, autofocus), headed by the count, with a link to each field it can name.",
+        motion: :none,
+        content_edges: %i[many long],
+        widths: :from_container,
+        interface: %i[errors field_ids],
+        limits: [
+          "A field without an id in field_ids prints its message as text, with no link.",
+          "A field's name before its message is its English humanized name until attribute names are translated."
+        ],
+        states: %i[one_error several_errors hover focus],
+        keys: %w[sentence heading],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(errors:, field_ids: {})
         @pairs = normalize(errors)
         @field_ids = field_ids.transform_keys(&:to_s)

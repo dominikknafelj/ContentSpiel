@@ -1,7 +1,8 @@
 module Admin
   module Ui
-    # `Admin::Ui::TabLinksComponent`: tabs that are links, with counts (the
-    # Trash screen's) and without (a form's Form | Submissions).
+    # `Admin::Ui::TabLinksComponent`: tabs that are links, at rest with no
+    # counts (a form's Form | Submissions) and with counts (the Trash
+    # screen's).
     class TabLinksComponentPreview < ViewComponent::Preview
       def with_counts
         render(Admin::Ui::TabLinksComponent.new(label: "Filter by type", tabs: [
@@ -9,7 +10,7 @@ module Admin
         ]))
       end
 
-      def without_counts
+      def rest
         render(Admin::Ui::TabLinksComponent.new(label: "Form screens", tabs: [
           { label: "Form", href: "#", current: false }, { label: "Submissions", href: "#", current: true }
         ]))

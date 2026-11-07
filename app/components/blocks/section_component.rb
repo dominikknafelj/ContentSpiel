@@ -1,5 +1,5 @@
 module Blocks
-  # A section (`BlockTypes::Section`, sections spec §5): a plain grouping
+  # A section (`BlockTypes::Section`): a plain grouping
   # element -- a `<section>` with no accessible name, so not a landmark, and no
   # heading the content doesn't have -- holding a grid with one column per
   # column of its layout. Each column renders its blocks in order with the
@@ -9,12 +9,27 @@ module Blocks
   # narrow screen. The grid, the band and the breakpoints are CSS only
   # (`app/assets/tailwind/themes/default/sections.css`).
   class SectionComponent < ApplicationComponent
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A section with no name of its own, so not a landmark, whose anchor is its id; its columns read in order, as they stack on a narrow screen, and it takes no focus.",
+      motion: :none,
+      content_edges: %i[none many],
+      widths: :from_container,
+      interface: %i[block page columns layout background width style anchor],
+      words: [],
+      limits: [
+        "Its full width reaches the window's edges; at the content width it is as wide as what holds it.",
+        "A style or a layout it does not know is drawn as none or as two columns, and a section in which nothing draws renders nothing."
+      ]
+    )
+
     # The width, in CSS pixels, of the public layout's content column: its
     # `max-w-3xl` (768px) less the `px-4` on either side
     # (`app/views/layouts/application.html.erb`).
     CONTENT_WIDTH = 736
 
-    # The `sizes` of an image in `column` of `section` (sections spec §5.4):
+    # The `sizes` of an image in `column` of `section`:
     # the column's share of the 736px content column from 768px of viewport
     # up, its share of the viewport while the columns still sit side by side
     # (from 480px, where `sections.css` unstacks them), and the full width
@@ -36,10 +51,9 @@ module Blocks
       @page = page
     end
 
-    # A section draws nothing when none of its blocks draws anything
-    # (sections spec §5.5; contrast and buttons spec, Ruling 19): an empty
+    # A section draws nothing when none of its blocks draws anything: an empty
     # band would be a stripe of background with nothing in it. A section
-    # with no block, a block whose type is no longer registered (drawn as
+    # with no block, a block whose type is not registered (drawn as
     # nothing by `ThemeHelper#render_block`), and a block that is empty (a
     # Code block with no code) are all no content. The blocks are asked in
     # reading order and the first that draws something ends the question,
@@ -56,7 +70,7 @@ module Blocks
     def columns = @columns ||= helpers.block_outline(page).columns(block)
 
     # The three settings as the class names they become. Each is read
-    # against its own list, so a stored value this code no longer knows --
+    # against its own list, so a stored value this code does not know --
     # or one written around the service -- reads as the default and never
     # reaches the class attribute.
     def layout = BlockTypes::Section::LAYOUTS.key?(settings.layout.to_s) ? settings.layout : "two"
@@ -66,7 +80,7 @@ module Blocks
     def width = BlockTypes::Section::WIDTHS.include?(settings.width.to_s) ? settings.width : "content"
 
     # The section's style: the stored name when the theme declares it, else
-    # nil. A name the theme no longer knows (or another theme's) is drawn as
+    # nil. A name the theme does not know (another theme's, say) is drawn as
     # no style and left as stored; nothing here writes it. The name is a
     # `Theme::Declarations` name (lowercase letters, digits, underscores), so
     # it is safe as a class suffix.

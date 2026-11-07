@@ -23,6 +23,19 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_selector "button[type='submit'][data-action='click->admin--editor--groups#add']", text: "Add row"
   end
 
+  test "every variant resets each of its presses under reduced motion, as it drops its transition" do
+    Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
+      %i[regular small].each do |size|
+        classes = Admin::Ui::ButtonComponent.classes(variant, size: size).split
+        assert_includes classes, "motion-reduce:transition-none", "#{variant} (#{size}) keeps its transition under reduced motion"
+        classes.grep(/active:translate-/).reject { |name| name.start_with?("motion-reduce:") }.each do |press|
+          assert_includes classes, "motion-reduce:#{press.sub(/translate-y-\w+\z/, 'translate-y-0')}", "#{variant}'s press #{press} moves under reduced motion"
+        end
+      end
+    end
+    assert_includes Admin::Ui::ButtonComponent.classes(:primary).split, "motion-reduce:not-disabled:active:translate-y-0"
+  end
+
   test "rejects an unknown variant" do
     assert_raises(ArgumentError) { Admin::Ui::ButtonComponent.new(label: "Save", variant: :nope) }
   end

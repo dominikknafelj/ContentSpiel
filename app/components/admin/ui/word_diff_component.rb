@@ -10,6 +10,24 @@ module Admin
     # real text. Every text is escaped (`content_tag`/`safe_join`), never
     # `html_safe`.
     class WordDiffComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Inline del and ins elements, each starting with screen-reader text (Removed:, Added:), since aria-label on them is unreliable.",
+        motion: :none,
+        content_edges: %i[long many],
+        widths: :fluid,
+        interface: %i[segments],
+        limits: [
+          "It draws the segments it is handed and computes no diff.",
+          "Its cues (Removed:, Added:) are English in the code, not keys."
+        ],
+        states: %i[rest],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(segments:)
         @segments = segments
       end

@@ -1,8 +1,8 @@
 module Admin
   module Ui
     # One `Setup::SystemCheck::Result` as a row, for CS Studio's System status
-    # page and the setup wizard's system-check step (handoff §10 item 14: the
-    # wizard "shares rows with System status"): a status chip -- a dot and the
+    # page and the setup wizard's system-check step, which shares its rows
+    # with System status: a status chip -- a dot and the
     # word, so the state is never colour alone -- then the check's name, its
     # message and, when the result has one, the console command in a code box
     # with a Copy button.
@@ -23,6 +23,27 @@ module Admin
     # `settings.manage`); without an address there is no link, whatever the
     # result says.
     class SystemCheckRowComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A list item: the state's word beside an aria-hidden dot, the check's name and message, a command with a Copy button named for its check and a polite status, and the links the screen hands over.",
+        motion: :reduced,
+        content_edges: %i[long],
+        widths: :from_container,
+        interface: %i[result copyable mail_settings_href image_settings_href forms_href],
+        limits: [
+          "Without copyable (the setup wizard) the command is selectable text with no Copy button.",
+          "Its words (OK, Warning, Copy, Copy command for, Learn more, and the script's Copied) are English, not keys."
+        ],
+        states: %i[ok warning hover focus],
+        script_states: {
+          copied: [ "test/system/admin/system_status_and_preview_test.rb", "Copy writes the command, says Copied, and announces it politely" ]
+        },
+        keys: %w[open_mail_settings open_image_settings open_forms],
+        slots: [],
+        controller: "admin--ui--clipboard"
+      )
+
       def initialize(result:, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil)
         @result = result
         @copyable = copyable
@@ -45,8 +66,8 @@ module Admin
 
       def status_word = result.ok? ? "OK" : "Warning"
 
-      # The border is the second cue beside the dot and the word (handoff: a
-      # Warning chip has a warn dot *and* a warn border).
+      # The border is the second cue beside the dot and the word: a Warning
+      # chip has a warn dot *and* a warn border.
       def chip_class
         border = result.ok? ? "border-line-strong" : "border-warn"
         "inline-flex items-center gap-1.5 rounded-cs border #{border} px-2 py-0.5 text-label text-ink"

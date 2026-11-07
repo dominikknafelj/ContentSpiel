@@ -1,8 +1,10 @@
 module Admin
   module Ui
-    # `Admin::Ui::ButtonComponent` (cs-studio spec §4.3): one example per variant.
+    # `Admin::Ui::ButtonComponent`: the primary at rest, then one example per
+    # other variant, the small size and the disabled look. Hover, focus and
+    # the press are the browser's.
     class ButtonComponentPreview < ViewComponent::Preview
-      def primary
+      def rest
         render Admin::Ui::ButtonComponent.new(label: "Save page")
       end
 

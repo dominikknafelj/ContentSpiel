@@ -12,6 +12,24 @@ module Admin
     # The date is read in `Time.zone`, the site's time zone for the request, so
     # the block, the row's phrase and its tooltip agree on the calendar day.
     class ScheduledDateComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Decoration hidden from a screen reader, with no focus: the row it stands in says the date in words.",
+        motion: :none,
+        content_edges: %i[short],
+        widths: :fixed_width,
+        interface: %i[at],
+        limits: [
+          "It draws a month and a day in the site's time zone, never a time.",
+          "It is a status mark and cannot be pressed."
+        ],
+        states: %i[rest],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(at:)
         @at = at
       end

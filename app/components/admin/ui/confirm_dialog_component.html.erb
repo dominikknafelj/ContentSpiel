@@ -1,4 +1,4 @@
-<%= render Admin::Ui::DialogComponent.new(id: id, title: title, width: :confirm, destructive: destructive) do |dialog| %>
+<%= render Admin::Ui::DialogComponent.new(id: id, title: title, width: :confirm, destructive: destructive, open_on_load: open_on_load) do |dialog| %>
   <% if body.present? %>
     <p class="text-ink"><%= body %></p>
   <% end %>

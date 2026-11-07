@@ -647,7 +647,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_equal "Typed Name", find_field("Your name").value
   end
 
-  test "a footer stuck over the fields draws a stronger top edge and a shadow, and at the end of the form neither" do
+  test "a footer stuck over the fields draws a stronger top edge and an elevation, and at the end of the form neither" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(@owner)
     page.driver.resize(1400, 600)

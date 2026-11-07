@@ -1,7 +1,7 @@
 module Admin
   module Ui
     # A labelled password input with a Show/Hide button and, optionally, a
-    # four-bar strength meter (design pass spec §4, handoff §9 A10). One
+    # four-bar strength meter. One
     # component for every password input in the product -- setup, new user,
     # change password, reset -- so the rule's wording, the toggle and the
     # meter never drift apart between screens. The behaviour is the Stimulus
@@ -13,13 +13,35 @@ module Admin
     # (e.g. "Use at least 12 characters."), printed under the field and tied
     # to the input through `aria-describedby`/`aria-invalid`.
     #
-    # The Show/Hide button is 12px medium sans in the accent colour (handoff
-    # "Studio Password Reset"), the same on every screen that renders this.
+    # The Show/Hide button is 12px medium sans in the accent colour, the same
+    # on every screen that renders this.
     # The optional `label_aside` slot puts a small link on the label row, to its
     # right -- sign-in's "Forgot your password?".
     #
     # The password itself is never rendered back: the input has no `value`.
     class PasswordFieldComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A labelled password input with a Show button that controls it; errors and the meter's hint are tied to it by aria-describedby, and the hint is a polite live region.",
+        motion: :none,
+        content_edges: %i[none long],
+        widths: :from_container,
+        interface: %i[name id label meter autocomplete errors required],
+        limits: [
+          "The password is never drawn back: the input has no value.",
+          "Its words (Show, Hide, the rule line and the meter's hints) are English in the template and the script, not keys."
+        ],
+        states: %i[rest meter invalid hover focus],
+        script_states: {
+          revealed: [ "test/system/password_field_test.rb", "the change-password form shows the meter, toggles visibility and blocks a short password" ],
+          measured: [ "test/system/password_field_test.rb", "the change-password form shows the meter, toggles visibility and blocks a short password" ]
+        },
+        keys: [],
+        slots: %i[label_aside],
+        controller: "password-field"
+      )
+
       renders_one :label_aside
 
       def initialize(name:, id:, label:, meter: false, autocomplete: "new-password", errors: [], required: true, **input_html)

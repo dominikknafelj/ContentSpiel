@@ -18,6 +18,25 @@ module Admin
     # CSS in `content-spiel.tailwind.css` (a `<dialog>` needs real CSS for its
     # max size and backdrop); an unknown one is a programming error.
     class DialogComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A native modal dialog named by its title (aria-labelledby) with a Close button; Escape closes it, and the browser keeps the focus inside while it is open.",
+        motion: :none,
+        content_edges: %i[long short],
+        widths: :fixed_width,
+        interface: %i[id title width destructive open_on_load hang steady],
+        limits: [
+          "It draws the frame, the title, Close and the footer slot: the actions and the form inside are the caller's.",
+          "It opens only through admin--ui--dialog on the body, by its id or marked by open_on_load."
+        ],
+        states: %i[rest hover focus],
+        script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },
+        keys: %w[close],
+        slots: %i[footer],
+        controller: nil
+      )
+
       WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880 }.freeze
 
       renders_one :footer

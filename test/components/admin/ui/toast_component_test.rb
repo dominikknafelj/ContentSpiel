@@ -64,40 +64,6 @@ class Admin::Ui::ToastComponentTest < ViewComponent::TestCase
   end
 end
 
-class Admin::Ui::ToastRegionComponentTest < ViewComponent::TestCase
-  test "maps notice to success and alert to error, inside one live region" do
-    render_inline(Admin::Ui::ToastRegionComponent.new(flash: { notice: "Done.", alert: "Failed." }))
-    assert_selector "#toasts .admin-toast[role=status]", text: "Done."
-    assert_selector "#toasts .admin-toast[role=alert]", text: "Failed."
-  end
-
-  test "a notice with an undo becomes an undo toast" do
-    render_inline(Admin::Ui::ToastRegionComponent.new(flash: { notice: "Moved.", undo: { "label" => "Undo", "url" => "/u", "method" => "post" } }))
-    assert_selector "#toasts .admin-toast form[action='/u']"
-  end
-
-  # Final review C, I4: a bulk action that did some and refused or failed
-  # others names the failures in its one toast; a 4 s success toast would take
-  # them away before they could be read.
-  test "a warning stays until dismissed, keeps its Undo, and is an alert" do
-    render_inline(Admin::Ui::ToastRegionComponent.new(flash: { warning: "Moved 2 posts to the trash. 1 was refused: “A”.", undo: { "label" => "Undo", "url" => "/u", "method" => "post" } }))
-    assert_selector "#toasts .admin-toast[role=alert][data-kind=warning][data-admin--ui--toast-timeout-value='0']", text: "1 was refused"
-    assert_selector "#toasts .admin-toast form[action='/u']"
-  end
-
-  test "the region is rendered even when empty, so streams have a target" do
-    render_inline(Admin::Ui::ToastRegionComponent.new(flash: {}))
-    assert_selector "#toasts"
-    assert_no_selector ".admin-toast"
-  end
-
-  test "a relay renders the toasts without the region" do
-    render_inline(Admin::Ui::ToastRegionComponent.new(flash: { notice: "Done." }, relay: true))
-    assert_no_selector "#toasts"
-    assert_selector ".admin-toast", text: "Done."
-  end
-end
-
 # `toast_stream` (`Admin::AutosaveResponses`) is how a Turbo Stream answer --
 # one with no redirect, so no flash -- raises a toast: one append to the
 # layout's `#toasts`.

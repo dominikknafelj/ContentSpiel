@@ -2,7 +2,7 @@ module Admin
   module Ui
     # The one button every admin screen renders through -- Save/Cancel in a
     # dialog, "+ Add block", a block card's "Duplicate"/"Delete" menu items,
-    # the tree's "+", and so on (spec §4.3). Five variants only: `:primary`
+    # the tree's "+", and so on. Five variants only: `:primary`
     # (the one emphasized action per screen: a solid accent fill raised to
     # shadow 2), `:secondary` (everything else: an accent tint, accent words,
     # inside an edge), `:tertiary` (accent words, no fill: a dialog's Cancel;
@@ -21,6 +21,26 @@ module Admin
     # caller asks for is the one place to move a button's look: a button that
     # throws work away (Discard changes…) is `:danger_text`.
     class ButtonComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A native button named by its label (an icon button by an aria-label from its label, which its tooltip shows too), pressed with Enter or Space.",
+        motion: :reduced,
+        content_edges: %i[long short],
+        widths: :fluid,
+        interface: %i[label variant type size icon],
+        limits: [
+          "It is drawn in five variants and two sizes, and a look outside them is refused rather than added by a caller's class.",
+          "Under reduced motion the fill and the lift change at once and the primary's one-pixel press does not move; its press is told by its elevation going.",
+          "Busy is set by admin--ui--busy on the button's form; the button only keeps its variant's look while it is busy."
+        ],
+        states: %i[rest hover focus pressed disabled],
+        script_states: { busy: [ "test/system/admin/ai_settings_test.rb", "Test connection keeps its look while it is busy" ] },
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       # Every hover is `not-disabled:hover:`: a disabled button never answers
       # the pointer. Tailwind's `hover:` stands under `@media (hover: hover)`,
       # so a touch screen keeps no stuck hover (`admin_design_rules_test`).

@@ -1,9 +1,8 @@
 module Admin
   module Ui
     # A multi-value input that shows each value as a removable chip, with
-    # autocomplete (design pass round 2, handoff §4.1 "Tags"): the post
-    # editor's tags and related posts. Replaces the comma-separated tag text
-    # field and the related-posts list-plus-search.
+    # autocomplete: the post editor's tags and related posts, and the group
+    # editor's members.
     #
     # The form's source of truth is real controls, never the chips' text: one
     # hidden input per chip (`name` is an array name such as
@@ -58,6 +57,33 @@ module Admin
     # In a view-only editor the surrounding `<fieldset disabled>` disables the
     # input and every remove button, so the whole component is inert.
     class ChipInputComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A labelled combobox with a listbox of suggestions and a list of chips, each removable by a button named Remove and the chip; ArrowDown and Enter pick, Escape closes, Backspace in the empty field removes the last chip, and a polite status says what was added or removed.",
+        motion: :none,
+        content_edges: %i[none many long],
+        widths: :from_container,
+        interface: %i[name id label search_url chips create noun placeholder errors hidden_note help single exclude lowercase max_length track],
+        limits: [
+          "Its hidden inputs are what the form submits; the text input has no name and typing alone never saves.",
+          "A noun it is handed has to have its two sentences under nouns, or its words are missing."
+        ],
+        states: %i[empty with_chips invalid hover focus],
+        script_states: {
+          suggesting: [ "test/system/admin/chip_input_test.rb", "typing, ArrowDown and Enter picks a suggestion as a chip, and it survives a reload" ],
+          too_long: [ "test/system/admin/chip_input_test.rb", "a tag longer than the limit is tinted at once and the save names it in the error slot" ]
+        },
+        keys: %w[
+          nouns.tag.no_matches nouns.tag.create nouns.user.no_matches nouns.user.create nouns.post.no_matches
+          nouns.post.create remove invalid untitled too_long suggestions_label results search_failed already_added
+          added removed
+        ],
+        slots: [],
+        controller: "admin--ui--chip-input",
+        keyboard: [ "test/system/admin/chip_input_test.rb", "a chip's remove button is reachable by keyboard, and focus lands on a neighbour" ]
+      )
+
       def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil, track: false)
         @name = name
         @id = id

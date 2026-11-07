@@ -31,6 +31,14 @@ class Admin::Ui::ConfirmDialogComponentTest < ViewComponent::TestCase
     assert_selector "dialog#c1 button[autofocus]", text: "Cancel"
   end
 
+  test "open_on_load reaches the shared dialog, which opens it as the page appears" do
+    render_inline(Admin::Ui::ConfirmDialogComponent.new(id: "c3", title: "Delete this page?", open_on_load: true)) { |d| d.with_confirm_action { "x" } }
+    assert_selector "dialog#c3[data-admin--ui--dialog-open-on-load]", visible: :all
+
+    render_inline(Admin::Ui::ConfirmDialogComponent.new(id: "c4", title: "Delete this page?")) { |d| d.with_confirm_action { "x" } }
+    assert_no_selector "dialog[data-admin--ui--dialog-open-on-load]", visible: :all
+  end
+
   test "a non-destructive confirm leaves focus to the first field or button" do
     render_inline(Admin::Ui::ConfirmDialogComponent.new(id: "c2", title: "Turn off Deutsch?")) { |d| d.with_confirm_action { "x" } }
     assert_no_selector "dialog#c2 button[autofocus]"

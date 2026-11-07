@@ -1,11 +1,11 @@
 module Admin
   module Ui
-    # `Admin::Ui::ChipInputComponent` (design pass round 2): tags with "Create tag",
-    # related posts with a dot and a status hint, an empty field, and a chip the
-    # server refused. Typing in the Lookbook reaches the real suggestion
+    # `Admin::Ui::ChipInputComponent`: tags with "Create tag", one value,
+    # related posts with a dot and a status hint, an empty field, and a chip
+    # the server refused. Typing in the Lookbook reaches the real suggestion
     # endpoints only when signed in to CS Studio in the same browser.
     class ChipInputComponentPreview < ViewComponent::Preview
-      def tags
+      def with_chips
         render Admin::Ui::ChipInputComponent.new(
           name: "post[tag_names][]", id: "preview-tags", label: "Tags", search_url: "/cs-studio/tags/suggest", create: true,
           chips: [ { value: "rails", label: "rails" }, { value: "ruby", label: "ruby" } ], placeholder: "Add a tag…",
@@ -36,7 +36,7 @@ module Admin
         )
       end
 
-      def with_invalid_chip
+      def invalid
         render Admin::Ui::ChipInputComponent.new(
           name: "post[tag_names][]", id: "preview-invalid", label: "Tags", search_url: "/cs-studio/tags/suggest", create: true,
           chips: [ { value: "rails", label: "rails" }, { value: "x" * 80, label: "x" * 80, invalid: true } ],
