@@ -97,7 +97,7 @@ export default class extends Controller {
           fallbackClass: "admin-drag-fallback",
           fallbackTolerance: 3,
           onStart: (event) => this.startHover(event.item),
-          onMove: (event) => this.hoverOver(event.related),
+          onMove: (event, pointer) => this.hoverOver(event.related, pointer),
           onEnd: (event) => {
             this.endHover()
             this.onDrop(event)
@@ -156,7 +156,10 @@ export default class extends Controller {
   //
   // Before anything is sent, the list's parent is written open in the open
   // set (see the class comment): a hover-opened parent, a page the drop made
-  // a parent and a sibling a keyboard move nested into alike.
+  // a parent and a sibling a keyboard move nested into alike. A move that is
+  // refused leaves that open stored, which is harmless: the open set is
+  // bounded, and an open of a page with no children means only "open once
+  // it has some".
   async save(item, list, index, origin = null) {
     this.storeOpen(list.closest("[data-tree-node]"))
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
@@ -194,43 +197,70 @@ export default class extends Controller {
 
   // ---- A folded parent under a dragged row ---------------------------------
   //
-  // SortableJS's `onMove` names the node the dragged row is over
-  // (`related`). Over a folded parent with a drop list, a timer of
-  // `OPEN_ON_HOVER_MS` starts; when it runs out the parent is opened and
-  // stored open as a person's open (`openUnder`), so its children take the
-  // drop, and it is marked the drop target while the pointer stays inside
-  // it. The pointer is followed for the whole drag (`followPointer`), since
-  // SortableJS calls `onMove` only when it would move the slot: leaving the
-  // parent's row cancels the timer, and leaving the node takes the mark
-  // away. The slot counts as on the parent: SortableJS moves the slot past a
-  // row the pointer enters, so the pointer that rests on a folded parent
-  // rests on the slot beside it. Both are judged by their boxes' height
-  // inside the tree's width, never by what is hit under the pointer: the
-  // slot's own parts are hidden, and the handle a drag holds stands in the
-  // gutter, outside its row's box.
+  // THE POINTER RESTS ON A FOLDED PARENT'S ROW for `OPEN_ON_HOVER_MS`, and
+  // the parent opens: drawn, stored open as a person's open (`unfold`), and
+  // marked the drop target while the pointer is inside it, so its children
+  // take the drop.
+  //
+  // SortableJS moves the slot past a row as soon as the pointer enters it,
+  // which would move a folded row out from under the pointer before it
+  // could rest there. So `onMove` (`hoverOver`) refuses the move (`false`)
+  // while the pointer is in the middle half of a folded row, where the
+  // timer starts, and in the quarter on the slot's side, which the pointer
+  // crosses to reach the middle; only the far quarter lets the slot pass
+  // it. A slot resting beside a folded parent therefore never opens it.
+  //
+  // The node is the one `related` stands in (a row's `<li>`, or the empty
+  // list of a leaf, whose node is the leaf), and any other node cancels the
+  // timer. The pointer is followed for the whole drag (`followPointer`),
+  // since SortableJS calls `onMove` only where it would move the slot:
+  // leaving the parent's row cancels the timer, leaving an opened parent
+  // takes its mark away, and coming back over a parent this drag opened
+  // marks it again. Boxes are judged by their height inside the tree's
+  // width, never by what is hit under the pointer: the handle a drag holds
+  // stands in the gutter, outside its row's box.
   //
   // The timer and the mark go on drag end (the drop), Escape,
   // `turbo:before-cache` and disconnect (`endHover`), so neither outlives a
-  // drag nor is kept in Turbo's snapshot. What the open writes (the fold's
-  // drawing and the open set) is the open set's own, which stays.
+  // drag nor is kept in Turbo's snapshot. Escape ends opening on hover for
+  // the rest of that drag (the drag itself goes on: SortableJS has no
+  // Escape). What an open writes (the fold's drawing and the open set) is
+  // the open set's own, which stays.
   startHover(item) {
     this.endHover()
     this.dragged = item
+    this.openedThisDrag = []
     this.pointerFollower = (event) => this.followPointer(event)
     this.escapeFollower = (event) => { if (event.key === "Escape") this.endHover() }
     document.addEventListener("pointermove", this.pointerFollower)
     document.addEventListener("keydown", this.escapeFollower)
   }
 
-  hoverOver(related) {
-    if (!this.pointerFollower) return
-    const node = related?.matches?.("[data-tree-node]") ? related : null
-    if (!node || node === this.hovered || node === this.dropTarget) return
+  // SortableJS's `onMove`: `false` keeps the slot where it is.
+  hoverOver(related, pointer) {
+    if (!this.pointerFollower) return undefined
+    const node = related?.closest?.("[data-tree-node]") ?? null
+    if (node !== this.hovered) this.cancelHover()
+    if (!node || !isFolded(node) || !this.dropListOf(node)) return undefined
 
-    this.cancelHover()
-    if (!isFolded(node) || !this.dropListOf(node)) return
-    this.hovered = node
-    this.hoverTimer = setTimeout(() => this.openUnder(node), OPEN_ON_HOVER_MS)
+    const box = node.querySelector(":scope > [data-tree-row]")?.getBoundingClientRect()
+    if (!box?.height || pointer?.clientY == null) return undefined
+    const at = (pointer.clientY - box.top) / box.height
+    if (at < 0 || at > 1) return undefined
+
+    const slotAbove = !!(this.dragged && (this.dragged.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING))
+    const middle = at >= 0.25 && at <= 0.75
+    const slotSide = slotAbove ? at < 0.25 : at > 0.75
+    if (!middle && !slotSide) {
+      // The slot passes the row, which moves from under the pointer.
+      this.cancelHover()
+      return undefined
+    }
+    if (middle && !this.hovered) {
+      this.hovered = node
+      this.hoverTimer = setTimeout(() => this.openUnder(node), OPEN_ON_HOVER_MS)
+    }
+    return false
   }
 
   followPointer(event) {
@@ -240,9 +270,14 @@ export default class extends Controller {
       const box = element?.getBoundingClientRect()
       return inTree && !!box && event.clientY >= box.top && event.clientY <= box.bottom
     }
-    const onSlot = at(this.dragged)
-    if (this.hovered && !onSlot && !at(this.hovered.querySelector(":scope > [data-tree-row]"))) this.cancelHover()
-    if (this.dropTarget && !onSlot && !at(this.dropTarget)) this.unmarkDropTarget()
+    if (this.hovered && !at(this.hovered.querySelector(":scope > [data-tree-row]"))) this.cancelHover()
+    if (this.dropTarget && !at(this.dropTarget)) this.unmarkDropTarget()
+    if (!this.dropTarget) {
+      // The innermost parent this drag opened that the pointer is back in.
+      const back = this.openedThisDrag.filter((node) => node.isConnected && !isFolded(node) && at(node))
+        .sort((a, b) => a.getBoundingClientRect().height - b.getBoundingClientRect().height)[0]
+      if (back) this.markDropTarget(back)
+    }
   }
 
   openUnder(node) {
@@ -251,6 +286,11 @@ export default class extends Controller {
     if (!node.isConnected || !isFolded(node)) return
 
     this.unfold(node)
+    this.openedThisDrag?.push(node)
+    this.markDropTarget(node)
+  }
+
+  markDropTarget(node) {
     this.unmarkDropTarget()
     this.dropTarget = node
     this.dropTargetClasses.forEach((name) => node.classList.add(name))
@@ -271,6 +311,7 @@ export default class extends Controller {
     this.cancelHover()
     this.unmarkDropTarget()
     this.dragged = null
+    this.openedThisDrag = []
     if (!this.pointerFollower) return
     document.removeEventListener("pointermove", this.pointerFollower)
     document.removeEventListener("keydown", this.escapeFollower)
@@ -386,9 +427,10 @@ export default class extends Controller {
     const opened = isFolded(above)
     if (opened) this.unfold(above)
     list.append(row)
+    if (!opened) return this.moved(row)
+
     this.focusHandle(row)
-    const position = this.positionOf(row)
-    this.announce(opened ? `${messages(row).t("components.ui.tree_item.opened", { title: this.titleOf(above) })} ${position}` : position)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.opened", { title: this.titleOf(above), position: this.positionOf(row) }))
   }
 
   outdent(row) {

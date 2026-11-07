@@ -156,6 +156,8 @@ class TreeSystemTest < ApplicationSystemTestCase
   # A page that had no children becomes a parent by the move, and the
   # move's answer redraws the tree from the open set: the move wrote the new
   # parent open before it was sent, or the redraw would fold it by default.
+  # (That red needs `admin--pages--tree#arrive` to take the server's path
+  # marks away before `admin--tree--disclosure` draws the folds again.)
   test "a page moved into a page with no children is shown under it after the tree is redrawn" do
     sign_in_via_form(users(:one))
     visit_screen admin_pages_path

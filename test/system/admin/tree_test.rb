@@ -390,13 +390,16 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       mouse.move(x: from_x + ((child_x + 40 - from_x) * (step + 1) / 3.0), y: start_y + ((child_y - start_y) * (step + 1) / 3.0))
       sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer rests one tick plus margin per step
     end
-    # The pointer rests there, stirred by a pixel, until SortableJS's own
-    # timer has put the slot in Alpha's list.
+    # The pointer rests on Child, stirred between its row's two halves,
+    # until SortableJS's own timer has put the slot in Alpha's list. Child is
+    # found again at each step: the slot may pass the opened Alpha, which
+    # moves its branch by a row.
     slot_in_alpha = "document.querySelector('#tree-children-#{@alpha.id} > li.admin-drag-ghost') !== null"
-    10.times do |step|
+    25.times do |step|
       break if page.evaluate_script(slot_in_alpha)
 
-      mouse.move(x: child_x + 40 + (step % 2), y: child_y)
+      child_x, child_y = handle_centre(@child)
+      mouse.move(x: child_x + 40, y: child_y + (step.even? ? -4 : 4))
       sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own
     end
     await_js slot_in_alpha, message: "the slot never reached Alpha's list"
@@ -440,6 +443,74 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     end
     sleep 0.9 # sleep: longer than the moment (600 ms) after the pointer left Alpha's row, so a timer that was not cancelled would have opened it
     assert children_hidden?(@alpha), "a parent the pointer left before the moment was opened"
+    assert_no_selector ".admin-tree-drop-target"
+    mouse.up
+
+    assert children_hidden?(@alpha)
+    assert_not_includes open_set, @alpha.id.to_s
+  end
+
+  # The pointer travels through `ys` in steps quicker than the moment.
+  def sweep(mouse, x, ys)
+    ys.each do |y|
+      mouse.move(x: x, y: y)
+      sleep 0.06 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer passes a row in well under the moment
+    end
+  end
+
+  # Only the pointer resting on a folded row opens it: the slot beside it,
+  # below as the drag starts and above once the pointer has crossed the
+  # row's far quarter, is not the row.
+  test "a slot resting beside a folded parent does not open it" do
+    Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
+    visit_screen "/cs-studio/pages"
+    from_x, from_y = handle_centre(@beta)
+    alpha_top = page.evaluate_script("document.getElementById('tree-row-#{@alpha.id}').getBoundingClientRect().top")
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    sweep(mouse, from_x, [ from_y - 2, from_y - 4 ])
+    sleep 0.9 # sleep: longer than the moment (600 ms), the slot resting below Alpha
+    assert children_hidden?(@alpha), "the slot below a folded parent opened it"
+
+    sweep(mouse, from_x, [ alpha_top + 21, alpha_top + 14, alpha_top + 7, alpha_top + 3 ])
+    assert_eventually(wait: 2, message: "the slot did not pass Alpha") do
+      page.evaluate_script("document.querySelector('li.admin-drag-ghost')?.nextElementSibling?.dataset.pageId") == @alpha.id.to_s
+    end
+    sleep 0.9 # sleep: longer than the moment (600 ms), the slot resting above Alpha
+    assert children_hidden?(@alpha), "the slot above a folded parent opened it"
+    assert_no_selector ".admin-tree-drop-target"
+    mouse.up
+
+    assert_eventually(wait: 10) { root_page.children.order(:position).first == @beta }
+    assert children_hidden?(@alpha)
+    assert_not_includes open_set, @alpha.id.to_s
+  end
+
+  # Gamma passes Alpha's middle on its way up and comes back down to rest
+  # on Beta, a leaf whose empty list is a drop target of its own: Alpha
+  # stays folded.
+  test "a drag across an empty leaf list after passing a folded parent does not open it" do
+    Current.set(actor: users(:one)) do
+      @child = create_page(title: "Child", parent: @alpha)
+      @gamma = create_page(title: "Gamma")
+    end
+    visit_screen "/cs-studio/pages"
+    from_x, from_y = handle_centre(@gamma)
+    alpha_y = row_middle(@alpha)
+    beta_y = row_middle(@beta)
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    sweep(mouse, from_x, [ from_y - 4, beta_y, alpha_y + 10, alpha_y ])
+    # Down to just under Beta's row, where its empty list takes the slot,
+    # and on the slot there.
+    beta_bottom = page.evaluate_script("document.getElementById('tree-row-#{@beta.id}').getBoundingClientRect().bottom")
+    sweep(mouse, from_x, [ alpha_y + 14, beta_bottom - 4, beta_bottom + 4, beta_bottom + 6 ])
+    sleep 0.9 # sleep: longer than the moment (600 ms) after the pointer left Alpha's row
+    assert children_hidden?(@alpha), "a folded parent the pointer passed was opened"
     assert_no_selector ".admin-tree-drop-target"
     mouse.up
 

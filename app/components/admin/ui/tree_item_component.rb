@@ -45,7 +45,7 @@ module Admin
           "It draws one row and never its nesting: the list around it, and the step between levels, are the screen's markup on the tree's own classes."
         ],
         states: %i[rest hover focus selected folded open leaf context_only flat root],
-        keys: %w[fold unfold opened],
+        keys: %w[fold unfold],
         slots: %i[handle mark title state trailings add],
         controller: nil,
         keyboard: [ "test/system/admin/tree_test.rb", "a row's disclosure folds and unfolds its branch by mouse and by keyboard" ]

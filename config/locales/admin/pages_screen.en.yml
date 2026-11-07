@@ -20,6 +20,8 @@ en:
           moves:
             picked_up: "Picked up %{title}. %{position}"
             dropped: "Dropped %{title}. %{position}"
+            # A keyboard move right into a folded page, which opens it.
+            opened: "Opened %{title}. %{position}"
             position: "Position %{position} of %{count}."
             cancelled: "Cancelled. %{title} is back where it was."
           # The head's button that folds the column to a strip (its name, and

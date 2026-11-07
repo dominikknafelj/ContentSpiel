@@ -18,6 +18,7 @@
              data-admin--pages--tree-drop-target-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:drop_target] %>"
              data-messages="<%= messages_data("components.pages_screen.tree.moves.picked_up", "components.pages_screen.tree.moves.dropped",
                                                "components.pages_screen.tree.moves.position", "components.pages_screen.tree.moves.cancelled",
+                                               "components.pages_screen.tree.moves.opened",
                                                "components.pages_screen.tree_row.untitled") %>"
              data-action="turbo:frame-load@document->admin--pages--tree#follow"
              data-live-part="waiting" data-admin--presence--list-kind-value="page" data-admin--presence--list-chunk-value="<%= Presence::HERE_IDS %>" data-admin--presence--list-url-value="<%= helpers.admin_presence_here_path(kind: "page") %>">
@@ -72,7 +73,7 @@
         and names each button in the words it is handed. %>
     <ul id="tree-list" class="<%= Admin::Ui::TreeItemComponent::CLASSES[:tree] %>" data-controller="admin--tree--disclosure"
         data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>" data-tree-locale="<%= locale %>"
-        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold", "components.ui.tree_item.opened") %>">
+        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold") %>">
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options, open_set: open_set, path_ids: path_ids) %>
     </ul>
   <% else %>
