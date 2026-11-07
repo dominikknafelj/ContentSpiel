@@ -46,7 +46,7 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     assert_nil screen_position(post), "an unplaced node has no place on screen"
   end
 
-  # Spec §6: the list is filled before the layout starts, so a worker that
+  # The list is filled before the layout starts, so a worker that
   # fails leaves the nodes reachable. A row opens the node's card -- in the
   # canvas's corner, since no node has a place to stand beside -- and the
   # card's links lead on. There is nothing to pin without a layout.

@@ -31,8 +31,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
   # the status chip with Close at the end of the row; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
   # and not underlined links. A post's notes stand under the title and its
-  # counts and the actions follow them, in the document as on screen (the
-  # notes handoff's decision 12).
+  # counts and the actions follow them, in the document as on screen.
   test "the card reads top to bottom: kind and status, the title, the two counts, its notes, then its actions as buttons" do
     a = create_post(title: "Alpha", tags: %w[one two])
     b = create_post(title: "Beta", tags: %w[one two])
@@ -188,8 +187,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     assert_nil page.evaluate_script("window.pwned")
   end
 
-  # The round of 2026-10-08: the card was in a corner, far from what it is
-  # about. It stands 22 px from the node's edge, centred on it, and stays
+  # The card stands next to what it is about. It stands 22 px from the node's edge, centred on it, and stays
   # there when the view moves: after a pan and after a zoom it is where the
   # node is.
   test "the card opens beside the clicked node and follows it through a pan and a zoom" do
@@ -317,9 +315,8 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card] h2", text: "A title long enough to press"
   end
 
-  # Hover (the round of 2026-10-08): a ring round the mark and the label on a
-  # backing -- and nothing else changes. Hovering used to be nothing but a
-  # tooltip; dimming the rest is the SELECTION's.
+  # Hover: a ring round the mark and the label on a
+  # backing -- and nothing else changes. Dimming the rest is the SELECTION's, not the hover's.
   test "hovering a node rings it and does not dim the others" do
     a, b, c, d = %w[A B C D].map { |title| create_post(title: title) }
     PostRelation.create!(post: a, related_post: b)

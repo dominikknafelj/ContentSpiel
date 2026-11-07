@@ -133,7 +133,7 @@ class Admin::MindGraphLegendSystemTest < Admin::MindGraphSystemTestCase
     await_graph
   end
 
-  # Third design answers and H6: status is not a filter. The key is a dialog
+  # Status is not a filter. The key is a dialog
   # named "Status key" behind the legend's "Status key…" button, in the chip's words.
   test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
     create_post(title: "Alpha", tags: [ "t" ])

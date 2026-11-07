@@ -28,7 +28,7 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card-notes] .sr-only", count: 1, visible: :all # the viewer's own note is not "new"
     assert_equal "", find("[data-mind-graph-card-notes] textarea").value
     assert_equal [ "mind_graph", a ], Notes::Thread.order(:id).last.then { |started| [ started.origin_view, started.subject ] }
-    # Listing a post's notes in the card read none of them (decision P10).
+    # Listing a post's notes in the card read none of them.
     assert_equal 1, Notes::Delivery.unread.where(user: users(:one)).count
   end
 
@@ -96,7 +96,7 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     click_node(b)
     assert_selector "[data-mind-graph-card-notes] textarea"
     assert_no_selector "[data-mind-graph-card-notes] li"
-    assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
+    assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field
   end
 
   # A note's text and its author's name are a person's: written as text.
@@ -199,7 +199,7 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     field = find("[data-mind-graph-card-notes] textarea")
     assert field.readonly?, "the card's field can be typed in while its note is on the wire"
     assert_equal "On its way", field.value
-    # Still out after 300ms: it says so (the notes handoff's decision 41).
+    # Still out after 300ms: it says so.
     assert_selector "[data-mind-graph-card-notes] button[type=submit][aria-busy=true][disabled]", text: "Sending…"
     assert page.evaluate_script("document.querySelector('[data-mind-graph-card-notes] textarea').classList.contains('text-dim')")
     page.execute_script("window.__release()")

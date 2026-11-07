@@ -31,7 +31,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     find("#{LIST} button[data-node-id='#{nid(alone)}']").click
     assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7'][data-edges='4']"
     assert_selector "[data-mind-graph-card] h2", text: "Entry alone"
-    # It is shown now: the notice no longer counts it among those that aren't.
+    # It is shown now: the notice does not count it among those that aren't.
     assert_no_selector "#{GRAPH} [role=status] p", text: /isn't shown|aren't shown/
     # The page does not know the added post's connections (its row was read
     # with none counted), so its card says nothing of them.
@@ -79,7 +79,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card] h2", text: ContentTypes.fetch("blog").label
   end
 
-  # Design answer G5: a read that fails says so in the list, not in a toast,
+  # A read that fails says so in the list, not in a toast,
   # with a small "Try again" button. The stub answers the first request for
   # the unlisted posts itself and hands every other request to the real fetch.
   test "a failed read of the unlisted posts says so in the list, Try again loads them, and Back shows the groups again" do
@@ -476,7 +476,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert places.size == 4 && places.all? { |value| value.is_a?(Numeric) && value.finite? }, "an added post has no place: #{places.inspect}"
   end
 
-  # Design answer H1: ONE PILL PER TARGET. A page with two list blocks has
+  # ONE PILL PER TARGET. A page with two list blocks has
   # two pills, each on its own hub or tag, each with its own posts, its own
   # row in the list and its own way to Posts.
   test "a page with two list blocks has two pills, each with its own row, its own posts and its own way to Posts, and a post a tag brings in is joined to that tag" do
@@ -689,8 +689,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
 
   # The keyboard's whole way: a row is reached by Tab (it is a button), Enter
   # selects its node and hands the focus to the card; Tab then walks the card
-  # as it reads -- the note's field before "Open post" (the notes handoff's
-  # decision 12) -- Enter on the card opens the post, and Escape gives the
+  # as it reads -- the note's field before "Open post" -- Enter on the card opens the post, and Escape gives the
   # focus back to the row.
   test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it, and Enter there opens the post" do
     a = create_post(title: "Alpha")
@@ -726,7 +725,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_current_path admin_post_path(a)
   end
 
-  # The notes handoff's decision 12: Enter on the selected node opens the post.
+  # Enter on the selected node opens the post.
   test "Enter on the canvas opens the selected post, does nothing with nothing selected, and stays a line break in the note's field" do
     a = create_post(title: "Alpha", tags: %w[shared])
     create_post(title: "Beta", tags: %w[shared])
@@ -755,7 +754,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_current_path admin_post_path(a)
   end
 
-  # Spec §5.7, as the round of 2026-10-08 left it: the Tab key meets the
+  # The Tab key meets the
   # search first, then a local view's bar, the filter, the zoom buttons, the
   # canvas, the card and, last, the list -- though on screen the search and
   # the list are one column on the right.

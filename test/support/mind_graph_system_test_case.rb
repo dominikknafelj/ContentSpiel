@@ -41,8 +41,8 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
 
   private
 
-  # A post, a tag and a page of ONE database id (pages spec, decision 4: the
-  # three tables count on their own), with a page's lines to a tag and to a
+  # A post, a tag and a page of ONE database id (the three
+  # tables count on their own), with a page's lines to a tag and to a
   # post type, and a pill hanging off the type by a `brings` line as in a
   # page's local view.
   SHARED_ID_GRAPH = <<~JS.freeze
@@ -227,7 +227,7 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   end
 
   # The browser says the person prefers reduced motion inside the block, and
-  # no longer afterwards: it is shared with the tests that follow.
+  # not afterwards: it is shared with the tests that follow.
   def with_reduced_motion
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
     yield
@@ -294,7 +294,7 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
     page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
   end
 
-  # A node's id as the data and the page write it (pages spec, decision 4):
+  # A node's id as the data and the page write it (the three tables count on their own):
   # of a record (a post, a tag, a page), or the id itself as a string
   # ("post-12", "type-blog"). NEVER of a bare number: 12 is a post, a tag
   # and a page at once, and a helper that read it as a post would press the

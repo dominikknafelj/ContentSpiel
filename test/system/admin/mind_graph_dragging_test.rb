@@ -33,7 +33,7 @@ class Admin::MindGraphDraggingSystemTest < Admin::MindGraphSystemTestCase
     assert_equal [ "drag" ], sent[0...-1].uniq, "something other than drags came before the drop: #{sent}"
   end
 
-  # The round of 2026-10-08: "it springs back" was the complaint. A dropped
+  # A dropped node does not spring back. A dropped
   # node is pinned -- it is where it was dropped once the layout has come to
   # rest around it -- its neighbour has followed it, it carries the pin mark,
   # and the screen says how many are pinned.

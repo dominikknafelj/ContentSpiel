@@ -21,7 +21,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     assert_no_text "Loading the graph…"
   end
 
-  # The screen fills the window (the round of 2026-10-08): the box is (almost)
+  # The screen fills the window: the box is (almost)
   # the content column wide -- main's width less its padding -- and ends
   # exactly where the window does less that padding, so the page itself does
   # not scroll. Inside it the canvas is on the left and the search and the
@@ -284,7 +284,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     assert_equal "ruby (12)", labels[4]
   end
 
-  # One number is three nodes (pages spec, decision 4): the post, the tag
+  # One number is three nodes (the three tables count on their own): the post, the tag
   # and the page of id 12 are each drawn, each selected by its own id, with
   # its own neighbours. A page's card and a pill's are their name and Pin
   # until each has its own. The pill is as wide as its
@@ -352,7 +352,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === 'more-type-blog'")
     await_frames
     assert_not_includes graph["data-labelled"].split(","), "more-type-blog", "a pill has no label beside it"
-    # Pressed near its end, the pill is not selected (design answer F4): it
+    # Pressed near its end, the pill is not selected: it
     # opens the list with its posts, asked for by its page's NUMBER and its
     # target (the pill carries the page as a node's id, "page-12"). The read
     # is played here, since page 12 is the stub's; every other request goes

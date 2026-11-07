@@ -289,8 +289,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
     assert_text "1.214 other posts have no connections yet and aren't shown."
   end
 
-  # Pages spec, decision 6; design answer, part one §6 and H5; the third
-  # answers ("not remembered after a reload"). The threshold is lowered for
+  # The choice is not remembered after a reload. The threshold is lowered for
   # the server this test's browser talks to: nobody builds three thousand
   # lines, and no request is played.
   test "a site with too many lines opens around Home and says why, Show everything draws the whole graph in the same page, and neither a reload nor Back remembers it" do
