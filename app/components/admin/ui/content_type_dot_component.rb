@@ -6,6 +6,24 @@ module Admin
     # class names are spelled out in full (not interpolated) so Tailwind's
     # scanner sees them.
     class ContentTypeDotComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Inline text named by the type's name; the dot or ring is hidden from a screen reader, and it takes no focus.",
+        motion: :none,
+        content_edges: %i[short long missing],
+        widths: :fluid,
+        interface: %i[content_type],
+        limits: [
+          "Colour is never the only cue: the name always stands beside the mark.",
+          "An unregistered type draws a neutral ring and its stored name, never an error."
+        ],
+        states: %i[filled ring unregistered],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       FILLED = %w[bg-cat-1 bg-cat-2 bg-cat-3 bg-cat-4 bg-cat-5 bg-cat-6].freeze
       RINGS = [ "border border-cat-1", "border border-cat-2", "border border-cat-3",
                 "border border-cat-4", "border border-cat-5", "border border-cat-6" ].freeze

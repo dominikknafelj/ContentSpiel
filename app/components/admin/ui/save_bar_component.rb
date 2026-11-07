@@ -1,7 +1,6 @@
 module Admin
   module Ui
-    # The explicit-save bar for configuration screens (design pass spec §4,
-    # handoff §9 B12): sticky at the foot of the form and always visible, with
+    # The explicit-save bar for configuration screens: sticky at the foot of the form and always visible, with
     # Save, Cancel (which leaves without asking, `data-save-bar-cancel`) and a
     # live count of changed fields. It is rendered *inside* the form that carries `admin--saving--save-bar`
     # (the controller finds its `bar`/`count` targets by being an ancestor), and
@@ -12,11 +11,33 @@ module Admin
     # password form needs `data-password-submit` on it so the strength meter can
     # hold the submit back until the password is long enough.
     class SaveBarComponent < AdminComponent
-      # `contained: true` is the footer of ONE card, drawn inside it (the notes
-      # handoff's decision 34): under a line, within the card's padding, on the
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A Save button and a Cancel link, with a polite live region for the count of changes and a status for the blocked hint.",
+        motion: :reduced,
+        content_edges: %i[short],
+        widths: :container,
+        interface: %i[form_id cancel_url save_label save_data contained],
+        limits: [
+          "The count, the blocked hint and Save's disabled state are written by admin--saving--save-bar on the form; without JavaScript Save is a plain working submit.",
+          "It must stand inside the form that carries admin--saving--save-bar."
+        ],
+        states: %i[rest contained hover focus],
+        script_states: {
+          changed: [ "test/system/save_bar_test.rb", "the footer is always there, counts changes, disables Save when nothing changed, and guards leaving" ],
+          stuck: [ "test/system/save_bar_test.rb", "a footer stuck over the fields draws a stronger top edge and a shadow, and at the end of the form neither" ],
+          blocked: [ "test/system/save_bar_test.rb", "Change password is locked while the name is unsaved, and unlocks when it is saved" ]
+        },
+        keys: %w[save cancel changes unsaved no_changes blocked],
+        slots: [],
+        controller: "admin--saving--save-bar"
+      )
+
+      # `contained: true` is the footer of ONE card, drawn inside it: under a line, within the card's padding, on the
       # card's own surface, and not stuck to the window -- the card is short
       # and its footer is where the card ends. Put it in the card as its last
-      # part. The default is the footer of a whole form, unchanged.
+      # part. The default is the footer of a whole form.
       def initialize(form_id:, cancel_url:, save_label: nil, save_data: {}, contained: false)
         @form_id = form_id
         @contained = contained

@@ -19,6 +19,24 @@ module Admin
     #
     # Decoration only: the sentence beside it names the actor.
     class ActorAvatarComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Decoration with no role, name or focus: the circle, the chip and the empty slot are hidden from a screen reader, and the sentence beside it names the actor.",
+        motion: :none,
+        content_edges: %i[none missing],
+        widths: :fixed,
+        interface: %i[actor],
+        limits: [
+          "It draws one mark in a 28px slot and never the actor's name.",
+          "A deleted user's circle is empty, because an event records no name to draw letters from."
+        ],
+        states: %i[user own deleted_user system nobody],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       SLOT = "flex size-7 shrink-0 items-center justify-center".freeze
 
       def initialize(actor:)

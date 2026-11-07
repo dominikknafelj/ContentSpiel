@@ -14,6 +14,24 @@ module Admin
     # so it is `aria-hidden` and has no words of its own. Anything else the
     # caller needs on the tag (`id`, `data`) passes through.
     class IconChipComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Decoration hidden from a screen reader, with no words and no focus: it always stands beside its type's or module's name.",
+        motion: :none,
+        content_edges: %i[none],
+        widths: :fixed,
+        interface: %i[icon family size],
+        limits: [
+          "It is the one place an icon's hue is drawn, in a family's pair and nowhere else.",
+          "It draws eight families and two sizes, and anything else is refused."
+        ],
+        states: %i[regular small],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       FAMILIES = {
         text: "bg-ic-text-bg text-ic-text",
         media: "bg-ic-media-bg text-ic-media",

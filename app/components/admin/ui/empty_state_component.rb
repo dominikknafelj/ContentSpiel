@@ -34,6 +34,24 @@ module Admin
     # same card. At most one action -- a second would be a choice the list
     # itself should offer.
     class EmptyStateComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "One line of text with no role and no heading, read where the rows would be; its action slot brings its own name and keyboard.",
+        motion: :none,
+        content_edges: %i[short long],
+        widths: :container,
+        interface: %i[title description],
+        limits: [
+          "It draws no border of its own: it stands inside the card the rows would be in.",
+          "It holds at most one action, and adds no punctuation between the title and the description."
+        ],
+        states: %i[title_only with_description_and_action],
+        keys: [],
+        slots: %i[action],
+        controller: nil
+      )
+
       renders_one :action
 
       def initialize(title:, description: nil)

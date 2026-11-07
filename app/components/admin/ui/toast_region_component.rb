@@ -22,6 +22,24 @@ module Admin
     # Deliberately NOT `data-turbo-permanent`: Turbo would keep the old region
     # and throw away the new page's, so the flash of every redirect would vanish.
     class ToastRegionComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "No role of its own: each toast in it is its own status or alert.",
+        motion: :none,
+        content_edges: %i[none many],
+        widths: :container,
+        interface: %i[flash relay],
+        limits: [
+          "It renders even when empty, so a stream has a target; with relay it draws the toasts without the region.",
+          "It is not Turbo-permanent: a new page's region replaces the old with its flash."
+        ],
+        states: %i[empty success undo warning error relay],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(flash:, relay: false)
         @flash = flash
         @relay = relay

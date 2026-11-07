@@ -24,6 +24,27 @@ module Admin
     # rail's column; the blocks column is the element marked
     # `.admin-rail__main`, and nothing else is placed.
     class RailTabsComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A tablist named Settings of tab buttons, one of them in the tab order, walked with the arrow keys, Home and End; a rail of one tab is a heading instead.",
+        motion: :none,
+        content_edges: %i[many short],
+        widths: :container,
+        interface: %i[rail_id tabs current slot_tabs],
+        limits: [
+          "It draws only where the rail docks, and the current tab is the server's only on the first draw.",
+          "A current that names no tab is the first tab."
+        ],
+        states: %i[rest single hover focus],
+        script_states: {
+          selected: [ "test/system/admin/editor_rail_test.rb", "Page and Section are tabs: arrows move between them, Home and End go to the ends" ]
+        },
+        keys: %w[label],
+        slots: [],
+        controller: nil
+      )
+
       Tab = Data.define(:key, :label, :count, :count_data) do
         def initialize(key:, label:, count: nil, count_data: nil) = super
       end

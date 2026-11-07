@@ -117,39 +117,28 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
 
   teardown { I18n.reload! }
 
-  def declared = ui_components - UNDECLARED.map(&:constantize)
-
-  test "every Admin::Ui component includes the contract and declares it, but the ones not declared yet" do
-    assert_not_empty declared
-    declared.each { |klass| assert_contract(klass) }
-  end
-
-  test "the undeclared list names only components, and none that declares" do
-    names = ui_components.map(&:name)
-    UNDECLARED.each do |name|
-      assert_includes names, name, "UiContract::UNDECLARED names #{name}, which is no component of app/components/admin/ui"
-      assert_nil name.constantize.try(:contract), "#{name} declares its contract: take it out of UiContract::UNDECLARED"
-    end
+  test "every Admin::Ui component includes the contract and declares it" do
+    ui_components.each { |klass| assert_contract(klass) }
   end
 
   test "the contract's interface is the component's keywords" do
-    declared.each { |klass| assert_contract_interface(klass) }
+    ui_components.each { |klass| assert_contract_interface(klass) }
   end
 
   test "the contract's slots are the component's slots" do
-    declared.each { |klass| assert_contract_slots(klass) }
+    ui_components.each { |klass| assert_contract_slots(klass) }
   end
 
   test "the contract's keys are the leaves the component owns in ui.en.yml" do
-    declared.each { |klass| assert_contract_keys(klass) }
+    ui_components.each { |klass| assert_contract_keys(klass) }
   end
 
   test "the contract's controller exists and is named in the component's own source" do
-    declared.each { |klass| assert_contract_controller(klass) }
+    ui_components.each { |klass| assert_contract_controller(klass) }
   end
 
   test "a script-held state names a browser test that is there" do
-    declared.each { |klass| assert_contract_script_states(klass) }
+    ui_components.each { |klass| assert_contract_script_states(klass) }
   end
 
   test "the contract can fail" do
@@ -213,6 +202,32 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
       assert_contract(UiContractFromFileComponent)
     ensure
       Object.send(:remove_const, :UiContractFromFileComponent) if Object.const_defined?(:UiContractFromFileComponent, false)
+    end
+  end
+
+  # A component with no template (`Admin::Ui::RailPanelComponent`) names its
+  # controller in its Ruby code alone, and the check reads that code's text.
+  test "the controller check reads a component's Ruby code, with no template beside it" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "ui_contract_from_code_component.rb")
+      File.write(path, <<~RUBY)
+        class UiContractFromCodeComponent < Admin::AdminComponent
+          include Admin::Ui::Contract
+
+          contract(states: %i[rest], keys: [], slots: [], controller: "admin--ui--dialog", interface: %i[a],
+            **UiContractSampleComponent::COMMON)
+
+          def initialize(a:)
+            @a = a
+          end
+
+          def call = tag.div(data: { controller: "admin--ui--dialog" })
+        end
+      RUBY
+      load path
+      assert_contract(UiContractFromCodeComponent)
+    ensure
+      Object.send(:remove_const, :UiContractFromCodeComponent) if Object.const_defined?(:UiContractFromCodeComponent, false)
     end
   end
 

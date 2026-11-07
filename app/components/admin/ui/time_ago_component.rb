@@ -1,7 +1,7 @@
 module Admin
   module Ui
-    # A time as a short relative phrase, the absolute time as its tooltip
-    # (design pass spec §4): `<time datetime="…" title="3 Oct 2026, 14:05">2h
+    # A time as a short relative phrase, the absolute time as its tooltip:
+    # `<time datetime="…" title="3 Oct 2026, 14:05">2h
     # ago</time>`. Everything is read in `Time.zone` -- the site time zone
     # `Admin::BaseController#use_site_time_zone` sets for the request -- so
     # "yesterday" is the site's calendar day, not UTC's, and the tooltip
@@ -15,6 +15,24 @@ module Admin
     # future time (a scheduled publish) is an absolute "5 Oct, 09:30".
     # Rendered once per request: lists reload on navigation, so no ticking.
     class TimeAgoComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A time element with its datetime, saying a short phrase, with the absolute time as its title; it takes no focus.",
+        motion: :none,
+        content_edges: %i[short missing],
+        widths: :fluid,
+        interface: %i[time title],
+        limits: [
+          "It is drawn once per request and never ticks.",
+          "A nil time renders nothing."
+        ],
+        states: %i[just_now minutes hours yesterday days this_year last_year scheduled],
+        keys: %w[just_now minutes_ago hours_ago yesterday days_ago],
+        slots: [],
+        controller: nil
+      )
+
       # `title:` replaces the tooltip (the dashboard's coalesced edit burst
       # shows its whole span there).
       def initialize(time:, title: nil)

@@ -1,7 +1,6 @@
 module Admin
   module Ui
-    # The content header's language tabs (spec §6.2, handoff §10 A13; they
-    # replaced the dotted language switcher): one entry per
+    # The content header's language tabs: one entry per
     # `Locales.enabled`, named in its own language (`Locales.name(code,
     # native: true)`, same as `SetupHelper#language_name`) rather than in
     # whichever language the admin's own UI happens to be in -- a German
@@ -18,15 +17,15 @@ module Admin
     # which ones still need attention before publishing.
     #
     # `outdated:` is the set of codes whose translation was made against an
-    # older version of the original (`Translations::Status.outdated_locales`,
-    # translation helpers spec §4) -- a second, solid warn dot
+    # older version of the original (`Translations::Status.outdated_locales`)
+    # -- a second, solid warn dot
     # with its own title and screen-reader text, since "something changed
     # since" asks for a different job than "something is still empty". Each
     # one carries a stable id (`.outdated_marker_id`) so "Still correct — mark up to date"
     # can stream it away once the last outdated field in that language is
     # confirmed (`Admin::TranslationConfirmationsController`).
     #
-    # `mode: :buttons` (round 3, Task 5, handoff B32) is for a screen that holds
+    # `mode: :buttons` is for a screen that holds
     # every language's fields at once (Settings' Site card): each language is a
     # `<button type="button" role="tab">` that only switches which pair of fields
     # is shown, never navigates -- so it is not a Turbo visit and the leave guard
@@ -38,6 +37,27 @@ module Admin
     # controls). The buttons have no `name`, so a form's save footer never counts
     # them as a field.
     class LanguageTabsComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A navigation named Languages: in links mode links with the current one aria-current, in buttons mode a tablist of buttons with aria-selected; each language's missing or outdated mark says its state in screen-reader text.",
+        motion: :none,
+        content_edges: %i[many short],
+        widths: :container,
+        interface: %i[current missing outdated url visible mode button_data panel_id],
+        limits: [
+          "Switching language is the caller's: links mode follows the URL it is handed, and buttons mode's behaviour is the caller's controller.",
+          "In links mode the languages past visible go into the shared menu, and buttons mode has no overflow."
+        ],
+        states: %i[rest missing outdated overflow buttons hover focus],
+        script_states: {
+          selected: [ "test/system/admin/settings_test.rb", "tabs switch without asking or counting, a sidebar link asks, and Save persists both languages" ]
+        },
+        keys: %w[nav_label missing_title missing outdated_title outdated more],
+        slots: [],
+        controller: nil
+      )
+
       MODES = %i[links buttons].freeze
 
       def self.outdated_marker_id(code) = "language-switcher-outdated-#{code}"
@@ -60,7 +80,7 @@ module Admin
 
       # The first `visible` languages, except that the current one always has
       # a tab: when it would fall into the overflow it takes the last visible
-      # slot instead (handoff §10 A13).
+      # slot instead.
       def buttons? = mode == :buttons
 
       def button_data_for(code) = button_data.call(code)

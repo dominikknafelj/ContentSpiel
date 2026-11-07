@@ -12,6 +12,24 @@ module Admin
     # number: what the answer puts into the tab, so the button stays and a tab
     # that has the keyboard's focus keeps it.
     class RailTabComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A button with role=tab, aria-selected and aria-controls its panel; only the current tab is in the tab order.",
+        motion: :none,
+        content_edges: %i[short long],
+        widths: :fluid,
+        interface: %i[rail_id tab current contents],
+        limits: [
+          "Its current is only the first draw's: from then on the rail's script decides it.",
+          "With contents it draws only the label and the count, for a stream to put into the tab."
+        ],
+        states: %i[rest current count hover focus],
+        keys: [],
+        slots: [],
+        controller: "admin--ui--rail"
+      )
+
       def initialize(rail_id:, tab:, current: false, contents: false)
         @rail_id = rail_id
         @tab = tab

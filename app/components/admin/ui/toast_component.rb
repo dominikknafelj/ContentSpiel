@@ -1,7 +1,6 @@
 module Admin
   module Ui
-    # One toast (handoff §10): a transient message at the foot of the screen
-    # that replaced the inline `Admin::FlashComponent` paragraphs. `kind` picks
+    # One toast: a transient message at the foot of the screen. `kind` picks
     # the live-region role and how long it stays:
     #
     #   success  role=status  4 s
@@ -33,6 +32,24 @@ module Admin
     # element must NOT carry `data-turbo-temporary` to get there: Turbo would
     # delete a live, just-relayed toast on the next frame navigation.
     class ToastComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A status (success, undo) or an alert (warning, error) with a Dismiss button and its action, when it has one, as a button.",
+        motion: :none,
+        content_edges: %i[short long],
+        widths: :fluid,
+        interface: %i[message kind action id],
+        limits: [
+          "A warning or an error never hides by itself; the clock and the pause on hover and focus are admin--ui--toast's.",
+          "Its message is plain text: a link goes in its action, never in the message."
+        ],
+        states: %i[success undo warning error hover focus],
+        keys: %w[dismiss save_failed order_failed dropped],
+        slots: [],
+        controller: "admin--ui--toast"
+      )
+
       KINDS = %i[success undo warning error].freeze
       TIMEOUTS = { success: 4000, undo: 8000, warning: 0, error: 0 }.freeze
 

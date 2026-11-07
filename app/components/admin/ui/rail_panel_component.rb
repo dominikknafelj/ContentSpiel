@@ -9,6 +9,24 @@ module Admin
     # shown. Named by its tab (`Admin::Ui::RailTabsComponent`), whose ids
     # both components build the same way.
     class RailPanelComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A tabpanel labelled by its tab, with no focus of its own.",
+        motion: :none,
+        content_edges: %i[none long],
+        widths: :container,
+        interface: %i[rail_id key current docked_only],
+        limits: [
+          "Its content is drawn once and never cloned; which panel shows is the rail's script from the first draw on.",
+          "A docked_only panel is hidden below the rail's threshold."
+        ],
+        states: %i[rest current docked_only],
+        keys: [],
+        slots: [],
+        controller: "admin--ui--rail"
+      )
+
       def initialize(rail_id:, key:, current: false, docked_only: false)
         @rail_id = rail_id
         @key = key

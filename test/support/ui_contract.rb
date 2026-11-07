@@ -40,13 +40,6 @@ module UiContract
   # red. Empty when a pull request is merged.
   KEYBOARD_NOT_YET = {}.freeze
 
-  # The components that do not declare their contract yet: every one but the
-  # first five declared. It goes when the last of them declares.
-  UNDECLARED = (MADE_BEFORE_CONTRACT - %w[
-    Admin::Ui::ButtonComponent Admin::Ui::StatusChipComponent Admin::Ui::DialogComponent
-    Admin::Ui::ListStateComponent Admin::Ui::SlotComponent
-  ]).freeze
-
   PLURAL_KEYS = %i[zero one two few many other].freeze
 
   # Ruby source's lexer tokens (`Ripper.lex`) outside a `contract(...)` call
@@ -75,7 +68,7 @@ module UiContract
   # its Ruby without comments and without the declaration.
   def self.own_source(klass)
     ruby = Object.const_source_location(klass.name)&.first or return ""
-    ruby_text = outside_contract(File.read(ruby)).reject { |_, type, _| %i[on_comment on_embdoc on_embdoc_beg on_embdoc_end].include?(type) }.map(&:last).join
+    ruby_text = outside_contract(File.read(ruby)).reject { |_, type, _| %i[on_comment on_embdoc on_embdoc_beg on_embdoc_end].include?(type) }.map { |_, _, text| text }.join
     templates = Dir["#{ruby.delete_suffix('.rb')}.*"].reject { |path| path == ruby }.map { |path| File.read(path) }
     [ ruby_text, *templates ].join("\n")
   end

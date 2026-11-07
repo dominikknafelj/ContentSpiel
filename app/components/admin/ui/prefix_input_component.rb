@@ -1,7 +1,7 @@
 module Admin
   module Ui
-    # A text input joined to a sunken, read-only prefix cell inside one border
-    # (design pass spec §4, handoff A-series "prefix input"): the slug field's
+    # A text input joined to a sunken, read-only prefix cell inside one border:
+    # the slug field's
     # "example.com/de/" in front of "about". The wrapper owns the border, so the
     # focus ring (`focus-within`) and the invalid state (danger border) apply to
     # both halves at once; the prefix cell keeps its sunken ground when invalid.
@@ -12,6 +12,24 @@ module Admin
     # that id (the per-field error slot autosave streams into), so there is
     # exactly one such element on the page.
     class PrefixInputComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A text input named by the caller's label, joined to a read-only prefix; an invalid one is aria-invalid and described by the caller's error slot.",
+        motion: :none,
+        content_edges: %i[short long],
+        widths: :container,
+        interface: %i[name id value prefix errors],
+        limits: [
+          "The error text is the caller's, in the element of id <id>-errors; it only marks the input and the border.",
+          "The prefix is text and cannot be edited."
+        ],
+        states: %i[rest invalid focus],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(name:, id:, value:, prefix:, errors: [], **html)
         @name = name
         @id = id

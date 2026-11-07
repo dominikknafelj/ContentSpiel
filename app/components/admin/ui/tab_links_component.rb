@@ -10,6 +10,24 @@ module Admin
     # the `<nav>`'s accessible name. Anything else for the links (`data`)
     # comes in as `link_data`.
     class TabLinksComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A navigation named by its label, of links with the current one aria-current=page; a tab change is a navigation.",
+        motion: :none,
+        content_edges: %i[many short],
+        widths: :fluid,
+        interface: %i[tabs label link_data],
+        limits: [
+          "It draws links only, never a tablist: pressing one is a visit.",
+          "With no tabs it renders nothing."
+        ],
+        states: %i[rest with_counts hover focus],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       LINK_CLASS = "inline-flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm last:border-r-0".freeze
 
       def initialize(tabs:, label:, link_data: {})

@@ -11,6 +11,24 @@ module Admin
     # before the file arrives. An image not decoded yet has none; the caller's
     # class then sizes it.
     class LibraryImageComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "An image with an empty alt, or an empty box hidden from a screen reader: whoever draws it names the image.",
+        motion: :none,
+        content_edges: %i[missing],
+        widths: :container,
+        interface: %i[asset min_width css_class loading],
+        limits: [
+          "It never draws the original, only a width the app made or the blurred preview.",
+          "Its alt is always empty: the image's alt text is the caller's to say."
+        ],
+        states: %i[width preview empty],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
       def initialize(asset:, min_width:, css_class: nil, loading: "lazy", **attributes)
         @asset = asset
         @url = asset.display_url(min_width: min_width)
