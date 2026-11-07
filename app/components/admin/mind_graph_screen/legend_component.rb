@@ -1,15 +1,14 @@
 module Admin
   module MindGraphScreen
-    # The mind graph's legend, WHICH IS ITS FILTER (pages in the mind graph,
-    # spec §6; design answers part one §4 and F6): the kinds of node and the
-    # kinds of line are checkboxes, everything on, each with its count
-    # ("Pages 200"), in place of the All / Related / Tags radios. Drawn
-    # as two labelled groups (Claude Design's O5): "Show" over the toggles
-    # of both kinds, then "Key" over the keys that switch nothing, with the
-    # "Status key…" button last (the Tab order is the toggles, then the
-    # button: the marks hold no stop). The keys are: one entry
-    # per content type PRESENT among the viewer's readable posts (not every
-    # registered type -- a legend of types you can't see is noise, and a
+    # The mind graph's legend, WHICH IS ITS FILTER (design answers part one
+    # §4 and F6): the kinds of node and the kinds of line are checkboxes,
+    # everything on, each with its count ("Pages 200"), in place of the All /
+    # Related / Tags radios. Drawn as three labelled groups (Claude Design's
+    # O5): "Show" over the toggles of both kinds, "Key" over the keys that
+    # switch nothing, then "Status" over the five looks (the Tab order is the
+    # toggles alone: the marks and the looks hold no stop). The keys are: one
+    # entry per content type PRESENT among the viewer's readable posts (not
+    # every registered type -- a legend of types you can't see is noise, and a
     # type the viewer can't read at all would be disclosed by it), "Retired
     # type" when one is present, "Pinned" (the mark of a node that stays
     # where it was dropped) and "Open notes" (the count badge of a post or a
@@ -17,8 +16,7 @@ module Admin
     #
     # WHICH TOGGLES A VIEWER GETS is `PostGraph::Kinds`' rule and nobody
     # else's: a kind that can be drawn for them has its toggle and its key,
-    # and one that cannot has none (pages spec §2: no type the viewer cannot
-    # read). So a reader of pages alone gets "Tags" too: a tag their pages
+    # and one that cannot has none (no type the viewer cannot read). So a reader of pages alone gets "Tags" too: a tag their pages
     # list is drawn. "Links in text" is not built and has no toggle, not
     # even a disabled one (F6).
     #
@@ -29,8 +27,11 @@ module Admin
     # the graph shows.
     #
     # STATUS IS NOT A FILTER (the third design answers): the five looks are
-    # a key of their own, a dialog (`StatusKeyComponent`, H6), and here is
-    # only the "Status key…" button that opens it.
+    # a key on the legend's row, after Key, with no control among them. Their
+    # names are THE CHIP'S WORDS (H6: one set of words): "Live, unpublished
+    # changes" and "Live, change scheduled", with the day of a scheduled
+    # change only on a card's chip (`test/lib/mind_graph_guards_test.rb`
+    # holds the words to the chips' and the card's).
     #
     # Server-rendered, so every name is text and a type's dot is the real
     # component. A SWATCH is a small canvas (`SwatchComponent`) that the
@@ -46,6 +47,9 @@ module Admin
       # (`NODE_TOGGLES`, `LINE_TOGGLES`; a test holds the two equal).
       NODES = ::PostGraph::Kinds::NODES
       LINES = ::PostGraph::Kinds::LINES
+      # `Publishing::State`'s names, in the Status group's order; a swatch is
+      # `state-<name, dasherized>`.
+      STATES = %i[live draft scheduled live_with_changes live_change_scheduled].freeze
 
       # `content_types:` the type names of the viewer's posts, in any order, with
       # repeats allowed; `pages:` whether the viewer can read a page at all.

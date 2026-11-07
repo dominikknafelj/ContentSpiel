@@ -256,8 +256,6 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/gestures.js
     app/javascript/mind_graph/parts.js
     app/javascript/controllers/admin/mind_graph/swatches_controller.js
-    app/components/admin/mind_graph_screen/status_key_component.rb
-    app/components/admin/mind_graph_screen/status_key_component.html.erb
     app/components/admin/mind_graph_screen/swatch_component.rb
     app/components/admin/mind_graph_screen/parts_component.rb
     app/components/admin/mind_graph_screen/parts_component.html.erb

@@ -9,17 +9,17 @@ en:
       # the two groups of toggles for a screen reader; `nodes` are the kinds of
       # node a toggle switches and `edges` the kinds of line (once its count
       # is known, a toggle's whole name is the script's `mind_graph.script.
-      # legend.toggle`); `status` is the link that opens the status key. The
-      # content types' own names come from the registry
+      # legend.toggle`). The content types' own names come from the registry
       # (`Admin::Ui::ContentTypeDotComponent`); `retired` and `pinned` are
       # keys that switch nothing (the notes badge's is in `notes.en.yml`).
       #
-      # `status_key` is the dialog that link opens: `title` its name and
-      # `states` its five rows, in the words of the card's chips (one set of
-      # words, changed together: these, the chips' own `status_chip.labels`
-      # and `unpublished_chip.label` in `ui.en.yml`, and `script.card.status`
-      # in `mind_graph.en.yml`; the day of a scheduled change stands only on
-      # the card).
+      # `states_label` heads the legend's Status group and `states` are its
+      # five looks, in the words of the card's chips (one set of words,
+      # changed together: these, the chips' own `status_chip.labels` and
+      # `unpublished_chip.label` in `ui.en.yml`, and `script.card.status` in
+      # `mind_graph.en.yml`; the day of a scheduled change stands only on the
+      # card). `test/lib/mind_graph_guards_test.rb` fails on a word changed
+      # in one of them and not in the others.
       #
       # `parts` are the shared pieces the graph's scripts clone: `close` is
       # the card's Close, an icon button named by it.
@@ -38,11 +38,9 @@ en:
             lists: "Lists"
             related: "Related"
             tag: "Shares a tag"
-          status: "Status key…"
           retired: "Retired type"
           pinned: "Pinned"
-        status_key:
-          title: "Status key"
+          states_label: "Status"
           states:
             live: "Live"
             draft: "Draft"

@@ -243,4 +243,60 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     component_retired = Rails.root.join("app/components/admin/ui/content_type_dot_component.rb").read[/def mark = .*: "border border-([\w-]+)"/, 1]
     assert_equal tokens_read.fetch(retired_key), utility_token(component_retired), "the component's unregistered type is border-#{component_retired}, the canvas draws it in theme.#{retired_key}"
   end
+
+  # THE STATUS WORDS ARE ONE SET (H6), written in three files: the legend's
+  # five looks (`legend.states`, `mind_graph_screen.en.yml`), the shared
+  # chips' labels (`status_chip.labels` and `unpublished_chip.label`,
+  # `ui.en.yml`), which are the card's words for a record in one state and
+  # the words of a list row's name (`list.stated`), and the card's sentences
+  # for the two states of a live record (`script.card.status`,
+  # `mind_graph.en.yml`), which carry the day of a scheduled change. A word
+  # changed in one of them and not in the others fails here. A two-state look
+  # is the Live chip's word, a comma and the second chip's word as the
+  # sentence goes on ("Live, unpublished changes"). That join is English's,
+  # and the guard reads the English files, the only ones CS Studio has.
+  def status_words
+    {
+      legend: I18n.t("admin.components.mind_graph_screen.legend.states", locale: :en),
+      chips: I18n.t("admin.components.ui.status_chip.labels", locale: :en),
+      unpublished: I18n.t("admin.components.ui.unpublished_chip.label", locale: :en),
+      card: I18n.t("admin.mind_graph.script.card.status", locale: :en)
+    }
+  end
+
+  def status_word_mismatches(words)
+    legend, chips, card = words.fetch(:legend), words.fetch(:chips), words.fetch(:card)
+    joined = ->(second) { "#{chips.fetch(:live)}, #{second[0].downcase}#{second[1..]}" }
+    expected = {
+      live: chips.fetch(:live), draft: chips.fetch(:draft), scheduled: chips.fetch(:scheduled),
+      live_with_changes: card.fetch(:live_with_changes),
+      live_change_scheduled: card.fetch(:live_change_scheduled).delete_suffix(" %{date}")
+    }
+    mismatches = expected.reject { |state, word| legend[state] == word }.map { |state, word| "legend.states.#{state} is #{legend[state].inspect}, the chip's words are #{word.inspect}" }
+    mismatches << "legend.states has #{legend.keys.sort}, not the five looks" unless legend.keys.sort == expected.keys.sort
+    mismatches << "card.status.live_change_scheduled names no day" unless card.fetch(:live_change_scheduled).end_with?(" %{date}")
+    mismatches << "card.status.live_with_changes is not the Live chip's word with the unpublished chip's" unless card.fetch(:live_with_changes) == joined.call(words.fetch(:unpublished))
+    mismatches << "card.status.live_change_scheduled is not the Live chip's word with change_scheduled's" unless card.fetch(:live_change_scheduled) == joined.call(card.fetch(:change_scheduled))
+    mismatches
+  end
+
+  test "the legend's status words are the chip's: the status chip's three labels and the card's two sentences without their day" do
+    assert_empty status_word_mismatches(status_words)
+    assert_equal I18n.t("admin.components.ui.status_chip.labels", locale: :en).keys.sort, %i[draft live scheduled], "a chip label with no look of the legend's"
+  end
+
+  # Each word of each file, changed alone in a copy, is refused: the guard
+  # holds every source, not only the legend.
+  test "the status words guard can fail: one word changed in any one of its sources is refused" do
+    words = status_words
+    samples = words.flat_map do |source, value|
+      value.is_a?(Hash) ? value.keys.map { |key| [ source, key ] } : [ [ source, nil ] ]
+    end
+    assert_equal 12, samples.size, "five looks, three chip labels, the unpublished chip and the card's three sentences"
+    samples.each do |source, key|
+      planted = words.transform_values { |value| value.is_a?(Hash) ? value.dup : value.dup }
+      if key then planted[source][key] = "#{planted[source][key]}x" else planted[source] = "#{planted[source]}x" end
+      assert_not_empty status_word_mismatches(planted), "#{source}#{".#{key}" if key} changed alone passed"
+    end
+  end
 end

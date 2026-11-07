@@ -46,10 +46,11 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
             "lists" => [ "lineLists", 1.5, [ 0.1, 3.5 ], "round" ], "tree" => [ "lineTree", 1, [], "butt" ] }.freeze
   AT_FULL = ->(styles) { styles.map { |colour, width, dash, cap| [ colour, width, dash, 1, cap ] } }
 
-  # The swatches of the legend and of the Status key are the RENDERER'S OWN
-  # drawings: each is compared with what the canvas draws for the same node
-  # or line, part for part, so a look that changes in `marks.js` changes
-  # here too and no key can show one the canvas does not have.
+  # The legend's swatches, its five status looks among them, are the
+  # RENDERER'S OWN drawings: each is compared with what the canvas draws for
+  # the same node or line, part for part, so a look that changes in
+  # `marks.js` changes here too and no key can show one the canvas does not
+  # have.
   SWATCH_STATES = { "state-live" => {}, "state-draft" => { status: "draft" }, "state-scheduled" => { status: "scheduled" },
                     "state-live-with-changes" => { changes: "unpublished" }, "state-live-change-scheduled" => { changes: "scheduled" } }.freeze
 
@@ -623,12 +624,12 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
     assert_equal [ 1, 1, 1, 1 ], hovered["nodeAlphas"]
   end
 
-  test "swatches: the Status key's five looks are the canvas's own drawing of a post in each state, in ink" do
+  test "swatches: the legend's five status looks are the canvas's own drawing of a post in each state, in ink" do
     on_canvas = marks_drawn(SWATCH_STATES.values)
 
     SWATCH_STATES.each_key.with_index { |name, index| assert_equal in_hue(on_canvas[index], "ink"), swatch_parts(name), name }
     assert_equal 5, SWATCH_STATES.keys.map { |name| swatch_parts(name) }.uniq.size, "no two looks are one drawing"
-    assert_equal Admin::MindGraphScreen::StatusKeyComponent::STATES.map { |state| "state-#{state.to_s.dasherize}" }, SWATCH_STATES.keys, "the key's states, by Publishing::State's names"
+    assert_equal Admin::MindGraphScreen::LegendComponent::STATES.map { |state| "state-#{state.to_s.dasherize}" }, SWATCH_STATES.keys, "the legend's states, by Publishing::State's names"
   end
 
   test "swatches: a toggle's mark, the retired type, the pin and the notes badge are the canvas's own drawings, and a toggle's line its kind's style" do

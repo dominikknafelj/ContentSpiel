@@ -27,8 +27,8 @@
   <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
       the legend's row, the canvas) and the LIST. In the document
       they come in that order, because the Tab key follows the document
-      (search, focus bar, the legend's toggles, the marks and its "Status key…" button,
-      zoom buttons, canvas, card, list -- the list last, since it can hold
+      (search, focus bar, the legend's toggles, zoom buttons, canvas, card,
+      list -- the list last, since it can hold
       two thousand rows). On screen, from
       1,100px, the graph is the left column over the box's whole height and
       the search and the list are a 300px column on its right, the search on
@@ -196,17 +196,18 @@
           they are painted over it whatever the order. "Release N pinned" is
           beside them only while a node is pinned: the script writes its label
           (a plural) and shows it, and the controller's `reset` hides it again.
-          The zoom's figure between the two buttons is the script's too. Each
+          The zoom's figure between the two buttons is the script's too, a
+          count with digits of one width, so it does not shift as it changes. Each
           zoom button is a glyph or a short word with its whole name as
           `aria-label` and `title`. The notice is a polite live region:
           loading, a failure and the cap's sentences are announced. %>
       <div class="relative min-h-0 flex-1">
         <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
           <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
-          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-field-line bg-surface text-[13px] text-ink">
+          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-button border border-field-line bg-surface text-small text-ink">
             <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
             <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
-            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 text-label text-meta"></span>
+            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 text-count tabular-nums text-meta"></span>
             <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>
             <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph--graph#fit" } %>
           </div>
@@ -249,11 +250,5 @@
     <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="min-h-80 border-t border-line pb-3 min-[1100px]:col-start-2 min-[1100px]:row-start-2 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l"></div>
     <%= render Admin::MindGraphScreen::PartsComponent.new %>
   </div>
-  <%# The status key (design answer H6): the dialog the
-      legend's "Status key…" button opens. OUTSIDE the graph's element on purpose:
-      the Tab order of the box is the search, the graph and the list, a
-      closed dialog is no part of it, and the graph's script and its `reset`
-      write nothing here. %>
-  <%= render Admin::MindGraphScreen::StatusKeyComponent.new %>
 <% end %>
 </div>

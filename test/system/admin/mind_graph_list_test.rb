@@ -782,10 +782,10 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     JS
 
     assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
-    # The toggles, then "Status key…", and every one of them a stop the Tab key
-    # makes: none is taken out of the order.
+    # The toggles alone, and every one of them a stop the Tab key makes: none
+    # is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
-    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status key…", 0 ] ], legend
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do

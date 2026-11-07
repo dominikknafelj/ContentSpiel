@@ -417,10 +417,10 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     draws = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()")
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
     # A swatch is a canvas too: it holds colours, not tokens, so the
-    # legend's and the Status key's are drawn again with the theme (the key
-    # is a closed dialog outside the graph's element, with its own painter).
-    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch], #mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
-    await_js("#{swatches}.length === 11 && document.querySelector('#mind-graph-status-key canvas').getContext('2d').getImageData(0, 0, 18, 18).data.some((value) => value > 0)")
+    # legend's, its five status looks among them, are drawn again with the
+    # theme.
+    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
+    assert_swatches_drawn("[data-mind-graph-legend]", count: 11)
     painted = page.evaluate_script(swatches)
     begin
       page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
@@ -431,6 +431,27 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     ensure
       page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
     end
+  end
+
+  # The zoom's figure is a count (`text-count`): the sans, with digits of one
+  # width, so the readout does not shift as the figure changes.
+  test "the zoom readout is a figure in the sans with even digits, beside the zoom buttons" do
+    2.times { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
+    visit admin_mind_graph_path
+    await_graph
+    zoom = "#{GRAPH} [data-mind-graph-zoom]"
+    before = find(zoom).text
+
+    find("#{GRAPH} button[aria-label='Zoom in']").click
+
+    assert_no_selector zoom, exact_text: before
+    assert_match(/\A\d+\s?%\z/, find(zoom).text)
+    readout = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{zoom.to_json})); return [ style.fontVariantNumeric, style.fontFamily ] })()")
+    sans = page.evaluate_script("getComputedStyle(document.body).fontFamily")
+    assert_includes readout.first, "tabular-nums"
+    assert_equal sans, readout.last, "the readout is in the page's sans"
+    assert_selector "#{zoom} + button[aria-label='Zoom in']"
+    assert_selector "button[aria-label='Zoom out'] + #{zoom.split.last}"
   end
 
   # A label is measured once per load, so a face the canvas asks for that has

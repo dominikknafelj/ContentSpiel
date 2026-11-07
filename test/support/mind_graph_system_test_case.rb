@@ -146,6 +146,17 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
     JS
   end
 
+  # Every swatch inside `selector` has been drawn by the graph's renderer:
+  # something is on each one (a canvas that was never painted is all zeros).
+  # `count:` the swatches there must be, so an empty match is no pass.
+  def assert_swatches_drawn(selector, count:)
+    assert_equal count, page.evaluate_script("document.querySelectorAll(#{"#{selector} canvas[data-swatch]".to_json}).length"), "swatches in #{selector}"
+    await_js(<<~JS)
+      Array.from(document.querySelectorAll(#{"#{selector} canvas[data-swatch]".to_json}))
+        .every((canvas) => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))
+    JS
+  end
+
   # A real click where the node is drawn.
   def click_node(id)
     point = screen_position(id)

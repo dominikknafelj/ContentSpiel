@@ -312,7 +312,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-mind-graph-empty=no-content]", text: "No pages or posts yet."
     assert_select "canvas", count: 0
-    assert_select "dialog#mind-graph-status-key", count: 0
+    assert_select "[data-mind-graph-legend], [data-legend-state]", count: 0
     assert_select "[data-controller='admin--mind-graph--graph']", count: 0
     assert_not_includes response.body, "Hidden from them"
   end
@@ -354,8 +354,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "ul[data-legend-keys] [data-legend='pinned']", text: /Pinned/
     assert_select "ul[data-legend-keys] [data-legend='notes']", text: /Open notes/
     assert_select "[data-legend='retired']", count: 0
-    # The five states are no part of the legend's row: they are the Status key's.
-    assert_select "[data-mind-graph-legend] [data-legend-state]", count: 0
+    # The five looks are the legend's own Status group, whatever posts there are.
+    assert_select "[data-mind-graph-legend] ul[data-legend-states] [data-legend-state]", count: 5
     assert_not_includes response.body, "Draft or scheduled"
   end
 
@@ -447,25 +447,25 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-legend], label[data-legend-toggle]", count: 0
   end
 
-  # Third design answers and H6: status is not a filter; its key is a dialog
-  # the legend's "Status key…" button opens. Outside the graph's element, so it is
-  # no part of the box's Tab order and the graph's script resets nothing in it.
-  test "the status key is in the page once, a closed dialog outside the graph's element" do
+  # Status is not a filter (the third design answers): the five looks are a
+  # key on the legend's row, inside the graph's element, drawn by the
+  # legend's own swatches controller. The screen opens no dialog of its own.
+  test "the status looks are in the legend's row, inside the graph's element, and the page holds no status dialog" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    assert_select "dialog#mind-graph-status-key", count: 1
-    assert_select "dialog#mind-graph-status-key[open]", count: 0
-    assert_select "[data-controller='admin--mind-graph--graph'] dialog", count: 0
-    assert_select "dialog#mind-graph-status-key li[data-legend-state]", count: 5
-    assert_select "dialog#mind-graph-status-key h2", text: "Status key"
-    assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status key…"
+    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-legend][data-controller='admin--mind-graph--swatches'] [data-legend-section=status] li[data-legend-state]", count: 5
+    assert_select "li[data-legend-state] canvas[data-swatch^='state-']", count: 5
+    assert_select "[data-legend-section=status] span.text-label", text: "Status"
+    assert_select "[data-controller='admin--mind-graph--graph'] dialog, dialog [data-legend-state]", count: 0
+    assert_select "[data-mind-graph-legend] button", count: 0
+    assert_not_includes response.body, "Status key"
   end
 
   # The tab order is the search, the filter (the
-  # legend's toggles, then its "Status key…" button, which is named by its text),
+  # legend's toggles: its keys and status looks are marks, and no stop),
   # the zoom buttons, then the canvas. (A swatch is a canvas too, and no stop:
   # only the graph's own canvas has a `tabindex`.) The buttons sit in the canvas's corner on
   # screen, but they come BEFORE it in the document, which is what the Tab key
@@ -485,7 +485,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
     # "Show everything" stands in a bar that is hidden until a large site has
     # opened around Home, where a focused view has its bar's links.
-    assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "Status key…", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
     assert_select "[data-mind-graph-opened][hidden] button", text: "Show everything"
     assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
     assert_select "[data-controller='admin--mind-graph--graph'] canvas[data-swatch][tabindex]", count: 0
@@ -614,7 +614,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
       .reject { |node| node.ancestors("template").any? }
       .map { |node| { "button" => node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip), "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
-    assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status key…", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end
 
   # Spec §5.7: the list comes after the canvas (and the card), so it is the
@@ -694,12 +694,16 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the zoom buttons are 28px high with 13px labels, the figure 11px mono, in a group outlined in the field line" do
+  # A size is a type token and a radius a radius token: the zoom's labels
+  # are `text-small`, its figure a count (`text-count`, with digits of one
+  # width), and the group takes the button's radius.
+  test "the zoom buttons are 28px high in the small type, the figure a count with even digits, in a group outlined in the field line with the button's radius" do
     sign_in_as(users(:one))
     create_post(title: "A")
     get "/cs-studio/mind_graph"
 
-    assert_select "[role=group][class~='border-field-line'][class~='text-[13px]'] button[data-action='admin--mind-graph--graph#zoomIn'][class~='h-7']"
-    assert_select "[data-mind-graph-zoom][class~='text-label']"
+    assert_select "[role=group][class~='border-field-line'][class~='rounded-button'][class~='text-small'] button[data-action='admin--mind-graph--graph#zoomIn'][class~='h-7']"
+    assert_select "[data-mind-graph-zoom][class~='text-count'][class~='tabular-nums']"
+    assert_select "[role=group][class*='text-[13px]'], [role=group][class~='rounded-cs'], [data-mind-graph-zoom][class~='text-label']", count: 0
   end
 end

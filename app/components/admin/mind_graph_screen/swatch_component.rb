@@ -1,9 +1,9 @@
 module Admin
   module MindGraphScreen
-    # One swatch of the Mind graph's legend or Status key (pages in the mind
-    # graph, spec §6): a small canvas with nothing on it. What is drawn there
+    # One swatch of the Mind graph's legend, a status look's included: a
+    # small canvas with nothing on it. What is drawn there
     # is the graph's own renderer's (`mind_graph/swatches.js`, through
-    # `admin--mind-graph--swatches` on the legend and on the key), so a
+    # `admin--mind-graph--swatches` on the legend), so a
     # swatch is the mark or the line the canvas draws and not a copy of it
     # in SVG or CSS that could drift from it.
     #
