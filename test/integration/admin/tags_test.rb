@@ -49,7 +49,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a tag manager who cannot read posts sees no count and no link, only the neutral dialog copy" do
+  test "a tag manager who cannot read posts sees no count, no link and no bar, and the detail's dialogs say the neutral copy" do
     create_post(title: "One", tags: [ "rails" ])
     tag = Tag.find_by!(name: "rails")
     sign_in_as(tag_manager("tags.manage" => {}))
@@ -58,8 +58,12 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
       assert_select "a[href*='/posts']", count: 0
-      assert_select "button[data-tag-delete-text=?]", "It is removed from every post that uses it. The posts themselves stay."
     end
+
+    get_detail(tag)
+    assert_select "[data-tag-detail-count]", count: 0
+    assert_select "[data-tag-detail-post]", count: 0
+    assert_select "button[data-tag-delete-text=?]", "It is removed from every post that uses it. The posts themselves stay."
   end
 
   test "the count is what the viewer may read, while the dialogs name every post the action reaches" do
@@ -69,12 +73,13 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     sign_in_as(tag_manager("tags.manage" => {}, "posts.read" => { "content_types" => [ "blog" ] }))
 
     get "/cs-studio/tags"
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
-      assert_select "a[href*='tag=rails']", text: "1 post"
-      # Two numbers for one tag need a reason (final fix wave, Task 13 I1).
-      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
-      assert_select "button[data-tag-merge-text=?]", "Its 2 posts, including ones in the trash or that you can't open, get the chosen tag and “rails” is deleted. This can't be undone."
-    end
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)} a[href*='tag=rails']", text: "1 post"
+
+    # Two numbers for one tag need a reason: the sentence says where the others are.
+    get_detail(tag)
+    assert_select "[data-tag-detail-count]", text: "1 post"
+    assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
+    assert_select "button[data-tag-merge-text=?]", "Its 2 posts, including ones in the trash or that you can't open, get the chosen tag and “rails” is deleted. This can't be undone."
   end
 
   test "when the column and the dialog agree, the dialogs keep the plain sentences; a single hidden post is named in the singular" do
@@ -82,15 +87,32 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     create_post(title: "Two", tags: [ "rails" ])
     create_post(title: "Only hidden", tags: [ "gone" ]).update_columns(trashed_at: Time.current)
 
+    get_detail(Tag.find_by!(name: "rails"))
+    assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts. The posts themselves stay."
+    assert_select "button[data-tag-merge-text=?]", "Its 2 posts get the chosen tag and “rails” is deleted. This can't be undone."
+
+    get_detail(Tag.find_by!(name: "gone"))
+    assert_select "button[data-tag-delete-text=?]", "It is removed from 1 post, which is in the trash or one you can't open. The posts themselves stay."
+    assert_select "button[data-tag-merge-text=?]", "Its 1 post, which is in the trash or one you can't open, gets the chosen tag and “gone” is deleted. This can't be undone."
+  end
+
+  # A viewer who may read posts, but none of this tag's: the detail lists
+  # nothing and counts nothing they can't open, and the row's bar stays empty.
+  test "a tag reachable only through posts the viewer can't read shows no posts and no count beyond 0 in the detail, and an empty bar" do
+    create_post(title: "Blog", content_type: "blog", tags: [ "shared" ])
+    create_post(title: "Entry", content_type: "resume_entry", tags: [ "hidden" ])
+    hidden = Tag.find_by!(name: "hidden")
+    sign_in_as(tag_manager("tags.manage" => {}, "posts.read" => { "content_types" => [ "blog" ] }))
+
     get "/cs-studio/tags"
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(Tag.find_by!(name: "rails"))}" do
-      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts. The posts themselves stay."
-      assert_select "button[data-tag-merge-text=?]", "Its 2 posts get the chosen tag and “rails” is deleted. This can't be undone."
-    end
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(Tag.find_by!(name: "gone"))}" do
-      assert_select "button[data-tag-delete-text=?]", "It is removed from 1 post, which is in the trash or one you can't open. The posts themselves stay."
-      assert_select "button[data-tag-merge-text=?]", "Its 1 post, which is in the trash or one you can't open, gets the chosen tag and “gone” is deleted. This can't be undone."
-    end
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(hidden)} a[href*='tag=hidden']", text: "0 posts"
+    assert_equal 0.0, usage_of(hidden)
+
+    get_detail(hidden)
+    assert_select "[data-tag-detail-count]", text: "0 posts"
+    assert_select "[data-tag-detail-post]", count: 0
+    assert_select "[data-tag-detail-show-all]", count: 0
+    assert_no_match(/Entry/, response.body)
   end
 
   test "the post counts come from one grouped query however many tags there are" do
@@ -152,15 +174,15 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
   # What the dialogs say is the number of posts the action really reaches: every
   # post carrying the tag, trashed ones included (what `tag.merged` records too),
   # not only the readable ones the list counts.
-  test "the dialogs are filled from each row's trigger with the true carrier count" do
+  test "the detail's triggers carry the true carrier count" do
     create_post(title: "One", tags: [ "rails" ])
     create_post(title: "Two", tags: [ "rails" ])
     create_post(title: "Gone", tags: [ "rails" ]).update_columns(trashed_at: Time.current)
     tag = Tag.find_by!(name: "rails")
 
-    get "/cs-studio/tags"
+    get admin_tag_path(tag), headers: { "Turbo-Frame" => "tag-detail" }
     assert_response :success
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
+    assert_select "turbo-frame#tag-detail #tag-detail-#{tag.id}" do
       assert_select "button[data-tag-delete-title=?][data-tag-delete-text=?]",
         "Delete “rails”?", "It is removed from 3 posts, including ones in the trash or that you can't open. The posts themselves stay."
       assert_select "button[data-tag-merge-title=?][data-tag-merge-text=?]",
@@ -171,8 +193,57 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
   test "an unused tag says no posts use it" do
     tag = Tag.create!(name: "unused")
 
-    get "/cs-studio/tags"
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)} button[data-tag-delete-text=?]", "No posts use it."
+    get_detail(tag)
+    assert_select "button[data-tag-delete-text=?]", "No posts use it."
+  end
+
+  test "the detail lists the tag's kept, readable posts, newest first, at most eight, with the posts list's own count" do
+    viewer = tag_manager("tags.manage" => {}, "posts.read" => { "content_types" => [ "blog" ] })
+    posts = Array.new(9) { |n| create_post(title: "Post #{n}", tags: [ "music" ]).tap { |post| post.update_columns(updated_at: (20 - n).minutes.ago) } }
+    create_post(title: "Trashed", tags: [ "music" ]).update_columns(trashed_at: Time.current, updated_at: 1.minute.ago)
+    create_post(title: "Out of scope", content_type: "resume_entry", tags: [ "music" ]).update_columns(updated_at: 1.minute.ago)
+    tag = Tag.find_by!(name: "music")
+    sign_in_as(viewer)
+
+    get_detail(tag)
+    titles = css_select("[data-tag-detail-post] a").map { |link| link.text.strip }
+    assert_equal posts.reverse.first(8).map { |post| post.title(locale: :en) }, titles
+    expected = as(viewer) { Posts::List.new(AccessControl.scope(viewer, "posts.read", Post.all), filters: { "tag" => "music" }, locale: :en).counts["all"] }
+    assert_equal 9, expected
+    assert_select "[data-tag-detail-count]", text: "9 posts"
+    assert_select "a[data-tag-detail-show-all][href='/cs-studio/posts?tag=music']", text: "Show all #{expected} posts"
+  end
+
+  test "the detail costs the same statements for a tag on 2 posts as on 20" do
+    2.times { |n| create_post(title: "Few #{n}", tags: [ "few" ]) }
+    20.times { |n| create_post(title: "Many #{n}", tags: [ "many" ]) }
+    few_tag, many_tag = Tag.find_by!(name: "few"), Tag.find_by!(name: "many")
+    get_detail(many_tag) # the first request asks a few things later ones don't (the setup check)
+    few = count_statements { get_detail(few_tag) }
+    many = count_statements { get_detail(many_tag) }
+
+    assert_equal few, many
+    assert_select "[data-tag-detail-post]", count: 8
+  end
+
+  test "GET /tags/:id outside its frame goes back to the list, and an unknown id is a 404" do
+    tag = Tag.create!(name: "music")
+
+    get admin_tag_path(tag)
+    assert_response :see_other
+    assert_redirected_to "/cs-studio/tags"
+
+    get admin_tag_path(Tag.maximum(:id) + 100), headers: { "Turbo-Frame" => "tag-detail" }
+    assert_response :not_found
+  end
+
+  test "/tags/suggest is still the suggestions, not a tag" do
+    create_post(title: "One", tags: [ "suggested" ])
+
+    get "/cs-studio/tags/suggest", params: { q: "sugg" }
+    assert_response :success
+    assert_includes response.body, "suggested"
+    assert_equal "tag_suggestions", request.path_parameters[:controller].split("/").last
   end
 
   test "there is one merge dialog and one delete dialog, outside every form but their own" do
@@ -195,18 +266,47 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_select "dialog#delete-tag-dialog button.bg-danger", text: "Delete tag"
   end
 
-  test "a row has a menu with Merge into… and Delete tag… and no red button" do
-    create_post(title: "One", tags: [ "rails" ])
-    tag = Tag.find_by!(name: "rails")
+  test "a row has no menu: its Details link names the tag, targets the detail frame and is never prefetched" do
+    create_post(title: "One", tags: [ "music" ])
+    tag = Tag.find_by!(name: "music")
 
     get "/cs-studio/tags"
 
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)} [role=menu]" do
-      assert_select "button", text: "Merge into…"
-      assert_select "button", text: "Delete tag…"
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
+      assert_select "a#tag-#{tag.id}-details[href='/cs-studio/tags/#{tag.id}'][data-turbo-frame=tag-detail][data-turbo-prefetch=false][aria-label='Details of “music”'][data-tag-details]", text: "Details"
     end
-    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)} button.text-danger-ink, tr##{ActionView::RecordIdentifier.dom_id(tag)} .bg-danger", count: 0
+    assert_select "tbody [role=menu]", count: 0
+    assert_select "tbody [data-admin--ui--dialog-id-param], tbody .bg-danger", count: 0, message: "the dialogs' triggers stand in the detail, not in a row"
     assert_select "p", text: /Click a name to rename it/
+    assert_select "section.admin-list-rail__rail.admin-tag-detail[aria-label='Tag details'] turbo-frame#tag-detail #tag-detail-empty[data-tag-detail-empty]",
+      text: "Choose a tag to see its posts, merge it or delete it."
+    assert_select "[data-controller='admin--tags--detail'] template[data-admin--tags--detail-target=empty]"
+  end
+
+  test "a rename answers the chosen tag's detail again, by its id" do
+    create_post(title: "One", tags: [ "rails" ])
+    tag = Tag.find_by!(name: "rails")
+
+    patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: tag.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action=replace][target='tag-detail-#{tag.id}']")
+    assert stream, "the rename answers the detail"
+    detail = stream.at_css("template").children.to_html
+    assert_includes detail, "id=\"tag-detail-#{tag.id}-name\""
+    assert_match(%r{data-tag-detail-heading[^>]*>ruby</h2>}, detail)
+    assert_includes detail, "data-tag-name=\"ruby\""
+
+    # The row's Details and its name's label say the new name; the input is never replaced.
+    link = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action=replace][target='tag-#{tag.id}-details'] template a#tag-#{tag.id}-details")
+    assert link, "the rename answers the row's Details"
+    assert_equal "Details of “ruby”", link["aria-label"]
+    assert_equal "tag-detail", link["data-turbo-frame"]
+    label = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action=replace][target='tag-#{tag.id}-name-label'] template label#tag-#{tag.id}-name-label[for='tag-#{tag.id}-name']")
+    assert_equal "Name of ruby", label&.text
+    assert_no_match(/target="tag-#{tag.id}-name"/, response.body, "the input being typed in is not replaced")
+
+    patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "" }, base_updated_at: tag.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_no_match(/target="tag-detail-#{tag.id}"/, response.body, "a refused rename draws no detail")
   end
 
   test "a name over the limit is refused on the row" do
@@ -274,7 +374,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert Tag.exists?(source.id)
   end
 
-  test "merge with no target or a target that no longer exists is a plain refusal" do
+  test "merge with no target or a target that is gone is a plain refusal" do
     source = Tag.create!(name: "news")
 
     post "/cs-studio/tags/#{source.id}/merge", params: { into: "" }
@@ -302,6 +402,14 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     post "/cs-studio/tags/#{source.id}/merge", params: { into: "studio" }
     assert_response :forbidden
     assert Tag.exists?(source.id)
+  end
+
+  test "the tag detail without tags.manage is a 403" do
+    tag = Tag.create!(name: "news")
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/tags/#{tag.id}", headers: { "Turbo-Frame" => "tag-detail" }
+    assert_response :forbidden
   end
 
   # Merge touches the carrying posts, the repointed blocks and their pages, so
@@ -341,9 +449,8 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_equal "rails", block.reload.settings["tag"]
   end
 
-  # Final fix wave (m3): the picker sends a name and the controller looked the
-  # target up by the exact lowercased string, so a tag stored with a capital
-  # (written before names were lowercased, or around the model) was "gone".
+  # The picker sends a name; a tag stored with a capital (written around the
+  # model) is still found by it.
   test "the merge target is found whatever the case it is stored in" do
     create_post(title: "One", tags: [ "news" ])
     source = Tag.find_by!(name: "news")
@@ -377,23 +484,96 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     source = Tag.find_by!(name: "news")
     Tag.create!(name: "studio")
 
-    get "/cs-studio/tags"
-    shown = css_select("tr##{ActionView::RecordIdentifier.dom_id(source)} button[data-tag-merge-text]").first["data-tag-merge-text"][/\d+/].to_i
+    get_detail(source)
+    shown = css_select("button[data-tag-merge-text]").first["data-tag-merge-text"][/\d+/].to_i
 
     post "/cs-studio/tags/#{source.id}/merge", params: { into: "studio" }
     assert_equal shown, Audit::Event.find_by!(action: "tag.merged").metadata["posts"]
   end
 
-  test "deleting answers a toast and leaves the dialog to be closed by the page" do
+  test "a delete answers the empty detail by the tag's id, and the list's empty state when it was the last tag" do
     tag = Tag.create!(name: "unused")
+    other = Tag.create!(name: "kept")
 
     delete "/cs-studio/tags/#{tag.id}", as: :turbo_stream
     assert_response :success
     assert_match(/Deleted “unused”/, response.body)
     assert_match(/action="remove"/, response.body)
+    fragment = Nokogiri::HTML5.fragment(response.body)
+    assert fragment.at_css("turbo-stream[action=replace][target='tag-detail-#{tag.id}'] template #tag-detail-empty[data-tag-detail-empty]")
+    assert_nil fragment.at_css("turbo-stream[target='tags-list']"), "a tag is left: the list stays"
+
+    delete "/cs-studio/tags/#{other.id}", as: :turbo_stream
+    fragment = Nokogiri::HTML5.fragment(response.body)
+    empty = fragment.at_css("turbo-stream[action=replace][target='tags-list'] template #tags-list")
+    assert empty, "the last delete draws the list's empty state"
+    assert_equal "No tags yet.", empty.at_css("[data-empty-state-title]").text
+  end
+
+  test "each row's usage bar is its readable count over the largest, and there is no bar without posts.read" do
+    4.times { |n| create_post(title: "Big #{n}", tags: [ "big" ]) }
+    2.times { |n| create_post(title: "Half #{n}", tags: [ "half" ]) }
+    Tag.create!(name: "none")
+
+    get "/cs-studio/tags"
+    assert_in_delta 1.0, usage_of(Tag.find_by!(name: "big")), 0.001
+    assert_in_delta 0.5, usage_of(Tag.find_by!(name: "half")), 0.001
+    assert_in_delta 0.0, usage_of(Tag.find_by!(name: "none")), 0.001
+    assert_select ".admin-tag-usage[aria-hidden=true] > .admin-tag-usage__bar.bg-tag-usage", count: 3
+
+    sign_in_as(tag_manager("tags.manage" => {}))
+    get "/cs-studio/tags"
+    assert_select ".admin-tag-usage", count: 0
+  end
+
+  test "a screen where no tag has a post draws empty tracks" do
+    Tag.create!(name: "one")
+    Tag.create!(name: "two")
+
+    get "/cs-studio/tags"
+    assert_response :success
+    assert_equal [ 0.0, 0.0 ], usages
+  end
+
+  # The matcher is a set of classes, so a link drawn with the primary's
+  # classes in another order is found too; the sample proves it finds one.
+  test "the Tags screen draws no primary button outside its dialogs" do
+    primary = Admin::Ui::ButtonComponent.classes(:primary).split
+    primaries = ->(html) do
+      document = Nokogiri::HTML5(html)
+      document.css("dialog").each(&:remove)
+      document.css("[class]").select { |element| (primary - element["class"].split).empty? }
+    end
+    sample = %(<div><a class="#{primary.reverse.join(" ")}" href="#">New</a><dialog><button class="#{primary.join(" ")}">Merge</button></dialog></div>)
+    assert_equal 1, primaries.(sample).size, "the matcher finds a primary outside a dialog and none inside one"
+
+    create_post(title: "One", tags: [ "rails" ])
+    get "/cs-studio/tags"
+    assert_empty primaries.(response.body).map(&:to_html)
+    get_detail(Tag.find_by!(name: "rails"))
+    assert_empty primaries.(response.body).map(&:to_html)
+  end
+
+  test "the Tags screen is never restored from Turbo's page cache" do
+    get "/cs-studio/tags"
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']"
   end
 
   private
+
+  def get_detail(tag)
+    get admin_tag_path(tag), headers: { "Turbo-Frame" => "tag-detail" }
+    assert_response :success
+  end
+
+  def usage_of(tag)
+    usages_in(css_select("tr##{ActionView::RecordIdentifier.dom_id(tag)} .admin-tag-usage__bar")).sole
+  end
+
+  # Every bar's `--usage` in the response, or in the elements given.
+  def usages(bars = css_select(".admin-tag-usage__bar")) = usages_in(bars)
+
+  def usages_in(bars) = bars.map { |bar| Float(bar["style"][/--usage:\s*([\d.]+)/, 1]) }
 
   def tag_manager(grants)
     user = User.create!(email_address: "tags-#{SecureRandom.hex(3)}@example.org", password: "a-long-enough-password")

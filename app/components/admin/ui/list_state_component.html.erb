@@ -1,0 +1,2 @@
+<%= render Admin::Ui::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
+<%= render Admin::Ui::UnpublishedChipComponent.new if changes? %>

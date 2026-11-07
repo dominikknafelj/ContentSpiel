@@ -51,4 +51,12 @@ class Admin::TagsHelperTest < ActionView::TestCase
     assert_equal "1 post", tag_posts_label(1)
     assert_equal "5 posts", tag_posts_label(5)
   end
+
+  test "tag_usage is the share of the largest, rounded, and 0 when the largest is 0" do
+    assert_equal 0.75, tag_usage(3, 4)
+    assert_equal 0.33, tag_usage(1, 3)
+    assert_equal 1.0, tag_usage(4, 4)
+    assert_equal 0.0, tag_usage(0, 0)
+    assert_equal 0.0, tag_usage(0, 5)
+  end
 end

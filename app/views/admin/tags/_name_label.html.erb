@@ -1,0 +1,5 @@
+<%# A row's name for a screen reader, named per row: fifty inputs all called
+    "Name" tell a screen reader's list of fields nothing. It is an element of
+    its own, beside the input, so a saved rename's answer replaces it by its
+    id and never the input being typed in. %>
+<%= label_tag "tag-#{tag.id}-name", t("admin.tags.index.name_label", name: tag.name), id: "tag-#{tag.id}-name-label", class: "sr-only" %>

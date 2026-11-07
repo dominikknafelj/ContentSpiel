@@ -1,0 +1,28 @@
+# CS Studio's Tags screen components, `app/components/admin/tags_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.tags_screen.<class name without Admin:: and Component, underscored>`.
+# The count line ("3 posts") and the dialogs' sentences the triggers carry
+# are the screen's own (`admin.tags.post_count`, `admin.tags.dialogs`,
+# `config/locales/admin/tags.en.yml`).
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      tags_screen:
+        # `Admin::TagsScreen::DetailComponent`, one tag in the list's rail.
+        detail:
+          # A post with no title in the editing language.
+          untitled: "(untitled)"
+          # The link to the posts list filtered by the tag, drawn when the
+          # tag has more posts than the rail lists.
+          show_all:
+            one: "Show all %{count} post"
+            other: "Show all %{count} posts"
+          # The triggers of the list's Merge and Delete dialogs.
+          merge: "Merge into…"
+          delete: "Delete tag…"
+          # The icon button that puts the rail back to its empty line.
+          close: "Close"
+        # `Admin::TagsScreen::EmptyDetailComponent`, the rail with no tag chosen.
+        empty_detail:
+          line: "Choose a tag to see its posts, merge it or delete it."

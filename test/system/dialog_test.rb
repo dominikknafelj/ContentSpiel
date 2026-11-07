@@ -4,11 +4,11 @@ require "application_system_test_case"
 # trigger opens a dialog by id, a destructive one starts on Cancel, Esc
 # closes without acting, and the confirm button does the write.
 class DialogSystemTest < ApplicationSystemTestCase
-  # The Tags list's row menu (round 3): "Delete tag…" opens the list's one Delete dialog.
+  # The Tags list: a row's Details opens the tag in the rail, whose
+  # "Delete tag…" opens the list's one Delete dialog.
   def open_delete_tag_dialog(tag)
-    row = "##{ActionView::RecordIdentifier.dom_id(tag)}"
-    find("#{row} button[aria-label^='Actions for']").click
-    find("#{row} [role=menu] button", text: "Delete tag…").click
+    find("##{ActionView::RecordIdentifier.dom_id(tag)} a[data-tag-details]").click
+    find("#tag-detail-#{tag.id} button", text: "Delete tag…").click
   end
 
   test "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" do

@@ -194,6 +194,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/save_status_component.html.erb
     app/components/admin/ui/status_chip_component.rb
     app/components/admin/ui/status_chip_component.html.erb
+    app/components/admin/ui/list_state_component.rb
+    app/components/admin/ui/list_state_component.html.erb
     app/components/admin/ui/translation_chip_component.rb
     app/components/admin/translation_screen/state_cell_component.rb
     app/components/admin/ui/language_tabs_component.rb
@@ -244,6 +246,15 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/saving/frame_hold.js
     app/javascript/saving/promotion_hold.js
     app/views/admin/tags/index.html.erb
+    app/views/admin/tags/show.html.erb
+    app/views/admin/tags/_empty.html.erb
+    app/views/admin/tags/_details_link.html.erb
+    app/views/admin/tags/_name_label.html.erb
+    app/components/admin/tags_screen/detail_component.rb
+    app/components/admin/tags_screen/detail_component.html.erb
+    app/components/admin/tags_screen/empty_detail_component.rb
+    app/components/admin/tags_screen/empty_detail_component.html.erb
+    app/javascript/controllers/admin/tags/detail_controller.js
     app/controllers/admin/tags_controller.rb
     app/controllers/admin/tag_suggestions_controller.rb
     app/helpers/admin/tags_helper.rb

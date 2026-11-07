@@ -840,12 +840,30 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
       assert_select "a[href*='tag=shared']", text: "1 post"
       assert_select "a", text: "2 posts", count: 0
-      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
     end
+    get "/cs-studio/tags/#{tag.id}", headers: { "Turbo-Frame" => "tag-detail" }
+    assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
 
     get "/cs-studio/posts", params: { tag: "shared" }
     assert_select "tbody tr", text: /Kept post/
     assert_select "tbody tr", text: /Gone post/, count: 0
+  end
+
+  # The Tags list's rail lists the tag's posts through `Posts::List`, so a
+  # trashed post is neither a row of it nor counted, and its count is the
+  # posts list's own All count for the tag.
+  test "the Tags rail lists a tag's kept posts and never a trashed one, and counts as the posts list does" do
+    sign_in_as users(:one)
+    tag = Tag.create!(name: "shared")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+
+    get "/cs-studio/tags/#{tag.id}", headers: { "Turbo-Frame" => "tag-detail" }
+    assert_response :success
+    assert_select "[data-tag-detail-post='#{@kept_post.id}']", text: /Kept post/
+    assert_select "[data-tag-detail-post='#{@gone_post.id}']", count: 0
+    assert_no_match(/Gone post/, response.body)
+    assert_select "[data-tag-detail-count]", text: "1 post"
+    assert_equal 1, as(users(:one)) { Posts::List.new(AccessControl.scope(users(:one), "posts.read", Post.all), filters: { "tag" => "shared" }, locale: :en).counts["all"] }
   end
 
   # The posts list's own filters, search, scope counts and pagination, and the

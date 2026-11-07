@@ -33,6 +33,15 @@ On approving the spec ("approved, all recommended"):
 18. Labels are the normal sans everywhere: small, sentence case, in `cs-meta`; no letterspaced mono capitals. This is the single type voice E4 takes from option C (stage 1).
 19. Below the rail's threshold, notes open in a 400px panel that slides in over the canvas at elevation 3, with the same Notes tab content; the full-screen sheet is for phone widths only, below 640px (stage 3b).
 
+## Decided on 2026-11-07
+
+The tree review of 2026-11-07, approved by the owner ("looks good, please add it to the design system", then "fiddle that into the redesign effort where you feel fit"); drawn in the Design System artifact as `StudioTree` (Decided, not built).
+
+20. The Pages tree and the mind graph's list are one row, `Admin::Ui::TreeItemComponent`; what differs is behaviour, in the row's slots and each screen's semantics (stage 5d).
+21. The tree's branches fold: folded by default, the path to the selection always drawn open, the person's folds remembered in a cookie (stage 5d).
+22. The tree column gets a find field, the same in both trees (stage 5d).
+23. The mind graph's list moves to the left, into the shell's tree column (stage 5d-2).
+
 ## Why
 
 The owner, on today's CS Studio:
@@ -67,9 +76,9 @@ What the artifact measured on main 6e7378b5 explains it. The grounds are equal (
 ## Non-goals
 
 - The public site's theme (`th-*`, `app/assets/tailwind/themes/`, the theme contract) is untouched.
-- No behaviour changes beyond layout, except what a stage names (stage 2: one add action, tiles that preview; stage 3: choosing a section, folding the tree, notes as a rail tab; stage 4: the dashboard's merge; stage 6: the inbox's filter, presence as avatars).
+- No behaviour changes beyond layout, except what a stage names (stage 2: one add action, tiles that preview; stage 3: choosing a section, folding the tree, notes as a rail tab; stage 4: the dashboard's merge; stage 5d: folding the tree's branches, the find field, the mind graph's list on the left; stage 6: the inbox's filter, presence as avatars).
 - No centred column (C, E). Option C's single type voice is taken: labels in sans (decision 18).
-- No navigation rail and no collapsible tree beyond what exists (E's stage 6).
+- No navigation rail (E's stage 6). The tree's branches fold from stage 5d (decided 2026-11-07); nothing else collapses that does not today.
 
 ## Anti-goals
 
@@ -184,13 +193,13 @@ Stage 1 restyles `app/components/admin/ui/` and the stylesheet once; most screen
 | System status | `admin/system_status`, `ui/system_check_row`, `ui/insecure_notice` | 7b | no |
 | Preview bar | public layout, `th-preview-*` | none (public stylesheet) | no |
 | Dashboard | `dashboard_screen/*`, `admin/dashboard`, `admin/note_inbox/_card` | 4 | Dashboard, E4E5 |
-| Page tree | `pages_screen/tree`, `tree_node`, `tree_state_mark`, `shell/tree_divider`, `shared/_tree_head` | 2 (markers, selection), 3 (fold) | E4E5 |
+| Page tree | `pages_screen/tree`, `tree_node`, `tree_state_mark`, `shell/tree_divider`, `shared/_tree_head` | 2 (markers, selection), 3 (fold), 5d-1 (one row, folding, find) | E4E5, StudioTree |
 | Page editor | `editor_screen/*`, `admin/pages/show` | 2, 3 | E4E5 |
 | Post editor | `editor_screen/post_form`, `related_posts`, `admin/posts/show` | 3 | E4E5 (layout) |
 | Posts list, New post dialog | `posts_screen/*`, `admin/posts/index`, `editor_screen/new_post_*` | 5b | E4More |
 | New page dialog | `editor_screen/new_page_*` | 1 | no |
 | Tags | `admin/tags/index`, `admin--tags--dialogs` | 5b | E4More |
-| Mind graph | `mind_graph_screen/*`, `admin/mind_graph`, `app/javascript/mind_graph/` | 5a | E4More |
+| Mind graph | `mind_graph_screen/*`, `admin/mind_graph`, `app/javascript/mind_graph/` | 5a, 5d-2 (the list on the left, on the tree's row) | E4More, StudioTree |
 | Settings | `settings_screen/*`, `admin/settings` | 5c | E4Setup |
 | Setup wizard | `app/views/setup/`, `layouts/setup`, `setup_helper.rb` | 5c | E4Setup (first step, Mail) |
 | Notes drawer → the rail's Notes tab | `notes_screen/drawer`, `list`, `thread`, `composer` | 3b | E4Together |
@@ -299,15 +308,45 @@ Each stage is one PR that ships working on its own, keeps the full suite green, 
 
 **Size.** 4 to 6 days. **Guide.** The dashboard; the sidebar's screenshots.
 
-### Stage 5: the screens drawn on E4More and E4Setup (three PRs)
+### Stage 5: the screens drawn on E4More and E4Setup, and one tree (five PRs)
 
-Each is built as drawn, with the owner's answers to the pages' own questions (decisions 11 to 15).
+Each is built as drawn, with the owner's answers to the pages' own questions (decisions 11 to 15). 5d is drawn in the Design System artifact as `StudioTree` (decisions 20 to 23) and is built after 5b and before 5c.
 
 - **5a, the mind graph.** Mostly tokens: `theme.js` reads `--cs-*`, so the canvas follows; the `LOOKS` table, `LINE_STYLES` and the dim factor change in `marks.js` and `renderer.js`; the legend, the list and `node_list.js` gain icon and status chips; the card's buttons become the shared button; the status key moves from its dialog onto the legend row (the dialog may stay for the long words). Pages stay neutral (the hues mean post types); every status keeps its shape and word; the script holds no colour value. The related lines, which fail today (2.25 / 2.93:1), reach 3.9 / 4.3:1; post hues 5.9–7.1 / 8.1–9.1:1, tags 6.2 / 8.9:1, tree lines 3.8 / 4.5:1, the selection ring 6.9 / 7.1:1. The CSS marks outside the canvas change with `marks.js` (no guard holds them). Tests: `admin_contrast_test` (graph tokens), `mind_graph_guards_test`, `mind_graph_test`, `mind_graph_modules_test` (its 25-drawing test keeps the looks apart). Findings: #132 (advances), `mind_graph/app.js` (1,433 lines), whose legend and list change, is split into state, input and render modules, the guards on `reset()` and the ids unchanged; +2 to 3 days. #133 (advances), `mind_graph_test.rb` (3,900 lines) and `mind_graph_modules_test.rb` (2,739) split by behaviour within their shards; +1 day. *Size* 7 to 10 days.
 - **5b, the posts list with its New post dialog, and tags.** Posts: the shared chips already carry most of it; the toolbar follows the field rules; the dialog is a field and a button; at wide widths the Type, Tag and Translation filters stand in a rail beside the list, the same filter form (`admin--ui--auto-submit`), above the list below the threshold. Tags: the row and its autosaving input restyled, a usage bar (structure hue, 6.2 / 8.9:1) from the count already read; Tags has no primary, since tags are made on posts; a detail rail shows the selected tag, its posts (the posts query by tag) and Merge into… and Delete tag… as buttons, out of the ⋯ menu, opening the existing two dialogs. Tests: `posts_list_test`, `filter_bar_test`, `new_record_test`, `tags_test`, plus a keyboard test for each rail. *Size* 6 to 9 days.
+**5d, one tree (two PRs), built after 5b and before 5c.** Drawn in the Design System artifact as `StudioTree` (Decided, not built; approved 2026-11-07); the review behind it is the tree review of 2026-11-07.
+
+*Why.* The owner: two columns that do the same job, the Pages tree and the mind graph's list, look different, and the Pages tree reads as "chaotic headlines with indentation". Nothing on a row says it is an item in a tree: no disclosure, no mark, a guide of `--cs-line` at 1.23 / 1.25:1, a 16px step against a 15px title, every parent's subtree always open (76 rows on the guide). The graph's list has a heavy ink blob per row, a 12px step with no guide, 14px Tailwind type and a selection of its own.
+
+*What changes.* One row for both trees, `Admin::Ui::TreeItemComponent` with one `.admin-tree` block in `content-spiel.tailwind.css`; each screen's extras go in its slots (`with_handle`, `with_mark`, `with_title`, `with_state`, `with_trailing`), never in a second look.
+
+- *The row.* Left to right: 4px, a 20px disclosure (a `<button>`, 12px chevron in `--cs-meta`, right when folded, turned 90° when open; an empty column on a leaf), a 16px mark (a 14px page glyph in `--cs-meta`, the home glyph for the root, ink when selected; never an icon chip), 8px, the title (`text-small`, 13px / 20px, 400, `--cs-ink`, one line, truncated), the trailing slots 6px apart (state dot, markers, presence, count, "+"), 8px; at least 28px tall. The drag handle stands in the 20px gutter left of the row, on `--cs-chrome`. Four lengths, written once on `:root` in `content-spiel.css`: `--cs-tree-row: 28px`, `--cs-tree-disclosure: 20px`, `--cs-tree-mark: 16px`, `--cs-tree-step: 20px`; every colour is an existing token.
+- *The 20px step and the guide.* A nested list is `margin-inline-start: 13px`, a 1px guide and `padding-inline-start: 6px`; the guide drops from the centre of the parent's disclosure and a child's disclosure lands under the parent's mark. The guide is `--cs-line-strong` (1.60 / 1.64:1 on the chrome), a hairline under 3:1 on purpose: the disclosure (6.3 / 6.8:1), the step and the markup carry the structure.
+- *Parents are never bolder.* Parents and leaves are 400 `--cs-ink`; depth changes only the step; 600 belongs to the selection alone (`--cs-sunken` and the 3px inset accent bar, the graph dropping its `bg-accent-tint` for it). A parent is told apart by its disclosure and, folded, its count at rest.
+- *Folding.* Folded by default: Home and its children shown, every deeper branch folded, **the path to the selected page always drawn open** (by the server, on `admin--pages--tree#follow` and on the graph's `mark(id)`), which is a view state and never stored. The selected row is scrolled into view inside the column only, never with `scrollIntoView`. A folded parent under a dragged row opens after 600ms; keyboard `nest()` into a folded sibling opens it and says so; Alt+click (`*` in the graph) opens a whole branch.
+- *Folds remembered in a cookie.* The person's own opens and folds are the open set, the cookie `cs_tree_open`, written by `tree/open_set.js` alone and read by the server, so the tree is drawn folded from the first paint and `TreeRowComponent.for_page` (the live row redraw) draws the same disclosure. The graph reads it as `data-tree-open` and writes it through the same module. A stored id that is no page the viewer reads sets nothing. No per-user server preference: it would be a write path that is neither a service save nor audited.
+- *The find field.* One field at the column's top, the same in both trees (`Admin::Ui::TreeFindComponent`, `tree/find.js`): the well, 32px, "Find a page", a `/` hint or Clear. Typing narrows the tree to the matching rows and their ancestors; a branch holding a match unfolds while the filter is on and never in the open set; the match is a `<mark>` on `--cs-accent-tint` with the title's ink (14.5 / 11.4:1), drawn by `.admin-tree mark`, a fourth named use of the tint. A polite status line, 300ms after the last keystroke: "%{count} pages match" or "No pages match". Matching is the title in the editing language, ignoring case and accents, anywhere in it; the address only when the query starts with "/". Escape clears, gives back the person's folds from the open set and scrolls the selection back, and is not taken in an empty field. "/" focuses it from anywhere but a text field, Down Arrow reaches the first match, Enter opens it. It runs on the client over the drawn rows; above `TreeComponent::FIND_ON_SERVER_ABOVE` (2,000 pages) it would ask `Admin::TreeController#find` (read-scoped, trashed pages hidden), a documented next step not built now. ⌘K is unchanged: it jumps and closes; the field shows a page in place.
+- *Drag off while filtered.* A drop among hidden siblings is a place the person cannot see: SortableJS is disabled, the handles are not drawn, keyboard pick-up is refused, and the status line says "Clear the search to move pages" while the filter is on. "+" stays.
+- *The mind graph's list on the left, in the shell's tree column.* Navigation left, details right, as on every other screen. The list becomes the screen's `content_for :tree` and inherits the column's ground, width (`--admin-tree-width`, 220 to 480px), divider, fold strip and drawer, with the two writers of width and fold unchanged. The find field takes the old search's place, with the server search (`PostGraph::Search`) as the list's last line, "Search the whole site for '%{query}'". The legend stays the first row over the canvas, the card beside its node, the zoom bottom-right. The column scrolls on its own on this screen (`.admin-shell__tree--fill`); the fold words are per screen (`content_for :tree_label`).
+- *The APG tree for the graph.* A graph row is one control, so its list is an APG tree: `role="tree"`, `treeitem` with `aria-level`, `aria-expanded`, `aria-selected`, one Tab stop with roving `tabindex` (↑/↓, →/←, Home/End, Enter or Space selects and opens the card). That lets the list come first in the Tab order at no cost: search, list, legend, zoom, canvas, card. Pages keeps nested lists with disclosure buttons (`aria-expanded`, `aria-controls`, "Fold %{title}"/"Unfold %{title}"), since a row holding a link, a handle and "+" may not be a `treeitem`; it is never given `role="tree"`.
+
+*5d-1, the shared row, the Pages tree, folding and the find field* (5.5 days): `TreeItemComponent`, the `.admin-tree` block and the four lengths; Pages rows through it; the disclosure, folding, the cookie open set, the open path on `follow`, drag onto folded parents, `nest()` that opens, counts at rest on folded rows; the find field, filter, marks, keyboard, live count and drag off while filtered.
+
+*5d-2, the mind graph's list moved to the left onto the shared row* (4.5 to 5.5 days): `data-tree-classes` and the two parts (`tree-disclosure`, `tree-page-mark`, from `PartsComponent`), `node_list.js` building the shared row and writing no class of its own; the APG tree with roving focus; the list in `content_for :tree` (the fill modifier, `reset()` taking back the list outside the controller's element, per-screen fold words); the shared find field in place of the old search, the server search as its last line; the open set shared. The semantic change is done in one sweep, not mixed with the visual one.
+
+*The open question* **(owner)**. Below 1024px the mind graph's list becomes the tree drawer, as Pages' does: a keyboard user on a narrow window opens the drawer (the top bar's tree button) to reach the nodes. That is the default. The fallback, if it is not acceptable, keeps today's stacked list under the canvas below 1024px, at the cost of a second placement rule.
+
+*Files.* New: `app/components/admin/ui/tree_item_component.*`, `tree_find_component.*`, `app/javascript/tree/open_set.js`, `tree/find.js` (with a topic of that name for `source_layout_test`: a small `admin--tree--disclosure` controller in `controllers/admin/tree/`, builder's call); the four lengths in `content-spiel.css`, the `.admin-tree` block in `content-spiel.tailwind.css`. Changed: `app/components/admin/pages_screen/tree_component.*`, `tree_node_component.*`, `tree_row_component.*` (`for_page` reads the open set), `app/javascript/controllers/admin/pages/tree_controller.js`, `app/views/admin/shared/_tree_head.html.erb`, `app/components/admin/shell/tree_fold_component.rb` (the per-screen words), `app/views/admin/mind_graph/show.html.erb`, `app/components/admin/mind_graph_screen/parts_component.*`, `app/javascript/mind_graph/node_list.js`, `parts.js`, `app.js` (`reset()`), the keys in `config/locales/admin/` (`admin.components.ui.tree_find`: `label`, `placeholder`, `count`, `none`, `no_moving`, `clear`; "Fold %{title}", "Unfold %{title}", "Opened %{title}", the graph's fold words and `mind_graph.script.list.search_site`); `docs/reference/design-system.md` (a "Tree" section), `docs/reference/cs-studio-shell-and-dashboard.md` (the column hosts two screens; the graph's layout and Tab order) and `CLAUDE.md`'s "Rules a change can break silently".
+
+*Tests.* `test/components/admin/pages_screen/tree_component_test.rb` and `tree_row_component_test.rb` (the indent and title classes; a folded parent draws `hidden` children and `aria-expanded="false"`, the open path is drawn open, the cookie honoured and ignored when junk; the threshold constant), a new `test/components/admin/ui/tree_item_component_test.rb` ("only the selected row is semibold"); browser: `tree_test` (fold and unfold by mouse and keyboard, the fold kept across a reload and a Turbo visit, a drag that opens a folded parent, "typing narrows the tree to matches and their paths, marks them, and Escape gives back the person's folds", "no match says No pages match", "drag is off while filtered and the line says why", "/ focuses the field, Down Arrow reaches the first match, Enter opens it", "a page saved while the tree is filtered keeps its row filtered and marked"), a new `tree_item_parity_test` ("the Pages tree and the mind graph's list draw one row"), `tree_column_test` and `tree_fold_test` (the width and fold on the graph's screen, the per-screen words), `mind_graph_list_test` and `mind_graph_card_and_list_modules_test` (rows as `treeitem`s, roving focus, the Tab order "the search, then the list, then the legend and the canvas", the twenty-characters test pinned to the default width), `mind_graph_search_test` (the field's new role), a snapshot test that a page restored from Turbo's cache has no stale rows; `admin_design_rules_test` ("a tree's geometry is its four tokens, written once", "the open set has one writer", the tint let through for `.admin-tree mark`, the width and fold writers unchanged), `admin_contrast_test` ("a tree's guide stays a hairline", "a tree's disclosure, mark and count read on the chrome and on sunken", the selected bar on both trees, "a match's tint keeps the title's ink"), `source_layout_test`, `script_messages_test`, `admin_i18n_test`.
+
+*Architecture-review findings.* Checked against the open `architecture-review` issues on 2026-11-07. #117 (advances), as every stage: the comments of the tree's files are rewritten with them. #132 is not taken: its remaining parts (`hold_controller.js`, `table_controller.js`, the rich-text editor controller, the posts and pages Rails controllers) are not files 5d rewrites; the tree's new behaviour goes into the `tree` topic's own modules so `admin--pages--tree` (374 lines) does not become the next one to split. #133: its remaining part (shorter names) is not in these files; the rewritten list tests begin on `visit_screen`. #127: the row's slots are the component's own, and `tree.row.markers` keeps its shape. No other open finding touches the tree or the mind graph's list.
+
+*Size.* 10 to 11 days (5d-1 5.5, 5d-2 4.5 to 5.5). *Guide.* "The page tree: how your pages are organised" and "Tags, related posts and the Mind graph".
+
 - **5c, Settings and the setup wizard.** Settings saves explicitly: its save bar is the one primary area, floating at the foot of the column and naming what changed; a changed field carries a violet edge (6.9 / 7.1:1) from the save bar's existing dirty tracking; cards and nav restyled; an "At a glance" rail shows the state of languages, AI, mail and images from what the cards already compute (`MailSettings`, the AI test result, the images' progress), a component and not a query. The wizard keeps one primary per step (Continue), Back and Skip for now as text buttons, "Optional" in words; the current step violet on its tint, a done step's green check; a progress bar (6.9 / 7.1:1 against its track), static per step, and a welcome line on the first step; no time left. Tests: `settings_test`, `settings_mail_test`, `settings_images_test`, `ai_settings_test`, `languages_test`, the setup tests. *Size* 4 to 7 days.
 
-**Guide.** The mind graph, posts, tags, Settings, first-time setup.
+**Guide.** The mind graph, posts, tags, Settings, first-time setup; for 5d, the page tree and the mind graph (above).
 
 ### Stage 6: working together
 
@@ -330,11 +369,11 @@ By the rule above.
 
 **Guide.** Media, trash, translations, forms, the audit log, users and groups, tokens, your account, signing in, the mails.
 
-**Total.** About 14 to 21 weeks in seven stages (twelve PRs), of which about 3 to 4 weeks are the architecture-review findings below.
+**Total.** About 16 to 23 weeks in seven stages (fourteen PRs, with 5d's two), of which about 3 to 4 weeks are the architecture-review findings below.
 
 ## Architecture-review findings
 
-The rule (the owner's): when a stage changes the code an open finding covers, that finding, or its part in that code, is done in the stage. Checked against every open issue labelled `architecture-review` on 2026-11-06. None of the parts taken changes what a person sees.
+The rule (the owner's): when a stage changes the code an open finding covers, that finding, or its part in that code, is done in the stage. Checked against every open issue labelled `architecture-review` on 2026-11-06, and again for stage 5d on 2026-11-07 (it takes only #117's part, see 5d). None of the parts taken changes what a person sees.
 
 | Issue | Stage | Closes or advances | Why |
 |---|---|---|---|

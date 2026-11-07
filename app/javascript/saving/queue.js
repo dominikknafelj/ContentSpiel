@@ -1,5 +1,4 @@
-// One screen's writes, one at a time (cs-studio design pass round 2, Task 6
-// fix round 1).
+// One screen's writes, one at a time.
 //
 // WHY. A page editor's forms write one record each, and a few of them share
 // state on the page: a hidden `base_updated_at` field per autosave form, which
@@ -10,8 +9,7 @@
 // to replace, and the second would be refused against nothing but its own
 // editor. The page settings form's base is its own (`Page#settings_changed_at`):
 // neither a block write nor the tree's move of the open page moves it, so no
-// request forwards another form's base any more (`X-Page-Base-Updated-At` is
-// gone); each form's answer carries its own.
+// request forwards another form's base; each form's answer carries its own.
 //
 // WHAT. This queue makes a request be SENT only after the previous one's
 // answer has been received AND its base values written into the hidden fields
@@ -28,7 +26,7 @@
 // is a write of the page, not for a base: a move does not move the open
 // settings form's `settings_changed_at` (`Page::SETTINGS_BASE_IGNORES`).
 //
-// THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR
+// THE RULE: nothing that REPLACES AN EDITOR
 // starts until the queue is empty. Three kinds of thing replace an editor:
 // - a Turbo visit (a sidebar link, a locale switch, Reload);
 // - the editor header's actions (Publish, Unpublish, Schedule, Move to trash,
@@ -48,21 +46,21 @@
 // queued or in flight AND no autosave form has a debounced, queued, in-flight
 // or retrying save -- forms are asked to send what they hold (`flush()`) in a
 // loop until a pass finds nothing new, bounded by `DRAIN_LIMIT_MS` -- the
-// whole wait, including the wait for a request already on the wire (fix round
-// 4: a save that never answers no longer holds a visit for its own 30 s
-// timeout). It resolves to whether every form ended CLEAN (last answer a
-// success, not paused by a 409, not failed).
-// So no edit is dropped on the way out: before this, a queued save was either
-// cancelled by the visit (lost silently) or sent on a base the action had just
-// moved (refused). The header action additionally refuses to run when a form
+// whole wait, including the wait for a request already on the wire (a save
+// that never answers does not hold a visit for its own 30 s timeout). It
+// resolves to whether every form ended CLEAN (last answer a success, not
+// paused by a 409, not failed).
+// So no edit is dropped on the way out: without the wait a queued save would
+// be either cancelled by the visit (lost silently) or sent on a base the
+// action had just moved (refused). The header action additionally refuses to run when a form
 // ended unclean (`admin--saving--queue-hold`): its redirect would throw away the very
 // text a 409 bar promised to keep. A plain visit or frame navigation still
 // goes on (the editor chose to leave; do not trap them), after the drain.
 //
 // THE MODULES. This file is the one specifier everybody imports
-// (`saving/queue`: the four controllers that write, and the system tests'
-// `assert_writes_settled`); what it exports is unchanged by the split, and
-// nothing outside this directory imports the files below.
+// (`saving/queue`: the controllers that write, the readers that wait on it,
+// and the system tests' `assert_writes_settled`), and nothing outside this
+// directory imports the files below.
 // - `saving/queue_state.js`: what the others share, and nothing else -- the
 //   page generations ("PAGE GENERATIONS", "WHAT A GENERATION IS"), the
 //   chain and its counters, the registered forms, the promotion window's
@@ -80,8 +78,7 @@
 // so each is evaluated once per document and there is one queue.
 //
 // THE ORDER THE LISTENERS ARE REGISTERED IN. Nine listeners are registered as
-// these modules are evaluated, and they are registered in the order the
-// single file this used to be had them in:
+// these modules are evaluated, in this order:
 //   1. `document`  `turbo:before-visit`          frame_hold.js
 //   2. `document`  `turbo:before-frame-render`   frame_hold.js
 //   3. `window`    `turbo:before-fetch-request`  frame_hold.js
@@ -117,9 +114,9 @@
 //   `document`, `admin--saving--save-bar`'s `turbo:before-visit` guard, a
 //   controller's `turbo:before-render` or `turbo:load`), and those run in the
 //   order they were added. The nine are added in one go -- no other module is
-//   evaluated in between -- at the first import of `saving/queue`, as they
-//   always were. Keeping their order means that position is the same listener
-//   for listener, so nothing has to be argued event by event.
+//   evaluated in between -- at the first import of `saving/queue`. Keeping
+//   their order means that position is the same listener for listener, so
+//   nothing has to be argued event by event.
 // - (9) is here because it belongs to two modules at once (it retires a body,
 //   `queue_state.js`, and drops a visit note, `frame_hold.js`) and comes last.
 import { Turbo } from "@hotwired/turbo-rails"
@@ -134,6 +131,8 @@ export {
 } from "saving/queue_core"
 // `quiet` and `writeCount` are for `controllers/admin/editing/live_controller.js`:
 // a read that waits for this tab's writes and notes whether one was queued meanwhile.
+// `busy` and `quiet` are also `controllers/admin/tags/detail_controller.js`'s:
+// the Tags rail's frame GET waits for a rename still being saved.
 export { writeCount } from "saving/queue_state"
 
 // See "WHAT A GENERATION IS" (`queue_state.js`): the body Turbo is about to

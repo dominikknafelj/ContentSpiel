@@ -1,12 +1,15 @@
 import { Controller } from "@hotwired/stimulus"
-import { Turbo } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
 
 // The Tags list's two dialogs, Merge and Delete (`app/views/admin/tags/index.html.erb`).
-// There is ONE of each in the page, not one per row: a row's menu item opens
-// the dialog with `data: dialog_trigger(id)` and carries that row's facts as
-// `data-tag-*` attributes (the id, the name, the already-worded title and
-// sentence -- `Admin::TagsHelper` chooses them from the locale file, so the copy is tested in Ruby).
+// There is ONE of each in the page, not one per row. The triggers stand in
+// the tag's detail in the list's rail (`Admin::TagsScreen::DetailComponent`):
+// each opens its dialog with `data: dialog_trigger(id)` and carries the tag's
+// facts as `data-tag-*` attributes (the id, the name, the already-worded title
+// and sentence -- `Admin::TagsHelper` chooses them from the locale file, so the
+// copy is tested in Ruby). They are read when the dialog opens, from the
+// trigger that was pressed, and no reference to a trigger is kept: a rename's
+// answer replaces the detail, triggers and all.
 // `admin--ui--dialog#open` announces the opening (`admin--ui--dialog:opening`, on
 // `document`, before the dialog is shown) with the trigger; this controller
 // reads the trigger and fills the dialog, the way `admin--editor--new-record` does for
@@ -25,18 +28,20 @@ import { messages } from "i18n/messages"
 // leaves the dialog open, so a submission's end closes it (`submitted`):
 // - a success moves the focus to the next row's name (the previous one's for
 //   the last row, the heading when none is left) -- the row that had it is
-//   gone, and focus on <body> sends a keyboard user back to the top; and when
-//   the last tag went, the screen is fetched again for its empty state;
+//   gone, and focus on <body> sends a keyboard user back to the top. The
+//   answer itself puts the rail back to its empty line and, when the last
+//   tag went, draws the list's empty state;
 // - a refusal (a 403, a tag someone else deleted) has no body to render: the
 //   dialog would stay open over a button that does nothing, so it closes and
 //   an error toast says the tag wasn't deleted.
 //
-// THE NAME IS READ LIVE. The row's `data-tag-*` were written when the list was
-// rendered; a name renamed in place since (the row's own autosave) is not in
-// them, and the dialog asked to delete "old" beside a row that says "new". So
-// the name comes from the row's input as it stands, and the title, the
-// sentence and the picker's exclusion are re-worded with it (the name appears
-// in them in “curly quotes”, as the locale file wrote it).
+// THE NAME IS READ LIVE. A trigger's `data-tag-*` were written when its detail
+// was drawn; a name being renamed in place since (the row's own autosave, its
+// answer not yet drawn) is not in them, and the dialog would ask to delete
+// "old" beside a row that says "new". So the name comes from the row's input
+// as it stands, and the title, the sentence and the picker's exclusion are
+// re-worded with it (the name appears in them in “curly quotes”, as the locale
+// file wrote it).
 //
 // Everything reaches the DOM through `textContent` and attributes: a tag name
 // is whatever an editor typed, never markup.
@@ -120,9 +125,6 @@ export default class extends Controller {
     const settle = () => {
       if (row?.isConnected && Date.now() - started < 2000) return setTimeout(settle, 30)
       next?.focus()
-      // The last tag: the table is a header over nothing. The screen itself
-      // knows its empty state.
-      if (!document.querySelector(".admin-tags-table tbody tr")) Turbo.visit(location.href, { action: "replace" })
     }
     settle()
   }
