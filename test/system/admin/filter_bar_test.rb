@@ -15,37 +15,45 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
-  # Every control of the bar as [description, height]: the fields and selects,
-  # the Clear link, the subject chip, and each segmented group's frame (its
-  # labels are the frame less its two border pixels).
-  def heights
+  # Every control under `root` as [description, height]: the fields and
+  # selects, the Clear link, the subject chip, and each segmented group's
+  # frame (its labels are the frame less its two border pixels). A filter
+  # panel's fieldset is no segmented group: its selects are measured as
+  # selects.
+  def heights(root: BAR)
     page.evaluate_script(<<~JS)
       (() => {
-        const bar = document.querySelector("#{BAR}")
+        const bar = document.querySelector(#{root.to_json})
         const out = []
         const add = (el, name) => out.push([name, Math.round(el.getBoundingClientRect().height * 100) / 100])
         bar.querySelectorAll("input:not(.sr-only):not([type=hidden]), select").forEach((el) => add(el, el.tagName.toLowerCase() + "#" + el.id))
         bar.querySelectorAll("a[data-turbo-frame]:not([aria-label])").forEach((el) => add(el, "link " + el.textContent.trim()))
         bar.querySelectorAll("[data-subject-chip]").forEach((el) => add(el, "chip"))
-        bar.querySelectorAll("fieldset > div").forEach((el) => add(el, "segments"))
+        bar.querySelectorAll("fieldset:not(.admin-filter-panel) > div").forEach((el) => add(el, "segments"))
         return out
       })()
     JS
   end
 
-  def assert_one_height(expected_names)
-    assert_selector BAR
-    measured = heights
+  def assert_one_height(expected_names, root: BAR)
+    assert_selector root
+    measured = heights(root:)
     names = measured.map(&:first)
     expected_names.each { |name| assert(names.any? { |n| n.start_with?(name) }, "#{name} is in the bar: #{names}") }
     measured.each { |name, height| assert_in_delta HEIGHT, height, 0.5, "#{name} is #{height}px, the bar is #{HEIGHT}px (#{measured})" }
-    assert_selector "#{BAR}.admin-filter-bar"
+    assert_selector(root == BAR ? "#{BAR}.admin-filter-bar" : "#{root} .admin-filter-bar")
   end
 
-  test "the posts list's bar: search, segments, three selects and Clear are one height" do
-    visit admin_posts_path(scope: "drafts")
-    await_admin_controllers
-    assert_one_height(%w[input#q segments select#type select#tag select#translation link\ Clear])
+  # The posts list's form is `display: contents` and holds the bar and the
+  # filter panel, so it is measured whole: the panel's selects are the
+  # bar's height wherever the panel stands.
+  test "the posts list's bar and its filter panel: search, segments, Clear and the three selects are one height" do
+    [ 1600, 1100 ].each do |width|
+      at_window(width) do
+        visit_screen admin_posts_path(scope: "drafts")
+        assert_one_height(%w[input#q segments select#type select#tag select#translation link\ Clear], root: "form#posts-filters")
+      end
+    end
   end
 
   test "the media library's bar: search, segments and Clear are one height" do

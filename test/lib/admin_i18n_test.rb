@@ -135,6 +135,22 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
+    app/views/admin/posts/index.html.erb
+    app/views/admin/posts/new.html.erb
+    app/views/admin/pages/new.html.erb
+    app/helpers/admin/posts_list_helper.rb
+    app/components/admin/posts_screen/toolbar_component.rb
+    app/components/admin/posts_screen/toolbar_component.html.erb
+    app/components/admin/editor_screen/new_post_dialog_component.rb
+    app/components/admin/editor_screen/new_post_dialog_component.html.erb
+    app/components/admin/editor_screen/new_post_form_component.rb
+    app/components/admin/editor_screen/new_post_form_component.html.erb
+    app/components/admin/editor_screen/new_page_dialog_component.rb
+    app/components/admin/editor_screen/new_page_dialog_component.html.erb
+    app/components/admin/editor_screen/new_page_form_component.rb
+    app/components/admin/editor_screen/new_page_form_component.html.erb
+    app/components/admin/editor_screen/new_record_messages.rb
+    app/javascript/controllers/admin/editor/new_record_controller.js
     app/components/admin/dashboard_screen/panel_component.rb
     app/components/admin/dashboard_screen/panel_component.html.erb
     app/components/admin/dashboard_screen/translation_panel_component.rb

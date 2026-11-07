@@ -140,10 +140,10 @@
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
 /* Nothing at rest; while the sticky footer is stuck over the content
    (`data-stuck`, set by `admin--saving--save-bar`), the strong line and a
-   shadow (Claude Design O2). */
+   shadow. */
 .admin-save-bar[data-stuck] { border-top-color: var(--cs-line-strong); box-shadow: var(--cs-shadow-stuck); }
-/* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT (Claude Design,
-   2026-10-13, T1). `--admin-tree-width` on <html> is the CHOSEN width, in
+/* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT.
+   `--admin-tree-width` on <html> is the CHOSEN width, in
    pixels: the layout's head script puts it there from this browser's memory
    before the first paint (`admin/shared/_tree_head`) and the divider's script
    writes it on every drag and key (`admin--shell--tree-width`). Without it --
@@ -184,7 +184,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-shell--tree { grid-template-columns: 15rem var(--admin-tree-column) minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a
-   long page (round 1 departure, dark and light). Only the nav inside is
+   long page, dark and light. Only the nav inside is
    sticky: viewport-high, scrolling its own module list. */
 .admin-shell__sidebar { align-self: stretch; background: var(--cs-chrome); }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; }
@@ -192,12 +192,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    below make the column `fixed`, which holds the (hidden) divider as well. */
 .admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 /* The Translations row's action word sits under the row's stretched link, so it
-   is shown by opacity, never visibility (layout points spec, B). */
+   is shown by opacity, never visibility. */
 .admin-translation-row__action { opacity: 0; }
 .admin-translation-row:hover .admin-translation-row__action,
 .admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
 
-/* The divider (`Admin::Shell::TreeDividerComponent`, T1). AT REST it is
+/* The divider (`Admin::Shell::TreeDividerComponent`). AT REST it is
    nothing but the column's own 1px line: this element is the 8px HIT AREA,
    centred on that line (the line is the column's last pixel, so the area
    starts 4.5px inside the column and ends 3.5px inside the editor) and as
@@ -278,7 +278,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
 /* The scrim belongs to a drawer, and `admin--shell--drawer` only un-hides it when
    one opens -- it knows nothing about widths. A drawer left open while the
-   window is widened stops being a drawer (the rules above no longer apply),
+   window is widened stops being a drawer (the rules above stop applying),
    and its scrim would be left covering a page that has nothing over it. So
    the scrim never shows where no drawer can exist: at all from 1280px, and
    from 1024px unless it is the modules sidebar (still a drawer there) that
@@ -349,9 +349,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
 
-/* Presence (`Admin::PresenceScreen::PeopleComponent`, the presence handoff's
-   items 14 and 25): someone who arrives fades in, 150ms, opacity only, and
-   not at all with reduced motion. Nobody fades out and nobody slides: who
+/* Presence (`Admin::PresenceScreen::PeopleComponent`): someone who arrives
+   fades in, 150ms, opacity only, and not at all with reduced motion. Nobody fades out and nobody slides: who
    left is not in the next drawing, and the others are where they belong.
    `admin--presence--record` marks the circle that is new in a drawing; here
    to away is a redraw with no mark, so it changes at once. */
@@ -397,11 +396,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    narrow window) grows instead of clipping, which a group height would do. It
    is unlayered like `.cs-select`, so it beats the utilities written beside a
    control (`py-1.5`, `py-2`): those are dead inside a bar. The segments sit
-   inside the group's 1px frame, hence two pixels less. */
+   inside the group's 1px frame, hence two pixels less. A list's filter panel
+   (`.admin-filter-panel`, below) is part of its bar's form, so its selects
+   take the bar's height wherever the panel stands. */
 .admin-filter-bar > div,
 .admin-filter-bar > fieldset { display: flex; }
 .admin-filter-bar input:not(.sr-only),
 .admin-filter-bar select,
+.admin-filter-panel select,
 .admin-filter-bar a.inline-block,
 .admin-filter-bar a.inline-flex,
 .admin-filter-bar button,
@@ -428,14 +430,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .admin-disclosure::before { transition: none; } }
 
-/* Styled native checkbox (Admin::Ui::CheckboxComponent, round 1 departure). The
+/* Styled native checkbox (Admin::Ui::CheckboxComponent). The
    browser draws the tick; `accent-color` gives it the token fill in both
    themes, and the radius and focus ring come from tokens too. */
 .cs-checkbox { accent-color: var(--cs-accent); border-radius: var(--cs-radius); width: 1rem; height: 1rem; flex: none; cursor: pointer; }
 .cs-checkbox:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 .cs-checkbox:disabled { cursor: not-allowed; opacity: 0.5; }
 
-/* Toggle switch (Admin::Fields::BooleanField, design pass round 2): still a
+/* Toggle switch (Admin::Fields::BooleanField): still a
    checkbox, so the form posts and autosaves it like one, drawn as a pill
    (the one place the system allows 999px, besides avatars and tag chips).
    The knob is a pseudo-element moved by :checked -- tokens only, so both
@@ -495,15 +497,16 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    column) reset it too: an invalid body must not redden their inputs. So does an
    AI suggestion box (`.admin-translation-suggestion`), whose editable textarea
    sits under the field's input inside the same wrapper, and a list's filter bar
-   (`.admin-filter-bar`, `FilterHelper`), which has no error slot.
+   (`.admin-filter-bar`, `FilterHelper`) and filter panel (`.admin-filter-panel`),
+   which have no error slot.
 
    Surfaces: native controls, the prefix input's wrapper, and the rich-text
    editor's toolbar and body (the whole editor border). The media column has no
    text input, so it has nothing to colour. Explicit-save forms render their
    class server-side instead. */
-.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
+.admin-column, .admin-field, .admin-filter-bar, .admin-filter-panel, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
-:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field),
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-filter-panel, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field),
 .admin-well {
   background-color: var(--cs-field-fill);
   border-width: 0 0 1px;
@@ -523,7 +526,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    and the graph card's note field) carries `.admin-well` itself: there is no
    second look for a field, compact or not. A filter bar's controls keep the
    bar's 38px (`--cs-control-compact`, above): the well sets no height. */
-:is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within),
+:is(.admin-column, .admin-field, .admin-filter-bar, .admin-filter-panel, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field):is(:focus, :focus-within),
 .admin-well:is(:focus, :focus-within) {
   background-color: var(--cs-surface);
   outline: 2px solid var(--cs-accent);
@@ -538,21 +541,21 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
 .admin-prefix-input:focus-within { background-color: var(--cs-surface); }
-/* The Media panel's Alt field while the default-language alt is empty (handoff
-   §4.6: "warn border when empty"): the warn colour, drawn only while the input
-   is empty (it carries a placeholder) so it clears as soon as the editor types,
-   and never over an error, whose red border stays. Warn is a hue, not the only
-   cue: the placeholder says "Add alt text" and the tile says NO ALT. */
+/* The Media panel's Alt field while the default-language alt is empty: the
+   warn colour, drawn only while the input is empty (it carries a placeholder)
+   so it clears as soon as the editor types, and never over an error, whose
+   red border stays. Warn is a hue, not the only cue: the placeholder says
+   "Add alt text" and the tile says NO ALT. */
 .admin-media-alt-warn .admin-column:not(:has(> [id$="-errors"] > p)) :is(input, textarea):placeholder-shown { border-color: var(--cs-warn); }
-/* A tag's name in the Tags list (handoff §4.9: "rename inline by clicking the
-   name") reads as text until it is hovered or focused. The row's form is an
+/* A tag's name in the Tags list (renamed inline by clicking the name) reads
+   as text until it is hovered or focused. The row's form is an
    `.admin-column` (its error slot colours the input red), so the rule above
    would otherwise draw the resting border the input's own `border-transparent`
    utility asks not to have: unlayered CSS wins over a utility. Only the resting,
    valid state is touched -- hover, focus and an error keep their borders. */
 .admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; background-color: transparent; }
 
-/* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
+/* Side-by-side translation. A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
    primary-language original (`.admin-reference-card`) on the other. The
    breakpoint is the width of the FORM (`container-type: inline-size` on
@@ -563,7 +566,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    below it they stack with the original FIRST (it is
    what you read before you type) and foldable (`<details open>`), and the
    rich-text toolbar -- now alone in its row -- has the full width, so it fits
-   on one line again (round 1's `flex-wrap` stays as the fallback only). Side
+   on one line again (`flex-wrap` is the fallback only). Side
    by side there is nothing to fold away: `::details-content` is forced visible
    whatever the `open` state (a card folded while stacked must not stay hidden
    once the column widens -- no JS, CSS only; Chrome 131+/Safari 18.4+/Firefox
@@ -723,6 +726,55 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-dashboard__rail .admin-dashboard-panel > footer { padding-inline: 0; }
   .admin-dashboard__head,
   .admin-dashboard__notice { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
+}
+/* The lists' rail (the posts list's filters; the Tags screen's detail). The
+   container is the LIST's own width, never the window's (the sidebar and
+   the tree take room the window does not show), and no `@media` rule names
+   it. It docks at 1200px, the editors' and the dashboard's threshold: a
+   container query cannot read a custom property, so the number is written
+   in each place and `admin_design_rules_test` holds them to one. Every rule
+   the threshold changes is in its one block below, so a second list's
+   docked rules join that block rather than open another.
+
+   `.admin-list-rail` holds the heading row (`__head`) and the grid
+   (`__grid`). The grid holds, in document order, what stands above the
+   list, the rail (`__rail`), then the list: the rail comes before the list
+   at every width, so the focus goes heading row, the bar, the rail, the
+   list, and only the grid places them; nothing is moved by script. Below
+   the threshold it is one column and the rail is a row of the page in that
+   order. Docked, the list stands at the content's left edge and the rail
+   `--cs-rail-gap` right of it, across the first two rows, on the rail's
+   ground; the tracks are fixed and `justify-content: start`, so spare
+   width falls right of the rail, and the heading row ends where the rail
+   does, so New post stands over the rail and not out in that spare width.
+   Nothing else is placed: the list falls into the first column's next row.
+   That row is `1fr`, so a rail taller than the bar grows the list's row
+   and never the bar's, and the list stays the bar's margin under it.
+   The rail is matched anywhere in the grid, never only as a child, because
+   the posts list's panel stands inside a form drawn `display: contents`:
+   one form holds the bar and the panel, so the panel's `change` reaches
+   the form's `admin--ui--auto-submit` and its focus is restored by id, and
+   `contents` makes the form's bar and panel two items of this grid.
+
+   `.admin-filter-panel` is a list's filter fieldset. Below the threshold it
+   is a wrapping row under the bar, each select under its visible label, its
+   legend for a screen reader only; docked it is a column, one select under
+   the other, under its legend. Docked, the legend is floated, so it is not
+   the fieldset's rendered legend (which the browser draws in the top
+   border, outside the padding) but the column's first item, inside the
+   rail's padding. */
+.admin-list-rail { container: admin-list / inline-size; }
+.admin-list-rail__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
+.admin-list-rail__grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+.admin-filter-panel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; min-width: 0; margin: 0 0 1rem; border: 0; padding: 0; }
+.admin-filter-panel > div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 10rem; }
+.admin-filter-panel > legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@container admin-list (min-width: 1200px) {
+  .admin-list-rail__head { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
+  .admin-list-rail__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
+  .admin-list-rail__rail { grid-column: 2; grid-row: 1 / span 2; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
+  .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
+  .admin-filter-panel > legend { position: static; float: left; width: auto; height: auto; margin: 0 0 0.25rem; overflow: visible; clip-path: none; white-space: normal; }
 }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
@@ -989,8 +1041,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    outline inside the edge, which leaves the shadow and the ring alone. */
 .admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 
-/* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
-   image and still GIF tile"). Its box is the picture's own size and shows
+/* A picture in a note or a still GIF's tile
+   (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
    the placeholder gradient behind a picture that is partly transparent.
    A GIF's Play / Pause is shown with reduced motion only (the component's
    `motion-reduce:` classes): centred over the still, and in the corner while
@@ -999,16 +1051,16 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
 
-/* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
-   handoff "Block card marker" and "Section tile marker"). Four states, set by
+/* A block card's and a section tile's notes marker
+   (`Admin::NotesScreen::MarkerComponent`). Four states, set by
    `admin--notes--drawer` as attributes:
    - at rest without notes it is in its place and not shown (the system draws
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
      it is the add-note control: a 24px square holding the icon (18px on a
-     tile, with a 12px icon). Shown at rest for nobody (the handoff's
-     decision 6): every card and tile has "Add note" in its "⋯" menu, which
-     is the way that needs neither a hover nor a keyboard;
+     tile, with a 12px icon). Shown at rest for nobody: every card and tile
+     has "Add note" in its "⋯" menu, which is the way that needs neither a
+     hover nor a keyboard;
    - `data-has-notes`: a pill with the icon and the count, always shown
      (20px high on a card, 18px on a tile); also while text is selected in the
      block, when it reads "Note on selection";
@@ -1056,14 +1108,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-notes-marker--on-image[data-has-notes],
 .admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
 .admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
-/* THE THREAD VIEW'S HEADER (the handoff's decision 11). While a thread is the
+/* THE THREAD VIEW'S HEADER. While a thread is the
    drawer's view the drawer's own header -- the title, the count, "New note"
    and Close -- is not shown, and the thread's first row is the header: "←
    All notes 4", the Notify link and a Close of its own
    (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
    what the panel's does. "New note" comes back with the list. Asked of the
-   frame's view, so the two can't both show or both hide. AT EVERY WIDTH (the
-   handoff's decision 17): under 640px the notes are a sheet whose header
+   frame's view, so the two can't both show or both hide. AT EVERY WIDTH: under 640px the notes are a sheet whose header
    holds "Back to <title>", the one way back to the editor, and that header
    is hidden over a thread too -- so there the row ends in a "Back to
    page" of its own (`.admin-note-leave`, a text button) where the
@@ -1078,7 +1129,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-notes-drawer .admin-note-close { display: none; }
   .admin-notes-drawer .admin-note-leave { display: inline-flex; }
 }
-/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL (the handoff's decision 35). In
+/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL. In
    the drawer and the sheet a thread fills the drawer's body exactly: its two
    rows at the top, the composer at the bottom, and between them the one
    thing that scrolls, `[data-note-scroll]` (the state, the quote, the
@@ -1092,7 +1143,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }
 .admin-notes-drawer [data-note-part="messages"] { min-height: 0; }
 .admin-notes-drawer [data-note-scroll] { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-/* ONE "New note" in the drawer (the handoff's decision 4): its header's
+/* ONE "New note" in the drawer: its header's
    button is the way in, so the list's own link -- above the groups, and the
    empty state's action -- is not shown there, with the element that only
    holds it. The same list in the media panel and on the notes page of a
@@ -1111,7 +1162,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    box is ever touched. */
 .admin-dialog div:has(> [data-notes-alone][hidden]) { display: none; }
 
-/* Drag pattern (handoff §9 A9), shared by the page tree and the block list
+/* Drag pattern, shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
    edge with its content hidden and no shadow, the only edge a tile ever
@@ -1133,7 +1184,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }
 
-/* A view-only editor (handoff §10 B20): the fieldset that disables a
+/* A view-only editor: the fieldset that disables a
    record's fields also marks them as plainly read-only -- sunken and dim,
    the same look a disabled field already has, but on the rich-text editor
    too (a `<fieldset disabled>` doesn't reach a contenteditable). */
@@ -1151,7 +1202,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 
 .admin-view-only .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-sunken); }
 
-/* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
+/* A form someone else holds: read-only, not disabled-looking.
    `readonly` text stays selectable and keeps full contrast; a control that can only be
    `disabled` (a select, a checkbox, a button) is drawn at full contrast too, and the
    rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */
@@ -1168,7 +1219,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
-   main form's unsaved changes, round 3 decision D10): it can't be `disabled`
+   main form's unsaved changes): it can't be `disabled`
    like a button, so it is dimmed the way a disabled button is. The controller
    swallows its click. */
 a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }

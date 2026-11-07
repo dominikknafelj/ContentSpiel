@@ -1,0 +1,40 @@
+# CS Studio's posts list components, `app/components/admin/posts_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.posts_screen.<class name without Admin:: and Component, underscored>`.
+# The table's Notes column is notes' wording (`config/locales/admin/notes.en.yml`).
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      posts_screen:
+        # `Admin::PostsScreen::ToolbarComponent`, the list's one filter form:
+        # the bar (search, the segments, Clear) and the filter panel (Type,
+        # Tag, Translation).
+        toolbar:
+          # The search field's label for a screen reader, and its placeholder.
+          search: "Search titles"
+          # The segmented control's name for a screen reader.
+          show: "Show"
+          # The segments, one per `Posts::List::SCOPES` name.
+          scopes:
+            all: "All"
+            live: "Live"
+            drafts: "Drafts"
+            scheduled: "Scheduled"
+          # Drawn only without JavaScript, where the form cannot apply itself.
+          filter: "Filter"
+          clear: "Clear"
+          # The filter panel's legend, shown where the panel stands in the rail.
+          filters: "Filters"
+          type: "Type"
+          tag: "Tag"
+          translation: "Translation"
+          # The blank choice of a select, under its label: every type, any tag,
+          # any state of translation.
+          all: "All"
+          any: "Any"
+          # The Translation select's choices, one per value `Posts::List` reads.
+          translations:
+            needs: "Needs translation"
+            outdated: "Outdated"
+            complete: "Complete"

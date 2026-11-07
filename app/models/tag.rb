@@ -8,7 +8,7 @@ class Tag < ApplicationRecord
 
   # A tag's name is printed on the posts that carry it and is what a listing
   # block's `tag` setting matches, so a rename or a delete moves the public
-  # content version (`PublicSite`, technical cleanup spec §4.8), whether or
+  # content version (`PublicSite`), whether or
   # not a live post carries the tag. A new tag is on no page until a join row
   # says so (`PostTag`).
   after_commit(on: %i[update destroy]) { PublicSite.bump_version! }
@@ -30,9 +30,8 @@ class Tag < ApplicationRecord
     names.empty? ? none : where(lowered_name.in(names))
   }
   # Every tag but the ones of these names, whatever the case. With no name at
-  # all it is no tag at all, not every tag -- what `NOT (... IN (NULL))`, the
-  # condition this used to be, answered; the one caller never passes an empty
-  # list.
+  # all it is no tag at all, not every tag, which `NOT (... IN (NULL))` would
+  # answer; the one caller never passes an empty list.
   scope :not_named, ->(names) {
     names = Array(names).map { |name| name.to_s.downcase }
     names.empty? ? none : where.not(lowered_name.in(names))
@@ -45,6 +44,10 @@ class Tag < ApplicationRecord
   scope :name_starting_first, ->(text) {
     order(Arel::Nodes::Grouping.new(SqlNodes.like(lowered_name, SqlNodes.like_pattern(text.to_s.downcase, prefix: true))).desc)
   }
+  # The tags at least one of the given posts carries (a relation -- the posts
+  # a viewer may read, which hides the trashed): a tag only posts outside it
+  # carry is none of them.
+  scope :on_posts, ->(posts) { where(id: PostTag.where(post_id: posts.select(:id)).select(:tag_id)) }
   # Ordering: alphabetical, capitals and small letters together.
   scope :by_name, -> { order(lowered_name.asc) }
 

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The design pass: tokens only, red only for destruction and failure,
+# CS Studio's design rules: tokens only, red only for destruction and failure,
 # and none of the components the shared parts replaced. These rules are easy to
 # break one innocent edit at a time, so they are pinned here.
 class AdminDesignRulesTest < ActiveSupport::TestCase
@@ -193,13 +193,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort
   end
 
-  # Contrast and buttons spec (C1): a boundary that identifies a control is
+  # A boundary that identifies a control is
   # `--cs-field-line`, 3:1 on every ground; `--cs-line-strong` only groups.
   # Read line by line: a line whose classes make it pressable or typed into
   # (a hover, a focus, a checked state, a placeholder, a pointer cursor)
   # draws no strong line. A control whose line says none of those (a
-  # segmented group's frame, the drop zone) is not seen here: the spec lists
-  # them and review holds them. The public layouts are the theme's, whose
+  # segmented group's frame, the drop zone) is not seen here: review holds
+  # them. The public layouts are the theme's, whose
   # outline token is `--th-meta` (`design_tokens_test.rb`).
   CONTROL_SOURCES = (ADMIN_SOURCES + [ Rails.root.join("app/helpers/setup_helper.rb").to_s ])
     .reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
@@ -332,7 +332,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   FIELD_LINE_EDGE = /(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-])/
   HAND_BUTTON_ALLOWED = {
     "admin-rich-text-button" => "the rich-text toolbar's toggles: `aria-pressed` draws their edge",
-    "has-checked:border-accent has-checked:bg-accent-tint" => "New post's type choice, a radio group drawn as tiles",
     "rounded-button border border-field-line px-2 py-1 text-sm text-meta" => "the top bar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare",
     "rounded-button border border-field-line px-2 py-1.5 text-left text-sm text-meta" => "the sidebar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare"
   }.freeze
@@ -404,7 +403,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  WELL_CONTAINERS = ":is(.admin-column, .admin-field, .admin-filter-bar, .admin-rich-text-popover, .admin-translation-suggestion)".freeze
+  WELL_CONTAINERS = ":is(.admin-column, .admin-field, .admin-filter-bar, .admin-filter-panel, .admin-rich-text-popover, .admin-translation-suggestion)".freeze
   WELL_CONTROLS = ':is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], ' \
                   '[type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), ' \
                   "textarea, select, .admin-rich-text-editor, .admin-chip-field)".freeze
@@ -435,9 +434,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/font-size:\s*10px/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
   end
 
-  test "a filter bar resets the invalid edge, as every wrapper of wells does" do
+  test "a filter bar and a filter panel reset the invalid edge, as every wrapper of wells does" do
     reset = self.class.css_rules("content-spiel.tailwind.css").find { |_, body| body.include?("--cs-field-invalid-border: initial") }
-    assert_equal %w[.admin-column .admin-field .admin-filter-bar .admin-rich-text-popover .admin-translation-suggestion], reset&.first
+    assert_equal %w[.admin-column .admin-field .admin-filter-bar .admin-filter-panel .admin-rich-text-popover .admin-translation-suggestion], reset&.first
   end
 
   test "the rule parser finds a rule by its whole selector list and splits it only at top-level commas" do
@@ -713,7 +712,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Layout points spec, decision 1: one cap, one place. The rail's three
+  # One cap, one place. The rail's three
   # widths (the 900px blocks column, the 360px rail, the 28px between them)
   # are tokens of the same kind, beside it.
   RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:900|360|28)px\]|(?:max-|min-)?width:\s*(?:900|360)px|(?:column-)?gap:\s*28px/
@@ -807,6 +806,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-filter-bar input:not\(\.sr-only\),.*?min-height:\s*var\(--cs-control-compact\);\s*padding-block:\s*0;/m, css)
     assert_match(/\.admin-filter-bar fieldset label\s*\{\s*min-height:\s*calc\(var\(--cs-control-compact\) - 2px\);/m, css)
+    assert_match(/\.admin-filter-bar select,\s*\.admin-filter-panel select,.*?min-height:\s*var\(--cs-control-compact\);/m, css, "a filter panel's selects are the bar's height")
     assert_no_match(/\b38px|2\.375rem/, css)
 
     assert_includes File.read(Rails.root.join("app/helpers/admin/filter_helper.rb")), "admin-filter-bar mb-4 flex flex-wrap items-start gap-3"
@@ -844,9 +844,39 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/auto-fit/, css)
   end
 
+  # The lists' rail (the posts list's filters, the Tags screen's detail):
+  # laid out by the list's own width, never a window media query, docked on
+  # the editors' rail tokens. Its rail is matched anywhere in the grid, since
+  # the posts panel stands inside a `display: contents` form.
+  test "the lists' rail is laid out by the list's own container, from the rail's tokens" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-list-rail\s*\{\s*container:\s*admin-list\s*\/\s*inline-size;\s*\}/, css)
+    assert_match(/\.admin-list-rail__grid\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*minmax\(0, 1fr\);\s*\}/, css, "one column below the threshold")
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-list \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the lists' rail"
+    grid = docked.first[/\.admin-list-rail__grid\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked block lays out .admin-list-rail__grid"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/justify-content:\s*start;/, grid, "left-aligned: spare width falls right of the rail")
+    assert_match(/grid-template-rows:\s*auto 1fr;/, grid, "a rail taller than the bar grows the list's row, never the bar's")
+    rail = docked.first[/\.admin-list-rail__rail\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds .admin-list-rail__rail"
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*span\s*2].each do |declaration|
+      assert_match(/#{declaration};/, rail)
+    end
+    assert_no_match(/>\s*\.admin-list-rail__rail/, css, "the rail is matched anywhere in the grid, not only as a child")
+    assert_match(/\.admin-list-rail__head\s*\{[^}]*max-width:\s*calc\(var\(--cs-editor-column\) \+ var\(--cs-rail-gap\) \+ var\(--cs-rail-width\)\);/, docked.first)
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-list-rail") }, "no window media query lays out the lists' rail"
+  end
+
   # A container query cannot read a custom property, so the threshold is a
-  # number written in two places; this holds them to one.
-  test "the editors' rail and the dashboard's dock at one threshold" do
+  # number written in three places; this holds them to one.
+  test "the editors' rail, the dashboard's and the lists' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     editor = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten.uniq
     assert_equal 1, editor.size, "the editor docks at one width: #{editor.inspect}"
@@ -855,6 +885,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # width (one that docked only the rail's ground or its panels) fails.
     dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)/).flatten
     assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
+    assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
 
     docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
     assert_equal 1, docked.size
@@ -945,7 +976,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
   PEOPLE_HUE = /ic-people/
   ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
-  # Where the people hue may be drawn once built (the spec); none uses it yet.
+  # Where the people hue may be drawn once it is built; none uses it yet.
   PEOPLE_HUE_ALLOWED = %w[
     app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
   ].freeze

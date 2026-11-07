@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The posts list (design pass round 2, Task 17): toolbar filters and counts,
+# The posts list: toolbar filters and counts,
 # 50 to a page, the Languages column, and the bulk bar's two actions
 # (`POST /posts/bulk`, `Posts::Bulk`) with the Undo a bulk trash offers
 # (`POST /trash/restore_many`).
@@ -63,13 +63,13 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_select "label[for=posts-scope-all] span.text-count", text: "1"
   end
 
-  test "the old status param still works, and scope wins when both are sent" do
+  test "the list's scope is read from scope alone" do
     create_post(title: "Live one", published: true)
     create_post(title: "Draft one", published: false)
-    get "/cs-studio/posts", params: { status: "draft" }
+    get "/cs-studio/posts", params: { status: "drafts" }
+    assert_equal [ "Draft one", "Live one" ], row_titles.sort
+    get "/cs-studio/posts", params: { scope: "drafts" }
     assert_equal [ "Draft one" ], row_titles
-    get "/cs-studio/posts", params: { status: "draft", scope: "live" }
-    assert_equal [ "Live one" ], row_titles
     get "/cs-studio/posts", params: { scope: "bogus" }
     assert_equal 2, row_titles.size
   end
@@ -199,8 +199,13 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
 
   test "the New post split button opens the dialog preset to its type; the menu offers the others" do
     get "/cs-studio/posts"
-    assert_select "a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=blog]", text: /New blog post/i
-    assert_select "[role=menu] a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=resume_entry]", visible: :all
+    assert_select "a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=blog]", text: "New post (Blog)"
+    assert_select "[role=menu] a[data-admin--ui--dialog-id-param=new-post-dialog][data-new-post-type-param=resume_entry]", text: "New post (Resume entry)"
+  end
+
+  test "the split button names a type by its label in the label's own case" do
+    get "/cs-studio/posts"
+    assert_select "a[data-new-post-type-param=now_update]", text: "New post (#{ContentTypes.fetch("now_update").label})"
   end
 
   test "the dashboard's All drafts link opens the list on Drafts" do
@@ -455,6 +460,56 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     post "/cs-studio/trash/restore_many", params: { type: "post", ids: (1..201).map(&:to_s) }
     assert_response :unprocessable_entity
+  end
+
+  test "the posts screen stands in the list rail: the heading row, then one filter form, then the list" do
+    create_post(title: "One")
+    get "/cs-studio/posts"
+    assert_select ".admin-list-rail", 1
+    assert_select ".admin-list-rail > .admin-list-rail__head:first-child h1", text: "Posts"
+    assert_select ".admin-list-rail > .admin-list-rail__head + .admin-list-rail__grid"
+    assert_select ".admin-list-rail__grid > form#posts-filters:first-child + [data-controller='admin--posts--bulk-select']"
+    assert_select "form#posts-filters > .admin-filter-bar + fieldset.admin-list-rail__rail.admin-filter-panel"
+    assert_select "fieldset.admin-filter-panel form", 0
+    assert_select "[data-controller='admin--posts--bulk-select'] tbody tr", 1
+  end
+
+  # Each filter in the form's own words: the segment's name, then a label
+  # and its chosen option; a value the form has no word for, as sent.
+  test "No matches names what was chosen, in the words the filter form showed" do
+    create_post(title: "One", published: false)
+    get "/cs-studio/posts", params: { scope: "drafts", type: "resume_entry", tag: "gone", translation: "outdated", q: "zzz" }
+    assert_select "p", text: "No matches. No posts match the current filters (Drafts, Type: Resume entry, Tag: gone, Translation: Outdated, and Title contains “zzz”)."
+
+    get "/cs-studio/posts", params: { type: "nonesuch", translation: "needs" }
+    assert_select "p", text: "No matches. No posts match the current filters (Type: nonesuch and Translation: Needs translation)."
+  end
+
+  # The list ignores a translation state it does not know and a value that
+  # is not a String, so the sentence names neither, and they alone filter
+  # nothing: the list is then the unfiltered one, never "No matches ()".
+  test "No matches names no forged translation value and no Array value, which filter nothing" do
+    create_post(title: "Live one", published: true)
+    get "/cs-studio/posts", params: { scope: "drafts", translation: "bogus", tag: [ "x" ] }
+    assert_select "p", text: "No matches. No posts match the current filters (Drafts)."
+    assert_select "select#translation option[selected]", count: 0
+    assert_select "select#tag option[selected]", count: 0
+
+    Post.delete_all
+    [ { translation: "bogus" }, { tag: [ "x" ] }, { type: [ "blog" ] } ].each do |params|
+      get "/cs-studio/posts", params: params
+      assert_select "[data-empty-state-title]", text: "No posts yet.", message: params.to_s
+      assert_select "p", text: /\(\)/, count: 0
+    end
+  end
+
+  test "a type no registered type has shows as the Type select's chosen option, so the filter can be seen and cleared" do
+    create_post(title: "One")
+    get "/cs-studio/posts", params: { type: "gone_type" }
+    assert_select "select#type option[selected][value=gone_type]", text: "gone_type"
+    assert_select "select#type option[value='']", text: "All"
+    assert_select "select#type option[selected][value='']", count: 0
+    assert_select "p", text: "No matches. No posts match the current filters (Type: gone_type)."
   end
 
   test "the split button's divider is the on-accent colour at 40 percent" do

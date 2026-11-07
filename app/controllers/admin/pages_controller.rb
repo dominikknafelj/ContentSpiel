@@ -1,5 +1,5 @@
 module Admin
-  # The Pages module (cs-studio spec §4.1/§5.1), at its own `/pages`
+  # The Pages module, at its own `/pages`
   # (CS Studio's home is the dashboard): the
   # tree, creating a page from just a title, and the page editor itself --
   # its record header (publish state, delete) and its autosaving "Page
@@ -9,8 +9,8 @@ module Admin
   # calls out (a block card, the post form) -- only `update` here uses it;
   # `publish`/`unpublish`/`schedule` are deliberately plain POSTs with a
   # redirect + flash rather than another autosave endpoint, since publishing
-  # is a one-shot, deliberate action (spec §5.1's own "Publish now /
-  # Unpublish / Schedule…, Delete" list), not something that should fire the
+  # is a one-shot, deliberate action ("Publish now / Unpublish /
+  # Schedule…, Delete"), not something that should fire the
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
@@ -38,7 +38,7 @@ module Admin
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule slug]
 
-    # The Pages module's own index (handoff §10 C34): Home's editor when the
+    # The Pages module's own index: Home's editor when the
     # viewer can open it (303, with the editing language kept), otherwise the
     # empty state "Choose a page from the tree" beside the tree -- a viewer
     # whose grants reach only a deep branch has a tree to choose from but no
@@ -74,7 +74,7 @@ module Admin
     # The parent is looked up through the read scope (a parent id outside
     # it is a 404, like any other out-of-scope record), and the form is
     # only offered where the page could actually be created -- `pages
-    # .create` on the parent's branch (design spec §3.3 "Create page"),
+    # .create` on the parent's branch,
     # or on the homepage's when none was named, which is where `create`
     # puts it.
     #
@@ -136,7 +136,7 @@ module Admin
       end
     end
 
-    # The page editor itself (spec §5.1): the record header (@page carries
+    # The page editor itself: the record header (@page carries
     # its own publish state/leaf-ness) plus the autosaving settings form,
     # rendered from the same `@page` a normal GET or a failed `destroy`
     # alike -- there's exactly one "what does this page's editor look like"
@@ -162,7 +162,7 @@ module Admin
       ]).call
     end
 
-    # The settings form's own autosave endpoint (spec §6.1): every field in
+    # The settings form's own autosave endpoint: every field in
     # `params[:page]` PATCHes here together (a plain `<input>`'s `input`
     # event bubbles to the whole form, which is what `FormData` then
     # serializes in full) and answers with the shared Turbo Stream shape
@@ -206,8 +206,8 @@ module Admin
       end
       streams << refused if refused
 
-      # The tree column lives outside this form (the layout's own `<aside>`,
-      # spec §4.2), so nothing aimed at the form's elements reaches it: the
+      # The tree column lives outside this form (the layout's own `<aside>`),
+      # so nothing aimed at the form's elements reaches it: the
       # saved page's row is replaced here, or the tree would keep showing its
       # old title, state mark and translation markers. Only that row: a
       # settings save changes nothing of the tree's shape (a page's place is
@@ -228,8 +228,8 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Moves the page, with its whole branch, to the trash (`Trash::Move`,
-    # trash spec §4.1) -- nothing is deleted from here; the permanent delete
+    # Moves the page, with its whole branch, to the trash (`Trash::Move`)
+    # -- nothing is deleted from here; the permanent delete
     # is `Trash::Purge`, reachable only from the trash.
     # `count` is read before the move (`Trash::Move` itself trashes every
     # kept descendant, so counting after would just see them all already
@@ -256,7 +256,7 @@ module Admin
       end
     end
 
-    # Publish now (spec §5.1): live immediately, keeping a live page's own
+    # Publish now: live immediately, keeping a live page's own
     # `published_at` untouched (`Pages::Save#assign_publishing`) -- this is
     # "make it live right now" even for a page that was already scheduled
     # ahead, not "clear the schedule".
@@ -274,7 +274,7 @@ module Admin
       redirect_after Pages::Save.call(@page, attributes: { published: false }), success: "Unpublished"
     end
 
-    # Schedule… (spec §5.1): a future `published_at` wins outright over the
+    # Schedule…: a future `published_at` wins outright over the
     # `published:` true/false shorthand (`Pages::Save#assign_publishing`),
     # so this is the one action here that can also *un*-schedule a page
     # back to a later date without first unpublishing it.
@@ -297,7 +297,7 @@ module Admin
       redirect_after Pages::Save.call(@page, attributes: { published_at: at }), success: "Scheduled"
     end
 
-    # A published or scheduled page's slug (drafts spec D7): not in the
+    # A published or scheduled page's slug: not in the
     # autosaving settings form, because a new slug moves the page's address
     # at once and is in no published copy to wait in. Its own form, behind a
     # confirmation. An instant action like Publish: no hold is taken, and it
@@ -313,7 +313,7 @@ module Admin
 
     helper_method :new_page_params
 
-    # Through the read scope (design spec §3.3): a page the actor can't
+    # Through the read scope: a page the actor can't
     # read is a 404 here -- show, autosave, publish and delete alike --
     # never a 403 that would confirm it exists.
     def set_page
@@ -373,7 +373,7 @@ module Admin
 
     def render_new_page_failure(gone: false)
       @page ||= Page.new
-      @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
+      @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent.gone) if gone
       form = Admin::EditorScreen::NewPageFormComponent.new(
         url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || new_page_params[:parent_id] unless gone),
         title: new_page_params[:title], template: new_page_params[:template], errors: @page.errors
@@ -388,7 +388,7 @@ module Admin
     # No `parent_id` at all (the empty state's "Add a page" names none) is
     # "use the homepage". A named one is looked up through the read scope
     # like every other record here, the same way `new` does: an id the
-    # actor can't read -- or one that no longer exists -- is a 404, never a
+    # actor can't read -- or one that does not exist -- is a 404, never a
     # silent fallback to the homepage that would put the page somewhere
     # the editor didn't choose. `Pages::Save` then decides `pages.create`
     # against the parent's branch.
