@@ -393,4 +393,55 @@ class AdminContrastTest < ActiveSupport::TestCase
       end
     end
   end
+
+  # The Notes tab stands on the rail's ground docked and on the popover's in
+  # the slide-over; the thread's reply dock paints the ground the drawer
+  # names (`--cs-notes-ground`), so a message, a time, a mention, Reply and
+  # the composer's edge are measured on both. Each colour is read from the
+  # class that draws it.
+  NOTES_GROUNDS = %w[--cs-rail --cs-popover].freeze
+
+  def notes_template(name) = Rails.root.join("app/components/admin/notes_screen/#{name}").read
+
+  def utility_token(classes, property)
+    classes[/(?<![\w:-])#{property}-([\w-]+)/, 1].then { |name| "--cs-#{name}" }
+  end
+
+  test "the Notes tab's ground is the rail docked and the popover in the slide-over, and the reply dock paints it" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_equal "--cs-popover", css[/^\.admin-notes-drawer\s*\{[^}]*--cs-notes-ground:\s*var\((--cs-[\w-]+)\)/, 1]
+    assert_equal "--cs-rail", css[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-notes-drawer\s*\{[^}]*--cs-notes-ground:\s*var\((--cs-[\w-]+)\)/, 1]
+    dock = notes_template("thread_component.html.erb")[/data-note-part="reply"[^\n]* class="([^"]*)">/, 1]
+    assert_includes dock.to_s.split, "bg-(--cs-notes-ground)", "the reply dock stands on the notes' ground, not on the surface"
+    refute_includes dock.to_s.split, "bg-surface"
+  end
+
+  test "a note's message, its time and the viewer's own mention hold 4.5:1 on the Notes tab's grounds, in both schemes" do
+    message = notes_template("message_component.html.erb")
+    assert_includes message, "text-[13px] font-semibold text-ink"
+    assert_match(/text-label text-meta/, message)
+    viewer = Admin::NotesScreen::BodyComponent::MENTION_VIEWER_CLASS
+    each_scheme do |scheme, colour|
+      NOTES_GROUNDS.each do |ground|
+        assert_ratio(4.5, colour.("--cs-ink"), colour.(ground), "a message's words on #{ground} (#{scheme})")
+        assert_ratio(4.5, colour.("--cs-meta"), colour.(ground), "a time on #{ground} (#{scheme})")
+      end
+      tint = utility_token(viewer, "bg")
+      assert_equal "--cs-accent-tint", tint
+      assert_ratio(4.5, colour.(utility_token(viewer, "text")), colour.(tint), "the viewer's own mention on its tint (#{scheme})")
+    end
+  end
+
+  test "Reply is the secondary button, 4.5:1 on the grounds a thread stands on, and the composer's edge is 3:1 there" do
+    thread = notes_template("thread_component.html.erb")
+    assert_match(/submit: t\("\.send_reply"\)[^%]*variant: :secondary/m, thread, "Reply is drawn as the secondary variant")
+    secondary = Admin::Ui::ButtonComponent::VARIANT_CLASSES.fetch(:secondary)
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.(utility_token(secondary, "text")), colour.(utility_token(secondary, "bg")), "Reply's words on its tint (#{scheme})")
+      NOTES_GROUNDS.each do |ground|
+        assert_ratio(4.5, colour.(utility_token(secondary, "text")), colour.(ground), "Reply's words on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the composer's edge on #{ground} (#{scheme})")
+      end
+    end
+  end
 end

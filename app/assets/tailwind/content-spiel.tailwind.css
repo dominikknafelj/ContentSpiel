@@ -713,6 +713,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-notes-drawer {
     position: sticky; z-index: auto; inset: auto; top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px));
     width: auto; height: calc(100vh - var(--admin-top-offset) - var(--admin-editor-header-height, 0px));
+    --cs-notes-ground: var(--cs-rail);
     background: transparent; box-shadow: none; animation: none;
   }
 }
@@ -737,7 +738,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-notes-drawer {
   display: flex; flex-direction: column;
   position: fixed; z-index: 20; top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); right: 0; bottom: 0; width: 400px;
-  background: var(--cs-popover); box-shadow: var(--cs-shadow-3);
+  --cs-notes-ground: var(--cs-popover);
+  background: var(--cs-notes-ground); box-shadow: var(--cs-shadow-3);
   animation: admin-notes-in 0.2s var(--cs-ease);
 }
 .admin-rail__panel:not([data-current]) > .admin-notes-drawer { display: none; }
