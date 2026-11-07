@@ -80,10 +80,9 @@ export default class extends Controller {
     this.buttonTarget.setAttribute("aria-expanded", "true")
   }
 
-  // The panel hangs from the menu's own box, at its left edge or, for a
-  // right-aligned menu (`right-0`), at its right.
-  // It hangs from the menu's own box, as its absolute panel does (the box's
-  // line, a little taller than the button, included). When that box scrolls
+  // The panel hangs from the menu's own box, as its absolute panel does (the
+  // box's line, a little taller than the button, included), at its left edge
+  // or, for a right-aligned menu (`right-0`), at its right. When that box scrolls
   // out of the panel the menu closes, and the focus, if it was in the menu,
   // goes back to the button.
   lift() {
