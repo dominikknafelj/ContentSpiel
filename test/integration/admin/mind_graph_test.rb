@@ -73,9 +73,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_nil element["data-opened-lines"], "the script's to write, once the data has said where to open"
   end
 
-  # "Show everything" is not remembered (the third design answers): it is no
-  # parameter of the page, so no address asks for it and a reload opens a
-  # large site around Home again. Only the data read takes it.
+  # "Show everything" is not remembered: it is no parameter of the page, so
+  # no address asks for it and a reload opens a large site around Home
+  # again. Only the data read takes it.
   test "everything is no parameter of the page: the data url is the same with it" do
     sign_in_as(users(:one))
     create_page(title: "About")
@@ -447,9 +447,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-legend], label[data-legend-toggle]", count: 0
   end
 
-  # Status is not a filter (the third design answers): the five looks are a
-  # key on the legend's row, inside the graph's element, drawn by the
-  # legend's own swatches controller. The screen opens no dialog of its own.
+  # Status is not a filter: the five looks are a key on the legend's row,
+  # inside the graph's element, drawn by the legend's own swatches
+  # controller. The screen opens no dialog of its own.
   test "the status looks are in the legend's row, inside the graph's element, and the page holds no status dialog" do
     sign_in_as(users(:one))
     create_post(title: "A")

@@ -1,8 +1,7 @@
-// The mind graph's search field (mind graph canvas spec §5.5; pages in the
-// mind graph, spec §5): readable pages, posts and tags by name, each row a
-// LINK to that row's local view -- so a result is opened like any other
-// link, by click, Enter or a new tab, and Back returns. The script never
-// navigates by itself, and a row's URL is the server's (`href` from the
+// The mind graph's search field: readable pages, posts and tags by name,
+// each row a LINK to that row's local view -- so a result is opened like
+// any other link, by click, Enter or a new tab, and Back returns. The
+// script never navigates by itself, and a row's URL is the server's (`href` from the
 // response); a title, a path or a tag's name is written with `textContent`,
 // never as markup.
 //

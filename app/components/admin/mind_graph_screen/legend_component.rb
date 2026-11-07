@@ -1,23 +1,21 @@
 module Admin
   module MindGraphScreen
-    # The mind graph's legend, WHICH IS ITS FILTER (design answers part one
-    # §4 and F6): the kinds of node and the kinds of line are checkboxes,
-    # everything on, each with its count ("Pages 200"), in place of the All /
-    # Related / Tags radios. Drawn as three labelled groups (Claude Design's
-    # O5): "Show" over the toggles of both kinds, "Key" over the keys that
-    # switch nothing, then "Status" over the five looks (the Tab order is the
-    # toggles alone: the marks and the looks hold no stop). The keys are: one
-    # entry per content type PRESENT among the viewer's readable posts (not
-    # every registered type -- a legend of types you can't see is noise, and a
-    # type the viewer can't read at all would be disclosed by it), "Retired
-    # type" when one is present, "Pinned" (the mark of a node that stays
-    # where it was dropped) and "Open notes" (the count badge of a post or a
-    # page with open notes).
+    # The mind graph's legend, WHICH IS ITS FILTER: the kinds of node and the
+    # kinds of line are checkboxes, everything on, each with its count
+    # ("Pages 200"). Drawn as three labelled groups: "Show" over the toggles
+    # of both kinds, "Key" over the keys that switch nothing, then "Status"
+    # over the five looks (the Tab order is the toggles alone: the marks and
+    # the looks hold no stop). The keys are: one entry per content type
+    # PRESENT among the viewer's readable posts (not every registered type --
+    # a legend of types you can't see is noise, and a type the viewer can't
+    # read at all would be disclosed by it), "Retired type" when one is
+    # present, "Pinned" (the mark of a node that stays where it was dropped)
+    # and "Open notes" (the count badge of a post or a page with open notes).
     #
     # WHICH TOGGLES A VIEWER GETS is `PostGraph::Kinds`' rule and nobody
     # else's: a kind that can be drawn for them has its toggle and its key,
-    # and one that cannot has none (no type the viewer cannot read). So a reader of pages alone gets "Tags" too: a tag their pages
-    # list is drawn. "Links in text" is not built and has no toggle, not
+    # and one that cannot has none (no type the viewer cannot read). So a
+    # reader of pages alone gets "Tags" too: a tag their pages list is drawn. "Links in text" is not built and has no toggle, not
     # even a disabled one (F6).
     #
     # THE COUNTS ARE THE SCRIPT'S: the page holds no graph data, so a count

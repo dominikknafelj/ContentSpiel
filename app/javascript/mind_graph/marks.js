@@ -274,7 +274,7 @@ function drawPost(context, theme, node, look, x, y, radius) {
   const hue = retired ? theme.meta : theme.categories[slot % 6]
 
   if (retired || slot >= 6) {
-    // A ring type (third design answers; H3): the ring, thin and ALWAYS
+    // A ring type (H3): the ring, thin and ALWAYS
     // solid, ending at the mark's radius, and inside it the type's mark in
     // whichever of the five looks.
     trace(context, { radius }, x, y)

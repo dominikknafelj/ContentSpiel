@@ -80,10 +80,10 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_no_selector "svg"
   end
 
-  # Status is not a filter (the third design answers): the five looks are a
-  # key that switches nothing, on the legend's row after Key, in the chip's
-  # words (one set of words; `test/lib/mind_graph_guards_test.rb` holds
-  # them to the chips'), each with the canvas's own drawing of it.
+  # Status is not a filter: the five looks are a key that switches nothing,
+  # on the legend's row after Key, in the chip's words (one set of words;
+  # `test/lib/mind_graph_guards_test.rb` holds them to the chips'), each
+  # with the canvas's own drawing of it.
   test "the legend's Status group holds the five looks in the chip's words, each with its canvas swatch, after the keys" do
     legend
 
@@ -148,7 +148,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     end
   end
 
-  # Claude Design's O5: groups a person can see, "Show" over the toggles of
+  # The legend is three groups a person can see: "Show" over the toggles of
   # both kinds, "Key" over the marks, then "Status" over the five looks. The
   # marks and the looks hold no stop, so the Tab order is the toggles alone.
   test "the legend is three labelled groups: Show over both kinds of toggle, Key over the marks, Status over the looks" do
