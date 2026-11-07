@@ -37,7 +37,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - **Buttons are the shared button.** A link styled as a button takes `ButtonComponent.classes`, handed over in `data-button-classes`. A button the script needs whole, with its icon (the card's Close), is the component's own markup, cloned from the parts template.
 - **Type voice.** Labels are `text-label` (sans, 12px, `cs-meta`), counts `text-count`. No `font-cs-mono` beyond `MONO_ALLOWED`, and from Task 4 no mono on the canvas. No `text-[13px]`: a size is a type token (`text-small` is 13px).
 - **Depth and radius.** A shadow is an elevation token, and a radius a radius token. The card and the tooltip keep `rounded-card` / `rounded-cs` on `bg-popover shadow-3`, and the zoom control takes `rounded-button`.
-- **Comment rule (#117).** A comment states a current invariant, a hazard or a reason. It never states a plan step, a review round ("Task 7's review", "the ruling on the review of"), "spec §" or what used to be there. Every task rewrites the comments of the files it changes by this rule. The graph's files are among the densest in "spec §" and "design answer": a design answer's letter (G3, H6) names a decision and may stay, while a review round or a task number goes.
+- **Comment rule (#117).** A comment states a current invariant, a hazard or a reason. It never states a plan step, a review round ("Task 7's review", "the ruling on the review of"), "spec §" or what used to be there. Every task rewrites the comments of the files it changes by this rule. The graph's files are among the densest in "spec §" and "design answer": a design answer's letter (G3, H6) names a decision and may stay, while a review round or a task number goes. Every task's last step before its commit runs `grep -n "spec §\|Task [0-9]\|ruling on\|review of" <the files the task changed>` and prints nothing. The plan's own wording ("what `show` does today", "today's line 561") is never copied into a comment.
 - **Tests and the machine.** On macOS every test command is prefixed with `PGGSSENCMODE=disable`. Browser tests run only after `bin/rails tailwindcss:build`, never during a build or beside a running `bin/dev`. They run one file at a time, and only while the one-minute load (`sysctl -n vm.loadavg`, first figure) is under 6. A graph file costs about 8 seconds a test, so each split file is run alone. **No test run is left in the background** when a task ends: a task's last step checks that `pgrep -f "rails test"` prints nothing.
 - Commits follow conventional commits and end with:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
@@ -118,12 +118,13 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
   | `mind_graph_list_test.rb` | the list, its reads and pills, the keyboard path | 2239, 2320, 2415, 2467, 2518, 2600, 2760, 3413, 3446, 3462, 3493, 3512, 3535, 3570, 3602, 3632 | 16 |
   | `mind_graph_notes_test.rb` | notes in the card and on the canvas | 3028, 3061, 3101, 3127, 3144, 3166, 3203, 3266, 3308 | 9 |
 
-  A helper used by one file only moves into that file instead of the base.
+  Every helper goes to the base, also one that a single file uses, so no file holds a helper of its own and Task 4 has one place to edit.
+- Modify `test/lib/system_test_sleeps_test.rb`: `offences`' `Dir[...]` gains `Rails.root.join("test/support/*system_test_case.rb")`, so the helpers that leave `test/system/` for the two new bases (and the sections base of stage 2, outside it today) stay under the sleep guard. Add `test "the guard reads the system test cases under test/support"`: the paths `offences` reads include `test/support/mind_graph_system_test_case.rb`, `mind_graph_modules_system_test_case.rb` and `sections_system_test_case.rb` (the path list is pulled into a method, `sources`, which `offences` and the new test both call).
 - Modify the test at line 42, "every stub of fetch in this file remembers the real one…". It reads every `test/system/admin/mind_graph_*_test.rb` that is not `*_modules_test.rb`, instead of `__FILE__`. It is renamed "every stub of fetch in the graph's browser files remembers the real one, so the teardown can put it back", and its floor stays `> 12` over all of them.
 - Delete `test/system/admin/mind_graph_test.rb`.
 - Modify `test/system_test_seconds.yml`. The `mind_graph_test.rb: 862.8` entry becomes nine entries, each the old seconds in proportion to its count of the 110 tests, rounded to 0.1, summing to 862.8.
 - Modify every citation of `test/system/admin/mind_graph_test.rb` to name its new file:
-  - `docs/reference/cs-studio-shell-and-dashboard.md` (15 citations; leave `test/integration/admin/mind_graph_test.rb`, a different file, as it is);
+  - `docs/reference/cs-studio-shell-and-dashboard.md` (13 citations: 10 written with `test/system/admin/` and 3 bare `mind_graph_test.rb` that mean the system file; the 2 of `test/integration/admin/mind_graph_test.rb`, a different file, stay);
   - the comment in `test/system/admin/tokens_related_posts_and_starter_pages_test.rb`.
 
 **Interfaces:** the helpers keep their names and signatures. Tasks 4–6 add tests to `mind_graph_drawing_test.rb`, `mind_graph_selection_test.rb`, `mind_graph_legend_test.rb`, `mind_graph_loading_test.rb` and `mind_graph_worker_and_back_test.rb`.
@@ -133,8 +134,9 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - [ ] **Step 3: Verify.**
   - `grep -h -c '^  test "' test/system/admin/mind_graph_{drawing,loading,worker_and_back,legend,selection,dragging,search,list,notes}_test.rb | paste -sd+ - | bc` prints 110.
   - `PGGSSENCMODE=disable bin/rails test test/lib/test_shards_test.rb` passes: "every system test file is in exactly one shard", and "no system shard is much heavier than a fair share", now that the heaviest file is not a whole shard.
-  - `grep -rn "system/admin/mind_graph_test.rb" docs CLAUDE.md test app` prints nothing.
+  - `grep -rn "system/admin/mind_graph_test.rb" docs/reference CLAUDE.md test app lib` prints nothing, and `grep -rn "mind_graph_test.rb" docs/reference | grep -v "integration/admin/mind_graph_test.rb"` prints nothing either (the bare citations). `docs/superpowers/` is history and is not edited.
   - After `bin/rails tailwindcss:build`, run each new file once, one at a time, on a quiet machine. Expected: PASS, the same 110 tests.
+  - `PGGSSENCMODE=disable bin/rails test test/lib/system_test_sleeps_test.rb` passes.
 - [ ] **Step 4: Commit** `test: mind_graph_test split by behaviour into nine files` (body: `Advances #133`)
 
 ---
@@ -144,10 +146,11 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 **Files:**
 - Create `test/support/mind_graph_modules_system_test_case.rb` with `Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase`. It holds:
   - the `setup` (sign in, `visit admin_tags_path`, `await_admin_controllers`);
-  - the private helpers used by more than one new file: `js_module`, `renderer_calls`, `draw_calls`, `marks_drawn`, `shapes_drawn`, `lines_drawn`, `swatch_drawn`, `row_mark_drawn`, `notes_badges`, `settled_log`, `settled_log_script`, `input_calls`, `summaries`, `node_set`;
-  - the constants those helpers read (`RECORDING_CONTEXT`, `NODE_RADIUS`, `PIN_RADIUS`).
+  - every private helper of today's file: `js_module`, `renderer_calls`, `draw_calls`, `marks_drawn`, `shapes_drawn`, `lines_drawn`, `swatch_drawn`, `row_mark_drawn`, `notes_badges`, `settled_log`, `settled_log_script`, `input_calls`, `summaries`, `node_set`;
+  - the constants those helpers read: `RECORDING_CONTEXT`, `NODE_RADIUS`, `PIN_RADIUS`, and `ALL_ON`, which `summaries` reads (a base-class method does not see a subclass's constant);
+  - one new private helper, `recording_theme(**overrides) -> String`, the JavaScript object literal of the theme the recorded draws use. Today the same hand-written theme stands six times (`renderer_calls`, twice; `marks_drawn`; `lines_drawn`; `swatch_drawn`; `row_mark_drawn`). The six become calls of this one, with the same keys and values as today, so no recorded draw changes. Task 4 edits only this helper.
 
-  The constants of one file's tests stay in that file (`SOLID`, `DASHED`, `CORNER`, `STATES`, `STATED_MARKS`, `LINES`, `GRAPH_DATA`, `MATRIX`, `WHOLE`, `ALL_ON`, `SWATCH_STATES`, `CARD_SCRIPT`, `LIST_SCRIPT`). It is required from `test/application_system_test_case.rb`.
+  The constants of one file's tests stay in that file: `SOLID`, `DASHED`, `CORNER`, `STATES`, `STATED_MARKS`, `LINES`, `SWATCH_STATES`, `CARD_SCRIPT`, `LIST_SCRIPT` (drawing or card-and-list), `GRAPH_DATA`, `MATRIX`, `WHOLE` (data). Before moving, check each by `grep -n` that only its file's tests read it; a constant read by a helper goes to the base. It is required from `test/application_system_test_case.rb`.
 - Create these files, each `< Admin::MindGraphModulesSystemTestCase`, holding the tests that start at these lines of today's file, unchanged:
 
   | File | Modules | Tests at today's lines | Count |
@@ -162,7 +165,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - Modify `test/system_test_seconds.yml`. The `mind_graph_modules_test.rb: 375.9` entry becomes five entries, in proportion to their tests out of 112, summing to 375.9.
 - Modify every citation of `mind_graph_modules_test.rb` to name its new file:
   - `docs/reference/cs-studio-shell-and-dashboard.md` (7);
-  - the comments of `app/components/admin/mind_graph_screen/swatch_component.rb` (→ the drawing file), `test/system/admin/live_connection_test.rb`, `notes_merge_test.rb` and `tokens_related_posts_and_starter_pages_test.rb`.
+  - the comments of `app/components/admin/mind_graph_screen/swatch_component.rb` (→ the drawing file), `test/system/admin/live_connection_test.rb`, `notes_merge_test.rb`, `editor_modules_test.rb` (line 8) and `tokens_related_posts_and_starter_pages_test.rb`.
 
 **Interfaces:** the helpers keep their names and signatures.
 - Task 3 adds the state tests to `mind_graph_data_modules_test.rb`.
@@ -171,7 +174,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 
 - [ ] **Step 1: Check the count.** The old file has 112 `test "` lines, and the start lines in the table are exactly those.
 - [ ] **Step 2: Move the tests, the helpers and the constants.**
-- [ ] **Step 3: Verify.** The five files hold 112 tests together. `test/lib/test_shards_test.rb` passes, and no citation of the old name is left. Run each new file once, one at a time. Expected: PASS.
+- [ ] **Step 3: Verify.** The five files hold 112 tests together. `test/lib/test_shards_test.rb` passes. `grep -rn "mind_graph_modules_test.rb" docs/reference CLAUDE.md test app lib` prints nothing (`docs/superpowers/` is history). `grep -c "recording_theme" test/support/mind_graph_modules_system_test_case.rb` is at least 7 (the helper and its six calls), and no other file under `test/` writes a theme literal with `strongMonoFont`. Run each new file once, one at a time. Expected: PASS.
 - [ ] **Step 4: Commit** `test: mind_graph_modules_test split by module into five files` (body: `Advances #133`)
 
 ---
@@ -196,15 +199,17 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
   - `applyFilter`, `refilter`, `addPost`'s orchestration, `notify`, `summarise`, `writeCounts`;
   - the `element.mindGraph` test API, the returned API and `destroy()`.
 
-  It is no more than 450 lines with its comments. The header essay is divided: each module's header takes the paragraphs about what it owns (the camera's to `frame.js` and `gestures.js`; SELECTING, DRAGGING AND PINNING and HOVERING to `selection.js` and `gestures.js`; THE LIST to `list_reads.js`). `app.js` keeps what it wires, the attributes it writes and the API, rewritten by the comment rule.
-- Modify `test/lib/admin_i18n_test.rb`: `selection.js`, `list_reads.js` and `notice.js`, which call `text.t`, join `CONVERTED`.
+  It holds no more than 450 lines of code: `grep -cvE '^\s*(//|$)' app/javascript/mind_graph/app.js` prints at most 450. Comments are on top of that and may bring the file to about 520; they are not cut to meet a count. The header essay is divided: each module's header takes the paragraphs about what it owns (the camera's to `frame.js` and `gestures.js`; SELECTING, DRAGGING AND PINNING and HOVERING to `selection.js` and `gestures.js`; THE LIST to `list_reads.js`). `app.js` keeps what it wires, the attributes it writes and the API, rewritten by the comment rule.
+- Modify `test/lib/admin_i18n_test.rb`. Its test "every component, controller and wording module of the Mind graph is listed" fails on a module of `mind_graph/` in neither list:
+  - `selection.js`, `list_reads.js` and `notice.js`, which call `text.t` or write words, join `CONVERTED`;
+  - `state.js`, `frame.js` and `gestures.js` join `MIND_GRAPH_WORDLESS`, if they hold no `text.t` and no words. `state.js` takes its words as data (`words:`), and `frame.js` its `percent` as a function. A module that does hold one goes in `CONVERTED` instead.
 - Modify `docs/reference/cs-studio-shell-and-dashboard.md`, "The modules and what each owns": `app.js`'s entry shrinks, and the six modules get an entry each.
 - Test: `test/system/admin/mind_graph_data_modules_test.rb`, and every browser file of Task 1 unchanged.
 
 **Interfaces:**
 - `mind_graph/state.js` exports:
   - `createState(theme) -> State`. The record `app.js` has today, plus `indexOf: Map<id, index>`, `plainWidths: number[]` and `strongWidths: number[]`.
-  - `labelFor(node) -> string`. It moves here from `app.js` with `MAX_LABEL_CHARACTERS`. `app.js` exports it no longer, and the browser test at today's line 561 imports `mind_graph/state`.
+  - `labelFor(node) -> string`. It moves here from `app.js` with `MAX_LABEL_CHARACTERS`. `app.js` exports it no longer. The browser test at today's line 561 ("a long label is cut with an ellipsis by code point, and a tag keeps its count whole", in `mind_graph_drawing_test.rb` after Task 1) is deleted: its cases become the module test below, which needs no page. `test/system_test_seconds.yml` keeps the drawing file's entry as it is.
   - `takeData(state, data, { context, words: { allPosts, more(count), retired(name) } })`:
     - nodes from `nodesOf`, each pill's `of`, the lines whose two ends are held, positions, sizes, labels with `cut`, and both width arrays;
     - it resets `selected`, `focusIndex`, `fitted`, `placed`, `pinned`, `labels` and `hovered`.
@@ -240,7 +245,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
   - `test "state: takeData leaves out a line whose end the data does not hold, gives a pill no label, and measures each label twice"`. Assert the edges' length, the pill's `label == ""`, and `plainWidths` and `strongWidths` of equal length with the selected font's entries wider.
   - `test "state: selectIndex lights the neighbours by the lines shown, and swaps the selected label to its semibold width and back"`. Hide one of two lines with `showOnly`, and assert that one neighbour is lit and the widths are restored on `selectIndex(state, -1)`.
   - `test "state: addNode joins a post to a tag by a tag line and to a hub by a brings line, beside it, and to nothing at the corner offset"`
-  - `test "state: labelFor cuts by code point and keeps a tag's count whole"`. The browser test at today's line 561 keeps its case; this is the module's own.
+  - `test "state: labelFor cuts by code point and keeps a tag's count whole"`, with every case of the deleted browser test (a short title, a long one, forty emoji, a tag with its count).
   - `test "state: hitAt answers nothing until the layout has placed the nodes"`
 - [ ] **Step 2: Run them, and verify they fail.** Run `PGGSSENCMODE=disable bin/rails test test/system/admin/mind_graph_data_modules_test.rb`. Expected: the import of `mind_graph/state` fails.
 - [ ] **Step 3: Move the code.** The moves are mechanical: each function's body moves as it is, and what it closed over becomes a parameter or a field named in the interfaces.
@@ -251,8 +256,8 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - [ ] **Step 4: Run the tests.**
   - First the module test, then `PGGSSENCMODE=disable bin/rails test test/lib test/integration/public_javascript_test.rb test/integration/admin/mind_graph_test.rb`.
   - Then, after `bin/rails tailwindcss:build`, one at a time on a quiet machine: the nine browser files of Task 1, then `mind_graph_input_modules_test.rb` and `mind_graph_card_and_list_modules_test.rb`.
-  - Expected: PASS with no change to any test but the import in today's line-561 test.
-  - `wc -l app/javascript/mind_graph/app.js` prints at most 450.
+  - Expected: PASS with no change to any test but the line-561 test's move into the module file.
+  - The code-line count above prints at most 450.
 - [ ] **Step 5: Write the PR body** for 5a-1.
   - Base: `studio-e4-4b`, or `main` once #193 and #194 have merged.
   - Findings: Advances #132 (`mind_graph/app.js`), Advances #133 (the graph's two files), Advances #117.
@@ -289,7 +294,8 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - Modify `swatches.js`, if a scene names `faint` or `tree`.
 - Modify `card.js`: `TAG_MARK` becomes `"h-2 w-2 shrink-0 border border-graph-tag bg-surface"`.
 - Modify `CLAUDE.md` and `docs/reference/cs-studio-shell-and-dashboard.md`, only the no-guard sentences this task retires (Step 3).
-- Test: `test/lib/admin_contrast_test.rb`, `test/lib/mind_graph_guards_test.rb`, `test/lib/design_tokens_test.rb` (if it lists the product tokens), `test/system/admin/mind_graph_drawing_modules_test.rb`, `test/system/admin/mind_graph_drawing_test.rb`
+- Modify `test/support/mind_graph_modules_system_test_case.rb`: `recording_theme` (Task 2) takes the new keys (`edge`, `tag`, `lineTree`, `lineLists`, `lineRelated`, `lineTag`, `lineBrings`, `faded`, the sans `countFont`) and loses `faint`, `tree`, `monoFont` and `strongMonoFont`. Without this every recorded draw reads undefined keys.
+- Test: `test/lib/admin_contrast_test.rb`, `test/lib/mind_graph_guards_test.rb`, `test/integration/design_tokens_test.rb` (it lists `--cs-cat-1…6` and `--color-cat-N`; it changes only if it must list `--color-graph-tag` or a `--cs-graph-*` token, decided when it is run), `test/system/admin/mind_graph_drawing_modules_test.rb`, `test/system/admin/mind_graph_drawing_test.rb`
 
 **Interfaces:**
 - Produces the theme keys `ink meta dim warn surface sunken accent line page edge tag lineTree lineLists lineRelated lineTag lineBrings` (colours), `categories` (six colours), `faded` (a number in 0–1), `font strongFont countFont` and `radius`. Tasks 5 and 6 read no theme key directly. The legend's swatches follow through `swatches.js`.
@@ -317,7 +323,14 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
     - `test "a graph line's translucent colour is its base token's colour"`. Each `rgba()` of `--cs-graph-line-*` has the red, green and blue of the hex of `--cs-ink`, `--cs-dim` or `--cs-meta` in its scheme, as the comment beside it names.
   - `mind_graph_guards_test.rb`:
     - `test "the canvas's text is in the sans: no script of the mind graph reads --cs-mono or names a mono font"`, with a sample `read("--cs-mono")` that the pattern matches;
-    - `test "no script of the mind graph sets a strength but 1: what fades is the theme's"`. `globalAlpha =` followed by a number other than `1` is refused in `marks.js`, `renderer.js` and `swatches.js`. Samples: `globalAlpha = 0.35` is matched; `globalAlpha = 1` and `globalAlpha = theme.faded` are not.
+    - `test "no script of the mind graph sets a strength but 1: what fades is the theme's"`. In `marks.js`, `renderer.js` and `swatches.js`, every `globalAlpha = <right-hand side>` (to the end of the statement) must be one of an exact allow-list, `ALPHA_ALLOWED`:
+      - `1`;
+      - `theme.faded`;
+      - `dimmed(index) ? theme.faded : 1`;
+      - `pass === "faded" ? theme.faded : 1`;
+      - `label.alpha * (dimmed(label.index) ? theme.faded : 1)`.
+
+      The list holds exactly the forms the renderer writes after this task; a form the build needs that is not one of these is added with its reason. A second test, "every strength allowance is still written", fails on an entry no file writes. Samples that must be refused: `globalAlpha = 0.35`, `globalAlpha = dimmed ? 0.3 : 1`, `globalAlpha = bright ? 0.9 : 1` and `globalAlpha = label.alpha * 0.28`. Samples that must pass: each entry of the list.
     - `test "every theme key LOOKS and LINE_STYLES name is one theme.js reads"`. The keys are parsed from the two tables and from `TOKENS`.
     - `test "the marks drawn in CSS outside the canvas are in the canvas's tokens"`, three cases:
       - `TAG_MARK`'s `border-<x>` names the token `theme.js` reads for the key `drawTag` strokes with;
@@ -341,6 +354,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
     - in `docs/reference/cs-studio-shell-and-dashboard.md`, the matching sentence of "Rules a change can break silently", which now cites the new guard by name.
 - [ ] **Step 4: Run them, and verify they pass.**
   - Run `bin/rails tailwindcss:build`, then `test/lib`.
+  - Run `PGGSSENCMODE=disable bin/rails test test/integration/design_tokens_test.rb`.
   - Then, one at a time: `mind_graph_drawing_modules_test.rb`, `mind_graph_drawing_test.rb` (the pixel tests of a live and a draft post read the new colours from the page), `mind_graph_selection_test.rb`, `mind_graph_legend_test.rb`, then `posts_list_test` and `drafts_test`, which draw type dots.
   - Expected: PASS.
 - [ ] **Step 5: Commit** `feat: the mind graph draws from its own E4 tokens, at the measured contrast, in the sans` (body: `Advances #117`)
@@ -353,8 +367,12 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - Create `app/components/admin/mind_graph_screen/parts_component.{rb,html.erb}` and its keys in `config/locales/admin/mind_graph_screen.en.yml` (`parts.close: "Close"`), with a preview under `test/components/previews/admin/mind_graph_screen/`.
 - Create `app/javascript/mind_graph/parts.js`.
 - Modify `card.js`: the chip, Close, and `STATUS_DOTS` and `DOT` deleted.
-- Modify `node_list.js`: the group headings' icon chips and the rows' status chips. Its retry button takes `buttonClasses.tertiary`.
-- Modify `app.js`: it reads the parts and hands them to the card and the list. Retry is `buttonClasses.tertiary`.
+- Modify `node_list.js`: the group headings' icon chips and the rows' status chips. Its retry button is unchanged: it takes the `retryClass` option.
+- Modify `app.js`: it reads the parts and hands them to the card and the list, and the two Retry buttons change there and only there:
+  - `createList`'s `retryClass` becomes `buttonClasses.tertiary` (today `buttonClasses.secondary`, `app.js:323` before the split);
+  - the load failure's hand-built Retry (`app.js:1259` before the split) takes `buttonClasses.tertiary` as its `className`.
+- Modify `card_notes.js`: its two `text-[13px]` (the note field and a note's row) become `text-small`, by the type-voice constraint.
+- Modify `docs/reference/cs-studio-shell-and-dashboard.md`, whole: "Selecting, and the card" (the card's chip and its Close), and the list's paragraph where it names a row's mark (the chips beside it).
 - Modify `app/views/admin/mind_graph/show.html.erb`:
   - render `PartsComponent` inside the graph's element;
   - `data-button-classes` gains `tertiary`;
@@ -375,9 +393,9 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - `mind_graph/parts.js` exports `readParts(element) -> { part(name) -> Element }`. Each call answers a deep clone of that part's one child. An unknown name throws `Error("mind graph: no part named <name>")`, loud as a failed import is.
 - `createCard(container, { …, parts })`:
   - a node with one state gets the clone of `status-<status>` beside what it is;
-  - a live node with changes gets a row under the first, `aria-hidden`, holding `status-live` and then `unpublished`, or the words `card.status.change_scheduled` with its `date`;
+  - a live node with changes gets a row under the first, `div[data-chip-row]`, `aria-hidden`, holding `status-live` and then `unpublished`, or the words `card.status.change_scheduled` with its `date`;
   - the sr-only sentence stays;
-  - `data-status` (the state's name) moves onto the row's first chip, or the single chip;
+  - a chip is never changed after it is cloned. The state's name is said by the chip's own `data-status` for a single state (`StatusChipComponent` writes `live`, `draft` or `scheduled`), and for a live node with changes by `data-status` on the `[data-chip-row]` (`live_with_changes`, `live_change_scheduled`);
   - Close is `parts.part("close")` with its click wired, still the card's last child.
 - `createList(container, { …, parts })`:
   - a group heading starts with `icon-<kind>`;
@@ -392,22 +410,23 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
       - the chips' own classes (`bg-live`, the Draft's `border-field-line`, `bg-scheduled`);
       - each icon chip's family classes (`bg-ic-structure-bg` for a page, `bg-ic-lists-bg` for the other three);
       - the Close button's `aria-label="Close"`.
-    - `test "a part is the shared component's own markup"`. Assert `status-draft`'s inner HTML equals `render_inline(StatusChipComponent.new(status: "draft"))`, and the same for one icon chip and Close.
+    - `test "a part is the shared component's own markup"`. Assert each part's inner HTML equals that of `render_inline` of its component with the interface's arguments: the three status chips, the unpublished chip, all four icon chips (so a wrong icon name fails, not only a wrong family) and Close.
   - `mind_graph_test.rb` (integration): `test "the parts template is inside the graph's element, once"`.
   - `mind_graph_card_and_list_modules_test.rb`:
-    - "card: the chip says each of the five states…" becomes `test "card: the chip is the shared status chip in each of the five states, the second state as the editor's header says it, and in the key's words for a screen reader"`. Each chip in the card `isEqualNode` to the clone `parts.part("status-…")` answers, so a chip copied by hand into the script fails it;
+    - "card: the chip says each of the five states…" becomes `test "card: the chip is the shared status chip in each of the five states, the second state as the editor's header says it, and in the key's words for a screen reader"`. Each chip in the card `isEqualNode` to the clone `parts.part("status-…")` or `part("unpublished")` answers, so a chip copied or altered by hand fails it. The state's name is read from the single chip's `data-status`, or the `[data-chip-row]`'s. `CARD_SCRIPT`'s reader (today's line 1754 and 1760 of the module file) reads it from there;
     - `test "card: Close is the shared icon button, named Close, last in the card"`;
     - `test "list: each group's heading carries its kind's icon chip, a draft's and a scheduled record's row its status chip, a changed live row the unpublished chip, and a live row none, all hidden from a screen reader"`;
     - `test "parts: a part the page does not hold is an error, not an empty card"`.
     - `CARD_SCRIPT` and `LIST_SCRIPT` render a `PartsComponent` template into the page they build.
   - `mind_graph_selection_test.rb`:
+    - the browser tests that read `.admin-status-chip[data-status=<two-state name>]` (today's `mind_graph_test.rb` 2878 and 2899, in the selection file) read `[data-chip-row][data-status=…]`; the single-state readers (1384) are unchanged;
     - "the card reads top to bottom: kind and status…", "a draft's card says Draft" and "a page's card says its address, state, counts and notes…, a scheduled change says its day behind a warn dot…" read the shared chip. The last one's "behind a warn dot" becomes "beside the Live chip", and its name changes with it;
     - `test "the card's chips follow the theme, and what is typed in the card stays"`: Review Focus 1. Open a post's card, type in its note field, and switch to dark. Assert the Live chip's computed `background-color` equals `--cs-live` read from the page in dark, and the field keeps its text;
     - `test "a two-state chip wraps inside the card, clear of Close, in German too"`: Review Focus 2. A live post with a scheduled change. Assert the chip row's right edge is at most the card's right edge less its padding, and above Close's bottom edge nothing of the row overlaps Close's box.
   - `mind_graph_loading_test.rb`: the Retry test and the "Show everything" test find their button by role and name, and assert it carries the tertiary variant's classes from `data-button-classes` (Retry) or is the component's (Show everything).
   - `admin_i18n_test.rb`: `parts_component.{rb,html.erb}` and `app/javascript/mind_graph/parts.js` join `CONVERTED`.
 - [ ] **Step 2: Run them, and verify they fail.** Run `PGGSSENCMODE=disable bin/rails test test/components/admin/mind_graph_screen test/integration/admin/mind_graph_test.rb test/lib`.
-- [ ] **Step 3: Implement.** `card_notes.js` keeps its buttons through `buttonClasses`. Search the tests by hand for `mindGraphCardClose`, `data-chip-seen` and the deleted keys' words, and fix each hit.
+- [ ] **Step 3: Implement.** `card_notes.js` keeps its buttons through `buttonClasses`. Search the tests by hand for `mindGraphCardClose`, `data-chip-seen`, `data-status` and the deleted keys' words, and fix each hit. `grep -rn "text-\[13px\]" app/javascript/mind_graph` prints nothing.
 - [ ] **Step 4: Run them, and verify they pass.** Run `test/lib test/components/admin test/integration/admin/mind_graph_test.rb`. Then, one at a time: `mind_graph_card_and_list_modules_test.rb`, `mind_graph_selection_test.rb`, `mind_graph_loading_test.rb`, `mind_graph_list_test.rb`, `mind_graph_notes_test.rb` and `mind_graph_worker_and_back_test.rb` (Back still shows no card and an empty list). Expected: PASS.
 - [ ] **Step 5: Commit** `feat: the mind graph's list and card carry the shared chips, and its buttons are the shared button` (body: `Advances #117`)
 
@@ -423,6 +442,9 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
   - the "Status key…" button goes;
   - the class comment's STATUS IS NOT A FILTER paragraph says the looks are a key on the row.
 - Delete `app/components/admin/mind_graph_screen/status_key_component.{rb,html.erb}`, `test/components/admin/mind_graph_screen/status_key_component_test.rb`, and the render in `show.html.erb`.
+- Modify `test/lib/admin_i18n_test.rb`: `CONVERTED` loses `app/components/admin/mind_graph_screen/status_key_component.rb` and `.html.erb`, or "every converted file exists" goes red.
+- Modify `test/system/admin/mind_graph_drawing_modules_test.rb`: the swatch test that reads `StatusKeyComponent::STATES` (today's module line 1671, `SWATCH_STATES`' user) reads `LegendComponent::STATES`.
+- Modify `test/components/admin/mind_graph_screen/legend_component_test.rb`: the test that asserts the "Status key…" button (`button[data-legend-status]`, today's lines 82–90) and the "two labelled groups" test (lines 125–134, `button[data-legend-status]:last-child`) are deleted; the three-group test below replaces them.
 - Modify `config/locales/admin/mind_graph_screen.en.yml`:
   - `legend.status` and `status_key.*` are deleted;
   - `legend.states_label: "Status"` and `legend.states.{live,draft,scheduled,live_with_changes,live_change_scheduled}` are added, with today's words;
@@ -436,8 +458,11 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - Modify `docs/reference/cs-studio-shell-and-dashboard.md`. This task owns, whole:
   - the "Status is not a filter" paragraph (the looks on the legend's row);
   - the legend's paragraph where it names the "Status key…" button and the Tab order;
-  - the `reset()` rule's "Not the graph's, so not touched: the status key…";
-  - the status-words sentence of "Rules a change can break silently", which now cites the new guard.
+  - "The page holds no data" (the frame's parts, which list the key's dialog);
+  - the swatches' paragraph ("on the legend and the key");
+  - the `reset()` paragraph and the `reset()` rule's "Not the graph's, so not touched: the status key…";
+  - the status-words sentence of "Rules a change can break silently", which now cites the new guard;
+  - and every other hit of `grep -n "Status key\|key's dialog\|StatusKey\|status_key\|mind-graph-status-key" docs/reference/*.md CLAUDE.md`, which prints nothing at the task's end.
 - Modify `CLAUDE.md`: the status-words sentence of "The Mind graph" ("The status key's five names are the chip's words… **no guard** holds that") goes, and the index line names the legend's states in place of "the status key". Task 7 does not touch these again.
 - Test: `test/components/admin/mind_graph_screen/legend_component_test.rb`, `test/components/previews/admin/mind_graph_screen/legend_component_preview.rb`, `test/integration/admin/mind_graph_test.rb`, `test/lib/mind_graph_guards_test.rb`, `test/system/admin/mind_graph_legend_test.rb`, `mind_graph_worker_and_back_test.rb`, `mind_graph_drawing_modules_test.rb`, `mind_graph_drawing_test.rb`, `mind_graph_list_test.rb`
 
@@ -447,7 +472,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
 - [ ] **Step 1: Write the failing tests.**
   - `legend_component_test.rb`:
     - `test "the legend's Status group holds the five looks in the chip's words, each with its canvas swatch, after the keys"`. The order of the sections is `show key status`. The five words and their `data-legend-state` are in `STATES`' order, and each `li` holds one `canvas[data-swatch=state-…][aria-hidden]`.
-    - `test "the legend has a row for every state a record can be in, and no other"` (moved from the deleted component's test).
+    - `test "the legend has a row for every state a record can be in, and no other"` (moved from the deleted component's test: `LegendComponent::STATES.sort == Publishing::State::STATES.sort`).
     - `test "the legend opens no dialog and has no button"`.
     - "every toggle and every key has a swatch…" also counts the five state swatches.
   - `mind_graph_guards_test.rb`: `test "the legend's status words are the chip's: the status chip's three labels and the card's two sentences without their day"`.
@@ -463,14 +488,14 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
     - in `mind_graph_worker_and_back_test.rb`, "Back to the graph draws it once…" counts the legend's swatches with the five state swatches in it, and drops `#mind-graph-status-key`;
     - in `mind_graph_drawing_test.rb`, "the theme's colours are read from the page…" waits for 16 legend swatches, where today it is 11 plus the key's;
     - in `mind_graph_list_test.rb`, "the Tab key meets the search first and the list last" loses "Status key…" from its stops.
-  - `mind_graph_legend_test.rb`: "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" becomes `test "the legend's status looks are drawn by the canvas's renderer, and Tab goes from the last toggle to the zoom buttons"`. The first part asserts each state swatch has drawn pixels, with the drawing file's pixel helper.
+  - `mind_graph_legend_test.rb`: "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" becomes `test "the legend's status looks are drawn by the canvas's renderer, and Tab goes from the last toggle to the zoom buttons"`. The first part asserts each state swatch has drawn pixels, with the drawing file's pixel helper. That they are five different looks is held by the module test "marks: every mark that has a state is drawn in each of the five looks exactly as the table says, no two alike", which stays.
   - `mind_graph_worker_and_back_test.rb`: `test "Back to the graph draws the legend's status looks again and shows no chip from the visit that was left"` (Review Focus 4). Open a draft's card, leave, go Back.
     - First assert the precondition, before leaving: the list holds the draft's row with its `.admin-status-chip`.
     - After Back, assert that the five state swatches have pixels before the data arrives, and that no `[data-mind-graph-list] .admin-status-chip` and no card chip exists until the data is back.
   - `mind_graph_drawing_modules_test.rb`: "swatches: the Status key's five looks are the canvas's own drawing…" becomes "swatches: the legend's five status looks are the canvas's own drawing…".
   - `mind_graph_drawing_test.rb`: `test "the zoom readout is a figure in the sans with even digits, beside the zoom buttons"`. Its computed `font-variant-numeric` includes `tabular-nums`, its `font-family` is the page's sans, and its text is the zoom as a percentage after a zoom.
 - [ ] **Step 2: Run them, and verify they fail.**
-- [ ] **Step 3: Implement.** Search the tests and the docs by hand for `status_key`, `mind-graph-status-key`, `legend_status` and "Status key", and fix each hit.
+- [ ] **Step 3: Implement.** Search the tests and the docs by hand for `status_key`, `StatusKeyComponent`, `mind-graph-status-key`, `legend_status`, `data-legend-status` and "Status key", and fix each hit. `grep -rn "StatusKeyComponent\|status_key_component" app test config docs/reference CLAUDE.md` prints nothing.
 - [ ] **Step 4: Run them, and verify they pass.** Run `test/lib test/components/admin test/integration/admin/mind_graph_test.rb`, then `bin/rails tailwindcss:build`. Then, one at a time: `mind_graph_legend_test.rb`, `mind_graph_worker_and_back_test.rb`, `mind_graph_drawing_test.rb`, `mind_graph_drawing_modules_test.rb` and `mind_graph_list_test.rb`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat: the mind graph's status looks stand on the legend's row, and the zoom readout is a figure` (body: `Advances #117`)
 
@@ -489,7 +514,7 @@ Why two: 5a-1 changes nothing a person sees. Its whole proof is that every brows
   - the fonts.
   ("Status is not a filter", the `reset()` rule and the two retired no-guard sentences are Tasks 4's and 6's, and are not touched again.)
 - Modify `docs/reference/design-system.md`: a part "E4: the mind graph", covering the graph tokens and why a line is `rgba()`, the chips cloned from server-rendered parts, and the canvas in the sans.
-- Modify `CLAUDE.md`: the shell index line's file list gains `state.js`, `frame.js`, `gestures.js`, `selection.js`, `list_reads.js`, `notice.js`, `parts.js` and `PartsComponent`.
+- Modify `CLAUDE.md`: the shell index line's file list (whose status-key words Task 6 already replaced) gains `state.js`, `frame.js`, `gestures.js`, `selection.js`, `list_reads.js`, `notice.js`, `parts.js` and `PartsComponent`.
 - Modify `CHANGELOG.md`, `## Unreleased`:
   - Changed: the mind graph's colours, chips and legend; the type dots' lightness;
   - Removed: the mind graph's Status key dialog.
