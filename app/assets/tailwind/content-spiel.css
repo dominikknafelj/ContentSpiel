@@ -227,6 +227,10 @@
   --cs-radius-field: 6px; --cs-radius-button: 8px; --cs-radius-button-sm: 7px; --cs-radius-chip: 7px;
   --cs-radius-tile: 12px; --cs-radius-card: 14px; --cs-radius-frame: 16px; --cs-radius-rail: 18px;
   --cs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The cross-fade between light and dark (theme_controller.js), read by the
+     root's view-transition rules under CS Studio's surface below. */
+  --cs-theme-fade-duration: 250ms;
+  --cs-theme-fade-easing: ease-out;
   /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
   --cs-control-compact: 2.375rem;
   /* The editors' and Settings' form column (layout points spec, decision 1),
@@ -240,6 +244,61 @@
   --cs-editor-column: 900px;
   --cs-rail-width: 360px;
   --cs-rail-gap: 28px;
+  /* THE LAYERS: every z-index in CS Studio is one of these, written as
+     `z-index: var(--cs-z-…)` or the utility `z-(--cs-z-…)`
+     (`admin_design_rules_test.rb` refuses any other value; `auto` is no
+     layer and stays allowed).
+
+     The first three are LOCAL layers, for raising a thing over its
+     neighbours: `lift`, a focused control over its neighbours (a table
+     strip's button) and an editor's canvas over a rail panel that follows
+     it; `raised`, over its own row or cell (a row's second
+     link over its stretched one, a matrix cell's link, a table strip's
+     entry and its "+", the mind graph's card and tooltip) and an editor's
+     rail panel over a canvas that follows it; `raised-top`, over `raised` in the same
+     context (the matrix's sticky title cell, an open or focused strip
+     entry). Not every user of `lift` and `raised` makes a stacking context
+     of its own (a row's second link meets the page's layers), so both stay
+     under the lowest page layer. `raised-top` does not, and is used only
+     inside a component's own stacking context (the matrix's `isolate`, the
+     canvas).
+
+     The rest are PAGE layers, lowest first, each over the one before it
+     wherever the two meet: the save bar (`sticky`; a configuration screen
+     has no slide-over); the notes slide-over; the editor's sticky header,
+     so a menu of the header (its "⋯", its people) that drops into the
+     slide-over's place is over it, the header keeping its menus' own
+     z-index inside it; the notes sheet under 640px, which covers the
+     header; the tree's divider, whose last pixels lie on the header's left
+     edge; the top bar below 1280px; a popover (a menu, tooltip, listbox,
+     emoji panel, the rich-text popover, the mind graph's search results);
+     the media library's whole-window drop overlay, over any open popover;
+     the shell's scrim, over an open popover too, so a drawer opened with a
+     menu up hides it; the sidebar and tree drawers; the toasts, over
+     everything but a dialog. A dialog opens with `showModal()` in the top
+     layer and takes no z-index.
+
+     The canvas (`.admin-rail__main`) is a stacking context at `lift`: what
+     it raises, a popover at `popover` included, stays inside it, and the
+     slide-over and the editor's header, which stand outside it (the header
+     before the rail's grid), cover all of it. Of the canvas and a rail
+     panel, whichever comes first in the document is the higher, since its
+     popovers drop onto the other (`.admin-rail__main` in
+     content-spiel.tailwind.css). */
+  --cs-z-lift: 1;
+  --cs-z-raised: 10;
+  --cs-z-raised-top: 20;
+  --cs-z-sticky: 15;
+  --cs-z-slide-over: 20;
+  --cs-z-header: 21;
+  --cs-z-sheet: 22;
+  --cs-z-divider: 23;
+  --cs-z-top-bar: 25;
+  --cs-z-popover: 30;
+  --cs-z-drop: 32;
+  --cs-z-scrim: 35;
+  --cs-z-drawer: 40;
+  --cs-z-toast: 50;
 }
 
 /* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`
@@ -257,4 +316,17 @@
 html[data-surface="studio"] {
   --cs-t-label: 12px;
   scrollbar-gutter: stable;
+}
+
+/* The theme switch's cross-fade: the browser's own fade-out of the old
+   snapshot and fade-in of the new, at the fade's length and easing. Only the
+   duration and the timing function are set, never the `animation` shorthand,
+   which would drop those keyframes. The pseudo-elements are drawn over the
+   whole document, top layer included, so they take no layer of THE LAYERS.
+   A visitor's page reads its theme's stylesheet, not this one, and takes the
+   browser's default fade. */
+html[data-surface="studio"]::view-transition-old(root),
+html[data-surface="studio"]::view-transition-new(root) {
+  animation-duration: var(--cs-theme-fade-duration);
+  animation-timing-function: var(--cs-theme-fade-easing);
 }

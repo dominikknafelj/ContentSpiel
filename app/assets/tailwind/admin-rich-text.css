@@ -117,7 +117,7 @@
 }
 .admin-table-controls .ProseMirror-focused .is-current-cell { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 
-.admin-table-strip-entry { position: absolute; z-index: 10; }
+.admin-table-strip-entry { position: absolute; z-index: var(--cs-z-raised); }
 /* The menu's own box (`relative inline-block`) fills the entry, so its panel hangs under the button. */
 .admin-table-strip-entry > div { display: block; width: 100%; height: 100%; }
 .admin-table-strip-button {
@@ -137,9 +137,9 @@
 }
 .admin-table-strip-button:hover { color: var(--cs-ink); background: var(--cs-sunken); }
 .admin-table-strip-button[aria-current="true"] { color: var(--cs-paper); background: var(--cs-ink); border-color: var(--cs-ink); }
-.admin-table-strip-button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.admin-table-strip-button:focus-visible { position: relative; z-index: var(--cs-z-lift); outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .admin-table-strip-entry:has(.admin-table-strip-button:focus-visible),
-.admin-table-strip-entry:has([aria-expanded="true"]) { z-index: 20; }
+.admin-table-strip-entry:has([aria-expanded="true"]) { z-index: var(--cs-z-raised-top); }
 
 .admin-table-strip-corner {
   position: absolute;
@@ -150,7 +150,7 @@
 }
 .admin-table-strip-add {
   position: absolute;
-  z-index: 10;
+  z-index: var(--cs-z-raised);
   display: flex;
   align-items: center;
   justify-content: center;

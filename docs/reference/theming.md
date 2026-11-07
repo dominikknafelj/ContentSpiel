@@ -409,7 +409,7 @@ Under the theme's `views/`. The default is the file of the same path under `app/
 | `layouts/public/_header.html.erb` | the site's header: its title, logo and menu |
 | `layouts/public/_footer.html.erb` | the site's footer: the copyright line, the social links, the light/dark switch |
 | `layouts/public/_language_switcher.html.erb` | the links to the shown page in the other languages |
-| `layouts/public/_theme_toggle.html.erb` | the light/dark switch; its script is the CMS's `theme` controller |
+| `layouts/public/_theme_toggle.html.erb` | the light/dark switch; its script is the CMS's `theme` controller, whose press cross-fades by the browser's default view transition, which a theme may style with `::view-transition-old(root)` and `::view-transition-new(root)` in its own stylesheet (none under reduced motion) |
 | `pages/show.html.erb` | a page: its heading, hero and blocks, and the list of its subpages |
 | `pages/not_found.html.erb` | the page for an address that is nobody's |
 | `pages/templates/_<name>.html.erb` | a page template: the page drawn inside `pages/show`, one file for each name of `page_templates` in `theme.yml` (a name the default theme also has may leave its file out) |

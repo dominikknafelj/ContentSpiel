@@ -71,7 +71,7 @@ The reason for two: 4a is one screen, its queries, its read scope and its access
 | "Languages behind English" | `Languages behind %{language}`, the primary language's name in the CS Studio language (`Translations.primary_locale`). | A site whose primary language is not English must not read "English". |
 | `ScheduledDateComponent`'s folder | `app/components/admin/ui/`, although only the dashboard draws it today. | It is a status component, the one place the scheduled fill is drawn besides the status chip (`LIVE_SCHEDULED_FILES`), as the spec's guard names "the scheduled date" among the status components. |
 | "Every family's chip on the sidebar's ground at 3:1" | Measured as the spec says, the chip's fill against `--cs-chrome` and `--cs-accent-tint`, in addition to the icon on its chip. With today's decided tokens that pair measures 1.14 to 1.37:1 on the chrome and 1.01 to 1.13:1 on the tint, so the assertion cannot pass. Task 10 therefore starts with an owner question (Step 0). | The spec's wording is followed and the conflict is put in front of the owner, not settled by the builder. The values are the spec's "decided" ones. |
-| The z-index scale's values | Today's order is kept for every pair of layers that can meet. The changes are: the save bar 20 → 15, the media drop overlay 30 → 32, the shell's scrim 30 → 35 (it covers an open popover, which it tied with), and the rich-text popover 20 → the popover layer (30) inside the isolated canvas. All four go to the owner (Task 11). | That keeps a refactor that shows nothing new apart from the fixed tie. The full table is in Task 8. |
+| The z-index scale's values | Today's order is kept for every pair of layers that can meet. The changes are: the save bar 20 → 15, the media drop overlay 30 → 32, the shell's scrim 30 → 35 (it covers an open popover, which it tied with), the rich-text popover 20 → the popover layer (30) inside the isolated canvas, and the mind graph's search results 20 → 30 (below 1280px, scrolled, they now pass over the top bar, as every other menu does). All five go to the owner (Task 11). | That keeps a refactor that shows nothing new apart from the fixed tie. The full table is in Task 8. |
 
 ---
 
@@ -566,7 +566,7 @@ The tests below are written for either answer. Only the chip-fill assertion diff
 - [ ] **Step 3: Write the PR body.**
   - Base: `studio-e4-4`, or `main` once 4a has merged.
   - Findings: Advances #127 (the module entry requires its family), Advances #117.
-  - For the owner to check: the fade's 250ms ease-out; the families of System's modules (code); and the four layer changes: the save bar 20 → 15, the drop overlay 30 → 32, the scrim 30 → 35 (now above an open menu), and the rich-text popover 20 → 30 inside the isolated canvas.
+  - For the owner to check: the fade's 250ms ease-out; the families of System's modules (code); and the five layer changes: the save bar 20 → 15, the drop overlay 30 → 32, the scrim 30 → 35 (now above an open menu), the rich-text popover 20 → 30 inside the isolated canvas, and the mind graph's search results 20 → 30 (now over the top bar when the page scrolls).
 - [ ] **Step 4: Check no test run is left**: `pgrep -f "rails test"` prints nothing.
 - [ ] **Step 5: Commit** `docs: E4 stage 4b in the reference and CLAUDE.md` (body: `Advances #117`)
 

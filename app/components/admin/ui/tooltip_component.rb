@@ -32,7 +32,7 @@ module Admin
 
       def call
         tag.span(@text, hidden: true, aria: { hidden: true }, data: { tooltip: true, "admin--ui--tooltip-target": "bubble" },
-          class: "pointer-events-none absolute left-1/2 top-full z-30 mt-1.5 w-max max-w-60 -translate-x-1/2 whitespace-normal break-words rounded-cs bg-ink px-2 py-1 " \
+          class: "pointer-events-none absolute left-1/2 top-full z-(--cs-z-popover) mt-1.5 w-max max-w-60 -translate-x-1/2 whitespace-normal break-words rounded-cs bg-ink px-2 py-1 " \
                  "text-left font-cs text-xs leading-[1.4] font-normal normal-case tracking-normal text-paper " \
                  "data-[align=left]:left-0 data-[align=left]:translate-x-0 data-[align=right]:left-auto data-[align=right]:right-0 data-[align=right]:translate-x-0")
       end

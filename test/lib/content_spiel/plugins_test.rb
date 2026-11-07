@@ -7,6 +7,7 @@ require "test_helper"
 # registration block replays it after the built-ins, every time.
 class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
   include GalleryAlbum
+  include LogCapture
 
   # The built-ins as the initializer's lines name them, read from its source
   # and not from the registry, so "the built-ins are registered" after a
@@ -324,6 +325,124 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_block_types(BlockTypes) }.message, "takes no attributes"
   ensure
     [ one, two, three ].compact.each { |hook| ContentSpiel::Plugins.remove(hook) }
+    Rails.application.reloader.prepare!
+  end
+
+  # CS Studio's sidebar modules (`StudioModules`). A gem cannot register one
+  # by itself: its initializer runs before `StudioModules` can be loaded, its
+  # `to_prepare` before the application's, whose first line is `reset!`, and
+  # its `after_initialize` is lost at the first development reload. The
+  # first test registers the way a gem's own `to_prepare` would, ahead of the
+  # application's, and the prepare that a boot and a reload both run wipes it.
+  BUILT_IN_MODULES = %i[dashboard pages posts media forms translations tags mind_graph trash users groups settings ai_assistant system_status audit_log].freeze
+
+  def module_names = StudioModules.entries.map(&:name)
+
+  def reports_module(modules, name = "acme/reports")
+    modules.register name, icon: :status, family: :code, path: :admin_root_path, permission: nil, group: :system
+  end
+
+  test "a module registered ahead of the application's prepare, as a gem's own to_prepare would, is wiped by it" do
+    reports_module(StudioModules)
+    assert_includes module_names, :"acme/reports"
+    Rails.application.reloader.prepare!
+    assert_equal BUILT_IN_MODULES, module_names, "the application's reset! empties the registry before its own lines"
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a module and its badge registered through the hook survive every prepare, after the built-ins" do
+    hook = ContentSpiel::Plugins.studio_modules do |modules|
+      reports_module(modules)
+      modules.badge("acme/reports", style: :plain) { |viewer:| viewer ? 3 : 0 }
+    end
+    Rails.application.reloader.prepare!
+    assert_equal BUILT_IN_MODULES + [ :"acme/reports" ], module_names
+    Rails.application.reloader.prepare!
+    assert_equal BUILT_IN_MODULES + [ :"acme/reports" ], module_names, "a reload resets the registry and replays the hook"
+    assert_equal :code, StudioModules.find("acme/reports").family
+    assert_equal 3, StudioModules.count("acme/reports", viewer: users(:one))
+    assert StudioModules.badged?(:dashboard), "the built-ins' badges are kept"
+    ContentSpiel::Plugins.remove(hook)
+    Rails.application.reloader.prepare!
+    assert_equal BUILT_IN_MODULES, module_names, "a removed hook registers nothing at the next prepare"
+  ensure
+    ContentSpiel::Plugins.remove(hook) if hook
+    Rails.application.reloader.prepare!
+  end
+
+  test "a module hook is handed register and badge alone, and a module without a family, with a bare name, a second owner or a taken owner is refused, naming the place of the call" do
+    seen = nil
+    hook = ContentSpiel::Plugins.studio_modules { |modules| seen = modules }
+    ContentSpiel::Plugins.register_studio_modules(StudioModules)
+    assert_respond_to seen, :register
+    assert_respond_to seen, :badge
+    assert_not_respond_to seen, :reset!
+    assert_not_respond_to seen, :entries
+    ContentSpiel::Plugins.remove(hook)
+
+    line = __LINE__ + 1
+    familyless = ContentSpiel::Plugins.studio_modules { |modules| modules.register "acme/reports", icon: :status, path: :admin_root_path, permission: nil, group: :system }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }
+    assert_includes error.message, "family"
+    assert_includes error.message, "#{__FILE__}:#{line}"
+    ContentSpiel::Plugins.remove(familyless)
+    Rails.application.reloader.prepare!
+
+    line = __LINE__ + 1
+    bare = ContentSpiel::Plugins.studio_modules { |modules| reports_module(modules, :trash) }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }
+    assert_includes error.message, "owner/name"
+    assert_includes error.message, "#{__FILE__}:#{line}"
+    ContentSpiel::Plugins.remove(bare)
+    Rails.application.reloader.prepare!
+
+    two = ContentSpiel::Plugins.studio_modules do |modules|
+      reports_module(modules, "acme/reports")
+      reports_module(modules, "other/reports")
+    end
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }.message, "one owner"
+    ContentSpiel::Plugins.remove(two)
+    Rails.application.reloader.prepare!
+
+    one = ContentSpiel::Plugins.studio_modules { |modules| reports_module(modules, "acme/reports") }
+    other = ContentSpiel::Plugins.studio_modules { |modules| reports_module(modules, "acme/audits") }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }.message, "another hook's"
+  ensure
+    [ hook, familyless, bare, two, one, other ].compact.each { |each| ContentSpiel::Plugins.remove(each) }
+    Rails.application.reloader.prepare!
+  end
+
+  test "a module hook sets the badge of a module it registered and of no other: a built-in's badge stays the built-in's" do
+    trash_badge = StudioModules.find(:trash).badge
+    line = __LINE__ + 1
+    probe = ContentSpiel::Plugins.studio_modules { |modules| modules.badge(:trash) { |viewer:| 99 } }
+    error = assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }
+    assert_includes error.message, "a hook sets the badge of a module it registered itself"
+    assert_includes error.message, "#{__FILE__}:#{line}"
+    assert_same trash_badge, StudioModules.find(:trash).badge, "Trash keeps its own count"
+    ContentSpiel::Plugins.remove(probe)
+
+    mine = ContentSpiel::Plugins.studio_modules { |modules| reports_module(modules) }
+    theirs = ContentSpiel::Plugins.studio_modules { |modules| modules.badge("acme/reports") { |viewer:| 1 } }
+    assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }
+    assert_not StudioModules.badged?("acme/reports"), "another hook's module keeps no badge it did not set"
+  ensure
+    [ probe, mine, theirs ].compact.each { |each| ContentSpiel::Plugins.remove(each) }
+    Rails.application.reloader.prepare!
+  end
+
+  test "a module hook that raises on a reload is logged, and leaves the built-in modules and every other registry filled" do
+    line = __LINE__ + 1
+    bad = ContentSpiel::Plugins.studio_modules { |modules| reports_module(modules, :trash) }
+    logged = capture_log { Rails.application.reloader.prepare! }
+    assert_includes logged, "#{__FILE__}:#{line}"
+    assert_includes logged, "restart the server"
+    assert_equal BUILT_IN_MODULES, module_names
+    assert_equal BUILT_INS, BlockTypes.names, "the types' prepare still runs"
+    assert_nil Theme.current.refusal
+  ensure
+    ContentSpiel::Plugins.remove(bad) if bad
     Rails.application.reloader.prepare!
   end
 end

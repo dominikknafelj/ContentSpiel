@@ -486,6 +486,75 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # What answers a press at a point inside both the element's box and the
+  # slide-over's: the browser's own hit test, not a reading of the stylesheet.
+  def covered_by_notes?(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const under = document.querySelector(#{selector.to_json}).getBoundingClientRect()
+        const notes = document.getElementById("notes-drawer").getBoundingClientRect()
+        const left = Math.max(under.left, notes.left), right = Math.min(under.right, notes.right)
+        const top = Math.max(under.top, notes.top), bottom = Math.min(under.bottom, notes.bottom, window.innerHeight)
+        if (left >= right || top >= bottom) return "the two boxes do not meet"
+        return document.elementFromPoint((left + right) / 2, (top + bottom) / 2)?.closest("#notes-drawer") !== null
+      })()
+    JS
+  end
+
+  # The canvas is a stacking context of its own (`.admin-rail__main`), so
+  # whatever it raises, at whatever layer, stays under the slide-over.
+  test "the slide-over covers a rich-text popover and an open table strip in the canvas" do
+    table = @page.content_blocks.new(block_type: "table", position: 1)
+    table.assign_body({ "type" => "doc", "content" => [ { "type" => "table", "content" => Array.new(2) do |row|
+      { "type" => "tableRow", "content" => Array.new(4) { { "type" => row.zero? ? "tableHeader" : "tableCell", "content" => [ { "type" => "paragraph" } ] } } }
+    end } ] }, locale: :en)
+    table.save!
+
+    at_window(MID) do
+      open_editor
+      assert_docked(false)
+
+      within("#content_block_#{@block.id}") do
+        find(".ProseMirror").execute_script("this.focus(); const range = document.createRange(); range.selectNodeContents(this); getSelection().removeAllRanges(); getSelection().addRange(range)")
+        # ProseMirror reads the DOM selection a frame or two later.
+        page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => done(true), 50)))")
+        press "Link"
+      end
+      assert_selector ".admin-rich-text-popover"
+
+      open_notes
+      assert_selector ".admin-rich-text-popover"
+      assert_equal true, covered_by_notes?(".admin-rich-text-popover"), "the rich-text popover stands over the slide-over"
+
+      # The last column's letter stands under the slide-over, where no
+      # pointer reaches it: the script's press opens its menu.
+      open_entry = "#content_block_#{table.id} .admin-table-strip-entry:has([aria-expanded=true])"
+      find("#content_block_#{table.id} button[aria-label='Column D actions']").execute_script("this.scrollIntoView({ block: 'center' }); this.click()")
+      assert_selector "#{open_entry} [role=menu]"
+      assert_equal true, covered_by_notes?(open_entry), "the open strip entry stands over the slide-over"
+      assert_equal true, covered_by_notes?("#{open_entry} [role=menu]"), "the strip's menu stands over the slide-over"
+    end
+  end
+
+  # A rail panel other than the notes' is a context of its own at `raised`
+  # (`.admin-rail__panel`), so the post's settings, outside the canvas,
+  # raise their popovers under the slide-over too.
+  test "the slide-over covers the post settings' tag suggestions" do
+    Tag.create!(name: "rails")
+    post = create_post(title: "Chips", published: false)
+    at_window(MID) do
+      visit_editor(post)
+      assert_docked(false)
+      open_notes
+
+      find("#post-tag_names").execute_script("this.scrollIntoView({ block: 'center' }); this.focus()")
+      keyboard.type("ra")
+      assert_selector "#post-tag_names-listbox [role=option]", text: "rails"
+      assert_selector "#notes-drawer #notes-list"
+      assert_equal true, covered_by_notes?("#post-tag_names-listbox"), "the tag suggestions stand over the slide-over"
+    end
+  end
+
   test "a post's tabs stand in the rail above its panels, after its main column in the document" do
     post = create_post(title: "Hello", published: false)
     at_window(WIDE) do

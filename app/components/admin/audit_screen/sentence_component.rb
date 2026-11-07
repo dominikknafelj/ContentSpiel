@@ -61,7 +61,7 @@ module Admin
         route = sentence.subject_route
         if route && ROUTES.include?(route.name)
           link_to(label, helpers.public_send(route.name, *route.args, **route.params, **url_options),
-            class: "relative z-10 font-semibold hover:underline", data: { turbo_frame: "_top" })
+            class: "relative z-(--cs-z-raised) font-semibold hover:underline", data: { turbo_frame: "_top" })
         else
           content_tag(:span, label, class: "font-semibold")
         end

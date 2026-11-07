@@ -143,7 +143,7 @@
         <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
               class: "admin-well block w-full px-3 py-1.5 text-sm text-ink" %>
         <p data-mind-graph-status role="status" class="sr-only"></p>
-        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-card bg-popover p-1 shadow-3"></ul>
+        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-(--cs-z-popover) m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-card bg-popover p-1 shadow-3"></ul>
       </div>
     </div>
     <div class="order-first flex h-[70vh] min-h-[480px] min-w-0 flex-col min-[1100px]:order-none min-[1100px]:col-start-1 min-[1100px]:row-span-2 min-[1100px]:row-start-1 min-[1100px]:h-auto min-[1100px]:min-h-0">
@@ -227,8 +227,8 @@
             hands it, and is named by its title once it has one. The card's
             links are the only way a selection leads anywhere: a click on the
             canvas never navigates. %>
-        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-10 flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-card bg-popover p-3 shadow-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"></aside>
-        <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs bg-popover px-2 py-1 text-sm text-ink shadow-3"></div>
+        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-(--cs-z-raised) flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-card bg-popover p-3 shadow-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"></aside>
+        <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-(--cs-z-raised) max-w-xs break-words rounded-cs bg-popover px-2 py-1 text-sm text-ink shadow-3"></div>
       </div>
     </div>
     <%# The list (mind graph canvas spec §5.7; pages spec §7): every node the

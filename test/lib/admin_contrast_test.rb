@@ -395,6 +395,40 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # Every sidebar module's chip, in its family's hue, on the sidebar's
+  # ground (`--cs-chrome`) and on the current module's row, which keeps the
+  # chip's family on the accent tint. The icon is the chip's meaningful mark
+  # (1.4.11), so it is the icon that is measured at 3:1: on its chip, and on
+  # both grounds the chip stands on. The chip's fill is decoration and is not
+  # measured: on the chrome it is 1.14 (media) to 1.23:1 (structure) light
+  # and 1.20 (people) to 1.37:1 (structure) dark, and on the accent tint
+  # 1.01 to 1.13:1.
+  def sidebar_families
+    families = StudioModules.entries.map(&:family).uniq
+    assert_not_includes families, :neutral, "a sidebar module's chip is never neutral"
+    families
+  end
+
+  test "every sidebar module's icon is 3:1 on the sidebar's ground and on the current row" do
+    families = sidebar_families
+    each_scheme do |scheme, colour|
+      families.each do |family|
+        %w[--cs-chrome --cs-accent-tint].each do |ground|
+          assert_ratio(3.0, colour.("--cs-ic-#{family}"), colour.(ground), "the #{family} module's icon on #{ground} (#{scheme})")
+        end
+      end
+    end
+  end
+
+  test "every sidebar module's icon is 3:1 on its chip" do
+    families = sidebar_families
+    each_scheme do |scheme, colour|
+      families.each do |family|
+        assert_ratio(3.0, colour.("--cs-ic-#{family}"), colour.("--cs-ic-#{family}-bg"), "the #{family} module's icon on its chip (#{scheme})")
+      end
+    end
+  end
+
   # The people hue is a circle or a bubble with initials in it: those are
   # words, so the pair is 4.5:1 and not the icon's 3:1.
   test "the people hue's initials are 4.5:1 or better on their circle, in both schemes" do

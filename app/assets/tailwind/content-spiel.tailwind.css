@@ -210,9 +210,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    - keyboard focus: `--cs-accent` along the full height, and no outline box
      (a ring around an 8px strip as tall as the page says less than the line).
    Nothing animates, so there is nothing to turn off for reduced motion.
-   `z-index: 23`: over the editor's sticky header (21), whose left edge the
-   area's last pixels lie on, and under the top bar (25). `touch-action:
-   none`: a finger on it drags the divider, not the page.
+   `--cs-z-divider`: over the editor's sticky header, whose left edge the
+   area's last pixels lie on, and under the top bar (THE LAYERS,
+   `content-spiel.css`). `touch-action: none`: a finger on it drags the
+   divider, not the page.
 
    `__tip` is where the shared tooltip hangs: a sticky box of no height near
    the top of the window, because "under the host" would be below the last
@@ -223,7 +224,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    a marker: accent as a marker means "unread and addressed to you", and this bar
    says only where you are. */
 .admin-tree-row--selected { box-shadow: inset 3px 0 0 var(--cs-accent); }
-.admin-tree-divider { position: absolute; z-index: 23; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
+.admin-tree-divider { position: absolute; z-index: var(--cs-z-divider); top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
 .admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
 .admin-tree-divider[data-hover] { cursor: col-resize; }
 .admin-tree-divider[data-hover]::after { background: var(--cs-line-strong); }
@@ -257,18 +258,18 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root[data-tree-folded] .admin-tree-fold { display: inline-flex; position: sticky; top: calc(var(--admin-top-offset) + 0.75rem); }
 }
 .admin-top-bar { display: none; }
-.admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
+.admin-shell__scrim { position: fixed; inset: 0; z-index: var(--cs-z-scrim); background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
 
 @media (max-width: 1279px) {
   .admin-top-bar { display: flex; }
   .admin-shell { grid-template-columns: minmax(0, 1fr); }
   .admin-shell--tree { grid-template-columns: var(--admin-tree-column) minmax(0, 1fr); }
-  .admin-shell__sidebar { position: fixed; z-index: 40; top: 0; left: 0; height: 100vh; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__sidebar { position: fixed; z-index: var(--cs-z-drawer); top: 0; left: 0; height: 100vh; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
   .admin-shell__sidebar[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
 }
 @media (max-width: 1023px) {
   .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
-  .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__tree { position: fixed; z-index: var(--cs-z-drawer); top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
   .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
   /* A drawer has a fixed width and no divider. */
   .admin-tree-divider { display: none; }
@@ -640,7 +641,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    the title and its meta line, then the count, the chip and the verb. The
    row presses as one: the title link's `::after` covers the row, and the
    focus ring is drawn on it, inside the row. "Review and publish…" is raised
-   over it (`relative z-10`), the one second link a row may have. */
+   over it (`relative z-(--cs-z-raised)`), the one second link a row may have. */
 .admin-waiting-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
 .admin-waiting-row__link::after { content: ""; position: absolute; inset: 0; }
 .admin-waiting-row__link:focus-visible { outline: none; }
@@ -757,6 +758,34 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `--folded` (an editor's translation tab) never docks. */
 .admin-editor-area { container: admin-editor / inline-size; }
 .admin-rail-grid { --admin-rail-docked: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+/* The canvas is a stacking context of its own, at every width, at
+   `--cs-z-lift`: what it raises (a block's menus, a table strip's open
+   entry, the rich-text popover) stays inside it, so the notes slide-over and
+   the editor's sticky header, page layers outside it, cover all of it (THE
+   LAYERS, `content-spiel.css`). Without it, a canvas popover at or above
+   the slide-over's layer would stand over the slide-over. Its z-index takes
+   without a `position` because the canvas is always a grid or flex item
+   (the page editor's grid; the post form's flex column, or the grid through
+   the form's `display: contents` while docked).
+   Every rail panel but the notes' is a context of its own too, so the
+   slide-over and the header, page layers, cover what it raises (the tags'
+   and related posts' suggestions); the notes' panel is left out, since the
+   slide-over inside it is a page layer and must not be trapped. Where the
+   two meet below the threshold, and on a translation tab at every width,
+   whatever stands first in the document drops its popovers onto the other,
+   so the one that comes first is the higher:
+   - a panel before the canvas (the page editor's) is at `--cs-z-raised`,
+     over the canvas, so a settings popover that drops into the blocks below
+     it stays over them;
+   - a panel after the canvas (the post editor's, inside the post form or
+     after it) is `isolation: isolate`, at level 0, under the canvas, so the
+     body's Insert menu, its Link popover or a table strip's menu that hangs
+     past the canvas over the Excerpt field stays over the field.
+   Docked, the canvas and the rail stand side by side and nothing either
+   raises overflows into the other. */
+.admin-rail__main { isolation: isolate; z-index: var(--cs-z-lift); }
+.admin-rail__panel:not(:has(> .admin-notes-drawer)) { position: relative; z-index: var(--cs-z-raised); }
+:is(.admin-rail__main ~ .admin-rail__panel, :has(.admin-rail__main) ~ .admin-rail__panel):not(:has(> .admin-notes-drawer)) { position: static; z-index: auto; isolation: isolate; }
 .admin-rail__tabs { display: none; }
 .admin-rail__panel--docked-only { display: none; }
 .admin-rail__tab { display: inline-flex; align-items: center; gap: 0.375rem; padding-block: 0.5rem; color: var(--cs-meta); cursor: pointer; }
@@ -844,18 +873,11 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    the rule inside the rail's container query above makes it the panel's
    content instead.
 
-   THE LAYERS of an editor, lowest first: the canvas and what it raises
-   inside itself (a table's strip and the rich-text popover at 20, which
-   the slide-over still covers, coming later in the document); the
-   slide-over (20); the editor's sticky header (21), so a popover of the
-   header (its "⋯" menu, its people) that drops into the slide-over's place
-   is over it, the header being a stacking context that keeps its menus'
-   own z-index inside it; the sheet (22), which covers the header; the
-   tree's divider (23); the top bar (25); the shell's scrim (30) and its
-   drawers (40). */
+   Its layers, `--cs-z-slide-over` and `--cs-z-sheet`, and why they stand
+   where they do, are in THE LAYERS (`content-spiel.css`). */
 .admin-notes-drawer {
   display: flex; flex-direction: column;
-  position: fixed; z-index: 20; top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); right: 0; bottom: 0; width: 400px;
+  position: fixed; z-index: var(--cs-z-slide-over); top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); right: 0; bottom: 0; width: 400px;
   --cs-notes-ground: var(--cs-popover);
   background: var(--cs-notes-ground); box-shadow: var(--cs-shadow-3);
   animation: admin-notes-in 0.2s var(--cs-ease);
@@ -865,7 +887,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 @media (prefers-reduced-motion: reduce) { .admin-notes-drawer { animation: none; } }
 .admin-notes-drawer__back { display: none; }
 @media (max-width: 639.98px) {
-  .admin-notes-drawer { z-index: 22; top: var(--admin-top-offset); inset-inline: 0; width: auto; }
+  .admin-notes-drawer { z-index: var(--cs-z-sheet); top: var(--admin-top-offset); inset-inline: 0; width: auto; }
   .admin-notes-drawer__back { display: inline-flex; }
   .admin-notes-drawer__close { display: none; }
 }

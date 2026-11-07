@@ -39,7 +39,7 @@ module Admin
       def bar_class
         return "admin-save-bar admin-save-bar--contained flex flex-wrap items-center gap-3 border-t border-line px-[18px] py-3.5" if @contained
 
-        "admin-save-bar sticky -bottom-px z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3"
+        "admin-save-bar sticky -bottom-px z-(--cs-z-sticky) mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3"
       end
     end
   end
