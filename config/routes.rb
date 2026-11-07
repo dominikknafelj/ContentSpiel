@@ -1,6 +1,6 @@
 Rails.application.routes.draw do
-  # While setup is required, every route below is unreachable (design spec
-  # 2026-09-26 §3): these two catch-alls are declared first, so they win over
+  # While setup is required, every route below is unreachable: these two
+  # catch-alls are declared first, so they win over
   # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
@@ -9,7 +9,7 @@ Rails.application.routes.draw do
   end
 
   # A component browser for the ViewComponents under app/components
-  # (open-types spec §5), development only -- never mounted in test or
+  # development only -- never mounted in test or
   # production, and declared here, before the public catch-alls below, so
   # "/lookbook" isn't swallowed as a page path first. Renders through
   # `ComponentPreviewsController` (config/initializers/view_component.rb),
@@ -19,7 +19,7 @@ Rails.application.routes.draw do
   # path.
   mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
 
-  # CS Studio, the admin (cs-studio spec §3). Its path is configurable
+  # CS Studio, the admin. Its path is configurable
   # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
   # advertises no login page. Declared before /preview and the public
   # catch-alls, which would otherwise swallow it as a page path.
@@ -28,12 +28,12 @@ Rails.application.routes.draw do
     post "sign-in", to: "sessions#create"
     delete "sign-out", to: "sessions#destroy", as: :sign_out
 
-    # ⌘K "Jump to..." results (design pass spec §5.6): a layout-less HTML
+    # ⌘K "Jump to..." results: a layout-less HTML
     # fragment for the palette's turbo-frame, read-only, open to every
     # signed-in user (each row is already narrowed to what they may read).
     get "jump", to: "jump#show", as: :jump
 
-    # The invitation's link (mail spec): `<admin>/invitation#<token>`, the
+    # The invitation's link: `<admin>/invitation#<token>`, the
     # token in the fragment so no server sees it. Under the admin path like
     # the reset page, so it shadows no public page slug. The leading slash
     # keeps `InvitationsController` out of the `Admin::` module: like the
@@ -65,9 +65,9 @@ Rails.application.routes.draw do
     patch "password", to: "passwords#update", as: :update_password
     post "password/check", to: "passwords#check", as: :check_password
 
-    # The Pages module (cs-studio spec §4.1/§5.1). `member` adds the three
+    # The Pages module. `member` adds the three
     # publish-state actions the record header's own buttons post to
-    # (Publish now / Unpublish / Schedule…, spec §5.1) -- each its own
+    # (Publish now / Unpublish / Schedule…) -- each its own
     # one-shot POST, deliberately outside the settings form's autosave
     # (`Admin::PagesController`'s own class comment explains why).
     resources :pages, only: %i[index new create show update destroy] do
@@ -80,7 +80,7 @@ Rails.application.routes.draw do
         patch :slug
       end
 
-      # A page's blocks (cs-studio spec §5.1/§6.1): nested under the
+      # A page's blocks: nested under the
       # page rather than a top-level resource, since a block is meaningless
       # without the page it's on and every one of these actions already
       # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
@@ -96,7 +96,7 @@ Rails.application.routes.draw do
       end
     end
 
-    # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`
+    # The page tree's own move endpoint, a `resource`
     # (singular) rather than nested under `pages` -- a move names the page
     # being dragged in its own params (`page_id`), not the URL, since the
     # same one PATCH target serves every node in the tree. `update` only
@@ -109,7 +109,7 @@ Rails.application.routes.draw do
     # top-level GET).
     resource :tree, only: %i[update], controller: :tree
 
-    # The Tiptap editor's own upload button (design spec §4.1/§4.2): POSTs
+    # The Tiptap editor's own upload button: POSTs
     # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
     # (422) -- `create` only, kept separate from the Media module's own
     # `media` resource just below: there's no page or post this upload
@@ -118,7 +118,7 @@ Rails.application.routes.draw do
     # JSON-in-JSON-out contract, not the module's own browse/edit screens.
     resources :media_assets, only: :create
 
-    # The Media module (media library design spec §6): browse,
+    # The Media module: browse,
     # upload, edit and delete library images, all through `Media::Upload`/
     # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
     # `show` is one image's detail panel; `create` is the grid's own
@@ -129,13 +129,13 @@ Rails.application.routes.draw do
     # default for this one English word, left as-is rather than overridden
     # with an `:as` this app has no other resource needing.
     resources :media, only: %i[index show create update destroy]
-    # "Download original" (image delivery spec, decision 2): the library
+    # "Download original": the library
     # image's original file, for a holder of `media.upload` alone. Active
     # Storage's own blob routes refuse it to everyone
     # (config/initializers/active_storage_access.rb).
     get "media/:id/original", to: "media_originals#show", as: :media_original, constraints: { id: /\d+/ }
 
-    # Trash (trash spec §7). `:type` is page|post|media|form -- one screen for
+    # Trash. `:type` is page|post|media|form -- one screen for
     # four models, so the item is addressed by type and id rather than by a
     # resource per model. The constraint is what turns any other `:type`
     # into a routing 404 before `Admin::TrashController` is ever reached.
@@ -146,14 +146,14 @@ Rails.application.routes.draw do
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media|form/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media|form/ }
 
-    # "Still correct — mark up to date" for an outdated translation (translation helpers
-    # spec §3.4/§4): one endpoint for every translatable record kind, named
+    # "Still correct — mark up to date" for an outdated translation:
+    # one endpoint for every translatable record kind, named
     # by `record_type`/`record_id` in the params (the editor's button posts
     # them in its `formaction`), the way the trash addresses its items by
     # type rather than one nested route per model.
     post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
 
-    # The Translations matrix (design pass round 2, handoff §4.4): every item
+    # The Translations matrix: every item
     # that needs work in any target language, one column per language,
     # optionally narrowed by `?type=page|post|media|settings` and
     # `?language=` and paged by `?page=`. A plain
@@ -162,7 +162,7 @@ Rails.application.routes.draw do
     # route of its own without a resource's implied member routes.
     get "translations", to: "translations#index", as: :translations
 
-    # AI translation suggestions (translation helpers spec §6.4): the
+    # AI translation suggestions: the
     # editor's Translate buttons post the record (`record_type`/
     # `record_id`, like the confirm endpoint above), `fields[]`, the target
     # `locale` and `inputs[field]` (the input each suggestion is for), and
@@ -170,13 +170,13 @@ Rails.application.routes.draw do
     # the provider's quota and records an `ai.translated` event.
     post "translations/suggest", to: "translations#suggest", as: :translation_suggestions
 
-    # The internal-link picker's own search (design spec §4.1/§4.2): a
+    # The internal-link picker's own search: a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource
     # to nest it under the way `content_blocks` nests under `pages`.
     get "link_targets", to: "link_targets#index"
 
-    # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
+    # The Posts module: a flat, filterable list
     # (no tree column of its own -- a post has no parent/child structure the
     # way a page does) plus the post editor. `member` adds the same three
     # publish-state actions the page editor's own record header posts to
@@ -195,7 +195,7 @@ Rails.application.routes.draw do
       end
     end
 
-    # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
+    # The Tags module: a flat list with no
     # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
     # an inline rename (`:update`), a delete (`:destroy`) and a merge into
     # another tag (`merge`, `Tags::Merge`) from the list itself; new tags are only ever created in passing, through a post's own
@@ -210,13 +210,13 @@ Rails.application.routes.draw do
       member { post :merge }
     end
 
-    # The Settings module (cs-studio spec §6.1): the `SiteSetting`
+    # The Settings module: the `SiteSetting`
     # singleton's own autosaving form (title, tagline, logo, social links,
     # default language) -- `resource` (singular), like the page tree's own
     # `resource :tree`, since there's exactly one settings row to show or
     # update, never a collection or an `:id` to route on.
     resource :settings, only: %i[show update] do
-      # Translation helpers spec §6.2: checks the saved AI provider, model
+      # Checks the saved AI provider, model
       # and key with one tiny request, answered inline as a Turbo Stream.
       post :test_ai_connection
       # The API key's own save (PATCH) and remove (DELETE), `Admin::AiKeysController`:
@@ -235,7 +235,7 @@ Rails.application.routes.draw do
       resource :mail_login, only: %i[update destroy]
     end
 
-    # Languages (cs-studio spec §6.1; they live INSIDE the
+    # Languages (they live INSIDE the
     # Settings screen, as its `#languages` card). Still under "settings" by
     # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
     # What is left is the card's INSTANT actions, each answering with a 303 back
@@ -253,7 +253,7 @@ Rails.application.routes.draw do
       patch "languages/:id/default", to: "languages#make_default", as: :default_language
     end
 
-    # The Users module (cs-studio spec §6.1): list, new/create,
+    # The Users module: list, new/create,
     # edit/update (email, and a password only when one was typed --
     # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
     # -- `Admin::UsersController#destroy` is also where deleting *yourself*
@@ -271,7 +271,7 @@ Rails.application.routes.draw do
       member { patch :owner }
     end
 
-    # Invites (mail spec "Invites", `Admin::InvitesController`): "Invite
+    # Invites (`Admin::InvitesController`): "Invite
     # person" posts `invites`; an invited row's menu resends
     # (`invites/:id/resend`) and withdraws (DELETE `invites/:id`). The id is
     # the `Invitation`'s: an invitation is no user until it is accepted.
@@ -279,7 +279,7 @@ Rails.application.routes.draw do
       member { post :resend }
     end
 
-    # The Groups module (access-control design spec §5): the list, the
+    # The Groups module: the list, the
     # editor (name, description, members, the permission matrix) and
     # delete (`Groups::Destroy`, which revokes the group's tokens). No
     # `:show` -- the editor is the group's page.
@@ -303,8 +303,7 @@ Rails.application.routes.draw do
       post :resend, on: :member
     end
 
-    # "Your account" (access-control design spec §5; the notes handoff's
-    # decisions 25 and 38): the signed-in user's own account, open to every
+    # "Your account": the signed-in user's own account, open to every
     # user -- unlike the Users module, which needs `users.manage`. Singular:
     # it's always *your* account. The page is `account`. It began as "Change
     # my password" at `account/password`, an address that named one of its
@@ -318,7 +317,7 @@ Rails.application.routes.draw do
     patch "account/password", to: "accounts#update", as: :account_password
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
-    # "Connect an AI assistant" (design spec §6.1): the MCP bearer
+    # "Connect an AI assistant": the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list
     # that POSTs straight to `create`, and `create` *renders* the one-time
     # reveal itself (never a redirect to a `show`, which would need the raw
@@ -328,13 +327,13 @@ Rails.application.routes.draw do
     # own "last used / IP" history.
     resources :api_tokens, only: %i[index create destroy]
 
-    # System status and the mind graph (design spec §6.1): one
+    # System status and the mind graph: one
     # read-only screen each, `resource` (singular) since neither has an
     # `:id` to route on. "Run again" on the status screen is a plain reload
     # of `show` -- `Setup::SystemCheck` runs on every request.
     resource :system_status, only: :show, controller: :system_status
     # `data`, `search`, `unlisted` and `listed` are the mind graph screen's
-    # own JSON reads (mind graph canvas spec §3.1; pages spec §3): the graph,
+    # own JSON reads: the graph,
     # global or around `page=` / `post=` / `tag=`; the search field's rows;
     # the posts no page lists; and the posts one target of `page=` brings in
     # (`target=`) beyond the ones its local view draws.
@@ -345,7 +344,7 @@ Rails.application.routes.draw do
       get :listed, defaults: { format: :json }
     end
 
-    # The audit log (access-control design spec §5 "Audit log module"):
+    # The audit log:
     # a paginated, filterable list plus one event's own page.
     # `resources` (plural, unlike `system_status`/`mind_graph` above) since
     # each row has its own `:id` to route `show` on -- but only `:index`/
@@ -353,7 +352,7 @@ Rails.application.routes.draw do
     # created, edited or destroyed through a CS Studio form.
     resources :audit_events, only: %i[index show]
 
-    # "Create starter pages" on the Pages home (design spec §6.1):
+    # "Create starter pages" on the Pages home:
     # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
@@ -378,13 +377,13 @@ Rails.application.routes.draw do
     # `?filter=everything|threads|unpublished`).
     root to: "dashboard#show"
     get "dashboard/waiting", to: "dashboard#waiting", as: :dashboard_waiting
-    # Presence (presence spec §5): who else has a record open, and which of a
+    # Presence: who else has a record open, and which of a
     # list's records have someone here. Two reads, both through the read
     # scope; the writes are a channel's (`Presence::Channel`). `here` comes
     # first and its words can not be taken for a kind below.
     get "presence/here", to: "presence#here", as: :presence_here, defaults: { format: :json }
     get "presence/:kind/:id", to: "presence#show", as: :record_presence, constraints: { kind: /page|post|media/, id: /\d+/ }
-    # Live editing (live-editing spec §3.2): the parts an open page or post
+    # Live editing: the parts an open page or post
     # editor fetches when it is told something changed, each through the read
     # scope: a page's block list, one block, the record's own form. Hung under
     # the record like notes' and presence's, but `kind` is only `page|post`:
@@ -397,18 +396,18 @@ Rails.application.routes.draw do
       get "record", to: "editing#record", as: :editing_record
       # The header's publishing chip, for another tab's change to the mark.
       get "publishing", to: "editing#publishing", as: :editing_publishing
-      # A save is a claim (live-editing spec §4.2): the tab takes a subject ahead
+      # A save is a claim: the tab takes a subject ahead
       # of its first save, and lets it go. `block_id` is optional (absent: the
       # record itself); a block that is not this record's is a 404.
       post "claim", to: "editing#claim", as: :editing_claim
       post "release", to: "editing#release", as: :editing_release
-      # Taking over (spec §4.4): the requester asks, the holder's tab hands over.
+      # Taking over: the requester asks, the holder's tab hands over.
       post "take_over", to: "editing#take_over", as: :editing_take_over
       post "hand_over", to: "editing#hand_over", as: :editing_hand_over
       # The asking tab leaves, or stops asking: its own request goes.
       post "withdraw", to: "editing#withdraw", as: :editing_withdraw
     end
-    # Publishing a record's changes (drafts spec §4.3).
+    # Publishing a record's changes.
     scope "publishing/:kind/:id", constraints: { kind: /page|post/, id: /\d+/ } do
       post "publish", to: "publishing#publish", as: :publishing_publish
       # What a publish would change, for the dialog: a POST, sent through the
@@ -418,7 +417,7 @@ Rails.application.routes.draw do
       post "discard", to: "publishing#discard", as: :publishing_discard
       post "cancel_scheduled_change", to: "publishing#cancel_scheduled_change", as: :publishing_cancel_scheduled_change
     end
-    # Notes on content (notes spec §3.4, §4). Everything about one record's
+    # Notes on content. Everything about one record's
     # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
     # `/notes/media/5` -- so a controller finds the container through the read
     # scope first and a thread only among that container's: a thread is never
@@ -430,13 +429,13 @@ Rails.application.routes.draw do
       get "resolved", to: "notes#resolved", as: :resolved_record_notes
       get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
       get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
-      # The writes (notes spec §3.5), each an ordinary Turbo form inside
+      # The writes, each an ordinary Turbo form inside
       # `turbo-frame#notes`. A thread's six changes share one action: the
       # segment is the whole request, so nothing about it is read from a
       # parameter (`Admin::NoteThreadsController::CHANGES`).
       get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
-      # The record's open threads as data, for the mind graph's card (notes
-      # spec §4.4). It shares its path with the POST below, which the card
+      # The record's open threads as data, for the mind graph's card.
+      # It shares its path with the POST below, which the card
       # sends too, and has a name of its own because two routes can't share
       # one: `admin_record_note_threads_data_path`.
       get "threads", to: "note_threads#index", as: :record_note_threads_data, defaults: { format: :json }
@@ -446,10 +445,10 @@ Rails.application.routes.draw do
       post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
       patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
       delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
-      # A reaction on one message: a toggle of the viewer's own (notes spec D10).
+      # A reaction on one message: a toggle of the viewer's own.
       post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
         constraints: { thread_id: /\d+/, id: /\d+/ }
-      # A file of one message (notes spec D15, §3.6): the ONLY address a
+      # A file of one message: the ONLY address a
       # note's file has. Its id is an attachment's, looked up among that
       # message's, of that thread, of this record -- never a blob's key or a
       # signed id, and no Active Storage URL of one is ever rendered.
@@ -459,13 +458,13 @@ Rails.application.routes.draw do
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
-  # First-run setup wizard (design spec 2026-09-26 §4). SetupController
+  # First-run setup wizard. SetupController
   # itself 404s once setup is complete.
   get "setup", to: "setup#index", as: :setup
   get "setup/:step", to: "setup#show", as: :setup_step
   patch "setup/:step", to: "setup#update"
 
-  # The MCP server (design spec section 10), bearer-token authenticated
+  # The MCP server, bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site
   # catch-all below, or "/mcp" would be swallowed as a page path instead.
   post "mcp", to: "mcp#create"
@@ -488,7 +487,7 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Signed-in preview of unpublished pages and posts (spec §6.4) -- its own
+  # Signed-in preview of unpublished pages and posts -- its own
   # URL space, so the public routes below can stay session-free and cacheable.
   # Two routes for the same reason the public site has two: an optional
   # `(/:locale)` would leave "about" in /preview/about to be read as a locale.
@@ -530,8 +529,8 @@ Rails.application.routes.draw do
   # normalizes to "/de") would raise a routing error and that locale's root
   # would be unreachable. `(/*path)` makes the segment genuinely optional.
   # `constraints: LocaleRouteConstraint` (not a fixed regex): which locales
-  # this route actually matches is a runtime setting (site_settings.locales,
-  # spec §4.4), so it can't be hard-coded here the way `:path`'s absence of a
+  # this route actually matches is a runtime setting (site_settings.locales),
+  # so it can't be hard-coded here the way `:path`'s absence of a
   # constraint can. `LocaleRouteConstraint#matches?` calls `Locales.enabled?`
   # per request; a locale that fails it is not an error -- the router simply
   # tries the next route, which is exactly what lets "/fr/about" fall through

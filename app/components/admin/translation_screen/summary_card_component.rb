@@ -1,9 +1,8 @@
 module Admin
   module TranslationScreen
-    # One target language's card on the Translations matrix (design pass
-    # round 2, Task 18, handoff §4.4): its own name in its own language,
-    # "% done" (complete items over everything the viewer can read), a 4px
-    # bar and "12 missing · 1 outdated". `summary` is one entry of
+    # One target language's card on the Translations matrix: its own name in
+    # its own language, "% done" (complete items over everything the viewer
+    # can read), a 4px bar and "12 missing · 1 outdated". `summary` is one entry of
     # `Translations::StateIndex.summaries` -- nothing is computed here.
     #
     # Same look and wording as the dashboard's translation panel rows
