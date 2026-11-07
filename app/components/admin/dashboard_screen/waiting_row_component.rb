@@ -18,9 +18,11 @@ module Admin
     # the verb is "Review and publish…", a second link, a small secondary
     # raised over the stretched one, to the editor asked to open Publish
     # changes. Otherwise it is words, "Open thread" or "Open", that describe
-    # the title's link (`aria-describedby`), dim at rest and accent while the
-    # row is pointed at or focused: a link cannot hold a second link, and a
-    # press that opens nothing is never offered.
+    # the title's link, dim at rest and accent while the row is pointed at or
+    # focused: a link cannot hold a second link, and a press that opens
+    # nothing is never offered. The title's link is named by the title and
+    # the count and the chip, and described by the verb, which are hidden
+    # from the reading order beside it, so each is read once (`OneLink`).
     #
     # The marker is round in the content type's colour for a post and square
     # in meta for a page and an image: a shape as well as a colour, and the
@@ -29,6 +31,8 @@ module Admin
     # Nothing here queries: the row carries its record, its thread and its
     # last author.
     class WaitingRowComponent < Admin::AdminComponent
+      include OneLink
+
       # The routes a row may name, checked before `public_send`: a route
       # name handed up from a query is data, and a method chosen by data is
       # called only from this list.
@@ -61,7 +65,15 @@ module Admin
 
       def review_path = resolve(row.review_route)
 
-      def verb_id = "waiting-row-#{kind}-#{row.record.id}-verb"
+      def link_id = "waiting-row-#{kind}-#{row.record.id}"
+
+      def verb_id = "#{link_id}-verb"
+
+      def count_id = "#{link_id}-count"
+
+      def unpublished_id = "#{link_id}-unpublished"
+
+      def reason_ids = [ (count_id if thread?), (unpublished_id if unpublished?) ].compact
 
       def verb = thread? ? t(".open_thread") : t(".open_record")
 

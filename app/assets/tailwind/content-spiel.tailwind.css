@@ -609,25 +609,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
-/* The dashboard's panels: one column,
-   two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
-   window's (the sidebar and the tree take room the window does not
-   show), and never more than three: a wider window widens the cards and adds
-   no fourth, so no `auto-fit`. `turbo-frame.contents` keeps Notes for you
-   and Waiting for you, each a frame of its own, grid items. */
-.admin-dashboard { container: admin-dashboard / inline-size; }
-.admin-dashboard-cards { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@container admin-dashboard (min-width: 40rem) {
-  .admin-dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container admin-dashboard (min-width: 60rem) {
-  .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
 /* The dashboard's heading row: the heading, then New page… and New post…
    at its end. It wraps, so on a narrow screen the buttons go under the
    heading rather than crushing it. */
 .admin-dashboard__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
-.admin-dashboard__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
+.admin-dashboard__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 /* A dashboard panel (`Admin::DashboardScreen::PanelComponent`): a card
    (elevation 1, `rounded-card`) whose head holds its heading and one line.
    The head is tinted by the panel's kind, and the heading and the line take
@@ -637,13 +623,16 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    The head's top corners follow the
    card's, since the card does not clip (a focus ring inside it would be cut). */
 .admin-dashboard-panel { display: flex; flex-direction: column; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
-.admin-dashboard-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }
-.admin-dashboard-panel__line { margin-top: 0.125rem; }
-/* A head whose action is wider than the room beside the heading (Waiting
-   for you's filter in a narrow column) puts the action under the heading
-   rather than crushing it. */
-.admin-dashboard-panel__head { flex-wrap: wrap; }
+/* The head wraps: an action wider than the room beside the heading
+   (Waiting for you's filter in a narrow column) goes under the heading
+   rather than crushing it, and where even the head's whole width is too
+   narrow for it, the action shrinks to that width and the filter's words
+   wrap inside their segments, never past the panel's edge. */
+.admin-dashboard-panel__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }
 .admin-dashboard-panel__head > :first-child { flex: 1 1 12rem; }
+.admin-dashboard-panel__head > :not(:first-child) { min-width: 0; max-width: 100%; }
+.admin-dashboard-panel__head nav { max-width: 100%; }
+.admin-dashboard-panel__line { margin-top: 0.125rem; }
 .admin-dashboard-panel--action .admin-dashboard-panel__head { background: var(--cs-head-action); color: var(--cs-head-action-ink); }
 .admin-dashboard-panel--shortcuts .admin-dashboard-panel__head { background: var(--cs-head-cool); color: var(--cs-head-cool-ink); }
 .admin-dashboard-panel--information .admin-dashboard-panel__head { background: var(--cs-head-warm); color: var(--cs-head-warm-ink); }
@@ -657,7 +646,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-waiting-row__link:focus-visible { outline: none; }
 .admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
 /* Pick up where you left off's tiles (`Admin::DashboardScreen::DraftTileComponent`),
-   one column. A tile presses as one: its title link's `::after` covers the
+   one column below the main column's 32rem (the dashboard's layout,
+   below). A tile presses as one: its title link's `::after` covers the
    tile, rounded with it, and the focus ring is drawn on it. */
 .admin-draft-tiles { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
 .admin-draft-tile { position: relative; }
@@ -676,6 +666,59 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
 a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
+/* The dashboard's layout. The container is the DASHBOARD's own width, never
+   the window's (the sidebar and the tree take room the window does not
+   show), and no `@media` rule names it. It docks at 1200px, the editors'
+   rail's threshold (`@container admin-editor`): a container query cannot
+   read a custom property, so the number is written in both places and
+   `admin_design_rules_test` holds them to one. The document order is the
+   heading row, the mail notice, the main column (Waiting for you, Notes for
+   you, then Pick up where you left off), then the rail, "At a glance"
+   (Publishing on its own, Languages behind, What changed recently): what
+   needs the person comes first at every width, and only the grid places the
+   two, so the focus follows that order. Every count of columns is written
+   here and none is `auto-fit`: a wider dashboard widens the columns and adds
+   none. Below the threshold the rail's panels follow the main column as
+   cards, one column, two from 40rem. Docked, the main column stands at the
+   content's left edge and the rail `--cs-rail-gap` right of it on the
+   rail's ground; the tracks are fixed and `justify-content: start`, so
+   spare width falls right of the rail, and the heading row ends where the
+   rail does, so New post… stands over the rail and not out in that spare
+   width. On that ground an information panel
+   has no card and no band, and its heading keeps its warm ink; its rows
+   lose their inset with the head's, so both start at the rail's padding.
+   The main column is a container of its own (`admin-dashboard-main`), so
+   Waiting for you and Notes for you stand side by side, and the tiles take
+   two or three columns, by the room the main column has.
+   `turbo-frame.contents` keeps those two frames' panels grid items. These are plain rules, unlayered, so they win over the
+   rows' padding utilities, and the block stands after the panels' and the
+   tiles' rules, which it overrides at equal specificity (a kind's head
+   tint, the tiles' one column), so it wins over those by coming later. */
+.admin-dashboard { container: admin-dashboard / inline-size; }
+.admin-dashboard__grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 1.5rem; }
+.admin-dashboard__main { container: admin-dashboard-main / inline-size; display: flex; flex-direction: column; gap: 1rem; }
+.admin-dashboard__actions { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+.admin-dashboard__rail { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container admin-dashboard-main (min-width: 44rem) {
+  .admin-dashboard__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard-main (min-width: 32rem) {
+  .admin-draft-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard-main (min-width: 48rem) {
+  .admin-draft-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container admin-dashboard (min-width: 40rem) {
+  .admin-dashboard__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard (min-width: 1200px) {
+  .admin-dashboard__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
+  .admin-dashboard__rail { grid-template-columns: minmax(0, 1fr); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
+  .admin-dashboard__rail .admin-dashboard-panel { background: transparent; box-shadow: none; }
+  .admin-dashboard__rail .admin-dashboard-panel__head { background: transparent; padding-inline: 0; }
+  .admin-dashboard__rail .admin-dashboard-panel > :not(.admin-dashboard-panel__head) { padding-inline: 0; }
+  .admin-dashboard__head { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
+}
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
    window's: a folded tree changes it while the

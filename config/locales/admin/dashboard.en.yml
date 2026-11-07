@@ -11,6 +11,9 @@ en:
         # The heading row's two buttons, each opening its New dialog.
         new_page: "New page…"
         new_post: "New post…"
+        # The information rail's name for a screen reader: the panels beside
+        # the main column, or under it where the dashboard is narrower.
+        rail_label: "At a glance"
         # The viewer's drafts: "Start a draft" opens the New post dialog.
         drafts:
           title: "Pick up where you left off"

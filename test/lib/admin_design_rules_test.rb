@@ -792,14 +792,45 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/cs-control-compact|admin-filter-bar/, public_css, "nothing of CS Studio's reaches the public stylesheet")
   end
 
-  # Layout points spec, decision 13: at most three cards in a row, by the
-  # dashboard's own width, never `auto-fit`.
-  test "the dashboard's grid is one, two or three columns by its container, and never auto-fit" do
+  # The dashboard's main column and its "At a glance" rail: laid out by the
+  # dashboard's own width (the sidebar and the tree take room the window does
+  # not show), never a window media query, docked on the editors' rail tokens.
+  test "the dashboard's main column and rail are laid out by the dashboard's container, from the rail's tokens" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-dashboard\s*\{\s*container:\s*admin-dashboard\s*\/\s*inline-size;\s*\}/, css)
-    assert_match(/@container admin-dashboard \(min-width: 40rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/m, css)
-    assert_match(/@container admin-dashboard \(min-width: 60rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/m, css)
-    assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
+    assert_match(/\.admin-dashboard__grid\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*minmax\(0, 1fr\);\s*row-gap:\s*1\.5rem;\s*\}/, css, "one column below the threshold")
+    assert_match(/\.admin-dashboard__main\s*\{\s*container:\s*admin-dashboard-main\s*\/\s*inline-size;/, css)
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the dashboard's rail"
+    grid = docked.first[/\.admin-dashboard__grid\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked block lays out .admin-dashboard__grid"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/justify-content:\s*start;/, grid, "left-aligned: spare width falls right of the rail")
+    rail = docked.first[/\.admin-dashboard__rail\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds .admin-dashboard__rail"
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\)].each do |declaration|
+      assert_match(/#{declaration};/, rail)
+    end
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-dashboard") }, "no window media query lays out the dashboard"
+    sources = [ "app/views/admin/dashboard/show.html.erb", *Dir[Rails.root.join("app/components/admin/dashboard_screen/*").to_s] ]
+    assert_empty sources.select { |path| Rails.root.join(path).read.include?("auto-fit") }, "the dashboard's columns are counted, never auto-fit"
+    assert_no_match(/auto-fit/, css)
+  end
+
+  # A container query cannot read a custom property, so the threshold is a
+  # number written in two places; this holds them to one.
+  test "the editors' rail and the dashboard's dock at one threshold" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    editor = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten.uniq
+    dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)\s*\{[^@]*\.admin-dashboard__grid\s*\{/).flatten.uniq
+    assert_equal 1, editor.size, "the editor docks at one width: #{editor.inspect}"
+    assert_equal 1, dashboard.size, "the dashboard docks at one width: #{dashboard.inspect}"
+    assert_equal editor, dashboard
   end
 
   # The buttons are tokens only. A Tailwind palette

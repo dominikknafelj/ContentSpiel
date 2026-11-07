@@ -25,6 +25,8 @@ class Admin::DashboardScreen::DraftTileComponentTest < ViewComponent::TestCase
     verb_id = page.find("span.admin-row-verb")[:id]
     assert_predicate verb_id, :present?
     assert_equal verb_id, page.find("a.admin-draft-tile__link")["aria-describedby"]
+    assert_equal "true", page.find("span.admin-row-verb")["aria-hidden"], "the verb is read once, as the link's description"
+    assert_nil page.find("a.admin-draft-tile__link")["aria-labelledby"], "the tile's link is named by its title"
     assert_includes page.find("article")[:class], "hover:shadow-2"
 
     draft = create_page(title: "About", published: false)

@@ -74,6 +74,23 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
     assert_no_text "Review and publish…"
   end
 
+  # Each is read once (`OneLink`): the link is named by its title and the
+  # reasons and described by the verb, and the marks beside it are hidden.
+  test "a row's link is named by its title and its reasons and described by its verb, which are hidden beside it" do
+    page = create_page(title: "Pricing")
+    link = "waiting-row-page-#{page.id}"
+
+    render_inline Admin::DashboardScreen::WaitingRowComponent.new(row: both_row(page, publisher: false))
+    assert_selector "a##{link}[aria-labelledby='#{link} #{link}-count #{link}-unpublished'][aria-describedby=#{link}-verb]"
+    assert_selector "##{link}-count[aria-hidden=true][aria-label='2 open notes']"
+    assert_selector "##{link}-unpublished[aria-hidden=true] [data-unpublished-changes]"
+    assert_selector "##{link}-verb.admin-row-verb[aria-hidden=true]", exact_text: "Open thread"
+
+    render_inline Admin::DashboardScreen::WaitingRowComponent.new(row: both_row(page, publisher: true))
+    assert_selector "a##{link}[aria-labelledby='#{link} #{link}-count #{link}-unpublished']:not([aria-describedby])"
+    assert_no_selector "a[href*='review=publish'][aria-hidden]"
+  end
+
   test "an unpublished row the viewer may not publish ends in Open, describing its title link" do
     post = create_post(title: "Hello")
 

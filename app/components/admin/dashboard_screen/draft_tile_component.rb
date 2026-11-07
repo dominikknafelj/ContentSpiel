@@ -9,16 +9,18 @@ module Admin
     # The tile presses as one: its title is a link whose `::after` is
     # stretched over the tile (`.admin-draft-tile__link`), so a press on the
     # excerpt opens the draft too. "Continue" is words, not a second link:
-    # it describes the title's link (`aria-describedby`) and, like every
-    # closing verb of a row, is dim at rest and accent only while the tile is
-    # pointed at or focused, because accent at rest means "unread and
-    # addressed to you".
+    # it describes the title's link and is read only as that (`OneLink`),
+    # and, like every closing verb of a row, it is dim at rest and accent
+    # only while the tile is pointed at or focused, because accent at rest
+    # means "unread and addressed to you".
     #
     # The excerpt is the record's plain text, escaped like any other string.
     # Everything is read from the record `Dashboard::Feed#drafts` loaded (the
     # title and excerpt are jsonb columns, a type's label comes from the
     # in-memory `ContentTypes` registry), so a tile costs no statement.
     class DraftTileComponent < Admin::AdminComponent
+      include OneLink
+
       def initialize(record:)
         @record = record
       end
