@@ -1,13 +1,12 @@
 <%# CS Studio's start page: one-row quick create, the panels in a grid of
-    at most three columns (`.admin-dashboard-cards`), each at most 5 rows and
-    a "→" to the fuller list, then "What changed recently". Each panel is an
+    at most three columns (`.admin-dashboard-cards`), each at most 5 rows,
+    then "What changed recently". Each panel is an
     `Admin::DashboardScreen::PanelComponent` headed by its job, with one line
     under the heading, its head tinted by its kind: action (something waits
     on the viewer), shortcuts (a way back into work) or information. Every
-    list comes from `Dashboard::Feed` / `Dashboard::Activity` /
-    `Dashboard::TranslationNeeds`, already read-scoped and loaded in a
-    constant number of queries; the components only render what they return.
-    A user who can read nothing simply gets empty panels.
+    list comes from a `Dashboard::` query, already read-scoped and loaded in
+    a constant number of queries; the components only render what they
+    return. A user who can read nothing simply gets empty panels.
 
     No `content_for :tree` here: the dashboard isn't a Pages screen, so the
     layout's grid collapses to its two-column form, same as every other
@@ -34,12 +33,14 @@
 <% arrow = tag.span("→", aria: { hidden: true }) %>
 
 <div class="admin-dashboard-cards">
-  <%# Notes: what was addressed to the viewer, and where threads are open.
-      Each is a frame of its own that its own GET answers again
-      (`Admin::NoteInboxController`). The unread number is the
-      sidebar's (`notes_badge_count`): asked once for both. %>
+  <%# Two frames, each answered again by its own GET when a live note
+      arrives: Notes for you, what was addressed to the viewer
+      (`Admin::NoteInboxController#card`; its unread number is the sidebar's,
+      `notes_badge_count`, asked once for both), and Waiting for you, the
+      records with open threads or unpublished changes
+      (`Admin::DashboardController#waiting`). %>
   <%= render "admin/note_inbox/card", rows: Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale).rows, unread: notes_badge_count %>
-  <%= render "admin/note_inbox/open_threads", open_threads: Dashboard::OpenThreads.new(actor: Current.actor) %>
+  <%= render "admin/dashboard/waiting", waiting: Dashboard::WaitingForYou.new(actor: Current.actor) %>
 
   <%= render Admin::DashboardScreen::PanelComponent.new(kind: :shortcuts, title: t(".drafts.title"), line: t(".drafts.line"), id: "dashboard-drafts",
         empty: t(".drafts.empty"), link: posts_list.call("drafts", t(".drafts.all"))) do |card| %>
@@ -64,17 +65,6 @@
     <% end %>
     <% going_live.each do |record| %>
       <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :going_live, mine: @feed.mine?(record)) } %>
-    <% end %>
-  <% end %>
-
-  <%# Published and scheduled records whose rows moved on from what the site
-      shows (`Dashboard::Feed#unpublished_changes`): an action panel, since
-      they wait on someone to publish them. Its rows are the drafts' (title,
-      type, "edited 2h ago"). %>
-  <%= render Admin::DashboardScreen::PanelComponent.new(kind: :action, title: t(".unpublished_changes.title"), line: t(".unpublished_changes.line"),
-        id: "dashboard-unpublished-changes", empty: t(".unpublished_changes.empty")) do |card| %>
-    <% @feed.unpublished_changes.each do |record| %>
-      <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :draft) } %>
     <% end %>
   <% end %>
 

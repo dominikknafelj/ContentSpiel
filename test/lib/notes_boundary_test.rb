@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The content side does not know notes (notes spec §3.7, plan Global
-# Constraints). A page, a post, a block and a library image are written and
+# The content side does not know notes. A page, a post, a block and a library image are written and
 # read without a thought for the threads on them: no `touch`, no count column,
 # no association. Notes point at content, never the other way, so the feature
 # can be changed or pushed live without re-reading the content services.
@@ -131,8 +130,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     %w[app/components/admin/editor_screen/block_tile_component.rb app/components/admin/editor_screen/block_tile_component.html.erb
        app/components/admin/editor_screen/section_card_component.html.erb] =>
       "the section tile's Add note menu item: a slot with the block card's, when a second feature puts an item into a block's menu (the marker is in the slot editor.block.markers)",
-    %w[app/components/admin/dashboard_screen/panel_component.rb] =>
-      "the dashboard's notes cards: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
+    %w[app/components/admin/dashboard_screen/panel_component.rb app/components/admin/dashboard_screen/waiting_row_component.html.erb] =>
+      "the dashboard's notes cards and Waiting for you's open-thread pill: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
     %w[app/components/admin/shell/sidebar_component.html.erb] =>
       "the sign-out form, which has the inbox drop the unsent drafts as the document goes: a slot when a second feature acts on signing out (the badge is a registered module's)",
     %w[app/components/admin/mind_graph_screen/legend_component.rb app/components/admin/mind_graph_screen/legend_component.html.erb] =>

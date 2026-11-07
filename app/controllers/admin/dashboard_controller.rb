@@ -1,20 +1,29 @@
 module Admin
-  # CS Studio's start page (dashboard spec §3-§4, design pass round 2): quick
-  # create, the cards "Your drafts", "Going live next" and "Needs
-  # translation", and "Recent activity". Open to every signed-in user -- its own
-  # module (`StudioModules`' `:dashboard`) has `permission: nil`, so a
-  # user whose groups hold no grants at all (nothing to read, nothing to
-  # write) still lands here instead of a 403 the moment they sign in; each
-  # list it shows is read-scoped (`Dashboard::Feed`, through
-  # `AccessControl.scope`), so it simply comes back empty for them, the
-  # same way every other admin list already does, and quick create shows
-  # only what they can do (`Admin::DashboardScreen::QuickCreateComponent`).
+  # CS Studio's start page. Open to every signed-in user: its module
+  # (`StudioModules`' `:dashboard`) has `permission: nil`, so a user whose
+  # groups hold no grants at all still lands here instead of a 403 the
+  # moment they sign in. Each list it shows is read-scoped (`Dashboard::Feed`,
+  # `Dashboard::WaitingForYou`, through `AccessControl.scope` and
+  # `Notes.readable_threads`), so it simply comes back empty for them, the
+  # same way every other admin list does, and quick create shows only what
+  # they can do (`Admin::DashboardScreen::QuickCreateComponent`).
   class DashboardController < BaseController
     def show
       load_dashboard
     end
 
-    # Quick draft (dashboard spec §4.1): a title and a content type, saved
+    # Waiting for you, answered again by itself: what its filter's links and
+    # a live note (`admin--notes--inbox`) fetch into
+    # `turbo-frame#dashboard-waiting`. The partial alone, no layout, so the
+    # answer pays nothing for the sidebar. Its address is the frame's and
+    # never a page: any other request goes to the dashboard.
+    def waiting
+      return redirect_to(admin_root_path(**admin_url_options), status: :see_other) unless turbo_frame_request_id == Admin::DashboardScreen::WaitingPanelComponent::FRAME
+
+      render partial: "admin/dashboard/waiting", locals: { waiting: Dashboard::WaitingForYou.new(actor: Current.actor, filter: params[:filter].to_s) }
+    end
+
+    # Quick draft: a title and a content type, saved
     # through `Posts::Save` as an unpublished post -- the title in the
     # site's default language, whatever language is being edited, since a
     # quick draft is the start of a post, not a translation of one -- and
@@ -50,7 +59,7 @@ module Admin
     # constant number of queries.
     def load_dashboard
       # Only a holder of settings.manage can fix mail, so only they are told
-      # (spec "The states"; the notice draws itself only while the last send failed).
+      # (the notice draws itself only while the last send failed).
       @mail_settings = MailSettings.current if can?("settings.manage")
       @feed = Dashboard::Feed.new(actor: Current.actor)
       @activity = Dashboard::Activity.new(actor: Current.actor)

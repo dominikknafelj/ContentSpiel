@@ -1,7 +1,7 @@
 require "test_helper"
 
 class Admin::DashboardScreen::PanelComponentTest < ViewComponent::TestCase
-  def panel(kind: :action, title: "Your drafts", line: "Your drafts, the latest first.", id: "d", empty: "None", **options, &block)
+  def panel(kind: :action, title: "Pick up where you left off", line: "Your drafts, the latest first.", id: "d", empty: "None", **options, &block)
     render_inline(Admin::DashboardScreen::PanelComponent.new(kind:, title:, line:, id:, empty:, **options), &block)
   end
 
@@ -51,21 +51,21 @@ class Admin::DashboardScreen::PanelComponentTest < ViewComponent::TestCase
       card.with_empty_action { '<a href="#x">Start a draft</a>'.html_safe }
     end
 
-    assert_selector "section > header + p[data-card-empty].px-4.text-sm.text-dim", text: /\ANo drafts\.\s+Start a draft\z/
-    assert_selector "p[data-card-empty] a[href='#x']", text: "Start a draft"
+    assert_selector "section > header + p[data-panel-empty].px-4.text-sm.text-dim", text: /\ANo drafts\.\s+Start a draft\z/
+    assert_selector "p[data-panel-empty] a[href='#x']", text: "Start a draft"
     assert_no_selector ".admin-empty-state, h3, ul"
   end
 
   test "an empty panel without an action says its line alone, and a panel with rows draws neither" do
     panel(kind: :information, title: "Publishing on its own", empty: "Nothing scheduled.")
-    assert_selector "p[data-card-empty]", exact_text: "Nothing scheduled."
+    assert_selector "p[data-panel-empty]", exact_text: "Nothing scheduled."
     assert_no_selector "a"
 
     panel(empty: "No drafts.") do |card|
       card.with_row { "A row" }
       card.with_empty_action { '<a href="#x">Start a draft</a>'.html_safe }
     end
-    assert_no_selector "p[data-card-empty]"
+    assert_no_selector "p[data-panel-empty]"
     assert_no_text "Start a draft"
   end
 

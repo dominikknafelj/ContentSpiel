@@ -357,26 +357,27 @@ Rails.application.routes.draw do
     # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
-    # A person's own inbox (notes spec §5): the full list, "Mark all read",
-    # and the three parts a page shows of it, each with its own GET so a tab
-    # can fetch that part again by itself (`turbo-frame#notes-for-you`,
-    # `turbo-frame#notes-open-threads`, the sidebar's `#sidebar-badge-dashboard`).
-    # None of these words can be taken for a record's notes below: that scope
-    # needs `page`, `post` or `media` and an id.
+    # A person's own inbox, five answers: the full list, "Mark all read",
+    # Notes for you as its frame (`turbo-frame#notes-for-you`), the sidebar's
+    # number (`#sidebar-badge-dashboard`) as JSON, each fetched again by
+    # itself, and one delivery as data. None of these words can be taken for
+    # a record's notes below: that scope needs `page`, `post` or `media` and
+    # an id.
     get "notes", to: "note_inbox#index", as: :notes
     post "notes/read", to: "note_inbox#read", as: :read_notes
     get "notes/card", to: "note_inbox#card", as: :notes_card
-    get "notes/open_threads", to: "note_inbox#open_threads", as: :open_note_threads
     get "notes/unread", to: "note_inbox#unread", as: :unread_notes, defaults: { format: :json }
-    # One delivery of the viewer's own, as data (notes spec §6.1, §6.4): what
-    # a tab asks for when a signal names its id, before it says anything.
+    # One delivery of the viewer's own, as data: what a tab asks for when a
+    # signal names its id, before it says anything.
     get "notes/deliveries/:id", to: "note_inbox#delivery", as: :note_delivery, constraints: { id: /\d+/ }, defaults: { format: :json }
 
-    # The dashboard is CS Studio's home (dashboard spec §3-§4):
-    # quick create, "Your drafts", "Going live next", "Needs translation"
-    # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
-    # its own `/pages` (`resources :pages` above), no longer at the root.
+    # The dashboard is CS Studio's home, open to every signed-in user. The
+    # Pages module -- the tree and its own editor -- is at `/pages`
+    # (`resources :pages` above). Waiting for you is the one part of it
+    # fetched again by itself, as a frame (`turbo-frame#dashboard-waiting`,
+    # `?filter=everything|threads|unpublished`).
     root to: "dashboard#show"
+    get "dashboard/waiting", to: "dashboard#waiting", as: :dashboard_waiting
     # Presence (presence spec §5): who else has a record open, and which of a
     # list's records have someone here. Two reads, both through the read
     # scope; the writes are a channel's (`Presence::Channel`). `here` comes
@@ -456,7 +457,7 @@ Rails.application.routes.draw do
         constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
     end
 
-    # Quick draft (dashboard spec §4.1): a title and a content type, saved
+    # Quick draft: a title and a content type, saved
     # through `Posts::Save` as an unpublished post, then opened in the
     # post editor.
     post "dashboard/draft", to: "dashboard#create_draft", as: :dashboard_draft

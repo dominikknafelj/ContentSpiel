@@ -442,8 +442,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-drafts] a", text: "Gone draft", count: 0
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Gone post", count: 0
-    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
-    assert_select "section[aria-labelledby=dashboard-unpublished-changes] a", text: "Gone post", count: 0
+    assert_select "turbo-frame#dashboard-waiting a.admin-waiting-row__link[href=?]", "/cs-studio/posts/#{@kept_post.id}"
+    assert_select "turbo-frame#dashboard-waiting a", text: "Gone post", count: 0
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
@@ -1221,10 +1221,10 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # The inbox (notes spec §5): "Notes for you", its full list, "Open threads"
-  # and the sidebar's unread count all narrow through `Notes.readable_threads`.
+  # "Notes for you", its full list, Waiting for you's open threads and the
+  # sidebar's unread count all narrow through `Notes.readable_threads`.
   # Trashed AFTER the note was written, as in life.
-  test "the inbox, Open threads and the sidebar's count show notes on kept records and never on trashed ones" do
+  test "the inbox, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
     kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
     gone = [ create_page(title: "Later gone"), create_post(title: "Later gone post"), create_media_asset ].map { |subject| [ subject, create_note_for_reader(subject) ] }
     gone.each { |subject, _thread| subject.update!(trashed_at: Time.current) }
@@ -1232,8 +1232,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get admin_root_path
     assert_select "turbo-frame#notes-for-you [data-delivery]", count: 3
-    assert_select "turbo-frame#notes-open-threads li", count: 3
-    assert_select "turbo-frame#notes-open-threads [data-notes-total]", text: "3"
+    assert_select "turbo-frame#dashboard-waiting .admin-waiting-row .admin-notes-marker", count: 3
     assert_select "#sidebar-badge-dashboard", text: "3"
     assert_no_match "Later gone", response.body
     get admin_notes_path
@@ -1275,7 +1274,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get admin_root_path
     assert_select "turbo-frame#notes-for-you [data-delivery]", count: 0
-    assert_select "turbo-frame#notes-open-threads li", count: 0
+    assert_select "turbo-frame#dashboard-waiting .admin-notes-marker", count: 0
     assert_select "#sidebar-badge-dashboard[hidden]"
     assert_no_match "Comes back", response.body
     get admin_notes_path
@@ -1289,7 +1288,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get admin_root_path
     assert_select "turbo-frame#notes-for-you [data-delivery][data-unread]", count: 3
-    assert_select "turbo-frame#notes-open-threads li", count: 3
+    assert_select "turbo-frame#dashboard-waiting .admin-waiting-row .admin-notes-marker", count: 3
     assert_select "#sidebar-badge-dashboard:not([hidden])", text: "3"
     get admin_notes_path
     assert_select "[data-delivery][data-unread]", count: 3

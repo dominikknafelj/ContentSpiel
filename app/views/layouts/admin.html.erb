@@ -84,7 +84,7 @@
       `data-messages` reads these. %>
   <body data-controller="admin--ui--dialog admin--shell--drawer admin--shell--command-palette admin--shell--fragment-links admin--shell--file-drop-guard admin--notes--drawer admin--notes--live admin--notes--inbox admin--notes--alert" data-admin--shell--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-admin--notes--inbox-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes--inbox-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
-        data-admin--notes--inbox-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
+        data-admin--notes--inbox-waiting-url-value="<%= admin_dashboard_waiting_path(**admin_url_options) %>"
         data-admin--notes--inbox-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes--inbox-person-value="<%= Current.user&.id %>"
         data-admin--notes--alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes--alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes--alert-person-value="<%= Current.user&.id %>"

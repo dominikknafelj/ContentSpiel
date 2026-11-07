@@ -1,0 +1,11 @@
+<%= tag.turbo_frame id: FRAME, class: "contents" do %>
+  <%= render Admin::DashboardScreen::PanelComponent.new(kind: :action, title: t(".title"), line: t(".line"), id: "dashboard-waiting-title",
+        empty: t(".empty.#{filter}")) do |panel| %>
+    <% panel.with_action do %>
+      <%= render Admin::Ui::TabLinksComponent.new(tabs:, label: t(".filter_label"), link_data: { turbo_frame: FRAME }) %>
+    <% end %>
+    <% waiting.rows.each do |row| %>
+      <% panel.with_row { render Admin::DashboardScreen::WaitingRowComponent.new(row:) } %>
+    <% end %>
+  <% end %>
+<% end %>

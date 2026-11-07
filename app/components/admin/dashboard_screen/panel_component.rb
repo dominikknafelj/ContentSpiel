@@ -31,9 +31,9 @@ module Admin
     # `empty_action` slot is drawn after that line, only while the panel has
     # no rows.
     #
-    # Two optional slots in the head, filled by the notes panels (Notes for
-    # you, Open threads): `badge` stands beside the heading (a count: "3 new",
-    # a total) and `action` before the "→" ("Mark all read"). `footer` is a
+    # Two optional slots in the head: `badge` stands beside the heading (Notes
+    # for you's "3 new") and `action` before the "→" (Notes for you's "Mark
+    # all read", Waiting for you's filter). `footer` is a
     # line under the rows, for a panel whose way to the fuller list is said in
     # words there ("All notes for you →") instead of by the head's arrow; a
     # panel passes one or the other.

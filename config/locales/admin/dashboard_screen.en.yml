@@ -1,7 +1,7 @@
 # CS Studio's dashboard components, `app/components/admin/dashboard_screen/` (docs/reference/i18n.md).
 # Keys are `admin.components.dashboard_screen.<class name without Admin:: and Component, underscored>`.
 # `PanelComponent` has none: its heading and line are its caller's
-# (`admin.dashboard.show.*`, `admin.note_inbox.*`).
+# (`admin.dashboard.show.*`, `admin.note_inbox.*`, `waiting_panel.*`).
 # YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
 # glyph that opens a YAML token (a bullet, `·`) is double-quoted.
 en:
@@ -33,8 +33,40 @@ en:
           # a link to its editor in that language.
           outdated_item_html: "Outdated: %{link}"
           untitled: "(untitled)"
-        # `Admin::DashboardScreen::RowComponent`, a page or post in the drafts,
-        # the scheduled and the unpublished-changes panels.
+        # `Admin::DashboardScreen::WaitingPanelComponent`, "Waiting for you",
+        # an action panel.
+        waiting_panel:
+          title: "Waiting for you"
+          line: "Open threads and changes that are not on the site yet."
+          # The filter's name for a screen reader, and its three links.
+          filter_label: "Show"
+          filters:
+            everything: "Everything"
+            threads: "Open threads"
+            unpublished: "Unpublished changes"
+          # The empty line, per filter.
+          empty:
+            everything: "Nothing is waiting for you."
+            threads: "No open threads."
+            unpublished: "No unpublished changes."
+        # `Admin::DashboardScreen::WaitingRowComponent`, one row of Waiting for you.
+        waiting_row:
+          untitled: "(untitled)"
+          # The record's kind on the meta line, where a post shows its content type.
+          kind:
+            page: "Page"
+            media: "Image"
+          # The open-thread count's name, for a screen reader.
+          open:
+            one: "%{count} open note"
+            other: "%{count} open notes"
+          # The verb a row ends in: a link of its own for someone who may
+          # publish, otherwise words that describe the row's one link.
+          review: "Review and publish…"
+          open_thread: "Open thread"
+          open_record: "Open"
+        # `Admin::DashboardScreen::RowComponent`, a page or post in the drafts
+        # and the scheduled panels.
         row:
           # `%{time}` is a `<time>` with a relative phrase ("2h ago").
           edited_html: "edited %{time}"

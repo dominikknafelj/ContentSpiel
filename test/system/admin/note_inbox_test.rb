@@ -1,7 +1,8 @@
 require "application_system_test_case"
 
-# The inbox in a browser (notes spec §5): the dashboard's two cards, the full
-# list and the sidebar's count, and where their rows lead.
+# The inbox in a browser: Notes for you and Waiting for you on the dashboard,
+# the full list and the sidebar's count, where their rows lead, and what a
+# live note fetches again.
 class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -100,20 +101,25 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_selector "turbo-frame#notes-for-you footer a", text: "All notes for you →"
   end
 
-  test "Open threads lists a record once with its count in the neutral pill and opens its notes" do
+  test "Waiting for you lists a record once with its count in the neutral pill, and the whole row opens its notes" do
     mention(@page)
     mention(@block)
     open_dashboard
 
-    within "turbo-frame#notes-open-threads" do
+    within "turbo-frame#dashboard-waiting" do
       assert_selector "li", count: 1
       assert_selector "li .admin-notes-marker[data-has-notes]:not([data-unread])", text: "2"
-      # The whole row is the link: as wide as the card, and it holds the pill.
-      widths = page.evaluate_script("[ 'section', 'li > a' ].map((selector) => document.querySelector('turbo-frame#notes-open-threads ' + selector).getBoundingClientRect().width)")
+      assert_selector "li .admin-waiting-row", text: /Page · Dana · /
+      assert_selector "li .admin-row-verb", text: "Open thread"
+      # The title's link is stretched over the row: as wide as the panel.
+      widths = page.evaluate_script(<<~JS)
+        [ "section", ".admin-waiting-row" ].map((selector) => document.querySelector("turbo-frame#dashboard-waiting " + selector).getBoundingClientRect().width)
+          .concat([ (() => { const link = document.querySelector("turbo-frame#dashboard-waiting .admin-waiting-row__link"); return parseFloat(getComputedStyle(link, "::after").width) })() ])
+      JS
       assert_in_delta widths[0], widths[1], 2
-      assert_selector "li > a .admin-notes-marker"
-      assert_selector "li > a", text: /Page · Dana · /
-      find("li > a").click
+      assert_in_delta widths[1], widths[2], 2
+      # The row presses as one: a press on it lands on the title's link.
+      find("li .admin-waiting-row").click
     end
 
     # As above: a visit, then the drawer's frame.
@@ -121,11 +127,49 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list a[data-note-row]", count: 2, wait: 8
   end
 
+  test "a filter chosen in Waiting for you survives a live reload of the panel" do
+    first = create_post(title: "First change")
+    first.update_columns(unpublished_changes_at: Time.current)
+    mention(@page, "Earlier, @[#{@me.id}]")
+    open_dashboard
+    await_notes_live
+
+    within("turbo-frame#dashboard-waiting") { press "Unpublished changes" }
+    within "turbo-frame#dashboard-waiting" do
+      assert_selector "nav a[aria-current=page]", text: "Unpublished changes"
+      assert_selector ".admin-waiting-row", count: 1, text: "First change"
+    end
+
+    # Nothing signals this one: only the reload the mention causes shows it.
+    create_post(title: "Second change").update_columns(unpublished_changes_at: Time.current)
+    mention(@block)
+
+    assert_selector "turbo-frame#notes-for-you [data-delivery]", count: 2, wait: 8
+    within "turbo-frame#dashboard-waiting" do
+      assert_selector ".admin-waiting-row", text: "Second change", wait: 8
+      assert_selector "nav a[aria-current=page]", text: "Unpublished changes"
+      assert_selector ".admin-waiting-row", count: 2
+      assert_no_selector ".admin-notes-marker"
+    end
+  end
+
+  test "a live note on a screen without the dashboard fetches no panel" do
+    visit_screen admin_posts_path
+    await_notes_live
+
+    mention(@page)
+
+    assert_selector "#sidebar-badge-dashboard", text: "1", wait: 8
+    fetched = page.evaluate_script("performance.getEntriesByType('resource').map((entry) => entry.name)")
+    assert fetched.any? { |name| name.include?("/notes/unread") }, "the count was fetched"
+    assert_empty fetched.grep(%r{dashboard/waiting|notes/card})
+  end
+
   test "All notes for you is the same rows as a page, and its Mark all read stays there" do
     thread = mention(@page)
     open_dashboard
 
-    # The footer's link, in words (the handoff's footer), not the header's arrow.
+    # The footer's link, in words, not the head's arrow.
     within("turbo-frame#notes-for-you footer") { click_link "All notes for you" }
 
     assert_current_path "/cs-studio/notes"

@@ -1,9 +1,8 @@
 module Admin
   module Ui
-    # A content type's colour mark plus its name (design pass spec §4, handoff
-    # §9 B13). Six hues: indexes 1-6 are filled dots, 7-12 the same hues as
-    # rings, 13+ cycle again -- and the name always accompanies the mark, so
-    # colour is never the only cue. The class names are spelled out in full
+    # A content type's colour mark plus its name. Six hues: indexes 1-6 are
+    # filled dots, 7-12 the same hues as rings, 13+ cycle again -- and the
+    # name always accompanies the mark, so colour is never the only cue. The class names are spelled out in full
     # (not interpolated) so Tailwind's scanner sees them.
     class ContentTypeDotComponent < AdminComponent
       FILLED = %w[bg-cat-1 bg-cat-2 bg-cat-3 bg-cat-4 bg-cat-5 bg-cat-6].freeze
@@ -29,7 +28,7 @@ module Admin
       # An unregistered type (a plugin that was removed) has no index: a
       # neutral ring and the raw stored name, never an error. Public, with
       # `label`: a row that draws the mark at its own size beside other words
-      # (the dashboard's Open threads) asks for the two and draws them itself.
+      # (the dashboard's Waiting for you) asks for the two and draws them itself.
       def mark = @definition ? mark_class(@definition.colour_index) : "border border-meta"
 
       def label = @definition ? @definition.label : @name

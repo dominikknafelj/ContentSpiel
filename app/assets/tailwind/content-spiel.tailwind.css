@@ -613,8 +613,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
    window's (the sidebar and the tree take room the window does not
    show), and never more than three: a wider window widens the cards and adds
-   no fourth, so no `auto-fit`. `turbo-frame.contents` keeps the two notes
-   panels, each a frame of its own, grid items. */
+   no fourth, so no `auto-fit`. `turbo-frame.contents` keeps Notes for you
+   and Waiting for you, each a frame of its own, grid items. */
 .admin-dashboard { container: admin-dashboard / inline-size; }
 .admin-dashboard-cards { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
 @container admin-dashboard (min-width: 40rem) {
@@ -634,9 +634,26 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-dashboard-panel { display: flex; flex-direction: column; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
 .admin-dashboard-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }
 .admin-dashboard-panel__line { margin-top: 0.125rem; }
+/* A head whose action is wider than the room beside the heading (Waiting
+   for you's filter in a narrow column) puts the action under the heading
+   rather than crushing it. */
+.admin-dashboard-panel__head { flex-wrap: wrap; }
+.admin-dashboard-panel__head > :first-child { flex: 1 1 12rem; }
 .admin-dashboard-panel--action .admin-dashboard-panel__head { background: var(--cs-head-action); color: var(--cs-head-action-ink); }
 .admin-dashboard-panel--shortcuts .admin-dashboard-panel__head { background: var(--cs-head-cool); color: var(--cs-head-cool-ink); }
 .admin-dashboard-panel--information .admin-dashboard-panel__head { background: var(--cs-head-warm); color: var(--cs-head-warm-ink); }
+/* A row of Waiting for you (`Admin::DashboardScreen::WaitingRowComponent`):
+   the title and its meta line, then the count, the chip and the verb. The
+   row presses as one: the title link's `::after` covers the row, and the
+   focus ring is drawn on it, inside the row. "Review and publish…" is raised
+   over it (`relative z-10`), the one second link a row may have. */
+.admin-waiting-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
+.admin-waiting-row__link::after { content: ""; position: absolute; inset: 0; }
+.admin-waiting-row__link:focus-visible { outline: none; }
+.admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* The verb an action row ends in when it is words and not a link of its
+   own: accent words that describe the row's one link. */
+.admin-row-verb { color: var(--cs-accent); font-size: var(--cs-t-small); white-space: nowrap; }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
    window's: a folded tree changes it while the

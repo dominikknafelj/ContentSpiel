@@ -17,7 +17,7 @@
     <% end %>
   </header>
   <% if rows.empty? %>
-    <p class="px-4 py-2.5 text-sm text-dim" data-card-empty><%= empty %><% if empty_action? %> <%= empty_action %><% end %></p>
+    <p class="px-4 py-2.5 text-sm text-dim" data-panel-empty><%= empty %><% if empty_action? %> <%= empty_action %><% end %></p>
   <% else %>
     <ul class="px-4">
       <% visible_rows.each do |row| %>

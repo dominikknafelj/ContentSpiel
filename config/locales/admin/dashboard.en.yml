@@ -24,10 +24,6 @@ en:
           all: "All scheduled posts"
         # Published and scheduled pages and posts whose rows have moved on
         # from what the site shows.
-        unpublished_changes:
-          title: "Unpublished changes"
-          line: "Live pages and posts with changes not yet on the site."
-          empty: "No unpublished changes."
         activity:
           title: "What changed recently"
           line: "The latest changes to pages, posts and images."

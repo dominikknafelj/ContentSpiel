@@ -1,10 +1,9 @@
 require "application_system_test_case"
 
-# The dashboard is CS Studio's start page (dashboard spec §2-§4): sign-in
-# lands here, a quick draft shows up under "Your drafts" immediately, and
-# once it's scheduled it shows up under "Going live next" at its go-live time
-# -- rendered in the site's time zone, not UTC (spec §5), which is the
-# other half of this sub-project.
+# The dashboard in a browser: sign-in lands here, a quick draft shows up in
+# "Pick up where you left off" at once, and once it is scheduled it shows up
+# in "Publishing on its own" at its go-live time, in the site's time zone,
+# not UTC.
 class Admin::DashboardSystemTest < ApplicationSystemTestCase
   test "land on the dashboard, quick-draft a post, schedule it and see it go live next in local time" do
     site_settings(:default).update!(time_zone: "Europe/Berlin")
@@ -81,9 +80,9 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # The cards' grid (layout points spec, C and decision 13): three columns at
-  # most, by the dashboard's own width. Six cards (two languages, so "Needs
-  # translation" is drawn) make the 3x2 the design asked for.
+  # The panels' grid: three columns at most, by the dashboard's own width.
+  # Five panels (two languages, so "Languages behind" is drawn) stand in two
+  # rows of three columns.
   def card_grid
     page.evaluate_script(<<~JS)
       (() => {
@@ -95,25 +94,25 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  test "the cards stand three in a row at 1600px and at 1400px, two rows of three, and one in a row at 600px" do
+  test "the panels stand three in a row at 1600px and at 1400px, in two rows, and one in a row at 600px" do
     with_locales(%w[en de], default: "en")
     create_post(title: "Untranslated")
     sign_in_via_form(users(:one))
     begin
-      [ [ 1600, 3, 2 ], [ 1400, 3, 2 ], [ 600, 1, 6 ] ].each do |width, columns, rows|
+      [ [ 1600, 3, 2 ], [ 1400, 3, 2 ], [ 600, 1, 5 ] ].each do |width, columns, rows|
         page.driver.resize(width, 1000)
         visit admin_root_path
         await_admin_controllers
-        assert_equal({ "columns" => columns, "cards" => 6, "rows" => rows }, card_grid, "at #{width}px")
+        assert_equal({ "columns" => columns, "cards" => 5, "rows" => rows }, card_grid, "at #{width}px")
       end
     ensure
       page.driver.resize(1400, 1400)
     end
   end
 
-  # O6: "Start a draft" takes the person to the quick-create row: the focus
+  # "Start a draft" takes the person to the quick-create row: the focus
   # moves to its title, ready to type (a fragment alone would only scroll).
-  test "Start a draft in an empty Your drafts moves the focus to the quick-create title" do
+  test "Start a draft in an empty Pick up where you left off moves the focus to the quick-create title" do
     sign_in_via_form(users(:one))
     visit admin_root_path
     await_admin_controllers

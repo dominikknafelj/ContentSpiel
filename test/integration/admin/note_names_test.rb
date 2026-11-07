@@ -62,12 +62,12 @@ class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
     assert_equal "Ready now, @[#{users(:reader).id}]? Ask @[#{users(:one).id}]", @note.reload.body
   end
 
-  test "the inbox sentence, its excerpt, the toast's delivery and Open threads name the person by the short name" do
+  test "the inbox sentence, its excerpt, the toast's delivery and Waiting for you name the person by the short name" do
     get "/cs-studio"
 
     assert_select "turbo-frame#notes-for-you [data-inbox-sentence]", text: "two mentioned you"
     assert_select "turbo-frame#notes-for-you [data-inbox-excerpt]", text: /Ready, @reader\? Ask @one/
-    assert_select "turbo-frame#notes-open-threads a[data-open-thread-row]", text: /Page · two · /
+    assert_select "turbo-frame#dashboard-waiting .admin-waiting-row", text: /Page · two · /
 
     delivery = Notes::Delivery.find_by!(user: users(:reader), thread: @thread)
     get "/cs-studio/notes/deliveries/#{delivery.id}", headers: { "Accept" => "application/json" }

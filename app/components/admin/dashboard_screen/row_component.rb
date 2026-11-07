@@ -1,8 +1,8 @@
 module Admin
   module DashboardScreen
-    # One record in "Pick up where you left off" (the viewer's drafts),
-    # "Publishing on its own" (what is scheduled) or "Unpublished changes":
-    # a page or post linked to its editor.
+    # One record in "Pick up where you left off" (the viewer's drafts) or
+    # "Publishing on its own" (what is scheduled): a page or post linked to
+    # its editor.
     #
     # * `variant: :draft` -- the title, the content-type dot (a page says
     #   "Page") and "edited 2h ago" (the record's `updated_at`).

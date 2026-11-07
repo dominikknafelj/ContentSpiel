@@ -143,6 +143,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/dashboard_screen/row_component.html.erb
     app/components/admin/dashboard_screen/activity_row_component.rb
     app/components/admin/dashboard_screen/activity_row_component.html.erb
+    app/components/admin/dashboard_screen/waiting_panel_component.rb
+    app/components/admin/dashboard_screen/waiting_panel_component.html.erb
+    app/components/admin/dashboard_screen/waiting_row_component.rb
+    app/components/admin/dashboard_screen/waiting_row_component.html.erb
     app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
@@ -323,13 +327,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/notes/permission_controller.js
     app/components/admin/notes_screen/inbox_row_component.rb
     app/components/admin/notes_screen/inbox_row_component.html.erb
-    app/components/admin/notes_screen/open_thread_row_component.rb
-    app/components/admin/notes_screen/open_thread_row_component.html.erb
     app/components/admin/notes_screen/person_name_component.rb
     app/components/admin/notes_screen/quote_component.rb
     app/views/admin/note_inbox/index.html.erb
     app/views/admin/note_inbox/_card.html.erb
-    app/views/admin/note_inbox/_open_threads.html.erb
     app/controllers/admin/note_inbox_controller.rb
   ].freeze
 
