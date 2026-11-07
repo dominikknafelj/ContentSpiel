@@ -36,7 +36,7 @@ Why two: the screens are independent for a person, and each is read against its 
 - **The rails** (spec rule 5): they dock only by the list's own container at 1200px, never by a window `@media`. Below the threshold they fold back into the page. The rail comes first in the document at every width, so the focus order is the document's and nothing is moved by script.
 - **Layers.** No rule of this stage sets a z-index. A native select and the two dialogs (`showModal()`, the top layer) need none. Anything that later raises a popover in a rail takes `--cs-z-popover` (`admin_design_rules_test`'s raw-value guard).
 - **Turbo prefetch hazard.** Turbo answers any GET of an address it prefetched in the last 10 seconds with that prefetch, a frame's `reload()` and `Turbo.visit` included. The two rails are checked against it in the decisions table. The rules that come of it are written into the reference in the tasks that need them.
-- **Comment rule (#117).** A comment states a current invariant, a hazard or a reason. It never states a plan step, a review round ("design pass round 2, Task 17", "round 3", "final review C, M7"), "spec §" or what used to be there. The posts and tags files are full of these. Every task rewrites the comments of the files it changes, and its last step before its commit runs `grep -n "spec §\|Task [0-9]\|round [0-9]\|final review\|handoff §" <the files the task changed>`, which prints nothing. The plan's wording ("what `index` does today") is never copied into a comment.
+- **Comment rule (#117).** A comment states a current invariant, a hazard or a reason. It never states a plan step, a review round ("design pass round 2, Task 17", "round 3", "final review C, M7"), "spec §" or what used to be there. The posts and tags files are full of these. Every task rewrites the comments of the files it changes, and its last step before its commit runs `grep -n "spec §\|Task [0-9]\|round [0-9]\|final review\|handoff §\|old name\|used to\|no longer" <the files the task changed>`, which prints nothing. The plan's wording ("what `index` does today") is never copied into a comment.
 - **Tests and the machine.**
   - On macOS every test command is prefixed with `PGGSSENCMODE=disable`.
   - Browser tests run only after `bin/rails tailwindcss:build`, never during a build or beside a running `bin/dev`. They run one file at a time, and only while the one-minute load (`sysctl -n vm.loadavg`, first figure) is under 6.
@@ -74,7 +74,7 @@ Why two: the screens are independent for a person, and each is read against its 
 | Tags: the choice and the address | The choice is not in the address. A reload or Back shows the list with nothing chosen. The screen carries `turbo-cache-control: no-cache`, so Back never restores a detail, or a row's `base_updated_at`, from a snapshot. **(owner)** | `?selected=` (Media's way) navigates the whole `content` frame. A frame's `src` is not the page's address, as with the dashboard's Waiting for you. |
 | Tags: the prefetch hazard | (1) The detail is never reloaded: a rename's answer replaces `#tag-detail-<id>` by stream, and a delete's answer replaces it with the empty line. (2) Details links carry `data-turbo-prefetch="false"`. The pointer rests on the link it pressed, so Turbo would prefetch it again at once, and a second press after a rename would get the old name. (3) The last delete no longer runs `Turbo.visit(location.href)`, whose address is the sidebar's Tags link's. The answer's stream draws the empty state (`replace "tags-list"`). | Each is a GET whose address equals a visible link's. |
 | Posts: the prefetch hazard | Nothing on the posts list reloads the `content` frame. `admin--presence--list` reads `presence_here_path`, another address. A filter form's GET always carries its fields (`?q=&scope=all&type=…`), so it never equals Clear's or the sidebar's bare `/posts`, nor a pager link, which carries `page`. No change. | Checked, as asked. The reference says so, so a later live reload of the list knows the rule. |
-| Tags: the rail's content | The heading (`h2`, `tabindex="-1"`, the name, `break-words`). Under it the count line (`tag_posts_label`). Then the posts: at most `DETAIL_POSTS = 8`, newest-changed first, from `Posts::List` with `tag:` the tag's name. Each is a link to the editor with its title cut by an ellipsis and its `ListStateComponent`. Then "Show all 12 posts" (`/posts?tag=<name>`, `_top`) when there are more. Then "Merge into…" (secondary) and "Delete tag…" (tertiary: quiet, since the red is the dialog's confirm). Close is `ButtonComponent` (`icon: :x`, `:tertiary`, `size: :small`). A viewer without `posts.read` gets no count and no posts, and the dialogs' neutral sentences. With nothing chosen, docked, the rail says "Choose a tag to see its posts, merge it or delete it." Below the threshold an unchosen rail takes no room. **(owner: 8 posts; Merge secondary and Delete tertiary; the empty line)** | The spec's "its posts (the posts query by tag)". The count and "Show all" are `Posts::List`'s `counts["all"]` for the same filter, so they are the list's own All count. |
+| Tags: the rail's content | The heading (`h2`, `tabindex="-1"`, the name, `break-words`). Under it the count line (`tag_posts_label`). Then the posts: at most `DETAIL_POSTS = 8`, newest-changed first, from `Posts::List` with `tag:` the tag's name. Each is a link to the editor with its title cut by an ellipsis and its `ListStateComponent`. Then "Show all 12 posts" (a plural key, `one`/`other`; `/posts?tag=<name>`, `_top`) when there are more. Then "Merge into…" (`secondary`) and "Delete tag…" (`danger_text`: design-system.md gives that variant to the trigger of a destructive action outside a dialog, as stage 2 did for "Discard changes…", and a delete takes the tag off every post with no undo). Close is `ButtonComponent` (`icon: :x`, `:tertiary`, `size: :small`). A viewer without `posts.read` gets no count and no posts, and the dialogs' neutral sentences. With nothing chosen, docked, the rail says "Choose a tag to see its posts, merge it or delete it." Below the threshold an unchosen rail takes no room. **(owner: 8 posts; the empty line)** | The spec's "its posts (the posts query by tag)". The count and "Show all" are `Posts::List`'s `counts["all"]` for the same filter, so they are the list's own All count. |
 | Tags: the rail below the threshold | The same panel, first in the document, above the table, as a card (`bg-surface shadow-1 rounded-card`). | Spec rule 5: below the threshold the rail folds back into the page. First in the document, as the posts filters are, so a choice made on a phone is seen, and focus order is document order. |
 | The usage bar | A 4px bar under the count, `bg-tag-usage` (`--cs-tag-usage: var(--cs-ic-structure)`) on a track of `--cs-paper`. Its width is the row's readable count over the largest readable count on the screen (`style="--usage: 0.42"`, `width: calc(var(--usage) * 100%)`). It is `aria-hidden`, since the count's words say it. There is no bar without `posts.read`, and the track stays empty at 0. Measured: 7.46 / 8.91:1 on the row's surface, 6.78 / 9.91:1 on the track **(owner: the light figure is above the spec's 6.2; the track)**. | The spec's 6.2 / 8.9:1 are floors. The structure hue meets them on both its neighbours, as 5a found for a tag's square. A `--cs-sunken` track (6.14:1) would miss 6.2. |
 | The tag row | The name at rest is text (today's rule); on hover it is the well, on focus the well with the 2px accent outline. It is `font-medium` at rest. The row's lines are `border-line` between rows. Columns: Name, Posts (count and bar), save status, Details **(owner)**. | The row and its input "restyled", from E4's field rule: a well is identified by its fill and edge whenever it is pressable, and the resting text look is the screen's decided rename-in-place. |
@@ -101,19 +101,21 @@ Why two: the screens are independent for a person, and each is read against its 
 
 ### Task 1: `Posts::List`, the posts list's reads out of the controller (#132)
 
-Nothing a person sees changes. The proof is that `test/integration/admin/posts_list_test.rb` and `posts_test.rb` pass unchanged.
+Nothing a person sees changes but one removal: `?status=` is no longer read. The proof is that `test/integration/admin/posts_list_test.rb` and `posts_test.rb` pass unchanged, but for the one test of that parameter.
 
 **Files:**
 - Create `app/queries/posts/list.rb`.
 - Modify `app/controllers/admin/posts_controller.rb`. `SCOPES`, `list_scope`, `base_posts`, `filtered_posts`, `page_of_posts`, `filter_by_scope`, `scope_counts`, `filter_by_translation` and `filter_by_title` move into the query, with their comments rewritten by the comment rule. `index` and `posts_list_path` ask the query. `listed_paths` stays, since it is the page's display and not the list. The class comment's filters paragraph moves to the query, and the controller keeps one line pointing to it.
 - Create `test/queries/posts/list_test.rb`.
+- Modify `test/integration/admin/posts_list_test.rb`: "the old status param still works, and scope wins when both are sent" becomes `test "the list's scope is read from scope alone"`. `?status=drafts` lists all, and `?scope=drafts` lists the drafts.
+- Modify `CHANGELOG.md`, `## Unreleased`, Removed: the posts list's `status` parameter and its `draft` spelling. `scope` (`all`, `live`, `drafts`, `scheduled`) is the list's one name for it.
 - Modify `docs/reference/editors-and-translation-pair.md`, "The posts list": its first sentence names `Posts::List` as what reads the rows and counts. This task owns that sentence. Task 4 rewrites the rest of the paragraph.
 
 **Interfaces:**
 - Produces `Posts::List`:
   - `Posts::List::SCOPES = %w[all live drafts scheduled]`.
-  - `Posts::List.new(posts, filters:, locale:)`. `posts` is the viewer's readable posts, a relation the caller has narrowed (`admin_scope(Post.all)`, which also hides the trashed). `filters` is a Hash with String keys, read from `"scope"`, `"status"` (the old name of `scope`), `"type"`, `"tag"` (a tag's stored name), `"translation"` and `"q"`. A value that is not a String is ignored, as today. `locale` is the editing language, for `q`.
-  - `#scope_name -> String`, one of `SCOPES` (`"draft"` reads as `"drafts"`, anything else as `"all"`).
+  - `Posts::List.new(posts, filters:, locale:)`. `posts` is the viewer's readable posts, a relation the caller has narrowed (`admin_scope(Post.all)`, which also hides the trashed). `filters` is a Hash with String keys, read from `"scope"`, `"type"`, `"tag"` (a tag's stored name), `"translation"` and `"q"`. A value that is not a String is ignored, as today. `locale` is the editing language, for `q`.
+  - `#scope_name -> String`, one of `SCOPES`; anything else is `"all"`. The list's scope has one name, `scope`. The `status` parameter and the `"draft"` spelling are not read: no link of CS Studio sends them (the dashboard's links send `scope`), and CLAUDE.md asks for no compatibility code.
   - `#counts -> { "all" => Integer, "live" =>, "drafts" =>, "scheduled" => }`: one statement, the scope ignored and every other filter applied.
   - `#rows(limit:, offset: 0) -> Array<Post>`, under the scope, ordered `updated_at desc, id desc`.
 - `Admin::PostsController` keeps `PER_PAGE` and `LIST_KEYS`. Every `SCOPES` it used reads `Posts::List::SCOPES`.
@@ -122,12 +124,12 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
   - `test "the tag filter is the tag's stored name, and a post with another tag or none is left out"`
   - `test "rows are the scope's, newest-changed first, and limit and offset page them"`
   - `test "counts ignore the scope and respect every other filter, in one statement"`. Assert the four numbers, and that `assert_queries_count(1) { list.counts }` holds.
-  - `test "a filter that is not a string is no filter, and an unknown scope is all"`. Pass `{ "tag" => ["a"], "scope" => "nope" }`.
+  - `test "a filter that is not a string is no filter, and an unknown scope is all"`. Pass `{ "tag" => ["a"], "scope" => "nope" }`, then `{ "status" => "drafts" }`, then `{ "scope" => "draft" }`. Each lists all.
   - `test "a trashed post is in no row and no count"`
 - [ ] **Step 2: Run them, and verify they fail.** Run `PGGSSENCMODE=disable bin/rails test test/queries/posts/list_test.rb`. Expected: `NameError: uninitialized constant Posts::List`.
-- [ ] **Step 3: Move the code.** The bodies move as they are. `params[:x]` becomes `filters["x"]`, `admin_locale` becomes `locale`, and `admin_scope(Post.all)` becomes `posts`. The `tags` subquery and its comment (why not `joins(:tags)`) move whole.
-- [ ] **Step 4: Run.** First the query test. Then `PGGSSENCMODE=disable bin/rails test test/integration/admin/posts_list_test.rb test/integration/admin/posts_test.rb test/integration/trash_visibility_test.rb test/lib/dependency_direction_test.rb test/lib/sql_strings_test.rb test/lib/admin_namespace_shadow_test.rb`, then `bin/rails zeitwerk:check`. Expected: PASS, with no change to any integration test.
-- [ ] **Step 5: Comments and commit.** Run the comment grep over `posts_controller.rb` and `list.rb`; it prints nothing. Check that `pgrep -f "rails test"` prints nothing. Commit `ref: the posts list's reads are Posts::List` (body: `Advances #132`, `Advances #117`).
+- [ ] **Step 3: Move the code.** The bodies move as they are. `params[:x]` becomes `filters["x"]`, `admin_locale` becomes `locale`, and `admin_scope(Post.all)` becomes `posts`. `list_scope`'s `status` and `"draft"` lines go, with the comment about bookmarks. The `tags` subquery and its comment (why not `joins(:tags)`) move whole.
+- [ ] **Step 4: Run.** First the query test. Then `PGGSSENCMODE=disable bin/rails test test/integration/admin/posts_list_test.rb test/integration/admin/posts_test.rb test/integration/admin/dashboard_test.rb test/integration/trash_visibility_test.rb test/lib/dependency_direction_test.rb test/lib/sql_strings_test.rb test/lib/admin_namespace_shadow_test.rb`, then `bin/changelog-guard` and `bin/rails zeitwerk:check`. Expected: PASS, with no integration test changed but the `status` one.
+- [ ] **Step 5: Comments and commit.** Run the comment grep over `posts_controller.rb` and `list.rb`; it prints nothing. Check that `pgrep -f "rails test"` prints nothing. Commit `ref: the posts list's reads are Posts::List, and its scope has one name` (body: `Advances #132`, `Advances #117`).
 
 ---
 
@@ -197,18 +199,19 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
   - With one creatable type, `hidden_field_tag "post[content_type]", name, id: TYPE_ID` carries the `type` target and `data-path`, and no label is drawn.
   - The URL line, then the note `t(".note", type: <label downcased>, language: Locales.name(locale))`.
   - `initial_url` reads `t(".url", path:)` or `t(".not_listed")`. The class comment loses "design pass round 2, handoff `Studio Modals.dc.html`" and "final review A, M4".
-- Modify `new_post_dialog_component.{rb,html.erb}`: the title, "Loading…", the two failure messages, "Try again", "Cancel" and "Create draft" become keys. The controller's element gains `data-messages="<%= messages_data(*NEW_RECORD_MESSAGES) %>"`.
+- Modify `new_post_dialog_component.{rb,html.erb}`: the title, "Loading…", the two failure messages, "Try again", "Cancel" and "Create draft" become keys. The controller's element gains `data-messages="<%= messages_data(*Admin::EditorScreen::NewRecordMessages::KEYS) %>"`.
 - Modify `new_page_dialog_component.{rb,html.erb}` the same way, and `new_page_form_component.{rb,html.erb}`: Title, Inside, `GONE`, `initial_url` and `initial_note` become keys. Its look is unchanged.
 - Modify `app/javascript/controllers/admin/editor/new_record_controller.js`. A post's path is read from `this.typeTarget`: the `selectedOptions[0]` of a select, or the hidden input itself. Its three sentences come from `messages(this.element).t("components.editor_screen.new_record.url", { path })`, `.not_listed` and `.page_note` (`{ title }`).
 - Modify `config/locales/admin/editor_screen.en.yml`: `new_post_dialog.*`, `new_post_form.*`, `new_page_dialog.*`, `new_page_form.*` (beside `template`) and `new_record.{url,not_listed,page_note}`, with today's words.
-- Modify `test/lib/admin_i18n_test.rb`: `CONVERTED` gains the eight component files and `new_record_controller.js`.
+- Create `app/components/admin/editor_screen/new_record_messages.rb` (`module Admin::EditorScreen::NewRecordMessages`, one constant, `KEYS`).
+- Modify `test/lib/admin_i18n_test.rb`: `CONVERTED` gains the eight component files, `new_record_messages.rb` and `new_record_controller.js`.
 - Modify `test/lib/admin_design_rules_test.rb`: `HAND_BUTTON_ALLOWED` loses `"has-checked:border-accent has-checked:bg-accent-tint"`. Without this, "every hand-button allowance is still used" goes red.
 - Modify `test/components/previews/admin/editor_screen/new_post_dialog_component_preview.rb`: a scenario with one creatable type.
 - Test: `test/components/admin/editor_screen/new_post_dialog_component_test.rb`, `test/integration/admin/new_record_dialogs_test.rb`, `test/integration/admin/access_control_test.rb`, `test/lib/script_messages_test.rb`, `test/lib/admin_i18n_test.rb`, `test/lib/admin_design_rules_test.rb`, `test/system/admin/new_record_test.rb`, `test/system/admin/dashboard_test.rb`.
 
 **Interfaces:**
 - `NewPostFormComponent::TYPE_ID = "new-post-type"` is now the select's id, or the hidden input's. `field_ids["content_type"]` still points at it, so the error summary links to the select.
-- `NEW_RECORD_MESSAGES = %w[components.editor_screen.new_record.url components.editor_screen.new_record.not_listed components.editor_screen.new_record.page_note]` is a constant of `NewPostDialogComponent`, which `NewPageDialogComponent` reads.
+- `Admin::EditorScreen::NewRecordMessages::KEYS = %w[components.editor_screen.new_record.url components.editor_screen.new_record.not_listed components.editor_screen.new_record.page_note]`, in `app/components/admin/editor_screen/new_record_messages.rb` (new), beside `NewRecordErrors`. It is the script's one list: both dialogs hand it over (`messages_data(*NewRecordMessages::KEYS)`), and the dialog test reads it. Neither dialog reads the other's constant.
 
 - [ ] **Step 1: Write the failing tests.**
   - `new_post_dialog_component_test.rb`:
@@ -216,7 +219,7 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
     - "a chosen card is bold as well as tinted" becomes `test "with one creatable type there is no select: a hidden input carries the type and the note names it"`.
     - "the first type is preselected unless one is asked for" reads `option[selected]`.
     - `test "the dialog's words are keys: its title, Loading…, its failures, Try again, Cancel and Create draft"`. Store a test string for `admin.components.editor_screen.new_post_dialog.create` with `I18n.backend.store_translations(:en, …)`, restored by `I18n.reload!` in `teardown`, and assert the button reads it, so a literal left in the template fails.
-    - `test "the dialog hands the script its three sentences"`. Parse `data-messages`, and assert it holds the three keys with today's words.
+    - `test "both dialogs hand the script the same three sentences"`. Parse each dialog's `data-messages`, and assert that each holds exactly `NewRecordMessages::KEYS` with today's words.
   - `access_control_test.rb` line 506: `test "new posts offer only the content types the author may create"` asserts `input[type=hidden][name='post[content_type]'][value='blog']` and no `select#new-post-type`.
   - `new_record_dialogs_test.rb`: the `post[content_type]` create tests are unchanged. A test that reads a radio reads the select.
   - `new_record_test.rb`: "New post: pick a type…" becomes `test "New post: type a title, choose a type, Create opens that post's editor"`. It uses `select ContentTypes.find("now_update").label, from: "Type"`, and asserts that the URL line follows the type (`data-path`) after the change.
@@ -235,8 +238,8 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
 
 **Files:**
 - Modify `docs/reference/editors-and-translation-pair.md`, "The posts list", after Task 1's first sentence: the toolbar's bar and the filter panel in one form, the rail at 1200px of the list's own width, the New post dialog's Title and Type select, and the prefetch check (nothing reloads the list's frame, and a filter's address never equals a link's).
-- Modify `docs/reference/design-system.md`. Add a part "E4: the lists' rail": `.admin-list-rail`, its tokens and threshold, why it is neither the editors' grid nor the dashboard's, `display: contents` for one form, the filter panel's two looks, and the rule that a rail is first in the document. Rewrite "Control heights" for the panel. Add a line under "Rules a change can break silently": a new list rail is laid out by `.admin-list-rail` and docks at the one threshold (the test names it).
-- Modify `CLAUDE.md`. The editors' index line gains `app/queries/posts/` (the posts list's reads). The design-system line's list gains `.admin-list-rail`. `Admin::PostsController`'s filter sentence, wherever CLAUDE.md quotes it, names `Posts::List`.
+- Modify `docs/reference/design-system.md`. Add a part "E4: the lists' rail": `.admin-list-rail`, its tokens and threshold, why it is neither the editors' grid nor the dashboard's, `display: contents` for one form, the filter panel's two looks, and the rule that a rail is first in the document. Rewrite "Control heights" for the panel. The sentence that lists `HAND_BUTTON_ALLOWED`'s controls loses "New post's type tiles", which Task 3 removed: what is left is the rich-text toolbar's toggles and the two ⌘K launchers. Step 1 searches the reference by hand for "type tiles" and "radio card", and fixes each hit. Add a line under "Rules a change can break silently": a new list rail is laid out by `.admin-list-rail` and docks at the one threshold (the test names it).
+- Modify `CLAUDE.md`. The editors' index line gains `app/queries/posts/` (the posts list's reads). The design-system line's list gains `.admin-list-rail`.
 - Modify `CHANGELOG.md`, `## Unreleased`, Changed:
   - On the posts list, the Type, Tag and Translation filters stand in a rail beside the list in a wide window and in a row above it otherwise, each under its own label.
   - The New post dialog asks for a title and offers the types in a Type list.
@@ -281,7 +284,7 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
 - [ ] **Step 2: Run them, and verify they fail.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `PGGSSENCMODE=disable bin/rails test test/components/admin/ui/list_state_component_test.rb test/components/admin/posts_screen test/lib`. Expected: PASS.
-- [ ] **Step 5: Commit** `ref: a record's state in a list is Admin::Ui::ListStateComponent`.
+- [ ] **Step 5: Comments and commit.** Run the comment grep over `list_state_component.{rb,html.erb}`, `table_component.html.erb` and the preview; it prints nothing. Check that `pgrep -f "rails test"` prints nothing. Commit `ref: a record's state in a list is Admin::Ui::ListStateComponent` (body: `Advances #117`).
 
 ---
 
@@ -292,7 +295,7 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
 - Create `app/components/admin/tags_screen/detail_component.{rb,html.erb}` and `empty_detail_component.{rb,html.erb}`, with `config/locales/admin/tags_screen.en.yml` (`admin.components.tags_screen.{detail,empty_detail}.*`) and previews under `test/components/previews/admin/tags_screen/`.
 - Create `app/views/admin/tags/show.html.erb`: `turbo_frame_tag "tag-detail"` around the detail. It renders without a layout.
 - Modify `app/controllers/admin/tags_controller.rb`:
-  - `index` keeps `@readable_counts` and drops `@carrier_counts`, which only the rows' triggers read. It adds `@largest = @readable_counts.values.max.to_i`.
+  - `index` keeps `@readable_counts` and drops `@carrier_counts`, which only the rows' triggers read. Each row's ratio comes from one helper, `TagsHelper#tag_usage(count, largest) -> Float`: `count / largest` rounded to 2 places, and `0.0` when `largest` is zero (every count is 0, or there is no tag), so nothing divides by zero.
   - `show` answers the `tag-detail` frame, and anything else with a 303 to the list. `Tag.find`, then `Posts::List.new(admin_scope(Post.all), filters: { "tag" => tag.name }, locale: admin_locale)`, then `rows(limit: DETAIL_POSTS)` and `counts["all"]`, and the carriers for that tag (`PostTag.where(tag_id:).count`), all only under `can?("posts.read")`.
   - `update` adds, on a saved rename, `turbo_stream.replace("tag-detail-#{tag.id}", DetailComponent)`.
   - `destroy` adds `turbo_stream.replace("tag-detail-#{tag.id}", EmptyDetailComponent)`. When no tag is left it also adds `turbo_stream.replace("tags-list", <the empty state>)`.
@@ -302,8 +305,8 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
   - `div.admin-list-rail` holding the heading and intro (`.admin-list-rail__head`) and the grid, which holds:
     - first, `section.admin-list-rail__rail.admin-tag-detail` (`aria-label` `t(".rail_label")`, "Tag details"; a heading inside changes with each tag), with `turbo_frame_tag "tag-detail"` holding the `EmptyDetailComponent`;
     - then `div#tags-list`, with the card and its table, or the empty state.
-  - Each row: the name's form as before (`font-medium`); the Posts cell with the count link and, under `posts.read`, `span.admin-tag-usage` (track) holding `span.admin-tag-usage__bar` with `style="--usage: <ratio>"`, `aria-hidden`; the save status; and the Details link (`data-tag-details`). The ⋯ menu goes.
-  - The two dialogs and `admin--tags--dialogs`' element stay as they are, outside the grid. The grid carries `data-controller="admin--tags--detail"`, with the empty line's `<template>`.
+  - Each row: the name's form as before (`font-medium`); the Posts cell with the count link and, under `posts.read`, `span.admin-tag-usage` (track) holding `span.admin-tag-usage__bar` with `style="--usage: <tag_usage(count, largest)>"`, `aria-hidden`; the save status; and the Details link (`data-tag-details`). The ⋯ menu goes.
+  - The two dialogs and `admin--tags--dialogs`' element stay as they are, outside the grid. The grid carries `data-controller="admin--tags--detail"`, with the empty line's `<template>`, which renders `EmptyDetailComponent` (its words are a key).
 - Modify `config/locales/admin/tags.en.yml`. `index.details` ("Details"), `index.details_label` ("Details of “%{name}”") and `index.rail_label` ("Tag details") are added. `actions_label`, `columns.actions`, `merge_item` and `delete_item` are deleted, since their reader, the row menu, goes in this task. `merge_item` and `delete_item` move as `tags_screen.detail.merge` and `.delete`. `columns.details` (`sr-only`) is added. The file's comment names the detail's scope.
 - Modify `app/helpers/admin/tags_helper.rb`: the comment names the detail as the triggers' place. The methods are unchanged.
 - Create `app/javascript/controllers/admin/tags/detail_controller.js` (`admin--tags--detail`).
@@ -315,12 +318,13 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
   - `--color-tag-usage: var(--cs-tag-usage);` in `@theme`;
   - `.admin-tag-usage` (4px, `--cs-paper`, `--cs-radius` pill) and `.admin-tag-usage__bar` (`width: calc(var(--usage) * 100%)`);
   - `.admin-tag-detail` below the threshold: a card, and `:has([data-tag-detail-empty])` takes no room;
-  - in `@container admin-list (min-width: 1200px)`: `.admin-tag-detail` on the rail's ground (through `.admin-list-rail__rail`), with the empty line shown;
+  - inside the one `@container admin-list (min-width: 1200px)` block that Task 2 wrote, never a second block: `.admin-tag-detail` on the rail's ground (through `.admin-list-rail__rail`), with the empty line shown;
   - the resting-text rule of `.admin-tags-table` keeps its comment, rewritten without "handoff §4.9".
 - Modify `test/lib/admin_i18n_test.rb`: `CONVERTED` gains `app/components/admin/tags_screen/detail_component.{rb,html.erb}`, `empty_detail_component.{rb,html.erb}`, `app/views/admin/tags/show.html.erb` and `app/javascript/controllers/admin/tags/detail_controller.js`.
 - Modify `test/system/dialog_test.rb`: `open_delete_tag_dialog` presses the row's Details, then the rail's "Delete tag…". Its comment loses "(round 3)".
 - Modify `test/integration/trash_visibility_test.rb` (line 841's test): the dialogs' count is read from `GET /tags/:id`'s frame.
-- Test: `test/components/admin/tags_screen/detail_component_test.rb` (new), `test/integration/admin/tags_test.rb`, `test/integration/trash_visibility_test.rb`, `test/integration/public_javascript_test.rb` (the Tags screen loads no editor script; unchanged), `test/lib/admin_contrast_test.rb`, `test/lib/admin_design_rules_test.rb`, `test/lib/admin_i18n_test.rb`, `test/lib/source_layout_test.rb`, `test/lib/admin_namespace_shadow_test.rb`, `test/system/admin/tags_test.rb`, `test/system/dialog_test.rb`, `test/system/admin/messages_test.rb`.
+- Modify `test/lib/admin_design_rules_test.rb`: Task 2's test "the lists' rail is laid out by the list's own container…" also asserts `.admin-tag-detail`'s docked rule inside the one block (below), and the usage-bar test is added.
+- Test: `test/components/admin/tags_screen/detail_component_test.rb` (new), `test/helpers/admin/tags_helper_test.rb` (extended), `test/integration/admin/tags_test.rb`, `test/integration/trash_visibility_test.rb`, `test/integration/public_javascript_test.rb` (the Tags screen loads no editor script; unchanged), `test/lib/admin_contrast_test.rb`, `test/lib/admin_design_rules_test.rb`, `test/lib/admin_i18n_test.rb`, `test/lib/source_layout_test.rb`, `test/lib/admin_namespace_shadow_test.rb`, `test/system/admin/tags_test.rb`, `test/system/dialog_test.rb`, `test/system/admin/messages_test.rb`.
 
 **Interfaces:**
 - `Admin::TagsScreen::DetailComponent.new(tag:, posts:, count:, carriers:, url_options: {}, locale:)`:
@@ -340,7 +344,7 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
 - [ ] **Step 1: Write the failing tests.**
   - `detail_component_test.rb`:
     - `test "the detail names the tag, counts its posts, lists them newest first with their state, and links Show all to the posts list filtered by it"`
-    - `test "Merge into… is a secondary button and Delete tag… a tertiary one, each opening its dialog with the row's facts; nothing is red and nothing is primary"`. Assert the variants' classes from `ButtonComponent.classes`, the `data-admin--ui--dialog-id-param`, `data-tag-id`, `data-tag-delete-text`, and no `bg-accent` and no `danger` class.
+    - `test "Merge into… is a secondary button and Delete tag… the danger text button, each opening its dialog with the row's facts, and nothing is primary or filled red"`. Assert that Merge carries `ButtonComponent.classes(:secondary)` and Delete `ButtonComponent.classes(:danger_text)`, the `data-admin--ui--dialog-id-param`, `data-tag-id` and `data-tag-delete-text`, and that no element carries `bg-accent` or `bg-danger`.
     - `test "Show all is drawn only when the tag has more posts than the rail lists"`
     - `test "without posts.read there is no count and no post, and the dialogs' sentences are the neutral ones"`
     - `test "Close is the shared icon button, named Close"`
@@ -354,14 +358,17 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
     - `test "/tags/suggest is still the suggestions, not a tag"`
     - `test "a rename answers the chosen tag's detail again, by its id"`. The `update` stream holds `turbo-stream[action=replace][target=tag-detail-<id>]` with the new name.
     - `test "a delete answers the empty detail by the tag's id, and the list's empty state when it was the last tag"`. It replaces the existing "deleting answers a toast and leaves the dialog to be closed by the page", whose toast assertion it keeps.
-    - `test "each row's usage bar is its readable count over the largest, and there is no bar without posts.read"`. Assert `--usage: 1.0` on the largest, `0.5` on a half, and no `.admin-tag-usage` for a viewer without `posts.read`.
-    - `test "the Tags screen draws no primary button outside its dialogs"`. Outside `dialog` elements, no element's `class` holds every class of `ButtonComponent.classes(:primary)`. A sample page with one such link fails the same matcher.
+    - `test "each row's usage bar is its readable count over the largest, and there is no bar without posts.read"`. Read each bar's `style` and parse `--usage` with `Float(style[/--usage:\s*([\d.]+)/, 1])`. Assert `assert_in_delta 1.0` on the largest and `0.5` on a half. There is no `.admin-tag-usage` for a viewer without `posts.read`.
+    - `test "a screen where no tag has a post draws empty tracks"`: every parsed `--usage` is `0.0`, and the page answers 200.
+  - `tags_helper_test.rb`: `test "tag_usage is the share of the largest, rounded, and 0 when the largest is 0"` (`tag_usage(3, 4) == 0.75`, `tag_usage(1, 3) == 0.33`, `tag_usage(0, 0) == 0.0`).
+    - `test "the Tags screen draws no primary button outside its dialogs"`. Outside `dialog` elements, no element's `class` holds every class of `ButtonComponent.classes(:primary)`. The test's first assertion runs the same matcher over a sample fragment holding one link with those classes, and asserts that it is found, so a weakened matcher fails.
     - `test "the Tags screen is never restored from Turbo's page cache"`: the `turbo-cache-control` meta.
   - `trash_visibility_test.rb`: `test "the Tags rail lists a tag's kept posts and never a trashed one, and counts as the posts list does"`
   - `admin_contrast_test.rb`: `test "a tag's usage bar is 6.2 / 8.9:1 or better on the row and on its track, in both schemes"`. Resolve `--cs-tag-usage` against `--cs-surface` and `--cs-paper`. A figure is a floor to its rounding, so 6.2 is met by 6.15.
+    - `test "the danger text button's words are 4.5:1 or better on the sunken ground and on the rail, in both schemes"`: `--cs-danger-ink` on `--cs-sunken` (its hover's ground) and on `--cs-rail` (where Delete tag… stands docked). No test measured the pair on these grounds.
   - `admin_design_rules_test.rb`:
     - `test "the usage bar is the structure hue, as a token of its own"`. `--cs-tag-usage: var(--cs-ic-structure);` appears once in each scheme block, and `bg-tag-usage` only in `app/views/admin/tags/index.html.erb`.
-    - The list rail test of Task 2 also finds `.admin-tag-detail`'s docked rule inside the one docked block.
+    - The list rail test of Task 2 also finds `.admin-tag-detail`'s docked rule inside the one docked block, and still finds exactly one `@container admin-list` width.
   - `tags_test.rb` (system), each starting on `visit_screen admin_tags_path`. A private `details(tag)` presses the row's Details and waits for `#tag-detail-<id>`.
     - The Merge tests ("Merge into… picks a target…", "the one Merge dialog is refilled for each row…") and "after an inline rename the dialogs name the tag by its new name…" open their dialogs through `details(tag)` and the rail's buttons.
     - "Delete tag… asks first, says how many posts are affected, and removes the row" is the same, through the rail.
@@ -371,8 +378,8 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
     - `test "at 1100px the details stand above the list as a card, and nothing stands there before a tag is chosen"`
     - `test "the rail follows the list's own width: a 1279px window docks it, a 1280px one does not"` (Review Focus 4)
     - `test "Details moves the focus to the tag's name in the rail, Tab goes through its posts and buttons, and Close and Escape give it back to the row's Details"`. At 1600: press Details on the second row from the keyboard (Enter). `document.activeElement` is the heading, and the row is marked (`aria-current`, `data-selected`). Tab steps through the post links, Show all, Merge into…, Delete tag… and Close, and Enter on Close puts the focus on the row's Details with no mark left. Again with Escape from inside the rail.
-    - `test "a rename of the chosen tag rewords the rail: its heading, Show all's address and both dialogs"` (Review Focus 1)
-    - `test "a 50-character tag name and long post titles stay inside the rail"` (Review Focus 3). At 1600, every child box of the rail is inside the rail's box.
+    - `test "a rename of the chosen tag rewords the rail: its heading, Show all's address and both dialogs"` (Review Focus 1). Choose a tag, rename it in its row and wait for SAVED. Assert the heading and Show all's `href` (`tag=<new>`). Press the rail's Merge into…: the dialog's title names the new name, and the picker excludes it. Close it and press Delete tag…: its title names the new name. `admin--tags--dialogs` reads the pressed trigger's `data-tag-*` when the dialog opens and keeps no reference to a trigger, so it never reads one that the rename's stream replaced.
+    - `test "a 50-character tag name and long post titles stay inside the rail"` (Review Focus 3). At 1600, every child box of the rail is inside the rail's box, and the rail's `scrollWidth` is at most its `clientWidth`.
   - `dialog_test.rb`: no assertion changes. `messages_test.rb` "the tag dialogs' root and an autosaving row…" is unchanged.
 - [ ] **Step 2: Run them, and verify they fail.** Run `PGGSSENCMODE=disable bin/rails test test/components/admin/tags_screen test/integration/admin/tags_test.rb test/integration/trash_visibility_test.rb test/lib/admin_contrast_test.rb test/lib/admin_design_rules_test.rb`.
 - [ ] **Step 3: Implement.**
@@ -389,10 +396,11 @@ Nothing a person sees changes. The proof is that `test/integration/admin/posts_l
 ### Task 7: 5b-2's reference, CLAUDE.md and the pull request
 
 **Files:**
-- Modify `docs/reference/design-system.md`. "Tags" is rewritten whole: the row, the usage bar and its token, Details, the detail frame and its streams, the triggers in the rail, no primary. "E4: the lists' rail" (Task 4) gains the tag detail's two looks and `ListStateComponent`. "Rules a change can break silently" gains:
+- Modify `docs/reference/design-system.md`. "Tags" is rewritten whole: the row, the usage bar and its token, Details, the detail frame and its streams, the triggers in the rail (Merge `secondary`, Delete `danger_text`), no primary. "E4: the lists' rail" (Task 4) gains the tag detail's two looks and `ListStateComponent`. "Rules a change can break silently" gains:
   - the detail frame is redrawn by stream and never reloaded, and a link into it is never prefetched. The integration test names the attribute. **No guard** for a later `reload()`.
   - a record's state in a list is `ListStateComponent`. **No guard** for a list that draws `StatusChipComponent` beside its own unpublished chip.
-- Modify `docs/reference/i18n.md`, the paragraph at its line 72: the Tags screen's scopes (`admin.tags.index`, `admin.components.tags_screen`).
+- Modify `docs/reference/design-system.md`'s tokens part: it lists `--cs-tag-usage` beside the structure hue it aliases.
+- Modify `docs/reference/i18n.md`, the paragraph that names `app/views/admin/tags/index.html.erb`: the Tags screen's scopes (`admin.tags.index`, `admin.components.tags_screen`).
 - Modify `CLAUDE.md`. The design-system index line names `app/components/admin/tags_screen/` beside "the Tags screen", and `Admin::Ui::ListStateComponent`.
 - Modify `CHANGELOG.md`, `## Unreleased`:
   - Changed: on Tags, each tag shows a bar for how many posts use it; Details opens the tag in a panel beside the list (above it in a narrow window) with its newest posts, Merge into… and Delete tag…; the row has no ⋯ menu.
@@ -447,7 +455,7 @@ Run locally after `bin/rails tailwindcss:build`, one file at a time, only while 
 
 A CI failure is fixed in the task that owns the file.
 
-## Pre-flight (done while writing this plan)
+## Pre-flight (done while writing this plan; the scan's C1–C8 are resolved above)
 
 - **Red mid-stack.**
   - Task 2 changes the toolbar's markup and fixes, in itself, `toolbar_component_test`, `filter_bar_test` and every system test that read "Type: All" or `form.admin-filter-bar` on posts.
