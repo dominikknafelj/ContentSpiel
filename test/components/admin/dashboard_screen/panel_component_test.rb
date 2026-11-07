@@ -99,4 +99,22 @@ class Admin::DashboardScreen::PanelComponentTest < ViewComponent::TestCase
     panel { |card| card.with_row { "A row" } }
     assert_no_selector "footer"
   end
+
+  # Pick up where you left off lays its rows out as tiles: no rules between
+  # them, each tile its own card, capped like rows.
+  test "layout: :tiles draws the rows as a list of tiles, capped at five" do
+    panel(kind: :shortcuts, layout: :tiles) do |card|
+      8.times { |i| card.with_row { "Tile #{i}" } }
+    end
+
+    assert_selector "section > ul.admin-draft-tiles > li", count: 5
+    assert_no_selector "li.border-b"
+    assert_no_text "Tile 5"
+
+    panel(kind: :shortcuts, layout: :tiles)
+    assert_selector "p[data-panel-empty]", text: "None"
+    assert_no_selector "ul"
+
+    assert_raises(ArgumentError) { Admin::DashboardScreen::PanelComponent.new(kind: :action, title: "x", line: "y", id: "o", empty: "None", layout: :grid) }
+  end
 end

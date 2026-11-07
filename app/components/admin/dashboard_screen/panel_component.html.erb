@@ -18,6 +18,12 @@
   </header>
   <% if rows.empty? %>
     <p class="px-4 py-2.5 text-sm text-dim" data-panel-empty><%= empty %><% if empty_action? %> <%= empty_action %><% end %></p>
+  <% elsif tiles? %>
+    <ul class="admin-draft-tiles px-4 pt-2 pb-4">
+      <% visible_rows.each do |row| %>
+        <li class="min-w-0"><%= row %></li>
+      <% end %>
+    </ul>
   <% else %>
     <ul class="px-4">
       <% visible_rows.each do |row| %>

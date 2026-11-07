@@ -456,11 +456,6 @@ Rails.application.routes.draw do
       get "threads/:thread_id/messages/:message_id/files/:id", to: "note_files#show", as: :record_note_file,
         constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
     end
-
-    # Quick draft: a title and a content type, saved
-    # through `Posts::Save` as an unpublished post, then opened in the
-    # post editor.
-    post "dashboard/draft", to: "dashboard#create_draft", as: :dashboard_draft
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

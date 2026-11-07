@@ -1,30 +1,18 @@
 module Admin
   module DashboardScreen
-    # One record in "Pick up where you left off" (the viewer's drafts) or
-    # "Publishing on its own" (what is scheduled): a page or post linked to
-    # its editor.
-    #
-    # * `variant: :draft` -- the title, the content-type dot (a page says
-    #   "Page") and "edited 2h ago" (the record's `updated_at`).
-    # * `variant: :going_live` -- the scheduled date block
-    #   (`Admin::Ui::ScheduledDateComponent`, hidden from a screen reader),
-    #   the title, "in 5 days" in a `<time>` whose tooltip is the exact
-    #   moment, and, when `mine:`, "by you".
+    # One record in "Publishing on its own" (what is scheduled): the
+    # scheduled date block (`Admin::Ui::ScheduledDateComponent`, hidden from
+    # a screen reader), the title linked to its editor, "in 5 days" in a
+    # `<time>` whose tooltip is the exact moment, and, when `mine:`, "by you".
     #
     # Everything is read from the record `Dashboard::Feed` already loaded:
-    # titles are jsonb columns and a post's type label comes from the
-    # in-memory `ContentTypes` registry, so a row never costs a query of its
-    # own (the dashboard's constant-query test pins this).
+    # titles are jsonb columns, so a row never costs a query of its own (the
+    # dashboard's constant-query test pins this).
     class RowComponent < Admin::AdminComponent
-      def initialize(record:, variant:, mine: false)
-        raise ArgumentError, "unknown variant #{variant.inspect}" unless %i[draft going_live].include?(variant)
-
+      def initialize(record:, mine: false)
         @record = record
-        @variant = variant
         @mine = mine
       end
-
-      def going_live? = variant == :going_live
 
       def mine? = @mine
 
@@ -51,7 +39,7 @@ module Admin
 
       private
 
-      attr_reader :record, :variant
+      attr_reader :record
 
       # Keeps the editing language across navigation, like every other admin
       # link. `admin_url_options` is a controller helper, absent when a

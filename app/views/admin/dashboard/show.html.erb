@@ -1,6 +1,6 @@
-<%# CS Studio's start page: one-row quick create, the panels in a grid of
-    at most three columns (`.admin-dashboard-cards`), each at most 5 rows,
-    then "What changed recently". Each panel is an
+<%# CS Studio's start page: the heading row with New page… and New post…,
+    the panels in a grid of at most three columns (`.admin-dashboard-cards`),
+    each at most 5 rows, then "What changed recently". Each panel is an
     `Admin::DashboardScreen::PanelComponent` headed by its job, with one line
     under the heading, its head tinted by its kind: action (something waits
     on the viewer), shortcuts (a way back into work) or information. Every
@@ -12,7 +12,25 @@
     layout's grid collapses to its two-column form, same as every other
     module but Pages. %>
 <div class="admin-dashboard">
-<h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
+<%# The heading row. "New post…" is the screen's one primary, last, by a
+    header's convention, and "New page…" its secondary before it. Each
+    opens the layout's dialog, and without it falls through to its
+    standalone page; each is drawn only for whoever may create one. %>
+<div class="admin-dashboard__head mb-4">
+  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+  <% if can?("pages.create") || can?("posts.create") %>
+    <div class="admin-dashboard__actions">
+      <% if can?("pages.create") %>
+        <%= link_to t(".new_page"), new_admin_page_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:secondary),
+              data: dialog_trigger("new-page-dialog").merge(turbo_frame: "_top") %>
+      <% end %>
+      <% if can?("posts.create") %>
+        <%= link_to t(".new_post"), new_admin_post_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:primary),
+              data: dialog_trigger("new-post-dialog").merge(turbo_frame: "_top") %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
 
 <%# Mail's last send failed: drawn for settings.manage only
     (`@mail_settings` is nil for anyone else) and only while it failed. %>
@@ -20,9 +38,6 @@
   <%= render Admin::Ui::MailFailedNoticeComponent.new(mail_settings: @mail_settings,
         href: admin_settings_path(anchor: "mail", **admin_url_options), class: "mb-4") %>
 <% end %>
-
-<% quick_create = Admin::DashboardScreen::QuickCreateComponent.new(**(@draft || {})) %>
-<%= render quick_create %>
 
 <%# The "→" goes to the posts list, filtered by status -- the only filtered
     list there is. It shows every readable post in that state, not only mine
@@ -43,16 +58,16 @@
   <%= render "admin/dashboard/waiting", waiting: Dashboard::WaitingForYou.new(actor: Current.actor) %>
 
   <%= render Admin::DashboardScreen::PanelComponent.new(kind: :shortcuts, title: t(".drafts.title"), line: t(".drafts.line"), id: "dashboard-drafts",
-        empty: t(".drafts.empty"), link: posts_list.call("drafts", t(".drafts.all"))) do |card| %>
-    <%# "Start a draft" is there whenever the quick-create row is: it takes the focus to its title. %>
-    <% if quick_create.render? %>
+        empty: t(".drafts.empty"), link: posts_list.call("drafts", t(".drafts.all")), layout: :tiles) do |card| %>
+    <%# "Start a draft" opens the New post dialog, for whoever may create a post. %>
+    <% if can?("posts.create") %>
       <% card.with_empty_action do %>
-        <%= link_to t(".drafts.start"), "#dashboard_draft_title", class: "text-ink underline",
-              data: { controller: "admin--dashboard--start-draft", action: "admin--dashboard--start-draft#start", "admin--dashboard--start-draft-field-value": "dashboard_draft_title" } %>
+        <%= link_to t(".drafts.start"), new_admin_post_path(**admin_url_options), class: "text-ink underline",
+              data: dialog_trigger("new-post-dialog").merge(turbo_frame: "_top") %>
       <% end %>
     <% end %>
     <% @feed.drafts.each do |record| %>
-      <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :draft) } %>
+      <% card.with_row { render Admin::DashboardScreen::DraftTileComponent.new(record:) } %>
     <% end %>
   <% end %>
 
@@ -64,7 +79,7 @@
       <% end %>
     <% end %>
     <% going_live.each do |record| %>
-      <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :going_live, mine: @feed.mine?(record)) } %>
+      <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, mine: @feed.mine?(record)) } %>
     <% end %>
   <% end %>
 

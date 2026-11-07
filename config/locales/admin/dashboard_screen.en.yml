@@ -77,15 +77,21 @@ en:
           review: "Review and publish…"
           open_thread: "Open thread"
           open_record: "Open"
-        # `Admin::DashboardScreen::RowComponent`, a page or post in the drafts
-        # and the scheduled panels.
-        row:
+        # `Admin::DashboardScreen::DraftTileComponent`, one of the viewer's
+        # drafts in Pick up where you left off.
+        draft_tile:
+          # A page's kind, where a post shows its content type.
+          page: "Page"
+          untitled: "(untitled)"
           # `%{time}` is a `<time>` with a relative phrase ("2h ago").
           edited_html: "edited %{time}"
+          # The verb the tile ends in, describing its one link.
+          continue: "Continue"
+        # `Admin::DashboardScreen::RowComponent`, a page or post in the
+        # scheduled panel.
+        row:
           # A scheduled row the viewer made.
           by_you: "by you"
-          # A draft row's kind, where a post shows its content type.
-          page: "Page"
           untitled: "(untitled)"
           # When a scheduled record goes live, by the site's calendar.
           tomorrow: "tomorrow"

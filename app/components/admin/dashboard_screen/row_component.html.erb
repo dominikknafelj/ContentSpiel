@@ -1,19 +1,8 @@
-<% if going_live? %>
-  <%= render Admin::Ui::ScheduledDateComponent.new(at: record.published_at) %>
-<% end %>
+<%= render Admin::Ui::ScheduledDateComponent.new(at: record.published_at) %>
 <div class="min-w-0 flex-1">
   <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
   <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
-    <% if going_live? %>
-      <time datetime="<%= record.published_at.iso8601 %>" title="<%= exact_time %>"><%= going_live_phrase %></time>
-      <% if mine? %><span><%= t(".by_you") %></span><% end %>
-    <% else %>
-      <% if record.is_a?(Post) %>
-        <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>
-      <% else %>
-        <span><%= t(".page") %></span>
-      <% end %>
-      <span><%= t(".edited_html", time: render(Admin::Ui::TimeAgoComponent.new(time: record.updated_at))) %></span>
-    <% end %>
+    <time datetime="<%= record.published_at.iso8601 %>" title="<%= exact_time %>"><%= going_live_phrase %></time>
+    <% if mine? %><span><%= t(".by_you") %></span><% end %>
   </div>
 </div>

@@ -74,13 +74,6 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "empty-state copy doesn't point at a quick-create row the viewer doesn't have" do
-    sign_in_as users(:reader)
-    get admin_root_path
-    assert_match "No drafts.", response.body
-    assert_no_match "Start a draft", response.body
-  end
-
   test "the needs-translation card shows each target language's numbers with several languages" do
     with_locales(%w[en de], default: "en")
     Current.set(actor: users(:one)) { create_post(title: "Untranslated") }
@@ -113,7 +106,6 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_equal({ "dashboard-notes-for-you" => "No notes for you.", "dashboard-waiting-title" => "Nothing is waiting for you.",
                    "dashboard-drafts" => "No drafts. Start a draft", "dashboard-going-live-next" => "Nothing scheduled. Drafts →",
                    "dashboard-activity" => "No recent activity." }, lines)
-    assert_select "section[aria-labelledby=dashboard-drafts] p[data-panel-empty] a[href='#dashboard_draft_title'][data-controller='admin--dashboard--start-draft'][data-action='admin--dashboard--start-draft#start'][data-admin--dashboard--start-draft-field-value='dashboard_draft_title']", text: "Start a draft"
     assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-panel-empty] a[href='#{admin_posts_path(scope: "drafts")}'][data-turbo-frame=_top] span[aria-hidden=true]", text: "→"
     assert_select ".admin-empty-state", count: 0
   end
@@ -150,82 +142,87 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-needs-translation]", count: 0
   end
 
-  test "quick draft creates a draft and opens it" do
+  # The heading row: "New post…" is the screen's one primary, "New page…"
+  # its secondary before it, each a link to its standalone page that opens
+  # the layout's dialog, and each drawn only for its right.
+  test "New post… is the screen's one primary and New page… its secondary, each with its right" do
+    root_page
+    new_post = "div.admin-dashboard__head a[href='#{new_admin_post_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-post-dialog]"
+    new_page = "div.admin-dashboard__head a[href='#{new_admin_page_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-page-dialog]"
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+    secondary = Admin::Ui::ButtonComponent.classes(:secondary)
+
     sign_in_as users(:one)
-    assert_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "New idea", content_type: "blog" }
-    end
-    post = Post.order(:id).last
-    assert_nil post.published_at
-    assert_equal "blog", post.content_type
-    assert_equal "New idea", post.title
-    assert_redirected_to admin_post_path(post)
-    follow_redirect!
-    assert_match "Draft created", response.body
-  end
-
-  test "a blank title re-renders the dashboard with the error" do
-    sign_in_as users(:one)
-    assert_no_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "", content_type: "blog" }
-    end
-    assert_response :unprocessable_entity
-    assert_select "[role=alert]"
-    assert_select "h1", "Dashboard"
-    assert_select "select[name=content_type] option[selected][value=blog]"
-  end
-
-  # An Author whose `posts.create` is scoped to one content
-  # type is offered only that type, and a forged other type is refused with
-  # a 403 by `Posts::Save` itself, not merely hidden from the select.
-  test "the type select lists only creatable types, and a forged type is refused" do
-    bloggers = AccessControl::Group.create!(name: "Bloggers")
-    bloggers.grants.create!(permission: "posts.read", scope: {})
-    bloggers.grants.create!(permission: "posts.create", scope: { "content_types" => [ "blog" ] })
-    blogger = User.create!(email_address: "blogger@example.com", password: "password12345")
-    AccessControl::Membership.create!(user: blogger, group: bloggers)
-
-    sign_in_as blogger
     get admin_root_path
-    assert_select "select[name=content_type] option", count: 1
-    assert_select "select[name=content_type] option[value=blog]", "Blog"
+    assert_select "div.admin-dashboard__head > h1", "Dashboard"
+    assert_select new_post, exact_text: "New post…", count: 1
+    assert_select new_page, exact_text: "New page…", count: 1
+    assert_equal primary, css_select(new_post).first["class"]
+    assert_equal secondary, css_select(new_page).first["class"]
+    assert_equal %w[New\ page… New\ post…], css_select("div.admin-dashboard__head a").map { |link| link.text.strip }
+    # Nothing else on the screen is a primary.
+    assert_equal 1, css_select(".admin-dashboard a, .admin-dashboard button").count { |control| control["class"].to_s.split.include?("bg-accent") }
 
-    assert_no_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "Sneaky", content_type: "now_update" }
-    end
-    assert_response :forbidden
+    sign_in_as users(:author) # posts.create, no pages.create
+    get admin_root_path
+    assert_select new_post, count: 1
+    assert_select new_page, count: 0
+
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.create", scope: { "page_ids" => [ root_page.id ] })
+    sign_in_as users(:editor_branch) # pages.create alone
+    get admin_root_path
+    assert_select new_post, count: 0
+    assert_select new_page, count: 1
+
+    sign_in_as users(:reader) # neither
+    get admin_root_path
+    assert_select "div.admin-dashboard__head > h1", "Dashboard"
+    assert_select "div.admin-dashboard__head a", count: 0
   end
 
-  test "a user who can create no post type gets no quick draft form" do
+  test "Start a draft opens the New post dialog, for someone who may create posts" do
+    sign_in_as users(:author)
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-drafts] p[data-panel-empty] a[href='#{new_admin_post_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-post-dialog]", exact_text: "Start a draft"
+
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "select[name=content_type]", count: 0
-    assert_select "form[action='#{admin_dashboard_draft_path}']", count: 0
+    assert_select "a", text: "Start a draft", count: 0
   end
 
-  test "the type select ends with Page for someone who may create pages, and the bar has no New page or Upload image buttons" do
+  test "POST dashboard/draft is gone" do
+    sign_in_as users(:one)
+    assert_no_difference -> { Post.count } do
+      post "/cs-studio/dashboard/draft", params: { title: "New idea", content_type: "blog" }
+    end
+    assert_response :not_found
+    assert_not Rails.application.routes.url_helpers.respond_to?(:admin_dashboard_draft_path)
+    assert_not respond_to?(:admin_dashboard_draft_path)
+  end
+
+  test "the full audit log link needs audit.view" do
     sign_in_as users(:one)
     get admin_root_path
-    assert_equal "page", css_select("select[name=content_type] option").last["value"]
-    assert_select "select[name=content_type] option", text: "Page"
-    assert_select "a", text: "Upload image", count: 0
-    assert_select "form[action='#{admin_dashboard_draft_path}'] a[data-admin--ui--dialog-id-param=new-page-dialog][hidden]", count: 1
     assert_select "a", text: /Full audit log/
-  end
 
-  test "Page is offered only with pages.create, and the audit link needs audit.view" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "select[name=content_type] option[value=page]", count: 0
     assert_select "a", text: /Full audit log/, count: 0
   end
 
-  test "submitting the quick draft form with Page goes to the standalone New page screen" do
+  # Drafts are tiles: each its own record's type, title, excerpt and time.
+  test "Pick up where you left off draws the viewer's drafts as tiles that end in Continue" do
+    draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
     sign_in_as users(:one)
-    assert_no_difference -> { Post.count + Page.count } do
-      post admin_dashboard_draft_path, params: { title: "Ignored", content_type: "page" }
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-drafts] ul.admin-draft-tiles > li > article.admin-draft-tile" do
+      assert_select "a.admin-draft-tile__link[href='#{admin_post_path(draft)}']", text: "Half-written"
+      assert_select "span.admin-row-verb", "Continue"
     end
-    assert_redirected_to new_admin_page_path
+    assert_select "section[aria-labelledby=dashboard-drafts] a[aria-label='All drafts'][href='#{admin_posts_path(scope: "drafts")}']", text: "→"
   end
 
   # Everything a row renders -- editor paths, type labels, the activity
@@ -243,7 +240,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     counts = [ 1, 20 ].map do |n|
       n.times do |i|
         Current.set(actor: me, channel: :admin) do
-          create_post(title: "D#{n}-#{i}", published: false)
+          create_post(title: "D#{n}-#{i}", published: false).update_columns(excerpt: { Locales.default => "An excerpt #{i}" })
           create_post(title: "S#{n}-#{i}", published: false).update_columns(published_at: (i + 1).days.from_now)
           create_page(title: "P#{n}-#{i}", published: false)
           create_media_asset.tap { |asset| Audit.record("media.uploaded", subject: asset) }
@@ -263,7 +260,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
       callback = ->(*, payload) { queries += 1 unless payload[:name] == "SCHEMA" || payload[:sql].start_with?("BEGIN", "COMMIT", "SAVEPOINT", "RELEASE") }
       ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { get admin_root_path }
       assert_response :ok
-      assert_select "section[aria-labelledby=dashboard-drafts] li"
+      assert_select "section[aria-labelledby=dashboard-drafts] article.admin-draft-tile p.line-clamp-2", text: /An excerpt/
       assert_select "section[aria-labelledby=dashboard-activity] li"
       assert_select "section[aria-labelledby=dashboard-needs-translation] li"
       assert_select ".admin-waiting-row", count: 5

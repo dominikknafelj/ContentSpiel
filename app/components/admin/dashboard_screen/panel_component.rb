@@ -21,8 +21,11 @@ module Admin
     # The rows are slots (`with_row`), whatever the caller renders for them;
     # the panel only caps them (`LIMIT`, `limit:` for another cap, `limit: nil`
     # for none: the activity feed, whose own query already limits it), so a
-    # list that returns more cannot grow the panel. `link:` is the `[path,
-    # label]` of the "→" (nil when the viewer has no fuller list to open).
+    # list that returns more cannot grow the panel. `layout: :tiles` lays the
+    # rows out as tiles (`ul.admin-draft-tiles`, Pick up where you left
+    # off's) instead of ruled rows; each tile draws its own card. `link:` is
+    # the `[path, label]` of the "→" (nil when the viewer has no fuller list
+    # to open).
     #
     # With no rows the panel says `empty` as one quiet line in dim,
     # left-aligned where the first row would be. It is
@@ -40,6 +43,7 @@ module Admin
     class PanelComponent < Admin::AdminComponent
       LIMIT = 5
       KINDS = %i[action shortcuts information].freeze
+      LAYOUTS = %i[rows tiles].freeze
 
       renders_many :rows
       renders_one :badge
@@ -48,8 +52,9 @@ module Admin
       # Drawn after the empty line, only while the panel has no rows: a link, which the caller builds.
       renders_one :empty_action
 
-      def initialize(kind:, title:, line:, id:, empty:, link: nil, limit: LIMIT)
+      def initialize(kind:, title:, line:, id:, empty:, link: nil, limit: LIMIT, layout: :rows)
         raise ArgumentError, "unknown kind #{kind.inspect}" unless KINDS.include?(kind)
+        raise ArgumentError, "unknown layout #{layout.inspect}" unless LAYOUTS.include?(layout)
 
         @kind = kind
         @title = title
@@ -58,15 +63,18 @@ module Admin
         @empty = empty
         @link = link
         @limit = limit
+        @layout = layout
       end
 
       def visible_rows = limit ? rows.first(limit) : rows.to_a
 
       def panel_class = "admin-dashboard-panel admin-dashboard-panel--#{kind}"
 
+      def tiles? = layout == :tiles
+
       private
 
-      attr_reader :kind, :title, :line, :id, :empty, :link, :limit
+      attr_reader :kind, :title, :line, :id, :empty, :link, :limit, :layout
     end
   end
 end

@@ -1,0 +1,20 @@
+<%# Only the title is a link; the rest lies under its stretched `::after`. %>
+<article class="admin-draft-tile rounded-tile bg-surface shadow-1 p-4 hover:shadow-2">
+  <div class="text-sm text-meta">
+    <% if post? %>
+      <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>
+    <% else %>
+      <span><%= t(".page") %></span>
+    <% end %>
+  </div>
+  <h3 class="mt-1 min-w-0 truncate">
+    <%= link_to title, path, class: "admin-draft-tile__link text-h3 text-ink no-underline", aria: { describedby: verb_id }, data: { turbo_frame: "_top" } %>
+  </h3>
+  <% if excerpt %>
+    <p class="mt-1 line-clamp-2 text-sm text-meta"><%= excerpt %></p>
+  <% end %>
+  <div class="mt-3 flex items-center justify-between gap-3 text-sm text-meta">
+    <span><%= t(".edited_html", time: render(Admin::Ui::TimeAgoComponent.new(time: record.updated_at))) %></span>
+    <span id="<%= verb_id %>" class="admin-row-verb"><%= t(".continue") %></span>
+  </div>
+</article>

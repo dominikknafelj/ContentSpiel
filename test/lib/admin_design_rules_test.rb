@@ -153,9 +153,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       columns/image_column_component.rb columns/image_column_component.html.erb
       dashboard_screen/card_component.rb dashboard_screen/card_component.html.erb
       dashboard_screen/translation_card_component.rb dashboard_screen/translation_card_component.html.erb
+      dashboard_screen/quick_create_component.rb dashboard_screen/quick_create_component.html.erb
     ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
+    # The dashboard's buttons open the layout's New post and New page
+    # dialogs: it has no script of its own.
+    assert_not Rails.root.join("app/javascript/controllers/admin/dashboard").exist?, "app/javascript/controllers/admin/dashboard/"
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
     # Languages is a card of the Settings screen, an image's detail a panel
     # beside the Media grid, and the audit log words its rows through
@@ -1152,6 +1156,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    assert_equal 4, selectors.size, selectors.inspect
+    # The Waiting for you row and the draft tile around their stretched
+    # links, and the Notes for you row that is the link, each on hover and focus.
+    assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
+                   ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
+                   "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end
 end

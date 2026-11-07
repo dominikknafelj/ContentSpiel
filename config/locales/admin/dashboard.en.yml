@@ -8,7 +8,10 @@ en:
     dashboard:
       show:
         title: "Dashboard"
-        # The viewer's drafts: "Start a draft" moves the focus to the quick-create title.
+        # The heading row's two buttons, each opening its New dialog.
+        new_page: "New page…"
+        new_post: "New post…"
+        # The viewer's drafts: "Start a draft" opens the New post dialog.
         drafts:
           title: "Pick up where you left off"
           line: "Your drafts, the latest first."
@@ -22,8 +25,7 @@ en:
           empty: "Nothing scheduled."
           drafts_html: "Drafts %{arrow}"
           all: "All scheduled posts"
-        # Published and scheduled pages and posts whose rows have moved on
-        # from what the site shows.
+        # The latest changes from the audit log; "Full audit log →" for audit.view.
         activity:
           title: "What changed recently"
           line: "The latest changes to pages, posts and images."

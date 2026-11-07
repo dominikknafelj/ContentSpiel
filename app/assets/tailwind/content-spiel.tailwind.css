@@ -623,6 +623,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @container admin-dashboard (min-width: 60rem) {
   .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* The dashboard's heading row: the heading, then New page… and New post…
+   at its end. It wraps, so on a narrow screen the buttons go under the
+   heading rather than crushing it. */
+.admin-dashboard__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.admin-dashboard__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 /* A dashboard panel (`Admin::DashboardScreen::PanelComponent`): a card
    (elevation 1, `rounded-card`) whose head holds its heading and one line.
    The head is tinted by the panel's kind, and the heading and the line take
@@ -651,14 +656,24 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-waiting-row__link::after { content: ""; position: absolute; inset: 0; }
 .admin-waiting-row__link:focus-visible { outline: none; }
 .admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* Pick up where you left off's tiles (`Admin::DashboardScreen::DraftTileComponent`),
+   one column. A tile presses as one: its title link's `::after` covers the
+   tile, rounded with it, and the focus ring is drawn on it. */
+.admin-draft-tiles { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
+.admin-draft-tile { position: relative; }
+.admin-draft-tile__link::after { content: ""; position: absolute; inset: 0; border-radius: var(--cs-radius-tile); }
+.admin-draft-tile__link:focus-visible { outline: none; }
+.admin-draft-tile__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row around its stretched link, the Notes for you
-   row that is the link). */
+   (the Waiting for you row and the draft tile around their stretched
+   links, the Notes for you row that is the link). */
 .admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
 .admin-waiting-row:hover .admin-row-verb,
 .admin-waiting-row:focus-within .admin-row-verb,
+.admin-draft-tile:hover .admin-row-verb,
+.admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
 a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 /* The editors' rail. The editor area (`#editing`, the live region) is the

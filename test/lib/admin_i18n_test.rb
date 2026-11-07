@@ -147,6 +147,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/dashboard_screen/waiting_panel_component.html.erb
     app/components/admin/dashboard_screen/waiting_row_component.rb
     app/components/admin/dashboard_screen/waiting_row_component.html.erb
+    app/components/admin/dashboard_screen/draft_tile_component.rb
+    app/components/admin/dashboard_screen/draft_tile_component.html.erb
     app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
