@@ -6,18 +6,18 @@ en:
   admin:
     components:
       editor_screen:
-        # A block's form drawn as the open panel of a section (sections spec
-        # §4.3). The rest of the block card is not converted yet. The panel's
-        # heading is `editor_screen.panel_title`. `move_into` is the one item
-        # of a top-level card's "⋯" menu that sections added (spec §4.4).
+        # A block's form drawn as the open panel of a section. The rest of the
+        # block card is not converted yet. The panel's heading is
+        # `editor_screen.panel_title`. `move_into` is the one item of a
+        # top-level card's "⋯" menu that sections added.
         block_card:
           close: "Close"
           move_into: "Move into section…"
           take_over: "Take over"
 
         # The page's one "+ Add block" (a menu headed "Add a block", whose name
-        # `menu_heading` is too) and the "+ Add" at the end of a section's lane
-        # (sections spec §4.2), named for its column.
+        # `menu_heading` is too) and the "+ Add" at the end of a section's lane,
+        # named for its column.
         block_picker:
           add_block: "+ Add block"
           menu_heading: "Add a block"
@@ -28,8 +28,8 @@ en:
         # name, as a link to its tab.
         shared_fields:
           code_not_translated_html: "Code isn't translated. Edit it on the %{language} tab."
-        # One line of a block's content on its tile in a section (sections
-        # spec §4.2), and what marks a tile that needs attention.
+        # One line of a block's content on its tile in a section, and what
+        # marks a tile that needs attention.
         tile_summary:
           unavailable: "Unavailable type — %{type}"
           no_image: "No image chosen"
@@ -58,7 +58,7 @@ en:
             post_list:
               any_type: "All posts"
               tag: "tag %{name}"
-        # A tile's "⋯" menu (sections spec §4.4): every move a drag makes,
+        # A tile's "⋯" menu: every move a drag makes,
         # by name. `actions` names the button, whose label is the glyph.
         block_tile:
           actions: "Block actions"
@@ -109,7 +109,7 @@ en:
           title: "Delete this block?"
           body: "Blocks don’t go to the trash. This can’t be undone."
           # The body on a published or scheduled page, INSTEAD of the one
-          # above (drafts spec §9): there the delete is an unpublished change
+          # above: there the delete is an unpublished change
           # like any other, so "can't be undone" would be untrue of the block
           # and is true only of its notes.
           published_body: "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back."
@@ -186,7 +186,7 @@ en:
         section_card:
           name: "Section"
           move: "Move section"
-          # The header's two selects (sections spec §4.1); the labels name
+          # The header's two selects; the labels name
           # controls that show only their value.
           background: "Background"
           backgrounds:
@@ -217,7 +217,7 @@ en:
           delete_confirm: "Delete section"
           # The button that closes the settings under the head.
           close_settings: "Close"
-          # A section whose type is no longer registered (sections spec §6):
+          # A section whose type is not registered:
           # the unavailable block card's own heading, over the blocks it
           # holds. Its two buttons are `remove_keep` and `delete` above, the
           # menu's own words, and the sentence names all three ways out
@@ -273,9 +273,9 @@ en:
             full: "Full width"
           anchor: "#%{anchor}"
           label: "Section settings: %{word}"
-        # A section on a translation tab (sections spec §4.5): a heading over
+        # A section on a translation tab: a heading over
         # its blocks' cards. `unavailable` is the heading of one whose type
-        # is no longer registered.
+        # is not registered.
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
@@ -289,7 +289,7 @@ en:
         updated_mark:
           updated_by: "Updated by %{name}"
         # Said in the header's notice area when the open record is in the
-        # trash, deleted or no longer the viewer's (`admin--editing--live#gone`).
+        # trash, deleted or not the viewer's to open (`admin--editing--live#gone`).
         live_region:
           missing: "This page was moved to the trash or deleted, or you can no longer open it."
           missing_post: "This post was moved to the trash or deleted, or you can no longer open it."
@@ -366,7 +366,7 @@ en:
 
         # The header's two publishing parts (`PublishingStateComponent`): the
         # button that makes a published or scheduled record's rows what the
-        # public sees (drafts spec §4.3).
+        # public sees.
         publishing_state:
           # Both open a dialog, hence the ellipsis.
           publish_changes: "Publish changes…"
@@ -410,8 +410,51 @@ en:
           change_address: "Change address…"
           template: "Template"
           shared: "Shared by all languages."
+        # The New post and New page dialogs' shells (`new_*_dialog`), their
+        # forms (`new_*_form`), and the three sentences their shared script
+        # rewrites as the person types (`new_record`, handed over as
+        # `Admin::EditorScreen::NewRecordMessages::KEYS`). A form's own `url`
+        # and `not_listed` are the server's first drawing of the same line,
+        # so they read as `new_record`'s do.
+        new_post_dialog:
+          title: "New post"
+          loading: "Loading…"
+          load_failed: "The form couldn’t be loaded."
+          submit_failed: "Couldn’t save. Check your connection and try again."
+          retry: "Try again"
+          cancel: "Cancel"
+          create: "Create draft"
+        new_post_form:
+          title: "Title"
+          type: "Type"
+          url: "URL: %{path}"
+          not_listed: "Not listed on any page yet"
+          # With a Type select the select names the type; with one creatable
+          # type there is no select, and the note names it.
+          note: "Created as a draft in %{language}. Everything can be changed in the editor."
+          note_typed: "Created as a %{type} draft in %{language}. Everything can be changed in the editor."
+        new_page_dialog:
+          title: "New page"
+          loading: "Loading…"
+          load_failed: "The form couldn’t be loaded."
+          submit_failed: "Couldn’t save. Check your connection and try again."
+          retry: "Try again"
+          cancel: "Cancel"
+          create: "Create page"
         new_page_form:
+          title: "Title"
+          inside: "Inside"
           template: "Template"
+          untitled: "(untitled)"
+          # The error a create answers when the chosen parent went meanwhile.
+          gone: "Choose a page that still exists."
+          url: "URL: %{path}"
+          note: "Created as a draft at the end of %{title}. Drag it in the tree to move it."
+          home_note: "Created as the home page."
+        new_record:
+          url: "URL: %{path}"
+          not_listed: "Not listed on any page yet"
+          page_note: "Created as a draft at the end of %{title}. Drag it in the tree to move it."
         slug_dialog:
           title: "Change this page’s address"
           label: "Last part of the address"

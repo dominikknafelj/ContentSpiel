@@ -1,10 +1,11 @@
 module Admin
   module EditorScreen
-    # The form inside the New post dialog (design pass round 2, handoff
-    # `Studio Modals.dc.html`): a type picker (radio cards, each the type's dot
-    # and label, only the types the viewer may create -- `posts.create` scoped
-    # on `content_types`), Title and a live URL line, or "Not listed on any
-    # page yet" for a type no listing page lists. Its own component for the
+    # The form inside the New post dialog: Title, then Type (a `<select>` of
+    # only the types the viewer may create -- `posts.create` scoped on
+    # `content_types`), a live URL line, or "Not listed on any page yet" for a
+    # type no listing page lists, and the draft note. With one creatable type
+    # there is nothing to choose: a hidden input carries the type under the
+    # same id and target, and the note names it. Its own component for the
     # same two reasons as `NewPageFormComponent`: the no-JS `GET /posts/new`
     # page and the Turbo Stream that replaces just `#new-post-form` after a
     # refused create.
@@ -14,11 +15,12 @@ module Admin
     #
     # A post's URL is its canonical listing page's path plus its own slug
     # (`PublicSite::Paths.canonical_pages`, asked once for an unsaved post of
-    # every creatable type), so each radio carries `data-path`: that page's path in the editing
-    # language, locale prefix included, no trailing slash -- blank when no page
-    # lists the type, which is what makes `admin--editor--new-record` print the
-    # "Not listed" line. The first type is preselected unless one was asked for
-    # (a split button's type, the posts list) or typed before a refusal.
+    # every creatable type), so each option (or the hidden input) carries
+    # `data-path`: that page's path in the editing language, locale prefix
+    # included, no trailing slash -- absent when no page lists the type, which
+    # is what makes `admin--editor--new-record` print the "Not listed" line.
+    # The first type is preselected unless one was asked for (a split
+    # button's type, the posts list) or typed before a refusal.
     class NewPostFormComponent < Admin::AdminComponent
       FORM_ID = "new-post-form".freeze
       TITLE_ID = "new-post-title".freeze
@@ -51,13 +53,13 @@ module Admin
           posts = types.to_h { |type| [ type, Post.new(content_type: type.name) ] }
           pages = PublicSite::Paths.canonical_pages(posts.values)
           # One query for every listing page's stored path, not one per page.
-          stored = PublicPath.current.where(record_type: "Page", record_id: pages.values.compact.map(&:id), locale: locale).pluck(:record_id, :path).to_h
+          stored = PublicPath.current.where(record_type: Page.polymorphic_name, record_id: pages.values.compact.map(&:id), locale: locale).pluck(:record_id, :path).to_h
           types.map do |type|
             page = pages.fetch(posts.fetch(type))
             # A draft or private listing page's path is only for someone who may
             # read that page: a posts-only author reads "Not listed on any
             # page yet" instead of learning the slug path of a page they can't
-            # open (final review A, M4).
+            # open.
             visible = page && (page.live? || can?("pages.read", page))
             path = visible && stored[page.id] ? "#{prefix}#{stored[page.id]}".sub(%r{/+\z}, "") : nil
             Choice.new(name: type.name, label: type.label, path: path)
@@ -69,12 +71,17 @@ module Admin
 
       def selected?(choice) = choice.name == selected_choice.name
 
+      # One creatable type: no select, a hidden input (see the class comment).
+      def single_type? = choices.one?
+
       def initial_url
         path = selected_choice.path
-        path ? "URL: #{path}/#{title.parameterize}" : "Not listed on any page yet"
+        path ? t(".url", path: "#{path}/#{title.parameterize}") : t(".not_listed")
       end
 
-      def note = "Created as a draft in #{::Locales.name(locale)}. Everything can be changed in the editor."
+      def note
+        t(single_type? ? ".note_typed" : ".note", type: selected_choice.label.downcase, language: ::Locales.name(locale))
+      end
 
       def error_summary
         @error_summary ||= NewRecordErrors.summarise(errors)
@@ -83,6 +90,8 @@ module Admin
       def field_ids = { "title" => TITLE_ID, "slug" => TITLE_ID, "content_type" => TYPE_ID }
 
       def title_invalid? = error_summary.is_a?(Hash) && (error_summary.key?("title") || error_summary.key?("slug"))
+
+      def type_invalid? = error_summary.is_a?(Hash) && error_summary.key?("content_type")
 
       private
 

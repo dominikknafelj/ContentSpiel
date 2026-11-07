@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The New page and New post dialogs (design pass round 2, Task 15): where they
-# are rendered, what `create` accepts (`page[template]`, `post[content_type]`),
+# The New page and New post dialogs: where they are rendered, what `create` accepts (`page[template]`, `post[content_type]`),
 # and how a refusal comes back -- a Turbo Stream replacing just the dialog's
 # form for a Turbo submission, the standalone page for a plain request.
 class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
@@ -56,7 +55,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/new", params: { type: "now_update" }, headers: { "Turbo-Frame" => "new-post-form-frame" }
     assert_response :success
     assert_not_includes response.body, "<html"
-    assert_select "turbo-frame#new-post-form-frame input[value=now_update][checked]"
+    assert_select "turbo-frame#new-post-form-frame select#new-post-type option[value=now_update][selected]"
   end
 
   test "the form endpoints cost the same queries with 3 pages as with 30, and with 1 listing page as with 4" do
@@ -297,7 +296,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "turbo-stream[action=replace][target=new-post-form]"
     assert_select "template form#new-post-form .admin-error-summary", text: /1 thing needs fixing/
-    assert_select "template input[type=radio][value=now_update][checked]"
+    assert_select "template select#new-post-type option[value=now_update][selected]"
   end
 
   test "without JavaScript a refused post re-renders the standalone page" do
@@ -314,7 +313,8 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
 
-    assert_equal [ "now_update" ], css_select("input[type=radio]").map { |radio| radio["value"] }
+    assert_equal [ "now_update" ], css_select("input#new-post-type[type=hidden]").map { |input| input["value"] }
+    assert_select "select#new-post-type", count: 0
   end
 
   test "a type the viewer may not create is refused by the service, audited once" do
@@ -333,12 +333,12 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
     assert_select "p[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
-    assert_select "input[value=blog][data-path]", count: 0
+    assert_select "option[value=blog][data-path]", count: 0
 
     ContentBlock.create!(owner: @services, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     publish_changes(@services)
     get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
-    assert_select "input[value=blog][data-path='/services']"
+    assert_select "option[value=blog][data-path='/services']"
     assert_select "p[data-admin--editor--new-record-target=url]", text: "URL: /services/"
   end
 
@@ -417,7 +417,7 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_includes result.record.errors.full_messages, "a root page already exists"
   end
 
-  # Final review A, M3: a hand-made parameter shape is the ordinary refusal,
+  # A hand-made parameter shape is the ordinary refusal,
   # never a 500 (`page=x` has no `dig`; a hash title reached the slug fill; an
   # array parent id reached `find`).
   test "forged parameter shapes are a 422 or the default parent, never a 500" do

@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { slugify } from "controllers/admin/editor/slug_preview_controller"
+import { messages } from "i18n/messages"
 
 // The New page / New post dialogs (`NewPageDialogComponent`,
 // `NewPostDialogComponent`; one instance per dialog, on a wrapper inside its
@@ -26,7 +27,11 @@ import { slugify } from "controllers/admin/editor/slug_preview_controller"
 // 3. Keeps the URL line live as Title, Inside or the type change: the chosen
 //    parent's (or type's listing page's) path plus the slug of the typed title,
 //    slugified by the same function as `admin--editor--slug-preview`. A type no page
-//    lists says "Not listed on any page yet".
+//    lists says "Not listed on any page yet". The type is the Type select's
+//    chosen option, or, with one creatable type, the hidden input that carries
+//    it. The sentences are the dialog's `data-messages`
+//    (`Admin::EditorScreen::NewRecordMessages::KEYS`), the same words the
+//    server drew the line in first.
 // 4. Guards the Create button, which sits in the dialog's footer outside the
 //    form (tied to it with `form=`, so found by that attribute): disabled
 //    while a form is loading and while a submit is in flight, re-enabled only
@@ -140,15 +145,19 @@ export default class extends Controller {
   update() {
     if (!this.hasTitleTarget || !this.hasUrlTarget) return
     const slug = slugify(this.titleTarget.value)
+    const text = messages(this.element)
     if (this.kindValue === "page") {
       const option = this.hasInsideTarget ? this.insideTarget.selectedOptions[0] : null
-      this.urlTarget.textContent = `URL: ${option?.dataset.path ?? ""}/${slug}`
+      this.urlTarget.textContent = text.t("components.editor_screen.new_record.url", { path: `${option?.dataset.path ?? ""}/${slug}` })
       if (this.hasNoteTarget && option) {
-        this.noteTarget.textContent = `Created as a draft at the end of ${option.dataset.title}. Drag it in the tree to move it.`
+        this.noteTarget.textContent = text.t("components.editor_screen.new_record.page_note", { title: option.dataset.title })
       }
     } else {
-      const path = this.typeTargets.find((radio) => radio.checked)?.dataset.path
-      this.urlTarget.textContent = path === undefined ? "Not listed on any page yet" : `URL: ${path}/${slug}`
+      const type = this.hasTypeTarget ? this.typeTarget : null
+      const path = (type?.tagName === "SELECT" ? type.selectedOptions[0] : type)?.dataset.path
+      this.urlTarget.textContent = path === undefined
+        ? text.t("components.editor_screen.new_record.not_listed")
+        : text.t("components.editor_screen.new_record.url", { path: `${path}/${slug}` })
     }
   }
 

@@ -1,9 +1,8 @@
 require "test_helper"
 
-# CS Studio enforcement (access-control design spec §3.3 "Scopes for
-# reading", §3.4 "Controllers", §5 "Everywhere"): which modules each group
+# CS Studio enforcement: which modules each group
 # sees, 403 for an area without its permission, 404 -- never 403 -- for a
-# record outside the actor's read scope (Review Focus 2), lists/pickers/tree
+# record outside the actor's read scope, lists/pickers/tree
 # narrowed to what the actor may read, action buttons only when allowed, and
 # the "View only" editor for a record that's readable but not editable.
 #
@@ -29,11 +28,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
   test "each group sees only the modules it can open" do
     expectations = {
-      # Media library Task 7: the Media module needs only `media.upload`
-      # (design spec §6, `StudioModules.entries`), which `two`
+      # The Media module needs only `media.upload`
+      # (`StudioModules.entries`), which `two`
       # (Admin, every permission) and `author` (`media.upload` is one of
       # its own seeded grants, test/fixtures/access_control/grants.yml)
-      # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
+      # both hold, and `reader` (Read only) doesn't. Trash
       # opens for any one of the rights that act on a trashed item, so
       # `author`'s `media.upload` is enough -- its own trashed images.
       users(:two) => [ "Dashboard", "Pages", "Posts", "Media", "Forms", "Translations", "Tags", "Mind graph", "Trash", "Users", "Groups", "Settings", "AI assistant", "System status", "Audit log" ],
@@ -50,9 +49,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Pages in the mind graph, spec §2: the screen opens for someone who may
+  # Pages in the mind graph: the screen opens for someone who may
   # read a page OR a post, and the sidebar's link is shown to the same
-  # people (the ruling on Task 3's review): either right alone is enough.
+  # people: either right alone is enough.
   test "a branch editor without post permissions sees no Posts, and the Mind graph, which opens for pages alone" do
     grant_branch("pages.edit")
     sign_in_as(users(:editor_branch))
@@ -160,7 +159,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/cs-studio"
   end
 
-  # --- Out-of-scope records: 404, not 403 (Review Focus 2) -------------------
+  # --- Out-of-scope records: 404, not 403 ------------------------------------
 
   test "an author whose reads are limited to their own posts gets 404 for someone else's" do
     narrow_author_reads_to_own
@@ -349,7 +348,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Pointing here" # "Also related from"
   end
 
-  # Task 7 review ruling: the picker never submits a relation it didn't
+  # The picker never submits a relation it didn't
   # render, so `Posts::Save` keeps relations to unreadable posts whatever
   # the list says -- including `[""]` (the sentinel alone, "clear").
   test "saving the related posts keeps a relation to a post the actor can't read" do
@@ -368,7 +367,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal [ @other_post.id ], PostRelation.where(post: @own_post).pluck(:related_post_id)
   end
 
-  # --- Fix round 1 -------------------------------------------------------------
+  # --- Out of scope through a link, a preview, an autosave or a create -------
 
   test "the editor shows no title for a link to a page the actor can't read (I1)" do
     block = ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" },
@@ -503,8 +502,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/new"
 
     assert_response :success
-    assert_select "input[type=radio][name='post[content_type]']", count: 1
-    assert_select "input[type=radio][name='post[content_type]'][value='blog']"
+    assert_select "input[type=hidden][name='post[content_type]'][value='blog']"
+    assert_select "select#new-post-type", count: 0
   end
 
   # --- View only ---------------------------------------------------------------
@@ -692,7 +691,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
   # The seeded Author group reads every post -- through `posts.read`, and
   # through its unscoped `posts.create` too, since any write key implies
-  # `read` within its own scope (design spec §3.3 "Implication"). These
+  # `read` within its own scope. These
   # tests need an author whose reads stop at their own posts, so "someone
   # else's post" is out of scope: both grants become `own`.
   def narrow_author_reads_to_own

@@ -175,7 +175,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     find("button[aria-label='Choose another type of post']").click
     find("[role=menu] a", text: "New resume entry").click
     assert_selector "dialog#new-post-dialog[open]"
-    assert_selector "dialog#new-post-dialog input[type=radio][value=resume_entry]:checked", visible: :all, wait: 10
+    assert_selector "dialog#new-post-dialog select#new-post-type option[value=resume_entry]:checked", visible: :all, wait: 10
 
     # The pick came from a menu item: Escape hands focus back to the caret.
     find("dialog#new-post-dialog").send_keys(:escape)

@@ -7,8 +7,8 @@ require "test_helper"
 # every string literal that is a message key -- one whose first segment is a
 # top-level key under `admin` in the locale files -- and checks it is in a list
 # a `messages_data` call renders: `Admin::MessagesHelper::SCRIPT_MESSAGES` (the
-# set on <body>) or the literal arguments of a `messages_data(...)` call in a
-# view or component. A `${...}` in the script's key stands for one segment
+# set on <body>), the literal arguments of a `messages_data(...)` call in a
+# view or component, or a constant list splatted into one. A `${...}` in the script's key stands for one segment
 # and is served if any served key fits it, a `#{...}` in the server's for a
 # placeholder (`components.ui.chip_input.nouns.#{noun}.create`).
 class ScriptMessagesTest < ActiveSupport::TestCase
@@ -35,7 +35,9 @@ class ScriptMessagesTest < ActiveSupport::TestCase
       File.read(path).lines.reject { |line| line.match?(/\A\s*#/) }.join.gsub(/<%#.*?%>/m, "").scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten
     end
     literals = calls.flat_map { |call| call.scan(/"([^"]+)"/).flatten }
-    (Admin::MessagesHelper::SCRIPT_MESSAGES + literals).map { |key| key.gsub(/#\{.*?\}/, "x") }
+    # A list handed over whole, `messages_data(*Admin::EditorScreen::NewRecordMessages::KEYS)`.
+    splats = calls.flat_map { |call| call.scan(/\*((?:[A-Z]\w*::)+[A-Z_]+)\b/).flatten }.flat_map { |name| name.constantize }
+    (Admin::MessagesHelper::SCRIPT_MESSAGES + literals + splats).map { |key| key.gsub(/#\{.*?\}/, "x") }
   end
 
   test "the scripts ask for keys, and for each the server serves it" do

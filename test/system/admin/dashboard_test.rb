@@ -10,7 +10,7 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
   def create_post_in_dialog(title)
     assert_selector "dialog#new-post-dialog[open] form#new-post-form"
     within("dialog#new-post-dialog") do
-      find("label", text: ContentTypes.find("blog").label).click
+      select ContentTypes.find("blog").label, from: "Type"
       fill_in "new-post-title", with: title
       click_button "Create draft"
     end

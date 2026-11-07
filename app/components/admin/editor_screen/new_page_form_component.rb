@@ -1,7 +1,6 @@
 module Admin
   module EditorScreen
-    # The form inside the New page dialog (design pass round 2, handoff §10 /
-    # `Studio Modals.dc.html`): Title, Inside (a `<select>` of the pages the
+    # The form inside the New page dialog: Title, Inside (a `<select>` of the pages the
     # viewer may create under, indented by depth), Template and a live
     # "URL: /about/team" line. It is its own component, not part of the dialog,
     # for two reasons: the no-JS `GET /pages/new` page renders the same form
@@ -36,7 +35,10 @@ module Admin
       TITLE_ID = "new-page-title".freeze
       INSIDE_ID = "new-page-inside".freeze
       TEMPLATE_ID = "new-page-template".freeze
-      GONE = "Choose a page that still exists.".freeze
+
+      # The refusal a create answers when the chosen parent went meanwhile
+      # (trashed or purged after the form was drawn), on the Inside field.
+      def self.gone = I18n.t("admin.components.editor_screen.new_page_form.gone")
 
       Choice = Struct.new(:id, :title, :depth, :path, keyword_init: true) do
         def label = "#{"  " * depth}#{title}"
@@ -80,14 +82,14 @@ module Admin
           kept = Page.kept.select(:id, :parent_id, :position, :title).to_a
           allowed = AccessControl.creatable_parents(Current.actor, kept).map(&:id).to_set
           children = kept.group_by(&:parent_id).transform_values { |pages| ::TreeOrder.sort(pages) }
-          paths = allowed.empty? ? {} : PublicPath.current.where(record_type: "Page", record_id: allowed.to_a, locale: locale).pluck(:record_id, :path).to_h
+          paths = allowed.empty? ? {} : PublicPath.current.where(record_type: Page.polymorphic_name, record_id: allowed.to_a, locale: locale).pluck(:record_id, :path).to_h
           prefix = PublicSite::Urls.new.prefix(locale)
           list = []
           walk = lambda do |parent_id, depth|
             Array(children[parent_id]).each do |page|
               if allowed.include?(page.id)
                 list << Choice.new(id: page.id, depth: depth, path: path_for(prefix, paths[page.id]),
-                  title: ::Locales.read(page, :title, locale: locale).presence || "(untitled)")
+                  title: ::Locales.read(page, :title, locale: locale).presence || untitled)
               end
               walk.call(page.id, depth + 1)
             end
@@ -116,14 +118,12 @@ module Admin
 
       def title_value = title
 
-      def initial_url
-        "URL: #{selected_choice&.path}/#{title.parameterize}"
-      end
+      def initial_url = t(".url", path: "#{selected_choice&.path}/#{title.parameterize}")
 
       def initial_note
-        return "Created as the home page." unless selected_choice
+        return t(".home_note") unless selected_choice
 
-        "Created as a draft at the end of #{selected_choice.title}. Drag it in the tree to move it."
+        t(".note", title: selected_choice.title)
       end
 
       def error_summary
@@ -139,6 +139,10 @@ module Admin
       private
 
       attr_reader :url_options, :requested_parent_id, :errors
+
+      # `I18n.t`, not the view's `t`: `#new` asks for `choices` before the
+      # form is rendered, when a component has no view context yet.
+      def untitled = @untitled ||= I18n.t("admin.components.editor_screen.new_page_form.untitled")
 
       def path_for(prefix, path)
         path = path.to_s

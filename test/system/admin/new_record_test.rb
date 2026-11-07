@@ -1,8 +1,7 @@
 require "application_system_test_case"
 
-# The New page and New post dialogs in a real browser (design pass round 2,
-# Task 15): opened from the tree's "+", the pages empty state, ⌘K and the posts
-# list; preset Inside, a live URL line, a refusal that stays inside the open
+# The New page and New post dialogs in a real browser: opened from the tree's
+# "+", the pages empty state, ⌘K and the posts list; preset Inside, a live URL line, a refusal that stays inside the open
 # dialog, and a create that never loses typing still waiting in the editor.
 class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   setup do
@@ -90,9 +89,10 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal "Typed just now", @about.reload.subtitle
   end
 
-  test "New post: pick a type, type a title, Create opens that post's editor" do
-    visit admin_posts_path
-    await_admin_controllers
+  test "New post: type a title, choose a type, Create opens that post's editor" do
+    ContentBlock.create!(owner: @services, block_type: :post_list, position: 0, settings: { "content_type" => "now_update" })
+    publish_changes(@services)
+    visit_screen admin_posts_path
 
     click_link "+ New post", match: :first
     assert_selector "dialog#new-post-dialog[open]"
@@ -100,8 +100,11 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_eventually { page.evaluate_script("document.activeElement.id") == "new-post-title" }
     assert_selector "dialog#new-post-dialog [data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
 
-    find("dialog#new-post-dialog label", text: ContentTypes.find("now_update").label).click
     fill_in "new-post-title", with: "Writing this down"
+    assert_selector "dialog#new-post-dialog [data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
+    # The URL line follows the chosen option's `data-path`.
+    within("dialog#new-post-dialog") { select ContentTypes.find("now_update").label, from: "Type" }
+    assert_selector "dialog#new-post-dialog [data-admin--editor--new-record-target=url]", text: "URL: /services/writing-this-down"
     click_button "Create draft"
 
     assert_selector "header.admin-editor-header", wait: 10
@@ -117,7 +120,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     good = page.evaluate_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').getAttribute('data-admin--editor--new-record-url-value')")
     page.execute_script("document.querySelector('[data-admin--editor--new-record-kind-value=page]').setAttribute('data-admin--editor--new-record-url-value', '/cs-studio/pages/does-not-exist')")
 
-    # Review C, M15: the alert is empty until the failure happens (text that is
+    # The alert is empty until the failure happens (text that is
     # already in the page and merely un-hidden is not announced).
     assert_equal "", page.evaluate_script("document.querySelector('[data-admin--editor--new-record-target=failure] [role=alert]').textContent")
     click_link "+ New page"

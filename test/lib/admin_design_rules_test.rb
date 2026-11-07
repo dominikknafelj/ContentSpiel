@@ -332,7 +332,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   FIELD_LINE_EDGE = /(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-])/
   HAND_BUTTON_ALLOWED = {
     "admin-rich-text-button" => "the rich-text toolbar's toggles: `aria-pressed` draws their edge",
-    "has-checked:border-accent has-checked:bg-accent-tint" => "New post's type choice, a radio group drawn as tiles",
     "rounded-button border border-field-line px-2 py-1 text-sm text-meta" => "the top bar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare",
     "rounded-button border border-field-line px-2 py-1.5 text-left text-sm text-meta" => "the sidebar's ⌘K launcher, a launcher button drawn as a field-like box; it opens the palette, whose own input is bare"
   }.freeze
