@@ -272,7 +272,9 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
       queries
     end
     assert_equal counts.first, counts.last
-    assert_operator counts.last, :<=, 43, "the dashboard's statements: #{counts.last}"
+    # Waiting for you's count beside its heading is 3 of these: the threads'
+    # records in one statement and the unpublished ones in one per model.
+    assert_operator counts.last, :<=, 46, "the dashboard's statements: #{counts.last}"
   end
 
   test "a user with no groups sees only the open modules, no empty group headings, and No groups" do

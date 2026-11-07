@@ -22,7 +22,7 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
 
     assert_equal [ [ @page, "page", "Pricing", 2 ], [ @post, "post", "Hello", 1 ] ], rows.map { |row| [ row.record, row.kind, row.title, row.count ] }
     assert_equal [ :admin_page_path, [ @page.id ], { notes: "open" } ], rows.first.route.then { |route| [ route.name, route.args, route.params ] }
-    assert_equal 3, open_threads.total
+    assert_equal [ [ "Page", @page.id ], [ "Post", @post.id ] ].to_set, open_threads.record_keys
   end
 
   # Handoff "Open threads row": "type · last author · time".
@@ -65,9 +65,9 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal [ [ @quiet, 1 ], [ @page, 2 ], [ asset, 1 ] ].to_set, narrowed.rows.map { |row| [ row.record, row.count ] }.to_set
     assert_empty statements.grep(/\ASELECT "(pages|posts|media_assets)"\.\*/), "the records handed in are not read again"
     assert_equal @quiet, narrowed.rows.first.record
-    assert_equal 4, narrowed.total
+    assert_equal [ [ "Page", @page.id ], [ "Post", @quiet.id ], [ "Media::Asset", asset.id ] ].to_set, narrowed.record_keys
     assert_empty Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, records: []).rows
-    assert_equal 5, Dashboard::OpenThreads.new(actor: users(:two), channel: :admin).total
+    assert_equal 4, Dashboard::OpenThreads.new(actor: users(:two), channel: :admin).record_keys.size
   end
 
   test "five rows, read-scoped, in a constant number of statements" do
@@ -75,12 +75,12 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     posts.first(2).each { |post| note(post) }
     stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
     open_threads.rows # warm-up: the fixture user's grants are read once and kept on the object
-    few = capture_sql { open_threads.then { |query| [ query.rows, query.total ] } }.size
+    few = capture_sql { open_threads.then { |query| [ query.rows, query.record_keys.size ] } }.size
     posts.each { |post| note(post) }
 
     assert_equal 5, open_threads.rows.size
-    assert_equal 9, open_threads.total
-    assert_equal few, capture_sql { open_threads.then { |query| [ query.rows, query.total ] } }.size
-    assert_equal [ [], 0 ], open_threads(stranger).then { |query| [ query.rows, query.total ] }
+    assert_equal 7, open_threads.record_keys.size
+    assert_equal few, capture_sql { open_threads.then { |query| [ query.rows, query.record_keys.size ] } }.size
+    assert_equal [ [], 0 ], open_threads(stranger).then { |query| [ query.rows, query.record_keys.size ] }
   end
 end

@@ -7,8 +7,9 @@
     thread's row: this link is the EDITOR, whose GET reads nothing; the
     thread is fetched, and marked read, only by the drawer once the page is
     open. The focus ring is the browser's own, drawn inside the row
-    (`-outline-offset-2`): nothing in a read row is accent but the verb's
-    words, and accent in a marker means unread and for the viewer. %>
+    (`-outline-offset-2`): nothing in a read row is accent at rest -- the
+    verb is dim until the row is pointed at or focused -- and accent in a
+    marker means unread and for the viewer. %>
 <%= link_to path, class: "-mx-4 -my-2.5 grid min-w-0 flex-1 grid-cols-[7px_24px_1fr_auto_auto] items-start gap-2.5 px-4 py-[11px] no-underline hover:bg-paper focus-visible:-outline-offset-2",
       data: { delivery: row.id, unread: (true if row.unread), turbo_frame: "_top" } do %>
   <span class="mt-[9px] size-[7px] rounded-full <%= "bg-accent" if row.unread %>" aria-hidden="true"></span>

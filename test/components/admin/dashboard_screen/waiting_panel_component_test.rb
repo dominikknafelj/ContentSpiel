@@ -33,6 +33,29 @@ class Admin::DashboardScreen::WaitingPanelComponentTest < ViewComponent::TestCas
     end
   end
 
+  # The rows stop at five; the count says how many wait in all, under each
+  # filter, and a record with both reasons once under Everything.
+  test "a neutral count beside the heading says how many wait under the filter, and nothing at zero" do
+    panel
+    assert_no_selector "[data-waiting-total]"
+    panel("threads")
+    assert_no_selector "[data-waiting-total]"
+
+    discussed = Array.new(4) { |n| create_page(title: "Discussed #{n}") }
+    marked = Array.new(3) { |n| create_post(title: "Marked #{n}") }
+    both = create_page(title: "Both")
+    (discussed + [ both ]).each { |record| as(users(:one)) { assert Notes::Start.call(record, body: "A note").ok? } }
+    (marked + [ both ]).each { |record| record.update_columns(unpublished_changes_at: Time.current) }
+
+    { "everything" => [ 8, "8 waiting in all" ], "threads" => [ 5, "5 with open threads in all" ],
+      "unpublished" => [ 4, "4 with unpublished changes in all" ] }.each do |filter, (count, label)|
+      panel(filter)
+      assert_selector "header h2 + [data-waiting-total].text-count.text-meta[role=img][aria-label='#{label}']", exact_text: count.to_s
+      assert_no_selector "header [data-waiting-total][class*=accent]"
+    end
+    assert_selector "li", count: 4
+  end
+
   test "every row is a waiting row" do
     page_record = create_page(title: "Marked")
     page_record.update_columns(unpublished_changes_at: Time.current)

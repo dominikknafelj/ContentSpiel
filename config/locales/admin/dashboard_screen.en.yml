@@ -44,6 +44,18 @@ en:
             everything: "Everything"
             threads: "Open threads"
             unpublished: "Unpublished changes"
+          # The neutral count beside the heading, named for a screen reader:
+          # every record waiting under the filter, beyond the five shown.
+          total:
+            everything:
+              one: "%{count} waiting in all"
+              other: "%{count} waiting in all"
+            threads:
+              one: "%{count} with open threads in all"
+              other: "%{count} with open threads in all"
+            unpublished:
+              one: "%{count} with unpublished changes in all"
+              other: "%{count} with unpublished changes in all"
           # The empty line, per filter.
           empty:
             everything: "Nothing is waiting for you."

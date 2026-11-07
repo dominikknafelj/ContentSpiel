@@ -2,8 +2,9 @@ module Admin
   module Ui
     # A content type's colour mark plus its name. Six hues: indexes 1-6 are
     # filled dots, 7-12 the same hues as rings, 13+ cycle again -- and the
-    # name always accompanies the mark, so colour is never the only cue. The class names are spelled out in full
-    # (not interpolated) so Tailwind's scanner sees them.
+    # name always accompanies the mark, so colour is never the only cue. The
+    # class names are spelled out in full (not interpolated) so Tailwind's
+    # scanner sees them.
     class ContentTypeDotComponent < AdminComponent
       FILLED = %w[bg-cat-1 bg-cat-2 bg-cat-3 bg-cat-4 bg-cat-5 bg-cat-6].freeze
       RINGS = [ "border border-cat-1", "border border-cat-2", "border border-cat-3",

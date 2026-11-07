@@ -18,8 +18,9 @@ module Admin
     # the verb is "Review and publish…", a second link, a small secondary
     # raised over the stretched one, to the editor asked to open Publish
     # changes. Otherwise it is words, "Open thread" or "Open", that describe
-    # the title's link (`aria-describedby`): a link cannot hold a second
-    # link, and a press that opens nothing is never offered.
+    # the title's link (`aria-describedby`), dim at rest and accent while the
+    # row is pointed at or focused: a link cannot hold a second link, and a
+    # press that opens nothing is never offered.
     #
     # The marker is round in the content type's colour for a post and square
     # in meta for a page and an image: a shape as well as a colour, and the

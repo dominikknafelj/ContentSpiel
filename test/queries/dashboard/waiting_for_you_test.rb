@@ -145,6 +145,22 @@ class Dashboard::WaitingForYouTest < ActiveSupport::TestCase
     assert_not_includes waiting.rows.map(&:record), page
   end
 
+  test "the total counts every record under the filter, beyond the five rows, a record with both reasons once" do
+    discussed = Array.new(6) { |n| create_page(title: "Discussed #{n}") }
+    marked = Array.new(2) { |n| create_post(title: "Marked #{n}") }
+    discussed.each_with_index { |page, n| note(page, at: @base + n.minutes) }
+    marked.each { |post| mark(post, @base) }
+    mark(discussed.first, @base)
+    binned = create_post(title: "Binned")
+    mark(binned, @base)
+    as(users(:one)) { assert Trash::Move.call(binned).ok? }
+
+    assert_equal [ 8, 6, 3 ], %w[everything threads unpublished].map { |filter| waiting(filter:).total }
+    assert_equal 5, waiting.rows.size
+    nobody = User.create!(email_address: "none@example.com", password: "a-long-password-1")
+    assert_equal [ 0, 0, 0 ], %w[everything threads unpublished].map { |filter| waiting(nobody, filter:).total }
+  end
+
   test "the same statements for one row of each as for five" do
     pages = Array.new(5) { |n| create_page(title: "Discussed #{n}") }
     posts = Array.new(5) { |n| create_post(title: "Marked #{n}") }

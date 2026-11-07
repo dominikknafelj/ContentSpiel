@@ -1135,4 +1135,23 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
     assert_empty offences, "the notes' open state is the rail's current tab, and the tree never folds for the notes"
   end
+
+  # A row's closing verb, when it is words: dim at rest, so a read row holds
+  # no accent, and accent only under the pointer or the focus. Read from the
+  # BUILT stylesheet (CI builds it before the unit shards), so a class name
+  # that only looks right, or a rule a later one overrides, cannot pass.
+  test "a row's closing verb is dim at rest and accent only on the row's hover or focus" do
+    built = Rails.root.join("app/assets/builds/tailwind.css")
+    assert built.file?, "run bin/rails tailwindcss:build first"
+    rules = built.read.gsub(%r{/\*.*?\*/}m, "").scan(/([^{}]+)\{([^{}]*)\}/).map { |selector, body| [ selector.split(",").map(&:strip), body ] }
+    colours = rules.filter_map { |selectors, body| [ selectors, body[/(?<![-\w])color:\s*([^;]+)/, 1] ] if selectors.any? { |selector| selector.include?(".admin-row-verb") } && body.match?(/(?<![-\w])color:/) }
+
+    rest = colours.select { |selectors, _| selectors.include?(".admin-row-verb") }
+    assert_equal [ "var(--cs-dim)" ], rest.map(&:last), "the verb at rest"
+    lit = colours - rest
+    assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
+    selectors = lit.flat_map(&:first)
+    assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
+    assert_equal 4, selectors.size, selectors.inspect
+  end
 end

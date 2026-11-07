@@ -14,8 +14,12 @@ module Admin
     # frame's `src` and never the page's address: a live note reloads the
     # frame's `src` (`admin--notes--inbox#reload`), which keeps the choice.
     #
-    # Every row is a `WaitingRowComponent`; the empty line says what the
-    # filter found nothing of.
+    # Beside the heading, a neutral count of every record waiting under the
+    # filter (`Dashboard::WaitingForYou#total`), so a sixth one is not
+    # invisible; nothing at zero, where the empty line speaks. Never accent:
+    # it is everybody's work, not what is unread for the viewer. Every row
+    # is a `WaitingRowComponent`; the empty line says what the filter found
+    # nothing of.
     class WaitingPanelComponent < Admin::AdminComponent
       FRAME = "dashboard-waiting".freeze
 

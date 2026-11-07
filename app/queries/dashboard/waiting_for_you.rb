@@ -73,11 +73,28 @@ module Dashboard
       end
     end
 
+    # How many records wait under the filter, the rows shown and beyond
+    # them: the panel's count. Read from the same scoped sources as the rows
+    # (`OpenThreads#record_keys`, `Feed#unpublished_keys`), a constant number
+    # of statements; under "everything" a record with both reasons counts
+    # once.
+    def total
+      @total ||= case filter
+      when "threads" then open_threads.record_keys.size
+      when "unpublished" then feed.unpublished_keys.size
+      else (open_threads.record_keys | feed.unpublished_keys).size
+      end
+    end
+
     private
 
-    def threads = OpenThreads.new(actor: @actor, channel: @channel, limit: @limit).rows
+    def open_threads = @open_threads ||= OpenThreads.new(actor: @actor, channel: @channel, limit: @limit)
 
-    def unpublished = Feed.new(actor: @actor, channel: @channel).unpublished_changes(limit: @limit)
+    def feed = @feed ||= Feed.new(actor: @actor, channel: @channel)
+
+    def threads = open_threads.rows
+
+    def unpublished = feed.unpublished_changes(limit: @limit)
 
     # Both sources grouped by record, the newest `limit` kept.
     def merged

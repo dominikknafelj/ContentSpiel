@@ -89,6 +89,13 @@ module Dashboard
         .flat_map(&:to_a).then { |records| newest_first(records, :unpublished_changes_at, limit) }
     end
 
+    # `[type, id]` of every page and post the viewer may read whose rows
+    # moved on from what the site shows, beyond the listed ones: what
+    # Waiting for you counts. One pluck per model.
+    def unpublished_keys
+      @unpublished_keys ||= page_and_post_relations { |r| r.with_unpublished_changes.pluck(:id).map { |id| [ r.model.name, id ] } }.flatten(1).to_set
+    end
+
     # Whether a record `#going_live_next` returned is mine (a post I wrote,
     # or one whose newest change is mine) -- the card's "by you".
     def mine?(record)

@@ -59,6 +59,18 @@ class Admin::DashboardWaitingTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#dashboard-waiting p[data-panel-empty]", "No unpublished changes."
   end
 
+  test "an unknown filter is answered as Everything" do
+    marked = create_post(title: "Marked")
+    mark(marked)
+
+    [ { filter: "bogus" }, { filter: [ "threads" ] }, { filter: { a: 1 } } ].each do |params|
+      get admin_dashboard_waiting_path(params), headers: FRAME
+      assert_response :ok, params.inspect
+      assert_select "nav[aria-label=Show] a[aria-current=page]", { count: 1, text: "Everything" }, params.inspect
+      assert_select ".admin-waiting-row", text: /Marked/
+    end
+  end
+
   test "the panel's address outside a frame goes to the dashboard" do
     get admin_dashboard_waiting_path(filter: "threads")
     assert_redirected_to admin_root_path
@@ -78,7 +90,7 @@ class Admin::DashboardWaitingTest < ActionDispatch::IntegrationTest
   # shown are of the same kinds with one set as with twenty: an image's
   # thread, a page's thread, a page and a post the feed alone brings, and a
   # post with both reasons, for a viewer who may publish pages and posts.
-  test "Waiting for you costs the same statements with one row as with five" do
+  test "Waiting for you costs the same statements with one set of every kind as with twenty" do
     counts = [ 1, 20 ].map do |n|
       n.times do |i|
         note(create_media_asset)
@@ -92,10 +104,13 @@ class Admin::DashboardWaitingTest < ActionDispatch::IntegrationTest
       assert_select ".admin-waiting-row", count: 5
       assert_select ".admin-waiting-row a", text: "Review and publish…", count: 3
       assert_select ".admin-waiting-row .admin-notes-marker", count: 3
+      assert_select "[data-waiting-total]", text: { 1 => "5", 20 => "105" }.fetch(n)
       statements
     end
 
     assert_equal counts.first, counts.last
-    assert_operator counts.last, :<=, 15, "Waiting for you's statements: #{counts.last}"
+    # 15 for the rows, and 3 for the count beside the heading: the threads'
+    # records in one statement and the unpublished ones in one per model.
+    assert_operator counts.last, :<=, 18, "Waiting for you's statements: #{counts.last}"
   end
 end

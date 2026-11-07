@@ -55,9 +55,10 @@ module Dashboard
       end
     end
 
-    # Every open thread the viewer may read, on the rows shown and beyond
-    # them: the number in the card's header. One COUNT.
-    def total = @total ||= unresolved.count
+    # `[type, id]` of every record the viewer may read that has an open
+    # thread, on the rows shown and beyond them: what Waiting for you counts.
+    # One statement, whatever the number of records.
+    def record_keys = @record_keys ||= unresolved.distinct.pluck(:container_type, :container_id).to_set
 
     private
 
