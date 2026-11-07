@@ -1,7 +1,7 @@
 module Admin
   module Shell
-    # The divider on the page tree's right edge (Claude Design, 2026-10-13,
-    # T1): the tree column is as wide as the person made it. A `separator`
+    # The divider on the tree column's right edge: the column is as wide as
+    # the person made it, on every screen that has one. A `separator`
     # that takes the focus and says its width (`aria-valuenow`, in pixels,
     # between `aria-valuemin` and `aria-valuemax`), which is ARIA's window
     # splitter: dragged with the pointer, moved with the arrow keys, reset by
@@ -11,18 +11,26 @@ module Admin
     # (the column is then simply not adjustable).
     #
     # Rendered by the layout as the LAST child of `aside#tree-column`, after
-    # the tree: outside `turbo-frame#tree`, which a move replaces, and after
-    # every row, so the shell's drawer still moves the focus to the tree's
-    # first link when it opens and Tab reaches the divider between the tree
-    # and the editor, which is where it stands.
+    # what the screen puts in the column: outside the Pages tree's
+    # `turbo-frame#tree`, which a move replaces, and after every row, so the
+    # shell's drawer still moves the focus to the column's first control when
+    # it opens and Tab reaches the divider between the column and the screen,
+    # which is where it stands.
+    #
+    # `subject:` is what the column holds (`TreeSubjects`), and names the
+    # separator and its tooltip in its words ("Page tree width", "List
+    # width"). The column hands the script the tooltip's key with the other
+    # values (`.column_data`), so the sentence it writes again is the
+    # subject's too.
     #
     # THE CONTROLLER IS THE COLUMN'S. `admin--shell--tree-width` stands on
     # the aside (`.column_data`, which the layout hands it), because the
     # column holds the three things it works with: this divider (its
-    # `divider` target), the tree head's "Hide page tree" (`fold`, inside
-    # the tree's frame, so it comes and goes with a move) and the strip's
-    # "Show page tree" (`unfold`, `Admin::Shell::TreeFoldComponent`). What
-    # is here are the divider's target, its gestures and the tooltip's words.
+    # `divider` target), the column head's hide button (`fold`,
+    # `Admin::Ui::TreeHideComponent`, which in Pages is inside the tree's
+    # frame, so it comes and goes with a move) and the strip's button
+    # (`unfold`, `Admin::Shell::TreeFoldComponent`). What is here are the
+    # divider's target, its gestures and the tooltip's words.
     #
     # THE NUMBERS are here once for the three that need them: this markup, the
     # layout's head script (`admin/shared/_tree_head`, which applies the
@@ -46,14 +54,15 @@ module Admin
     #   The divider stops there before `MAX` on a narrow window.
     # - `SIDEBAR`: the modules sidebar, where it is a column of the grid (from
     #   1280px; below that it is a drawer and takes no room).
-    # - `STRIP`: the folded tree, a strip that holds "Show page tree"
+    # - `STRIP`: the folded column, a strip that holds its one button
     #   (`--admin-tree-strip`, 2.75rem): the stylesheet's alone, since the
     #   fold keeps the chosen width and no script counts the strip.
     #
     # THE TOOLTIP is the shared one (`Admin::Ui::TooltipComponent`), with the
     # divider as its host: on keyboard focus at once, on hover after its own
     # wait. Its text names the current width, so the script writes it again
-    # whenever the width changes, from the same key (`data-messages`). The
+    # whenever the width changes, from the same key (`data-messages`, and the
+    # key's name as the column's `tooltip-key` value). The
     # bubble hangs from a small sticky box (`.admin-tree-divider__tip`) and
     # not from the divider itself, which is as tall as the page: "under the
     # host" would be below the last row of a long page.
@@ -88,27 +97,38 @@ module Admin
         turbo:before-cache@document->admin--shell--tree-width#rest
       ].join(" ").freeze
 
-      # The `data:` of `aside#tree-column`: the controller, every number and
-      # both storage keys as its values, and the column's actions.
-      def self.column_data
+      # The `data:` of `aside#tree-column`: the controller, every number,
+      # both storage keys and the subject's tooltip key as its values, and the
+      # column's actions.
+      def self.column_data(subject:)
         {
           controller: "admin--shell--tree-width",
           action: COLUMN_ACTIONS,
           "admin--shell--tree-width-min-value": MIN, "admin--shell--tree-width-default-value": DEFAULT, "admin--shell--tree-width-max-value": MAX,
           "admin--shell--tree-width-editor-value": EDITOR, "admin--shell--tree-width-sidebar-value": SIDEBAR,
-          "admin--shell--tree-width-key-value": STORAGE_KEY, "admin--shell--tree-width-fold-key-value": FOLD_KEY
+          "admin--shell--tree-width-key-value": STORAGE_KEY, "admin--shell--tree-width-fold-key-value": FOLD_KEY,
+          "admin--shell--tree-width-tooltip-key-value": TreeSubjects.key(subject, :divider_tooltip)
         }
+      end
+
+      def initialize(subject:)
+        TreeSubjects.fetch(subject)
+        @subject = subject.to_s
       end
 
       def call
         tag.div(class: "admin-tree-divider", role: "separator", tabindex: 0,
-          aria: { orientation: "vertical", controls: "tree-column", label: t(".label"), valuenow: DEFAULT, valuemin: MIN, valuemax: MAX },
+          aria: { orientation: "vertical", controls: "tree-column", label: t("admin.#{TreeSubjects.key(subject, :divider)}"), valuenow: DEFAULT, valuemin: MIN, valuemax: MAX },
           data: divider_data) do
-          tag.span(class: "admin-tree-divider__tip") { render Admin::Ui::TooltipComponent.new(text: t(".tooltip", width: DEFAULT)) }
+          tag.span(class: "admin-tree-divider__tip") { render Admin::Ui::TooltipComponent.new(text: t("admin.#{tooltip_key}", width: DEFAULT)) }
         end
       end
 
       private
+
+      attr_reader :subject
+
+      def tooltip_key = TreeSubjects.key(subject, :divider_tooltip)
 
       def divider_data
         tooltip = Admin::Ui::TooltipComponent.host_data
@@ -116,7 +136,7 @@ module Admin
           controller: tooltip[:controller],
           "admin--shell--tree-width-target": "divider",
           action: "#{tooltip[:action]} #{ACTIONS}",
-          messages: messages_data("components.shell.tree_divider.tooltip")
+          messages: messages_data(tooltip_key)
         }
       end
     end

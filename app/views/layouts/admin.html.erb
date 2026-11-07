@@ -22,10 +22,16 @@
   </head>
 
   <%# CS Studio's shell: a grid of
-      up to three columns -- modules, an optional page tree, and the main
-      content frame -- plus, below 1280px, a top bar. The grid quietly
-      collapses to two columns on any screen with no tree column of its own
-      (every one but Pages -- `content_for :tree` is never set outside it).
+      up to three columns -- modules, an optional tree column, and the main
+      content frame -- plus, below 1280px, a top bar. The tree column holds
+      what a screen puts in `content_for :tree`: today the Pages tree (the
+      Pages screen and the editors) and the mind graph's list. The grid
+      quietly collapses to two columns on any screen that puts nothing there.
+      `content_for :tree_label` names what the column holds
+      (`admin_tree_subject`, "pages" when a screen gives none), which picks
+      the words of the parts the shell draws for it -- the top bar's button,
+      the fold strip and the divider -- and whether its content fills it
+      from top to bottom (`admin-shell__tree--fill`, the mind graph's list).
 
       The sidebar and tree columns are *drawers* below 1280px / 1024px
       (`.admin-shell` in content-spiel.tailwind.css): the same
@@ -92,7 +98,7 @@
         data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes--drawer#selected mousedown->admin--notes--drawer#release:capture admin--notes--drawer:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes--drawer#shellOpened admin--ui--rail:shown->admin--notes--drawer#shown admin--ui--rail:connected->admin--notes--drawer#railConnected turbo:load@document->admin--notes--drawer#syncAddress turbo:before-fetch-request@document->admin--notes--live#tag turbo:before-fetch-request@document->admin--notes--live#asked turbo:before-frame-render@document->admin--notes--live#answered admin--notes--drawer:opened->admin--notes--live#shown turbo:frame-load@document->admin--notes--live#fresh visibilitychange@document->admin--notes--live#visible admin--notes--inbox:watching@document->admin--notes--live#watched admin--notes--inbox:delivery@document->admin--notes--alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render "admin/shared/notes_alert_settings" %>
-    <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
+    <%= render Admin::Shell::TopBarComponent.new(tree: (admin_tree_subject if content_for?(:tree))) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">
       <%# The modules registered in `StudioModules`, narrowed to what this user
           can see (`admin_modules`: a module
@@ -109,19 +115,21 @@
       <% if content_for?(:tree) %>
         <%# The column carries the controller of its width and its fold
             (`admin--shell--tree-width`, `TreeDividerComponent.column_data`),
-            which reaches the divider, the tree head's "Hide page tree" and
-            the strip's "Show page tree" as its targets. %>
-        <%= tag.aside id: "tree-column", class: "admin-shell__tree", tabindex: "-1",
-              data: { "admin--shell--drawer-target": "panel", drawer: "tree" }.merge(Admin::Shell::TreeDividerComponent.column_data) do %>
-          <%# The folded tree's strip ("Show page tree"): first, outside the
-              tree's frame, shown only while folded from 1024px. %>
-          <%= render Admin::Shell::TreeFoldComponent.new %>
+            which reaches the divider, the column head's hide button
+            (`Admin::Ui::TreeHideComponent`, the screen's) and the strip's
+            button as its targets. %>
+        <% subject = admin_tree_subject %>
+        <%= tag.aside id: "tree-column", class: [ "admin-shell__tree", ("admin-shell__tree--fill" if Admin::Shell::TreeSubjects.fill?(subject)) ], tabindex: "-1",
+              data: { "admin--shell--drawer-target": "panel", drawer: "tree" }.merge(Admin::Shell::TreeDividerComponent.column_data(subject: subject)) do %>
+          <%# The folded column's strip: first, outside what the screen puts
+              in the column (the Pages tree's frame, which a move replaces),
+              shown only while folded from 1024px. %>
+          <%= render Admin::Shell::TreeFoldComponent.new(subject: subject) %>
           <%= yield :tree %>
           <%# The divider the column is resized by, on its right edge
-              (`Admin::Shell::TreeDividerComponent`): last, after the tree's
-              own frame, which a move replaces. Not shown where the tree is a
-              drawer. %>
-          <%= render Admin::Shell::TreeDividerComponent.new %>
+              (`Admin::Shell::TreeDividerComponent`): last, after the
+              screen's content. Not shown where the column is a drawer. %>
+          <%= render Admin::Shell::TreeDividerComponent.new(subject: subject) %>
         <% end %>
       <% end %>
 

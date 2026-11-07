@@ -212,6 +212,21 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1024px) {
   .admin-shell__tree { position: sticky; top: var(--admin-top-offset); align-self: start; height: calc(100dvh - var(--admin-top-offset)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 }
+/* A COLUMN WHOSE CONTENT FILLS IT (`Admin::Shell::TreeSubjects`, `fill:`;
+   the mind graph's list): the window-high column above is a flex column, in
+   which the screen's region (`.admin-shell__tree-region`, a child of the
+   column) takes the height its head and find field leave, so a short list,
+   its loading line or its empty line stand in a region as tall as the
+   column. A longer one grows the region past it and the column scrolls, as
+   every column does: this rule adds no geometry of its own (no position, no
+   height, no scroll), which is the rule above's for every screen. Only while
+   unfolded: folded, the column is the strip's row (THE TREE FOLDS TO A
+   STRIP, below). Below 1024px the column is the drawer, and the region is as
+   tall as its rows. */
+@media (min-width: 1024px) {
+  :root:not([data-tree-folded]) .admin-shell__tree--fill { display: flex; flex-direction: column; }
+  :root:not([data-tree-folded]) .admin-shell__tree--fill > .admin-shell__tree-region { flex: 1; }
+}
 /* The Translations row's action word sits under the row's stretched link, so it
    is shown by opacity, never visibility. */
 .admin-translation-row__action { opacity: 0; }
@@ -255,10 +270,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-tree-divider { left: calc(var(--admin-tree-column) - 4.5px); }
 }
 :root[data-tree-resizing], :root[data-tree-resizing] * { cursor: col-resize; user-select: none; }
-/* THE TREE FOLDS TO A STRIP. "Hide page tree" in the tree's head
-   (`.admin-tree-hide`) sets `data-tree-folded` on <html>, and "Show page
-   tree", the strip's one button (`.admin-tree-fold`,
-   `Admin::Shell::TreeFoldComponent`), takes it away; the layout's head
+/* THE TREE FOLDS TO A STRIP. The hide button in the column's head
+   (`.admin-tree-hide`, `Admin::Ui::TreeHideComponent`: "Hide page tree",
+   "Hide list") sets `data-tree-folded` on <html>, and the strip's one button
+   (`.admin-tree-fold`, `Admin::Shell::TreeFoldComponent`) takes it away; the layout's head
    script sets it before the first paint where this browser remembers the
    fold (`admin/shared/_tree_head`), and `admin--shell--tree-width` from then
    on. Folded, the grid's track is the strip (`--admin-tree-strip`, 2.75rem,

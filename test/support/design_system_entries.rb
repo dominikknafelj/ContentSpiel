@@ -59,6 +59,7 @@ module DesignSystemEntries
     "Admin::Ui::ToastRegionComponent" => "Toast",
     "Admin::Ui::TranslationChipComponent" => "Badge",
     "Admin::Ui::TreeFindComponent" => "StudioTree",
+    "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",
     "Admin::Ui::UnpublishedChipComponent" => "Badge",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"

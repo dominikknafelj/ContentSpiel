@@ -45,6 +45,10 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_select "aside#tree-column[data-controller~='admin--shell--tree-width'][data-admin--shell--drawer-target=panel]", count: 1
     assert_select "aside#tree-column > :first-child.admin-tree-fold[aria-label='Show page tree'][aria-controls=tree-column][aria-expanded=false][data-admin--shell--tree-width-target=unfold]"
     assert_select "turbo-frame#tree button.admin-tree-hide[aria-label='Hide page tree'][aria-controls=tree-column][aria-expanded=true][data-admin--shell--tree-width-target=fold]", count: 1
+    # The column holds the Pages tree: its words, and a tree as tall as its rows.
+    assert_select "aside#tree-column[data-admin--shell--tree-width-tooltip-key-value='components.shell.tree_subject.pages.divider_tooltip']", count: 1
+    assert_select "aside#tree-column.admin-shell__tree--fill", count: 0
+    assert_select ".admin-top-bar button[aria-controls=tree-column][aria-label='Open page tree']", text: "Pages ▾"
 
     get "/cs-studio/posts"
     assert_select "#tree-column", count: 0

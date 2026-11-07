@@ -1,16 +1,16 @@
 <header class="admin-top-bar sticky top-0 z-(--cs-z-top-bar) h-12 items-center gap-2 border-b border-line bg-chrome px-3">
-  <%= drawer_button(label: "Open navigation", controls: "sidebar", name: "sidebar") { helpers.render "admin/shared/icon", name: :menu } %>
+  <%= drawer_button(label: t(".navigation"), controls: "sidebar", name: "sidebar") { helpers.render "admin/shared/icon", name: :menu } %>
   <div class="flex min-w-0 flex-col leading-tight">
-    <span class="admin-wordmark font-cs text-xs font-bold uppercase tracking-wide text-ink">CONTENT·SPIEL</span>
+    <span class="admin-wordmark font-cs text-xs font-bold uppercase tracking-wide text-ink"><%= t(".wordmark") %></span>
     <span class="admin-site-name truncate text-[13px] text-dim"><%= site_name %></span>
   </div>
   <% if tree %>
     <%# Under 1024 the tree column is a drawer of its own; above it the
         column is in the grid and this button hides (`.admin-top-bar__tree`). %>
-    <%= drawer_button(label: "Open page tree", controls: "tree-column", name: "tree", classes: "admin-top-bar__tree text-sm") { "Pages ▾" } %>
+    <%= drawer_button(label: tree_word(:open), controls: "tree-column", name: "tree", classes: "admin-top-bar__tree text-sm") { tree_word(:button) } %>
   <% end %>
-  <%= tag.button type: "button", aria: { label: "Jump to…" }, data: { action: "admin--shell--command-palette#open" },
+  <%= tag.button type: "button", aria: { label: t(".jump") }, data: { action: "admin--shell--command-palette#open" },
         class: "ml-auto flex cursor-pointer items-center gap-2 rounded-button border border-field-line px-2 py-1 text-sm text-meta" do %>
-    <%= helpers.render "admin/shared/icon", name: :search %><span class="text-label">⌘K</span>
+    <%= helpers.render "admin/shared/icon", name: :search %><span class="text-label"><%= t(".shortcut") %></span>
   <% end %>
 </header>
