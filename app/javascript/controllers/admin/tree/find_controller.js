@@ -191,13 +191,14 @@ export default class extends Controller {
     return matchFocuses(tree)[0] ?? null
   }
 
-  // "/" anywhere a slash is not being typed.
+  // "/" anywhere a slash is not being typed: not in a control that takes
+  // text (a checkbox, a radio or a button leaves the key to the find).
   slash(event) {
     if (event.key !== "/" || event.defaultPrevented || event.isComposing) return
     if (event.ctrlKey || event.metaKey || event.altKey) return
     const target = event.target
     if (target instanceof Element) {
-      if (target.closest("input, textarea, select, dialog[open]") || target.isContentEditable) return
+      if (takesText(target) || target.closest("dialog[open]") || target.isContentEditable) return
     }
     if (!this.fieldTarget.checkVisibility({ visibilityProperty: true })) return
 
@@ -210,4 +211,15 @@ export default class extends Controller {
     cancelAnimationFrame(this.frame)
     this.empty()
   }
+}
+
+// The input types that are not text entry; any other type, a made-up one
+// included, is drawn as a text field by the browser.
+const NOT_TEXT_INPUTS = new Set(["checkbox", "radio", "button", "submit", "reset", "image", "file", "range", "color", "hidden"])
+
+function takesText(element) {
+  const control = element.closest("input, textarea, select")
+  if (!control) return false
+  if (control instanceof HTMLInputElement) return !NOT_TEXT_INPUTS.has(control.type)
+  return true
 }

@@ -192,6 +192,19 @@ class Admin::TreeFindSystemTest < ApplicationSystemTestCase
     assert_selector body, text: "/"
     assert_not field_focused?
 
+    # A checkbox in the column is not text entry: the slash finds.
+    page.execute_script(<<~JS)
+      const box = document.createElement("input")
+      box.type = "checkbox"
+      box.id = "slash-probe"
+      document.getElementById("tree-list").before(box)
+      box.focus()
+    JS
+    assert_equal "slash-probe", page.evaluate_script("document.activeElement.id")
+    page.send_keys("/")
+    assert_eventually(message: "/ from a focused checkbox did not focus the find field") { field_focused? }
+    page.execute_script("document.getElementById('slash-probe').remove()")
+
     at_window(900) do
       # The drawer hides itself 0.2s after it stops being a column (its
       # `visibility` transition).
@@ -210,12 +223,14 @@ class Admin::TreeFindSystemTest < ApplicationSystemTestCase
   end
 
   test "a title with markup is marked as text" do
-    marked = create_page(title: "<b>Bold</b> & co")
+    marked = create_page(title: "<b>Bold</b> & co <script>window.pwned = 1</script>")
     visit_editor(@beta)
     type_in_field("bold")
     assert_selector "#tree-row-#{marked.id} a mark", text: "Bold", exact_text: true
-    assert_selector "#tree-row-#{marked.id} a", text: "<b>Bold</b> & co", exact_text: true
+    assert_selector "#tree-row-#{marked.id} a", text: "<b>Bold</b> & co <script>window.pwned = 1</script>", exact_text: true
     assert_no_selector "#tree-list b", visible: :all
+    assert_no_selector "#tree-list script", visible: :all
+    assert_nil page.evaluate_script("window.pwned")
   end
 
   def with_module(body)
