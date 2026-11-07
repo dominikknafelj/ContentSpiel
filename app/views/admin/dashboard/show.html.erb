@@ -5,6 +5,16 @@
     panels. The layout (`.admin-dashboard` in content-spiel.tailwind.css)
     places the main column and the "At a glance" rail; the order here is the
     order the focus takes at every width. %>
+<%# Never restored from Turbo's page cache: a snapshot holds the rows as
+    they stood when the dashboard was left, so Back from publishing a page
+    would list it still, offered for publishing with nothing left to
+    publish. With this, Back/Forward to the dashboard fetches it afresh (and
+    with it Waiting for you on Everything, the frame's `src` not being the
+    page's address). %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
 <div class="admin-dashboard">
 <%# The heading row. "New post…" is the screen's one primary, last, by a
     header's convention, and "New page…" its secondary before it. Each

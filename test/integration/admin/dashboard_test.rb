@@ -12,6 +12,15 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "html[data-surface=studio]"
   end
 
+  # A restored snapshot would list what waited when the dashboard was left.
+  test "the dashboard is never restored from Turbo's page cache" do
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    get admin_root_path, headers: { "Turbo-Frame" => "content" }
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+  end
+
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
     sign_in_as users(:one)
     root_page

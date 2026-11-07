@@ -48,7 +48,7 @@
 
 ### Changed
 
-- CS Studio's dashboard is redrawn. Its panels are headed by their job: Waiting for you (open threads and unpublished changes in one list, a record with both in one row, filtered by Everything, Open threads or Unpublished changes, with "Review and publish…" for whoever may publish), Notes for you, Pick up where you left off (the viewer's drafts as tiles), and, in a rail beside them when the dashboard is 1200px wide, Publishing on its own, Languages behind … and What changed recently. "New page…" and "New post…" stand in the heading row. An editor's address with `?review=publish` opens Publish changes on load.
+- CS Studio's dashboard is redrawn. Its panels are headed by their job: Waiting for you (open threads and unpublished changes in one list, a record with both in one row, filtered by Everything, Open threads or Unpublished changes, with "Review and publish…" for whoever may publish), Notes for you, Pick up where you left off (the viewer's drafts as tiles), and, in a rail beside them when the dashboard is 1200px wide, Publishing on its own, Languages behind … and What changed recently. "New page…" and "New post…" stand in the heading row. An editor's address with `?review=publish` opens Publish changes on load. Back to the dashboard shows it as it is now, never as it was left, and a filter pressed from the keyboard keeps the focus.
 
 ### Removed
 

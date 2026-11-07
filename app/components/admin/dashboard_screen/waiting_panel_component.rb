@@ -13,6 +13,9 @@ module Admin
     # one reads as Everything, as the query reads it. The filter is the
     # frame's `src` and never the page's address: a live note reloads the
     # frame's `src` (`admin--notes--inbox#reload`), which keeps the choice.
+    # After a press, and only then, the focus goes to the filter now current
+    # (`admin--dashboard--waiting`), since the answer replaces the pressed
+    # link.
     #
     # Beside the heading, a neutral count of every record waiting under the
     # filter (`Dashboard::WaitingForYou#total`), so a sixth one is not
@@ -32,6 +35,10 @@ module Admin
       attr_reader :waiting
 
       def filter = waiting.filter
+
+      def filter_data
+        { turbo_frame: FRAME, action: "turbo:click->admin--dashboard--waiting#press", "admin--dashboard--waiting-target": "filter" }
+      end
 
       def tabs
         Dashboard::WaitingForYou::FILTERS.map do |name|

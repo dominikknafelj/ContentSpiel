@@ -1,5 +1,9 @@
-<%# The whole row is ONE link: dot, avatar, three lines, time and the verb,
-    in a grid of `7px 24px 1fr auto auto`, `hover:bg-paper`. The negative
+<%# The whole row is ONE link: dot, avatar, three lines, then the time with
+    the verb under it, in a grid of `7px 24px 1fr auto`, `hover:bg-paper`.
+    The time and the verb share the last column, so the lines keep the room
+    of one: in a 327px panel (390px window) they would otherwise be left
+    about 100px and cut "Dana mentioned you". The verb stays the link's last
+    child, so `a:hover > .admin-row-verb` still finds it. The negative
     margins take it to the edges of the row that holds it -- the dashboard
     panel's and the full list's `<li>` alike (`px-4` on the list, `py-2.5`
     on the item) -- so the hover fills the row. Everything inside is a span:
@@ -10,7 +14,7 @@
     (`-outline-offset-2`): nothing in a read row is accent at rest -- the
     verb is dim until the row is pointed at or focused -- and accent in a
     marker means unread and for the viewer. %>
-<%= link_to path, class: "-mx-4 -my-2.5 grid min-w-0 flex-1 grid-cols-[7px_24px_1fr_auto_auto] items-start gap-2.5 px-4 py-[11px] no-underline hover:bg-paper focus-visible:-outline-offset-2",
+<%= link_to path, class: "-mx-4 -my-2.5 grid min-w-0 flex-1 grid-cols-[7px_24px_1fr_auto] items-start gap-2.5 px-4 py-[11px] no-underline hover:bg-paper focus-visible:-outline-offset-2",
       data: { delivery: row.id, unread: (true if row.unread), turbo_frame: "_top" } do %>
   <span class="mt-[9px] size-[7px] rounded-full <%= "bg-accent" if row.unread %>" aria-hidden="true"></span>
   <% if somebody? %>
@@ -18,12 +22,12 @@
   <% else %>
     <span class="flex size-6 items-center justify-center rounded-full border border-line-strong bg-sunken text-meta" aria-hidden="true"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %></span>
   <% end %>
-  <span class="flex min-w-0 flex-col">
+  <span class="row-span-2 flex min-w-0 flex-col">
     <span class="truncate text-[13px] <%= row.unread ? "text-ink" : "text-dim" %>" data-inbox-sentence><%= sentence %></span>
     <% if row.unread %><span class="sr-only"><%= t(".unread") %></span><% end %>
     <span class="truncate text-[13px] text-dim" data-inbox-excerpt><%= row.excerpt %></span>
     <span class="truncate text-xs text-meta" data-inbox-where><%= where %></span>
   </span>
-  <span class="mt-0.5 text-label text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
-  <span class="admin-row-verb mt-0.5"><%= t(".verb") %></span>
+  <span class="mt-0.5 justify-self-end text-label text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
+  <span class="admin-row-verb col-start-4 justify-self-end"><%= t(".verb") %></span>
 <% end %>

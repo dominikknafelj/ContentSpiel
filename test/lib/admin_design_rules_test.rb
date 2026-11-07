@@ -158,8 +158,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     # The dashboard's buttons open the layout's New post and New page
-    # dialogs: it has no script of its own.
-    assert_not Rails.root.join("app/javascript/controllers/admin/dashboard").exist?, "app/javascript/controllers/admin/dashboard/"
+    # dialogs, with no script of the dashboard's.
+    %w[quick_create_controller.js start_draft_controller.js].each do |file|
+      assert_not Rails.root.join("app/javascript/controllers/admin/dashboard", file).exist?, file
+    end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
     # Languages is a card of the Settings screen, an image's detail a panel
     # beside the Media grid, and the audit log words its rows through

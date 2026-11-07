@@ -9,13 +9,13 @@ class Admin::NotesScreen::InboxRowComponentTest < ViewComponent::TestCase
     as(users(:two)) { assert Notes::Start.call(@page, body: "Ready, @[#{users(:reader).id}]?").ok? }
   end
 
-  test "the row ends in Open thread, inside its one link" do
+  test "the row ends in Open thread, under the time, inside its one link" do
     row = Dashboard::NotesForYou.new(actor: users(:reader), channel: :admin).rows.sole
 
     render_inline Admin::NotesScreen::InboxRowComponent.new(row:)
 
     assert_selector "a", count: 1
-    assert_selector "a[data-delivery][class~='grid-cols-[7px_24px_1fr_auto_auto]'] > span.admin-row-verb:last-child", exact_text: "Open thread"
+    assert_selector "a[data-delivery][class~='grid-cols-[7px_24px_1fr_auto]'] > span.admin-row-verb.col-start-4:last-child", exact_text: "Open thread"
     assert_selector "a [data-inbox-sentence]", text: "Dana mentioned you"
     assert_selector "a > span:nth-last-child(2) time"
   end

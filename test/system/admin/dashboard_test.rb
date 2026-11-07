@@ -283,6 +283,38 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The frame's answer replaces the link that was pressed, so the focus
+  # would fall to <body> and the next Tab start at the top of the document.
+  test "a filter pressed from the keyboard leaves the focus on the filter it chose" do
+    fill_dashboard
+    sign_in_via_form(users(:one))
+    visit_screen admin_root_path
+
+    page.execute_script("document.querySelector('turbo-frame#dashboard-waiting nav a[href*=\"filter=unpublished\"]').focus()")
+    page.driver.browser.keyboard.type(:enter)
+    within("turbo-frame#dashboard-waiting") { assert_selector "nav a[aria-current=page]", text: "Unpublished changes" }
+    focused = "(document.activeElement.matches('turbo-frame#dashboard-waiting nav a[aria-current=page]') && document.activeElement.textContent.trim())"
+    assert_eventually(message: -> { "the focus is on #{page.evaluate_script('document.activeElement.outerHTML.slice(0, 200)')}" }) do
+      page.evaluate_script(focused) == "Unpublished changes"
+    end
+  end
+
+  # A restored snapshot would show the rows from before the person left (a
+  # page just published, still offered for publishing), so Back to the
+  # dashboard fetches it afresh.
+  test "Back to the dashboard shows what waits now, not what waited when it was left" do
+    fill_dashboard
+    sign_in_via_form(users(:one))
+    visit_screen admin_root_path
+    within("section[aria-labelledby=dashboard-drafts]") { press "Half-written" }
+    assert_selector "header.admin-editor-header", wait: 10
+
+    create_post(title: "Changed meanwhile").update_columns(unpublished_changes_at: Time.current)
+    page.go_back
+
+    within("turbo-frame#dashboard-waiting") { assert_selector ".admin-waiting-row", text: "Changed meanwhile", wait: 8 }
+  end
+
   test "Start a draft in an empty Pick up where you left off opens the New post dialog" do
     sign_in_via_form(users(:one))
     visit_screen admin_root_path

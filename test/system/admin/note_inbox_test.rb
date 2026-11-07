@@ -153,6 +153,36 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # Only a filter's press moves the focus to the filter; a reload a note
+  # causes, here after a press, leaves it where the person put it.
+  test "a live reload of Waiting for you leaves the focus where it is" do
+    create_post(title: "First change").update_columns(unpublished_changes_at: Time.current)
+    open_dashboard
+    await_notes_live
+
+    filter = "turbo-frame#dashboard-waiting nav a[href*='filter=unpublished']"
+    page.execute_script("document.querySelector(#{filter.to_json}).focus()")
+    page.driver.browser.keyboard.type(:enter)
+    within("turbo-frame#dashboard-waiting") { assert_selector ".admin-waiting-row", count: 1, text: "First change" }
+    # The answer's own link, current: the press's load has run.
+    assert_eventually { page.evaluate_script("document.activeElement.matches(#{(filter + "[aria-current=page]").to_json})") }
+
+    elsewhere = ".admin-dashboard__head a[href$='/posts/new']"
+    page.execute_script("document.querySelector(#{elsewhere.to_json}).focus()")
+    # The reload's `turbo:frame-load` comes after its rows are drawn.
+    page.execute_script(<<~JS)
+      window.waitingLoads = 0
+      document.getElementById("dashboard-waiting").addEventListener("turbo:frame-load", () => window.waitingLoads++)
+    JS
+    create_post(title: "Second change").update_columns(unpublished_changes_at: Time.current)
+    mention(@page)
+
+    within("turbo-frame#dashboard-waiting") { assert_selector ".admin-waiting-row", text: "Second change", wait: 8 }
+    await_js("window.waitingLoads > 0")
+    assert page.evaluate_script("document.activeElement.matches(#{elsewhere.to_json})"),
+      "the focus moved to #{page.evaluate_script('document.activeElement.outerHTML.slice(0, 200)')}"
+  end
+
   test "a live note on a screen without the dashboard fetches no panel" do
     visit_screen admin_posts_path
     await_notes_live
