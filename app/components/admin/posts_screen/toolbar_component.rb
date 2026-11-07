@@ -1,6 +1,6 @@
 module Admin
   module PostsScreen
-    # The posts list's toolbar (design pass round 2, Task 17, handoff §4.3):
+    # The posts list's toolbar:
     # title search, a segmented control with counts -- "All 128 · Live 96 ·
     # Drafts 20 · Scheduled 12" -- and Type, Tag and Translation drop-downs.
     # One GET form that applies as it changes (`admin--ui--auto-submit`, no
@@ -10,7 +10,7 @@ module Admin
     # The segmented control is a radio group (`scope`), so it is one tab stop,
     # arrow keys move it and a screen reader says "3 of 4" -- the visual
     # buttons are the radios' labels, the checked one drawn by `:has(:checked)`.
-    # The counts are the controller's (`scope_counts`): they respect every
+    # The counts are `Posts::List#counts`: they respect every
     # other filter, but not the scope itself, so "Drafts 20" is what choosing
     # Drafts would list.
     class ToolbarComponent < Admin::AdminComponent

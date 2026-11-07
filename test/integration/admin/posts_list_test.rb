@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The posts list (design pass round 2, Task 17): toolbar filters and counts,
+# The posts list: toolbar filters and counts,
 # 50 to a page, the Languages column, and the bulk bar's two actions
 # (`POST /posts/bulk`, `Posts::Bulk`) with the Undo a bulk trash offers
 # (`POST /trash/restore_many`).
@@ -63,13 +63,13 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_select "label[for=posts-scope-all] span.text-count", text: "1"
   end
 
-  test "the old status param still works, and scope wins when both are sent" do
+  test "the list's scope is read from scope alone" do
     create_post(title: "Live one", published: true)
     create_post(title: "Draft one", published: false)
-    get "/cs-studio/posts", params: { status: "draft" }
+    get "/cs-studio/posts", params: { status: "drafts" }
+    assert_equal [ "Draft one", "Live one" ], row_titles.sort
+    get "/cs-studio/posts", params: { scope: "drafts" }
     assert_equal [ "Draft one" ], row_titles
-    get "/cs-studio/posts", params: { status: "draft", scope: "live" }
-    assert_equal [ "Live one" ], row_titles
     get "/cs-studio/posts", params: { scope: "bogus" }
     assert_equal 2, row_titles.size
   end

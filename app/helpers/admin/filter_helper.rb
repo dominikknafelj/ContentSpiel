@@ -1,5 +1,5 @@
 module Admin
-  # The shared shape of a list's filter form (design pass spec §4): a GET form
+  # The shared shape of a list's filter form: a GET form
   # that applies as you change it (`admin--ui--auto-submit`) and reloads only the
   # `content` frame, replacing the history entry rather than adding one per
   # keystroke pause. The controller's actions sit on the form so every field
@@ -23,7 +23,7 @@ module Admin
 
     def filters_active?(keys) = keys.any? { |key| params[key].present? }
 
-    # "type blog, status draft, title “zzz”" -- the active filters named for a
+    # "type blog, scope drafts, title “zzz”" -- the active filters named for a
     # "No matches" empty state, from `{ label => param key }`.
     def filter_summary(labels)
       labels.filter_map { |label, key| "#{label} #{params[key]}" if params[key].present? }.to_sentence

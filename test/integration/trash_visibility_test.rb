@@ -877,6 +877,16 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "label[for=posts-scope-live] span", text: "1"
   end
 
+  test "Posts::List over the read scope rows and counts kept posts only, under every scope" do
+    posts = AccessControl.scope(users(:one), "posts.read", Post.all)
+    Posts::List::SCOPES.each do |scope|
+      list = Posts::List.new(posts, filters: { "scope" => scope }, locale: "en")
+      assert_not_includes list.rows(limit: 50), @gone_post, scope
+      assert_equal list.rows(limit: 50).size, list.counts.fetch(scope), scope
+    end
+    assert_includes Posts::List.new(posts, filters: {}, locale: "en").rows(limit: 50), @kept_post
+  end
+
   test "bulk publish and trash name a trashed post as not found and leave it alone; restore_many ignores a kept post" do
     sign_in_as users(:one)
     @gone_post.update_columns(published_at: nil)

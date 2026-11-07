@@ -1,5 +1,5 @@
 module Admin
-  # The Posts module (cs-studio spec §4.1/§5.2): a filterable list, "New
+  # The Posts module: a filterable list, "New
   # post" (content type first, then everything else, like the page tree's
   # own title-only "Add a page"), and the post editor -- the page editor's
   # own shell/autosave/publish shape (`Admin::PagesController`), just folded
@@ -22,37 +22,24 @@ module Admin
 
     before_action :set_post, only: %i[show update destroy publish unpublish schedule]
     # The list (and the module itself) needs `posts.read` somewhere; the
-    # rows are then narrowed to the readable ones (`filtered_posts`).
+    # rows are then narrowed to the readable ones (`posts_list`).
     # "New post" needs `posts.create` for at least one content type.
     before_action -> { require_permission("posts.read") }, only: %i[index bulk]
     before_action -> { require_permission("posts.create") }, only: %i[new create]
 
-    # Filters as query params (spec §5.2's "filters: content type, status,
-    # tag, title search"; design pass round 2, Task 17): `type` is the bare
-    # registered name, `scope` is `all|live|drafts|scheduled` (the old `status`
-    # still reads, see `list_scope`), `tag` is a tag's own name, `translation`
-    # is `needs|outdated|complete` (`filter_by_translation`), `page` is the
-    # 50-row page (`Pagination`), `q` is a
-    # title substring matched in the *editing* locale (not every locale --
-    # an editor filtering the list they're currently reading in one
-    # language expects that language's titles to match, not some other
-    # one's). `title ->> locale` reads the jsonb column's own per-locale
-    # text value directly (`posts.title` is a plain jsonb hash, `{locale =>
-    # title}`) -- `where(title: ...)` on a jsonb column is the exact bug the
-    # project's own Mobility convention warns against (CLAUDE.md), so this
-    # goes around Mobility/ActiveRecord entirely for the ILIKE match one
-    # locale's value needs.
+    # The list's filters and its reads are `Posts::List`'s.
     def index
       @content_types = ContentTypes.all
       @tags = Tag.order(:name)
-      @scope = list_scope
-      @counts = scope_counts
+      list = posts_list(list_filters)
+      @scope = list.scope_name
+      @counts = list.counts
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: @counts.fetch(@scope))
       # A page past the end shows the "back to page 1" notice and no rows:
-      # don't query rows that were never going to be shown.
-      @posts = @pagination.out_of_range? ? [] : page_of_posts
+      # no rows are read that were never going to be shown.
+      @posts = @pagination.out_of_range? ? [] : list.rows(limit: PER_PAGE, offset: @pagination.offset)
       @paths = listed_paths(@posts)
-      # The "Languages" column (translation helpers spec §4): every listed
+      # The "Languages" column: every listed
       # post's state per target language, worked out once for the whole
       # page, so the column costs the same queries however many rows it
       # shows. Read from the stored `translation_states` rows
@@ -60,7 +47,7 @@ module Admin
       @translation_states = Translations::StateIndex.states_for(@posts)
     end
 
-    # Publishes or moves to the trash the posts ticked on the list (Task 17).
+    # Publishes or moves to the trash the posts ticked on the list.
     # All the rules live in `Posts::Bulk` (one single-record service per
     # post, so each post is authorised, audited and answered on its own);
     # this turns its `Result` into one toast and sends the editor back to
@@ -72,7 +59,7 @@ module Admin
       ids = bulk_ids
       return redirect_to(posts_list_path, alert: "Select at least one post.", status: :see_other) if ids.empty?
 
-      # A post someone is editing is left alone, and counted (spec §4.2): publishing it
+      # A post someone is editing is left alone, and counted: publishing it
       # would move its `updated_at` under their open form. One read of the live
       # reservations, here and not in the service, so it is outside the
       # per-post savepoints. From a list every hold is someone else's, tab id or
@@ -105,7 +92,7 @@ module Admin
       redirect_to posts_list_path, status: :see_other
     end
 
-    # The no-JS fallback of the New post dialog (design pass round 2, Task 15):
+    # The no-JS fallback of the New post dialog:
     # the same form (`Admin::EditorScreen::NewPostFormComponent`) as a page of
     # its own; with JavaScript every "New post" trigger opens the dialog in
     # the layout instead. The content type is chosen here and nowhere else: it
@@ -147,7 +134,7 @@ module Admin
     def show
     end
 
-    # The post form's own autosave endpoint (spec §6.1), same shape as
+    # The post form's own autosave endpoint, same shape as
     # `Admin::PagesController#update`/`Admin::ContentBlocksController#update`:
     # `title`/`slug`/`excerpt`/`body` are translated columns, split into
     # `attributes:`/`translations:` the same fixed way every PATCH here does
@@ -164,7 +151,7 @@ module Admin
     #
     # `content_type` is never accepted here at all (not even silently
     # ignored -- it simply isn't in `TRANSLATED_COLUMNS` nor built into
-    # `attributes`): the content type is fixed after creation (spec §5.2),
+    # `attributes`): the content type is fixed after creation,
     # so there is no field in this form that could change it. `published`/
     # `published_at` are likewise absent -- those are the record header's
     # own one-shot `publish`/`unpublish`/`schedule` actions below, not
@@ -216,7 +203,7 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Moves the post to the trash (`Trash::Move`, trash spec §4.1); the
+    # Moves the post to the trash (`Trash::Move`); the
     # permanent delete is `Trash::Purge`, reachable only from the trash. The
     # Undo link's own URL carries `from: "undo"` (`Admin::TrashController
     # #restore`) so restoring lands the actor back on this post's editor,
@@ -270,14 +257,13 @@ module Admin
     helper_method :new_post_params
 
     # The New post dialog's two fields, read as scalars only (`params.dig`
-    # raises on `post=x`, and a hash for the title reached the slug fill and
-    # 500ed); anything else reads as blank -- the ordinary 422 (final review
-    # A, M3).
+    # raises on `post=x`, and a Hash for a title would reach the slug fill
+    # and raise); anything else reads as blank -- the ordinary 422.
     def new_post_params
       @new_post_params ||= (params[:post].respond_to?(:permit) ? params[:post] : ActionController::Parameters.new).permit(:title, :content_type)
     end
 
-    # Through the read scope (design spec §3.3): someone else's post an
+    # Through the read scope: someone else's post an
     # author may not read is a 404 -- for show, autosave, publish and delete
     # alike -- not a 403 that would confirm it exists (Review Focus 2).
     # The ids among `ids` that have a live reservation.
@@ -305,94 +291,10 @@ module Admin
     end
 
     # The list's own query params, the ones its links carry (`list_params`).
-    # `status` is the old name of `scope` (the dashboard's "All drafts" links
-    # and bookmarks used `status=draft|scheduled|live`): still read, `scope`
-    # wins when both are there.
-    LIST_KEYS = %i[q scope status type tag translation page].freeze
-    SCOPES = %w[all live drafts scheduled].freeze
+    LIST_KEYS = %i[q scope type tag translation page].freeze
 
-    def list_scope
-      requested = params[:scope].presence || params[:status].presence
-      requested = "drafts" if requested == "draft"
-      requested.presence_in(SCOPES) || "all"
-    end
-
-    # Everything except the scope: the base the segmented control's counts
-    # are taken over ("counts respect the other filters, not the scope
-    # itself"), and what `filtered_posts` then narrows by scope.
-    def base_posts
-      scope = admin_scope(Post.all)
-      scope = scope.where(content_type: params[:type]) if params[:type].is_a?(String) && params[:type].present?
-      # A subquery, not `scope.joins(:tags).where(tags: { name: ... })`
-      # directly (final-fixes round, finding 6): `.includes(:tags)` combined
-      # with a `where` that references the same `tags` table is exactly what
-      # makes Rails silently upgrade that `includes` into an `eager_load` (a
-      # single LEFT OUTER JOIN) -- and once the *listing* query's own join is
-      # filtered down to just the matching tag, that's also all `post.tags`
-      # sees for the rest of that row, not every tag the post actually has.
-      # Filtering by a subquery's `id`s instead leaves the outer scope with no
-      # `tags` reference of its own. (The list shows no tags and preloads none
-      # today; the subquery is what keeps it that way if tags are ever
-      # preloaded here again -- `posts_test.rb` pins that no `LEFT OUTER JOIN
-      # "tags"` appears.)
-      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].is_a?(String) && params[:tag].present?
-      scope = filter_by_translation(scope, params[:translation]) if params[:translation].is_a?(String)
-      scope = filter_by_title(scope, params[:q]) if params[:q].is_a?(String) && params[:q].present?
-      scope
-    end
-
-    def filtered_posts = filter_by_scope(base_posts, @scope)
-
-    def page_of_posts
-      filtered_posts.order(updated_at: :desc, id: :desc).offset(@pagination.offset).limit(PER_PAGE).to_a
-    end
-
-    def filter_by_scope(scope, name)
-      case name
-      when "live" then scope.published
-      when "scheduled" then scope.scheduled
-      when "drafts" then scope.where(published_at: nil)
-      else scope
-      end
-    end
-
-    # "All 128 · Live 96 · Drafts 20 · Scheduled 12": one query for the four
-    # numbers (`COUNT ... FILTER`), over `base_posts` -- the other filters
-    # apply, the scope itself does not. The same instant is bound for both
-    # comparisons so a post can't be counted as live and scheduled at once.
-    def scope_counts
-      now = Time.current
-      published_at = Post.arel_table[:published_at]
-      all, live, drafts, scheduled = base_posts.reorder(nil).pick(
-        Arel.star.count,
-        SqlNodes.count_where(published_at.lteq(now)),
-        SqlNodes.count_where(published_at.eq(nil)),
-        SqlNodes.count_where(published_at.gt(now))
-      )
-      { "all" => all, "live" => live, "drafts" => drafts, "scheduled" => scheduled }
-    end
-
-    # `needs` (missing or outdated in any target language), `outdated`, or
-    # `complete` (neither, in every target language), read from the stored
-    # `translation_states` rows -- a post with no row reads as complete, the
-    # same rule `Translations::StateIndex` applies everywhere. An EXISTS over
-    # the target languages rather than `StateIndex.joins`, which narrows by
-    # one language: this filter asks about the post as a whole. The states
-    # are the *rolled-up* ones the row's chips show (`Translations::Status`:
-    # a language that is both missing and outdated reads as missing), so
-    # "Outdated" lists exactly the posts with an outdated chip -- never one
-    # whose only chip in that language is missing.
-    def filter_by_translation(scope, name)
-      states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
-      return scope unless states || name == "complete"
-
-      exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states || %w[missing outdated], locales: Translations.target_locales)
-      states ? scope.where(exists) : scope.where.not(exists)
-    end
-
-    def filter_by_title(scope, q)
-      scope.title_matching(q, locale: admin_locale)
-    end
+    # The viewer's readable posts under the list's filters (`Posts::List`).
+    def posts_list(filters) = Posts::List.new(admin_scope(Post.all), filters: filters, locale: admin_locale)
 
     # Each listed post's current public path in the editing language, locale
     # prefix included, in ONE query for the page (`PublicSite::Urls#path_for`
@@ -422,13 +324,13 @@ module Admin
     # page kept -- except that emptying the last page (a bulk trash, or a
     # bulk publish under Drafts) would land on "Nothing on this page", so a
     # page past the end of the *returned* filters goes to the last page that
-    # exists (and no `page` at all when nothing is left). `index` itself still
-    # reports an out-of-range page, as ever.
+    # exists (and no `page` at all when nothing is left). `index` reports an
+    # out-of-range page itself.
     def posts_list_path
       query = list_query
       if query.key?(:page)
-        @scope = list_scope
-        pagination = Pagination.new(page: query[:page], per_page: PER_PAGE, total: scope_counts.fetch(@scope))
+        list = posts_list(list_filters)
+        pagination = Pagination.new(page: query[:page], per_page: PER_PAGE, total: list.counts.fetch(list.scope_name))
         if pagination.out_of_range? || pagination.total.zero?
           query = query.except(:page)
           query[:page] = pagination.total_pages if pagination.out_of_range? && pagination.total_pages > 1
@@ -541,7 +443,7 @@ module Admin
         # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
         # duplicate name is already filtered out before it ever reaches
         # that point) -- wired up anyway so `Admin::Ui::ChipInputComponent`'s own
-        # error slot (fix round 1 review) is always cleared/replaced like
+        # error slot is always cleared/replaced like
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land
         # without a second wiring pass.
@@ -555,8 +457,8 @@ module Admin
       fields
     end
 
-    # Per-row/per-subfield error slots for a `group`/`groups` typed field
-    # (cs-studio Task 7, carried in from Task 2's review) -- a dynamically
+    # Per-row/per-subfield error slots for a `group`/`groups` typed field:
+    # a dynamically
     # sized set `Admin::AutosaveResponses#autosave_stream`'s own fixed
     # `fields:` map has no way to express, since how many rows exist is only
     # known from *this* request's own submitted `fields_hash` (already

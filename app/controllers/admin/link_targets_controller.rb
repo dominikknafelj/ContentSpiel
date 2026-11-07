@@ -1,5 +1,5 @@
 module Admin
-  # The Tiptap editor's own internal-link picker (design spec §4.1/§4.2)
+  # The Tiptap editor's own internal-link picker
   # searches pages and posts by title, in one locale, and hands back just
   # enough to let the editor insert an `internalLink` mark
   # (`{type, id}`, `RichText::BuiltIns`) without a second round trip: the
@@ -25,7 +25,7 @@ module Admin
     def index
       return render(json: { errors: [ "type must be page or post" ] }, status: :unprocessable_entity) unless requested_type.nil? || TYPES.include?(requested_type)
 
-      # Fix round 1's minor note: gathered as bare records first, capped at
+      # Gathered as bare records first, capped at
       # `LIMIT` *before* any of the per-record work below runs (Mobility's
       # translated-title read, `path_for`'s own `PublicPath` lookup) --
       # `page_candidates`/`post_candidates` can hand back up to `LIMIT` each,
@@ -36,7 +36,7 @@ module Admin
       candidates.concat(page_candidates) if requested_type.nil? || requested_type == "page"
       candidates.concat(post_candidates) if requested_type.nil? || requested_type == "post"
 
-      # Fix round 1's I2: one `PublicSite::Urls` for the whole request, not
+      # One `PublicSite::Urls` for the whole request, not
       # a fresh instance per result -- `Urls` memoizes `path_for` lookups
       # per instance (its own comment: "one instance per request renders
       # every ... link off it"), which a brand-new instance per record
@@ -54,7 +54,7 @@ module Admin
 
     def query = params[:q].to_s
 
-    # Fix round 1's I1: `params[:locale]` is free-form user input -- a
+    # `params[:locale]` is free-form user input -- a
     # malformed value ("en US", say) isn't an *enabled* locale, so this
     # falls back exactly the way `Admin::BaseController#admin_locale`
     # itself does, rather than reaching `target_json`'s own `Mobility
@@ -66,7 +66,7 @@ module Admin
     end
 
     # The title in ONE language, through `TitleSearch#title_matching` (the
-    # scope `Admin::PostsController#filter_by_title` uses too), not Mobility's
+    # scope `Posts::List` filters by too), not Mobility's
     # own `.i18n` scope or a plain `where(title: ...)` -- `Page#title`/
     # `Post#title` are jsonb columns (`{ locale => title }`), so comparing one
     # to a bare String with `where` would compare jsonb to text and never
@@ -119,7 +119,7 @@ module Admin
     # names are spelled out, so the scanner sees them), so a chip the browser
     # builds from a search row carries the same mark a server-rendered one
     # does. A page has no content type, hence no dot; neither has a post
-    # whose type is no longer registered.
+    # whose type is not registered.
     def type_dot(record)
       definition = record.is_a?(Post) ? ::ContentTypes.find(record.content_type) : nil
       definition && Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type).mark_class(definition.colour_index)

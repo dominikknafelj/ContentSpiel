@@ -1,13 +1,11 @@
-<%# The Posts module's list (cs-studio spec §4.1/§5.2, design pass round 2
-    Task 17): a toolbar (search, All/Live/Drafts/Scheduled with counts, Type,
-    Tag, Translation), a table with a checkbox per row and a bulk bar
-    (Publish, Move to trash), 50 rows to a page. Filters are query params
-    (`Admin::PostsController#index`); rows are read-scoped and kept only. %>
-<%# "New post" only with `posts.create` somewhere (access-control design
-    spec §5); the rows are already narrowed to readable posts
-    (`Admin::PostsController#base_posts`). The split button's default is the
-    first type the viewer may create, the menu holds the others; each opens
-    the New post dialog with that type chosen. %>
+<%# The Posts module's list: a toolbar (search, All/Live/Drafts/Scheduled
+    with counts, Type, Tag, Translation), a table with a checkbox per row and
+    a bulk bar (Publish, Move to trash), 50 rows to a page. Filters are query
+    params, read by `Posts::List`; rows are read-scoped and kept only. %>
+<%# "New post" only with `posts.create` somewhere; the rows are already
+    narrowed to readable posts (`Posts::List`). The split button's default is
+    the first type the viewer may create, the menu holds the others; each
+    opens the New post dialog with that type chosen. %>
 <% may_create = can?("posts.create") %>
 <% creatable_types = may_create ? @content_types.select { |type| can?("posts.create", Post.new(content_type: type.name)) } : [] %>
 <%# "New blog post", "New resume entry": a one-word type name reads better with "post" after it. %>
@@ -48,7 +46,7 @@
   <% elsif @posts.empty? %>
     <div class="rounded-card bg-surface shadow-1">
       <% if filtered %>
-        <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "status" => :status, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
+        <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No posts match the current filters (#{filter_summary("scope" => :scope, "type" => :type, "tag" => :tag, "translation" => :translation, "title" => :q)}).") do |empty_state| %>
           <% empty_state.with_action do %>
             <%= link_to "Clear filters", admin_posts_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
           <% end %>

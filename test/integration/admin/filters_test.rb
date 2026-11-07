@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The instant filter forms (design pass spec §4): wired to `admin--ui--auto-submit`
+# The instant filter forms: wired to `admin--ui--auto-submit`
 # and aimed at the `content` frame, no Filter button outside a <noscript>, and
 # a Clear link only while a filter is set.
 class Admin::FiltersTest < ActionDispatch::IntegrationTest
@@ -31,9 +31,9 @@ class Admin::FiltersTest < ActionDispatch::IntegrationTest
   end
 
   test "a filtered list with no matches says which filters, and offers Clear filters" do
-    get "/cs-studio/posts", params: { q: "zzz-no-such-title", status: "draft" }
+    get "/cs-studio/posts", params: { q: "zzz-no-such-title", scope: "drafts" }
     assert_select "[data-empty-state-title]", text: "No matches."
-    assert_select "p", text: /status draft and title zzz-no-such-title/
+    assert_select "p", text: /scope drafts and title zzz-no-such-title/
     assert_select "a[href='/cs-studio/posts']", text: "Clear filters"
 
     get "/cs-studio/audit_events", params: { event_action: "no.such.action" }

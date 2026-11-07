@@ -67,6 +67,7 @@
 - The `after_id` parameter of the block create request (`POST …/blocks`): the block is appended; to place it, create it and move it.
 - The comma-separated string for a post's `tag_names` in the post form's autosave (`post[tag_names]=a, b`): send an Array, `post[tag_names][]=a&post[tag_names][]=b`, as the chip input does. A string leaves the tags as they were.
 - The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start. The migration that drops the ActionText tables (`20260928040000_drop_action_text`) stays, for a database that still has them, and refuses while a body in them was never converted, since nothing converts it any more: `FORCE_DROP_ACTION_TEXT=1` drops the tables and discards such bodies.
+- The posts list's `status` parameter and its `draft` spelling (`?status=draft`): an address that carries it lists every post, as with no filter. `scope` (`all`, `live`, `drafts`, `scheduled`) is the list's one name for it.
 
 ### For a gem or an outside caller
 
