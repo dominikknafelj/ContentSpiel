@@ -57,6 +57,8 @@
 - On the posts list, the Type, Tag and Translation filters stand in a rail beside the list in a wide window and in a row above it otherwise, each under its own label.
 - The New post dialog asks for a title and offers the types in a Type list. The posts list's New button names the type as "New post (Blog)", in the type's own case.
 - The posts list's Tag filter offers only the tags on posts you can open that are not in the trash, and a Type the site no longer has shows as the chosen Type, so the filter can be seen and cleared.
+- On Tags, each tag shows a bar for how many posts use it. Details opens the tag in a panel beside the list (above it in a narrow window) with its newest posts, Merge into… and Delete tag…. The row has no ⋯ menu.
+- Added `GET <admin>/tags/:id`, the tag panel. It answers only the Tags screen's panel and otherwise sends back to the list.
 
 ### Removed
 
