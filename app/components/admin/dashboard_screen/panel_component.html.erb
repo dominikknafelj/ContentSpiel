@@ -1,0 +1,37 @@
+<section aria-labelledby="<%= id %>" class="<%= panel_class %>">
+  <header class="admin-dashboard-panel__head">
+    <div class="min-w-0 flex-1">
+      <div class="flex items-baseline gap-2">
+        <h2 id="<%= id %>" class="text-h3"><%= title %></h2>
+        <%= badge %>
+      </div>
+      <p class="admin-dashboard-panel__line text-sm"><%= line %></p>
+    </div>
+    <% if action? || link %>
+      <div class="flex items-center gap-3">
+        <%= action %>
+        <% if link %>
+          <%= link_to "→", link.first, class: "text-sm text-ink hover:underline", aria: { label: link.last }, data: { turbo_frame: "_top" } %>
+        <% end %>
+      </div>
+    <% end %>
+  </header>
+  <% if rows.empty? %>
+    <p class="px-4 py-2.5 text-sm text-dim" data-panel-empty><%= empty %><% if empty_action? %> <%= empty_action %><% end %></p>
+  <% elsif tiles? %>
+    <ul class="admin-draft-tiles px-4 pt-2 pb-4">
+      <% visible_rows.each do |row| %>
+        <li class="min-w-0"><%= row %></li>
+      <% end %>
+    </ul>
+  <% else %>
+    <ul class="px-4">
+      <% visible_rows.each do |row| %>
+        <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= row %></li>
+      <% end %>
+    </ul>
+  <% end %>
+  <% if footer? %>
+    <footer class="mt-auto border-t border-line px-4 py-2.5 text-small"><%= footer %></footer>
+  <% end %>
+</section>

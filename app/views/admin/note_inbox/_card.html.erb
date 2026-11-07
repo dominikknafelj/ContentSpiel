@@ -1,15 +1,15 @@
-<%# "Notes for you" (notes spec §5): a frame of its own (`display: contents`,
-    so the card is still the dashboard grid's item) that `GET notes/card`
+<%# "Notes for you", an action panel: a frame of its own (`display: contents`,
+    so the panel is still the dashboard grid's item) that `GET notes/card`
     answers again on its own. Locals: `rows` (`Dashboard::NotesForYou#rows`)
     and `unread`, the viewer's unread count.
 
-    The header says how many are new, in accent -- the one meaning accent has
+    The head says how many are new, in accent -- the one meaning accent has
     here: unread and addressed to the viewer -- and offers "Mark all read";
     both only while something is unread. That button is a whole-page visit
     (`_top`): the sidebar's count, outside this frame, changes with it. %>
 <%= tag.turbo_frame id: "notes-for-you", class: "contents" do %>
-  <%= render Admin::DashboardScreen::CardComponent.new(title: t("admin.note_inbox.card.title"), id: "dashboard-notes-for-you",
-        empty: t("admin.note_inbox.card.empty")) do |card| %>
+  <%= render Admin::DashboardScreen::PanelComponent.new(kind: :action, title: t("admin.note_inbox.card.title"), line: t("admin.note_inbox.card.line"),
+        id: "dashboard-notes-for-you", empty: t("admin.note_inbox.card.empty")) do |card| %>
     <% if unread.positive? %>
       <% card.with_badge do %>
         <%= tag.span t("admin.note_inbox.card.new", count: unread), class: "text-label text-accent", data: { notes_new: true } %>
@@ -22,8 +22,8 @@
     <% rows.each do |row| %>
       <% card.with_row { render Admin::NotesScreen::InboxRowComponent.new(row: row) } %>
     <% end %>
-    <%# The way to the same rows as a page, in words at the foot of the card
-        (handoff "Inbox row": "All notes for you →"), not the header's arrow. %>
+    <%# The way to the same rows as a page, in words at the foot of the panel
+        ("All notes for you →"), not the head's arrow. %>
     <% card.with_footer do %>
       <%= link_to t("admin.note_inbox.card.all_html", arrow: tag.span("→", aria: { hidden: true })), admin_notes_path(**admin_url_options),
             class: "text-ink hover:underline", data: { turbo_frame: "_top", notes_all: true } %>

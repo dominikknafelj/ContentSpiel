@@ -5,8 +5,8 @@ import { json } from "notes/json"
 import { report } from "live/state"
 import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 
-// The person's side of live notes (notes spec §6): the sidebar's count, the
-// dashboard's two cards, the toasts and their bursts. Lives on <body>, so
+// The person's side of live notes: the sidebar's count, the dashboard's
+// Notes for you and Waiting for you, the toasts and their bursts. Lives on <body>, so
 // every screen of CS Studio has the person's stream. A signal over the cable
 // says only THAT something changed (`Notes::Signals`: a kind and ids); this
 // controller then fetches what it shows through the scoped endpoints, so
@@ -18,7 +18,7 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 //
 // ONE SUBSCRIPTION.
 // `Notes::PersonChannel`, once per tab. `delivery`: a delivery was written
-// for the viewer. The sidebar's count and, on the dashboard, the two cards
+// for the viewer. The sidebar's count and, on the dashboard, the two panels
 // are fetched again; then that one delivery is FETCHED as data -- the
 // signal may have reached someone who has since lost the right to read the
 // record, and a refusal ends it there, with nothing said -- announced on
@@ -29,9 +29,9 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 // asked for, so two windows side by side both stay live): the thread's own
 // refresh shows the message and,
 // being the thread's GET, reads the delivery. `inbox`: deliveries of theirs
-// were read or removed elsewhere; only the count and the cards are fetched,
+// were read or removed elsewhere; only the count and the panels are fetched,
 // and nothing is said.
-// SEVERAL AT ONCE (the handoff's decision 18). A BURST is deliveries
+// SEVERAL AT ONCE. A BURST is deliveries
 // announced within `burstMs` (10 s) of the one before; it ends that long
 // after the last. The first two that are said in a burst get their own
 // toasts; from the third, those named toasts are taken away and ONE toast
@@ -52,7 +52,7 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 // GET redrew.
 //
 // THE SOCKET. When it drops, CS Studio works as without push; when it is
-// back, the count, the cards and what was to be announced are fetched once
+// back, the count, the panels and what was to be announced are fetched once
 // -- signals sent meanwhile were never received. What a session's end does
 // to the socket: `live/connection`. This controller says on <body> whether
 // the person's subscription is up, its half of `data-notes-live`
@@ -65,7 +65,7 @@ import { forgetDrafts } from "controllers/admin/notes/composer_controller"
 const COALESCE_MS = 500
 
 // What the person's stream has said and nobody has acted on yet: the
-// deliveries to announce, and whether the count and the cards are due. Beside
+// deliveries to announce, and whether the count and the panels are due. Beside
 // the controller, not on it (as `pool` is in `live/connection`): a signal
 // waits half a second before anything is fetched, and a Turbo visit inside
 // that window replaces <body> and the controller with it. The next page's
@@ -95,7 +95,7 @@ function endBurst() {
 }
 
 export default class extends Controller {
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: BURST_MS } }
+  static values = { unreadUrl: String, cardUrl: String, waitingUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: BURST_MS } }
 
   initialize() {
     this.timers = new Map()
@@ -189,7 +189,7 @@ export default class extends Controller {
   // --- what the person's stream says ------------------------------------------------
 
   // A signal on the person's stream. Every delivery named in a burst is
-  // announced; the count and the cards are fetched once for all of them.
+  // announced; the count and the panels are fetched once for all of them.
   addressed(signal) {
     if (signal?.kind === "delivery") {
       if (Number.isInteger(signal.delivery_id)) pending.deliveries.add(signal.delivery_id)
@@ -225,7 +225,7 @@ export default class extends Controller {
   }
 
   // This run's page is gone. What it had not announced is the next page's:
-  // the delivery it was reading goes back, the count and the cards are due
+  // the delivery it was reading goes back, the count and the panels are due
   // again (the answer went to the old page's elements), and the controller
   // that is live runs -- now, not at the next signal. Without one yet, its
   // `connect` will. Nothing is handed to another person's page.
@@ -322,16 +322,20 @@ export default class extends Controller {
       badge.hidden = unread === 0
       badge.toggleAttribute("data-badge", unread > 0)
     }
+    this.reload(document.getElementById("dashboard-waiting"), this.waitingUrlValue)
     this.reload(document.getElementById("notes-for-you"), this.cardUrlValue)
-    this.reload(document.getElementById("notes-open-threads"), this.openThreadsUrlValue)
   }
 
-  // The dashboard's two cards are frames drawn with the page, with no `src`
-  // of their own: the first signal gives them one, later ones reload it.
+  // A dashboard panel that is on this page, fetched again; on any other
+  // screen there is no frame and nothing is fetched. A frame drawn with the
+  // page has no `src`, and the first signal gives it its own address. A
+  // frame that has one reloads THAT: the person's filter is the frame's
+  // `src` (a filter link of Waiting for you navigates the frame), and
+  // setting the fixed address back would throw their choice away under them.
   reload(frame, url) {
-    if (!frame || !url) return
-    if (frame.getAttribute("src") === url) frame.reload()
-    else frame.src = url
+    if (!frame) return
+    if (frame.getAttribute("src")) frame.reload()
+    else if (url) frame.src = url
   }
 
   // The layout's `#toast-note-template` with an accent dot before its

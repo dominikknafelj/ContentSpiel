@@ -1,14 +1,13 @@
 module Admin
-  # The signed-in person's notes inbox (notes spec §5). Open to every
-  # signed-in user, like the dashboard: what it lists is narrowed by the read
-  # scope inside the queries (`Dashboard::NotesForYou`, `Dashboard::OpenThreads`),
-  # so someone with no rights gets empty lists, and a record that left the
+  # The signed-in person's notes inbox. Open to every signed-in user, like
+  # the dashboard: what it lists is narrowed by the read scope inside the
+  # query (`Dashboard::NotesForYou`, through `Notes.readable_threads`), so
+  # someone with no rights gets an empty list, and a record that left the
   # viewer's scope or went to the trash is simply not there.
   #
-  # Six answers: the full list, "Mark all read", the three parts a page
-  # shows of the inbox, each fetched again on its own -- the two dashboard
-  # cards as their frames, and the sidebar's number as JSON -- and one
-  # delivery as data, for the toast. None of the last four renders the
+  # Five answers: the full list, "Mark all read", Notes for you as its frame
+  # and the sidebar's number as JSON, each fetched again on its own, and one
+  # delivery as data, for the toast. None of the last three renders the
   # layout, so none pays for the sidebar.
   #
   # Nothing here marks one row read: a row is read by opening its thread
@@ -42,15 +41,11 @@ module Admin
       render partial: "admin/note_inbox/card", locals: { rows: inbox.rows, unread: inbox.unread_count }
     end
 
-    def open_threads
-      render partial: "admin/note_inbox/open_threads", locals: { open_threads: Dashboard::OpenThreads.new(actor: Current.actor) }
-    end
-
     def unread
       render json: { unread: inbox.unread_count }
     end
 
-    # One of the viewer's own deliveries as data (notes spec §6.1, §6.4): what
+    # One of the viewer's own deliveries as data: what
     # a tab asks for after a signal named its id, for the toast and the
     # desktop notification. THE SIGNAL SAID NOTHING, and may have reached
     # someone who has since lost the right to read the record: this is where
@@ -80,7 +75,7 @@ module Admin
       return I18n.t("#{scope}.nobody") unless row.by || row.by_id
       return I18n.t("#{scope}.deleted") unless row.by
 
-      I18n.t("#{scope}.somebody_html", name: Notes.name_of(row.by))
+      I18n.t("#{scope}.somebody_html", name: PersonName.of(row.by))
     end
 
     def inbox = @inbox ||= Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale)

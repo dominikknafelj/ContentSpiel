@@ -1,9 +1,8 @@
 require "test_helper"
 
-# The dashboard as CS Studio's start page (dashboard spec §3-§4, Task 2):
-# the admin root now renders the dashboard shell, not the pages list, and
-# sign-in lands there. The pages list itself moves to /pages -- the sidebar
-# still lists it, just no longer first, and no longer at the admin root.
+# The dashboard is CS Studio's start page: the admin root renders it and
+# sign-in lands there. The Pages module is at /pages, after Dashboard in the
+# sidebar.
 class Admin::DashboardTest < ActionDispatch::IntegrationTest
   test "the admin root is the dashboard and sign-in lands there" do
     post admin_sign_in_path, params: { email_address: users(:one).email_address, password: "password" }
@@ -11,6 +10,15 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_select "h1", "Dashboard"
     assert_select "html[data-surface=studio]"
+  end
+
+  # A restored snapshot would list what waited when the dashboard was left.
+  test "the dashboard is never restored from Turbo's page cache" do
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    get admin_root_path, headers: { "Turbo-Frame" => "content" }
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
   end
 
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
@@ -36,19 +44,22 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "h1", "Dashboard"
   end
 
-  # Round 2, Task 16: quick create, three cards and one activity feed (the
-  # old "Your work" / "On the site" columns and their lists are gone).
-  test "the three cards and the activity feed render; the old two columns are gone" do
+  # Each panel is headed by its job, with one line under it, and tinted by
+  # its kind.
+  test "the panels and the activity feed render, each headed by its job" do
     draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
     sign_in_as users(:one)
     get admin_root_path
 
-    assert_select "section[aria-labelledby=dashboard-drafts] h2", "Your drafts"
+    assert_select "section.admin-dashboard-panel--shortcuts[aria-labelledby=dashboard-drafts] h2", "Pick up where you left off"
+    assert_select "section[aria-labelledby=dashboard-drafts] .admin-dashboard-panel__line", "Your drafts, the latest first."
     assert_select "section[aria-labelledby=dashboard-drafts] a[href='#{admin_post_path(draft)}']", text: "Half-written"
-    assert_select "section[aria-labelledby=dashboard-going-live-next] h2", "Going live next"
-    assert_select "section[aria-labelledby=dashboard-activity] h2", "Recent activity"
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-going-live-next] h2", "Publishing on its own"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] .admin-dashboard-panel__line", "Scheduled pages and posts, the soonest first."
+    assert_select "turbo-frame#dashboard-waiting section.admin-dashboard-panel--action[aria-labelledby=dashboard-waiting-title] h2", "Waiting for you"
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-activity] h2", "What changed recently"
+    assert_select "section[aria-labelledby=dashboard-activity] .admin-dashboard-panel__line", "The latest changes to pages, posts and images."
     assert_select "section[aria-labelledby=dashboard-activity] li", text: /Half-written/
-    assert_select "#your-work, #on-the-site, #dashboard-recently-updated, #dashboard-recently-edited, #dashboard-scheduled", count: 0
   end
 
   test "the needs-translation card is hidden with one language" do
@@ -72,19 +83,14 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "empty-state copy doesn't point at a quick-create row the viewer doesn't have" do
-    sign_in_as users(:reader)
-    get admin_root_path
-    assert_match "No drafts.", response.body
-    assert_no_match "Start a draft", response.body
-  end
-
   test "the needs-translation card shows each target language's numbers with several languages" do
     with_locales(%w[en de], default: "en")
     Current.set(actor: users(:one)) { create_post(title: "Untranslated") }
     sign_in_as users(:one)
     get admin_root_path
 
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-needs-translation] h2", "Languages behind English"
+    assert_select "section[aria-labelledby=dashboard-needs-translation] .admin-dashboard-panel__line", "What is missing or outdated, per language."
     assert_select "section[aria-labelledby=dashboard-needs-translation] [data-locale=de]", text: /Deutsch.*1 missing/m
     assert_select "section[aria-labelledby=dashboard-needs-translation] [role=progressbar]"
   end
@@ -99,33 +105,32 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-activity] li", text: /#{Regexp.escape(users(:two).email_address)} via Claude desktop edited “From MCP!”/
   end
 
-  # Claude Design's O6: each card's empty line, and the two actions.
+  # Each panel's empty line, and the two actions.
   test "every empty card says its one line, with Start a draft and Drafts → for someone who may create and read posts" do
     with_locales(%w[en], default: "en")
     sign_in_as users(:one)
     get admin_root_path
 
-    lines = css_select("p[data-card-empty]").to_h { |line| [ line.ancestors("section").first["aria-labelledby"], line.text.squish ] }
-    assert_equal({ "dashboard-notes-for-you" => "No notes for you.", "dashboard-open-threads" => "No open threads.",
+    lines = css_select("p[data-panel-empty]").to_h { |line| [ line.ancestors("section").first["aria-labelledby"], line.text.squish ] }
+    assert_equal({ "dashboard-notes-for-you" => "No notes for you.", "dashboard-waiting-title" => "Nothing is waiting for you.",
                    "dashboard-drafts" => "No drafts. Start a draft", "dashboard-going-live-next" => "Nothing scheduled. Drafts →",
-                   "dashboard-unpublished-changes" => "No unpublished changes.", "dashboard-activity" => "No recent activity." }, lines)
-    assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty] a[href='#dashboard_draft_title'][data-controller='admin--dashboard--start-draft'][data-action='admin--dashboard--start-draft#start'][data-admin--dashboard--start-draft-field-value='dashboard_draft_title']", text: "Start a draft"
-    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a[href='#{admin_posts_path(scope: "drafts")}'][data-turbo-frame=_top] span[aria-hidden=true]", text: "→"
+                   "dashboard-activity" => "No recent activity." }, lines)
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-panel-empty] a[href='#{admin_posts_path(scope: "drafts")}'][data-turbo-frame=_top] span[aria-hidden=true]", text: "→"
     assert_select ".admin-empty-state", count: 0
   end
 
   test "someone who may create nothing reads No drafts. alone, and Drafts → only with posts.read" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "section[aria-labelledby=dashboard-drafts] p[data-card-empty]", text: "No drafts."
+    assert_select "section[aria-labelledby=dashboard-drafts] p[data-panel-empty]", text: "No drafts."
     assert_select "a", text: "Start a draft", count: 0
     # The read-only group holds posts.read (test/fixtures/access_control/grants.yml).
-    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a[href='#{admin_posts_path(scope: "drafts")}']", count: 1
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-panel-empty] a[href='#{admin_posts_path(scope: "drafts")}']", count: 1
 
     sign_in_as users(:editor_branch)
     get admin_root_path
-    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty]", text: "Nothing scheduled."
-    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-card-empty] a", count: 0
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-panel-empty]", text: "Nothing scheduled."
+    assert_select "section[aria-labelledby=dashboard-going-live-next] p[data-panel-empty] a", count: 0
   end
 
   test "empty lists say so" do
@@ -146,102 +151,117 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-needs-translation]", count: 0
   end
 
-  test "quick draft creates a draft and opens it" do
+  # The heading row: "New post…" is the screen's one primary, "New page…"
+  # its secondary before it, each a link to its standalone page that opens
+  # the layout's dialog, and each drawn only for its right.
+  test "New post… is the screen's one primary and New page… its secondary, each with its right" do
+    root_page
+    new_post = "div.admin-dashboard__head a[href='#{new_admin_post_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-post-dialog]"
+    new_page = "div.admin-dashboard__head a[href='#{new_admin_page_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-page-dialog]"
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+    secondary = Admin::Ui::ButtonComponent.classes(:secondary)
+
     sign_in_as users(:one)
-    assert_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "New idea", content_type: "blog" }
-    end
-    post = Post.order(:id).last
-    assert_nil post.published_at
-    assert_equal "blog", post.content_type
-    assert_equal "New idea", post.title
-    assert_redirected_to admin_post_path(post)
-    follow_redirect!
-    assert_match "Draft created", response.body
-  end
-
-  test "a blank title re-renders the dashboard with the error" do
-    sign_in_as users(:one)
-    assert_no_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "", content_type: "blog" }
-    end
-    assert_response :unprocessable_entity
-    assert_select "[role=alert]"
-    assert_select "h1", "Dashboard"
-    assert_select "select[name=content_type] option[selected][value=blog]"
-  end
-
-  # Review Focus 3: an Author whose `posts.create` is scoped to one content
-  # type is offered only that type, and a forged other type is refused with
-  # a 403 by `Posts::Save` itself, not merely hidden from the select.
-  test "the type select lists only creatable types, and a forged type is refused" do
-    bloggers = AccessControl::Group.create!(name: "Bloggers")
-    bloggers.grants.create!(permission: "posts.read", scope: {})
-    bloggers.grants.create!(permission: "posts.create", scope: { "content_types" => [ "blog" ] })
-    blogger = User.create!(email_address: "blogger@example.com", password: "password12345")
-    AccessControl::Membership.create!(user: blogger, group: bloggers)
-
-    sign_in_as blogger
     get admin_root_path
-    assert_select "select[name=content_type] option", count: 1
-    assert_select "select[name=content_type] option[value=blog]", "Blog"
+    assert_select "div.admin-dashboard__head > h1", "Dashboard"
+    assert_select new_post, exact_text: "New post…", count: 1
+    assert_select new_page, exact_text: "New page…", count: 1
+    assert_equal primary, css_select(new_post).first["class"]
+    assert_equal secondary, css_select(new_page).first["class"]
+    assert_equal %w[New\ page… New\ post…], css_select("div.admin-dashboard__head a").map { |link| link.text.strip }
+    # Nothing else on the screen is a primary.
+    assert_equal 1, css_select(".admin-dashboard a, .admin-dashboard button").count { |control| control["class"].to_s.split.include?("bg-accent") }
 
-    assert_no_difference -> { Post.count } do
-      post admin_dashboard_draft_path, params: { title: "Sneaky", content_type: "now_update" }
-    end
-    assert_response :forbidden
+    sign_in_as users(:author) # posts.create, no pages.create
+    get admin_root_path
+    assert_select new_post, count: 1
+    assert_select new_page, count: 0
+
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.create", scope: { "page_ids" => [ root_page.id ] })
+    sign_in_as users(:editor_branch) # pages.create alone
+    get admin_root_path
+    assert_select new_post, count: 0
+    assert_select new_page, count: 1
+
+    sign_in_as users(:reader) # neither
+    get admin_root_path
+    assert_select "div.admin-dashboard__head > h1", "Dashboard"
+    assert_select "div.admin-dashboard__head a", count: 0
   end
 
-  test "a user who can create no post type gets no quick draft form" do
+  test "Start a draft opens the New post dialog, for someone who may create posts" do
+    sign_in_as users(:author)
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-drafts] p[data-panel-empty] a[href='#{new_admin_post_path}'][data-turbo-frame=_top]" \
+      "[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param=new-post-dialog]", exact_text: "Start a draft"
+
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "select[name=content_type]", count: 0
-    assert_select "form[action='#{admin_dashboard_draft_path}']", count: 0
+    assert_select "a", text: "Start a draft", count: 0
   end
 
-  test "the type select ends with Page for someone who may create pages, and the bar has no New page or Upload image buttons" do
+  test "POST dashboard/draft is gone" do
+    sign_in_as users(:one)
+    assert_no_difference -> { Post.count } do
+      post "/cs-studio/dashboard/draft", params: { title: "New idea", content_type: "blog" }
+    end
+    assert_response :not_found
+    assert_not Rails.application.routes.url_helpers.respond_to?(:admin_dashboard_draft_path)
+    assert_not respond_to?(:admin_dashboard_draft_path)
+  end
+
+  test "the full audit log link needs audit.view" do
     sign_in_as users(:one)
     get admin_root_path
-    assert_equal "page", css_select("select[name=content_type] option").last["value"]
-    assert_select "select[name=content_type] option", text: "Page"
-    assert_select "a", text: "Upload image", count: 0
-    assert_select "form[action='#{admin_dashboard_draft_path}'] a[data-admin--ui--dialog-id-param=new-page-dialog][hidden]", count: 1
     assert_select "a", text: /Full audit log/
-  end
 
-  test "Page is offered only with pages.create, and the audit link needs audit.view" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "select[name=content_type] option[value=page]", count: 0
     assert_select "a", text: /Full audit log/, count: 0
   end
 
-  test "submitting the quick draft form with Page goes to the standalone New page screen" do
+  # Drafts are tiles: each its own record's type, title, excerpt and time.
+  test "Pick up where you left off draws the viewer's drafts as tiles that end in Continue" do
+    draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
     sign_in_as users(:one)
-    assert_no_difference -> { Post.count + Page.count } do
-      post admin_dashboard_draft_path, params: { title: "Ignored", content_type: "page" }
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-drafts] ul.admin-draft-tiles > li > article.admin-draft-tile" do
+      assert_select "a.admin-draft-tile__link[href='#{admin_post_path(draft)}']", text: "Half-written"
+      assert_select "span.admin-row-verb", "Continue"
     end
-    assert_redirected_to new_admin_page_path
+    assert_select "section[aria-labelledby=dashboard-drafts] a[aria-label='All drafts'][href='#{admin_posts_path(scope: "drafts")}']", text: "→"
   end
 
-  # Spec §4.5, at the view level: everything a row renders -- editor paths,
-  # type labels, the activity sentences (a token's user included) and the
-  # translation card -- comes from a constant set of queries. Signed in
-  # as users(:two), a non-owner Admin-group member, so every `can?` and
-  # every read scope goes through the grant path rather than the owner
-  # shortcut.
+  # Everything a row renders -- editor paths, type labels, the activity
+  # sentences (a token's user included), the translation panel and every
+  # kind of row Waiting for you has -- comes from a constant set of queries.
+  # Signed in as users(:two), a non-owner Admin-group member who may publish
+  # pages and posts, so every `can?` and every read scope goes through the
+  # grant path rather than the owner shortcut. Waiting for you's kinds are
+  # made last, so its five rows are the same kinds with one set as with
+  # twenty: an image's thread, a page's thread, a page and a post the feed
+  # alone brings, and a post with both reasons.
   test "the dashboard renders in the same number of queries with 1 or 20 records per list" do
     me = users(:two)
     token, = ApiToken.generate!(me, group: access_control_groups(:admin))
     counts = [ 1, 20 ].map do |n|
       n.times do |i|
         Current.set(actor: me, channel: :admin) do
-          create_post(title: "D#{n}-#{i}", published: false)
+          create_post(title: "D#{n}-#{i}", published: false).update_columns(excerpt: { Locales.default => "An excerpt #{i}" })
           create_post(title: "S#{n}-#{i}", published: false).update_columns(published_at: (i + 1).days.from_now)
           create_page(title: "P#{n}-#{i}", published: false)
           create_media_asset.tap { |asset| Audit.record("media.uploaded", subject: asset) }
         end
         Current.set(actor: token, channel: :mcp) { create_post(title: "T#{n}-#{i}", published: false) }
+        as(users(:one)) do
+          [ create_media_asset, create_page(title: "Discussed #{n}-#{i}") ].each { |record| assert Notes::Start.call(record, body: "A note").ok? }
+        end
+        [ create_page(title: "Marked page #{n}-#{i}"), create_post(title: "Marked post #{n}-#{i}") ].each { |record| record.update_columns(unpublished_changes_at: Time.current) }
+        both = create_post(title: "Both #{n}-#{i}")
+        as(users(:one)) { assert Notes::Start.call(both, body: "A note").ok? }
+        both.update_columns(unpublished_changes_at: Time.current)
       end
       sign_in_as me
       get admin_root_path # warm-up: first-render template compilation, schema loads
@@ -249,12 +269,18 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
       callback = ->(*, payload) { queries += 1 unless payload[:name] == "SCHEMA" || payload[:sql].start_with?("BEGIN", "COMMIT", "SAVEPOINT", "RELEASE") }
       ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { get admin_root_path }
       assert_response :ok
-      assert_select "section[aria-labelledby=dashboard-drafts] li"
+      assert_select "section[aria-labelledby=dashboard-drafts] article.admin-draft-tile p.line-clamp-2", text: /An excerpt/
       assert_select "section[aria-labelledby=dashboard-activity] li"
       assert_select "section[aria-labelledby=dashboard-needs-translation] li"
+      assert_select ".admin-waiting-row", count: 5
+      assert_select ".admin-waiting-row a", text: "Review and publish…", count: 3
+      assert_select ".admin-waiting-row .admin-notes-marker", count: 3
       queries
     end
     assert_equal counts.first, counts.last
+    # Waiting for you's count beside its heading is 3 of these: the threads'
+    # records in one statement and the unpublished ones in one per model.
+    assert_operator counts.last, :<=, 46, "the dashboard's statements: #{counts.last}"
   end
 
   test "a user with no groups sees only the open modules, no empty group headings, and No groups" do

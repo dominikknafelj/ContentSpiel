@@ -17,13 +17,14 @@ class PressHelperSystemTest < ApplicationSystemTestCase
     JS
   end
 
-  test "press refuses a button another element covers" do
-    assert_raises(Capybara::Cuprite::MouseEventFailed) { press "Create draft" }
+  test "press refuses a link another element covers" do
+    assert_raises(Capybara::Cuprite::MouseEventFailed) { press "New post…" }
   end
 
-  test "press_by_script clicks a covered button" do
-    fill_in "Title", with: "Covered draft", visible: :all
-    press_by_script "Create draft"
-    assert_text "Draft created"
+  test "press_by_script clicks a covered link" do
+    await_admin_controllers
+    # Scripted on purpose: reaching a covered control is what this test is about.
+    press_by_script "New post…"
+    assert_selector "dialog#new-post-dialog[open]"
   end
 end

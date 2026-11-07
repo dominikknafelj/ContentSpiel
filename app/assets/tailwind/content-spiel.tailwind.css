@@ -78,6 +78,7 @@
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
+  --text-h3: var(--cs-t-h3);
   --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
   --text-count: var(--cs-t-count);
@@ -85,6 +86,8 @@
      read faint); an explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
   --text-count--font-weight: 500;
+  /* A panel's heading and a tile's title. */
+  --text-h3--font-weight: 600;
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);
@@ -606,19 +609,119 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
-/* The dashboard's cards (layout points spec, C and decision 13): one column,
-   two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
-   window's (the sidebar and the tree take room the window does not
-   show), and never more than three: a wider window widens the cards and adds
-   no fourth, so no `auto-fit`. `turbo-frame.contents` keeps the two notes
-   cards, each a frame of its own, grid items. */
+/* The dashboard's heading row: the heading, then New page… and New post…
+   at its end. It wraps, so on a narrow screen the buttons go under the
+   heading rather than crushing it. */
+.admin-dashboard__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.admin-dashboard__buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
+/* A dashboard panel (`Admin::DashboardScreen::PanelComponent`): a card
+   (elevation 1, `rounded-card`) whose head holds its heading and one line.
+   The head is tinted by the panel's kind, and the heading and the line take
+   the head's ink: action (something waits on the viewer), shortcuts (a way
+   back into work), information (what is happening). The tints are these
+   rules and not utilities, so a later rule changes them by plain cascade.
+   The head's top corners follow the
+   card's, since the card does not clip (a focus ring inside it would be cut). */
+.admin-dashboard-panel { display: flex; flex-direction: column; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+/* The head wraps: an action wider than the room beside the heading
+   (Waiting for you's filter in a narrow column) goes under the heading
+   rather than crushing it, and where even the head's whole width is too
+   narrow for it, the action shrinks to that width and the filter's words
+   wrap inside their segments, never past the panel's edge. */
+.admin-dashboard-panel__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }
+.admin-dashboard-panel__head > :first-child { flex: 1 1 12rem; }
+.admin-dashboard-panel__head > :not(:first-child) { min-width: 0; max-width: 100%; }
+.admin-dashboard-panel__head nav { max-width: 100%; }
+.admin-dashboard-panel__line { margin-top: 0.125rem; }
+.admin-dashboard-panel--action .admin-dashboard-panel__head { background: var(--cs-head-action); color: var(--cs-head-action-ink); }
+.admin-dashboard-panel--shortcuts .admin-dashboard-panel__head { background: var(--cs-head-cool); color: var(--cs-head-cool-ink); }
+.admin-dashboard-panel--information .admin-dashboard-panel__head { background: var(--cs-head-warm); color: var(--cs-head-warm-ink); }
+/* A row of Waiting for you (`Admin::DashboardScreen::WaitingRowComponent`):
+   the title and its meta line, then the count, the chip and the verb. The
+   row presses as one: the title link's `::after` covers the row, and the
+   focus ring is drawn on it, inside the row. "Review and publish…" is raised
+   over it (`relative z-10`), the one second link a row may have. */
+.admin-waiting-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
+.admin-waiting-row__link::after { content: ""; position: absolute; inset: 0; }
+.admin-waiting-row__link:focus-visible { outline: none; }
+.admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* Pick up where you left off's tiles (`Admin::DashboardScreen::DraftTileComponent`),
+   one column below the main column's 32rem (the dashboard's layout,
+   below). A tile presses as one: its title link's `::after` covers the
+   tile, rounded with it, and the focus ring is drawn on it. */
+.admin-draft-tiles { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
+.admin-draft-tile { position: relative; }
+.admin-draft-tile__link::after { content: ""; position: absolute; inset: 0; border-radius: var(--cs-radius-tile); }
+.admin-draft-tile__link:focus-visible { outline: none; }
+.admin-draft-tile__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* The verb an action row ends in when it is words and not a link of its
+   own, describing the row's one link: dim at rest, so a read row holds no
+   accent, and accent while the row is under the pointer or holds the focus
+   (the Waiting for you row and the draft tile around their stretched
+   links, the Notes for you row that is the link). */
+.admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
+.admin-waiting-row:hover .admin-row-verb,
+.admin-waiting-row:focus-within .admin-row-verb,
+.admin-draft-tile:hover .admin-row-verb,
+.admin-draft-tile:focus-within .admin-row-verb,
+a:hover > .admin-row-verb,
+a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
+/* The dashboard's layout. The container is the DASHBOARD's own width, never
+   the window's (the sidebar and the tree take room the window does not
+   show), and no `@media` rule names it. It docks at 1200px, the editors'
+   rail's threshold (`@container admin-editor`): a container query cannot
+   read a custom property, so the number is written in both places and
+   `admin_design_rules_test` holds them to one. The document order is the
+   heading row, the mail notice, the main column (Waiting for you, Notes for
+   you, then Pick up where you left off), then the rail, "At a glance"
+   (Publishing on its own, Languages behind, What changed recently): what
+   needs the person comes first at every width, and only the grid places the
+   two, so the focus follows that order. Every count of columns is written
+   here and none is `auto-fit`: a wider dashboard widens the columns and adds
+   none. Below the threshold the rail's panels follow the main column as
+   cards, one column, two from 40rem. Docked, the main column stands at the
+   content's left edge and the rail `--cs-rail-gap` right of it on the
+   rail's ground; the tracks are fixed and `justify-content: start`, so
+   spare width falls right of the rail, and the heading row and the mail
+   notice end where the rail does, so New post… stands over the rail and
+   not out in that spare width. On that ground an information panel has no
+   card and no band, and its heading keeps its warm ink; its rows, its empty
+   line and its footer lose their inset with the head's, so all start at
+   the rail's padding. The main column is a container of its own
+   (`admin-dashboard-main`), so Waiting for you and Notes for you stand side
+   by side, and the tiles take two or three columns, by the room the main
+   column has. `turbo-frame.contents` keeps those two frames' panels grid
+   items. These are plain rules, unlayered, so they win over the rows'
+   padding utilities; the docked head outweighs a kind's tint by
+   specificity (0,3,0 against 0,2,0). The tiles' columns override the
+   tiles' one column at equal specificity, so this block stands after it. */
 .admin-dashboard { container: admin-dashboard / inline-size; }
-.admin-dashboard-cards { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@container admin-dashboard (min-width: 40rem) {
-  .admin-dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.admin-dashboard__grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 1.5rem; }
+.admin-dashboard__main { container: admin-dashboard-main / inline-size; display: flex; flex-direction: column; gap: 1rem; }
+.admin-dashboard__actions { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+.admin-dashboard__rail { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container admin-dashboard-main (min-width: 44rem) {
+  .admin-dashboard__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@container admin-dashboard (min-width: 60rem) {
-  .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@container admin-dashboard-main (min-width: 32rem) {
+  .admin-draft-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard-main (min-width: 48rem) {
+  .admin-draft-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container admin-dashboard (min-width: 40rem) {
+  .admin-dashboard__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-dashboard (min-width: 1200px) {
+  .admin-dashboard__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
+  .admin-dashboard__rail { grid-template-columns: minmax(0, 1fr); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
+  .admin-dashboard__rail .admin-dashboard-panel { background: transparent; box-shadow: none; }
+  .admin-dashboard__rail .admin-dashboard-panel .admin-dashboard-panel__head { background: transparent; padding-inline: 0; }
+  .admin-dashboard__rail .admin-dashboard-panel > ul,
+  .admin-dashboard__rail .admin-dashboard-panel > [data-panel-empty],
+  .admin-dashboard__rail .admin-dashboard-panel > footer { padding-inline: 0; }
+  .admin-dashboard__head,
+  .admin-dashboard__notice { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
 }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the

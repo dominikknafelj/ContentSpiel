@@ -109,7 +109,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       app/components/admin/pages_screen/tree_row_component.html.erb app/components/admin/pages_screen/tree_row_component.rb
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
-      app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb
+      app/components/admin/dashboard_screen/translation_panel_component.html.erb app/components/admin/dashboard_screen/translation_panel_component.rb
     ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
@@ -151,8 +151,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       audit_changes_component.html.erb settings_form_component.rb settings_form_component.html.erb
       media_library/detail_component.rb media_library/detail_component.html.erb
       columns/image_column_component.rb columns/image_column_component.html.erb
+      dashboard_screen/card_component.rb dashboard_screen/card_component.html.erb
+      dashboard_screen/translation_card_component.rb dashboard_screen/translation_card_component.html.erb
+      dashboard_screen/quick_create_component.rb dashboard_screen/quick_create_component.html.erb
     ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
+    end
+    # The dashboard's buttons open the layout's New post and New page
+    # dialogs, with no script of the dashboard's.
+    %w[quick_create_controller.js start_draft_controller.js].each do |file|
+      assert_not Rails.root.join("app/javascript/controllers/admin/dashboard", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
     # Languages is a card of the Settings screen, an image's detail a panel
@@ -617,6 +625,18 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "11px" ], tokens.scan(/--cs-t-count:\s*([^;]+);/).flatten
   end
 
+  # A heading is drawn at a size token's utility; a token with no utility is
+  # written as a bare size instead, which the type voice cannot see.
+  test "each heading size token has its utility" do
+    theme = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")[/@theme inline \{(.*?)\n\}/m, 1]
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    %w[h1 h2 h3].each do |size|
+      assert_includes theme, "--text-#{size}: var(--cs-t-#{size});", "the @theme block maps text-#{size}"
+      assert_match(/--cs-t-#{size}:\s*\d+px/, tokens, "--cs-t-#{size} is a size")
+    end
+    assert_includes theme, "--text-h3--font-weight: 600;"
+  end
+
   # A count is a figure in a pill, `text-count`; the 12px label would grow it
   # with the label. A line that draws a count (a count helper, a tab's count,
   # a total, the graph legend's count, the presence marker's) carries no
@@ -774,14 +794,57 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/cs-control-compact|admin-filter-bar/, public_css, "nothing of CS Studio's reaches the public stylesheet")
   end
 
-  # Layout points spec, decision 13: at most three cards in a row, by the
-  # dashboard's own width, never `auto-fit`.
-  test "the dashboard's grid is one, two or three columns by its container, and never auto-fit" do
+  # The dashboard's main column and its "At a glance" rail: laid out by the
+  # dashboard's own width (the sidebar and the tree take room the window does
+  # not show), never a window media query, docked on the editors' rail tokens.
+  test "the dashboard's main column and rail are laid out by the dashboard's container, from the rail's tokens" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-dashboard\s*\{\s*container:\s*admin-dashboard\s*\/\s*inline-size;\s*\}/, css)
-    assert_match(/@container admin-dashboard \(min-width: 40rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/m, css)
-    assert_match(/@container admin-dashboard \(min-width: 60rem\)\s*\{\s*\.admin-dashboard-cards\s*\{\s*grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\);/m, css)
-    assert_no_match(/auto-fit/, Rails.root.join("app/views/admin/dashboard/show.html.erb").read)
+    assert_match(/\.admin-dashboard__grid\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*minmax\(0, 1fr\);\s*row-gap:\s*1\.5rem;\s*\}/, css, "one column below the threshold")
+    assert_match(/\.admin-dashboard__main\s*\{\s*container:\s*admin-dashboard-main\s*\/\s*inline-size;/, css)
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the dashboard's rail"
+    grid = docked.first[/\.admin-dashboard__grid\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked block lays out .admin-dashboard__grid"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/justify-content:\s*start;/, grid, "left-aligned: spare width falls right of the rail")
+    rail = docked.first[/\.admin-dashboard__rail\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds .admin-dashboard__rail"
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\)].each do |declaration|
+      assert_match(/#{declaration};/, rail)
+    end
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-dashboard") }, "no window media query lays out the dashboard"
+    sources = [ "app/views/admin/dashboard/show.html.erb", *Dir[Rails.root.join("app/components/admin/dashboard_screen/*").to_s] ]
+    assert_empty sources.select { |path| Rails.root.join(path).read.include?("auto-fit") }, "the dashboard's columns are counted, never auto-fit"
+    assert_no_match(/auto-fit/, css)
+  end
+
+  # A container query cannot read a custom property, so the threshold is a
+  # number written in two places; this holds them to one.
+  test "the editors' rail and the dashboard's dock at one threshold" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    editor = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten.uniq
+    assert_equal 1, editor.size, "the editor docks at one width: #{editor.inspect}"
+    # Every width the dashboard's container asks: the rail's two columns
+    # below the threshold, and the threshold itself; a block at any other
+    # width (one that docked only the rail's ground or its panels) fails.
+    dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)/).flatten
+    assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
+    assert_equal 1, docked.size
+    %w[admin-dashboard__grid admin-dashboard__rail].each { |name| assert_match(/\.#{name}\s*\{/, docked.first, "#{name} docks in the threshold's block") }
+    outside = css.sub(docked.first, "")
+    assert_no_match(/\.admin-dashboard__rail \.admin-dashboard-panel/, outside, "the rail's panels change only in the threshold's block")
+    # The docked head outweighs a kind's tint (0,2,0) by specificity, not
+    # by standing later, and the panel's parts that lose their inset are named.
+    assert_match(/\.admin-dashboard__rail \.admin-dashboard-panel \.admin-dashboard-panel__head\s*\{[^}]*background:\s*transparent;/, docked.first)
+    assert_no_match(/:not\(/, docked.first, "the docked rules name what they change")
   end
 
   # The buttons are tokens only. A Tailwind palette
@@ -970,10 +1033,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # today, a list that may only shrink as screens move their fills into a
   # status component.
   LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
-  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb].freeze
+  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb
+    app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/dashboard_screen/translation_card_component.html.erb
+    app/components/admin/dashboard_screen/translation_panel_component.html.erb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/changes_overview_component.html.erb
     app/components/admin/editor_screen/delete_block_dialog_component.rb
@@ -1019,9 +1083,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/setup/_flash.html.erb
   ].freeze
 
-  test "the live and scheduled fills are drawn only by the status chip" do
+  test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do
     assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
-    assert File.read(Rails.root.join(LIVE_SCHEDULED_FILES.last)).match?(LIVE_SCHEDULED_FILL), "the chip no longer draws them: the guard looks at nothing"
+    %w[status_chip_component.rb scheduled_date_component.rb].each do |file|
+      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} no longer draws them: the guard looks at nothing"
+    end
   end
 
   test "the ok, warn and danger fills are in no file beyond today's: a new one goes in a status component" do
@@ -1117,5 +1183,28 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       RETIRED_NOTES_STATE.select { |name| source.include?(name) }.map { |name| "#{path.delete_prefix("#{Rails.root}/")}: #{name}" }
     end
     assert_empty offences, "the notes' open state is the rail's current tab, and the tree never folds for the notes"
+  end
+
+  # A row's closing verb, when it is words: dim at rest, so a read row holds
+  # no accent, and accent only under the pointer or the focus. Read from the
+  # BUILT stylesheet (CI builds it before the unit shards), so a class name
+  # that only looks right, or a rule a later one overrides, cannot pass.
+  test "a row's closing verb is dim at rest and accent only on the row's hover or focus" do
+    built = Rails.root.join("app/assets/builds/tailwind.css")
+    assert built.file?, "run bin/rails tailwindcss:build first"
+    rules = built.read.gsub(%r{/\*.*?\*/}m, "").scan(/([^{}]+)\{([^{}]*)\}/).map { |selector, body| [ selector.split(",").map(&:strip), body ] }
+    colours = rules.filter_map { |selectors, body| [ selectors, body[/(?<![-\w])color:\s*([^;]+)/, 1] ] if selectors.any? { |selector| selector.include?(".admin-row-verb") } && body.match?(/(?<![-\w])color:/) }
+
+    rest = colours.select { |selectors, _| selectors.include?(".admin-row-verb") }
+    assert_equal [ "var(--cs-dim)" ], rest.map(&:last), "the verb at rest"
+    lit = colours - rest
+    assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
+    selectors = lit.flat_map(&:first)
+    assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
+    # The Waiting for you row and the draft tile around their stretched
+    # links, and the Notes for you row that is the link, each on hover and focus.
+    assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
+                   ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
+                   "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end
 end

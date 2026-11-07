@@ -165,10 +165,9 @@ en:
           ask: "This browser has not been allowed to show notifications yet."
           allow: "Allow in this browser"
           blocked: "Blocked in this browser. Change it in the site settings of your browser."
-    # The inbox (notes spec §5): the full list at `<admin>/notes`
-    # (`index`, the view's own lazy-lookup scope) and the dashboard's two
-    # cards. `card.new` stands beside the card's title, in the small
-    # upper-case label style.
+    # The inbox: the full list at `<admin>/notes` (`index`, the view's own
+    # lazy-lookup scope) and Notes for you on the dashboard (`card`).
+    # `card.new` stands beside the panel's heading, in the label style.
     note_inbox:
       index:
         page_title: "Notes for you · CS Studio"
@@ -177,6 +176,8 @@ en:
         empty: "No notes for you."
       card:
         title: "Notes for you"
+        # The line under the heading: what the panel holds.
+        line: "Mentions and replies addressed to you."
         empty: "No notes for you."
         # The card's footer link; the arrow is decoration, hidden from a
         # screen reader.
@@ -185,13 +186,6 @@ en:
         new:
           one: "%{count} new"
           other: "%{count} new"
-      open_threads:
-        title: "Open threads"
-        empty: "No open threads."
-        # The name of the number beside the title, for a screen reader.
-        total:
-          one: "%{count} open thread in all"
-          other: "%{count} open threads in all"
     # The mind graph's selection card (`mind_graph/card_notes.js`): a post's
     # open notes and the field that starts one. Served by the Mind graph's own
     # `messages_data` call, beside the card's other strings in
@@ -450,6 +444,8 @@ en:
         # and with nobody to name (a reopen records no one).
         inbox_row:
           unread: "Unread"
+          # The verb the row ends in, inside its one link.
+          verb: "Open thread"
           untitled: "(untitled)"
           mention:
             somebody_html: "%{name} mentioned you"
@@ -472,11 +468,3 @@ en:
             post: "Post · %{title}"
             media: "Image · %{title}"
             block: "%{place} · %{block}"
-        open_thread_row:
-          untitled: "(untitled)"
-          kind:
-            page: "Page"
-            media: "Image"
-          open:
-            one: "%{count} open note"
-            other: "%{count} open notes"

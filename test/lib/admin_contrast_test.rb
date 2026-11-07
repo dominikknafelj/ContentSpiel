@@ -265,6 +265,24 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # Docked in the dashboard's rail an information panel has no band: its
+  # heading and line stand on the rail itself, in the warm head's ink; the
+  # action ink is measured there too, for a panel of that kind beside it.
+  test "an information panel's heading and line read on the rail's ground" do
+    each_scheme do |scheme, colour|
+      %w[--cs-head-warm-ink --cs-head-action-ink].each do |ink|
+        assert_ratio(4.5, colour.(ink), colour.("--cs-rail"), "#{ink} on --cs-rail (#{scheme})")
+      end
+    end
+  end
+
+  # `Admin::Ui::ScheduledDateComponent`: its month and day in the block's ink.
+  test "the scheduled date's words read on its block" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-on-scheduled"), colour.("--cs-scheduled"), "--cs-on-scheduled on --cs-scheduled (#{scheme})")
+    end
+  end
+
   test "each of the six type hues is 3:1 or better on the surface, and cat-5 has left cat-1's side in dark" do
     each_scheme do |scheme, colour|
       (1..6).each { |slot| assert_ratio(3.0, colour.("--cs-cat-#{slot}"), colour.("--cs-surface"), "--cs-cat-#{slot} (#{scheme})") }

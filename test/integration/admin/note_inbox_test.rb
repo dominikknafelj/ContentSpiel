@@ -11,37 +11,34 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
   end
 
-  test "the dashboard has Notes for you and Open threads, each in a frame of its own, and the sidebar counts the unread" do
+  test "the dashboard has Notes for you and Waiting for you, each in a frame of its own, and the sidebar counts the unread" do
     get "/cs-studio"
 
-    assert_select "turbo-frame#notes-for-you section[aria-labelledby=dashboard-notes-for-you]" do
-      # The whole row is one link (handoff "Inbox row"), with the handoff's hover.
+    assert_select "turbo-frame#notes-for-you section.admin-dashboard-panel--action[aria-labelledby=dashboard-notes-for-you]" do
+      assert_select "header h2", "Notes for you"
+      assert_select "header .admin-dashboard-panel__line", "Mentions and replies addressed to you."
+      # The whole row is one link, with the row's hover.
       assert_select "li > a[data-delivery][data-unread][href='/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
         assert_select "[data-inbox-sentence]", text: "Dana mentioned you"
         assert_select "[data-inbox-excerpt]", text: /Ready, @reader\?/
         assert_select "[data-inbox-where]", text: "Page · Pricing"
       end
       assert_select "li a a", count: 0
-      # "All notes for you →" in words at the foot of the card (the handoff's
-      # footer), not an arrow in its header.
+      # "All notes for you →" in words at the foot of the panel, not an
+      # arrow in its head.
       assert_select "footer a[href='/cs-studio/notes'][data-turbo-frame=_top]", text: "All notes for you →"
       assert_select "header a", count: 0
       # Unread is said in words too, and counted in the card's header.
       assert_select "[data-delivery][data-unread] .sr-only", text: "Unread"
       assert_select "header [data-notes-new]", text: "1 new"
     end
-    assert_select "turbo-frame#notes-open-threads section[aria-labelledby=dashboard-open-threads]" do
-      # One link, the whole row: the title, then "type · last author · time"
-      # led by the type's marker (square for a page), and the neutral pill.
-      assert_select "li > a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
-        assert_select "span", text: "Pricing"
-        assert_select "[data-type-marker=square][class~='bg-meta'][class~='size-1.5']", count: 1
-        assert_select "span", text: /\APage · Dana · /
-        assert_select "time"
+    assert_select "turbo-frame#dashboard-waiting section.admin-dashboard-panel--action[aria-labelledby=dashboard-waiting-title]" do
+      assert_select "header h2", "Waiting for you"
+      assert_select "li > .admin-waiting-row", count: 1 do
+        assert_select "a.admin-waiting-row__link[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-frame=_top]", text: "Pricing"
+        assert_select ".admin-notes-marker[data-has-notes]:not([data-unread])", text: "1"
+        assert_select ".admin-row-verb", text: "Open thread"
       end
-      assert_select "li a", count: 1
-      assert_select "li .admin-notes-marker[data-has-notes]:not([data-unread])", text: "1"
-      assert_select "header [data-notes-total]", text: "1"
     end
     assert_select "#sidebar #sidebar-badge-dashboard:not([hidden])", text: "1"
   end
@@ -56,8 +53,8 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#notes-for-you" do
       assert_select "[data-delivery]", count: 2
       assert_select "[data-delivery][data-unread]", count: 0
-      # The block as the list's group heading names it (the handoff's
-      # decision 8): its type, then -- it is empty -- its place on the page.
+      # The block as the list's group heading names it: its type, then --
+      # it is empty -- its place on the page.
       assert_select "[data-inbox-where]", text: "Page · Pricing · Rich text · Block 1"
       assert_select "[class*=accent]", count: 0
       assert_select "[data-notes-new]", count: 0
@@ -66,29 +63,9 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "#sidebar-badge-dashboard[hidden]", text: ""
   end
 
-  test "an Open threads row on a post is led by a round marker in the type's colour, and one on an image by a square" do
-    sign_in_as(users(:two))
-    post_record = create_post(title: "Hello")
-    asset = create_media_asset
-    as(users(:two)) { [ post_record, asset ].each { |record| assert Notes::Start.call(record, body: "A note").ok? } }
-
-    get "/cs-studio/notes/open_threads"
-
-    assert_select "a[data-open-thread-row=post]" do
-      assert_select "[data-type-marker=round][class~='rounded-full'][class*='cat-'][class~='size-1.5']", count: 1
-      assert_select "span", text: /\A#{ContentTypes.find(post_record.content_type).label} · Dana · /
-    end
-    assert_select "a[data-open-thread-row=media] [data-type-marker=square][class~='bg-meta']", count: 1
-    assert_select "a[data-open-thread-row=media] span", text: /\AImage · Dana · /
-  end
-
   test "each part is fetched on its own" do
     get "/cs-studio/notes/card"
     assert_select "turbo-frame#notes-for-you [data-delivery]", count: 1
-    assert_select "#sidebar", count: 0
-
-    get "/cs-studio/notes/open_threads"
-    assert_select "turbo-frame#notes-open-threads a[data-open-thread-row=page]", text: /\APricing/
     assert_select "#sidebar", count: 0
 
     get "/cs-studio/notes/unread"
@@ -160,7 +137,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     get "/cs-studio"
 
     assert_select "turbo-frame#notes-for-you", text: /No notes for you/
-    assert_select "turbo-frame#notes-open-threads", text: /No open threads/
+    assert_select "turbo-frame#dashboard-waiting", text: /Nothing is waiting for you/
     assert_select "#sidebar-badge-dashboard[hidden]"
     assert_no_match "Pricing", response.body
 
@@ -175,7 +152,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "[data-delivery]", count: 0
 
     delete "/cs-studio/sign-out"
-    [ "/cs-studio/notes", "/cs-studio/notes/card", "/cs-studio/notes/open_threads", "/cs-studio/notes/unread" ].each do |path|
+    [ "/cs-studio/notes", "/cs-studio/notes/card", "/cs-studio/notes/unread", "/cs-studio/dashboard/waiting" ].each do |path|
       get path
       assert_response :redirect, path
     end
@@ -206,7 +183,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
 
   # A frame's own answer renders no layout, so no sidebar and no count.
   test "an answer without the layout pays nothing for the sidebar" do
-    assert_empty capture_sql { get "/cs-studio/notes/open_threads" }.grep(/"note_deliveries"/)
+    assert_empty capture_sql { get "/cs-studio/dashboard/waiting", headers: { "Turbo-Frame" => "dashboard-waiting" } }.grep(/"note_deliveries"/)
   end
 
   test "the dashboard reads its notes in the same statements with one note or many" do

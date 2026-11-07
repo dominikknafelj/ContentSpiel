@@ -1,0 +1,18 @@
+<%= tag.turbo_frame id: FRAME, class: "contents", data: { controller: "admin--dashboard--waiting",
+      action: "turbo:before-fetch-request->admin--dashboard--waiting#requested turbo:frame-load->admin--dashboard--waiting#loaded" } do %>
+  <%= render Admin::DashboardScreen::PanelComponent.new(kind: :action, title: t(".title"), line: t(".line"), id: "dashboard-waiting-title",
+        empty: t(".empty.#{filter}")) do |panel| %>
+    <% if waiting.total.positive? %>
+      <% panel.with_badge do %>
+        <%= tag.span waiting.total, class: "text-count text-meta", role: "img",
+              aria: { label: t(".total.#{filter}", count: waiting.total) }, data: { waiting_total: true } %>
+      <% end %>
+    <% end %>
+    <% panel.with_action do %>
+      <%= render Admin::Ui::TabLinksComponent.new(tabs:, label: t(".filter_label"), link_data: filter_data) %>
+    <% end %>
+    <% waiting.rows.each do |row| %>
+      <% panel.with_row { render Admin::DashboardScreen::WaitingRowComponent.new(row:) } %>
+    <% end %>
+  <% end %>
+<% end %>

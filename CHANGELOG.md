@@ -46,8 +46,15 @@
 - `20261104090200_add_form_keep_days_to_site_settings`: `site_settings.form_keep_days`, 90 by default.
 - `20261104090300_grant_forms_permissions_to_admin_group`: gives the built-in Admin group "Manage forms" and "View form submissions".
 
+### Changed
+
+- CS Studio's dashboard is redrawn. Its panels are headed by their job: Waiting for you (open threads and unpublished changes in one list, a record with both in one row, filtered by Everything, Open threads or Unpublished changes, with "Review and publish…" for whoever may publish), Notes for you, Pick up where you left off (the viewer's drafts as tiles), and, in a rail beside them when the dashboard is 1200px wide, Publishing on its own, Languages behind … and What changed recently. "New page…" and "New post…" stand in the heading row. An editor's address with `?review=publish` opens Publish changes on load. Back to the dashboard shows it as it is now, never as it was left, and a filter pressed from the keyboard keeps the focus.
+
 ### Removed
 
+- The dashboard's quick-create row: a draft is begun from "New post…" or "Start a draft", in the New post dialog.
+- `POST <admin>/dashboard/draft`, which the quick-create row sent: it is a 404 now.
+- `GET <admin>/notes/open_threads`, the Open threads panel's frame: it is a 404 now. Its list is part of Waiting for you, `GET <admin>/dashboard/waiting`.
 - `Page#page_type` and `Page#landing?`, and the `page_type` column: a template writes `page_template == "landing"`. `theme:check` refuses a call of either with that sentence.
 - The old password-reset link `GET <admin>/password/:token/edit`: it is a 404 now. The mailed link is `<admin>/password/edit#<token>`; ask for a new one. With it went telemetry's scrubbing of a token segment in `<admin>/password/…` paths: the reset token is in no path, and every query string is still cut from a span.
 - `SITEMAP_HOST`, the old name of `PUBLIC_HOST`: set `PUBLIC_HOST`; `SITEMAP_HOST` is no longer read.

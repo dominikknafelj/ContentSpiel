@@ -1,7 +1,7 @@
 module Admin
   module NotesScreen
-    # One line of the inbox (notes spec §5, handoff "Inbox row"), on the
-    # dashboard's card and in the full list: who did what, the note's first
+    # One line of the inbox, in Notes for you on the dashboard and in the
+    # full list: who did what, the note's first
     # words, where, and when. `Dashboard::NotesForYou::Row` is data; the
     # sentence, the record's kind and the link are made here, the link from
     # the row's route NAME with this request's URL options.
@@ -11,7 +11,8 @@ module Admin
     # marks the row read, by the thread view's own rule; this component adds
     # no other way. The link IS the whole row: negative margins take it to
     # the edges of the item that holds it (see the template), so the row is
-    # one target and its accessible name is what it says.
+    # one target and its accessible name is what it says, ending in its
+    # verb, "Open thread".
     #
     # Unread is said four ways, never by colour alone: the accent dot (the
     # one use of accent here: unread and addressed to the viewer), the name
@@ -41,7 +42,7 @@ module Admin
         return t(".#{row.reason}.nobody") unless somebody?
         return t(".#{row.reason}.deleted") unless row.by
 
-        t(".#{row.reason}.somebody_html", name: tag.strong(::Notes.name_of(row.by), class: row.unread ? "font-semibold" : "font-medium"))
+        t(".#{row.reason}.somebody_html", name: tag.strong(::PersonName.of(row.by), class: row.unread ? "font-semibold" : "font-medium"))
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich

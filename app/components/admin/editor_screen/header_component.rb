@@ -1,14 +1,13 @@
 module Admin
   module EditorScreen
-    # The one sticky header of the page and the post editor (design pass
-    # round 2, handoff §4.1 and §9 B15): a breadcrumb row carrying the save
+    # The one sticky header of the page and the post editor: a breadcrumb row carrying the save
     # status, Preview, ONE primary action and a ⋯ menu; the title with its
     # status chip; the public path; the language tabs. One component serves
     # both editors so their publish forms can't drift apart (a publish must
     # carry `turbo_frame: "_top"` to refresh the sidebar's badge and the
     # lists).
     #
-    # "Drafts of live content" (drafts spec §3): an edit to a live record
+    # "Drafts of live content": an edit to a live record
     # reaches the site only with "Publish changes", so a live record has no
     # primary button until its rows differ from what is published (the
     # button is `Publishing::State`'s `publish_changes`) -- while a draft
@@ -29,6 +28,12 @@ module Admin
     # inside it: the header is sticky with its own stacking context, and a
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
+    # Publish changes opens on load only from a GET that asks for it
+    # (`?review=publish`, `review_on_load?`), so a save's answer, which draws
+    # the header again from a PATCH, never reopens it; `admin--ui--dialog`
+    # strips the attribute as it opens, so a Turbo restore does not either,
+    # and a live refresh fetches the editor's own part addresses, which carry
+    # no `review`.
     #
     # Slots (`Admin::Slots`): the action row draws what features register at
     # `editor.header.people` (first, before the saved status) and
@@ -130,7 +135,7 @@ module Admin
         t(".waiting_lister", title: ::Locales.read(waiting_lister, :title, locale: locale))
       end
 
-      # Access control (design spec §5 "Everywhere"): publishing, unpublishing
+      # Access control: publishing, unpublishing
       # and scheduling need `<pages|posts>.publish` on the record, moving it to
       # the trash `.delete` -- absent, not disabled, without them. A readable
       # record the viewer cannot edit says "View only".
@@ -140,7 +145,7 @@ module Admin
       # case. The editing right is there but the record is published (or
       # scheduled) and the viewer cannot publish: `can_edit?`'s own rule
       # ("editing a published record needs publish too": the person who may
-      # change it is the person who may publish it, drafts spec D5).
+      # change it is the person who may publish it).
       def view_only_hint
         hint = "You can view this #{type} but not change it."
         return hint unless can?("#{type}s.edit", record) && record.published_at.present?
@@ -149,6 +154,14 @@ module Admin
       end
 
       def may_publish? = can?("#{type}s.publish", record)
+
+      # `?review=publish` (the dashboard's "Review and publish…") asks for the
+      # Publish changes dialog open on a live record that has something to
+      # publish and a viewer who may publish it. Any other condition: nothing
+      # opens and nothing raises. GET only: see the class comment.
+      def review_on_load?
+        helpers.request.get? && helpers.params[:review] == "publish" && !draft? && state.changes? && may_publish?
+      end
 
       def may_delete? = can?("#{type}s.delete", record)
 
@@ -180,7 +193,7 @@ module Admin
 
       def publish_value = helpers.flash[:publish_value]
 
-      # Trash spec §4.1: a page with subpages moves its whole branch, so only
+      # A page with subpages moves its whole branch to the trash, so only
       # the homepage is refused (`Page#only_one_root_page`, `Trash::Move`).
       def can_delete? = !(page? && record.root?)
 
@@ -200,7 +213,7 @@ module Admin
         body
       end
 
-      # Handoff §10 A8: unpublishing is reversible, so its dialog is a plain
+      # Unpublishing is reversible, so its dialog is a plain
       # confirmation; it only says what the site will show.
       def unpublish_dialog_body
         body = "It will show “not found” on the site."
@@ -208,7 +221,7 @@ module Admin
         body
       end
 
-      # A save of a live or scheduled record is not a publication (drafts spec §3).
+      # A save of a live or scheduled record is not a publication.
       def live_hint = t(scheduled? ? ".scheduled_hint" : ".live_hint", type: type)
 
       # Whether the ⋯ menu has anything to hold (a viewer who can only read

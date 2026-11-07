@@ -1,8 +1,7 @@
 require "application_system_test_case"
 
 # What a live record's header, the page tree, the posts list and the dashboard
-# say once its rows have moved on from what is published (drafts plan, task 6).
-# The answer to a save carries the header's chip part, so the mark and the
+# say once its rows have moved on from what is published. The answer to a save carries the header's chip part, so the mark and the
 # two buttons it shows appear with the first change and not at the next
 # reload. The dialog those buttons open is `drafts_test.rb`'s.
 class UnpublishedChangesSystemTest < ApplicationSystemTestCase
@@ -52,7 +51,16 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_not @live.unpublished_changes?
   end
 
-  test "the posts list marks a live post with unpublished changes, and the dashboard lists it under Unpublished changes" do
+  test "an editor opened with review=publish shows Publish changes at once" do
+    Current.set(actor: users(:one)) { assert Pages::Save.call(@live, translations: { "en" => { title: "Live page, retitled" } }).ok? }
+    sign_in_via_form(users(:one))
+
+    visit_screen admin_page_path(@live, review: "publish")
+
+    assert_selector "dialog#publish-changes-page-#{@live.id}[open] [data-publishing-overview]", wait: 10
+  end
+
+  test "the posts list marks a live post with unpublished changes, and the dashboard lists it in Waiting for you" do
     Current.set(actor: users(:one)) do
       @marked = create_post(title: "Marked post")
       @plain = create_post(title: "Plain post")
@@ -67,11 +75,25 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_selector "tbody tr:has(a[href$='/posts/#{@marked.id}']) [data-unpublished-changes]"
 
     visit admin_root_path
-    assert_selector "section[aria-labelledby=dashboard-unpublished-changes] a[href$='/posts/#{@marked.id}']", text: "Marked post, retyped"
-    assert_no_selector "section[aria-labelledby=dashboard-unpublished-changes] a[href$='/posts/#{@plain.id}']"
+    assert_selector "turbo-frame#dashboard-waiting a[href$='/posts/#{@marked.id}']", text: "Marked post, retyped"
+    assert_no_selector "turbo-frame#dashboard-waiting a[href$='/posts/#{@plain.id}']"
   end
 
-  # -- the press that is not lost (fix round 1, C1) ------------------------------
+  test "an unpublished change waits for its publisher on the dashboard, and Review and publish… opens Publish changes" do
+    Current.set(actor: users(:one)) { assert Pages::Save.call(@live, translations: { "en" => { title: "Live page, retitled" } }).ok? }
+    sign_in_via_form(users(:one))
+    visit_screen admin_root_path
+
+    within "turbo-frame#dashboard-waiting .admin-waiting-row", text: "Live page, retitled" do
+      assert_selector "[data-unpublished-changes]", text: "Unpublished changes"
+      press "Review and publish…"
+    end
+
+    assert_current_path(/\/pages\/#{@live.id}\?review=publish\z/, wait: 8)
+    assert_selector "dialog#publish-changes-page-#{@live.id}[open] [data-publishing-overview]", wait: 10
+  end
+
+  # -- the press that is not lost ------------------------------------------------
 
   LIVE = 8
 
@@ -132,7 +154,7 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_not page_record.reload.unpublished_changes?
   end
 
-  # -- another tab's header (fix round 1, I3) ------------------------------------
+  # -- another tab's header -----------------------------------------------------
 
   test "a colleague's header learns of a change and of its publication without a reload" do
     dana = users(:two)

@@ -210,4 +210,15 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
 
     assert_equal 2, statements.grep(/FROM "(pages|posts)"/).size
   end
+
+  test "unpublished changes take a limit, five by default" do
+    7.times { |n| create_post(title: "Marked #{n}").update_columns(unpublished_changes_at: n.minutes.ago) }
+    f = feed
+
+    assert_equal 5, f.unpublished_changes.size
+    assert_equal 7, f.unpublished_changes(limit: 7).size
+    assert_equal 2, f.unpublished_changes(limit: 2).size
+    assert_equal f.unpublished_changes(limit: 7).first(2), f.unpublished_changes(limit: 2)
+    assert_equal 0, count_statements { f.unpublished_changes(limit: 2) }
+  end
 end

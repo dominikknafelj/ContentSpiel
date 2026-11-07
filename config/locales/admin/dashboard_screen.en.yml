@@ -1,0 +1,106 @@
+# CS Studio's dashboard components, `app/components/admin/dashboard_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.dashboard_screen.<class name without Admin:: and Component, underscored>`.
+# `PanelComponent` has none: its heading and line are its caller's
+# (`admin.dashboard.show.*`, `admin.note_inbox.*`, `waiting_panel.*`).
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      dashboard_screen:
+        # `Admin::DashboardScreen::TranslationPanelComponent`, an information
+        # panel. `%{language}` is the site's primary language, named in its
+        # own language ("Languages behind Deutsch" on a German site).
+        translation_panel:
+          title: "Languages behind %{language}"
+          line: "What is missing or outdated, per language."
+          # Never drawn: the panel is hidden when no language has a row.
+          empty: "Nothing to translate."
+          # The head's "→" to the Translations matrix, named for a screen reader.
+          overview: "Open the translations overview"
+          # A language's counts: "12 missing · 1 outdated", or "All translated".
+          missing:
+            one: "%{count} missing"
+            other: "%{count} missing"
+          outdated:
+            one: "%{count} outdated"
+            other: "%{count} outdated"
+          separator: " · "
+          all_translated: "All translated"
+          # The progress bar's name, after the language's own name.
+          translated: "%{language} translated"
+          # The most recently changed outdated item; `%{link}` is its title,
+          # a link to its editor in that language.
+          outdated_item_html: "Outdated: %{link}"
+          untitled: "(untitled)"
+        # `Admin::DashboardScreen::WaitingPanelComponent`, "Waiting for you",
+        # an action panel.
+        waiting_panel:
+          title: "Waiting for you"
+          line: "Open threads and changes that are not on the site yet."
+          # The filter's name for a screen reader, and its three links.
+          filter_label: "Show"
+          filters:
+            everything: "Everything"
+            threads: "Open threads"
+            unpublished: "Unpublished changes"
+          # The neutral count beside the heading, named for a screen reader:
+          # every record waiting under the filter, beyond the five shown.
+          total:
+            everything:
+              one: "%{count} waiting in all"
+              other: "%{count} waiting in all"
+            threads:
+              one: "%{count} with open threads in all"
+              other: "%{count} with open threads in all"
+            unpublished:
+              one: "%{count} with unpublished changes in all"
+              other: "%{count} with unpublished changes in all"
+          # The empty line, per filter.
+          empty:
+            everything: "Nothing is waiting for you."
+            threads: "No open threads."
+            unpublished: "No unpublished changes."
+        # `Admin::DashboardScreen::WaitingRowComponent`, one row of Waiting for you.
+        waiting_row:
+          untitled: "(untitled)"
+          # The record's kind on the meta line, where a post shows its content type.
+          kind:
+            page: "Page"
+            media: "Image"
+          # The open-thread count's name, for a screen reader.
+          open:
+            one: "%{count} open note"
+            other: "%{count} open notes"
+          # The verb a row ends in: a link of its own for someone who may
+          # publish, otherwise words that describe the row's one link.
+          review: "Review and publish…"
+          open_thread: "Open thread"
+          open_record: "Open"
+        # `Admin::DashboardScreen::DraftTileComponent`, one of the viewer's
+        # drafts in Pick up where you left off.
+        draft_tile:
+          # A page's kind, where a post shows its content type.
+          page: "Page"
+          untitled: "(untitled)"
+          # `%{time}` is a `<time>` with a relative phrase ("2h ago").
+          edited_html: "edited %{time}"
+          # The verb the tile ends in, describing its one link.
+          continue: "Continue"
+        # `Admin::DashboardScreen::RowComponent`, a page or post in the
+        # scheduled panel.
+        row:
+          # A scheduled row the viewer made.
+          by_you: "by you"
+          untitled: "(untitled)"
+          # When a scheduled record goes live, by the site's calendar.
+          tomorrow: "tomorrow"
+          in_days:
+            one: "in %{count} day"
+            other: "in %{count} days"
+          in_hours: "in %{hours}h"
+          soon: "soon"
+        # `Admin::DashboardScreen::ActivityRowComponent`.
+        activity_row:
+          # A coalesced burst's tooltip: its first moment, then the time it last extended.
+          span: "%{from} – %{to}"

@@ -28,10 +28,9 @@ test/components/admin/columns/plain_column_component_test.rb: 0.1
 test/components/admin/columns/rich_text_column_component_test.rb: 1.1
 test/components/admin/columns/slug_column_component_test.rb: 0.0
 test/components/admin/dashboard_screen/activity_row_component_test.rb: 1.0
-test/components/admin/dashboard_screen/card_component_test.rb: 0.0
-test/components/admin/dashboard_screen/quick_create_component_test.rb: 0.1
+test/components/admin/dashboard_screen/panel_component_test.rb: 0.0
 test/components/admin/dashboard_screen/row_component_test.rb: 0.5
-test/components/admin/dashboard_screen/translation_card_component_test.rb: 0.7
+test/components/admin/dashboard_screen/translation_panel_component_test.rb: 0.7
 test/components/admin/editor_screen/block_card_component_test.rb: 12.0
 test/components/admin/editor_screen/block_icon_component_test.rb: 0.3
 test/components/admin/editor_screen/block_picker_component_test.rb: 1.0
