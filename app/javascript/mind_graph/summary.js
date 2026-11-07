@@ -1,7 +1,8 @@
-// What the canvas says of itself (design answers G6 and H5). The canvas is one image to a screen reader, and its
-// name says what is on it NOW: the counts in view by type, then the lines,
-// then the scope. A plain function over what the page holds, with no canvas
-// and no element, so a test can ask it for every form.
+// What the canvas says of itself (design answers G6 and H5). The canvas is
+// one image to a screen reader, and its name says what is on it NOW: the
+// counts in view by type, then the lines, then the scope. A plain function
+// over what the page holds, with no canvas and no element, so a test can
+// ask it for every form.
 //
 //   the whole graph   "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything."
 //   a local view      "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list."

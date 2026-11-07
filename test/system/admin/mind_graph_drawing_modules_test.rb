@@ -102,7 +102,7 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
   # The rules say both "labels never overlap" and "the selection, its
   # neighbours and the focus are always labelled"; where two of them overlap,
   # no-overlap wins and the `always` Set's own order decides who keeps the
-  # place (`app.js` puts the selected node in first).
+  # place (`frame.js` puts the selected node in first).
   test "labels: of two overlapping members of the always set the first in the set wins, whatever the order says" do
     labelled = js_module("mind_graph/labels", <<~JS)
       m.chooseLabels({ free: new Set(), order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],

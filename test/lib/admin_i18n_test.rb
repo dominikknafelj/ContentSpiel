@@ -252,6 +252,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/selection.js
     app/javascript/mind_graph/list_reads.js
     app/javascript/mind_graph/notice.js
+    app/javascript/mind_graph/frame.js
+    app/javascript/mind_graph/gestures.js
     app/javascript/controllers/admin/mind_graph/swatches_controller.js
     app/components/admin/mind_graph_screen/status_key_component.rb
     app/components/admin/mind_graph_screen/status_key_component.html.erb
@@ -558,7 +560,7 @@ class AdminI18nTest < ActiveSupport::TestCase
   # day it is added: its components, its controllers, and the modules that
   # put words together or write into the page (`MIND_GRAPH_WORDLESS` are the
   # ones that only compute or draw: the layout, the camera, the geometry).
-  MIND_GRAPH_WORDLESS = %w[camera card_placement hit_test labels layout_client layout_worker state frame gestures].freeze
+  MIND_GRAPH_WORDLESS = %w[camera card_placement hit_test labels layout_client layout_worker state].freeze
 
   test "every component, controller and wording module of the Mind graph is listed" do
     files = Dir[Rails.root.join("app/components/admin/mind_graph_screen/*"), Rails.root.join("app/javascript/controllers/admin/mind_graph/*.js"), Rails.root.join("app/javascript/mind_graph/*.js")]

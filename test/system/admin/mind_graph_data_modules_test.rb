@@ -368,11 +368,17 @@ class Admin::MindGraphDataModulesSystemTest < Admin::MindGraphModulesSystemTestC
     result = js_module("mind_graph/state", <<~JS)
       (() => {
         #{STATE}
-        const state = taken()
+        const state = m.createState(theme)
+        Object.assign(state, { selected: 1, focusIndex: 2, fitted: true, placed: true, labels: [ {} ], hovered: 1 })
+        state.pinned.add(0)
+        m.takeData(state, graph(), { context, words })
+        const focused = m.createState(theme)
+        m.takeData(focused, { ...graph(), focus: { node_id: "post-2" } }, { context, words })
         const pill = state.nodes[state.indexOf.get("more-type-blog")]
         return { edges: state.edges.length, pill: pill.label, of: pill.of, plain: state.plainWidths, strong: state.strongWidths, widths: state.widths,
                  labelled: state.nodes.filter((node) => node.label !== "").map((node) => state.indexOf.get(node.id)), positions: state.positions.length,
-                 reset: [ state.selected, state.focusIndex, state.fitted, state.placed, state.pinned.size, state.labels.length, state.hovered ] }
+                 reset: [ state.selected, state.focusIndex, state.fitted, state.placed, state.pinned.size, state.labels.length, state.hovered ],
+                 focus: [ focused.focusIndex, focused.indexOf.get("post-2") ] }
       })()
     JS
 
@@ -384,7 +390,8 @@ class Admin::MindGraphDataModulesSystemTest < Admin::MindGraphModulesSystemTestC
     assert result["labelled"].all? { |index| result["strong"][index] > result["plain"][index] }, "each label is measured in the selected font too, and that is wider"
     assert_equal result["plain"], result["widths"], "with nothing selected every label has its plain width"
     assert_equal 14, result["positions"]
-    assert_equal [ -1, -1, false, false, 0, 0, -1 ], result["reset"]
+    assert_equal [ -1, -1, false, false, 0, 0, -1 ], result["reset"], "the selection, focus, fit, places, pins, labels and hover of the graph before are not of these nodes"
+    assert_equal result["focus"][1], result["focus"][0], "a local view's focus is its node's index"
   end
 
   test "state: selectIndex lights the neighbours by the lines shown, and swaps the selected label to its semibold width and back" do

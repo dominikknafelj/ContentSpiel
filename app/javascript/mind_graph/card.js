@@ -1,5 +1,5 @@
-// The selection card: what a click on a node opens, and the only place a selection
-// leads anywhere. HTML over the canvas, standing beside its node
+// The selection card: what a click on a node opens, and the only place a
+// selection leads anywhere. HTML over the canvas, standing beside its node
 // (`card_placement.js`; `selection.js` moves it), so its links are links --
 // reachable by keyboard, opened in a new tab like any other -- and a click on
 // the canvas never navigates by itself.

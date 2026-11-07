@@ -49,7 +49,8 @@ import { fill } from "mind_graph/card"
 import { recordId } from "mind_graph/ids"
 
 // How long a read may go unanswered before it is given up and shown as a
-// failure, with Retry; the graph's own load (`app.js`) takes the same.
+// failure, with Retry. This module owns the figure, and the graph's own load
+// (`app.js`) imports it: `app.js` itself cannot be imported without a cycle.
 export const LOAD_TIMEOUT_MS = 15_000
 
 export function createListReads({ element, list, state, text, number, signal, destroyed }) {

@@ -24,14 +24,13 @@
 // every mark, so no state rests on colour alone. The corners are then:
 // notes top-left, pin top-right (`renderer.js`), changes bottom-right.
 //
-// A MARK'S SIZE IS ITS OUTER SIZE: an
-// outline is drawn INSIDE the mark's edge, so an outlined mark is exactly as
-// large as a filled one -- a draft page is 14 by 10, a ring type's hub and a
-// retired hub 12px across, a ring post's ring ends at its radius, the pill
-// is 60 by 16 with its border in it. `inside` below traces the path such a
-// stroke is centred on. Two marks are older than that rule and are left as
-// they were: a live filled post's own outline in its hue and a tag's
-// square are centred on the edge.
+// A MARK'S SIZE IS ITS OUTER SIZE: an outline is drawn INSIDE the mark's
+// edge, so an outlined mark is exactly as large as a filled one -- a draft
+// page is 14 by 10, a ring type's hub and a retired hub 12px across, a
+// ring post's ring ends at its radius, the pill is 60 by 16 with its border
+// in it. `inside` below traces the path such a stroke is centred on. Two
+// marks are older than that rule and are left as they were: a live filled
+// post's own outline in its hue and a tag's square are centred on the edge.
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`),
 // and a value of the table is a theme KEY.

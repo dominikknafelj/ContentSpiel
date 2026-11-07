@@ -132,6 +132,8 @@ export function attachGestures({ canvas, element, state, tooltip, cardElement, l
       state.fitted = true
       if (!dragging) {
         dragging = true
+        // Pinned here, not through the selection's `pin`: the worker holds a
+        // dragged node itself, so no `pin` message is sent for it.
         state.pinned.add(pressed)
         act.pinsChanged()
         if (pressed === state.selected) cardElement.hidden = true
