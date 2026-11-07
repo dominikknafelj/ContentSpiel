@@ -111,4 +111,51 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
       assert_eventually(message: "the toggle was never cleared") { post_record.reload.fields.featured == false }
     end
   end
+
+  test "the toggle's knob is centred in its track, off and on" do
+    with_test_types do
+      ContentTypes.register "test/flagged" do |t|
+        t.label "Flagged"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :featured, :boolean
+      end
+      post_record = create_post(title: "Launch", content_type: "test/flagged")
+
+      visit_editor(post_record)
+
+      # The knob is a pseudo-element: its box is the computed `left`, `top`,
+      # `width` and `height` plus the `translateX` of its matrix, against the
+      # track's padding box (inside the 1px border). Waits out the 150ms slide.
+      measure = <<~JS
+        (() => {
+          const track = document.querySelector("input.cs-toggle[role=switch]")
+          const knob = getComputedStyle(track, "::before")
+          const dx = new DOMMatrixReadOnly(knob.transform === "none" ? undefined : knob.transform).m41
+          const left = parseFloat(knob.left) + dx
+          const width = parseFloat(knob.width), height = parseFloat(knob.height)
+          const top = parseFloat(knob.top)
+          return { moving: track.getAnimations({ subtree: true }).length > 0,
+                   above: top, below: track.clientHeight - top - height,
+                   before: left, after: track.clientWidth - left - width }
+        })()
+      JS
+      gaps = lambda do
+        await_js("!#{measure}.moving", message: "the toggle never stopped sliding")
+        page.evaluate_script(measure)
+      end
+
+      off = gaps.call
+      find("input.cs-toggle[role=switch]").click
+      on = gaps.call
+
+      [ off, on ].each do |g|
+        assert_in_delta g["above"], g["below"], 0.5, "the knob is not centred vertically: #{g}"
+      end
+      # The left gap off is the right gap on, and the knob has travelled the
+      # track's width less the knob and the two gaps.
+      assert_in_delta off["before"], on["after"], 0.5, "the gap at the left off and at the right on differ: #{off} #{on}"
+      assert_in_delta on["before"] - off["before"], off["after"] - on["after"], 0.01, "the knob's travel does not use the whole track"
+    end
+  end
 end
