@@ -10,7 +10,7 @@ class Admin::DashboardScreen::TranslationPanelComponentTest < ViewComponent::Tes
 
   def entries = Dashboard::TranslationNeeds.new(actor: users(:one)).entries
 
-  test "an information panel headed by the languages behind the primary one, named in CS Studio's language" do
+  test "an information panel headed by the languages behind the primary one, named in its own language" do
     render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
       Dashboard::TranslationNeeds::Entry.new(locale: "de", name: "Deutsch", total: 2, complete: 1, missing: 1, outdated: 0, item: nil)
     ])
@@ -25,7 +25,7 @@ class Admin::DashboardScreen::TranslationPanelComponentTest < ViewComponent::Tes
     render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
       Dashboard::TranslationNeeds::Entry.new(locale: "en", name: "English", total: 2, complete: 2, missing: 0, outdated: 0, item: nil)
     ])
-    assert_selector "h2", exact_text: "Languages behind German"
+    assert_selector "h2", exact_text: "Languages behind Deutsch"
     assert_text "All translated"
   end
 

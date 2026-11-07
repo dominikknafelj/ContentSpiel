@@ -628,8 +628,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    The head is tinted by the panel's kind, and the heading and the line take
    the head's ink: action (something waits on the viewer), shortcuts (a way
    back into work), information (what is happening). The tints are these
-   rules and not utilities, so a place that draws a panel without its band
-   overrides them by plain cascade. The head's top corners follow the
+   rules and not utilities, so a later rule changes them by plain cascade.
+   The head's top corners follow the
    card's, since the card does not clip (a focus ring inside it would be cut). */
 .admin-dashboard-panel { display: flex; flex-direction: column; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
 .admin-dashboard-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }

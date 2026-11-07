@@ -9,8 +9,8 @@ en:
     components:
       dashboard_screen:
         # `Admin::DashboardScreen::TranslationPanelComponent`, an information
-        # panel. `%{language}` is the site's primary language, named in CS
-        # Studio's language ("Languages behind German" on a German site).
+        # panel. `%{language}` is the site's primary language, named in its
+        # own language ("Languages behind Deutsch" on a German site).
         translation_panel:
           title: "Languages behind %{language}"
           line: "What is missing or outdated, per language."

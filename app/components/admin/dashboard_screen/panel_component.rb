@@ -11,9 +11,9 @@ module Admin
     # `:shortcuts` (a way back into work: `--cs-head-cool`) and `:information`
     # (what is happening: `--cs-head-warm`). The colours are stylesheet rules
     # on `.admin-dashboard-panel--<kind>` (`content-spiel.tailwind.css`), not
-    # utilities, so a place that draws a panel differently (the dashboard's
-    # rail) overrides them by plain cascade. The heading and the line take
-    # the head's ink; nothing in the head sets its own colour but a badge.
+    # utilities, so a later rule changes them by plain cascade. The heading
+    # and the line take the head's ink; nothing in the head sets its own
+    # colour but a badge.
     #
     # The heading and the line are the caller's words, already translated:
     # this component holds none of its own.

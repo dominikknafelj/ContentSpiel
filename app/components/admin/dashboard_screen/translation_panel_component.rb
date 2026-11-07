@@ -10,9 +10,10 @@ module Admin
     # enabled, or nothing readable (`entries` is empty).
     #
     # The heading names the site's primary language (`Translations.primary_locale`)
-    # in CS Studio's language, never a fixed "English": a site whose primary
-    # language is German reads "Languages behind German". Each row's language
-    # is named in its own language (`entry.name`).
+    # in its own language, as CS Studio names a language everywhere, never a
+    # fixed "English": a site whose primary language is German reads
+    # "Languages behind Deutsch". Each row's language is named the same way
+    # (`entry.name`).
     #
     # Colours: translation states are never red. The bar is `ok` for what is
     # done on a `line` track; the outdated count reads in `warn-ink`.
@@ -28,7 +29,7 @@ module Admin
 
       def render? = entries.any?
 
-      def title = t(".title", language: ::Locales.name(Translations.primary_locale))
+      def title = t(".title", language: ::Locales.name(Translations.primary_locale, native: true))
 
       # The overview needs `pages.read` or `posts.read` (its own gate).
       def link
