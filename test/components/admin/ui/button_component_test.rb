@@ -23,7 +23,7 @@ class Admin::Ui::ButtonComponentTest < ViewComponent::TestCase
     assert_selector "button[type='submit'][data-action='click->admin--editor--groups#add']", text: "Add row"
   end
 
-  test "every variant drops its transition and the press's movement under reduced motion" do
+  test "every variant resets each of its presses under reduced motion, as it drops its transition" do
     Admin::Ui::ButtonComponent::VARIANT_CLASSES.each_key do |variant|
       %i[regular small].each do |size|
         classes = Admin::Ui::ButtonComponent.classes(variant, size: size).split

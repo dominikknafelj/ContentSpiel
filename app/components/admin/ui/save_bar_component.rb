@@ -27,7 +27,7 @@ module Admin
         states: %i[rest contained hover focus],
         script_states: {
           changed: [ "test/system/save_bar_test.rb", "the footer is always there, counts changes, disables Save when nothing changed, and guards leaving" ],
-          stuck: [ "test/system/save_bar_test.rb", "a footer stuck over the fields draws a stronger top edge and a shadow, and at the end of the form neither" ],
+          stuck: [ "test/system/save_bar_test.rb", "a footer stuck over the fields draws a stronger top edge and an elevation, and at the end of the form neither" ],
           blocked: [ "test/system/save_bar_test.rb", "Change password is locked while the name is unsaved, and unlocks when it is saved" ]
         },
         keys: %w[save cancel changes unsaved no_changes blocked],
