@@ -81,7 +81,34 @@ class AdminContrastTest < ActiveSupport::TestCase
       %w[--cs-sunken --cs-chrome].each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the selected row's accent bar on #{ground} (#{scheme})") }
     end
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-tree-row--selected\s*\{\s*box-shadow:\s*inset 3px 0 0 var\(--cs-accent\);\s*\}/, css)
+    rule = css[/(?:^|\})\s*\.admin-tree-row--selected\s*\{([^}]*)\}/, 1]
+    assert rule, "the .admin-tree-row--selected rule is there"
+    assert_match(/(?:^|;)\s*box-shadow:\s*inset 3px 0 0 var\(--cs-accent\);/, rule)
+    assert_match(/(?:^|;)\s*background:\s*var\(--cs-sunken\);/, rule)
+  end
+
+  # The tree's row (`.admin-tree` in content-spiel.tailwind.css) stands on
+  # the chrome, and on sunken under the pointer or selected.
+  test "a tree's guide stays a hairline: --cs-line-strong on the chrome is under 3:1 in both schemes" do
+    each_scheme do |scheme, colour|
+      ratio = contrast(colour.("--cs-line-strong", under: "--cs-chrome"), colour.("--cs-chrome"))
+      assert_operator ratio, :<, 3.0, "the guide at 3:1 would be an outline, carrying the structure alone (#{scheme})"
+      assert_operator ratio, :>=, 1.55, "the guide still shows (#{scheme}): #{ratio.round(2)}:1"
+    end
+  end
+
+  test "a tree's disclosure, mark and count read on the chrome and on sunken: 4.5:1 or better in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-chrome --cs-sunken].product(%w[--cs-meta --cs-ink]).each do |ground, ink|
+        assert_ratio(4.5, colour.(ink), colour.(ground), "a tree's #{ink} part on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  test "a match's tint keeps the title's ink at 4.5:1 or better in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint", under: "--cs-chrome"), "a match's title ink on its tint (#{scheme})")
+    end
   end
 
   test "a selected state is seen: a selected pill's words and its paper focus ring, and the accent ring at rest" do

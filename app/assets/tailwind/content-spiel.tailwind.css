@@ -228,12 +228,6 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    `__tip` is where the shared tooltip hangs: a sticky box of no height near
    the top of the window, because "under the host" would be below the last
    row of a page-high divider. */
-/* The tree's selected row: a 3px accent bar on its left edge, 3:1 on the sunken
-   ground and the chrome in both schemes (`admin_contrast_test.rb`). An inset
-   shadow and not a border, so the title does not move. It is a SELECTION and not
-   a marker: accent as a marker means "unread and addressed to you", and this bar
-   says only where you are. */
-.admin-tree-row--selected { box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-divider { position: absolute; z-index: var(--cs-z-divider); top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
 .admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
 .admin-tree-divider[data-hover] { cursor: col-resize; }
@@ -285,6 +279,76 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-tree-divider { display: none; }
 }
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
+
+/* THE TREE (`Admin::Ui::TreeItemComponent`, whose `CLASSES` names these
+   classes): one row for both trees, Pages and the mind graph's list, from
+   the four lengths of `content-spiel.css` (`--cs-tree-*`). A screen sets
+   nothing on the row: no class, no indent, no weight, no colour.
+
+   The row, left to right: 4px, the disclosure, the mark, 8px, the title,
+   the trailing slots, 8px. A parent is told by its disclosure and, folded,
+   its count, never by a heavier title. On a leaf the disclosure is an empty
+   box of the same width, so the marks line up across siblings; a flat row
+   (the graph's posts, tags and post types) has none. `position: relative`
+   holds the drag handle, which stands in the gutter left of the row. */
+.admin-tree-row { position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
+.admin-tree-row:hover { background: var(--cs-sunken); }
+.admin-tree-row__disclosure { flex: none; display: grid; place-items: center; width: var(--cs-tree-disclosure); height: var(--cs-tree-row); color: var(--cs-meta); }
+.admin-tree-row:hover .admin-tree-row__disclosure { color: var(--cs-ink); }
+.admin-tree-row__disclosure svg { transition: transform 120ms var(--cs-ease); }
+.admin-tree-row__disclosure[aria-expanded="true"] svg { transform: rotate(90deg); }
+.admin-tree-row--flat .admin-tree-row__disclosure { display: none; }
+.admin-tree-row__mark { flex: none; display: grid; place-items: center; width: var(--cs-tree-mark); height: var(--cs-tree-mark); margin-inline-end: 8px; color: var(--cs-meta); }
+.admin-tree-row__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--cs-t-small); line-height: 1.25rem; font-weight: 400; color: var(--cs-ink); }
+.admin-tree-row--context-only .admin-tree-row__title { color: var(--cs-meta); }
+.admin-tree-row__trailing { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; }
+.admin-tree-row__count { min-width: 14px; text-align: end; font-size: var(--cs-t-count); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--cs-meta); }
+/* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
+   clipped at rest, never `hidden` and never removed, so a screen reader
+   still hears "3 subpages" and they take no room; the "+" and the handle
+   (`__reveal-opacity`) keep their room and turn transparent, since a press
+   where they are must still reach them. Both show on the row's hover and
+   while the focus is in it, on the selected row, and always where any
+   pointer of the device is coarse (`any-pointer`, not `pointer`: on a touch
+   laptop the first pointer is the mouse, and the finger cannot hover). A
+   folded parent's count shows at rest too: it says what the fold holds. */
+.admin-tree-row__reveal { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.admin-tree-row__reveal-opacity { opacity: 0; }
+.admin-tree-row:is(:hover, :focus-within, .admin-tree-row--selected) .admin-tree-row__reveal,
+.admin-tree-row:has(> .admin-tree-row__disclosure[aria-expanded="false"]) .admin-tree-row__count,
+[role="treeitem"][aria-expanded="false"] > .admin-tree-row .admin-tree-row__count { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+.admin-tree-row:is(:hover, :focus-within, .admin-tree-row--selected) .admin-tree-row__reveal-opacity { opacity: 1; }
+@media (any-pointer: coarse) {
+  .admin-tree-row .admin-tree-row__reveal { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .admin-tree-row .admin-tree-row__reveal-opacity { opacity: 1; }
+}
+/* One level is `--cs-tree-step`: this margin, the 1px guide and this
+   padding (13 + 1 + 6), so the guide drops from the centre of the parent's
+   disclosure and a child's disclosure lands under the parent's mark. The
+   guide only groups: a hairline under 3:1 (`admin_contrast_test.rb`). The
+   list's `data-tree-children` is the scripts' hook, never a selector here. */
+.admin-tree__children { margin-inline-start: 13px; border-inline-start: 1px solid var(--cs-line-strong); padding-inline-start: 6px; }
+/* The drag handle stands in the step's gutter, left of its row and over
+   the parent's guide, on the chrome, so it covers the guide while shown. */
+.admin-tree-node__handle { position: absolute; inset-block: 0; inset-inline-start: calc(-1 * var(--cs-tree-step)); width: var(--cs-tree-step); display: grid; place-items: center; border-radius: var(--cs-radius); background: var(--cs-chrome); color: var(--cs-meta); cursor: grab; user-select: none; }
+.admin-tree-node__handle:hover { color: var(--cs-ink); }
+/* Focus is drawn on the row, whichever of its controls holds it (Pages), or
+   on the treeitem's row (the graph's list), whose own outline is none. */
+.admin-tree-row:has(:focus-visible),
+[role="treeitem"]:focus-visible > .admin-tree-row { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible { outline: none; }
+/* The selected row: `--cs-sunken` and a 3px accent bar on its left edge,
+   3:1 on the sunken ground and the chrome in both schemes
+   (`admin_contrast_test.rb`). An inset shadow and not a border, so the
+   title does not move. It is a SELECTION and not a marker: accent as a
+   marker means "unread and addressed to you", and this bar says only where
+   you are. */
+.admin-tree-row--selected { background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
+.admin-tree-row--selected .admin-tree-row__title { font-weight: 600; }
+.admin-tree-row--selected .admin-tree-row__mark { color: var(--cs-ink); }
+/* A find's match keeps the title's own ink on the accent's tint. */
+.admin-tree mark { background: var(--cs-accent-tint); color: inherit; border-radius: var(--cs-radius); }
+@media (prefers-reduced-motion: reduce) { .admin-tree-row__disclosure svg { transition: none; } }
 /* The scrim belongs to a drawer, and `admin--shell--drawer` only un-hides it when
    one opens -- it knows nothing about widths. A drawer left open while the
    window is widened stops being a drawer (the rules above stop applying),

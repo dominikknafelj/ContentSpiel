@@ -1,0 +1,19 @@
+<%= tag.div id: @id, class: row_class, data: row_data do %>
+  <%= handle if handle? %>
+  <% if disclosure? %>
+    <%= tag.button type: "button", class: CLASSES[:disclosure], aria: { expanded: !@folded, controls: @controls, label: disclosure_label } do %>
+      <%= render "admin/shared/tree_glyph", name: :chevron %>
+    <% end %>
+  <% elsif empty_disclosure? %>
+    <span class="<%= CLASSES[:disclosure] %>"></span>
+  <% end %>
+  <span class="<%= CLASSES[:mark] %>">
+    <% if mark? %><%= mark %><% else %><%= render "admin/shared/tree_glyph", name: default_glyph %><% end %>
+  </span>
+  <%# `title`: the whole title, for a row the column cuts short. %>
+  <span class="<%= CLASSES[:title] %>" title="<%= whole_title %>"><%= title %></span>
+  <%= state if state? %>
+  <% if trailings? %>
+    <span class="<%= CLASSES[:trailing] %>"><% trailings.each do |part| %><%= part %><% end %></span>
+  <% end %>
+<% end %>

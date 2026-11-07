@@ -1566,4 +1566,101 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end
+
+  # THE TREE: both trees draw one row (`Admin::Ui::TreeItemComponent`), whose
+  # geometry is the four `--cs-tree-*` lengths and whose looks are the one
+  # `.admin-tree` block. The files that draw a tree row, where an indent or a
+  # tint of their own would part the two trees.
+  TREE_FILES = [
+    "app/components/admin/pages_screen/tree_*", "app/components/admin/ui/tree_item_component.*",
+    "app/components/admin/ui/tree_find_component.*", "app/javascript/mind_graph/node_list.js"
+  ].freeze
+  TREE_LENGTHS = %w[--cs-tree-row --cs-tree-disclosure --cs-tree-mark --cs-tree-step].freeze
+  # A tree file let through both tree rules, with the reason.
+  TREE_RULES_NOT_YET = {
+    "app/components/admin/pages_screen/tree_node_component.html.erb" => "the Pages rows are not on the shared row yet",
+    "app/javascript/mind_graph/node_list.js" => "the graph's list is not on the shared row yet"
+  }.freeze
+  TREE_INDENT = /(?<![\w-])(?:[\w-]+:)*(?:ml|pl)-|padding-inline-start|paddingInlineStart/
+  TREE_TINT = /(?<![\w-])(?:[\w\[\]-]+:)*bg-accent-tint(?![\w-])/
+
+  # A tree file's text without its comments: ERB's `<%# %>`, Ruby's `#`, and
+  # a script's `//` and `/* */`.
+  def self.without_comments(path)
+    text = File.read(path)
+    text = text.gsub(/<%#.*?%>/m, "") if path.end_with?(".erb")
+    text = text.gsub(/^\s*#.*$/, "").gsub(/\s#\s.*$/, "") if path.end_with?(".rb")
+    text = text.gsub(%r{/\*.*?\*/}m, "").gsub(%r{(?<![:"'])//.*$}, "") if path.end_with?(".js")
+    text
+  end
+
+  def self.tree_files = TREE_FILES.flat_map { |glob| Dir[Rails.root.join(glob)] }.sort.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+
+  # The tree files whose text, comments stripped, matches `pattern`.
+  def self.tree_offences(pattern, files = tree_files)
+    files.select { |path| without_comments(Rails.root.join(path).to_s).match?(pattern) }
+  end
+
+  # Each `--cs-tree-*` declaration in `content-spiel.css`, comments
+  # stripped, as `[selector of the rule it stands in, name, value]`.
+  def tree_length_declarations
+    self.class.css_rules("content-spiel.css").flat_map do |selectors, body|
+      body.scan(/(--cs-tree-[\w-]+):\s*([^;]+);/).map { |name, value| [ selectors.join(", "), name, value.strip ] }
+    end
+  end
+
+  test "a tree's geometry is its four tokens, written once" do
+    declarations = tree_length_declarations
+    assert_equal TREE_LENGTHS.sort, declarations.map { |_, name, _| name }.sort, "each tree length is defined once in content-spiel.css"
+    assert_equal [ ":root" ], declarations.map(&:first).uniq, "the tree lengths are defined on :root"
+    assert_no_match(/--cs-tree-[\w-]+:/, self.class.stylesheet_without_comments("content-spiel.tailwind.css"), "a tree length is written once, in content-spiel.css")
+
+    step = declarations.find { |_, name, _| name == "--cs-tree-step" }.last
+    rule = single_rule(".admin-tree__children")
+    margin = rule[/margin-inline-start:\s*(\d+)px/, 1]
+    guide = rule[/border-inline-start:\s*(\d+)px solid var\(--cs-line-strong\)/, 1]
+    padding = rule[/padding-inline-start:\s*(\d+)px/, 1]
+    assert [ margin, guide, padding ].all?, "the children list's margin, guide and padding are pixels: #{rule.squish}"
+    assert_equal step, "#{margin.to_i + guide.to_i + padding.to_i}px", "one level's step is the children list's margin, guide and padding"
+
+    offences = self.class.tree_offences(TREE_INDENT) - TREE_RULES_NOT_YET.keys
+    assert_empty offences, "a tree file sets no indent of its own (ml-, pl-, padding-inline-start): the step is the .admin-tree block's"
+  end
+
+  test "the match's tint is the tree's own rule, with the title's ink" do
+    rule = single_rule(".admin-tree mark")
+    assert_match(/background:\s*var\(--cs-accent-tint\);/, rule)
+    assert_match(/(?<![\w-])color:\s*inherit;/, rule)
+    offences = self.class.tree_offences(TREE_TINT) - TREE_RULES_NOT_YET.keys
+    assert_empty offences, "a tree file draws no accent tint of its own: a match's is the .admin-tree block's"
+  end
+
+  test "a tree-rules exception that no longer breaks a rule fails" do
+    files = self.class.tree_files
+    stale = TREE_RULES_NOT_YET.keys.reject { |path| files.include?(path) && self.class.tree_offences(Regexp.union(TREE_INDENT, TREE_TINT), [ path ]).any? }
+    assert_empty stale, "these exceptions break neither tree rule any more: drop them from TREE_RULES_NOT_YET"
+  end
+
+  test "the tree patterns match an indent and a tint, and not a token, a margin of another side or a comment" do
+    [ "ml-2", "pl-[7px]", "hover:pl-1", "padding-inline-start: 4px", "button.style.paddingInlineStart = x" ].each { |sample| assert_match TREE_INDENT, sample }
+    [ "html-", "mr-2", "pr-1", "url-path", "margin-inline-start: 13px" ].each { |sample| assert_no_match TREE_INDENT, sample }
+    [ "bg-accent-tint", "aria-[current]:bg-accent-tint" ].each { |sample| assert_match TREE_TINT, sample }
+    [ "bg-accent", "text-accent-tint", "bg-accent-tint-strong" ].each { |sample| assert_no_match TREE_TINT, sample }
+    Dir.mktmpdir do |dir|
+      { "a.html.erb" => "<%# ml-2 %>\n<li>", "b.rb" => "# pl-2\nx = 1 # ml-1\n", "c.js" => "// pl-2\n/* ml-2 */ const a = \"https://x\"" }.each do |name, text|
+        path = File.join(dir, name)
+        File.write(path, text)
+        assert_no_match TREE_INDENT, self.class.without_comments(path), name
+      end
+    end
+  end
+
+  test "the tree's rules are one block" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    tree = /\.admin-tree(?:-row|-node__handle|__children|(?![\w-]))/
+    indices = rules.each_index.select { |index| rules[index].first.any? { |selector| selector.match?(tree) } }
+    assert_operator indices.size, :>=, 10, "the .admin-tree block was not found"
+    assert_equal (indices.first..indices.last).to_a, indices, "every rule of the tree stands in the one .admin-tree block, with no other rule between"
+    assert_equal 1, rules.count { |selectors, _| selectors == [ ".admin-tree-row--selected" ] }, ".admin-tree-row--selected is defined once"
+  end
 end
