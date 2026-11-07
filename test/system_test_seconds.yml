@@ -6,7 +6,11 @@
 # of its sum. This table needs no upkeep: a file it does not list is weighed by
 # its number of tests, an entry for a file that is gone is ignored, and a stale
 # number only makes the shards a little uneven. To measure again: the per-test
-# lines end in " s = ", and a test's class name finds its file.
+# lines end in " s = ", and a test's class name finds its file. Three files are
+# from a later run, 42318225796 (2026-11-07): tree_fold_test, editor_modules_test
+# and entry_helpers_test; editor_modules_test held 9 of its 14 tests then.
+# notes_rail_test has no run yet: its figure is 4.53 s a test, what
+# notes_column_test, the file it replaced, took in that run, times its 17 tests.
 test/system/admin/account_password_answer_test.rb: 20.6
 test/system/admin/ai_settings_test.rb: 42.5
 test/system/admin/audit_log_test.rb: 7.0
@@ -29,9 +33,9 @@ test/system/admin/editing_merge_test.rb: 179.1
 test/system/admin/editing_take_over_test.rb: 270.7
 test/system/admin/editor_fields_test.rb: 27.6
 test/system/admin/editor_header_test.rb: 25.5
-test/system/admin/editor_modules_test.rb: 27.0
+test/system/admin/editor_modules_test.rb: 47.0
 test/system/admin/editor_rail_test.rb: 26.0
-test/system/admin/entry_helpers_test.rb: 13.0
+test/system/admin/entry_helpers_test.rb: 24.4
 test/system/admin/entry_point_test.rb: 2.6
 test/system/admin/field_error_border_test.rb: 13.1
 test/system/admin/filter_bar_test.rb: 28.6
@@ -62,7 +66,7 @@ test/system/admin/notes_flow_test.rb: 45.7
 test/system/admin/notes_live_test.rb: 150.2
 test/system/admin/notes_markers_test.rb: 126.2
 test/system/admin/notes_merge_test.rb: 46.4
-test/system/admin/notes_rail_test.rb: 38.0
+test/system/admin/notes_rail_test.rb: 77.1
 test/system/admin/notes_view_only_test.rb: 8.3
 test/system/admin/password_reset_test.rb: 19.4
 test/system/admin/pending_lock_test.rb: 8.3
@@ -93,7 +97,7 @@ test/system/admin/translation_status_test.rb: 6.8
 test/system/admin/translations_test.rb: 119.8
 test/system/admin/trash_test.rb: 23.9
 test/system/admin/tree_column_test.rb: 117.6
-test/system/admin/tree_fold_test.rb: 16.0
+test/system/admin/tree_fold_test.rb: 25.7
 test/system/admin/tree_test.rb: 14.1
 test/system/admin/unpublished_changes_test.rb: 18.8
 test/system/admin/unsaved_order_test.rb: 33.9
