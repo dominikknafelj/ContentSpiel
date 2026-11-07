@@ -1,8 +1,10 @@
 require "application_system_test_case"
 
-# The Tags list in a real browser (round 3, Task 13): the inline rename, the
-# post count that opens the filtered posts list, and the row menu's Merge and
-# Delete dialogs -- one of each in the page, filled from the row that opened it.
+# The Tags list in a real browser: the inline rename, the post count that
+# opens the filtered posts list, the detail rail a row's Details opens (the
+# tag's posts, Merge into… and Delete tag…), where it stands at each width,
+# and the Merge and Delete dialogs -- one of each in the page, filled from
+# the trigger that opened it.
 class Admin::TagsSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -13,18 +15,34 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     end
     @news, @studio, @gear = %w[news studio gear].map { |name| Tag.find_by!(name: name) }
     sign_in_via_form(users(:one))
-    visit admin_tags_path
-    await_admin_controllers
   end
 
   def row(tag) = "tr#tag_#{tag.id}"
 
-  def open_row_menu(tag, item)
-    find("#{row(tag)} button[aria-label^='Actions for']").click
-    find("#{row(tag)} [role=menu] button", text: item).click
+  def details_link(tag) = "#{row(tag)} a[data-tag-details]"
+
+  # Presses the row's Details and waits for the tag's detail in the rail.
+  def details(tag)
+    find(details_link(tag)).click
+    assert_selector "#tag-detail-#{tag.id}", wait: 8
+  end
+
+  def rail_button(tag, label)
+    find("#tag-detail-#{tag.id} button", text: label).click
+  end
+
+  # The focused element: its id, its name (an icon button's label, else its text) and whether it is a row's Details.
+  def active
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.activeElement
+        return { id: element.id, name: element.getAttribute("aria-label") || element.textContent.trim(), details: element.hasAttribute("data-tag-details") }
+      })()
+    JS
   end
 
   test "clicking a name renames it in place and saves" do
+    visit_screen admin_tags_path
     field = find("#tag-#{@gear.id}-name")
     field.set("kit")
 
@@ -32,7 +50,8 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     assert_eventually { @gear.reload.name == "kit" }
   end
 
-  test "a duplicate name shows its error on the row and keeps the old name" do
+  test "a duplicate name shows its error on the row and keeps the name it had" do
+    visit_screen admin_tags_path
     field = find("#tag-#{@gear.id}-name")
     field.set("news")
 
@@ -41,6 +60,7 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
   end
 
   test "the post count opens the posts list filtered by that tag" do
+    visit_screen admin_tags_path
     find("#{row(@news)} a", text: "2 posts").click
 
     assert_current_path(/\/posts\?tag=news/)
@@ -50,7 +70,9 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
   end
 
   test "Merge into… picks a target, never offers the tag itself, and moves the posts" do
-    open_row_menu(@news, "Merge into…")
+    visit_screen admin_tags_path
+    details(@news)
+    rail_button(@news, "Merge into…")
 
     within("dialog#merge-tag-dialog[open]") do
       assert_selector "h2", text: "Merge “news” into…"
@@ -74,7 +96,9 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
   end
 
   test "the one Merge dialog is refilled for each row, with nothing left from the last opening" do
-    open_row_menu(@news, "Merge into…")
+    visit_screen admin_tags_path
+    details(@news)
+    rail_button(@news, "Merge into…")
     within("dialog#merge-tag-dialog[open]") do
       find("#merge-tag-into").send_keys("s")
       find("#merge-tag-into-listbox [role=option]", text: "studio").click
@@ -83,7 +107,8 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     end
     assert_no_selector "dialog[open]"
 
-    open_row_menu(@gear, "Merge into…")
+    details(@gear)
+    rail_button(@gear, "Merge into…")
     within("dialog#merge-tag-dialog[open]") do
       assert_selector "h2", text: "Merge “gear” into…"
       assert_text "Its 1 post gets the chosen tag"
@@ -94,7 +119,9 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
   end
 
   test "Delete tag… asks first, says how many posts are affected, and removes the row" do
-    open_row_menu(@gear, "Delete tag…")
+    visit_screen admin_tags_path
+    details(@gear)
+    rail_button(@gear, "Delete tag…")
 
     within("dialog#delete-tag-dialog[open]") do
       assert_selector "h2", text: "Delete “gear”?"
@@ -108,19 +135,20 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     assert_not Tag.exists?(@gear.id)
   end
 
-  # Final wave B (ledger C-M7): the row's data was written when the list was
-  # rendered; the dialogs name the tag as it is called now.
+  # The dialogs name the tag as it is called now, read from the row's input.
   test "after an inline rename the dialogs name the tag by its new name, and the picker excludes it" do
+    visit_screen admin_tags_path
+    details(@gear)
     find("#tag-#{@gear.id}-name").set("kit")
     assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
 
-    open_row_menu(@gear, "Delete tag…")
+    rail_button(@gear, "Delete tag…")
     within("dialog#delete-tag-dialog[open]") do
       assert_selector "h2", text: "Delete “kit”?"
       click_button "Cancel"
     end
 
-    open_row_menu(@gear, "Merge into…")
+    rail_button(@gear, "Merge into…")
     within("dialog#merge-tag-dialog[open]") do
       assert_selector "h2", text: "Merge “kit” into…"
       find("#merge-tag-into").send_keys("k")
@@ -128,10 +156,12 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # Task 13 m4: a refusal has no body to render; the dialog stayed open over a
-  # button that did nothing.
+  # A refusal has no body to render: the dialog would stay open over a
+  # button that does nothing.
   test "a delete the server refuses closes the dialog and says so" do
-    open_row_menu(@gear, "Delete tag…")
+    visit_screen admin_tags_path
+    details(@gear)
+    rail_button(@gear, "Delete tag…")
     assert_selector "dialog#delete-tag-dialog[open]"
     @gear.destroy!
     within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
@@ -140,22 +170,205 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts [role=alert]", text: "The tag wasn't deleted. Reload the list and try again."
   end
 
-  # Task 13 m6 and m7.
-  test "after a delete the focus is on a neighbouring row, and deleting the last tag shows the empty state" do
-    rows = page.all("table.admin-tags-table tbody tr").map { |tr| tr[:id] }
-    first = Tag.find(rows.first.delete_prefix("tag_"))
-    open_row_menu(first, "Delete tag…")
-    within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
-    assert_no_selector row(first)
-    assert_eventually(message: "focus fell to the body") { page.evaluate_script("document.activeElement.id") == "tag-#{rows.second.delete_prefix('tag_')}-name" }
-
-    rows.drop(1).each do |id|
-      tag = Tag.find(id.delete_prefix("tag_"))
-      open_row_menu(tag, "Delete tag…")
+  # No visit: a `turbo:visit` listener installed before the deletes sets a
+  # flag, which stays unset when the answer alone draws the empty state.
+  test "deleting the chosen tag from the rail empties the rail and focuses a neighbour; deleting the last one shows the empty state from the answer, with no visit" do
+    at_window(1600) do
+      visit_screen admin_tags_path
+      page.execute_script("window.__tagsVisit = undefined; document.addEventListener('turbo:visit', () => { window.__tagsVisit = true })")
+      rows = page.all("table.admin-tags-table tbody tr").map { |tr| tr[:id] }
+      first = Tag.find(rows.first.delete_prefix("tag_"))
+      details(first)
+      rail_button(first, "Delete tag…")
       within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
-      assert_no_selector row(tag)
+      assert_no_selector row(first)
+      assert_selector ".admin-tag-detail #tag-detail-empty"
+      assert_no_selector "#tag-detail-#{first.id}"
+      assert_eventually(message: "focus fell to the body") { page.evaluate_script("document.activeElement.id") == "tag-#{rows.second.delete_prefix('tag_')}-name" }
+
+      rows.drop(1).each do |id|
+        tag = Tag.find(id.delete_prefix("tag_"))
+        details(tag)
+        rail_button(tag, "Delete tag…")
+        within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
+        assert_no_selector row(tag)
+      end
+      assert_text "No tags yet"
+      assert_no_selector "table.admin-tags-table"
+      assert_selector "#tag-detail-empty"
+      assert_nil page.evaluate_script("window.__tagsVisit"), "the empty state was drawn by a visit, not by the answer"
     end
-    assert_text "No tags yet"
-    assert_no_selector "table.admin-tags-table"
+  end
+
+  # The rail's boxes, from the DOM: the list rail container, the heading
+  # row, the rail and the list, with the rail's ground and display and the
+  # rail token's value (read from a probe that uses the token, so both are
+  # computed values).
+  def layout
+    page.evaluate_script(<<~JS)
+      (() => {
+        const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } }
+        const probe = document.createElement("div")
+        probe.style.backgroundColor = "var(--cs-rail)"
+        document.body.append(probe)
+        const token = getComputedStyle(probe).backgroundColor
+        probe.style.backgroundColor = "var(--cs-surface)"
+        const surface = getComputedStyle(probe).backgroundColor
+        probe.remove()
+        const rail = document.querySelector(".admin-tag-detail")
+        return {
+          container: box(document.querySelector(".admin-list-rail")),
+          head: box(document.querySelector(".admin-list-rail__head")),
+          rail: box(rail),
+          list: box(document.querySelector("#tags-list")),
+          rail_background: getComputedStyle(rail).backgroundColor,
+          rail_display: getComputedStyle(rail).display,
+          rail_token: token,
+          surface_token: surface
+        }
+      })()
+    JS
+  end
+
+  def docked?(boxes) = boxes["rail"]["width"] > 0 && boxes["rail"]["left"] >= boxes["list"]["right"] && (boxes["rail"]["top"] - boxes["list"]["top"]).abs < 1
+
+  test "at 1600px a tag's details stand in a rail right of the list, on the rail's ground" do
+    at_window(1600) do
+      visit_screen admin_tags_path
+      assert docked?(layout), layout.inspect
+      assert_selector ".admin-tag-detail #tag-detail-empty", text: "Choose a tag to see its posts, merge it or delete it."
+
+      details(@news)
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      assert_in_delta boxes["list"]["right"] + 28, boxes["rail"]["left"], 1, "the rail stands --cs-rail-gap right of the list"
+      assert_in_delta 360, boxes["rail"]["width"], 1, "the rail is --cs-rail-width"
+      assert_in_delta boxes["container"]["left"], boxes["list"]["left"], 1, "the list starts at the content's left edge"
+      assert_in_delta boxes["rail"]["right"], boxes["head"]["right"], 1, "the heading row ends where the rail does"
+      assert_equal boxes["rail_token"], boxes["rail_background"]
+    end
+  end
+
+  test "at 1100px the details stand above the list as a card, and nothing stands there before a tag is chosen" do
+    at_window(1100) do
+      visit_screen admin_tags_path
+      boxes = layout
+      assert_equal "none", boxes["rail_display"], "an unchosen rail takes no room"
+      assert_in_delta boxes["head"]["bottom"] + 16, boxes["list"]["top"], 1, boxes.inspect
+
+      details(@news)
+      boxes = layout
+      assert_not docked?(boxes), boxes.inspect
+      assert_operator boxes["rail"]["bottom"], :<=, boxes["list"]["top"], boxes.inspect
+      assert_in_delta boxes["list"]["left"], boxes["rail"]["left"], 1
+      assert_in_delta boxes["list"]["width"], boxes["rail"]["width"], 1
+      assert_equal boxes["surface_token"], boxes["rail_background"], "below the threshold the detail is a card"
+    end
+  end
+
+  # Below 1280px the sidebar is a drawer and takes no width, so a 1279px
+  # window gives the list more room than a 1280px one. The widths are
+  # asserted first: a change of the sidebar's width then fails here by name
+  # rather than passing for another reason.
+  test "the rail follows the list's own width: a 1279px window docks it, a 1280px one does not" do
+    at_window(1279) do
+      visit_screen admin_tags_path
+      details(@news)
+      boxes = layout
+      assert_operator boxes["container"]["width"], :>=, 1200
+      assert docked?(boxes), boxes.inspect
+    end
+    at_window(1280) do
+      visit_screen admin_tags_path
+      details(@news)
+      boxes = layout
+      assert_operator boxes["container"]["width"], :<, 1200
+      assert_not docked?(boxes), boxes.inspect
+    end
+  end
+
+  test "Details moves the focus to the tag's name in the rail, Tab goes through its posts and buttons, and Close and Escape give it back to the row's Details" do
+    Current.set(actor: users(:one)) { 8.times { |n| create_post(title: "More news #{n}", tags: [ "news" ]) } }
+    keyboard = page.driver.browser.keyboard
+    at_window(1600) do
+      visit_screen admin_tags_path
+      second = Tag.find(page.all("table.admin-tags-table tbody tr")[1][:id].delete_prefix("tag_"))
+      assert_equal @news, second, "tags are listed by name: gear, news, studio"
+      titles = second.posts.kept.order(updated_at: :desc, id: :desc).first(8).map { |post| post.title(locale: :en) }
+
+      [ :close, :escape ].each do |way|
+        page.execute_script("document.querySelector(#{details_link(second).to_json}).focus()")
+        keyboard.type(:enter)
+        assert_selector "#tag-detail-#{second.id}", wait: 8
+        assert_eventually(message: -> { "the focus is on #{active.inspect}" }) { active["id"] == "tag-detail-#{second.id}-name" }
+        assert_selector "#{details_link(second)}[aria-current=true]"
+        assert_selector "#{row(second)}[data-selected]"
+
+        stops = Array.new(titles.size + 4) do
+          keyboard.type(:tab)
+          active["name"]
+        end
+        assert_equal [ *titles, "Show all 10 posts", "Merge into…", "Delete tag…", "Close" ], stops
+
+        keyboard.type(way == :close ? :enter : :escape)
+        assert_eventually(message: -> { "the focus is on #{active.inspect}" }) { active["details"] && active["name"] == "Details of “news”" }
+        assert_no_selector "[data-tag-details][aria-current]"
+        assert_no_selector "tr[data-selected]"
+        assert_selector ".admin-tag-detail #tag-detail-empty"
+      end
+    end
+  end
+
+  # `admin--tags--dialogs` reads the pressed trigger's `data-tag-*` when a
+  # dialog opens and keeps no reference to a trigger, so it never reads one
+  # the rename's stream replaced.
+  test "a rename of the chosen tag rewords the rail: its heading, Show all's address and both dialogs" do
+    Current.set(actor: users(:one)) { 8.times { |n| create_post(title: "More gear #{n}", tags: [ "gear" ]) } }
+    visit_screen admin_tags_path
+    details(@gear)
+    assert_selector "#tag-detail-#{@gear.id} a[data-tag-detail-show-all][href$='tag=gear']"
+
+    find("#tag-#{@gear.id}-name").set("kit")
+    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( · NOT PUBLISHED)? \d{2}:\d{2}/, wait: 8
+    assert_selector "#tag-detail-#{@gear.id}-name", text: "kit"
+    assert_selector "#tag-detail-#{@gear.id} a[data-tag-detail-show-all][href$='tag=kit']"
+
+    rail_button(@gear, "Merge into…")
+    within("dialog#merge-tag-dialog[open]") do
+      assert_selector "h2", text: "Merge “kit” into…"
+      find("#merge-tag-into").send_keys("k")
+      assert_no_selector "#merge-tag-into-listbox [role=option]", text: "kit", wait: 1
+      click_button "Cancel"
+    end
+    assert_no_selector "dialog[open]"
+
+    rail_button(@gear, "Delete tag…")
+    within("dialog#delete-tag-dialog[open]") { assert_selector "h2", text: "Delete “kit”?" }
+  end
+
+  test "a 50-character tag name and long post titles stay inside the rail" do
+    long = "a" * 50
+    Current.set(actor: users(:one)) do
+      3.times { |n| create_post(title: "A very long post title that goes on and on past any rail's width, number #{n}", tags: [ long ]) }
+    end
+    tag = Tag.find_by!(name: long)
+    at_window(1600) do
+      visit_screen admin_tags_path
+      details(tag)
+      measured = page.evaluate_script(<<~JS)
+        (() => {
+          const rail = document.querySelector(".admin-tag-detail")
+          const box = rail.getBoundingClientRect()
+          const out = Array.from(rail.querySelectorAll("*")).filter((element) => {
+            const r = element.getBoundingClientRect()
+            if (r.width === 0 && r.height === 0) return false
+            return r.left < box.left - 0.5 || r.right > box.right + 0.5
+          }).map((element) => element.outerHTML.slice(0, 80))
+          return { out, scroll: rail.scrollWidth, client: rail.clientWidth }
+        })()
+      JS
+      assert_empty measured["out"]
+      assert_operator measured["scroll"], :<=, measured["client"]
+    end
   end
 end

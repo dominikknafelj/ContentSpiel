@@ -1,0 +1,38 @@
+<%# The name wraps anywhere (a 50-character name with no space stays inside
+    the rail's 360px); a post's title is cut with an ellipsis. Every link
+    leaves the rail's frame (`_top`): the editor and the posts list are
+    screens, not parts of the rail. Close is the root's last child, so the
+    focus reaches it after the triggers, and the root stands it in its
+    top-right corner (the `[&>[data-tag-detail-close]]` classes, over the
+    tooltip host's own `relative`), as the mind graph's card does; the
+    heading keeps its room clear. %>
+<div id="<%= root_id %>" data-tag-detail-for="<%= tag.id %>"
+     class="relative flex min-w-0 flex-col gap-3 [&>[data-tag-detail-close]]:absolute [&>[data-tag-detail-close]]:right-0 [&>[data-tag-detail-close]]:top-0">
+  <h2 id="<%= heading_id %>" tabindex="-1" data-tag-detail-heading class="min-w-0 pr-10 text-h3 text-ink [overflow-wrap:anywhere]"><%= tag.name %></h2>
+
+  <% if counted? %>
+    <p class="text-sm text-meta" data-tag-detail-count><%= helpers.tag_posts_label(count) %></p>
+    <% if posts.any? %>
+      <ul class="flex min-w-0 flex-col gap-1.5" data-tag-detail-posts>
+        <% posts.each do |post| %>
+          <li class="flex min-w-0 items-center justify-between gap-2" data-tag-detail-post="<%= post.id %>">
+            <%= link_to title_of(post), editor_path(post), class: "min-w-0 truncate text-sm text-ink underline-offset-2 hover:underline", data: { turbo_frame: "_top" } %>
+            <span class="flex shrink-0 items-center gap-1"><%= render Admin::Ui::ListStateComponent.new(record: post) %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+    <% if show_all? %>
+      <%= link_to t(".show_all", count: count), posts_path, class: "self-start text-sm text-accent underline-offset-2 hover:text-accent-hover hover:underline",
+            data: { turbo_frame: "_top", tag_detail_show_all: "" } %>
+    <% end %>
+  <% end %>
+
+  <div class="flex flex-wrap gap-2">
+    <%= content_tag(:button, t(".merge"), type: "button", class: Admin::Ui::ButtonComponent.classes(:secondary), data: merge_data) %>
+    <%= content_tag(:button, t(".delete"), type: "button", class: Admin::Ui::ButtonComponent.classes(:danger_text), data: delete_data) %>
+  </div>
+
+  <%= render Admin::Ui::ButtonComponent.new(label: t(".close"), icon: :x, variant: :tertiary, size: :small,
+        data: { action: "admin--tags--detail#close", tag_detail_close: "" }) %>
+</div>

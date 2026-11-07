@@ -195,20 +195,27 @@ Rails.application.routes.draw do
       end
     end
 
-    # The Tags module: a flat list with no
-    # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
-    # an inline rename (`:update`), a delete (`:destroy`) and a merge into
-    # another tag (`merge`, `Tags::Merge`) from the list itself; new tags are only ever created in passing, through a post's own
-    # `tag_names` (`Posts::Save`).
-    # The post editor's tag chip input asks this for suggestions
+    # The Tags module: a flat list with no `:new`/`:create` of its own -- a
+    # tag has no editor screen, only an inline rename (`:update`), a delete
+    # (`:destroy`) and a merge into another tag (`merge`, `Tags::Merge`) from
+    # the list itself; new tags are only ever created in passing, through a
+    # post's own `tag_names` (`Posts::Save`). `show` is the list's detail
+    # rail, answered only to its frame (`tag-detail`).
+    # The post editor's tag chip input asks `tags/suggest` for suggestions
     # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
-    # module's `tags.manage`, and `suggest` is not a tag id (`resources :tags`
-    # has no `show`, so the two paths can't collide).
+    # module's `tags.manage`. It is declared before the tags' own routes, and
+    # `show` takes digits only, so `suggest` is never read as a tag.
     get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
 
+    # `show` is a route of its own so that its constraint is its own: the
+    # list builds the dialogs' form addresses from `admin_tag_path("__ID__")`
+    # and `merge_admin_tag_path("__ID__")`, a placeholder its script replaces,
+    # which a digits-only id on every member route would refuse. Its path is
+    # `admin_tag_path`'s, which `update`'s route names.
     resources :tags, only: %i[index update destroy] do
       member { post :merge }
     end
+    get "tags/:id", to: "tags#show", constraints: { id: /\d+/ }
 
     # The Settings module: the `SiteSetting`
     # singleton's own autosaving form (title, tagline, logo, social links,

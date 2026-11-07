@@ -868,10 +868,36 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
     assert_no_match(/>\s*\.admin-list-rail__rail/, css, "the rail is matched anywhere in the grid, not only as a child")
     assert_match(/\.admin-list-rail__head\s*\{[^}]*max-width:\s*calc\(var\(--cs-editor-column\) \+ var\(--cs-rail-gap\) \+ var\(--cs-rail-width\)\);/, docked.first)
+    # The Tags screen's detail docks in the same block: shown with its empty
+    # line, and on the rail's ground through `.admin-list-rail__rail`, which
+    # stands after its card rule and so wins on order.
+    assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
+    outside = css.sub(docked.first, "")
+    assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
+    card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)
+    assert card, "below the threshold the detail is a card"
+    assert_operator card, :<, css.index(docked.first), "the card rule stands before the docked block, so the rail's ground wins"
 
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"
     assert_empty medias.select { |body| body.include?("admin-list-rail") }, "no window media query lays out the lists' rail"
+  end
+
+  # The Tags list's usage bar takes the structure hue through a token of its
+  # own, as a tag's square on the canvas does, so it can change without
+  # moving the icons; the bar is drawn in one place.
+  test "the usage bar is the structure hue, as a token of its own" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    light = css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1]
+    dark = css[/\[data-theme="dark"\]\s*\{(.*?)\}/m, 1]
+    [ light, dark ].each { |block| assert_equal 1, block.scan("--cs-tag-usage: var(--cs-ic-structure);").size }
+    assert_match(/--color-tag-usage:\s*var\(--cs-tag-usage\);/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
+
+    users = Dir[Rails.root.join("app/{views,components,helpers,javascript}/**/*.{erb,rb,js}")].select { |path| File.read(path).include?("bg-tag-usage") }
+    assert_equal [ "app/views/admin/tags/index.html.erb" ], users.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+    tailwind = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tag-usage__bar\s*\{[^}]*width:\s*calc\(var\(--usage\) \* 100%\);/, tailwind)
+    assert_match(/\.admin-tag-usage\s*\{[^}]*height:\s*4px;[^}]*background:\s*var\(--cs-paper\);/, tailwind)
   end
 
   # A container query cannot read a custom property, so the threshold is a

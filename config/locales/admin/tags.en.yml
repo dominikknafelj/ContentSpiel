@@ -1,9 +1,12 @@
 # The Tags screen (docs/reference/i18n.md): `admin.tags.index` is the view's
-# own lazy-lookup scope (`app/views/admin/tags/index.html.erb`), `dialogs` the
-# sentences `Admin::TagsHelper` chooses between for the Merge and Delete
+# own lazy-lookup scope (`app/views/admin/tags/index.html.erb`, and its empty
+# state, `_empty.html.erb`, which reads `index.empty` by its full key), `dialogs`
+# the sentences `Admin::TagsHelper` chooses between for the Merge and Delete
 # dialogs, `toasts` what `Admin::TagsController` answers with, `merge` the
 # refusals `Tags::Merge` returns, and `post_count` the "N posts" the Posts
-# column and the tag chips' suggestions share.
+# column and the tag chips' suggestions share. The detail in the list's rail,
+# with the dialogs' triggers, is a component and reads
+# `admin.components.tags_screen.detail` (`config/locales/admin/tags_screen.en.yml`).
 #
 # THE NAME IN THE DIALOG SENTENCES stays in “curly quotes”, literally:
 # `admin--tags--dialogs` finds the live tag name inside the finished sentence by
@@ -34,12 +37,14 @@ en:
           name: "Name"
           posts: "Posts"
           save_status: "Save status"
-          actions: "Actions"
+          details: "Details"
         name_label: "Name of %{name}"
         no_count: "Not shown: you can't read posts"
-        actions_label: "Actions for %{name}"
-        merge_item: "Merge into…"
-        delete_item: "Delete tag…"
+        # Each row's link to its detail in the rail; the label keeps the visible word.
+        details: "Details"
+        details_label: "Details of “%{name}”"
+        # The rail's name for a screen reader; its heading is the chosen tag's.
+        rail_label: "Tag details"
         merge_dialog:
           title: "Merge tag"
           picker_label: "Merge into"

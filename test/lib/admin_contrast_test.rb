@@ -330,6 +330,27 @@ class AdminContrastTest < ActiveSupport::TestCase
     assert_operator measure.("--cs-graph-page"), :<, measure.("--cs-ink"), "a page's mark glares in dark: it is no softer than the ink"
   end
 
+  # The Tags list's usage bar is a tag's mark, so it takes a tag's figure,
+  # on the row's surface and on its paper track.
+  test "a tag's usage bar is 6.2 / 8.9:1 or better on the row and on its track, in both schemes" do
+    each_scheme do |scheme, colour|
+      figure = floor({ light: 6.2, dark: 8.9 }.fetch(scheme))
+      %w[--cs-surface --cs-paper].each do |ground|
+        assert_ratio(figure, colour.("--cs-tag-usage"), colour.(ground), "the usage bar on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # The danger text button (`ButtonComponent`'s `:danger_text`) rests on
+  # sunken; Delete tag… stands docked on the rail.
+  test "the danger text button's words are 4.5:1 or better on the sunken ground and on the rail, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-sunken --cs-rail].each do |ground|
+        assert_ratio(4.5, colour.("--cs-danger-ink"), colour.(ground), "--cs-danger-ink on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   # What a selection leaves out is drawn at `--cs-graph-faded`: the
   # strongest mark at it, ink, stays under a control's 3:1, and the faintest
   # post hue at it is still seen.

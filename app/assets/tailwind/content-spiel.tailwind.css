@@ -70,6 +70,7 @@
   --color-cat-5: var(--cs-cat-5);
   --color-cat-6: var(--cs-cat-6);
   --color-graph-tag: var(--cs-graph-tag);
+  --color-tag-usage: var(--cs-tag-usage);
   /* font-cs / font-cs-mono, not --font-sans / --font-mono: Tailwind preflight
      wires --font-sans into --default-font-family on <html>, so mapping the
      token fonts there would restyle every existing page (public site, auth
@@ -549,11 +550,18 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-media-alt-warn .admin-column:not(:has(> [id$="-errors"] > p)) :is(input, textarea):placeholder-shown { border-color: var(--cs-warn); }
 /* A tag's name in the Tags list (renamed inline by clicking the name) reads
    as text until it is hovered or focused. The row's form is an
-   `.admin-column` (its error slot colours the input red), so the rule above
-   would otherwise draw the resting border the input's own `border-transparent`
-   utility asks not to have: unlayered CSS wins over a utility. Only the resting,
-   valid state is touched -- hover, focus and an error keep their borders. */
+   `.admin-column` (its error slot colours the input red), so the field rules
+   above would otherwise draw a well and its edge at rest, and unlayered CSS
+   wins over any utility the input could carry. Only the resting, valid state
+   is touched -- hover, focus and an error keep the well and its edges. */
 .admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; background-color: transparent; }
+/* A tag's usage bar, under its count in the Posts column: a 4px pill whose
+   fill (`bg-tag-usage`, drawn in the view) is the row's readable count over
+   the largest on the screen (`--usage`, 0 to 1, `TagsHelper#tag_usage`). The
+   track is paper, on which the fill keeps its figure (a sunken track would
+   take it under the spec's light figure); at 0 the track stays empty. */
+.admin-tag-usage { display: block; height: 4px; margin-top: 0.25rem; border-radius: var(--cs-radius-pill); background: var(--cs-paper); overflow: hidden; }
+.admin-tag-usage__bar { display: block; height: 100%; width: calc(var(--usage) * 100%); border-radius: var(--cs-radius-pill); }
 
 /* Side-by-side translation. A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
@@ -736,6 +744,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    the threshold changes is in its one block below, so a second list's
    docked rules join that block rather than open another.
 
+   `.admin-tag-detail` is the Tags screen's rail, one tag's detail. Below
+   the threshold it is a card above the list, and with no tag chosen (its
+   empty line, `[data-tag-detail-empty]`) it takes no room; docked it is on
+   the rail's ground (`.admin-list-rail__rail`, which comes after it) and
+   shows the empty line.
+
    `.admin-list-rail` holds the heading row (`__head`) and the grid
    (`__grid`). The grid holds, in document order, what stands above the
    list, the rail (`__rail`), then the list: the rail comes before the list
@@ -769,12 +783,16 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-filter-panel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; min-width: 0; margin: 0 0 1rem; border: 0; padding: 0; }
 .admin-filter-panel > div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 10rem; }
 .admin-filter-panel > legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.admin-tag-detail { margin-bottom: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
+.admin-tag-detail:has([data-tag-detail-empty]) { display: none; }
 @container admin-list (min-width: 1200px) {
   .admin-list-rail__head { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
   .admin-list-rail__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
   .admin-list-rail__rail { grid-column: 2; grid-row: 1 / span 2; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
   .admin-filter-panel > legend { position: static; float: left; width: auto; height: auto; margin: 0 0 0.25rem; overflow: visible; clip-path: none; white-space: normal; }
+  .admin-tag-detail { margin-bottom: 0; }
+  .admin-tag-detail:has([data-tag-detail-empty]) { display: block; }
 }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the

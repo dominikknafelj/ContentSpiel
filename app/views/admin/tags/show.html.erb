@@ -1,0 +1,5 @@
+<%# One tag's detail, the answer to a row's Details link: the `tag-detail`
+    frame alone, rendered without a layout (`Admin::TagsController#show`). %>
+<%= turbo_frame_tag Admin::TagsScreen::DetailComponent::FRAME_ID do %>
+  <%= render detail %>
+<% end %>

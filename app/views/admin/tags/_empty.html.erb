@@ -1,0 +1,7 @@
+<%# The list's empty state, `#tags-list` whole: the screen draws it with no
+    tag, and a delete of the last tag answers with it (`replace "tags-list"`). %>
+<div id="tags-list">
+  <div class="rounded-card bg-surface shadow-1">
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t("admin.tags.index.empty.title"), description: t("admin.tags.index.empty.description")) %>
+  </div>
+</div>
