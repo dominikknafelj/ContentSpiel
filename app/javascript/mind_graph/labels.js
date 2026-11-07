@@ -1,4 +1,4 @@
-// Which labels the mind graph shows (mind graph canvas spec §5.2). Four rules:
+// Which labels the mind graph shows. Four rules:
 //
 // 1. HUBS FIRST, AMONG THE NODES ON THE CANVAS. `order` is the visible nodes,
 //    best-connected first, and the zoom decides how far down that list labels
@@ -14,7 +14,7 @@
 //    labelled at any zoom, at full strength, and places before everything
 //    else. Rule 2 still holds among them: where two of their labels would
 //    overlap both can't be shown, and NO OVERLAP WINS. Who keeps the place is
-//    the Set's own insertion order, not `order`: `app.js` puts the selected
+//    the Set's own insertion order, not `order`: `frame.js` puts the selected
 //    node in first, then the focus, then the neighbours, so the selection is
 //    labelled whenever it is on the canvas, and a neighbour gives way to it
 //    however well connected it is. A member that is not in `order` (hidden by

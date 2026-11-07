@@ -1,6 +1,6 @@
-// The canvas's pointer, wheel and key events as callbacks (mind graph canvas
-// spec §4.4). It knows nothing of the graph: it says where something happened,
-// in canvas pixels, and `app.js` decides what that means.
+// The canvas's pointer, wheel and key events as callbacks. It knows nothing
+// of the graph: it says where something happened, in canvas pixels, and
+// `gestures.js` decides what that means.
 //
 // ONE POINTER (a mouse, a pen, one finger):
 // - `onPress(x, y)` answers what the press is on: anything truthy starts a

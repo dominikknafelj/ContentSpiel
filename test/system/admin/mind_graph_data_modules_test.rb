@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The data modules: `graph_data` and `summary`.
+# The data modules: `graph_data`, `summary` and `state`.
 class Admin::MindGraphDataModulesSystemTest < Admin::MindGraphModulesSystemTestCase
   GRAPH_DATA = <<~JS.freeze
     (() => {
@@ -342,5 +342,152 @@ class Admin::MindGraphDataModulesSystemTest < Admin::MindGraphModulesSystemTestC
 
     assert_equal [ [ 10, 20, 11, 21, 30, 40 ], true, 6, true, [] ], result.values_at("merged", "finite", "length", "same", "none"), "the worker's places for the nodes it knows, the page's own for the one it has not taken yet"
     assert_equal [ 10, 20, 11, 21, 0, 0 ], result["first"], "and where the page holds no place either, the centre: a number, never nothing"
+  end
+
+  # The state's operations run on a context that only measures: a label is
+  # as wide as its characters, and a semibold one wider, so the two widths
+  # of each label tell the fonts apart.
+  STATE = <<~JS.freeze
+    const theme = { font: "12px sans", strongFont: "600 12px sans", monoFont: "12px mono", strongMonoFont: "600 12px mono", countFont: "11px mono" }
+    const context = { font: "", measureText(words) { return { width: Array.from(words).length * (this.font.startsWith("600") ? 8 : 6) } } }
+    const words = { allPosts: "All posts", more: (count) => `+${count} more`, retired: (name) => `${name} (retired)` }
+    const graph = () => ({
+      pages: [ { id: "page-1", title: "Home", home: true } ], nodes: [ { id: "post-1", title: "Alpha" }, { id: "post-2", title: "Beta" }, { id: "post-3", title: "Gamma" } ],
+      tags: [ { id: "tag-1", name: "ruby", count: 2 } ], types: [ { id: "type-blog", label: "Blog", colour_index: 1 } ],
+      more: [ { id: "more-type-blog", count: 3, page: "page-1", target: "type-blog" } ],
+      edges: [ { kind: "related", source: "post-1", target: "post-2" }, { kind: "tag", source: "post-1", target: "tag-1" }, { kind: "related", source: "post-1", target: "post-9" } ]
+    })
+    const taken = () => {
+      const state = m.createState(theme)
+      m.takeData(state, graph(), { context, words })
+      return state
+    }
+  JS
+
+  test "state: takeData leaves out a line whose end the data does not hold, gives a pill no label, and measures each label twice" do
+    result = js_module("mind_graph/state", <<~JS)
+      (() => {
+        #{STATE}
+        const state = taken()
+        const pill = state.nodes[state.indexOf.get("more-type-blog")]
+        return { edges: state.edges.length, pill: pill.label, of: pill.of, plain: state.plainWidths, strong: state.strongWidths, widths: state.widths,
+                 labelled: state.nodes.filter((node) => node.label !== "").map((node) => state.indexOf.get(node.id)), positions: state.positions.length,
+                 reset: [ state.selected, state.focusIndex, state.fitted, state.placed, state.pinned.size, state.labels.length, state.hovered ] }
+      })()
+    JS
+
+    assert_equal 2, result["edges"], "the line to post-9, which the data does not hold, is left out"
+    assert_equal "", result["pill"], "the pill's words are inside it: it has no label"
+    assert_equal "Blog", result["of"], "a pill is named by what it hangs off"
+    assert_equal result["plain"].size, result["strong"].size
+    assert_equal 7, result["plain"].size
+    assert result["labelled"].all? { |index| result["strong"][index] > result["plain"][index] }, "each label is measured in the selected font too, and that is wider"
+    assert_equal result["plain"], result["widths"], "with nothing selected every label has its plain width"
+    assert_equal 14, result["positions"]
+    assert_equal [ -1, -1, false, false, 0, 0, -1 ], result["reset"]
+  end
+
+  test "state: selectIndex lights the neighbours by the lines shown, and swaps the selected label to its semibold width and back" do
+    result = js_module("mind_graph/state", <<~JS)
+      (() => {
+        #{STATE}
+        const state = taken()
+        const at = (id) => state.indexOf.get(id)
+        const related = state.edges.findIndex((edge) => edge.kind === "related")
+        m.showOnly(state, { visibleNodes: state.nodes.map((_, index) => index), visibleEdges: state.edges.map((_, index) => index).filter((index) => index !== related), order: [], free: new Set() })
+        const plain = state.widths[at("post-1")]
+        m.selectIndex(state, at("post-1"))
+        const selected = { neighbours: Array.from(state.neighbours, (index) => state.nodes[index].id), width: state.widths[at("post-1")], strong: state.strongWidths[at("post-1")], selected: state.selected }
+        m.selectIndex(state, -1)
+        return { selected, plain, after: state.widths[at("post-1")], neighbours: state.neighbours.size, none: state.selected }
+      })()
+    JS
+
+    assert_equal [ "tag-1" ], result["selected"]["neighbours"], "post-2's line is hidden, so only the tag is lit"
+    assert_equal result["selected"]["strong"], result["selected"]["width"]
+    assert_operator result["selected"]["width"], :>, result["plain"]
+    assert_equal result["plain"], result["after"], "the plain width comes back when the selection goes"
+    assert_equal [ 0, -1 ], result.values_at("neighbours", "none")
+  end
+
+  test "state: addNode joins a post to a tag by a tag line and to a hub by a brings line, beside it, and to nothing at the corner offset" do
+    result = js_module("mind_graph/state", <<~JS)
+      (() => {
+        #{STATE}
+        const state = taken()
+        state.positions[state.indexOf.get("tag-1") * 2] = 100
+        state.positions[state.indexOf.get("tag-1") * 2 + 1] = 50
+        state.placed = true
+        const add = (row) => {
+          const { index, node, lines, at } = m.addNode(state, row, { context })
+          return { index, kind: node.kind, added: node.added, degree: node.degree, unknown: [ node.related_count === null, node.tag_count === null ], label: node.label,
+                   lines: lines.map((line) => [ line.kind, state.nodes[line.source].id, state.nodes[line.target].id ]), at, held: [ state.positions[index * 2], state.positions[index * 2 + 1] ],
+                   widths: [ state.widths[index], state.plainWidths[index], state.strongWidths[index] ], found: state.indexOf.get(row.id) }
+        }
+        const nodes = state.nodes.length, edges = state.edges.length
+        const tagged = add({ id: "post-10", title: "Tagged", via: "tag-1" })
+        const brought = add({ id: "post-11", title: "Brought", via: "type-blog" })
+        const alone = add({ id: "post-12", title: "Alone" })
+        return { tagged, brought, alone, nodes: [ nodes, state.nodes.length ], edges: [ edges, state.edges.length ], positions: state.positions.length,
+                 radii: state.radii.length, boxes: state.boxes.length }
+      })()
+    JS
+
+    assert_equal [ [ "tag", "post-10", "tag-1" ] ], result["tagged"]["lines"]
+    assert_equal [ 130, 80 ], result["tagged"]["at"], "beside its tag, by the offset each way"
+    assert_equal [ 130, 80 ], result["tagged"]["held"]
+    assert_equal [ [ "brings", "type-blog", "post-11" ] ], result["brought"]["lines"]
+    assert_equal [], result["alone"]["lines"]
+    assert_equal [ 30, 30 ], result["alone"]["at"], "with no hub, the offset from the centre"
+    assert_equal [ "post", true, 1, [ true, true ], "Tagged" ], result["tagged"].values_at("kind", "added", "degree", "unknown", "label"), "its related posts and tags are not known: null, not 0"
+    assert_equal 0, result["alone"]["degree"]
+    assert_equal result["tagged"]["index"], result["tagged"]["found"]
+    assert_equal result["tagged"]["widths"][0], result["tagged"]["widths"][1]
+    assert_operator result["tagged"]["widths"][2], :>, result["tagged"]["widths"][1]
+    assert_equal [ 7, 10 ], result["nodes"]
+    assert_equal [ 2, 4 ], result["edges"]
+    assert_equal [ 20, 10, 10 ], result.values_at("positions", "radii", "boxes")
+  end
+
+  # Cut by code point (an emoji is never halved), and a tag's count is never
+  # cut. The labels are drawn, not elements, so the rule is asked of the
+  # function that makes them.
+  test "state: labelFor cuts by code point and keeps a tag's count whole" do
+    labels = js_module("mind_graph/state", <<~JS)
+      [
+        m.labelFor({ kind: "post", title: "Short" }),
+        m.labelFor({ kind: "post", title: "A very long post title that goes on and on and on" }),
+        m.labelFor({ kind: "post", title: "😀".repeat(40) }),
+        m.labelFor({ kind: "tag", title: "a-long-shared-tag-name-for-the-box", count: 3 }),
+        m.labelFor({ kind: "tag", title: "ruby", count: 12 })
+      ]
+    JS
+
+    assert_equal "Short", labels[0]
+    assert_equal "A very long post title that goe…", labels[1]
+    assert_equal 32, labels[1].each_char.size
+    assert_equal ("😀" * 31) + "…", labels[2]
+    assert_equal "a-long-shared-tag-name-for-… (3)", labels[3]
+    assert_equal "ruby (12)", labels[4]
+  end
+
+  test "state: hitAt answers nothing until the layout has placed the nodes" do
+    result = js_module("mind_graph/state", <<~JS)
+      (() => {
+        #{STATE}
+        const state = taken()
+        const post = state.indexOf.get("post-1")
+        m.showOnly(state, { visibleNodes: [ post ], visibleEdges: [], order: [], free: new Set() })
+        state.positions[post * 2] = 40
+        state.positions[post * 2 + 1] = 40
+        const before = [ m.hitAt(state, 40, 40), m.hitAt(state, 0, 0) ]
+        state.placed = true
+        return { before, after: [ m.hitAt(state, 40, 40), m.hitAt(state, 0, 0) ], post, screen: m.screenOf(state, post) }
+      })()
+    JS
+
+    assert_equal [ -1, -1 ], result["before"], "unplaced, nothing is under any point, the corner included"
+    assert_equal [ result["post"], -1 ], result["after"]
+    assert_equal({ "x" => 40, "y" => 40 }, result["screen"])
   end
 end

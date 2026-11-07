@@ -259,31 +259,6 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{first_id.to_json}); return Math.abs(p.x - #{from["x"] - 60}) < 1 && Math.abs(p.y - #{from["y"] - 60}) < 1 })()")
   end
 
-  # Cut by code point (an emoji is never halved),
-  # and a tag's count is never cut. The labels are drawn, not elements, so the
-  # rule is asked of the function that makes them.
-  test "a long label is cut with an ellipsis by code point, and a tag keeps its count whole" do
-    visit_screen admin_tags_path
-
-    labels = page.evaluate_async_script(<<~JS)
-      const done = arguments[arguments.length - 1]
-      import("mind_graph/app").then(({ labelFor }) => done([
-        labelFor({ kind: "post", title: "Short" }),
-        labelFor({ kind: "post", title: "A very long post title that goes on and on and on" }),
-        labelFor({ kind: "post", title: "😀".repeat(40) }),
-        labelFor({ kind: "tag", title: "a-long-shared-tag-name-for-the-box", count: 3 }),
-        labelFor({ kind: "tag", title: "ruby", count: 12 })
-      ]))
-    JS
-
-    assert_equal "Short", labels[0]
-    assert_equal "A very long post title that goe…", labels[1]
-    assert_equal 32, labels[1].each_char.size
-    assert_equal ("😀" * 31) + "…", labels[2]
-    assert_equal "a-long-shared-tag-name-for-… (3)", labels[3]
-    assert_equal "ruby (12)", labels[4]
-  end
-
   # One number is three nodes (the three tables count on their own): the post, the tag
   # and the page of id 12 are each drawn, each selected by its own id, with
   # its own neighbours. A page's card and a pill's are their name and Pin
