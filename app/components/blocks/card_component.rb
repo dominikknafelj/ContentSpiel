@@ -9,6 +9,21 @@ module Blocks
   # with the site's fallback; an icon or a link alone draws nothing. The text
   # is plain text (the template prints it escaped), the icon is decoration.
   class CardComponent < ApplicationComponent
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A div with an h3 title; its one link is the title, else the text, else the image (then named by the image's alt, else its title); the icon is hidden from a screen reader.",
+      motion: :none,
+      content_edges: %i[short long missing],
+      widths: :container,
+      interface: %i[block page title text link icon icon_name image],
+      words: [],
+      limits: [
+        "It holds one link at most.",
+        "An icon the theme does not declare is drawn as none, and a card with no title, text or image renders nothing."
+      ]
+    )
+
     def initialize(block:, page:)
       @block = block
       @page = page
@@ -49,8 +64,7 @@ module Blocks
     end
 
     # The theme's icon file as the theme wrote it, or nil for no icon, an
-    # undeclared name and an icon file that is gone or no longer passes the
-    # fence.
+    # undeclared name and an icon file that is gone or fails the fence.
     def icon = icon_name && Theme.current.icon_svg(icon_name)
 
     # What a template hands to the one picture every image is drawn with, or

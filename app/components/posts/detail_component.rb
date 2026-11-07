@@ -7,6 +7,21 @@ module Posts
   # whole request via `PublicPageRendering`), so a German URL renders the
   # German translation.
   class DetailComponent < ApplicationComponent
+    include Blocks::Contract
+
+    contract(
+      accessibility: "An article whose h1 is the post's title, with its date and excerpt as text, the body as rich text and the tags as one line of text after a \"Tagged\" label.",
+      motion: :none,
+      content_edges: %i[long short missing],
+      widths: :container,
+      interface: %i[post],
+      words: %w[public.site.tagged],
+      limits: [
+        "The tags are plain text, never links.",
+        "The date is written by post_date in English month names, not in the visitor's language."
+      ]
+    )
+
     def initialize(post:)
       @post = post
     end

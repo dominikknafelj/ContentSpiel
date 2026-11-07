@@ -1,13 +1,27 @@
 module Blocks
   # A single library image with a caption and alt text (`BlockTypes::Image`).
-  # The image is the block's `media_asset` (media library design spec §3.3);
-  # the block's own translated `alt`/`caption` override the asset's defaults
-  # locale by locale (`Media::Asset#alt_text`/`#caption_text`). Rendered through
-  # `Media::PictureComponent` (media library Task 5) for a real `srcset`.
+  # The image is the block's `media_asset`; the block's own translated
+  # `alt`/`caption` override the asset's defaults locale by locale
+  # (`Media::Asset#alt_text`/`#caption_text`). Rendered through
+  # `Media::PictureComponent` for a real `srcset`.
   class ImageComponent < ApplicationComponent
-    # The one `sizes` value this app picks for a content-width image
-    # (design spec §4: "pick one and comment it"). The public layout's own
-    # content column tops out at `max-w-3xl` (768px,
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A figure holding one img, named by its alt text (the block's, else the image's), with the caption as its figcaption; it takes no focus.",
+      motion: :none,
+      content_edges: %i[short long missing],
+      widths: :container,
+      interface: %i[block page asset alt caption sizes],
+      words: [],
+      limits: [
+        "It never links the image, and draws nothing without an image file.",
+        "Its sizes is the content column's, or its column's share inside a section; the widths themselves are Media::PictureComponent's."
+      ]
+    )
+
+    # The one `sizes` value this app picks for a content-width image. The
+    # public layout's own content column tops out at `max-w-3xl` (768px,
     # `app/views/layouts/application.html.erb`) with no further inset once
     # the viewport reaches it, so a block image (and, per
     # `RichText::ImageComponent`, a rich-text one) is exactly that column's
@@ -48,19 +62,19 @@ module Blocks
 
     def asset = block.media_asset
 
-    # The one thing a block's component knows about where it sits (sections
-    # spec §5.4): an image in a column asks for a picture as wide as its
-    # column, not as wide as the page.
+    # The one thing a block's component knows about where it sits: an image
+    # in a column asks for a picture as wide as its column, not as wide as
+    # the page.
     def sizes = self.class.sizes_for(block)
 
-    # The block's overrides go in whole, as their `{locale => value}` jsonb
-    # (final fix wave, I1): `Media::Asset#alt_text` interleaves them with the
-    # asset's own defaults per locale, so an override written in another
-    # language never beats the asset's default in this one -- which
-    # resolving them first through `translated` (the fallback chain) did.
+    # The block's overrides go in whole, as their `{locale => value}` jsonb:
+    # `Media::Asset#alt_text` interleaves them with the asset's own defaults
+    # per locale, so an override written in another language never beats the
+    # asset's default in this one, as resolving them first through
+    # `translated` (the fallback chain) would let it.
     # Each answers nil for a block with no image: a theme's template may call
-    # them without the default template's guard around them (theming spec §3,
-    # `Theme::Contract.components`).
+    # them without the default template's guard around them
+    # (`Theme::Contract.components`).
     def alt = asset&.alt_text(override: block.read_attribute(:alt))
 
     def caption = asset&.caption_text(override: block.read_attribute(:caption))

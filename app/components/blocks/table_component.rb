@@ -13,6 +13,22 @@ module Blocks
   # A TABLE WITH NO TEXT DRAWS NOTHING: no cell has text in the visitor's
   # language and none along the site's fallback.
   class TableComponent < ApplicationComponent
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A focusable region named by the caption, or by the word \"Table\" without one, so a keyboard scrolls a wide table; a header row is th scope=col and a header column th scope=row.",
+      motion: :none,
+      content_edges: %i[long many missing],
+      widths: :container,
+      interface: %i[block page rows header_row? header_column? column_count caption],
+      words: %w[public.blocks.table.label],
+      limits: [
+        "Wider than its column it scrolls inside its own box; the edges' fades follow the scroll position (a scroll-driven animation), with nothing that moves on its own.",
+        "It draws no sorting, no filter and no merged cells.",
+        "An empty table renders nothing."
+      ]
+    )
+
     # What the template is handed for a cell: `TableBody::Cell` is the
     # editor's value (its JSON nodes) and stays as it is; this answers the
     # three things a template draws, `html` already scrubbed and safe.

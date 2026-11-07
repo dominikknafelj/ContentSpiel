@@ -33,6 +33,22 @@ module Blocks
   # private readers below the line are help for those and no promise.
   class FormComponent < ApplicationComponent
     include Blocks::FixedWords
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A form that posts without a script; each field says \"required\" in words, the script fills the error summary (role=alert) or shows the thank-you (role=status) in place of the body and moves the focus there, and the honeypot is hidden from people and screen readers.",
+      motion: :none,
+      content_edges: %i[many short long missing],
+      widths: :container,
+      interface: %i[block page form_name fields action locale page_id drawn honeypot submit_label thank_you unavailable string],
+      words: %w[public.forms.sending public.forms.network public.forms.submit public.forms.sent public.forms.unavailable],
+      limits: [
+        "Without a script it posts and the endpoint answers with a plain page; form-send only sends it in place.",
+        "It mints no token and sets no cookie: the endpoint takes none.",
+        "Without the encryption keys it says it can't take answers and disables every field; with no form or no field it renders nothing.",
+        "Outside a section it is at most 36rem wide."
+      ]
+    )
 
     # The CMS's words a template may ask for (`string`), all of
     # `public.forms` (config/locales/public.en.yml): the required word, a

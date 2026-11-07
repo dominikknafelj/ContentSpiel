@@ -28,6 +28,21 @@ module Blocks
   # one (docs/reference/theming.md, "The Code block").
   class CodeComponent < ApplicationComponent
     include Blocks::FixedWords
+    include Blocks::Contract
+
+    contract(
+      accessibility: "A figure whose pre takes the focus so a keyboard scrolls a long line; the Copy button is named \"Copy code\" (described by the file name), and a status line says Copied or Not copied.",
+      motion: :none,
+      content_edges: %i[long short missing],
+      widths: :container,
+      interface: %i[block page lines code language language_label filename caption string],
+      words: %w[public.blocks.code.copy public.blocks.code.copy_code public.blocks.code.copied public.blocks.code.failed],
+      limits: [
+        "The Copy button is hidden until code-copy shows it: without a script there is none.",
+        "The highlighting is CodeHighlight's roles, not a full grammar, and there are no line numbers.",
+        "Empty code renders nothing."
+      ]
+    )
 
     # The block's public strings, the keys of `public.blocks.code`
     # (`config/locales/public.en.yml`): what `string` answers, and nothing
@@ -50,7 +65,7 @@ module Blocks
 
     def code = settings&.code
 
-    # The language's tag as stored, or nil. A tag that is no longer on the
+    # The language's tag as stored, or nil. A tag that is not on the
     # list has no label and is drawn plain.
     def language = settings&.language
 
