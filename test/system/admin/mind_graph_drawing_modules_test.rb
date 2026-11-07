@@ -20,7 +20,7 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
   # `LOOKS` fails here until it is given its row.
   STATES = {
     "live" => { node: { status: "live" }, fill: :own },
-    "draft" => { node: { status: "draft" }, fill: "surface", outline: [ "meta", DASHED ] },
+    "draft" => { node: { status: "draft" }, fill: "surface", outline: [ "edge", DASHED ] },
     "scheduled" => { node: { status: "scheduled" }, fill: "surface", outline: [ "dim", SOLID ], centre: "warn" },
     "unpublished" => { node: { status: "live", changes: "unpublished" }, fill: :own, corner: "dim" },
     "change_scheduled" => { node: { status: "live", changes: "scheduled" }, fill: :own, corner: "warn" }
@@ -40,9 +40,11 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
 
   # The Lists line is 1.5px with round caps and a dash of
   # 0.1 / 3.5, which is what makes its dots round. A hub's line to what it
-  # brings in is the faint 1px line.
-  LINES = { "tag" => [ "meta", 1, [ 4, 3 ], 0.8, "butt" ], "related" => [ "ink", 1.5, [], 0.35, "butt" ], "brings" => [ "faint", 1, [], 1, "butt" ],
-            "lists" => [ "dim", 1.5, [ 0.1, 3.5 ], 1, "round" ], "tree" => [ "tree", 1, [], 1, "butt" ] }.freeze
+  # brings in is the 1px hairline. Each is in its own theme key, whose token
+  # carries its strength: the script draws every line at 1.
+  LINES = { "tag" => [ "lineTag", 1, [ 4, 3 ], "butt" ], "related" => [ "lineRelated", 1.5, [], "butt" ], "brings" => [ "lineBrings", 1, [], "butt" ],
+            "lists" => [ "lineLists", 1.5, [ 0.1, 3.5 ], "round" ], "tree" => [ "lineTree", 1, [], "butt" ] }.freeze
+  AT_FULL = ->(styles) { styles.map { |colour, width, dash, cap| [ colour, width, dash, 1, cap ] } }
 
   # The swatches of the legend and of the Status key are the RENDERER'S OWN
   # drawings: each is compared with what the canvas draws for the same node
@@ -181,21 +183,21 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
     ])
 
     assert_equal [ [ "fill", "box", 14, 10, 4, "page" ] ], live
-    assert_equal [ [ "fill", "box", 14, 10, 4, "surface" ], [ "stroke", "box", 14, 10, 4, "meta", 1.5, DASHED ] ], draft
+    assert_equal [ [ "fill", "box", 14, 10, 4, "surface" ], [ "stroke", "box", 14, 10, 4, "edge", 1.5, DASHED ] ], draft
     assert_equal [ [ "fill", "box", 14, 10, 4, "surface" ], [ "stroke", "box", 14, 10, 4, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "warn" ] ], scheduled
     assert_equal live + CORNER.call("dim"), changed, "unpublished changes: a dim corner dot"
     assert_equal live + CORNER.call("warn"), pending, "a change scheduled: a warn corner dot"
     assert_equal [ [ "fill", "box", 18, 13, 4, "page" ] ], home
   end
 
-  test "marks: a filled post in each of the five looks, a draft dashed in meta" do
+  test "marks: a filled post in each of the five looks, a draft dashed in the Draft chip's edge" do
     live, draft, scheduled, changed, pending = marks_drawn([
       {}, { status: "draft" }, { status: "scheduled" }, { changes: "unpublished" }, { changes: "scheduled" }
     ])
 
     # A live post's own outline is centred on its edge: its outer edge is at 7.75.
     assert_equal [ [ "fill", "circle", 7, "cat-1" ], [ "stroke", "circle", 7.75, "cat-1", 1.5, SOLID ] ], live
-    assert_equal [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "meta", 1.5, DASHED ] ], draft
+    assert_equal [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "edge", 1.5, DASHED ] ], draft
     assert_equal [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "warn" ] ], scheduled
     assert_equal live + CORNER.call("dim"), changed
     assert_equal live + CORNER.call("warn"), pending
@@ -211,13 +213,13 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
     ])
 
     assert_equal ring + [ [ "fill", "circle", 4, "cat-1" ] ], live, "the ring at radius 7 with a filled radius-4 disk"
-    assert_equal ring + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "meta", 1.5, DASHED ] ], draft
+    assert_equal ring + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "edge", 1.5, DASHED ] ], draft
     assert_equal ring + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "dim", 1.5, SOLID ], [ "fill", "circle", 2, "warn" ] ], scheduled
     assert_equal live + CORNER.call("dim"), changed
     assert_equal live + CORNER.call("warn"), pending
     grey = [ [ "fill", "circle", 7, "surface" ], [ "stroke", "circle", 7, "meta", 1.5, SOLID ] ]
     assert_equal grey + [ [ "fill", "circle", 4, "meta" ], [ "stroke", "line", "meta", 1.5, SOLID ] ], retired
-    assert_equal grey + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "meta", 1.5, DASHED ], [ "stroke", "line", "meta", 1.5, SOLID ] ], retired_draft
+    assert_equal grey + [ [ "fill", "circle", 4, "surface" ], [ "stroke", "circle", 4, "edge", 1.5, DASHED ], [ "stroke", "line", "meta", 1.5, SOLID ] ], retired_draft
     # At every size, to the nearest half pixel.
     inner = marks_drawn([ { colour_index: 7, degree: 1 }, { colour_index: 7, degree: 4 }, { colour_index: 7, degree: 9 }, { colour_index: 7, degree: 20 } ]).map { |drawn| [ drawn[0][2], drawn[2][2] ] }
     assert_equal [ [ 7, 4 ], [ 10, 5.5 ], [ 13, 7.5 ], [ 16, 9 ] ], inner
@@ -283,8 +285,8 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
     assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "cat-2", 1.5, SOLID ], [ "fill", "circle", 3, "cat-2" ] ], ring_type
     assert_equal [ [ "fill", "circle", 6, "dim" ], [ "stroke", "circle", 4.5, "surface", 1.5, SOLID ] ], all
     assert_equal [ [ "fill", "circle", 6, "surface" ], [ "stroke", "circle", 6, "dim", 1.5, DASHED ], [ "fill", "circle", 2, "dim" ] ], retired
-    # A tag's square has its outline on its edge.
-    assert_equal [ [ "fill", "box", 9, 9, "surface" ], [ "stroke", "box", 10.5, 10.5, "meta", 1.5, SOLID ] ], tag
+    # A tag's square has its outline on its edge, in the tag hue.
+    assert_equal [ [ "fill", "box", 9, 9, "surface" ], [ "stroke", "box", 10.5, 10.5, "tag", 1.5, SOLID ] ], tag
     assert_equal [ [ "fill", "box", 60, 16, 8, "surface" ], [ "stroke", "box", 60, 16, 8, "line", 1, SOLID ], [ "text", "+92 more", "count", "dim" ] ], more
     assert_equal [ [ "fill", "box", 82, 16, 8, "surface" ], [ "stroke", "box", 82, 16, 8, "line", 1, SOLID ], [ "text", "+1,980 more", "count", "dim" ] ], long
     # A hub has no state: whatever the data says of one, it is drawn the same.
@@ -307,14 +309,14 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
   test "renderer: each kind of line has its style, one path per style, and below 40 percent zoom a shared tag's is not drawn" do
     kinds = %w[tree lists related tag brings]
 
-    assert_equal LINES.values, lines_drawn(kinds), "in the order they are drawn: a shared tag's first, the tree's on top"
-    assert_equal LINES.except("tag").values, lines_drawn(kinds, k: 0.39)
+    assert_equal AT_FULL.call(LINES.values), lines_drawn(kinds), "in the order they are drawn: a shared tag's first, the tree's on top, each at full strength"
+    assert_equal AT_FULL.call(LINES.except("tag").values), lines_drawn(kinds, k: 0.39)
     assert_equal 5, lines_drawn(kinds, k: 0.4).size
     assert_equal 1, lines_drawn(%w[tree tree tree]).size, "three lines of one style are one path"
   end
 
-  test "renderer: a selection brightens its own lines in ink, half a pixel wider, and keeps each kind's dash and cap" do
-    assert_equal LINES.values.map { |_colour, width, dash, _alpha, cap| [ "ink", width + 0.5, dash, 0.9, cap ] }, lines_drawn(%w[tree lists related tag brings], selected: 0)
+  test "renderer: a selection brightens its own lines in ink at full strength, half a pixel wider, and keeps each kind's dash and cap" do
+    assert_equal LINES.values.map { |_colour, width, dash, cap| [ "ink", width + 0.5, dash, 1, cap ] }, lines_drawn(%w[tree lists related tag brings], selected: 0)
   end
 
   # What hangs on a mark's corners follows the mark: on a card and on the
@@ -340,21 +342,21 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
     assert_includes square[0], [ "box", 0, 0, 66, 22 ], "where the canvas has no roundRect the ring is a plain box, and the frame is still drawn"
   end
 
-  # A page's and a type's label in ink, a
-  # post's in dim, a tag's in mono and meta; the selected one semibold and in
-  # full ink whatever its kind, the hovered one in ink on its backing; and a
-  # node without a label (the pill, whose words are inside it) has none drawn,
+  # Every label is in the sans: a page's and a type's in ink, a post's in
+  # dim, a tag's in the tag hue; the selected one semibold and in full ink
+  # whatever its kind, the hovered one in ink on its backing; and a node
+  # without a label (the pill, whose words are inside it) has none drawn,
   # hovered or not.
-  test "renderer: a label is ink for a page and a type, dim for a post, mono meta for a tag, full ink when selected or hovered, and the pill has none" do
+  test "renderer: a label is ink for a page and a type, dim for a post, the tag hue for a tag, in the sans, full ink when selected or hovered, and the pill has none" do
     nodes = [ { kind: "page", label: "Page" }, { kind: "type", id: "type-a", label: "Type" }, { kind: "post", label: "Post" }, { kind: "tag", label: "Tag" }, { kind: "more", title: "+3 more", label: "" } ]
     labels = ->(**state) { marks_drawn(nodes, labels: true, **state).map { |drawn| drawn.select { |entry| entry.first == "text" && !entry[1].start_with?("+") }.map { |entry| entry.drop(1) } } }
 
-    assert_equal [ [ [ "Page", "sans", "ink" ] ], [ [ "Type", "sans", "ink" ] ], [ [ "Post", "sans", "dim" ] ], [ [ "Tag", "mono", "meta" ] ], [] ], labels.call
+    assert_equal [ [ [ "Page", "sans", "ink" ] ], [ [ "Type", "sans", "ink" ] ], [ [ "Post", "sans", "dim" ] ], [ [ "Tag", "sans", "tag" ] ], [] ], labels.call
     assert_equal [ [ "Post", "strong", "ink" ] ], labels.call(selected: 2)[2]
-    assert_equal [ [ "Tag", "strongMono", "ink" ] ], labels.call(selected: 3)[3], "a selected tag's label is semibold and still mono"
-    assert_equal [ [ "Tag", "strongMono", "ink" ] ], labels.call(selected: 3, hovered: 3)[3]
+    assert_equal [ [ "Tag", "strong", "ink" ] ], labels.call(selected: 3)[3], "a selected tag's label is the semibold sans"
+    assert_equal [ [ "Tag", "strong", "ink" ] ], labels.call(selected: 3, hovered: 3)[3]
     assert_equal [ [ "Post", "sans", "ink" ] ], labels.call(hovered: 2)[2]
-    assert_equal [ [ "Tag", "mono", "ink" ] ], labels.call(hovered: 3)[3]
+    assert_equal [ [ "Tag", "sans", "ink" ] ], labels.call(hovered: 3)[3]
     assert_equal [], labels.call(hovered: 4)[4], "a hovered pill draws no label and no backing"
     assert_empty marks_drawn(nodes, labels: true, hovered: 4)[4].select { |entry| entry.first == "fill" && entry.last == "sunken" }
   end
@@ -400,8 +402,10 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
       const done = arguments[arguments.length - 1]
       import("mind_graph/theme").then(({ readTheme }) => {
         const element = document.createElement("div")
-        const tokens = [ "ink", "meta", "dim", "warn", "surface", "sunken", "accent", "line", "line-strong", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6", "graph-page", "graph-tree" ]
+        const tokens = [ "ink", "meta", "dim", "warn", "surface", "sunken", "accent", "line", "line-strong", "field-line", "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6",
+                         "graph-page", "graph-tag", "graph-line-tree", "graph-line-lists", "graph-line-related", "graph-line-tag", "graph-line-brings" ]
         tokens.forEach((token) => element.style.setProperty(`--cs-${token}`, `the-${token}`))
+        element.style.setProperty("--cs-graph-faded", "0.45")
         element.style.setProperty("--cs-mono", "MonoFace")
         element.style.setProperty("--cs-radius", "7px")
         element.style.fontFamily = "SansFace"
@@ -414,10 +418,14 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
 
     assert_equal({
       "ink" => "the-ink", "meta" => "the-meta", "dim" => "the-dim", "warn" => "the-warn", "surface" => "the-surface", "sunken" => "the-sunken", "accent" => "the-accent",
-      "line" => "the-line-strong", "faint" => "the-line", "page" => "the-graph-page", "tree" => "the-graph-tree", "categories" => (1..6).map { |slot| "the-cat-#{slot}" },
-      "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "11px MonoFace", "monoFont" => "12px MonoFace", "strongMonoFont" => "600 12px MonoFace",
+      "line" => "the-line-strong", "page" => "the-graph-page", "edge" => "the-field-line", "tag" => "the-graph-tag",
+      "lineTree" => "the-graph-line-tree", "lineLists" => "the-graph-line-lists", "lineRelated" => "the-graph-line-related", "lineTag" => "the-graph-line-tag", "lineBrings" => "the-graph-line-brings",
+      "categories" => (1..6).map { |slot| "the-cat-#{slot}" }, "faded" => 0.45,
+      "font" => "12px SansFace", "strongFont" => "600 12px SansFace", "countFont" => "500 11px SansFace",
       "radius" => 7
     }, theme)
+    assert_kind_of Numeric, theme["faded"], "the fade is a number the canvas takes as its strength"
+    assert_empty theme.select { |key, value| key.match?(/mono/i) || value.to_s.include?("MonoFace") }, "the canvas's text is the sans: no key is a mono font"
     # The brand book's rule, held where the canvas's sizes are chosen: no
     # text under 11px in CS Studio, a canvas's own words included.
     theme.select { |key, _| key.match?(/font\z/i) }.each do |key, font|
@@ -491,6 +499,31 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
       [ "pill", 126.96, 35.96, 24, 18, 9, "surface" ], [ "pill", 128.96, 37.96, 20, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "12", 138.96, 45.46, "ink", "count" ],
       [ "pill", 220.96, 35.96, 30, 18, 9, "surface" ], [ "pill", 222.96, 37.96, 26, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "99+", 235.96, 45.46, "ink", "count" ]
     ], drawn.reject { |entry| entry.first == "pin" }
+  end
+
+  # The count is drawn in the page's sans at weight 500 and 11px, as
+  # `text-count` sets a count, and measured in that face once it has loaded:
+  # "99+", the widest count, fits its pill with 3px of room on either side,
+  # one less than `NOTES_BADGE_PAD` (`px-1`), as the badge's geometry is
+  # kept: Archivo's "99+" is 19.6px in a 26px pill.
+  test "renderer: the notes count is in the sans at 11px and the widest count, 99+, fits its badge" do
+    measured = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      Promise.all([ import("mind_graph/theme"), import("mind_graph/marks") ]).then(async ([ { readTheme }, marks ]) => {
+        const theme = readTheme(document.body)
+        const faces = await document.fonts.load(theme.countFont, "99+")
+        const context = document.createElement("canvas").getContext("2d")
+        context.font = theme.countFont
+        const pill = marks.notesPill({ kind: "post", open_notes: 120 }, 0, 0, 7)
+        done({ faces: faces.map((face) => `${face.family.replace(/"/g, "")} ${face.weight}`), font: theme.countFont, family: getComputedStyle(document.body).fontFamily, text: context.measureText("99+").width, pad: marks.NOTES_BADGE_PAD, width: pill.half * 2 })
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "renderer: #{measured["error"]}" if measured["error"]
+
+    assert_equal "500 11px #{measured["family"]}", measured["font"]
+    assert_match(/Archivo/, measured["family"], "the count is the page's sans")
+    assert_includes measured["faces"], "Archivo 500", "the count is measured in the face it is drawn in, not a fallback's"
+    assert_operator measured["text"] + (measured["pad"] - 1) * 2, :<=, measured["width"], "\"99+\" is #{measured["text"].round(2)}px in #{measured["font"]}, in a #{measured["width"]}px pill"
   end
 
   # The count badges must not overlap the page
@@ -578,14 +611,15 @@ class Admin::MindGraphDrawingModulesSystemTest < Admin::MindGraphModulesSystemTe
   end
 
   # With a node selected its own edges are the bright pass and the others the
-  # faded one; hovering fades nothing.
-  test "renderer: a selection brightens its edges and fades the rest to 28 percent, and a hover fades nothing" do
-    selected = renderer_calls(positions: [ 10, 10, 60, 10, 110, 10, 160, 10 ], edges: [ [ 0, 1 ], [ 2, 3 ] ], selected: 0)
-    hovered = renderer_calls(positions: [ 10, 10, 60, 10, 110, 10, 160, 10 ], edges: [ [ 0, 1 ], [ 2, 3 ] ], hovered: 0)
+  # faded one; hovering fades nothing. Drawn with a theme whose `faded` is
+  # 0.5, so a strength written into the renderer fails it.
+  test "renderer: a selection brightens its edges and fades the rest to the theme's faded strength, and a hover fades nothing" do
+    selected = renderer_calls(positions: [ 10, 10, 60, 10, 110, 10, 160, 10 ], edges: [ [ 0, 1 ], [ 2, 3 ] ], selected: 0, faded: 0.5)
+    hovered = renderer_calls(positions: [ 10, 10, 60, 10, 110, 10, 160, 10 ], edges: [ [ 0, 1 ], [ 2, 3 ] ], hovered: 0, faded: 0.5)
 
-    assert_equal [ [ [ 110, 10, 160, 10 ], 0.098 ], [ [ 10, 10, 60, 10 ], 0.9 ] ], selected["strokes"].reject { |lines, _| lines.nil? }
-    assert_equal [ 1, 1, 0.28, 0.28 ], selected["nodeAlphas"], "the selected node and its neighbour at full strength, the others at 28%"
-    assert_equal [ [ [ 10, 10, 60, 10, 110, 10, 160, 10 ], 0.35 ] ], hovered["strokes"].reject { |lines, _| lines.nil? }
+    assert_equal [ [ [ 110, 10, 160, 10 ], 0.5 ], [ [ 10, 10, 60, 10 ], 1 ] ], selected["strokes"].reject { |lines, _| lines.nil? }
+    assert_equal [ 1, 1, 0.5, 0.5 ], selected["nodeAlphas"], "the selected node and its neighbour at full strength, the others at the theme's faded"
+    assert_equal [ [ [ 10, 10, 60, 10, 110, 10, 160, 10 ], 1 ] ], hovered["strokes"].reject { |lines, _| lines.nil? }
     assert_equal [ 1, 1, 1, 1 ], hovered["nodeAlphas"]
   end
 

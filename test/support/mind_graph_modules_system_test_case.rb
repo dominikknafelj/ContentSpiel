@@ -105,7 +105,7 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
 
   PIN_RADIUS = 3
 
-  def renderer_calls(positions:, edges:, selected: -1, hovered: -1, pinned: [], tags: [])
+  def renderer_calls(positions:, edges:, selected: -1, hovered: -1, pinned: [], tags: [], faded: 0.3)
     log = page.evaluate_async_script(<<~JS, positions, edges, selected, hovered, pinned, tags)
       const [positions, pairs, selected, hovered, pinned, tags, done] = arguments
       import("mind_graph/renderer").then(({ draw, radiusFor }) => {
@@ -128,7 +128,7 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
         const neighbours = new Set(pairs.flatMap(([source, target]) => (source === selected ? [target] : target === selected ? [source] : [])))
         draw(context, {
           width: 200, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
-          theme: #{recording_theme(ink: "", meta: "", surface: "", sunken: "", accent: "", categories: Array.new(6, ""), font: "", strongFont: "", dim: nil, warn: nil, line: nil, faint: nil, page: nil, tree: nil, radius: nil, monoFont: nil, strongMonoFont: nil, countFont: nil)},
+          theme: #{recording_theme(ink: "", meta: "", surface: "", sunken: "", accent: "", tag: "", lineRelated: "", categories: Array.new(6, ""), font: "", strongFont: "", dim: nil, warn: nil, line: nil, page: nil, edge: nil, lineTree: nil, lineLists: nil, lineTag: nil, lineBrings: nil, radius: nil, countFont: nil, faded: faded)},
           nodes, edges: pairs.map(([source, target]) => ({ source, target, kind: "related" })), positions: Float32Array.from(positions),
           radii: nodes.map(radiusFor), widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: pairs.map((_, index) => index),
           labels: [], selected, neighbours, focusIndex: -1, hovered, pinned: new Set(pinned)
@@ -221,7 +221,7 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
         tags.forEach((id) => nodes.push({ id, kind: "tag", degree: 1, label: "", open_notes: tagNotes }))
         draw(context, {
           width: 100 * nodes.length, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
-          theme: #{recording_theme(meta: "", sunken: "", categories: Array.new(6, "hue"), font: "", strongFont: "", dim: nil, warn: nil, faint: nil, page: nil, tree: nil, radius: nil, monoFont: nil, strongMonoFont: nil)},
+          theme: #{recording_theme(meta: "", sunken: "", categories: Array.new(6, "hue"), font: "", strongFont: "", dim: nil, warn: nil, page: nil, edge: nil, tag: nil, lineTree: nil, lineLists: nil, lineRelated: nil, lineTag: nil, lineBrings: nil, radius: nil)},
           nodes, edges: [], positions: Float32Array.from(nodes.flatMap((_, index) => [ 50 + index * 100, 50 ])),
           radii: nodes.map(radiusFor), widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
           labels: [], selected: -1, neighbours: new Set(), focusIndex: -1, hovered: -1, pinned: new Set(pinned)
@@ -347,7 +347,7 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
         const nodes = [0, 1, 2].map((id) => ({ id, kind: "tag", degree: 1, label: "" }))
         draw(context, {
           width: 400, height: 100, ratio: 1, camera: { k, tx: 0, ty: 0 },
-          theme: #{recording_theme(categories: Array.new(6, "hue"), font: "", strongFont: "", monoFont: "", strongMonoFont: nil, countFont: nil)},
+          theme: #{recording_theme(categories: Array.new(6, "hue"), font: "", strongFont: "", countFont: nil)},
           nodes, edges: kinds.map((kind) => ({ source: 0, target: 1, kind })), positions: Float32Array.from([ 10 / k, 10 / k, 60 / k, 10 / k, 300 / k, 80 / k ]),
           radii: nodes.map(radiusFor), widths: [0, 0, 0], visibleNodes: [0, 1, 2], visibleEdges: kinds.map((_, index) => index),
           labels: [], selected, neighbours: new Set(selected === 0 ? [1] : []), focusIndex: -1, hovered: -1, pinned: new Set()
@@ -420,12 +420,14 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
   # which the module is `m`.
   # The theme every recorded draw is given, as a JavaScript object literal:
   # each colour and font is its own name, so a drawn part says which one it
-  # was drawn with. A key given replaces the default and one given as nil is
+  # was drawn with, and `faded` is a strength no constant of the renderer's
+  # would match. A key given replaces the default and one given as nil is
   # left out, for a draw that is meant to meet a theme without it.
   def recording_theme(**overrides)
     {
-      ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", faint: "faint", page: "page", tree: "tree", radius: 4,
-      categories: (1..6).map { |slot| "cat-#{slot}" }, font: "sans", strongFont: "strong", monoFont: "mono", strongMonoFont: "strongMono", countFont: "count"
+      ink: "ink", meta: "meta", dim: "dim", warn: "warn", surface: "surface", sunken: "sunken", accent: "accent", line: "line", page: "page", edge: "edge", tag: "tag",
+      lineTree: "lineTree", lineLists: "lineLists", lineRelated: "lineRelated", lineTag: "lineTag", lineBrings: "lineBrings", faded: 0.3, radius: 4,
+      categories: (1..6).map { |slot| "cat-#{slot}" }, font: "sans", strongFont: "strong", countFont: "count"
     }.merge(overrides).compact.to_json
   end
 

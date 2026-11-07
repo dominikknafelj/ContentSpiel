@@ -13,7 +13,7 @@
 /* color-scheme is intentionally NOT set here. shared/theme_head puts
    data-theme="dark"/"light" on <html> for every page (public site, sign-in,
    and product UI alike) so the inline script can beat first paint -- but
-   the theme boundary (design spec §1) means only product UI actually opts
+   the theme boundary means only product UI actually opts
    into these tokens. A color-scheme declared globally against [data-theme]
    would still flip the OS-level chrome (scrollbars, form controls, native
    canvas colour) on public/auth pages that never asked for it. Apply
@@ -53,16 +53,29 @@
   --cs-ph-a: #dddbd3;
   --cs-ph-b: #c9c7bd;
   --cs-chrome: #ffffff;              /* sidebar / tree column */
-  --cs-cat-1: oklch(0.52 0.09 200);
-  --cs-cat-2: oklch(0.52 0.11 300);
-  --cs-cat-3: oklch(0.52 0.09 120);
-  --cs-cat-4: oklch(0.52 0.10 0);
-  --cs-cat-5: oklch(0.50 0.08 230);
-  --cs-cat-6: oklch(0.54 0.08 95);   /* types 7+ reuse 1-6 as rings */
-  /* The Mind graph's canvas (design answer D2), read by
-     `mind_graph/theme.js`: a page's mark, and the tree's lines. */
+  /* A post type's hue, each 5.9 to 7.1:1 on the surface in light and 8.1
+     to 9.1:1 in dark, on its own hue angle (design answer D2); only the
+     lightness is tuned. Types 7+ reuse 1-6 as rings. */
+  --cs-cat-1: oklch(0.47 0.09 200);
+  --cs-cat-2: oklch(0.49 0.11 300);
+  --cs-cat-3: oklch(0.48 0.09 120);
+  --cs-cat-4: oklch(0.49 0.10 0);
+  --cs-cat-5: oklch(0.48 0.08 230);
+  --cs-cat-6: oklch(0.48 0.08 95);
+  /* The Mind graph's canvas, read by `mind_graph/theme.js`: a page's mark
+     (pages stay neutral; the hues mean post types), a tag's square and
+     label, the five lines (tree, related, shared tag, lists, and a hub's
+     line to what it brings in), and the strength of what a selection leaves
+     out. A translucent line is its base token's colour, named beside it,
+     written as `rgba()`: a canvas takes that, and not `color-mix()`. */
   --cs-graph-page: var(--cs-ink);
-  --cs-graph-tree: var(--cs-dim);
+  --cs-graph-tag: var(--cs-ic-structure);
+  --cs-graph-line-tree: rgba(74,79,90,0.7);       /* dim */
+  --cs-graph-line-related: rgba(23,25,31,0.55);   /* ink */
+  --cs-graph-line-tag: rgba(90,96,112,0.8);       /* meta */
+  --cs-graph-line-lists: var(--cs-dim);
+  --cs-graph-line-brings: var(--cs-line);
+  --cs-graph-faded: 0.3;
   /* The grounds, lowest first: paper, surface (a card), rail
      (elevation 2: a rail or panel), popover (elevation 3: a popover, menu,
      dialog, a dragged card). A text field sits on its own fill. */
@@ -147,18 +160,21 @@
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
   --cs-chrome: #181a21;
-  --cs-cat-1: oklch(0.74 0.08 200);
-  --cs-cat-2: oklch(0.74 0.10 300);
-  --cs-cat-3: oklch(0.74 0.09 120);
-  --cs-cat-4: oklch(0.74 0.09 0);
-  --cs-cat-5: oklch(0.74 0.07 260);   /* away from cat-1's teal (design answer D2) */
-  --cs-cat-6: oklch(0.78 0.08 95);
-  /* Ink-white page marks glared in dark; the tree's lines are #a9aaaf at 60%,
-     as a colour a canvas can take. That was `--cs-dim`'s dark value before
-     the grounds moved; the graph keeps it, apart from `--cs-dim`, until stage
-     5a redraws the graph. */
-  --cs-graph-page: #d9d9dc;
-  --cs-graph-tree: rgba(169,170,175,0.6);
+  --cs-cat-1: oklch(0.79 0.08 200);
+  --cs-cat-2: oklch(0.80 0.10 300);
+  --cs-cat-3: oklch(0.79 0.09 120);
+  --cs-cat-4: oklch(0.81 0.09 0);
+  --cs-cat-5: oklch(0.80 0.07 260);   /* away from cat-1's teal (design answer D2) */
+  --cs-cat-6: oklch(0.80 0.08 95);
+  /* A page's mark is the dim and not the ink, which glares in dark. */
+  --cs-graph-page: var(--cs-dim);
+  --cs-graph-tag: var(--cs-ic-structure);
+  --cs-graph-line-tree: rgba(176,182,196,0.7);    /* dim */
+  --cs-graph-line-related: rgba(227,229,236,0.5); /* ink */
+  --cs-graph-line-tag: rgba(156,162,178,0.8);     /* meta */
+  --cs-graph-line-lists: var(--cs-dim);
+  --cs-graph-line-brings: var(--cs-line);
+  --cs-graph-faded: 0.3;
   --cs-field-fill: #272b36;
   --cs-rail: #1f2a3d;
   --cs-popover: #283244;

@@ -69,6 +69,7 @@
   --color-cat-4: var(--cs-cat-4);
   --color-cat-5: var(--cs-cat-5);
   --color-cat-6: var(--cs-cat-6);
+  --color-graph-tag: var(--cs-graph-tag);
   /* font-cs / font-cs-mono, not --font-sans / --font-mono: Tailwind preflight
      wires --font-sans into --default-font-family on <html>, so mapping the
      token fonts there would restyle every existing page (public site, auth
@@ -118,7 +119,7 @@
   color: var(--cs-ink);
 }
 
-/* The shell (design pass spec §4, handoff §9 A7). Real CSS rather than
+/* The shell. Real CSS rather than
    utilities because the drawers' open state is the `data-open` attribute
    `admin--shell--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
    Below 1280px the sidebar leaves the grid and becomes a fixed drawer behind
@@ -324,7 +325,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    downwards. `test/system/admin/media_picker_test.rb` pins it. */
 .admin-media-picker { margin-top: 7.5vh; }
 /* The same fixed top edge for the New page and New post dialogs
-   (`Admin::Ui::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
+   (`Admin::Ui::DialogComponent`'s `hang:`): they open as a shell
    with a loading line and the form loads into it, so a centred one grew in both
    directions and moved its own header (and the Create button at the foot) under
    the pointer. 7.5vh as above, where the top of a full-height dialog sits when
@@ -361,7 +362,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-editing-mark { transition: opacity 200ms var(--cs-ease); }
 .admin-editing-mark--leaving { opacity: 0; }
 
-/* Styled native select (design pass spec §4). The chevron is two CSS
+/* Styled native select. The chevron is two CSS
    gradients rather than an image so it takes the token colour in both
    themes. Size/width come from the utility classes beside it.
 
@@ -473,8 +474,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .cs-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) { .cs-toggle, .cs-toggle::before { transition: none; } }
 
-/* Invalid field border, derived from the error slot's content (design pass
-   spec §4). Autosave streams replace a field's error slot but never its input,
+/* Invalid field border, derived from the error slot's content. Autosave streams replace a field's error slot but never its input,
    so the border can't be a class set at render time: it would stay red after
    a fix, or never turn red after a failed autosave. The slot's presence of a
    message (<p>) is the single source of truth.
@@ -593,7 +593,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-translation-pair > .admin-reference-card { order: -1; }
 }
 
-/* A section's lanes (sections spec §4.1, §4.6): side by side while the CARD
+/* A section's lanes: side by side while the CARD
    is wide enough, stacked below that with each lane's column label shown.
    The breakpoint is the card's own width, like `.admin-translation-form`:
    the editor sits beside the page tree, so the window's width says little
@@ -898,7 +898,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    live editing's merge leaves alone (its RUNTIME set): a class written by
    the script would be taken away by the next list merge. */
 .admin-section-card__settings[data-editing-away] { margin: 0; padding: 0; background: transparent; }
-/* A section's header controls (sections spec §4.1). A layout is shown as a
+/* A section's header controls. A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen
    ::SectionLayoutMenuComponent`); the layout the section has is the framed
@@ -1039,7 +1039,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: var(--cs-t-label); }
 .admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
 .admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
-/* The same pill where a LIST shows a record's open notes (notes spec §4.4):
+/* The same pill where a LIST shows a record's open notes:
    the posts list's cell, a row of the page tree, a tile of the media grid.
    There the server draws it with its number and `data-has-notes` (and
    `data-unread`), so every rule above applies as it stands; what follows is
@@ -1198,8 +1198,7 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
   padding-right: 14px;
 }
 
-/* The mind graph's LEGEND and its STATUS KEY (pages in the mind graph, spec
-   §6). The graph is drawn on a canvas, which no stylesheet reaches: it reads
+/* The mind graph's LEGEND and its STATUS KEY. The graph is drawn on a canvas, which no stylesheet reaches: it reads
    the `--cs-*` tokens through `app/javascript/mind_graph/theme.js` and draws
    the marks in `mind_graph/marks.js` and the lines in `mind_graph/
    renderer.js`. A SWATCH IS DRAWN THE SAME WAY, by the same code, on a small

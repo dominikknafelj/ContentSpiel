@@ -433,6 +433,34 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     end
   end
 
+  # A label is measured once per load, so a face the canvas asks for that has
+  # not loaded is measured in the fallback's widths, and the hit test with
+  # it. Each of the theme's three fonts is a face the page has LOADED when
+  # the graph is drawn: `document.fonts.check` alone would not do, as it
+  # answers true for a family no face matches.
+  test "the canvas's fonts are faces the page has loaded when the graph is drawn" do
+    create_post(title: "One", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    fonts = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("mind_graph/theme").then(({ readTheme }) => {
+        const theme = readTheme(document.querySelector(#{GRAPH.to_json}))
+        const loaded = Array.from(document.fonts).filter((face) => face.status === "loaded").map((face) => `${face.family.replace(/"/g, "")} ${face.weight}`)
+        done({ fonts: [ theme.font, theme.strongFont, theme.countFont ], loaded })
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "theme: #{fonts["error"]}" if fonts["error"]
+
+    fonts["fonts"].zip([ 400, 600, 500 ]).each do |font, weight|
+      stated, family = font.match(/\A(?:(\d+) )?(\d+px) (.+)\z/).values_at(1, 3)
+      assert_equal weight, (stated || 400).to_i, "#{font} is drawn at the weight the design gives it"
+      first = family.split(",").first.strip.delete('"')
+      assert_includes fonts["loaded"], "#{first} #{weight}", "#{font}: no loaded face of #{first} at #{weight} (#{fonts["loaded"].join(", ")})"
+    end
+  end
+
   # Reduced motion: the page tells the worker, and the layout is
   # shown ONCE, at rest -- one `tick`, then `settled`. A dragged node moves
   # alone, its neighbours stay put until the drop, and the drop shows the

@@ -283,23 +283,83 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "each of the six type hues is 3:1 or better on the surface, and cat-5 has left cat-1's side in dark" do
-    each_scheme do |scheme, colour|
-      (1..6).each { |slot| assert_ratio(3.0, colour.("--cs-cat-#{slot}"), colour.("--cs-surface"), "--cs-cat-#{slot} (#{scheme})") }
+  # The canvas's figures (spec, stage 5a), each a floor to its rounding: a
+  # figure of 6.9 is met by 6.85. A post's hues mean post types, so each slot
+  # keeps its own hue angle; only its lightness is tuned into the band.
+  CANVAS = "--cs-surface"
+  def floor(figure) = figure - 0.05
+  CAT_HUES = { light: [ 200, 300, 120, 0, 230, 95 ], dark: [ 200, 300, 120, 0, 260, 95 ] }.freeze
+
+  test "a post's six hues are 5.9 to 7.1:1 on the canvas in light and 8.1 to 9.1:1 in dark, each on its own hue" do
+    bands = { light: 5.9..7.1, dark: 8.1..9.1 }
+    each_scheme do |scheme, colour, tokens|
+      (1..6).each do |slot|
+        ratio = contrast(colour.("--cs-cat-#{slot}"), colour.(CANVAS))
+        band = bands.fetch(scheme)
+        assert_operator ratio, :>=, floor(band.begin), "--cs-cat-#{slot} (#{scheme}) is #{ratio.round(2)}:1"
+        assert_operator ratio, :<, band.end + 0.05, "--cs-cat-#{slot} (#{scheme}) is #{ratio.round(2)}:1"
+        hue = tokens.fetch("--cs-cat-#{slot}")[/\Aoklch\([\d.]+ [\d.]+ ([\d.]+)\)\z/, 1]
+        assert_equal CAT_HUES.fetch(scheme)[slot - 1], hue&.to_f, "--cs-cat-#{slot} (#{scheme}) left its hue: #{tokens["--cs-cat-#{slot}"]}"
+      end
     end
-    assert_equal "oklch(0.74 0.07 260)", schemes[:dark]["--cs-cat-5"]
   end
 
-  # Design answer D2: in dark, ink-white page marks glared and the tree's
-  # lines vanished.
-  test "the Mind graph's page mark and tree line are 3:1 or better on the surface, the dark page mark no glare" do
+  # The upper bound keeps a line from reading as text.
+  test "the graph's related line is 3.9 / 4.3:1 and its tree line 3.8 / 4.5:1 on the canvas, each under its figure plus 0.4, and the shared-tag and lists lines 3:1 or better" do
+    figures = { "--cs-graph-line-related" => { light: 3.9, dark: 4.3 }, "--cs-graph-line-tree" => { light: 3.8, dark: 4.5 } }
     each_scheme do |scheme, colour|
-      assert_ratio(3.0, colour.("--cs-graph-page"), colour.("--cs-surface"), "a page's mark (#{scheme})")
-      assert_ratio(3.0, colour.("--cs-graph-tree", under: "--cs-surface"), colour.("--cs-surface"), "a tree line (#{scheme})")
+      ground = colour.(CANVAS)
+      figures.each do |token, figure|
+        ratio = contrast(colour.(token, under: CANVAS), ground)
+        assert_operator ratio, :>=, floor(figure.fetch(scheme)), "#{token} (#{scheme}) is #{ratio.round(2)}:1"
+        assert_operator ratio, :<, figure.fetch(scheme) + 0.4, "#{token} (#{scheme}) is #{ratio.round(2)}:1, near a text's figure"
+      end
+      %w[--cs-graph-line-tag --cs-graph-line-lists].each { |token| assert_ratio(3.0, colour.(token, under: CANVAS), ground, "#{token} (#{scheme})") }
     end
-    assert_equal "#d9d9dc", schemes[:dark]["--cs-graph-page"]
-    assert_equal "var(--cs-ink)", schemes[:light]["--cs-graph-page"]
-    assert_equal "var(--cs-dim)", schemes[:light]["--cs-graph-tree"]
+  end
+
+  test "a tag is 6.2 / 8.9:1 or better, a page's mark 3:1 or better and in dark below the ink, and the selection ring 6.9 / 7.1:1" do
+    each_scheme do |scheme, colour|
+      ground = colour.(CANVAS)
+      assert_ratio(floor({ light: 6.2, dark: 8.9 }.fetch(scheme)), colour.("--cs-graph-tag"), ground, "a tag (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-graph-page"), ground, "a page's mark (#{scheme})")
+      assert_ratio(floor({ light: 6.9, dark: 7.1 }.fetch(scheme)), colour.("--cs-accent"), ground, "the selection ring (#{scheme})")
+    end
+    dark = schemes[:dark]
+    measure = ->(name) { contrast(resolve_colour(dark, name), resolve_colour(dark, CANVAS)) }
+    assert_operator measure.("--cs-graph-page"), :<, measure.("--cs-ink"), "a page's mark glares in dark: it is no softer than the ink"
+  end
+
+  # What a selection leaves out is drawn at `--cs-graph-faded`: the
+  # strongest mark at it, ink, stays under a control's 3:1, and the faintest
+  # post hue at it is still seen.
+  test "what a selection leaves out stays seen and never reads as a control" do
+    each_scheme do |scheme, colour, tokens|
+      faded = Float(tokens.fetch("--cs-graph-faded"))
+      ground = colour.(CANVAS)
+      at_faded = ->(name) { contrast(mix(colour.(name), ground, faded), ground) }
+      assert_operator at_faded.("--cs-ink"), :<, 3.0, "faded ink reads as a control (#{scheme})"
+      faintest = (1..6).map { |slot| at_faded.("--cs-cat-#{slot}") }.min
+      assert_operator faintest, :>=, 1.5, "a faded post is lost (#{scheme}): #{faintest.round(2)}:1"
+    end
+  end
+
+  # A canvas takes `rgba()` and not `color-mix()`, so a translucent line is
+  # its base token's colour written as `rgba()`, with the base named in the
+  # comment beside it. This holds the two together.
+  test "a graph line's translucent colour is its base token's colour" do
+    css = STYLESHEET.read
+    blocks = { light: css[/:root, \[data-theme="light"\]\s*\{(.*?)\n\}/m, 1], dark: css[/\[data-theme="dark"\]\s*\{(.*?)\n\}/m, 1] }
+    blocks.each do |scheme, block|
+      lines = block.lines.grep(/--cs-graph-line-[\w-]+:\s*rgba\(/)
+      assert_operator lines.size, :>=, 3, "the translucent lines of #{scheme}"
+      lines.each do |line|
+        token, red, green, blue, base = line.match(%r{(--cs-graph-line-[\w-]+):\s*rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\);\s*/\*\s*(ink|dim|meta)\b}).to_a.drop(1)
+        assert token, "a translucent graph line names its base token in the comment beside it: #{line.strip}"
+        hex = schemes[scheme].fetch("--cs-#{base}")
+        assert_equal hex.delete("#").scan(/../).map(&:hex), [ red, green, blue ].map(&:to_i), "#{token} (#{scheme}) is not --cs-#{base}'s colour"
+      end
+    end
   end
 
   # The MCP channel chip (`text-accent` on `bg-accent-tint`) and the NO ALT

@@ -8,15 +8,17 @@
 //   the hue; a post of a type that is no longer registered is a ring type
 //   in `meta` with a stroke through it;
 // - a PAGE is a small card, 14 by 10 with the card's corner radius, Home 18
-//   by 13, in the page colour (`theme.page`: the ink in light, a softer light grey in dark; the hues mean post types). Fixed: a page's size
-//   does not follow its connections;
+//   by 13, in the page colour (`theme.page`: the ink in light, the dim in
+//   dark; the hues mean post types). Fixed: a page's size does not follow
+//   its connections;
 // - a POST TYPE a page lists is a hub: a 12px circle in the type's hue with a
 //   surface ring inside it, so it is not one more post. "All posts" is the
 //   same, filled in `dim`. A RING TYPE's hub is a ring in the hue round a
 //   filled centre; a RETIRED type's is a DASHED ring in `dim` round a small
 //   `dim` centre: it differs from "All posts" by fill, not by shade, and
 //   from a ring type's hub by its dashes. A hub has no state;
-// - a TAG is a square; "+N more" is a pill with its words inside it.
+// - a TAG is a square edged in the tag hue (`theme.tag`); "+N more" is a
+//   pill with its words inside it.
 //
 // THE STATE is one table, `LOOKS`, which a page, a post and a ring type's
 // inner mark all read (never worked out here: `status` and
@@ -86,13 +88,14 @@ const innerRadius = (radius) => Math.round((radius * 4 / 7) * 2) / 2
 //   corner   the colour of the 5px dot at the mark's bottom-right, or none
 //
 //   live                       filled
-//   draft                      a DASHED outline, 1.5px `meta`, surface inside
+//   draft                      a DASHED outline, 1.5px `edge` (the Draft
+//                              chip's), surface inside
 //   scheduled                  an outline in `dim`, with a `warn` centre dot
 //   live with changes          filled, with a `dim` dot at the bottom right
 //   live, a change scheduled   filled, with a `warn` dot at the bottom right
 export const LOOKS = {
   live: { fill: "own", outline: null, dashed: false, centre: null, corner: null },
-  draft: { fill: "surface", outline: "meta", dashed: true, centre: null, corner: null },
+  draft: { fill: "surface", outline: "edge", dashed: true, centre: null, corner: null },
   scheduled: { fill: "surface", outline: "dim", dashed: false, centre: "warn", corner: null },
   unpublished: { fill: "own", outline: null, dashed: false, centre: null, corner: "dim" },
   change_scheduled: { fill: "own", outline: null, dashed: false, centre: null, corner: "warn" }
@@ -141,16 +144,16 @@ export function topCorner(node, radius) {
 
 // A post or a page with open notes (the notes handoff's "Mind graph node
 // badge"): the count in a small pill on the mark's top-left corner. Half its
-// height (the handoff's 14px line), half a character's advance at 10px mono,
-// the room beside the text (`px-1`), and how far a POST's pill reaches over
-// the corner (the handoff's "overlapping by 4px").
+// height (the handoff's 14px line), half a character's room, the room beside
+// the text (`px-1`), and how far a POST's pill reaches over the corner (the
+// handoff's "overlapping by 4px").
 //
-// THE COUNT IS DRAWN AT 11px since 2026-10-31 (`theme.countFont`: no text
-// under 11px in CS Studio), and the pill was left as it was measured for
-// 10px on purpose: IBM Plex Mono advances 0.6em, so "99+" is 19.8px wide in
-// a 26px pill (3px each side where `px-1` gave 4) and "12" is 13.2 in 20,
-// and the 11px line sits in the 14px height. Grow NOTES_CHARACTER only if a
-// wider mono font is put on `--cs-mono`.
+// THE COUNT IS THE SANS, 500 at 11px (`theme.countFont`, as `text-count`).
+// "99+", the widest count, is 19.6px in Archivo, so its 26px pill leaves it
+// 3px of room each side where `px-1` gives 4 (the browser test "the notes
+// count is in the sans at 11px and the widest count, 99+, fits its badge"
+// holds the 3), and the 11px line sits in the 14px height. Grow
+// NOTES_CHARACTER if a wider sans is put on the page.
 //
 // A PAGE'S CARD'S BADGE STANDS OUTSIDE IT (Claude Design's K3, 2026-10-12;
 // the "count badges overlap the page cards" of the 2026-10-15 review): its
@@ -315,8 +318,8 @@ function drawType(context, theme, node, x, y) {
 }
 
 // "+N more" (design answers G2, H4): a pill on surface with a strong line
-// round it (inside its 16px) and its words inside, in the small mono style
-// the notes badge has. `save` and `restore` leave the text settings as the
+// round it (inside its 16px) and its words inside, in the count's sans the
+// notes badge has. `save` and `restore` leave the text settings as the
 // labels expect them.
 function drawMore(context, theme, node, x, y) {
   const box = boxOf(node)
@@ -335,7 +338,7 @@ function drawMore(context, theme, node, x, y) {
 
 function drawTag(context, theme, x, y, half) {
   context.fillStyle = theme.surface
-  context.strokeStyle = theme.meta
+  context.strokeStyle = theme.tag
   context.lineWidth = OUTLINE
   context.fillRect(x - half, y - half, half * 2, half * 2)
   context.strokeRect(x - half, y - half, half * 2, half * 2)

@@ -110,7 +110,10 @@ export const fill = (template, placeholder, value) => template.replace(placehold
 // with the same two.
 export const dotClass = (dotClasses, node) =>
   `h-[7px] w-[7px] shrink-0 rounded-full ${node.colour_index == null ? "border border-meta" : dotClasses[(node.colour_index - 1) % dotClasses.length]}`
-export const TAG_MARK = "h-2 w-2 shrink-0 border border-meta bg-surface"
+// A tag's square, edged in the tag hue as the canvas draws it (`drawTag`).
+// The type dot and this square are CSS beside the canvas's own drawing:
+// `mind_graph_guards_test` holds each to the token the canvas uses.
+export const TAG_MARK = "h-2 w-2 shrink-0 border border-graph-tag bg-surface"
 
 export function createCard(container, { text, number = String, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
   let pin = null
