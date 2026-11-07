@@ -1,16 +1,20 @@
-# The one registration hook for code outside the CMS (block types spec,
-# decision 11): an engine calls
+# The registration hooks for code outside the CMS (block types spec,
+# decision 11), one per registry: `block_types`, `form_field_types`,
+# `form_destinations` and `studio_modules`. An engine calls, for example,
 #
 #   ContentSpiel::Plugins.block_types do |types|
 #     types.register "gallery/album" do |t| … end
 #   end
 #
-# from an `initializer` of its own (Rails' convention). The hook KEEPS the
-# block, for the life of the process, and config/initializers/types.rb calls
-# every kept block after the built-ins on every `to_prepare`, so a reload
-# registers the outside types again against freshly loaded classes, as it
-# does the built-ins. An engine's own `to_prepare` would not do: it runs
-# before the application's, whose first line is `reset!`.
+# from an `initializer` of its own (Rails' convention). A hook KEEPS the
+# block, for the life of the process, and the application's initializer
+# (config/initializers/types.rb for the three type hooks,
+# config/initializers/studio_modules.rb for the modules') calls every kept
+# block after the built-ins on every `to_prepare`, so a reload registers the
+# outside entries again against freshly loaded classes, as it does the
+# built-ins. An engine's own `to_prepare` would not do: it runs before the
+# application's, whose first line is `reset!`. Every hook names what it
+# registers `owner/name`, under the same owner rules (`Registrar`).
 #
 # Required from config/application.rb BEFORE `Bundler.require`, so a gem may
 # name the hook whenever its own files are loaded; therefore plain Ruby,
@@ -81,18 +85,30 @@ module ContentSpiel
 
     # What a studio modules hook's block is handed: `register` and `badge`
     # with `StudioModules`' own signatures, and nothing else of the registry
-    # (no `reset!`, no `entries`). A module's name is bare, as the built-ins'
-    # are, because it is the key of its label (`admin.modules.<name>`, which
-    # the gem's locale file gives); a name already taken is refused by the
-    # registry, with the place of the hook in the message.
+    # (no `reset!`, no `entries`). A module's name is `owner/name`, with the
+    # block types' owner rules (`Registrar`): a bare name is a built-in's,
+    # one call registers one owner's modules, and an owner is one hook's, so
+    # two gems' modules never take each other's name. The name is the key of
+    # its label (`admin.modules.<owner/name>`, in the gem's locale file).
+    # `badge` sets the count of a module this same call registered and of no
+    # other, so a gem never replaces a built-in's badge or another gem's.
     class ModuleRegistrar
-      def initialize(registry)
+      def initialize(registry, location, owners)
         @registry = registry
+        @registered = []
+        @registrar = Registrar.new(registry, location, owners, kind: "studio module", takes: %i[attributes],
+          build: ->(name, attributes, _definition) { registry.register(name, **attributes).tap { @registered << name.to_sym } })
       end
 
-      def register(name, **options) = @registry.register(name, **options)
+      def register(name, **options) = @registrar.register(name, **options)
 
-      def badge(name, **options, &counter) = @registry.badge(name, **options, &counter)
+      def badge(name, **options, &counter)
+        unless @registered.include?(name.to_sym)
+          raise ArgumentError, "#{name.inspect}: a hook sets the badge of a module it registered itself, and this call registered #{@registered.empty? ? "none" : @registered.map(&:to_s).join(", ")}"
+        end
+
+        @registry.badge(name, **options, &counter)
+      end
     end
 
     # One hook list per registry: a hook is replayed into its own registry
@@ -142,13 +158,14 @@ module ContentSpiel
       # A gem's entry in CS Studio's sidebar and ⌘K, with its count:
       #
       #   ContentSpiel::Plugins.studio_modules do |modules|
-      #     modules.register :acme_reports, icon: :status, family: :code, path: :acme_reports_path,
+      #     modules.register "acme/reports", icon: :status, family: :code, path: :acme_reports_path,
       #       permission: "acme_reports.view", group: :system
-      #     modules.badge(:acme_reports) { |viewer:| Acme::Report.unread_for(viewer).count }
+      #     modules.badge("acme/reports") { |viewer:| Acme::Report.unread_for(viewer).count }
       #   end
       #
       # The arguments are `StudioModules.register`'s and `.badge`'s (its
-      # comment says what each means; `family:` is required). Kept and
+      # comment says what each means; `family:` is required), with the
+      # owner rules of `ModuleRegistrar`. Kept and
       # replayed as the block types are, by config/initializers/
       # studio_modules.rb after the built-ins on every `to_prepare`: a gem's
       # own `to_prepare` runs before the application's `reset!`, its
@@ -191,7 +208,7 @@ module ContentSpiel
       # group is the built-ins', then the gems' in the order their hooks
       # were called.
       def register_studio_modules(registry)
-        replay(:studio_modules, REPLAYED_STUDIO_MODULES) { ModuleRegistrar.new(registry) }
+        replay(:studio_modules, REPLAYED_STUDIO_MODULES) { |location, owners| ModuleRegistrar.new(registry, location, owners) }
       end
 
       # Tests only: a hook a test kept is taken out again.
