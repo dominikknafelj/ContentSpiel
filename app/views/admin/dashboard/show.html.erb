@@ -30,7 +30,7 @@
     (`@mail_settings` is nil for anyone else) and only while it failed. %>
 <% if @mail_settings %>
   <%= render Admin::Ui::MailFailedNoticeComponent.new(mail_settings: @mail_settings,
-        href: admin_settings_path(anchor: "mail", **admin_url_options), class: "mb-4") %>
+        href: admin_settings_path(anchor: "mail", **admin_url_options), class: "admin-dashboard__notice mb-4") %>
 <% end %>
 
 <%# The "→" goes to the posts list, filtered by status -- the only filtered

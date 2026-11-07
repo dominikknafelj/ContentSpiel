@@ -827,10 +827,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "the editors' rail and the dashboard's dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     editor = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten.uniq
-    dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)\s*\{[^@]*\.admin-dashboard__grid\s*\{/).flatten.uniq
     assert_equal 1, editor.size, "the editor docks at one width: #{editor.inspect}"
-    assert_equal 1, dashboard.size, "the dashboard docks at one width: #{dashboard.inspect}"
-    assert_equal editor, dashboard
+    # Every width the dashboard's container asks: the rail's two columns
+    # below the threshold, and the threshold itself; a block at any other
+    # width (one that docked only the rail's ground or its panels) fails.
+    dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)/).flatten
+    assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
+    assert_equal 1, docked.size
+    %w[admin-dashboard__grid admin-dashboard__rail].each { |name| assert_match(/\.#{name}\s*\{/, docked.first, "#{name} docks in the threshold's block") }
+    outside = css.sub(docked.first, "")
+    assert_no_match(/\.admin-dashboard__rail \.admin-dashboard-panel/, outside, "the rail's panels change only in the threshold's block")
+    # The docked head outweighs a kind's tint (0,2,0) by specificity, not
+    # by standing later, and the panel's parts that lose their inset are named.
+    assert_match(/\.admin-dashboard__rail \.admin-dashboard-panel \.admin-dashboard-panel__head\s*\{[^}]*background:\s*transparent;/, docked.first)
+    assert_no_match(/:not\(/, docked.first, "the docked rules name what they change")
   end
 
   # The buttons are tokens only. A Tailwind palette

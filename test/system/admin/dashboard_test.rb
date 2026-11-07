@@ -81,8 +81,18 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
       create_post(title: "Half-written", published: false)
       create_post(title: "Later").update!(published_at: 2.days.from_now)
     end
-    block = create_page(title: "Pricing").content_blocks.create!(block_type: "rich_text", position: 0)
+    @pricing = create_page(title: "Pricing")
+    block = @pricing.content_blocks.create!(block_type: "rich_text", position: 0)
     as(users(:two)) { Notes::Start.call(block, body: "Is this ready, @[#{users(:one).id}]?") }
+    # A live page with an open thread and unpublished changes: one row with both reasons.
+    Current.set(actor: users(:one), channel: :admin) do
+      discussed = create_page(title: "Contact")
+      discussed_block = discussed.content_blocks.create!(block_type: "rich_text", position: 0)
+      assert Pages::Save.call(discussed, translations: { "en" => { title: "Contact us" } }).ok?
+      @discussed = discussed
+      @discussed_block = discussed_block
+    end
+    as(users(:two)) { Notes::Start.call(@discussed_block, body: "Phone number?") }
   end
 
   # The boxes of the dashboard, its main column and its rail, and the
@@ -227,11 +237,19 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
     visit_screen admin_root_path
 
-    row = "turbo-frame#dashboard-waiting .admin-waiting-row"
+    row = "turbo-frame#dashboard-waiting .admin-waiting-row:has(a[href*='/pages/#{@pricing.id}'])"
     assert_selector row, text: "Pricing"
     assert_equal({ name: "Pricing 1 open note", description: "Open thread", ignored: false }, accessibility("#{row} a.admin-waiting-row__link"))
     assert accessibility("#{row} .admin-row-verb")[:ignored], "the verb is the link's description, not read again as text"
     assert accessibility("#{row} [data-has-notes]")[:ignored], "the count is in the link's name, not read again"
+
+    # A row with both reasons for someone who may publish: the chip's words
+    # join the name, read through its hidden wrapper, and its verb is the
+    # second link, so the name has no description.
+    both = "turbo-frame#dashboard-waiting .admin-waiting-row:has(a[href*='/pages/#{@discussed.id}'])"
+    assert_selector both, text: "Contact us"
+    assert_equal({ name: "Contact us 1 open note Unpublished changes", description: nil, ignored: false }, accessibility("#{both} a.admin-waiting-row__link"))
+    assert accessibility("#{both} [id$='-unpublished']")[:ignored], "the chip is in the link's name, not read again"
 
     tile = "section[aria-labelledby=dashboard-drafts] article.admin-draft-tile"
     assert_equal({ name: "Half-written", description: "Continue", ignored: false }, accessibility("#{tile} a.admin-draft-tile__link"))
