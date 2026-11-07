@@ -52,6 +52,15 @@ class UnpublishedChangesSystemTest < ApplicationSystemTestCase
     assert_not @live.unpublished_changes?
   end
 
+  test "an editor opened with review=publish shows Publish changes at once" do
+    Current.set(actor: users(:one)) { assert Pages::Save.call(@live, translations: { "en" => { title: "Live page, retitled" } }).ok? }
+    sign_in_via_form(users(:one))
+
+    visit_screen admin_page_path(@live, review: "publish")
+
+    assert_selector "dialog#publish-changes-page-#{@live.id}[open] [data-publishing-overview]", wait: 10
+  end
+
   test "the posts list marks a live post with unpublished changes, and the dashboard lists it under Unpublished changes" do
     Current.set(actor: users(:one)) do
       @marked = create_post(title: "Marked post")

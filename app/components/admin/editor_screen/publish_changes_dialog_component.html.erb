@@ -1,5 +1,5 @@
 <% if may_publish? %>
-  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title"), width: :form, open_on_load: error.present?, steady: true) do |dialog| %>
+  <%= render Admin::Ui::DialogComponent.new(id: dialog_id, title: t(".title"), width: :form, open_on_load: open_on_load?, steady: true) do |dialog| %>
     <%# `min-h-full` and the form's `mt-auto`: the When form stands at the foot of the body while the overview is short, so it does not move either. %>
     <%= tag.div class: "flex min-h-full flex-col", data: { controller: "admin--editor--publish-dialog", admin__editor__publish_dialog_url_value: changes_url,
           action: "admin--ui--dialog:opening@window->admin--editor--publish-dialog#opening" } do %>

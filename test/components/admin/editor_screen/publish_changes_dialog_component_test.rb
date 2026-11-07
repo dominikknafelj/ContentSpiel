@@ -17,6 +17,15 @@ class Admin::EditorScreen::PublishChangesDialogComponentTest < ViewComponent::Te
 
   def texts(selector) = page.all(selector, visible: :all).map { |node| node.text(:all).strip }
 
+  test "open_on_load opens the dialog without an error" do
+    dialogs(open_on_load: true)
+    assert_selector "#{publish_dialog}[data-admin--ui--dialog-open-on-load]", visible: :all
+    assert_no_selector "#{publish_dialog} [role=alert]#publish-changes-page-#{@live.id}-error", visible: :all
+
+    dialogs
+    assert_no_selector "#{publish_dialog}[data-admin--ui--dialog-open-on-load]", visible: :all
+  end
+
   test "the dialog holds an empty overview that a POST through the write queue fills, and a form with Now and At a time" do
     dialogs
 

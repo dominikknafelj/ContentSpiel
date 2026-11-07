@@ -29,6 +29,12 @@ module Admin
     # inside it: the header is sticky with its own stacking context, and a
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
+    # Publish changes opens on load only from a GET that asks for it
+    # (`?review=publish`, `review_on_load?`), so a save's answer, which draws
+    # the header again from a PATCH, never reopens it; `admin--ui--dialog`
+    # strips the attribute as it opens, so a Turbo restore does not either,
+    # and a live refresh fetches the editor's own part addresses, which carry
+    # no `review`.
     #
     # Slots (`Admin::Slots`): the action row draws what features register at
     # `editor.header.people` (first, before the saved status) and
@@ -149,6 +155,14 @@ module Admin
       end
 
       def may_publish? = can?("#{type}s.publish", record)
+
+      # `?review=publish` (the dashboard's "Review and publish…") asks for the
+      # Publish changes dialog open on a live record that has something to
+      # publish and a viewer who may publish it. Any other condition: nothing
+      # opens and nothing raises. GET only: see the class comment.
+      def review_on_load?
+        helpers.request.get? && helpers.params[:review] == "publish" && !draft? && state.changes? && may_publish?
+      end
 
       def may_delete? = can?("#{type}s.delete", record)
 

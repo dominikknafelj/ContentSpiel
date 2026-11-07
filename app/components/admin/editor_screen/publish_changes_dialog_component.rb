@@ -49,11 +49,12 @@ module Admin
       def self.discard_dialog_id_for(record) = "discard-changes-#{kind_of(record)}-#{record.id}"
       def self.cancel_dialog_id_for(record) = "cancel-scheduled-change-#{kind_of(record)}-#{record.id}"
 
-      def initialize(record:, state: nil, url_options: {}, error: nil, when_chosen: nil, value: nil)
+      def initialize(record:, state: nil, url_options: {}, error: nil, when_chosen: nil, value: nil, open_on_load: false)
         @record = record
         @state = state
         @url_options = url_options
         @error = error.presence
+        @open_on_load = open_on_load
         @when_chosen = when_chosen
         @submitted_value = value
       end
@@ -121,6 +122,9 @@ module Admin
       def min_value = zone.now.strftime(FORMAT)
       def zone_line = site_zone_line(default_time)
       def queue_hold = { turbo_frame: "_top", controller: "admin--saving--queue-hold", action: "submit->admin--saving--queue-hold#submit" }
+
+      # Opens on load after a refusal, or when the page asked for it.
+      def open_on_load? = error.present? || @open_on_load
 
       attr_reader :error
 

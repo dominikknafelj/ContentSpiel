@@ -158,7 +158,7 @@
     drawn once, whatever there is to publish now (see the component). %>
 <% unless draft? %>
   <%= render Admin::EditorScreen::PublishChangesDialogComponent.new(record: record, state: state, url_options: url_options,
-        error: publish_error, when_chosen: publish_when, value: publish_value) %>
+        error: publish_error, when_chosen: publish_when, value: publish_value, open_on_load: review_on_load?) %>
 <% end %>
 
 <% if can_unpublish? %>
