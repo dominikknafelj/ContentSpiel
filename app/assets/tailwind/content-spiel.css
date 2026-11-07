@@ -240,6 +240,53 @@
   --cs-editor-column: 900px;
   --cs-rail-width: 360px;
   --cs-rail-gap: 28px;
+  /* THE LAYERS: every z-index in CS Studio is one of these, written as
+     `z-index: var(--cs-z-…)` or the utility `z-(--cs-z-…)`
+     (`admin_design_rules_test.rb` refuses any other value; `auto` is no
+     layer and stays allowed).
+
+     The first three are LOCAL layers. They mean something only inside a
+     stacking context their component makes, and are never compared with a
+     page layer: `lift`, a focused control over its neighbours (a table
+     strip's button); `raised`, over its own row or cell (a row's second
+     link over its stretched one, a matrix cell's link, a table strip's
+     entry and its "+", the mind graph's card and tooltip); `raised-top`,
+     over `raised` in the same context (the matrix's sticky title cell, an
+     open or focused strip entry).
+
+     The rest are PAGE layers, lowest first, each over the one before it
+     wherever the two meet: the save bar (`sticky`; a configuration screen
+     has no slide-over); the notes slide-over; the editor's sticky header,
+     so a menu of the header (its "⋯", its people) that drops into the
+     slide-over's place is over it, the header keeping its menus' own
+     z-index inside it; the notes sheet under 640px, which covers the
+     header; the tree's divider, whose last pixels lie on the header's left
+     edge; the top bar below 1280px; a popover (a menu, tooltip, listbox,
+     emoji panel, the rich-text popover, the mind graph's search results);
+     the media library's whole-window drop overlay, over any open popover;
+     the shell's scrim, over an open popover too, so a drawer opened with a
+     menu up hides it; the sidebar and tree drawers; the toasts, over
+     everything but a dialog. A dialog opens with `showModal()` in the top
+     layer and takes no z-index.
+
+     The canvas (`.admin-rail__main`) is `isolation: isolate`: what it
+     raises, a popover at `popover` included, stays inside it, and the
+     slide-over and the editor's header, which stand outside it (the header
+     before the rail's grid), cover all of it. */
+  --cs-z-lift: 1;
+  --cs-z-raised: 10;
+  --cs-z-raised-top: 20;
+  --cs-z-sticky: 15;
+  --cs-z-slide-over: 20;
+  --cs-z-header: 21;
+  --cs-z-sheet: 22;
+  --cs-z-divider: 23;
+  --cs-z-top-bar: 25;
+  --cs-z-popover: 30;
+  --cs-z-drop: 32;
+  --cs-z-scrim: 35;
+  --cs-z-drawer: 40;
+  --cs-z-toast: 50;
 }
 
 /* CS Studio's three layouts (admin, product, setup) say `data-surface="studio"`

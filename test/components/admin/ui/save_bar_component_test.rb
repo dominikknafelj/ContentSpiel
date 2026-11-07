@@ -50,6 +50,6 @@ class Admin::Ui::SaveBarComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::Ui::SaveBarComponent.new(form_id: "f", cancel_url: "/x"))
     assert_no_selector ".admin-save-bar[data-stuck]"
-    assert_selector ".admin-save-bar.sticky.-bottom-px.z-20.mt-6.bg-paper.py-3:not(.admin-save-bar--contained)"
+    assert_selector ".admin-save-bar.sticky.-bottom-px.mt-6.bg-paper.py-3[class~='z-(--cs-z-sticky)']:not(.admin-save-bar--contained)"
   end
 end

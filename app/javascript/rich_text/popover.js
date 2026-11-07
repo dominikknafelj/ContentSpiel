@@ -1,5 +1,5 @@
 // Small DOM builders for `admin--rich-text--editor`'s Link popover (the image, YouTube
-// and page dialogs are server-rendered, `RichTextDialogsComponent`) -- task 7's "no browser dialogs" ruling: no
+// and page dialogs are server-rendered, `RichTextDialogsComponent`). No browser dialogs: no
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class
 // strings here are `SetupHelper#setup_input_class`/`#setup_label_class`
@@ -35,7 +35,7 @@ let sequence = 0
 
 export function createPopover({ title, onSubmit, onClose }) {
   const root = document.createElement("div")
-  root.className = "admin-rich-text-popover absolute left-0 right-0 z-20 mt-1 flex flex-col gap-3 rounded-card bg-popover p-3 shadow-3"
+  root.className = "admin-rich-text-popover absolute left-0 right-0 z-(--cs-z-popover) mt-1 flex flex-col gap-3 rounded-card bg-popover p-3 shadow-3"
   root.setAttribute("role", "dialog")
   root.setAttribute("aria-label", title)
 

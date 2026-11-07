@@ -18,13 +18,13 @@
           <% items.each do |item| %>
             <% focus = editor_path(item, focus_locale(item)) %>
             <tr id="<%= row_id(item) %>" class="admin-translation-row relative border-b border-line last:border-b-0 hover:bg-paper">
-              <th scope="row" class="sticky left-0 z-20 min-w-60 max-w-80 bg-surface p-0 text-left font-medium">
+              <th scope="row" class="sticky left-0 z-(--cs-z-raised-top) min-w-60 max-w-80 bg-surface p-0 text-left font-medium">
                 <%= link_to title(item), focus, class: "relative block truncate px-4 py-2 text-ink hover:underline", aria: { label: open_label(item) }, data: { turbo_frame: "_top" } %>
               </th>
               <td class="px-3 py-2 text-sm text-dim" data-column="type"><%= type_label(item) %></td>
               <% locales.each do |locale| %>
                 <td class="px-3 py-2">
-                  <%= link_to editor_path(item, locale), aria: { label: cell_label(item, locale) }, class: "relative z-10 inline-flex", data: { turbo_frame: "_top" } do %>
+                  <%= link_to editor_path(item, locale), aria: { label: cell_label(item, locale) }, class: "relative z-(--cs-z-raised) inline-flex", data: { turbo_frame: "_top" } do %>
                     <%= render Admin::TranslationScreen::StateCellComponent.new(state: item.states.fetch(locale), locale: locale) %>
                   <% end %>
                 </td>

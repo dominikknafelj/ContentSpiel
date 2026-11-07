@@ -98,7 +98,7 @@ module Admin
 
       def panel_classes
         # `admin-menu-panel`: the keyboard's row carries the stylesheet's accent bar.
-        [ "admin-menu-panel absolute z-30 mt-1 min-w-44 rounded-card bg-popover shadow-3",
+        [ "admin-menu-panel absolute z-(--cs-z-popover) mt-1 min-w-44 rounded-card bg-popover shadow-3",
           (columns ? "#{GRID_CLASSES.fetch(columns)} #{GRID_PANEL} p-2.5" : "p-1"),
           ("focus:outline-none focus-visible:outline-2 focus-visible:outline-accent" if list),
           align == :right ? "right-0" : "left-0",

@@ -37,7 +37,7 @@
           <span class="sr-only"><%= t(".last_sign_in_label") %> </span><% if !invited && last_sign_ins[row.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[row.id]) %><% else %><%= t(".never") %><% end %>
         </span>
         <% if invited %>
-          <span class="relative z-10 justify-self-end" data-invite-menu>
+          <span class="relative z-(--cs-z-raised) justify-self-end" data-invite-menu>
             <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: row.display_name), close_on_select: true) do |menu| %>
               <% menu.with_item do %>
                 <%= button_to t(".resend"), resend_path(row), method: :post %>

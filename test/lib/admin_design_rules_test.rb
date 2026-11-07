@@ -996,6 +996,67 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
   end
 
+  # The layers: a z-index is one of the `--cs-z-*` tokens of THE LAYERS
+  # (`content-spiel.css`), so which layer covers which is decided in one list
+  # and not per element. A class writes `z-(--cs-z-<name>)`; a stylesheet
+  # writes `z-index: var(--cs-z-<name>)`, or `auto`, which is no layer. The
+  # public site is the theme's and out of scope, as for elevation (its
+  # language switcher and the preview bar keep their own values).
+  RAW_Z_UTILITY = /(?<![\w-])-?z-(?:\d+|\[[^\]]*\]|auto)(?![\w-])/
+  Z_TOKEN_UTILITY = /(?<![\w-])z-\(--cs-z-([a-z-]+)\)/
+  Z_TOKEN_VAR = /var\(--cs-z-([a-z-]+)\)/
+  Z_STYLESHEETS = %w[application.css content-spiel.tailwind.css admin-rich-text.css].freeze
+  # Lowest first; each covers the one before it wherever the two meet.
+  LOCAL_LAYERS = %w[lift raised raised-top].freeze
+  PAGE_LAYERS = %w[sticky slide-over header sheet divider top-bar popover drop scrim drawer toast].freeze
+
+  def self.stylesheet_without_comments(name) = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+
+  # `[name, value]` of every `--cs-z-*` the scale writes, in its order.
+  def z_scale = self.class.stylesheet_without_comments("content-spiel.css").scan(/--cs-z-([a-z-]+):\s*([^;]+);/).map { |name, value| [ name, value.strip ] }
+
+  test "no z-index is a raw value outside the scale, in a stylesheet or a class" do
+    assert_empty elevation_offences(RAW_Z_UTILITY)
+    Z_STYLESHEETS.each do |name|
+      values = self.class.stylesheet_without_comments(name).scan(/z-index:\s*([^;}]+)/).flatten.map(&:strip)
+      assert_empty values.grep_v(/\A(?:var\(--cs-z-[a-z-]+\)|auto)\z/), "#{name}: a z-index is a --cs-z-* token or auto"
+    end
+    assert_no_match(/z-index:/, self.class.stylesheet_without_comments("content-spiel.css"), "content-spiel.css writes the scale, never a z-index of its own")
+    names = z_scale.map(&:first)
+    assert_not_empty names, "content-spiel.css writes the scale"
+    assert_equal names.uniq, names, "each --cs-z-* is written once"
+  end
+
+  test "every z token used is one the scale defines" do
+    used = ELEVATION_SOURCES.flat_map { |path| File.read(path).scan(Z_TOKEN_UTILITY).flatten }
+    used += Z_STYLESHEETS.flat_map { |name| self.class.stylesheet_without_comments(name).scan(Z_TOKEN_VAR).flatten }
+    assert_not_empty used
+    assert_empty used.uniq - z_scale.map(&:first), "a z token that THE LAYERS does not define"
+  end
+
+  test "the page layers stand in THE LAYERS' order" do
+    values = z_scale.to_h.transform_values { |value| Integer(value) }
+    assert_equal (LOCAL_LAYERS + PAGE_LAYERS).sort, values.keys.sort, "the scale is the three local layers and the page layers"
+    [ LOCAL_LAYERS, PAGE_LAYERS ].each do |layers|
+      order = layers.map { |name| values.fetch(name) }
+      assert_equal order.sort.uniq, order, "lowest first, strictly increasing: #{layers.zip(order).to_h}"
+    end
+  end
+
+  test "the z patterns match a raw value and not a token or a word" do
+    [ "z-30", "-z-10", "z-[60]", "md:z-20", "z-auto" ].each { |sample| assert_match RAW_Z_UTILITY, sample }
+    [ "z-(--cs-z-popover)", "size-10", "fuzz-1", '"Zoom"' ].each { |sample| assert_no_match RAW_Z_UTILITY, sample }
+    assert_equal [ [ "popover" ] ], "absolute z-(--cs-z-popover) mt-1".scan(Z_TOKEN_UTILITY)
+  end
+
+  # The canvas raises its own things (the rich-text popover, a table strip's
+  # open entry, a block's menus) inside a stacking context of its own, so the
+  # notes slide-over and the editor's sticky header, page layers over it,
+  # cover all of them whatever their tokens.
+  test "the canvas is its own stacking context" do
+    assert_match(/isolation:\s*isolate/, single_rule(".admin-rail__main"))
+  end
+
   # A card is told apart by its shadow. These keep an edge because the edge is
   # the thing: an alert's tint and an error's outline, a drop zone's dashes.
   CARD_BORDER_ALLOWED = {

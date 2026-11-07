@@ -40,7 +40,7 @@
           data: { "admin--notes--composer-target": "field", action: "input->admin--notes--composer#typed keydown->admin--notes--composer#key blur->admin--notes--composer#left" } %>
     <%# The mention picker (handoff "Mention picker"): the menu panel, filled by the script, six rows at most. %>
     <ul id="<%= field_id %>-people" role="listbox" hidden aria-label="<%= t(".people") %>" data-admin--notes--composer-target="suggestions"
-        class="absolute left-0 z-30 w-[250px] max-w-full rounded-card bg-popover p-1 shadow-3 <%= POPOVER_SIDE %>"></ul>
+        class="absolute left-0 z-(--cs-z-popover) w-[250px] max-w-full rounded-card bg-popover p-1 shadow-3 <%= POPOVER_SIDE %>"></ul>
     <p class="sr-only" role="status" aria-live="polite" data-admin--notes--composer-target="status"></p>
     <div class="flex items-center justify-between gap-2 border-t border-line px-1.5 py-1">
       <%# The toolbar's controls, on the left (handoff "Composer"): the paperclip, emoji and the at-sign. %>

@@ -45,7 +45,7 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
       assert_selector "a.admin-waiting-row__link[href='/cs-studio/pages/#{page.id}'][data-turbo-frame=_top]", text: "Pricing"
       assert_no_selector "a.admin-waiting-row__link[aria-describedby]"
       assert_selector "[data-unpublished-changes]", text: "Unpublished changes"
-      assert_selector "a[href='/cs-studio/pages/#{page.id}?review=publish'][data-turbo-frame=_top].relative.z-10", exact_text: "Review and publish…"
+      assert_selector "a[href='/cs-studio/pages/#{page.id}?review=publish'][data-turbo-frame=_top].relative[class~='z-(--cs-z-raised)']", exact_text: "Review and publish…"
       assert_selector "a", count: 2
       assert_no_selector ".admin-notes-marker"
       assert_no_selector ".admin-row-verb"

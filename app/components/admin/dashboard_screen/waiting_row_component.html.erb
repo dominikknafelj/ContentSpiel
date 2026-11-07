@@ -23,7 +23,7 @@
       <%= tag.span id: unpublished_id, class: "inline-flex", aria: { hidden: true } do %><%= render Admin::Ui::UnpublishedChipComponent.new %><% end %>
     <% end %>
     <% if review? %>
-      <%= link_to t(".review"), review_path, class: "#{Admin::Ui::ButtonComponent.classes(:secondary, size: :small)} relative z-10", data: { turbo_frame: "_top" } %>
+      <%= link_to t(".review"), review_path, class: "#{Admin::Ui::ButtonComponent.classes(:secondary, size: :small)} relative z-(--cs-z-raised)", data: { turbo_frame: "_top" } %>
     <% else %>
       <%= row_verb(verb) %>
     <% end %>
