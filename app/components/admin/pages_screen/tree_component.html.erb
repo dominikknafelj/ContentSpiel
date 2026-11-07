@@ -20,7 +20,7 @@
                                                "components.pages_screen.tree.moves.position", "components.pages_screen.tree.moves.cancelled",
                                                "components.pages_screen.tree.moves.opened",
                                                "components.pages_screen.tree_row.untitled") %>"
-             data-action="turbo:frame-load@document->admin--pages--tree#follow"
+             data-action="turbo:frame-load@document->admin--pages--tree#follow tree-find:filtered->admin--pages--tree#filtered tree-find:cleared->admin--pages--tree#unfiltered"
              data-live-part="waiting" data-admin--presence--list-kind-value="page" data-admin--presence--list-chunk-value="<%= Presence::HERE_IDS %>" data-admin--presence--list-url-value="<%= helpers.admin_presence_here_path(kind: "page") %>">
   <%# "+ New page" opens the New page dialog (Inside = Home, the default);
       the `href` is the no-JS page, and the trigger is a data attribute on
@@ -52,6 +52,14 @@
           aria: { controls: "tree-column", expanded: "true" },
           data: { "admin--shell--tree-width-target": "fold", action: "admin--shell--tree-width#fold" }) %>
   </div>
+
+  <%# The find field narrows the tree below to the pages that match and
+      their paths; the tree is still while it is narrowed
+      (`tree-find:filtered`, heard above), so its line says how to move a
+      page again. Only over a tree: an empty site has nothing to find. %>
+  <% if root %>
+    <%= render Admin::Ui::TreeFindComponent.new(controls: "tree-list", noun: :pages, moving: true) %>
+  <% end %>
 
   <%# A flash-style status for the last move, replaced on its own by
       Admin::TreeController#update -- kept empty (not `sr-only`'d away

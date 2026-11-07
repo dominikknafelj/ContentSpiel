@@ -82,7 +82,8 @@ pin_all_from "app/javascript/search", under: "search", preload: "admin"
 pin_all_from "app/javascript/ui", under: "ui", preload: "admin"
 
 # The page trees' shared modules: `tree/open_set`, the one writer of the open
-# set (the cookie `cs_tree_open`), read by the Pages tree's controllers.
+# set (the cookie `cs_tree_open`), and `tree/find`, the find field's narrowing,
+# read by the Pages tree's controllers.
 pin_all_from "app/javascript/tree", under: "tree", preload: "admin"
 
 # The strings a script shows, read from the server's `data-messages`

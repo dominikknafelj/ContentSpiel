@@ -370,6 +370,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    the parent's guide, on the chrome, so it covers the guide while shown. */
 .admin-tree-node__handle { position: absolute; inset-block: 0; inset-inline-start: calc(-1 * var(--cs-tree-step)); width: var(--cs-tree-step); display: grid; place-items: center; border-radius: var(--cs-radius); background: var(--cs-chrome); color: var(--cs-meta); cursor: grab; user-select: none; }
 .admin-tree-node__handle:hover { color: var(--cs-ink); }
+/* A tree a find narrows (`data-filtered`, `admin--pages--tree`) does not
+   move, so it draws no handle: none is in the page or the Tab order. */
+.admin-tree[data-filtered] .admin-tree-node__handle { display: none; }
 /* Focus is one ring, on the focused element and never on the row: in
    Pages the control inside the row that holds it (the title's link, the
    disclosure, the handle, "+"), in the graph's list the treeitem, its row's

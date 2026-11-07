@@ -235,6 +235,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/pages/tree_controller.js
     app/javascript/controllers/admin/tree/disclosure_controller.js
     app/javascript/tree/open_set.js
+    app/javascript/tree/find.js
+    app/javascript/controllers/admin/tree/find_controller.js
+    app/components/admin/ui/tree_find_component.rb
+    app/components/admin/ui/tree_find_component.html.erb
     app/javascript/controllers/admin/presence/list_controller.js
     app/components/admin/ui/menu_component.rb
     app/components/admin/ui/menu_component.html.erb

@@ -177,3 +177,27 @@ en:
           # A parent's disclosure, named by what pressing it does to the branch.
           fold: "Fold %{title}"
           unfold: "Unfold %{title}"
+
+        # The find field at the top of a tree column, in the words of what the
+        # tree holds (`noun:`): Pages' pages, or the graph's pages, posts and
+        # tags.
+        tree_find:
+          label:
+            pages: "Find a page"
+            nodes: "Find a page, post or tag"
+          placeholder:
+            pages: "Find a page"
+            nodes: "Find a page, post or tag"
+          count:
+            pages:
+              one: "1 page matches"
+              other: "%{count} pages match"
+            nodes:
+              one: "1 match"
+              other: "%{count} matches"
+          none:
+            pages: "No pages match"
+            nodes: "Nothing matches"
+          # Said under the count while the tree is narrowed, where its rows move.
+          no_moving: "Clear the search to move pages"
+          clear: "Clear"

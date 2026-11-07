@@ -64,6 +64,7 @@ export default class extends Controller {
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     this.settleHover = () => this.endHover()
     document.addEventListener("turbo:before-cache", this.settleHover)
+    this.narrowed = false
     this.arrive()
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
@@ -101,7 +102,8 @@ export default class extends Controller {
           onEnd: (event) => {
             this.endHover()
             this.onDrop(event)
-          }
+          },
+          disabled: this.narrowed
         })
       )
       this.element.dataset.sortable = "ready"
@@ -355,6 +357,35 @@ export default class extends Controller {
     origin.list.insertBefore(item, origin.next)
   }
 
+  // ---- While a find narrows the tree ---------------------------------------
+  //
+  // A NARROWED TREE DOES NOT MOVE: a drop among hidden siblings would land
+  // at a place the person cannot see. While the find field narrows it
+  // (`tree-find:filtered`, from `admin--tree--find` on the tree), every
+  // Sortable is disabled (one made while it is, too), a pick-up is refused
+  // (`key`), and the tree carries `data-filtered`, under which the block
+  // draws no handle, so none is in the Tab order either. "+" stays. When
+  // the find gives the tree back (`tree-find:cleared`) all of it comes back,
+  // and the selected row, which the narrowing may have moved, is scrolled
+  // into the column again. The find takes its narrowing back before Turbo's
+  // snapshot, and with it `data-filtered`.
+  filtered(event) {
+    if (event.target !== this.element.querySelector(".admin-tree")) return
+    this.setFiltered(event.target, true)
+  }
+
+  unfiltered(event) {
+    if (event.target !== this.element.querySelector(".admin-tree")) return
+    this.setFiltered(event.target, false)
+    this.scrollToRow(this.openPageId())
+  }
+
+  setFiltered(tree, filtered) {
+    this.narrowed = filtered
+    tree.toggleAttribute("data-filtered", filtered)
+    this.sortables?.forEach((sortable) => sortable.option("disabled", filtered))
+  }
+
   // ---- Keyboard path ------------------------------------------------------
   //
   // Space on a row's handle picks the row up; ArrowUp/ArrowDown move it among
@@ -376,7 +407,7 @@ export default class extends Controller {
   // that isn't real.
   key(event) {
     const row = event.currentTarget.closest("li[data-page-id]")
-    if (!row) return
+    if (!row || this.narrowed) return
 
     if (event.key === " ") {
       event.preventDefault()
