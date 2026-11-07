@@ -13,7 +13,7 @@
 //            related · 2 tags" (left out for a post added from the list,
 //            whose lines nobody counted); its open notes; "Open post",
 //            "Focus", Pin
-//   a PAGE   (design answer, part one §5) its mark and its address in mono
+//   a PAGE   (design answer, part one §5) its mark and its address
 //            with its status chip; the title; "4 child pages · lists 112
 //            posts"; its open notes, as on a post's card; "Open page",
 //            "Focus", Pin. Home's is the same card
@@ -25,8 +25,9 @@
 //            reads; Pin. NO LINK: it leads nowhere, and the pages that list
 //            it are its neighbours on the canvas
 //
-// then the Close button in the corner (×, named for a screen reader; LAST in
-// the document, so Tab meets the actions first). The actions LOOK like CS
+// then Close in the corner (the shared icon button, named "Close"; LAST in
+// the document, so Tab meets the actions first; the card's own classes in
+// `show.html.erb` stand it in the corner). The actions LOOK like CS
 // Studio's buttons and are what they do: what leads somewhere is a link, and
 // Pin / Unpin changes the graph, so it is a button. "Open post" and "Open
 // page" have a key of their own: Enter on the selected node -- on the
@@ -41,22 +42,22 @@
 // "lists 112 posts" is of the page, not of this picture: a neighbour page
 // says it with no line of its own on screen.
 //
-// THE STATUS CHIP draws the look `Admin::Ui::StatusChipComponent` had before
-// its solid Live and Scheduled fills and its outlined Draft, and keeps it until
-// stage 5a redraws the card: a dot in the status's token colour AND the word,
-// so the colour is never the only cue. A live record that has more to say carries its second state
-// after the label (design answer G4, verbatim):
-//   "● Live · Unpublished changes"          no second dot
-//   "● Live · ● Change scheduled 14 Oct"    a warn dot: warn means "scheduled"
-// A chip of two states is as wide as the card, so it stands in a row of its
-// own under the first (a READING: the design drew the chip, not the card
-// around it).
-// Those two rows are for the eye, and hidden from a screen reader, which is
-// given the Status key's own words in one sentence (H6: one set of words):
-// "Live, unpublished changes", "Live, change scheduled 14 Oct". The state is
-// the data's `status` and `changes` (`Publishing::State`'s), never worked
-// out here, and the day is the server's (`change_on`, CS Studio's short
-// date): this formats no date. `data-status` is the state's name.
+// THE STATUS CHIP is `Admin::Ui::StatusChipComponent`'s own, cloned from
+// the parts (`parts.js`), never drawn here: a record in one state has the
+// chip of that state beside what it is, and the chip's `data-status`
+// (`live`, `draft`, `scheduled`) names the state. A live record that has
+// more to say carries its second state as the editor's header does: the
+// Live chip, then the unpublished chip, or the words "Change scheduled 14
+// Oct" with the server's day (`change_on`, CS Studio's short date; this
+// formats no date). Two states are as wide as the card, so they stand in a
+// row of their own under the first (`[data-chip-row]`), which may wrap and
+// whose `data-status` (`live_with_changes`, `live_change_scheduled`) names
+// the state: a chip is never changed after it is cloned. That row is for
+// the eye, and hidden from a screen reader, which is given the Status key's
+// own words in one sentence (H6: one set of words) at the end of the first
+// row: "Live, unpublished changes", "Live, change scheduled 14 Oct". The
+// state is the data's `status` and `changes` (`Publishing::State`'s), never
+// worked out here.
 //
 // A MARK. A post's is its type's dot and a tag's the square, CS Studio's own
 // classes. A page's and a post type's are small canvases drawn by the
@@ -71,17 +72,19 @@
 // arrives with its node. The buttons' classes are
 // `Admin::Ui::ButtonComponent`'s and a type's dot is
 // `Admin::Ui::ContentTypeDotComponent`'s, both handed over by the view
-// (`buttonClasses`, `dotClasses`), so neither is copied here.
+// (`buttonClasses`, `dotClasses`), so neither is copied here; the chips and
+// Close are the parts' clones.
 //
 // `createCard(container, { text, number, urls, typeLabels, dotClasses, buttonClasses,
-// onClose, onPin, onChange })` answers `{ show(node, { pinned, pinnable }),
+// parts, onClose, onPin, onChange })` answers `{ show(node, { pinned, pinnable }),
 // setPinned(pinned), open(), hide() }` (`pinnable: false` leaves the Pin button out:
 // with no layout there is nothing to hold; `show` answers whether the node's
 // kind has a card, and does nothing for one that has none). `text` is
 // `messages(element)`, `number` groups a figure as the messages' language does,
 // `urls` the six templates (`postFocus`, `tagFocus`, `tagPosts`, `pageFocus`,
 // and `postNotes` and `pageNotes`, a record's notes as JSON), `typeLabels` a
-// content type's human name by its stored name, `onClose` what the Close
+// content type's human name by its stored name, `parts` the clones
+// (`readParts`), `onClose` what the Close
 // button does (the app clears the selection, which hides the card), `onPin`
 // what Pin / Unpin does (the app pins or releases the node and says which
 // with `setPinned`) and `onChange` what the notes call when they arrived or
@@ -90,14 +93,13 @@ import { cardNotes } from "mind_graph/card_notes"
 import { recordId } from "mind_graph/ids"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 
-// The chip's earlier dots, not `StatusChipComponent`'s current shapes: the
-// card keeps the old look until stage 5a.
-const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
-const DOT = "h-1.5 w-1.5 rounded-full"
+// The states a chip is drawn for: a status the parts have no chip of has
+// none on the card.
+const STATUSES = [ "draft", "scheduled", "live" ]
 // Which of the five states a node is in (`Publishing::State`'s, as the data
-// says it in `status` and `changes`): the chip's `data-status`, and the key
-// of the sentence a screen reader is given. Only a LIVE record has a second
-// state.
+// says it in `status` and `changes`): the chip row's `data-status`, and the
+// key of the sentence a screen reader is given. Only a LIVE record has a
+// second state.
 const stateOf = (node) => (node.status === "live" && node.changes ? (node.changes === "scheduled" ? "live_change_scheduled" : "live_with_changes") : node.status)
 // A URL template filled with one value: a function as the replacement, because
 // a string would have its `$&` and `$1` read as patterns. (`encodeURIComponent`
@@ -115,7 +117,7 @@ export const dotClass = (dotClasses, node) =>
 // `mind_graph_guards_test` holds each to the token the canvas uses.
 export const TAG_MARK = "h-2 w-2 shrink-0 border border-graph-tag bg-surface"
 
-export function createCard(container, { text, number = String, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
+export function createCard(container, { text, number = String, urls, typeLabels, dotClasses, buttonClasses, parts, onClose, onPin, onChange }) {
   let pin = null
 
   const element = (tag, className, content) => {
@@ -158,68 +160,43 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     return counts
   }
 
-  // The status chip (the header says how it reads). None for a status it
-  // does not know.
-  function statusChip(node) {
-    if (!Object.hasOwn(STATUS_DOTS, node.status)) return []
-
-    const chip = element("span", "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs bg-sunken px-2 py-0.5 text-xs text-ink")
-    const state = stateOf(node)
-    chip.dataset.status = state
-    chip.append(mark(`${DOT} ${STATUS_DOTS[node.status]}`))
-    if (state === node.status) {
-      chip.append(text.t(`mind_graph.script.card.status.${node.status}`))
-      return [ chip ]
-    }
-
-    // The second part is one piece, its dot with its words, so that where
-    // the chip is too wide for the card it breaks before the piece and never
-    // between a dot and what the dot is of.
-    const date = node.change_on ?? ""
-    const seen = element("span", "inline-flex flex-wrap items-center gap-x-1 gap-y-0.5")
-    seen.setAttribute("aria-hidden", "true")
-    seen.dataset.chipSeen = ""
-    const second = element("span", "inline-flex items-center gap-1.5")
-    if (node.changes === "scheduled") second.append(mark(`${DOT} ${STATUS_DOTS.scheduled}`), text.t("mind_graph.script.card.status.change_scheduled", { date }))
-    else second.append(text.t("mind_graph.script.card.status.unpublished_changes"))
-    seen.append(text.t("mind_graph.script.card.status.live"), element("span", "text-meta", "·"), second)
-    chip.classList.replace("shrink-0", "max-w-full")
-    chip.append(seen, element("span", "sr-only", text.t(`mind_graph.script.card.status.${state}`, { date })))
-    return [ chip ]
+  // Where the state stands (the header says how it reads). One state is its
+  // chip, beside what the node is, in the first row. Two have the row under
+  // the first to themselves, which wraps inside the card; the first row
+  // then ends with the sentence a screen reader is given in their place.
+  const known = (node) => STATUSES.includes(node.status)
+  const twoStates = (node) => known(node) && stateOf(node) !== node.status
+  const chipBeside = (node) => {
+    if (!known(node)) return []
+    if (!twoStates(node)) return [ parts.part(`status-${node.status}`) ]
+    return [ element("span", "sr-only", text.t(`mind_graph.script.card.status.${stateOf(node)}`, { date: node.change_on ?? "" })) ]
   }
-
-  // Where the chip stands. One that says one state is beside what the node
-  // is, in the first row. One that says two is as wide as the card ("● Live
-  // · ● Change scheduled 14 Oct" beside a page's address and the Close
-  // button left the address no room, and ran under the button): it has the
-  // row under the first to itself.
-  const twoStates = (node) => Object.hasOwn(STATUS_DOTS, node.status) && stateOf(node) !== node.status
-  const chipBeside = (node) => (twoStates(node) ? [] : statusChip(node))
   function chipBelow(node) {
     if (!twoStates(node)) return []
-    const row = element("div", "flex")
+    const row = element("div", "flex flex-wrap items-center gap-x-1.5 gap-y-1")
     row.dataset.chipRow = ""
-    row.append(...statusChip(node))
+    row.dataset.status = stateOf(node)
+    row.setAttribute("aria-hidden", "true")
+    const second = node.changes === "scheduled"
+      ? element("span", "min-w-0 text-xs text-dim", text.t("mind_graph.script.card.status.change_scheduled", { date: node.change_on ?? "" }))
+      : parts.part("unpublished")
+    row.append(parts.part("status-live"), second)
     return [ row ]
   }
 
-  // The first row: what the node is. It keeps clear of the Close button,
-  // which stands in the card's top-right corner.
+  // The first row: what the node is. It keeps clear of Close, which stands
+  // in the card's top-right corner.
   function heading(...what) {
-    const row = element("div", "flex min-h-6 items-center gap-2 pr-6")
+    const row = element("div", "flex min-h-6 items-center gap-2 pr-8")
     row.append(...what)
     return row
   }
 
-  // The way out: × in the card's corner, named for a screen reader. It is the
+  // The way out: the shared icon button, cloned, named "Close". It is the
   // card's LAST child, so the Tab key meets the actions first -- a person who
   // came from the list wants "Open post", not the way back.
   function closeButton() {
-    const close = element("button", "absolute right-1.5 top-1.5 cursor-pointer rounded-cs px-1.5 text-lg leading-none text-meta hover:bg-sunken hover:text-ink", "×")
-    close.type = "button"
-    close.setAttribute("aria-label", text.t("mind_graph.script.card.close"))
-    close.title = text.t("mind_graph.script.card.close")
-    close.dataset.mindGraphCardClose = ""
+    const close = parts.part("close")
     close.addEventListener("click", onClose)
     return close
   }

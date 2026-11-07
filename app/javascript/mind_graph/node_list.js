@@ -1,5 +1,4 @@
-// Every node the graph draws, as a row beside the canvas (mind graph canvas
-// spec §5.7; pages in the mind graph, spec §7): the path for a keyboard and a
+// Every node the graph draws, as a row beside the canvas: the path for a keyboard and a
 // screen reader, since nothing on a canvas can take focus, and a way to find
 // a node by name for everyone.
 //
@@ -25,9 +24,8 @@
 // the data has them -- colour-slot order, then retired types, then "All
 // posts" last.
 //
-// "+N MORE" HAS A ROW TOO (the ruling on the review of the pages plan's Task
-// 7: a pill pressed on the canvas opens the list, and nothing on a canvas
-// can be pressed by a keyboard). Each pill in view has a row UNDER THE ROW
+// "+N MORE" HAS A ROW TOO (a pill pressed on the canvas opens the list,
+// and nothing on a canvas can be pressed by a keyboard). Each pill in view has a row UNDER THE ROW
 // OF WHAT IT HANGS OFF -- the post type's, "All posts"' or the tag's --
 // indented one step, in the pill's own words ("+92 more"), and named whole
 // for a screen reader, beginning with those words ("+92 more: 92 more posts
@@ -52,6 +50,18 @@
 // A page whose parent is not among the rows (not readable, or not in this
 // view) stands at the top level, indented by its depth as the eye sees it.
 //
+// A GROUP'S HEADING starts with its kind's icon chip (`Admin::Ui::
+// IconChipComponent`, the sidebar's: a page the structure's, a post, a tag
+// and a post type the lists'), cloned from the parts (`parts.js`).
+//
+// A ROW'S STATE is said as the editors' lists say it: an exception stands
+// out and a plain live row has nothing. After the title, a draft's and a
+// scheduled record's row carries its `StatusChipComponent`, and a live
+// record whose `changes` is set the `UnpublishedChipComponent`, each cloned
+// from the parts and never changed after, in a wrapper hidden from a
+// screen reader: the row's name says what it is, and is the same with a
+// chip or without.
+//
 // A ROW'S MARK. A page's and a post type's are small canvases drawn by the
 // renderer the graph is drawn by (`swatches.js`: `markCanvas`, painted once
 // the rows are in the document), so a hub's row cannot show a look the
@@ -64,7 +74,7 @@
 // 1.8 ms, inside a redraw of the whole list (2,202 rows) of about 30 ms.
 // A site of several thousand pages is where this would be looked at again.
 //
-// ABOVE THE GROUPS, "Not listed on any page" (pages spec §7), a checkbox:
+// ABOVE THE GROUPS, "Not listed on any page", a checkbox:
 // while it is on, the list shows the rows the app hands `showRows` IN PLACE
 // OF the groups, and the canvas is left as it is. The same form serves the
 // posts behind a page's "+N more", with "Open in Posts →" under them. The
@@ -98,7 +108,7 @@
 //
 // Text goes in with `textContent`; no path is written here but the one the
 // app hands in (`link`). `createList(container, { text, number, dotClasses,
-// typeLabels, retryClass, unlisted, onSelect, onHover, onAdd, onMore,
+// typeLabels, retryClass, parts, unlisted, onSelect, onHover, onAdd, onMore,
 // onUnlisted })` answers `{ render(nodes), showRows({ heading, rows, inView,
 // link, back }), fail(line, { label, onRetry, focus, back }), clear(),
 // setUnlisted(on), setBusy(on), mark(id), row(id), destroy() }`: `render` replaces the
@@ -130,7 +140,7 @@ const ROW_PADDING = 12
 const PILL_INDENT = 16
 const LINK = "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
 
-export function createList(container, { text, number = String, dotClasses, typeLabels = {}, retryClass = "", unlisted: filterable = true, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
+export function createList(container, { text, number = String, dotClasses, typeLabels = {}, retryClass = "", parts, unlisted: filterable = true, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
   let rows = new Map()
   let absent = new Map()
   let marked = null
@@ -178,10 +188,12 @@ export function createList(container, { text, number = String, dotClasses, typeL
     return button
   }
   // A group: its heading, and its rows in a list the heading names. With
+  // `icon`, the heading starts with that part (a group's kind). With
   // `back`, the way back stands beside the heading, before the rows.
-  const section = (title, list, { back = null } = {}) => {
+  const section = (title, list, { back = null, icon = null } = {}) => {
     const wrapper = document.createElement("section")
-    const heading = element("h2", "m-0 min-w-0 px-3 pb-1 pt-3 text-label text-meta", title)
+    const heading = element("h2", "m-0 flex min-w-0 items-center gap-2 px-3 pb-1 pt-3 text-label text-meta")
+    heading.append(...(icon ? [ parts.part(icon) ] : []), title)
     heading.id = `mind-graph-list-${(headings += 1)}`
     list.setAttribute("aria-labelledby", heading.id)
     if (back) {
@@ -214,6 +226,16 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // The same row while there is no graph to add its post to (the graph is
   // still being read, or its read failed): what it is, and that it is not
   // in view, with no word of activating it.
+  // The chip a row of a page or a post carries after its title, if any.
+  const stateChip = (node) => {
+    if (node.kind !== "page" && node.kind !== "post") return []
+    const name = node.status === "live" ? (node.changes ? "unpublished" : null) : [ "draft", "scheduled" ].includes(node.status) ? `status-${node.status}` : null
+    if (!name) return []
+    const held = element("span", "flex shrink-0")
+    held.setAttribute("aria-hidden", "true")
+    held.append(parts.part(name))
+    return [ held ]
+  }
   const absentName = (node) => Object.hasOwn(typeLabels, node.type)
     ? text.t("mind_graph.script.list.absent_post", { title: node.title, type: lower(typeLabels[node.type]) })
     : text.t("mind_graph.script.list.absent_retired_post", { title: node.title, type: lower(node.type) })
@@ -226,7 +248,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
     const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-count text-meta", figure(node))
-    button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), trailing)
+    button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), ...stateChip(node), trailing)
     item.append(button)
     rows.set(node.id, button)
     if (notInView) {
@@ -281,9 +303,9 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // same node, else on the first row, else on the checkbox. Only when the
   // focus WAS in the rows: a list drawn while the person is elsewhere takes
   // nothing from them. The marks are drawn once the rows are in the page.
-  const put = (...parts) => {
+  const put = (...pieces) => {
     const held = body.contains(document.activeElement) ? document.activeElement.dataset.nodeId ?? "" : null
-    body.replaceChildren(...parts)
+    body.replaceChildren(...pieces)
     paintMarks(body)
     if (held == null) return
     const next = rows.get(held) || body.querySelector("button[data-node-id]") || (filterable ? unlisted : null)
@@ -335,15 +357,16 @@ export function createList(container, { text, number = String, dotClasses, typeL
     render(nodes) {
       forget()
       const of = (kind, order) => nodes.filter((node) => node.kind === kind).sort(order)
-      const groups = [ [ "pages", of("page", byTree) ], [ "posts", of("post", byDegree) ], [ "tags", of("tag", byDegree) ], [ "types", of("type", asGiven) ] ].filter(([ , found ]) => found.length)
+      const groups = [ [ "pages", of("page", byTree), "icon-page" ], [ "posts", of("post", byDegree), "icon-post" ], [ "tags", of("tag", byDegree), "icon-tag" ], [ "types", of("type", asGiven), "icon-type" ] ]
+        .filter(([ , found ]) => found.length)
       const pills = of("more", asGiven)
       if (!groups.length && !pills.length) return put(line(text.t("mind_graph.script.list.empty")))
 
       const lists = new Map()
-      const parts = groups.map(([ name, found ]) => {
+      const drawn = groups.map(([ name, found, icon ]) => {
         const list = name === "pages" ? tree(found) : listOf(found.map((node) => row(node)))
         lists.set(name, list)
-        return section(text.t(`mind_graph.script.list.${name}`, { count: found.length }), list)
+        return section(text.t(`mind_graph.script.list.${name}`, { count: found.length }), list, { icon })
       })
       // Each pill under the row of what it hangs off; one with no such row
       // at the end of the posts, or after the groups when no post is drawn.
@@ -354,8 +377,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
         else loose.push(pillRow(pill))
       }
       if (loose.length && lists.has("posts")) lists.get("posts").append(...loose)
-      else if (loose.length) parts.push(listOf(loose))
-      put(...parts)
+      else if (loose.length) drawn.push(listOf(loose))
+      put(...drawn)
     },
     // `addable: false`: there is no graph to add a post to, and a row that
     // is not in view only says so.
@@ -365,14 +388,14 @@ export function createList(container, { text, number = String, dotClasses, typeL
     showRows({ heading, rows: given, inView, link = null, back = null, addable = true }) {
       forget()
       goBack = back?.onBack ?? null
-      const parts = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id), addable }))), { back }) ]
+      const shown = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id), addable }))), { back }) ]
       if (link) {
         const anchor = element("a", "mx-3 mt-2 inline-block text-sm text-accent underline", link.label)
         anchor.href = link.href
         anchor.dataset.mindGraphPostsLink = ""
-        parts.push(anchor)
+        shown.push(anchor)
       }
-      put(...parts)
+      put(...shown)
     },
     // A read that failed (design answer G5): the line and a small button
     // that asks again, in the list. `focus`: the press that asked was the

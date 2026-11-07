@@ -431,10 +431,14 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
     }.merge(overrides).compact.to_json
   end
 
-  def js_module(path, expression)
+  # Imports the module at `path` as `m`, and each of `also` under its name
+  # (`also: { parts: "mind_graph/parts" }`), then answers `expression`.
+  def js_module(path, expression, also: {})
+    names = [ "m", *also.keys ].join(", ")
+    paths = [ path, *also.values ].to_json
     result = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
-      import(#{path.to_json}).then((m) => done(#{expression})).catch((error) => done({ error: String(error) }))
+      Promise.all(#{paths}.map((name) => import(name))).then(([ #{names} ]) => done(#{expression})).catch((error) => done({ error: String(error) }))
     JS
     flunk "#{path}: #{result["error"]}" if result.is_a?(Hash) && result.keys == [ "error" ]
     result

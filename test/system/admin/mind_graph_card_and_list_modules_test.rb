@@ -2,6 +2,14 @@ require "application_system_test_case"
 
 # The card and the node list modules: `card` and `node_list`.
 class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSystemTestCase
+  # The parts the card and the list clone, imported beside the module under
+  # test as `p`, and their template in the page as the view renders it.
+  PARTS = { p: "mind_graph/parts" }.freeze
+
+  setup do
+    page.execute_script("document.body.insertAdjacentHTML('beforeend', arguments[0])", ApplicationController.render(Admin::MindGraphScreen::PartsComponent.new, layout: false))
+  end
+
   # The selection card, asked directly with plain nodes: no
   # layout, no canvas and no request (a node with no open notes fetches
   # none). Each message is its key's last segments with its values, so a
@@ -12,24 +20,33 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       document.body.append(container)
       const text = { t: (key, values = {}) => `${key.split(".").slice(2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
       const urls = { postFocus: "/g?post=__ID__", tagFocus: "/g?tag=__ID__", tagPosts: "/posts?tag=__NAME__", postNotes: "/notes/post/__ID__/threads", pageFocus: "/g?page=__ID__", pageNotes: "/notes/page/__ID__/threads" }
-      const card = m.createCard(container, { text, number: (value) => new Intl.NumberFormat("en").format(value), urls, typeLabels: { blog: "Blog" }, dotClasses: Array(12).fill("dot"), buttonClasses: { primary: "primary", secondary: "secondary" }, onClose() {}, onPin() {}, onChange() {} })
+      const parts = p.readParts(document.body)
+      const card = m.createCard(container, { text, number: (value) => new Intl.NumberFormat("en").format(value), urls, typeLabels: { blog: "Blog" }, dotClasses: Array(12).fill("dot"), buttonClasses: { primary: "primary", secondary: "secondary" }, parts, onClose() {}, onPin() {}, onChange() {} })
       // The card top to bottom: each child as what it is and what it says.
       const part = (child) => child.matches("[data-mind-graph-card-notes]") ? [ "notes", child.dataset.notesType, child.dataset.notesId, child.querySelector("textarea").getAttribute("aria-label") ]
         : child.matches("[data-mind-graph-card-close]") ? [ "close" ]
+        : child.matches("[data-chip-row]") ? [ "chips", child.dataset.status ]
         : child.tagName === "H2" ? [ "title", child.textContent ]
         : child.querySelector("a, button") ? [ "actions", ...Array.from(child.querySelectorAll("a, button"), (control) => [ control.tagName, control.textContent, control.getAttribute("href") ?? "-", control.className ]) ]
         : child.tagName === "P" ? [ "counts", ...Array.from(child.children, (item) => [ item.textContent, item.getAttribute("aria-hidden") ?? "-" ]) ]
         : [ "heading", ...Array.from(child.children, (item) => item.tagName === "CANVAS" ? [ "mark", item.dataset.mark, item.dataset.markOf ?? "-", item.getAttribute("aria-hidden") ] : item.matches(".admin-status-chip") ? [ "chip", item.dataset.status ] : [ "words", item.textContent, item.getAttribute("aria-hidden") ?? "-" ]) ]
       const read = () => Array.from(container.children, part)
+      // Where the state stands and what it is made of: each chip by the part
+      // it is a clone of (`same`), so a chip drawn or altered by hand reads
+      // as "not <part>"; the state's name from the single chip's
+      // `data-status`, or the chip row's.
+      const same = (element, name) => element.isEqualNode(parts.part(name)) ? name : `not ${name}`
+      const piece = (item) => item.matches("[data-unpublished-changes]") ? same(item, "unpublished") : item.matches(".admin-status-chip") ? same(item, `status-${item.dataset.status}`) : [ "words", item.className, item.textContent ]
       const chip = () => {
-        const found = container.querySelector(".admin-status-chip")
-        if (!found) return "none"
-        const seen = found.querySelector("span[aria-hidden='true'][data-chip-seen]")
-        return { status: found.dataset.status, row: found.parentElement === container.firstElementChild ? "first" : found.parentElement.matches("[data-chip-row]") && found.parentElement.previousElementSibling === container.firstElementChild ? "own" : "?", dots: Array.from(found.querySelectorAll("span.rounded-full"), (dot) => [ dot.className.match(/bg-[a-z]+/)[0], dot.getAttribute("aria-hidden") ]),
-                 seen: seen ? Array.from(seen.childNodes).flatMap((item) => item.nodeType === 3 || item.childElementCount === 0 ? [ item.textContent ] : Array.from(item.childNodes, (piece) => piece.nodeType === 3 ? piece.textContent : "(dot)")) : "-",
-                 heard: found.querySelector(".sr-only")?.textContent ?? "-", text: found.textContent }
+        const first = container.firstElementChild
+        const single = first.querySelector(":scope > .admin-status-chip")
+        const row = container.querySelector(":scope > [data-chip-row]")
+        return { first: single ? [ piece(single), single.dataset.status ] : "-",
+                 row: row ? [ row.dataset.status, row.getAttribute("aria-hidden"), row.previousElementSibling === first, ...Array.from(row.children, piece) ] : "-",
+                 heard: first.querySelector(".sr-only")?.textContent ?? "-",
+                 chips: container.querySelectorAll(".admin-status-chip, [data-unpublished-changes]").length }
       }
-      return { container, card, read, chip }
+      return { container, card, read, chip, parts }
     })()
   JS
 
@@ -38,10 +55,11 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       const container = document.createElement("div")
       const calls = []
       const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
-      const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
+      const parts = p.readParts(document.body)
+      const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts, onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
                                              onAdd: (row) => calls.push([ "add", row.id ]), onUnlisted: (on) => calls.push([ "unlisted", on ]) })
       const read = () => Array.from(container.querySelectorAll("h2, button")).map((item) => item.tagName === "H2" ? item.textContent : [ item.querySelector(".truncate").textContent, item.lastChild.textContent, item.style.paddingInlineStart, item.getAttribute("aria-label") ])
-      return { container, calls, list, read }
+      return { container, calls, list, read, parts }
     })()
   JS
 
@@ -49,7 +67,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # pages · lists 112 posts', Open page / Focus / Pin; the notes list under
   # the title as on post cards".
   test "card: a page's card is its path and state, its title, its two counts, its notes, then Open page, Focus and Pin, and Home's is the same" do
-    result = js_module("mind_graph/card", <<~JS)
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
       (() => {
         const { container, card, read } = #{CARD_SCRIPT}
         const page = { id: "page-7", kind: "page", title: "<b>Blog</b>", path: "/blog/<i>x</i>", depth: 1, home: false, status: "live", changes: null, url: "/cs-studio/pages/7?locale=de", degree: 3, child_count: 4, listed_count: 112, open_notes: 0 }
@@ -96,16 +114,16 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_equal [ false, "<b>Blog</b>", false ], result["over"], "and the card that is open stays as it is"
   end
 
-  # The chip keeps its three dots and says a live
-  # record's second state after the label -- "● Live · Unpublished changes"
-  # with no second dot, "● Live · ● Change scheduled 14 Oct" with a warn dot
-  # before the second part -- and a screen reader is given the Status key's
-  # own words in one sentence. The day is the server's (`change_on`).
-  test "card: the chip says each of the five states, the second state after the label for the eye and in the key's words for a screen reader, on a page and on a post alike" do
+  # A record in one state has the shared status chip beside what it is. A
+  # live record with more to say has a row of its own under the first, for
+  # the eye only: the Live chip, then the unpublished chip or the scheduled
+  # change's words with the server's day (`change_on`), as the editor's
+  # header says it. A screen reader is given the key's words in one sentence.
+  test "card: the chip is the shared status chip in each of the five states, the second state as the editor's header says it, and in the key's words for a screen reader" do
     states = { draft: { status: "draft" }, scheduled: { status: "scheduled" }, live: { status: "live", changes: nil },
                live_with_changes: { status: "live", changes: "unpublished" }, live_change_scheduled: { status: "live", changes: "scheduled", change_at: "2026-10-14T09:00:00Z", change_on: "14 Oct" },
                draft_with_changes: { status: "draft", changes: "unpublished" }, unknown: { status: "archived" } }
-    result = js_module("mind_graph/card", <<~JS)
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
       (() => {
         const { container, card, chip } = #{CARD_SCRIPT}
         const states = #{states.to_json}
@@ -119,25 +137,64 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
 
     %w[page post].each do |kind|
       chips = result[kind]
-      assert_equal({ "status" => "draft", "row" => "first", "dots" => [ [ "bg-meta", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.draft()" }, chips["draft"], kind)
-      assert_equal({ "status" => "scheduled", "row" => "first", "dots" => [ [ "bg-warn", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.scheduled()" }, chips["scheduled"], kind)
-      assert_equal({ "status" => "live", "row" => "first", "dots" => [ [ "bg-ok", "true" ] ], "seen" => "-", "heard" => "-", "text" => "card.status.live()" }, chips["live"], kind)
-      assert_equal({ "status" => "live_with_changes", "row" => "own", "dots" => [ [ "bg-ok", "true" ] ], "seen" => [ "card.status.live()", "·", "card.status.unpublished_changes()" ], "heard" => "card.status.live_with_changes()",
-                     "text" => "card.status.live()·card.status.unpublished_changes()card.status.live_with_changes()" }, chips["live_with_changes"], "#{kind}: no second dot")
-      assert_equal({ "status" => "live_change_scheduled", "row" => "own", "dots" => [ [ "bg-ok", "true" ], [ "bg-warn", "true" ] ],
-                     "seen" => [ "card.status.live()", "·", "(dot)", "card.status.change_scheduled(14 Oct)" ], "heard" => "card.status.live_change_scheduled(14 Oct)",
-                     "text" => "card.status.live()·card.status.change_scheduled(14 Oct)card.status.live_change_scheduled(14 Oct)" }, chips["live_change_scheduled"], "#{kind}: a warn dot before the second part, and the server's day")
-      assert_equal "draft", chips["draft_with_changes"]["status"], "#{kind}: only a live record has a second state"
-      assert_equal "card.status.draft()", chips["draft_with_changes"]["text"]
-      assert_equal "none", chips["unknown"], "#{kind}: a status the chip does not know gets no chip"
+      %w[draft scheduled live].each do |state|
+        assert_equal({ "first" => [ "status-#{state}", state ], "row" => "-", "heard" => "-", "chips" => 1 }, chips[state], "#{kind}: #{state} is the shared chip beside what the node is")
+      end
+      assert_equal({ "first" => "-", "row" => [ "live_with_changes", "true", true, "status-live", "unpublished" ], "heard" => "card.status.live_with_changes()", "chips" => 2 },
+                   chips["live_with_changes"], "#{kind}: the Live chip and the unpublished chip, in a row of their own")
+      assert_equal({ "first" => "-", "row" => [ "live_change_scheduled", "true", true, "status-live", [ "words", "min-w-0 text-xs text-dim", "card.status.change_scheduled(14 Oct)" ] ],
+                     "heard" => "card.status.live_change_scheduled(14 Oct)", "chips" => 1 }, chips["live_change_scheduled"], "#{kind}: the Live chip and the change's words with the server's day")
+      assert_equal({ "first" => [ "status-draft", "draft" ], "row" => "-", "heard" => "-", "chips" => 1 }, chips["draft_with_changes"], "#{kind}: only a live record has a second state")
+      assert_equal({ "first" => "-", "row" => "-", "heard" => "-", "chips" => 0 }, chips["unknown"], "#{kind}: a status the chip does not know gets no chip")
     end
+  end
+
+  test "card: Close is the shared icon button, named Close, last in the card" do
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
+      (() => {
+        const container = document.createElement("aside")
+        document.body.append(container)
+        let closed = 0
+        const parts = p.readParts(document.body)
+        const card = m.createCard(container, { text: { t: (key) => key, locale: () => "en" }, urls: { tagPosts: "/posts?tag=__NAME__", tagFocus: "/g?tag=__ID__" }, typeLabels: {}, dotClasses: [], buttonClasses: { primary: "primary", secondary: "secondary" }, parts,
+                                               onClose: () => { closed += 1 }, onPin() {}, onChange() {} })
+        card.show({ id: "tag-3", kind: "tag", title: "a", count: 1, degree: 1 })
+        const close = container.lastElementChild
+        const seen = [ close.isEqualNode(parts.part("close")), close.tagName, close.type, close.getAttribute("aria-label"), container.querySelectorAll("[data-mind-graph-card-close]").length ]
+        close.click()
+        card.hide()
+        container.remove()
+        return { seen, closed }
+      })()
+    JS
+
+    assert_equal [ true, "BUTTON", "button", "Close", 1 ], result["seen"], "Close is the part as the server drew it, the card's last child"
+    assert_equal 1, result["closed"], "a press on it is the card's onClose"
+  end
+
+  test "parts: a part the page does not hold is an error, not an empty card" do
+    result = js_module("mind_graph/parts", <<~JS)
+      (() => {
+        const error = (call) => { try { call(); return "no error" } catch (thrown) { return [ thrown.constructor.name, thrown.message ] } }
+        const parts = m.readParts(document.body)
+        const close = [ parts.part("close"), parts.part("close") ]
+        return { unknown: error(() => parts.part("status-archived")), none: error(() => m.readParts(document.createElement("div")).part("close")),
+                 fresh: [ close[0] === close[1], close[0].isEqualNode(close[1]), close[0].isConnected ],
+                 names: #{Admin::MindGraphScreen::PartsComponent::NAMES.to_json}.map((name) => parts.part(name).parentNode === null) }
+      })()
+    JS
+
+    assert_equal [ "Error", "mind graph: no part named status-archived" ], result["unknown"]
+    assert_equal [ "Error", "mind graph: no part named close" ], result["none"], "a page without the template is the same error"
+    assert_equal [ false, true, false ], result["fresh"], "each call answers a clone of its own, in no document"
+    assert_equal [ true ] * Admin::MindGraphScreen::PartsComponent::NAMES.size, result["names"]
   end
 
   # A post type a page lists: what
   # it is, its name, how many posts of it the viewer reads, and Pin. No link:
   # the pages that list it are its neighbours on the canvas.
   test "card: a post type's card is its hub's mark, its name and how many posts it has, with Pin and no link, for a retired type and All posts too" do
-    result = js_module("mind_graph/card", <<~JS)
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
       (() => {
         const { container, card, read } = #{CARD_SCRIPT}
         const cards = [ { id: "type-blog", kind: "type", name: "blog", title: "Blog", colour_index: 3, count: 112, degree: 2 },
@@ -161,7 +218,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # A post's card and a tag's, and the added post's, whose counts the page
   # does not know.
   test "card: a post's card keeps its order and its notes' type, an added post's leaves the counts out, and a tag's has no notes" do
-    result = js_module("mind_graph/card", <<~JS)
+    result = js_module("mind_graph/card", <<~JS, also: PARTS)
       (() => {
         const { container, card, read } = #{CARD_SCRIPT}
         const post = { id: "post-12", kind: "post", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, url: "/cs-studio/posts/12", related_count: 3, tag_count: 2, open_notes: 0 }
@@ -181,7 +238,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   end
 
   test "list: four groups: Pages first, in tree order and indented by depth, then posts and tags by their connections, then the post types as the data has them" do
-    rows = js_module("mind_graph/node_list", <<~JS)
+    rows = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, list, read } = #{LIST_SCRIPT}
         list.render([ { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
@@ -214,8 +271,45 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_equal [ "LABEL", "checkbox", "list.unlisted()" ], rows["checkbox"]
   end
 
+  # The list says a record's state as the editors' lists do: an exception
+  # stands out (a draft, a scheduled record, a live one with changes) and a
+  # plain live row has nothing. Every chip is a clone of its part, and is
+  # decoration: the row's name says what it is.
+  test "list: each group's heading carries its kind's icon chip, a draft's and a scheduled record's row its status chip, a changed live row the unpublished chip, and a live row none, all hidden from a screen reader" do
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { container, list, parts } = #{LIST_SCRIPT}
+        list.render([ { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null, status: "live", changes: null },
+                      { id: "page-2", kind: "page", title: "Draft", degree: 1, depth: 1, order: 1, parent: "page-1", status: "draft", changes: null },
+                      { id: "page-3", kind: "page", title: "Changed", degree: 1, depth: 1, order: 2, parent: "page-1", status: "live", changes: "unpublished" },
+                      { id: "post-1", kind: "post", title: "Soon", degree: 3, colour_index: 1, status: "scheduled", changes: null },
+                      { id: "post-2", kind: "post", title: "Live", degree: 2, colour_index: 1, status: "live", changes: null },
+                      { id: "post-3", kind: "post", title: "Later", degree: 1, colour_index: 1, status: "live", changes: "scheduled" },
+                      { id: "tag-1", kind: "tag", title: "tag", degree: 2 }, { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 3, colour_index: 1 },
+                      { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
+        const same = (element, name) => element.isEqualNode(parts.part(name)) ? name : `not ${name}`
+        const icons = [ "icon-page", "icon-post", "icon-tag", "icon-type" ]
+        const headings = Array.from(container.querySelectorAll("section > h2"), (heading, index) => [ heading.textContent, same(heading.firstElementChild, icons[index]), heading.firstElementChild.getAttribute("aria-hidden") ])
+        const chips = Array.from(container.querySelectorAll("button[data-node-id]"), (button) => {
+          const chip = button.querySelector(".admin-status-chip, [data-unpublished-changes]")
+          if (!chip) return [ button.dataset.nodeId, "-" ]
+          const name = chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`
+          return [ button.dataset.nodeId, same(chip, name), Boolean(chip.closest("[aria-hidden='true']")), chip.closest("button > *").previousElementSibling.classList.contains("truncate"), button.getAttribute("aria-label") ]
+        })
+        return { headings, chips }
+      })()
+    JS
+
+    assert_equal [ [ "list.pages(3)", "icon-page", "true" ], [ "list.posts(3)", "icon-post", "true" ], [ "list.tags(1)", "icon-tag", "true" ], [ "list.types(1)", "icon-type", "true" ] ], result["headings"],
+      "each group's heading starts with its kind's icon chip, and its words are the heading's whole text"
+    assert_equal [ [ "page-1", "-" ], [ "page-2", "status-draft", true, true, "list.select_page(Draft,1)" ], [ "page-3", "unpublished", true, true, "list.select_page(Changed,1)" ],
+                   [ "post-1", "status-scheduled", true, true, "list.select_post(Soon,3)" ], [ "post-2", "-" ], [ "post-3", "unpublished", true, true, "list.select_post(Later,1)" ],
+                   [ "tag-1", "-" ], [ "type-blog", "-" ], [ "more-type-blog", "-" ] ], result["chips"],
+      "a chip stands after the title, is hidden from a screen reader and leaves the row's name as it was; a live row, a tag, a type and a pill have none"
+  end
+
   test "list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, calls, list, read } = #{LIST_SCRIPT}
         document.body.append(container) // a checkbox outside the document changes without saying so
@@ -246,7 +340,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # while the graph is being read, or after its read failed, a row that is
   # not in view says so and no more, and a press on it does nothing.
   test "list: without a graph a row that is not in view is named without the add, is marked as doing nothing and asks for nothing, and drawn again with a graph it adds" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, calls, list } = #{LIST_SCRIPT}
         document.body.append(container)
@@ -272,7 +366,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
 
   # The error line is in the list, with a small button.
   test "list: a failed read says so in the list with Try again, and pressing it asks again" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, list } = #{LIST_SCRIPT}
         document.body.append(container)
@@ -298,7 +392,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # The keyboard is never left on nothing: the rows are replaced whenever
   # what is in view changes, and a person may be on one of them.
   test "list: rows drawn again keep the focus on the row of the same node, else on the first row, else on the checkbox, and take none from elsewhere" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, list } = #{LIST_SCRIPT}
         document.body.append(container)
@@ -328,11 +422,11 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # A viewer who reads no page is told every post is unlisted (the server
   # counts by the pages THEY read), so the filter is not offered to them.
   test "list: without the unlisted read there is no checkbox, and the rows are all there is" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const container = document.createElement("div")
         const text = { t: (key) => key, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: [], unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const list = m.createList(container, { text, dotClasses: [], parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
         list.setUnlisted(true)
         return [ container.querySelectorAll("input, label").length, container.querySelectorAll("button[data-node-id]").length ]
@@ -347,12 +441,12 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # under the row of what it hangs off; activating it asks the app for the
   # pill's rows, as a press on the pill does.
   test "list: each pill has a row after the row of what it hangs off, in the pill's own words and named whole, pressing it asks for its rows, and one whose hub has no row stands after the posts" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
+        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
                                                onAdd() {}, onUnlisted() {}, onMore: (id) => calls.push([ "more", id ]), onBack() {} })
         document.body.append(container)
         const order = () => Array.from(container.querySelectorAll("h2, button[data-node-id]"), (item) => item.tagName === "H2" ? item.textContent : item.dataset.nodeId)
@@ -394,12 +488,12 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # beside "Try again". The rows of "Not listed on any page" have neither:
   # their checkbox is the way back.
   test "list: a pill's rows have a heading with Back to the list, Escape in the rows goes back, a failed read of a pill offers the way back, and the unlisted rows have none" do
-    result = js_module("mind_graph/node_list", <<~JS)
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key) => key.split(".").slice(-2).join("."), locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
+        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts: p.readParts(document.body), onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
         document.body.append(container)
         const back = { label: "Back to the list", onBack: () => calls.push("back") }
         const rows = [ { id: "post-1", title: "One", degree: 0, type: "blog" }, { id: "post-2", title: "Two", degree: 0, type: "blog" } ]

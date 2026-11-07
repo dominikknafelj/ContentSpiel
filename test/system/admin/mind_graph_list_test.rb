@@ -710,9 +710,9 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card] textarea"
     page.driver.browser.keyboard.type(:Tab)
     assert_equal "TEXTAREA", page.evaluate_script("document.activeElement.tagName")
-    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.textContent.trim())")
+    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.getAttribute('aria-label') ?? stop.textContent.trim())")
     assert_operator stops.index("field"), :<, stops.index("Open post")
-    assert_equal [ "Open post", "Focus", "Pin", "×" ], stops.last(4)
+    assert_equal [ "Open post", "Focus", "Pin", "Close" ], stops.last(4)
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible

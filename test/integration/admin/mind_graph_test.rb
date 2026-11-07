@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The mind graph's page (mind graph canvas spec §3.2): a frame -- heading,
+# The mind graph's page: a frame -- heading,
 # legend, filter, an empty canvas -- with NO graph data in it. The
 # `admin--mind-graph--graph` controller fetches the data from the URL the page names
 # (`test/integration/admin/mind_graph_data_test.rb` covers that endpoint) and
@@ -32,7 +32,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
   end
 
-  # The selection card's links (spec §5.3) are filled into templates the route
+  # The selection card's links are filled into templates the route
   # helpers built: the placeholders arrive literally, for the script to
   # replace with a URL-encoded id or name, and no path is written in JavaScript.
   test "the card's URL templates and the type labels ride on the element" do
@@ -43,10 +43,10 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-controller='admin--mind-graph--graph'][data-post-focus-url='/cs-studio/mind_graph?post=__ID__'][data-tag-focus-url='/cs-studio/mind_graph?tag=__ID__'][data-tag-posts-url='/cs-studio/posts?tag=__NAME__']"
-    # A post's notes for its card (notes spec §4.4): the route takes digits
+    # A post's notes for its card: the route takes digits
     # only, so the template is built for id 0 and the segment swapped.
     assert_select "[data-controller='admin--mind-graph--graph'][data-post-notes-url='/cs-studio/notes/post/__ID__/threads']"
-    # The list's two reads (pages spec §3, §7): the posts no page lists, and
+    # The list's two reads: the posts no page lists, and
     # the posts behind one of a page's "+N more" pills, by its page and target.
     element = css_select("[data-controller='admin--mind-graph--graph']").first
     assert_equal "/cs-studio/mind_graph/unlisted", element["data-unlisted-url"]
@@ -57,7 +57,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-tooltip][hidden]:empty"
   end
 
-  # A page's card (pages spec §7) and the graph that opens around Home
+  # A page's card and the graph that opens around Home
   # (decision 6): four more addresses, built here by the route helpers.
   test "the page's templates ride on the element, built by the route helpers" do
     sign_in_as(users(:one))
@@ -115,6 +115,20 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-focus] a", text: "Whole graph"
   end
 
+  # The chips and the card's Close are the shared components' markup, which
+  # the scripts clone from one template inside the graph's element. A
+  # template's content is no part of the document: the page's text, its Tab
+  # order and the controller's `reset` never meet it.
+  test "the parts template is inside the graph's element, once" do
+    sign_in_as(users(:one))
+    create_post(title: "Alpha")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "template[data-mind-graph-parts]", count: 1
+    assert_select "[data-controller='admin--mind-graph--graph'] template[data-mind-graph-parts]", count: 1
+  end
+
   # A type that is no longer registered has no label to send: the card shows
   # the stored name.
   test "a retired type has no entry among the type labels" do
@@ -167,16 +181,16 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
     # The design answer's words, verbatim: a page's card (part one §5), the
     # chip's second part (G4) and the whole chip for a screen reader (H6).
-    assert_equal [ "Open page", "Unpublished changes", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
-                 messages.values_at(*%w[open_page status.unpublished_changes status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
+    assert_equal [ "Open page", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
+                 messages.values_at(*%w[open_page status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
     assert_equal [ { "one" => "%{figure} child page", "other" => "%{figure} child pages" }, { "one" => "lists %{figure} post", "other" => "lists %{figure} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
     # A pill's row is named with its visible words first ("+92 more: …"), so
     # that someone who says what they see names it (WCAG 2.5.3).
     assert_equal [ true, true ], messages["mind_graph.script.list.more_row"].values_at("one", "other").map { |name| name.start_with?("%{words}: ") }
-    assert_equal %w[all_posts capped capped_local card.child_pages card.close card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
+    assert_equal %w[all_posts capped capped_local card.child_pages card.focus card.lists_posts card.notes.add card.notes.deleted_user card.notes.failed card.notes.label card.notes.label_page card.notes.more
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
-                    card.status.change_scheduled card.status.draft card.status.live card.status.live_change_scheduled card.status.live_with_changes card.status.scheduled card.status.unpublished_changes
+                    card.status.change_scheduled card.status.live_change_scheduled card.status.live_with_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
                     list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
                     list.select_page list.select_post list.select_tag list.select_type
@@ -198,7 +212,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-controller='admin--mind-graph--graph'] > *", count: 3
+    # Three parts, and the template of what the scripts clone, which is no part of the document.
+    assert_select "[data-controller='admin--mind-graph--graph'] > :not(template)", count: 3
+    assert_select "[data-controller='admin--mind-graph--graph'] > template:last-child[data-mind-graph-parts]", count: 1
     assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(1) #mind-graph-search"
     assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(2) canvas"
     assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Pages, posts, tags and post types in this graph']:empty"
@@ -296,7 +312,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Hidden from them"
   end
 
-  # Pages spec §2: a graph of pages alone is a graph.
+  # A graph of pages alone is a graph.
   test "a viewer who reads pages and no post gets the canvas" do
     create_post(title: "Hidden from them")
     create_page(title: "Theirs to read")
@@ -361,7 +377,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-legend-type]", count: 0
   end
 
-  # Pages spec §6 (design answer F6): the toggles replace the radio group
+  # Design answer F6: the toggles replace the radio group
   # completely, everything on, and "Links in text" is not built.
   test "the legend's toggles are checkboxes in two groups, all on, and the radios are gone" do
     sign_in_as(users(:one))
@@ -377,9 +393,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Links in text"
   end
 
-  # Pages spec §2 with the ruling on Task 6's review: a kind that can be
-  # drawn has its toggle and its key, and no kind the viewer cannot read has
-  # one. The matrix of rights: both, posts alone, pages alone, neither.
+  # A kind that can be drawn has its toggle and its key, and no kind the
+  # viewer cannot read has one. The matrix of rights: both, posts alone, pages alone, neither.
   def toggles = css_select("label[data-legend-toggle]").map { |label| [ label.parent["data-legend-group"], label["data-legend-toggle"] ].join(":") }
 
   test "a viewer who reads pages and posts gets all eight toggles" do
@@ -444,7 +459,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-legend] button[data-legend-status][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status key…"
   end
 
-  # Mind graph canvas spec §5.7: the tab order is the search, the filter (the
+  # The tab order is the search, the filter (the
   # legend's toggles, then its "Status key…" button, which is named by its text),
   # the zoom buttons, then the canvas. (A swatch is a canvas too, and no stop:
   # only the graph's own canvas has a `tabindex`.) The buttons sit in the canvas's corner on
@@ -459,7 +474,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph"
 
+    # A template's content is not in the document a browser tabs through.
     order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=checkbox], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas[tabindex]")
+      .reject { |node| node.ancestors("template").any? }
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
     # "Show everything" stands in a bar that is hidden until a large site has
     # opened around Home, where a focused view has its bar's links.
@@ -590,6 +607,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph", params: { post: post.id }
 
     order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
+      .reject { |node| node.ancestors("template").any? }
       .map { |node| { "button" => node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip), "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
     assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "Status key…", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end

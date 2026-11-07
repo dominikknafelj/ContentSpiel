@@ -17,6 +17,9 @@ en:
       # `status_key` is the dialog that link opens: `title` its name and
       # `states` its five rows, in the words of the card's status chip (one
       # set of words; the day of a scheduled change stands only on the chip).
+      #
+      # `parts` are the shared pieces the graph's scripts clone: `close` is
+      # the card's Close, an icon button named by it.
       mind_graph_screen:
         legend:
           key: "Key"
@@ -43,3 +46,5 @@ en:
             scheduled: "Scheduled"
             live_with_changes: "Live, unpublished changes"
             live_change_scheduled: "Live, change scheduled"
+        parts:
+          close: "Close"

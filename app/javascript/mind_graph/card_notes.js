@@ -1,5 +1,5 @@
-// A post's or a page's open notes in the selection card (notes spec §4.4; handoff, "Node
-// card thread list"): each thread's first message, who wrote it and how many
+// A post's or a page's open notes in the selection card (the notes handoff, "Node card
+// thread list"): each thread's first message, who wrote it and how many
 // replies it has, a link into the record's editor with the drawer open at that
 // thread, and a field to start a note without leaving the graph.
 //
@@ -17,7 +17,7 @@
 // count may have: this writes `node.open_notes`, which the canvas draws as
 // the node's badge (`renderer.js`), from the endpoint's exact `open`.
 //
-// LIVE (notes spec §6). The section is a `record` of `admin--notes--live`, the
+// LIVE. The section is a `record` of `admin--notes--live`, the
 // controller on <body> that holds the socket: it subscribes to this post's
 // signals for as long as the section is in the page and, when a thread of the
 // post changed, says so with `admin--notes--live:changed` on the section, which
@@ -55,7 +55,7 @@
 // (`section[data-mind-graph-card-notes]`), which the card draws under the
 // title and above its actions (`card.js` says how); a row is `li[data-note-row]`, with
 // `data-unread` while it holds something the viewer has not read -- ink for
-// dim, the accent dot (spec §4.5: the one meaning accent has in notes) and
+// dim, the accent dot (the one meaning accent has in notes) and
 // the word "new" for a screen reader, so it is never colour alone -- and the
 // link to the rest is `a[data-note-more]`.
 import { draftKey } from "controllers/admin/notes/composer_controller"
@@ -93,7 +93,7 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
   status.hidden = true
 
   const form = element("form", "flex flex-col items-start gap-1.5")
-  const field = element("textarea", "admin-well block w-full px-[9px] py-[7px] text-[13px] text-ink placeholder:text-meta")
+  const field = element("textarea", "admin-well block w-full px-[9px] py-[7px] text-small text-ink placeholder:text-meta")
   field.name = "body"
   field.rows = 2
   field.maxLength = 4000
@@ -150,7 +150,7 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
   // while unread, else dim) over who wrote it and its replies, and the unread
   // dot. The first line is the link.
   function row(thread) {
-    const item = element("li", "grid grid-cols-[20px_1fr_7px] items-start gap-2 text-[13px]")
+    const item = element("li", "grid grid-cols-[20px_1fr_7px] items-start gap-2 text-small")
     item.dataset.noteRow = ""
     const who = thread.author ?? text.t("mind_graph.script.card.notes.deleted_user")
     const avatar = element("span", `${AVATAR} ${thread.mine ? AVATAR_OWN : AVATAR_OTHER}`, thread.initials)
