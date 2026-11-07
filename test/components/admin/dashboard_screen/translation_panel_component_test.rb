@@ -1,6 +1,6 @@
 require "test_helper"
 
-class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::TestCase
+class Admin::DashboardScreen::TranslationPanelComponentTest < ViewComponent::TestCase
   setup do
     Current.actor = users(:one)
     Current.channel = :admin
@@ -10,13 +10,32 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
 
   def entries = Dashboard::TranslationNeeds.new(actor: users(:one)).entries
 
+  test "an information panel headed by the languages behind the primary one, named in CS Studio's language" do
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
+      Dashboard::TranslationNeeds::Entry.new(locale: "de", name: "Deutsch", total: 2, complete: 1, missing: 1, outdated: 0, item: nil)
+    ])
+
+    assert_selector "section.admin-dashboard-panel--information[aria-labelledby=dashboard-needs-translation] h2#dashboard-needs-translation",
+      exact_text: "Languages behind English"
+    assert_selector ".admin-dashboard-panel__line", exact_text: "What is missing or outdated, per language."
+    assert_selector "header a[aria-label='Open the translations overview']", text: "→"
+    assert_text "1 missing"
+
+    with_locales(%w[de en], default: "de")
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
+      Dashboard::TranslationNeeds::Entry.new(locale: "en", name: "English", total: 2, complete: 2, missing: 0, outdated: 0, item: nil)
+    ])
+    assert_selector "h2", exact_text: "Languages behind German"
+    assert_text "All translated"
+  end
+
   test "its numbers equal StateIndex.summary and each language is named in its own language" do
     create_post(title: "One")
     create_page(title: "Two")
     summary = Translations::StateIndex.summary("de", [ Page.kept, Post.kept ])
     assert_operator summary[:missing], :>, 0
 
-    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries:)
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries:)
 
     entry = entries.find { |e| e.locale == "de" }
     assert_equal summary.slice(:total, :complete, :missing, :outdated), entry.to_h.slice(:total, :complete, :missing, :outdated)
@@ -25,13 +44,13 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
     assert_selector "[data-locale=de] [role=progressbar][aria-valuenow='#{(summary[:complete] * 100.0 / summary[:total]).round}']"
   end
 
-  # Task 16's d2: the shared card caps its rows at five; a language is a row,
-  # so a sixth and seventh must not disappear.
+  # The shared panel caps its rows at five; a language is a row, so a sixth
+  # and seventh must not disappear.
   test "every language gets its row, however many there are" do
     fake = %w[aa bb cc dd ee ff gg].map do |code|
       Dashboard::TranslationNeeds::Entry.new(locale: code, name: code.upcase, total: 4, complete: 2, missing: 1, outdated: 1, item: nil)
     end
-    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries: fake)
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: fake)
     assert_selector "[data-locale]", count: 7
   end
 
@@ -39,7 +58,7 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
     post = create_post(title: "Changing")
     Translations::State.where(record_type: "Post", record_id: post.id, locale: "de").update_all(state: "outdated", outdated_count: 1, missing_count: 0)
 
-    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries:)
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries:)
 
     assert_selector "[data-locale=de] a[href='/cs-studio/posts/#{post.id}?locale=de']", text: "Changing"
     assert_text "1 outdated"
@@ -47,7 +66,7 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
 
   test "hidden with one language, and with nothing readable" do
     with_locales(%w[en], default: "en")
-    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries:)
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries:)
     assert_no_selector "section"
 
     with_locales(%w[en de], default: "en")
@@ -60,7 +79,7 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
     user = User.create!(email_address: "uploader@example.com", password: "password12345")
     AccessControl::Membership.create!(user:, group:)
     Current.actor = user
-    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries: Dashboard::TranslationNeeds.new(actor: user).entries)
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: Dashboard::TranslationNeeds.new(actor: user).entries)
 
     assert_selector "[data-locale=de]", text: "Deutsch"
     assert_no_selector "a"

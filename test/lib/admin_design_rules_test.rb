@@ -109,7 +109,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       app/components/admin/pages_screen/tree_row_component.html.erb app/components/admin/pages_screen/tree_row_component.rb
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
-      app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb
+      app/components/admin/dashboard_screen/translation_panel_component.html.erb app/components/admin/dashboard_screen/translation_panel_component.rb
     ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
@@ -151,6 +151,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       audit_changes_component.html.erb settings_form_component.rb settings_form_component.html.erb
       media_library/detail_component.rb media_library/detail_component.html.erb
       columns/image_column_component.rb columns/image_column_component.html.erb
+      dashboard_screen/card_component.rb dashboard_screen/card_component.html.erb
+      dashboard_screen/translation_card_component.rb dashboard_screen/translation_card_component.html.erb
     ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
@@ -617,6 +619,18 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "11px" ], tokens.scan(/--cs-t-count:\s*([^;]+);/).flatten
   end
 
+  # A heading is drawn at a size token's utility; a token with no utility is
+  # written as a bare size instead, which the type voice cannot see.
+  test "each heading size token has its utility" do
+    theme = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")[/@theme inline \{(.*?)\n\}/m, 1]
+    tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    %w[h1 h2 h3].each do |size|
+      assert_includes theme, "--text-#{size}: var(--cs-t-#{size});", "the @theme block maps text-#{size}"
+      assert_match(/--cs-t-#{size}:\s*\d+px/, tokens, "--cs-t-#{size} is a size")
+    end
+    assert_includes theme, "--text-h3--font-weight: 600;"
+  end
+
   # A count is a figure in a pill, `text-count`; the 12px label would grow it
   # with the label. A line that draws a count (a count helper, a tab's count,
   # a total, the graph legend's count, the presence marker's) carries no
@@ -970,10 +984,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # today, a list that may only shrink as screens move their fills into a
   # status component.
   LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
-  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb].freeze
+  LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb
+    app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/dashboard_screen/translation_card_component.html.erb
+    app/components/admin/dashboard_screen/translation_panel_component.html.erb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/changes_overview_component.html.erb
     app/components/admin/editor_screen/delete_block_dialog_component.rb
@@ -1019,9 +1034,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/setup/_flash.html.erb
   ].freeze
 
-  test "the live and scheduled fills are drawn only by the status chip" do
+  test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do
     assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
-    assert File.read(Rails.root.join(LIVE_SCHEDULED_FILES.last)).match?(LIVE_SCHEDULED_FILL), "the chip no longer draws them: the guard looks at nothing"
+    %w[status_chip_component.rb scheduled_date_component.rb].each do |file|
+      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} no longer draws them: the guard looks at nothing"
+    end
   end
 
   test "the ok, warn and danger fills are in no file beyond today's: a new one goes in a status component" do

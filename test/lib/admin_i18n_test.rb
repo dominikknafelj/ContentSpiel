@@ -135,8 +135,15 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
-    app/components/admin/dashboard_screen/card_component.rb
-    app/components/admin/dashboard_screen/card_component.html.erb
+    app/components/admin/dashboard_screen/panel_component.rb
+    app/components/admin/dashboard_screen/panel_component.html.erb
+    app/components/admin/dashboard_screen/translation_panel_component.rb
+    app/components/admin/dashboard_screen/translation_panel_component.html.erb
+    app/components/admin/dashboard_screen/row_component.rb
+    app/components/admin/dashboard_screen/row_component.html.erb
+    app/components/admin/dashboard_screen/activity_row_component.rb
+    app/components/admin/dashboard_screen/activity_row_component.html.erb
+    app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb

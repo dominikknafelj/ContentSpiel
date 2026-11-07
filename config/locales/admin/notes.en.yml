@@ -177,6 +177,8 @@ en:
         empty: "No notes for you."
       card:
         title: "Notes for you"
+        # The line under the heading: what the panel holds.
+        line: "Mentions and replies addressed to you."
         empty: "No notes for you."
         # The card's footer link; the arrow is decoration, hidden from a
         # screen reader.
@@ -187,6 +189,7 @@ en:
           other: "%{count} new"
       open_threads:
         title: "Open threads"
+        line: "Conversations still open on what you can read."
         empty: "No open threads."
         # The name of the number beside the title, for a screen reader.
         total:

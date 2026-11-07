@@ -14,7 +14,9 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
   test "the dashboard has Notes for you and Open threads, each in a frame of its own, and the sidebar counts the unread" do
     get "/cs-studio"
 
-    assert_select "turbo-frame#notes-for-you section[aria-labelledby=dashboard-notes-for-you]" do
+    assert_select "turbo-frame#notes-for-you section.admin-dashboard-panel--action[aria-labelledby=dashboard-notes-for-you]" do
+      assert_select "header h2", "Notes for you"
+      assert_select "header .admin-dashboard-panel__line", "Mentions and replies addressed to you."
       # The whole row is one link (handoff "Inbox row"), with the handoff's hover.
       assert_select "li > a[data-delivery][data-unread][href='/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
         assert_select "[data-inbox-sentence]", text: "Dana mentioned you"
@@ -30,7 +32,9 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
       assert_select "[data-delivery][data-unread] .sr-only", text: "Unread"
       assert_select "header [data-notes-new]", text: "1 new"
     end
-    assert_select "turbo-frame#notes-open-threads section[aria-labelledby=dashboard-open-threads]" do
+    assert_select "turbo-frame#notes-open-threads section.admin-dashboard-panel--action[aria-labelledby=dashboard-open-threads]" do
+      assert_select "header h2", "Open threads"
+      assert_select "header .admin-dashboard-panel__line", "Conversations still open on what you can read."
       # One link, the whole row: the title, then "type · last author · time"
       # led by the type's marker (square for a page), and the neutral pill.
       assert_select "li > a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do

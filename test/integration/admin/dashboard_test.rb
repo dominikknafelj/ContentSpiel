@@ -36,17 +36,22 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "h1", "Dashboard"
   end
 
-  # Round 2, Task 16: quick create, three cards and one activity feed (the
-  # old "Your work" / "On the site" columns and their lists are gone).
-  test "the three cards and the activity feed render; the old two columns are gone" do
+  # Each panel is headed by its job, with one line under it, and tinted by
+  # its kind; the old "Your work" / "On the site" columns are gone.
+  test "the panels and the activity feed render, each headed by its job; the old two columns are gone" do
     draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
     sign_in_as users(:one)
     get admin_root_path
 
-    assert_select "section[aria-labelledby=dashboard-drafts] h2", "Your drafts"
+    assert_select "section.admin-dashboard-panel--shortcuts[aria-labelledby=dashboard-drafts] h2", "Pick up where you left off"
+    assert_select "section[aria-labelledby=dashboard-drafts] .admin-dashboard-panel__line", "Your drafts, the latest first."
     assert_select "section[aria-labelledby=dashboard-drafts] a[href='#{admin_post_path(draft)}']", text: "Half-written"
-    assert_select "section[aria-labelledby=dashboard-going-live-next] h2", "Going live next"
-    assert_select "section[aria-labelledby=dashboard-activity] h2", "Recent activity"
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-going-live-next] h2", "Publishing on its own"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] .admin-dashboard-panel__line", "Scheduled pages and posts, the soonest first."
+    assert_select "section.admin-dashboard-panel--action[aria-labelledby=dashboard-unpublished-changes] h2", "Unpublished changes"
+    assert_select "section[aria-labelledby=dashboard-unpublished-changes] .admin-dashboard-panel__line", "Live pages and posts with changes not yet on the site."
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-activity] h2", "What changed recently"
+    assert_select "section[aria-labelledby=dashboard-activity] .admin-dashboard-panel__line", "The latest changes to pages, posts and images."
     assert_select "section[aria-labelledby=dashboard-activity] li", text: /Half-written/
     assert_select "#your-work, #on-the-site, #dashboard-recently-updated, #dashboard-recently-edited, #dashboard-scheduled", count: 0
   end
@@ -85,6 +90,8 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
     get admin_root_path
 
+    assert_select "section.admin-dashboard-panel--information[aria-labelledby=dashboard-needs-translation] h2", "Languages behind English"
+    assert_select "section[aria-labelledby=dashboard-needs-translation] .admin-dashboard-panel__line", "What is missing or outdated, per language."
     assert_select "section[aria-labelledby=dashboard-needs-translation] [data-locale=de]", text: /Deutsch.*1 missing/m
     assert_select "section[aria-labelledby=dashboard-needs-translation] [role=progressbar]"
   end

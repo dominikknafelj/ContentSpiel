@@ -1,6 +1,6 @@
 module Admin
   module DashboardScreen
-    # A line of "Recent activity": a person (round avatar) and a change made
+    # A line of "What changed recently": a person (round avatar) and a change made
     # through an API token (the user's own round avatar, "via <name>" and an MCP chip).
     class ActivityRowComponentPreview < ViewComponent::Preview
       def person

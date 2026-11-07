@@ -131,7 +131,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     %w[app/components/admin/editor_screen/block_tile_component.rb app/components/admin/editor_screen/block_tile_component.html.erb
        app/components/admin/editor_screen/section_card_component.html.erb] =>
       "the section tile's Add note menu item: a slot with the block card's, when a second feature puts an item into a block's menu (the marker is in the slot editor.block.markers)",
-    %w[app/components/admin/dashboard_screen/card_component.rb] =>
+    %w[app/components/admin/dashboard_screen/panel_component.rb] =>
       "the dashboard's notes cards: a slot when the dashboard offers cards to a second feature (presence on the dashboard is out of scope)",
     %w[app/components/admin/shell/sidebar_component.html.erb] =>
       "the sign-out form, which has the inbox drop the unsent drafts as the document goes: a slot when a second feature acts on signing out (the badge is a registered module's)",

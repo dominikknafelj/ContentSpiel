@@ -78,6 +78,7 @@
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
+  --text-h3: var(--cs-t-h3);
   --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
   --text-count: var(--cs-t-count);
@@ -85,6 +86,8 @@
      read faint); an explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
   --text-count--font-weight: 500;
+  /* A panel's heading and a tile's title. */
+  --text-h3--font-weight: 600;
   --tracking-mono: var(--cs-track-mono);
   --tracking-wide: var(--cs-track-wide);
   --radius-cs: var(--cs-radius);
@@ -606,12 +609,12 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
-/* The dashboard's cards (layout points spec, C and decision 13): one column,
+/* The dashboard's panels: one column,
    two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
    window's (the sidebar and the tree take room the window does not
    show), and never more than three: a wider window widens the cards and adds
    no fourth, so no `auto-fit`. `turbo-frame.contents` keeps the two notes
-   cards, each a frame of its own, grid items. */
+   panels, each a frame of its own, grid items. */
 .admin-dashboard { container: admin-dashboard / inline-size; }
 .admin-dashboard-cards { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
 @container admin-dashboard (min-width: 40rem) {
@@ -620,6 +623,20 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @container admin-dashboard (min-width: 60rem) {
   .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* A dashboard panel (`Admin::DashboardScreen::PanelComponent`): a card
+   (elevation 1, `rounded-card`) whose head holds its heading and one line.
+   The head is tinted by the panel's kind, and the heading and the line take
+   the head's ink: action (something waits on the viewer), shortcuts (a way
+   back into work), information (what is happening). The tints are these
+   rules and not utilities, so a place that draws a panel without its band
+   overrides them by plain cascade. The head's top corners follow the
+   card's, since the card does not clip (a focus ring inside it would be cut). */
+.admin-dashboard-panel { display: flex; flex-direction: column; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+.admin-dashboard-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--cs-radius-card) var(--cs-radius-card) 0 0; }
+.admin-dashboard-panel__line { margin-top: 0.125rem; }
+.admin-dashboard-panel--action .admin-dashboard-panel__head { background: var(--cs-head-action); color: var(--cs-head-action-ink); }
+.admin-dashboard-panel--shortcuts .admin-dashboard-panel__head { background: var(--cs-head-cool); color: var(--cs-head-cool-ink); }
+.admin-dashboard-panel--information .admin-dashboard-panel__head { background: var(--cs-head-warm); color: var(--cs-head-warm-ink); }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
    window's: a folded tree changes it while the

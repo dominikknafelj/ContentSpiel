@@ -1,0 +1,56 @@
+# CS Studio's dashboard components, `app/components/admin/dashboard_screen/` (docs/reference/i18n.md).
+# Keys are `admin.components.dashboard_screen.<class name without Admin:: and Component, underscored>`.
+# `PanelComponent` has none: its heading and line are its caller's
+# (`admin.dashboard.show.*`, `admin.note_inbox.*`).
+# YAML: a value with a leading or trailing space, a `%{...}`, a `:` or a
+# glyph that opens a YAML token (a bullet, `·`) is double-quoted.
+en:
+  admin:
+    components:
+      dashboard_screen:
+        # `Admin::DashboardScreen::TranslationPanelComponent`, an information
+        # panel. `%{language}` is the site's primary language, named in CS
+        # Studio's language ("Languages behind German" on a German site).
+        translation_panel:
+          title: "Languages behind %{language}"
+          line: "What is missing or outdated, per language."
+          # Never drawn: the panel is hidden when no language has a row.
+          empty: "Nothing to translate."
+          # The head's "→" to the Translations matrix, named for a screen reader.
+          overview: "Open the translations overview"
+          # A language's counts: "12 missing · 1 outdated", or "All translated".
+          missing:
+            one: "%{count} missing"
+            other: "%{count} missing"
+          outdated:
+            one: "%{count} outdated"
+            other: "%{count} outdated"
+          separator: " · "
+          all_translated: "All translated"
+          # The progress bar's name, after the language's own name.
+          translated: "%{language} translated"
+          # The most recently changed outdated item; `%{link}` is its title,
+          # a link to its editor in that language.
+          outdated_item_html: "Outdated: %{link}"
+          untitled: "(untitled)"
+        # `Admin::DashboardScreen::RowComponent`, a page or post in the drafts,
+        # the scheduled and the unpublished-changes panels.
+        row:
+          # `%{time}` is a `<time>` with a relative phrase ("2h ago").
+          edited_html: "edited %{time}"
+          # A scheduled row the viewer made.
+          by_you: "by you"
+          # A draft row's kind, where a post shows its content type.
+          page: "Page"
+          untitled: "(untitled)"
+          # When a scheduled record goes live, by the site's calendar.
+          tomorrow: "tomorrow"
+          in_days:
+            one: "in %{count} day"
+            other: "in %{count} days"
+          in_hours: "in %{hours}h"
+          soon: "soon"
+        # `Admin::DashboardScreen::ActivityRowComponent`.
+        activity_row:
+          # A coalesced burst's tooltip: its first moment, then the time it last extended.
+          span: "%{from} – %{to}"

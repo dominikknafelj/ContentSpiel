@@ -1,16 +1,17 @@
 module Admin
   module DashboardScreen
-    # One line of "Recent activity" (design pass round 2, Task 16): an avatar
-    # (round with the person's two letters, a token's change included), one
-    # sentence -- "<name> published “<title>”", the title a link to the record's editor -- a status chip when the
-    # record is not Live, and a relative time. A coalesced burst of edits
-    # shows the time it last extended, with the whole span as its tooltip.
+    # One line of "What changed recently": an avatar (round, with the
+    # person's two letters, a token's change included), one sentence --
+    # "<name> published “<title>”", the title a link to the record's editor --
+    # a status chip when the record is not Live, and a relative time. A
+    # coalesced burst of edits shows the time it last extended, with the
+    # whole span as its tooltip.
     #
     # A change through a token names the token's *user*, with the user's own
     # round avatar, and says "via <token name>" beside an MCP chip. The name
     # is the one recorded on the event (the sentence's actor), escaped like any
-    # text; no part of the token's value is ever rendered, and the row doesn't
-    # even carry the token. The wording is the audit log's own
+    # text; no part of the token's value is ever rendered, and the row does
+    # not even carry the token. The wording is the audit log's own
     # (`Admin::AuditScreen::SentenceComponent` over `Audit::Sentence`).
     # Everything comes from a `Dashboard::Activity::Row` (record, user and time
     # already loaded), so a row never queries.
@@ -21,12 +22,13 @@ module Admin
 
       def sentence = row.sentence
 
-      # The circle's letters (Ruling 7, O9): the two-letter rule of the name
-      # the circle is named by, drawn upper-case by the template. A user is
-      # named by `PersonName.of` (their name, else the part of the address
-      # before the at sign), as notes and presence name them; a deleted user
-      # and System are the label the row shows. The sentence beside the circle
-      # keeps the full address. The circle stays this row's own 28px one.
+      # The circle's letters: the two-letter rule of the name the circle is
+      # named by, drawn upper-case by the template. A user is named by
+      # `PersonName.of` (their name, else the part of the address before the
+      # at sign), as notes and presence name them; a deleted user and System
+      # are the label the row shows. The sentence beside the circle keeps the
+      # full address. The circle is this row's own 28px one, not
+      # `Admin::Ui::AvatarComponent`.
       def initials
         actor = sentence.actor
         name = actor.user ? PersonName.of(actor.user) : Admin::Ui::UserNameComponent.new(user: nil, user_id: actor.user_id).label
@@ -42,10 +44,11 @@ module Admin
       # Pages and posts have a publish state; an image has none.
       def status? = !record.is_a?(Media::Asset)
 
+      # A burst's tooltip: when it began, and the time it last extended.
       def span_title
         return unless row.span_end
 
-        "#{row.at.in_time_zone.strftime("%-d %b %Y, %H:%M")} – #{row.span_end.in_time_zone.strftime("%H:%M")}"
+        t(".span", from: I18n.l(row.at.in_time_zone, format: :"admin.datetime"), to: I18n.l(row.span_end.in_time_zone, format: :"admin.time"))
       end
 
       def shown_at = row.span_end || row.at
