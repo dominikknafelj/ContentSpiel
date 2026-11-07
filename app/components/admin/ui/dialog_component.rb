@@ -28,7 +28,7 @@ module Admin
         interface: %i[id title width destructive open_on_load hang steady],
         limits: [
           "It draws the frame, the title, Close and the footer slot: the actions and the form inside are the caller's.",
-          "It opens only through admin--ui--dialog on the body, looked up by its id; it has no open argument of its own."
+          "It opens only through admin--ui--dialog on the body, by its id or marked by open_on_load."
         ],
         states: %i[rest hover focus],
         script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },

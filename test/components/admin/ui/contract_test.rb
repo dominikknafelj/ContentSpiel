@@ -77,6 +77,30 @@ class UiContractMissingTestComponent < Admin::AdminComponent
   def call = ""
 end
 
+class UiContractUndeclaredKeyComponent < Admin::AdminComponent
+  include Admin::Ui::Contract
+
+  contract(states: %i[rest], keys: %w[title], slots: [], controller: nil, interface: %i[a], **UiContractSampleComponent::COMMON)
+
+  def initialize(a:)
+    @a = a
+  end
+
+  def call = ""
+end
+
+class UiContractNoControllerFileComponent < Admin::AdminComponent
+  include Admin::Ui::Contract
+
+  contract(states: %i[rest], keys: [], slots: [], controller: "contract-sample--no-such-thing", interface: %i[a], **UiContractSampleComponent::COMMON)
+
+  def initialize(a:)
+    @a = a
+  end
+
+  def call = ""
+end
+
 # Every shared component declares its contract (`Admin::Ui::Contract`), and
 # the declaration is held to the code: its keywords, its slots, the keys it
 # owns, its controller and the browser tests its script-held states name.
@@ -86,7 +110,8 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
   setup do
     I18n.backend.store_translations(:en, admin: { components: { ui: {
       ui_contract_sample: { title: "Sample", count: { one: "1 sample", other: "%{count} samples" } },
-      ui_contract_missing_key: { title: "Sample" }
+      ui_contract_missing_key: { title: "Sample" },
+      ui_contract_undeclared_key: { title: "Sample", hint: "Unsaid" }
     } } })
   end
 
@@ -145,7 +170,62 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     assert_match "script_states", failure.message
     assert_match "a test this file does not hold", failure.message
 
+    failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractUndeclaredKeyComponent, source: "") }
+    assert_match "keys leave them out", failure.message
+    assert_match "hint", failure.message
+
+    failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractNoControllerFileComponent, source: "contract-sample--no-such-thing") }
+    assert_match "has no file", failure.message
+
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: "") }
     assert_match "controller", failure.message
+
+    failure = assert_raises(Minitest::Assertion) { assert_contract_interface(Class.new { def self.name = "UiContractBareComponent" }) }
+    assert_match "UiContractBareComponent", failure.message
+  end
+
+  # A component's own file names its controller only in its declaration and a
+  # comment: the check reads its source the way it reads a real component's,
+  # from the file, and still fails.
+  test "the controller check reads a component's file around its declaration and comments" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "ui_contract_from_file_component.rb")
+      File.write(path, <<~RUBY)
+        # Stands on admin--ui--dialog, says this comment.
+        class UiContractFromFileComponent < Admin::AdminComponent
+          include Admin::Ui::Contract
+
+          contract(states: %i[rest], keys: [], slots: [], controller: "admin--ui--dialog", interface: %i[a],
+            **UiContractSampleComponent::COMMON)
+
+          def initialize(a:)
+            @a = a
+          end
+
+          def call = ""
+        end
+      RUBY
+      load path
+      failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractFromFileComponent) }
+      assert_match "not named in its own source", failure.message
+
+      File.write(path.sub(/\.rb\z/, ".html.erb"), %(<div data-controller="admin--ui--dialog"></div>))
+      assert_contract(UiContractFromFileComponent)
+    ensure
+      Object.send(:remove_const, :UiContractFromFileComponent) if Object.const_defined?(:UiContractFromFileComponent, false)
+    end
+  end
+
+  test "a state both drawn and held by a script is refused when the class declares" do
+    error = assert_raises(ArgumentError) do
+      Class.new(Admin::AdminComponent) do
+        def self.name = "UiContractBothComponent"
+        include Admin::Ui::Contract
+        contract(states: %i[rest open], keys: [], slots: [], controller: nil, interface: [],
+          script_states: { open: [ "test/system/dialog_test.rb", "x" ] }, **UiContractSampleComponent::COMMON)
+      end
+    end
+    assert_match "UiContractBothComponent", error.message
+    assert_match "script_states", error.message
   end
 end

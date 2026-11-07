@@ -32,9 +32,10 @@ module Admin
         limits: [
           "It is drawn in five variants and two sizes, and a look outside them is refused rather than added by a caller's class.",
           "Under reduced motion the fill and the lift change at once and the primary's one-pixel press does not move; its press is told by its shadow going.",
-          "A busy button is the busy controller's (admin--ui--busy, on the form), not this component's."
+          "Busy is set by admin--ui--busy on the button's form; the button only keeps its variant's look while it is busy."
         ],
         states: %i[rest hover focus pressed disabled],
+        script_states: { busy: [ "test/system/admin/ai_settings_test.rb", "Test connection keeps its look while it is busy" ] },
         keys: [],
         slots: [],
         controller: nil

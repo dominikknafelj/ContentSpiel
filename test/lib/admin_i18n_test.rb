@@ -44,9 +44,10 @@ require "ripper"
 #   to_sentence time_ago_in_words distance_of_time_in_words number_to_human*
 #   strftime to_fs to_formatted_s` (use `I18n.l`, `t` with `count`).
 #   Excluded: comments (the lexer never reports them), a line that starts
-#   `raise` (a message for a developer) and the arguments of a component's
-#   `contract(...)` declaration (`ComponentContract`: read by the tests
-#   alone, never drawn).
+#   `raise` (a message for a developer) and, in the file of a class that
+#   includes `ComponentContract`, the arguments of its `contract(...)`
+#   declaration (read by the tests alone: nothing under app/ reads it, which
+#   a test below holds).
 # - JavaScript: (a) no string literal that reads as a sentence: a capitalised
 #   word (with its apostrophe) then a lower-case word, `${` or an opening quote
 #   ("Couldn't save", "Create ${x} “..."), an all-capitals phrase ("NOT
@@ -453,23 +454,12 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   # The offences in Ruby source. `first_line` is the line the source starts on
   # in its file (for the Ruby of an ERB tag), `ok_lines` the lines of that file
-  # which carry an ERB marker.
-  def ruby_offences(source, first_line: 1, ok_lines: [])
+  # which carry an ERB marker. `contract: true` (a declaring class's file)
+  # reads around its `contract(...)` call.
+  def ruby_offences(source, first_line: 1, ok_lines: [], contract: false)
     lines = source.lines
-    # The parentheses still open in a `contract(` call, while inside one.
-    contract_depth = nil
-    Ripper.lex(source).filter_map do |(line, _column), type, text|
-      if contract_depth.nil? && type == :on_ident && text == "contract" && lines[line - 1].to_s.strip.start_with?("contract(")
-        contract_depth = 0
-        next
-      end
-      unless contract_depth.nil?
-        contract_depth += 1 if type == :on_lparen
-        contract_depth -= 1 if type == :on_rparen
-        contract_depth = nil if contract_depth.zero? && type == :on_rparen
-        next
-      end
-
+    tokens = contract ? UiContract.outside_contract(source) : Ripper.lex(source)
+    tokens.filter_map do |(line, _column), type, text|
       reported = nil
       if type == :on_tstring_content && copy?(text)
         reported = text.strip.inspect
@@ -560,13 +550,21 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   # --- The checks -----------------------------------------------------------
 
+  # A file under app/components whose class includes `ComponentContract`.
+  def declares_contract?(path)
+    return false unless path.start_with?("app/components/")
+
+    klass = path.delete_prefix("app/components/").delete_suffix(".rb").camelize.safe_constantize
+    klass.is_a?(Class) && klass.include?(ComponentContract)
+  end
+
   def offences_in(path)
     source = File.read(Rails.root.join(path))
     case File.extname(path)
     when ".erb"
       markup, code, ok_lines = split_erb(source)
       markup_offences(markup) + code.flat_map { |line, ruby| ruby_offences(ruby, first_line: line, ok_lines: ok_lines) }
-    when ".rb" then ruby_offences(source)
+    when ".rb" then ruby_offences(source, contract: declares_contract?(path))
     when ".js" then js_offences(source)
     else flunk "#{path}: no rule for this kind of file"
     end
@@ -582,6 +580,17 @@ class AdminI18nTest < ActiveSupport::TestCase
     found = CONVERTED.flat_map { |path| offences_in(path).map { |offence| "#{path}: #{offence}" } }
 
     assert_empty found, "Move these into config/locales/admin/ and read them with t(\".key\") (docs/reference/i18n.md):\n#{found.join("\n")}"
+  end
+
+  # The contract's sentences are English the i18n rules let through because no
+  # person reads them: the tests read a declaration, and nothing at run time.
+  test "nothing under app/ reads a component's contract at run time" do
+    readers = Dir[Rails.root.join("app/**/*.{rb,erb}")].flat_map do |file|
+      File.readlines(file).each_with_index.filter_map do |line, index|
+        "#{Pathname(file).relative_path_from(Rails.root)}:#{index + 1}" if line.sub(/(?:^|\s)#(?!\{).*/, "").match?(/\.contract\b/)
+      end
+    end
+    assert_empty readers, "A component's contract is the tests' alone: its sentences are not translated"
   end
 
   test "every shared component is listed" do
@@ -662,8 +671,13 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ "1: call to pluralize" ], ruby_offences(%(pluralize(n, "post")\n))
     assert_empty ruby_offences(%(# label = "Cancel"\n))
     assert_empty ruby_offences(%(raise ArgumentError, "Unknown thing"\n))
-    assert_equal [ %(4: "Cancel") ], ruby_offences(%(contract(\n  limits: [ "It does not (yet) draw this." ]\n)\nlabel = "Cancel"\n)),
-      "a contract's sentences are not copy, and what follows it is read again"
+    declaration = %(contract(\n  limits: [ "It does not (yet) draw this." ]\n)\nlabel = "Cancel"\n)
+    assert_equal [ %(4: "Cancel") ], ruby_offences(declaration, contract: true),
+      "a declaring class's contract sentences are not copy, and what follows the call is read again"
+    assert_equal [ %(2: "It does not (yet) draw this."), %(4: "Cancel") ], ruby_offences(declaration),
+      "in a file whose class does not declare, a contract( call is read like any other"
+    assert declares_contract?("app/components/admin/ui/button_component.rb")
+    assert_not declares_contract?("app/components/admin/shell/sidebar_component.rb")
     assert_empty ruby_offences(%(x = "Cancel" # i18n-ok: a product name, never translated\n))
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok: no\n)), "a reason under ten characters does not count"
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok\n))
