@@ -192,7 +192,8 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_selector "#sidebar-badge-dashboard", text: "1", wait: 8
     fetched = page.evaluate_script("performance.getEntriesByType('resource').map((entry) => entry.name)")
     assert fetched.any? { |name| name.include?("/notes/unread") }, "the count was fetched"
-    assert_empty fetched.grep(%r{dashboard/waiting|notes/card})
+    # The panels' addresses, not a script's file (`controllers/admin/dashboard/waiting_controller-….js`).
+    assert_empty fetched.grep(%r{/cs-studio/(dashboard/waiting|notes/card)(\?|\z)})
   end
 
   test "All notes for you is the same rows as a page, and its Mark all read stays there" do

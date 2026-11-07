@@ -12,6 +12,10 @@
 # editor_modules_test held 9 of its 15 tests then.
 # notes_rail_test has no run yet: its figure is 4.53 s a test, what
 # notes_column_test, the file it replaced, took in that run, times its 20 tests.
+# dashboard_test is an estimate too: 12.1 s summed over its 13 tests in a local
+# run (2026-11-07, one at a time, load under 6), times 3.44, CI's figure over
+# the local one for drafts, editor_fields, new_record and unpublished_changes
+# run the same way (201.0 s against 58.5 s).
 test/system/admin/account_password_answer_test.rb: 20.6
 test/system/admin/ai_settings_test.rb: 42.5
 test/system/admin/audit_log_test.rb: 7.0
@@ -23,7 +27,7 @@ test/system/admin/card_link_target_test.rb: 16.5
 test/system/admin/changed_elsewhere_test.rb: 122.3
 test/system/admin/chip_input_test.rb: 64.9
 test/system/admin/code_block_test.rb: 64.5
-test/system/admin/dashboard_test.rb: 26.7
+test/system/admin/dashboard_test.rb: 41.6
 test/system/admin/dialogs_hang_test.rb: 5.1
 test/system/admin/drafts_test.rb: 104.0
 test/system/admin/editing_claims_test.rb: 9.2
