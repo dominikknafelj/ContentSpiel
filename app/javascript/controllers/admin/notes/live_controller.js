@@ -3,7 +3,7 @@ import { messages } from "i18n/messages"
 import { TAB, listen } from "live/connection"
 import { json } from "notes/json"
 import { report } from "live/state"
-import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge"
+import { hold, mergeGone, mergeNoteList, mergeThread, scrollerOf } from "notes/merge"
 
 // Live delivery of notes, the RECORD'S side (notes spec §6): a record's
 // threads and its list kept current while someone reads or types in them,
@@ -29,7 +29,7 @@ import { hold, mergeGone, mergeList, mergeThread, scrollerOf } from "notes/merge
 //
 // REFRESHING WITHOUT LOSING WORK (§6.3). What is READ is replaced; what is
 // TYPED is never touched.
-// The rule has one owner, `notes/merge` (`mergeList`, `mergeThread`,
+// The rule has one owner, `notes/merge` (`mergeNoteList`, `mergeThread`,
 // `mergeGone`), whose header says what counts as typed and how a list and
 // a thread are merged; `redrawList`, `redrawThread` and `gone` here call it
 // and do what is not the view's business. What this controller decides is
@@ -374,7 +374,7 @@ export default class extends Controller {
   // view and the answer over, with the page's translator for what the merge
   // says, and does the rest itself.
   redrawList(view, answer) {
-    mergeList(view, answer)
+    mergeNoteList(view, answer)
   }
 
   // `own`, `reply`, `state` and `held` are `mergeThread`'s (`answered`

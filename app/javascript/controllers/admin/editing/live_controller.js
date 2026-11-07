@@ -3,7 +3,7 @@ import { listen, TAB } from "live/connection"
 import { settle } from "live/state"
 import { quiet, writeCount } from "saving/queue"
 import { get } from "editing/requests"
-import { anchored, holds, mergeList, mergeUnits } from "editing/merge"
+import { anchored, holds, mergeBlockList, mergeUnits } from "editing/merge"
 
 // LIVE REFRESH of an open page or post editor (live-editing spec §3.2). On
 // the element `Admin::EditorScreen::LiveRegionComponent` renders.
@@ -380,7 +380,7 @@ export default class extends Controller {
       // back in `awayGone`, for that script to remove.
       const away = [ ...this.element.querySelectorAll("[data-editing-away]") ]
       const before = new Set([ list, ...away ].flatMap((root) => [ ...root.querySelectorAll("[data-editing-gone]") ]))
-      const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart, away }))
+      const result = anchored(list, () => mergeBlockList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart, away }))
       // A section's own settings form names its block by its region's
       // `data-section-id`, as a card or a panel names it by `data-block-id`.
       const blockOf = (unit) => unit.dataset.blockId ?? unit.closest("[data-section-id]")?.dataset.sectionId

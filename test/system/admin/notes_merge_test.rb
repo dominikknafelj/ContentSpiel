@@ -113,7 +113,7 @@ class Admin::NotesMergeSystemTest < ApplicationSystemTestCase
   end
 
   def merge_list
-    merging("(merge, view, answer) => { const merged = merge.mergeList(view, answer); return merged && { kept: merged.kept.length } }")
+    merging("(merge, view, answer) => { const merged = merge.mergeNoteList(view, answer); return merged && { kept: merged.kept.length } }")
   end
 
   test "a half-typed reply is the same element, with its text, after a merge" do

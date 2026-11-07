@@ -105,7 +105,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
   def merge_list(path = blocks_path, only_changed: false, away: false)
     run_merge(path, <<~JS)
       const away = #{away} ? [ ...document.querySelectorAll("[data-editing-away]") ] : []
-      const result = merge.anchored(list, () => merge.mergeList(list, fresh, { unsaved: window.__unsaved, onlyChanged: #{only_changed}, away }))
+      const result = merge.anchored(list, () => merge.mergeBlockList(list, fresh, { unsaved: window.__unsaved, onlyChanged: #{only_changed}, away }))
       done({ kept: result.kept.map((each) => each.id), gone: result.gone.map((each) => each.id), moved: result.moved.map((each) => each.id), same: result.same.map((each) => each.id),
         awayGone: (result.awayGone || []).map((each) => each.id) })
     JS
@@ -186,7 +186,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         const fresh = document.createElement("div")
         fresh.innerHTML = '<div id="inner"><div id="x" data-editing-unit data-editing-subject="block-9" data-editing-version="1"></div></div>'
         const x = root.querySelector("#x")
-        const out = merge.mergeList(root, fresh, { unsaved: () => false, onlyChanged: true })
+        const out = merge.mergeBlockList(root, fresh, { unsaved: () => false, onlyChanged: true })
         done({ gone: out.gone.length, marked: x.hasAttribute("data-editing-gone"), connected: x.isConnected })
         root.remove()
       })
@@ -206,9 +206,9 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         const fresh = document.createElement("div")
         fresh.innerHTML = '<div id="t" data-editing-part data-editing-subject="block-9" data-editing-version="2"><span id="menu">new</span></div>'
         const tile = root.querySelector("#t")
-        const held = merge.mergeList(root, fresh.cloneNode(true), { unsaved: () => false, hold: () => true })
+        const held = merge.mergeBlockList(root, fresh.cloneNode(true), { unsaved: () => false, hold: () => true })
         const same = root.querySelector("#t") === tile
-        merge.mergeList(root, fresh, { unsaved: () => false })
+        merge.mergeBlockList(root, fresh, { unsaved: () => false })
         done({ same, replacedAfter: root.querySelector("#t") !== tile, kept: held.kept.length })
         root.remove()
       })
@@ -544,7 +544,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
       // A second copy of the region at the top level of the answer, beside the one in its card.
       fresh.append(fresh.querySelector("#section-#{@section.id}-settings").cloneNode(true))
       const away = [ ...document.querySelectorAll("[data-editing-away]") ]
-      const out = merge.mergeList(list, fresh, { unsaved: window.__unsaved, away })
+      const out = merge.mergeBlockList(list, fresh, { unsaved: window.__unsaved, away })
       done({ awayGone: out.awayGone.map((each) => each.id) })
     JS
 
@@ -622,7 +622,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     first, second = run_merge(blocks_path, <<~JS)
       const unsaved = window.__unsaved
       const once = () => {
-        const result = merge.mergeList(list, fresh.cloneNode(true), { unsaved })
+        const result = merge.mergeBlockList(list, fresh.cloneNode(true), { unsaved })
         return { ids: Array.from(list.children).map((each) => each.id), kept: result.kept.map((each) => each.id), gone: result.gone.length, kept_html: result.kept.map((each) => each.outerHTML) }
       }
       done([ once(), once() ])
@@ -948,7 +948,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
       window.__merge.then((merge) => window.__fresh(#{blocks_path.to_json})).then((fresh) => {
         window.__merge.then((merge) => {
           const list = document.getElementById("content-blocks-list")
-          merge.mergeList(list, fresh, { unsaved: window.__unsaved })
+          merge.mergeBlockList(list, fresh, { unsaved: window.__unsaved })
           // The editor of the new card has not mounted yet: the person focuses something else first.
           document.querySelector(elsewhere).focus()
           done(true)
@@ -965,7 +965,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
       window.__fresh(#{blocks_path.to_json}).then((fresh) => window.__merge.then((merge) => {
-        merge.mergeList(document.getElementById("content-blocks-list"), fresh, { unsaved: window.__unsaved })
+        merge.mergeBlockList(document.getElementById("content-blocks-list"), fresh, { unsaved: window.__unsaved })
         document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))
         done(true)
       }))
@@ -1006,7 +1006,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         const loose = box.children[1]
         const fresh = document.createElement("div")
         fresh.innerHTML = '<form data-editing-unit id="x"></form><p id="p">new</p>'
-        const result = merge.mergeList(box, fresh, { unsaved: () => true })
+        const result = merge.mergeBlockList(box, fresh, { unsaved: () => true })
         done({ kept: result.kept.includes(loose), connected: loose.parentElement === box, text: box.querySelector("#p").textContent })
       })
     JS
@@ -1135,11 +1135,11 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
       const scroller = #{SCROLLER_JS}
       const card = () => document.getElementById(#{"content_block_#{@section.id}".to_json})
       const unsaved = window.__unsaved
-      merge.anchored(list, () => merge.mergeList(list, fresh.cloneNode(true), { unsaved }))
+      merge.anchored(list, () => merge.mergeBlockList(list, fresh.cloneNode(true), { unsaved }))
       // A little up, so the section's card is still the first one wholly in view for the second merge.
       scroller.scrollTop -= 30
       const before = card().getBoundingClientRect().top
-      merge.anchored(list, () => merge.mergeList(list, fresh.cloneNode(true), { unsaved }))
+      merge.anchored(list, () => merge.mergeBlockList(list, fresh.cloneNode(true), { unsaved }))
       const samples = []
       let frames = 0
       const sample = () => {

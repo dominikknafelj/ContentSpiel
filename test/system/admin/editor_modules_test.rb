@@ -1,7 +1,8 @@
 require "application_system_test_case"
 
-# The editor's own modules (`app/javascript/editor/`), imported in the browser
-# from the page editor: the project has no JavaScript test runner, and these
+# The editor's own modules (`app/javascript/editor/`), and the merge core the
+# editor's live refresh stands on (`app/javascript/live/keep_merge.js`),
+# imported in the browser from the page editor: the project has no JavaScript test runner, and these
 # are plain modules the import map resolves, so a system test can call them
 # directly against the page's real containers (as `mind_graph_modules_test`
 # does for the graph's). The keyboard path is driven through its handle,
@@ -24,12 +25,131 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
   def lane(column, section = @section) = "section-#{section.id}-lane-#{column}"
   def card(block) = "##{ActionView::RecordIdentifier.dom_id(block)}"
 
-  # Runs `body` with the module `editor/<name>` as `mod`, and answers what it returns.
+  # Runs `body` with the module `editor/<name>` (or the full specifier given,
+  # such as "live/keep_merge") as `mod`, and answers what it returns.
   def with_module(name, body)
-    page.evaluate_async_script(<<~JS, "editor/#{name}")
+    page.evaluate_async_script(<<~JS, name.include?("/") ? name : "editor/#{name}")
       const [specifier, done] = arguments
       import(specifier).then((mod) => done((() => { #{body} })())).catch((error) => done({ error: String(error) }))
     JS
+  end
+
+  # The core's cases build their own containers from markup (`build`), and
+  # answer the ids in order afterwards (`ids`) and which elements are the
+  # ones they were.
+  KEEP_MERGE_SETUP = <<~JS
+    const build = (html) => { const box = document.createElement("div"); box.innerHTML = html; return box }
+    const ids = (box) => Array.from(box.children).map((child) => child.id)
+  JS
+
+  test "keepMerge keeps a kept element the same element in the answer's place" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const box = build('<p id="a">old a</p><p id="k">typed</p><p id="b">old b</p>')
+      document.body.append(box)
+      const [ a, k, b ] = box.children
+      const answer = Array.from(build('<p id="b">new b</p><p id="k">answer k</p><p id="a">new a</p><p id="c">new c</p>').children)
+      const { orphans } = mod.keepMerge(box, answer, { kept: new Set([ k ]) })
+      const out = { order: ids(box), same: box.querySelector("#k") === k, text: k.textContent, replaced: box.querySelector("#a") !== a && box.querySelector("#b") !== b, a: box.querySelector("#a").textContent, orphans: orphans.length }
+      box.remove()
+      return out
+    JS
+
+    assert_nil result["error"]
+    assert_equal %w[b k a c], result["order"]
+    assert_equal true, result["same"]
+    assert_equal "typed", result["text"]
+    assert_equal true, result["replaced"]
+    assert_equal "new a", result["a"]
+    assert_equal 0, result["orphans"]
+  end
+
+  test "keepMerge leaves an orphan after its preceding sibling, or before place()" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const run = (html, answerHtml, options = {}) => {
+        const box = build(html)
+        document.body.append(box)
+        const k = box.querySelector("#k")
+        const { orphans } = mod.keepMerge(box, Array.from(build(answerHtml).children), { kept: new Set([ k ]), ...options })
+        const out = { order: ids(box), orphan: orphans.length === 1 && orphans[0] === k, connected: k.isConnected }
+        box.remove()
+        return out
+      }
+      return {
+        after: run('<p id="a"></p><p id="k"></p><p id="b"></p>', '<p id="b"></p><p id="a"></p><p id="c"></p>'),
+        first: run('<p id="k"></p><p id="a"></p>', '<p id="z"></p><p id="a"></p>'),
+        placed: run('<p id="a"></p><p id="k"></p>', '<p id="a"></p><p id="h" hidden></p><p id="c"></p>', { place: (orphan, fresh) => fresh[2] }),
+        end: run('<p id="k"></p><p id="a"></p>', '<p id="a"></p><p id="c"></p>', { place: () => null })
+      }
+    JS
+
+    assert_nil result["error"]
+    assert_equal({ "order" => %w[b a k c], "orphan" => true, "connected" => true }, result["after"])
+    assert_equal({ "order" => %w[k z a], "orphan" => true, "connected" => true }, result["first"])
+    assert_equal({ "order" => %w[a h k c], "orphan" => true, "connected" => true }, result["placed"])
+    assert_equal({ "order" => %w[a c k], "orphan" => true, "connected" => true }, result["end"])
+  end
+
+  test "keepMerge reconciles inside an element that holds a kept one" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const box = build('<div id="s" data-look="old"><p id="h">old head</p><p id="k">typed</p></div><div id="t"><p id="u">old</p></div>')
+      document.body.append(box)
+      const s = box.querySelector("#s"), k = box.querySelector("#k"), t = box.querySelector("#t")
+      const answer = Array.from(build('<div id="s" data-look="new"><p id="k">answer k</p><p id="h">new head</p><p id="n">new</p></div><div id="t"><p id="u">new</p></div>').children)
+      const synced = []
+      const { orphans } = mod.keepMerge(box, answer, {
+        kept: new Set([ k ]),
+        within: (element) => element.contains(k) && element !== k,
+        sync: (live, twin) => { synced.push(live.id); live.setAttribute("data-look", twin.getAttribute("data-look")) }
+      })
+      const out = {
+        order: ids(box), inside: ids(s), sameSection: box.querySelector("#s") === s, sameKept: s.querySelector("#k") === k,
+        look: s.getAttribute("data-look"), head: s.querySelector("#h").textContent, synced,
+        replacedOther: box.querySelector("#t") !== t, orphans: orphans.length
+      }
+      box.remove()
+      return out
+    JS
+
+    assert_nil result["error"]
+    assert_equal %w[s t], result["order"]
+    assert_equal %w[k h n], result["inside"]
+    assert_equal true, result["sameSection"]
+    assert_equal true, result["sameKept"]
+    assert_equal "new", result["look"]
+    assert_equal "new head", result["head"]
+    assert_equal %w[s], result["synced"]
+    assert_equal true, result["replacedOther"]
+    assert_equal 0, result["orphans"]
+  end
+
+  test "keepMerge moves the kept element without the focus when two swap" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const run = (focused) => {
+        const box = build('<div id="one"><input id="one-field"></div><div id="two"><input id="two-field"></div>')
+        document.body.append(box)
+        const one = box.querySelector("#one"), two = box.querySelector("#two")
+        const field = box.querySelector(`#${focused}-field`)
+        field.focus()
+        const taken = []
+        const observer = new MutationObserver((records) => records.forEach((record) => record.removedNodes.forEach((node) => taken.push(node.id))))
+        observer.observe(box, { childList: true })
+        mod.keepMerge(box, Array.from(build('<div id="two"></div><div id="one"></div>').children), { kept: new Set([ one, two ]) })
+        observer.takeRecords().forEach((record) => record.removedNodes.forEach((node) => taken.push(node.id)))
+        observer.disconnect()
+        const out = { order: ids(box), focus: document.activeElement === field, taken, same: box.querySelector("#one") === one && box.querySelector("#two") === two }
+        box.remove()
+        return out
+      }
+      return { one: run("one"), two: run("two") }
+    JS
+
+    assert_nil result["error"]
+    assert_equal({ "order" => %w[two one], "focus" => true, "taken" => %w[two], "same" => true }, result["one"])
+    assert_equal({ "order" => %w[two one], "focus" => true, "taken" => %w[one], "same" => true }, result["two"])
   end
 
   test "itemsOf counts only an element that stands for a block, and placeOf names the section and its column, or neither" do

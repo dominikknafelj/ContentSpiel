@@ -51,8 +51,10 @@ pin_all_from "app/javascript/saving", under: "saving", preload: "admin"
 # The cable connection CS Studio's scripts share: one socket, its pooled
 # subscriptions and the tab's id (`live/connection`), and `live/state`, which
 # makes `data-notes-live` on <body> of what the scripts that hold a
-# subscription say of theirs (notes' two controllers, presence's part).
-# Nothing on a public page imports either, so a public page opens no socket.
+# subscription say of theirs (notes' two controllers, presence's part); and
+# `live/keep_merge`, the merge core `notes/merge` and `editing/merge` draw a
+# fetched answer with around what they keep. Nothing on a public page imports
+# any of them, so a public page opens no socket.
 pin_all_from "app/javascript/live", under: "live", preload: "admin"
 # The notes' plain modules, imported by the notes' controllers: `notes/merge`,
 # the merge of a notes view with the server's fresh markup ("what is read is

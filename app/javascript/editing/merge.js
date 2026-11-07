@@ -1,3 +1,5 @@
+import { keepMerge } from "live/keep_merge"
+
 // THE MERGE RULE of live editing (live-editing spec §3.2), and nothing else:
 //
 //   A FORM THAT HOLDS CHANGES NOT YET SAVED IS NEVER REPLACED, AND NEITHER IS
@@ -20,19 +22,16 @@
 // (every form carries a fresh masked CSRF token), and a mounted editor has
 // added its own elements to the one on screen. Nothing here compares markup.
 //
-// A KEPT UNIT IS THE SAME ELEMENT AFTERWARDS, AND IS NOT MOVED. Moving an
-// element takes it out of the document and puts it back: its Stimulus
-// controllers disconnect and connect, the rich-text editor is mounted again
-// and the caret is gone, under someone who is typing. So the list is not
-// replaced and the kept units put back into it; the list is RECONCILED
-// AROUND them: what does not stay is removed, what was fetched is inserted
-// before, between and after what stays, and an element that is the ancestor
-// of a kept unit (a section's card, its header, its body, its panels) stays
-// too and is reconciled inside, level by level, matched by id. That is why
-// every ancestor of a unit up to the list has an id. The one time a kept unit
-// is moved is when two kept units changed places, and then it is the one that
-// does not hold the focus (a unit taken out of the document drops the focus
-// and its editor is built again).
+// A KEPT UNIT IS THE SAME ELEMENT AFTERWARDS, AND IS NOT MOVED. The list is
+// not replaced; it is RECONCILED AROUND the kept units by the merge core it
+// shares with notes (`live/keep_merge.js`, whose header holds the mechanics: the
+// answer drawn before, between and after what stays, the ancestors of what
+// stays reconciled level by level and matched by id, and the one move, when
+// two kept units changed places, of the one without the focus). This module
+// says what is kept: the units that hold unsaved text, and for its own
+// reasons below what is `same`, what the caller holds and a notice nobody has
+// dismissed. That is why every ancestor of a unit up to the list has an id: a
+// section's card, its header, its body, its panels.
 //
 // A BLOCK IS ONE SUBJECT AND HAS ONE FORM ON SCREEN AT A TIME. The subject is
 // `data-editing-subject` ("block-<id>", on a card, a panel, a tile and a
@@ -141,7 +140,7 @@ export function holds(unit, unsaved) {
   return forms.some((form) => unsaved(form))
 }
 
-export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = null, away = [] }) {
+export function mergeBlockList(list, fresh, { unsaved, onlyChanged = false, hold = null, away = [] }) {
   // What a script moved out of the list (see WHAT A SCRIPT MOVED AWAY above).
   const movedOut = away.filter((element) => element.id && element.isConnected && !list.contains(element))
   const roots = [ list, ...movedOut ]
@@ -164,7 +163,7 @@ export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = nu
   const notices = [ ...list.querySelectorAll("[data-editing-strip-slot]") ].filter((slot) => slot.querySelector("[role=alert]:not(:empty)") && reachable(slot, list))
   withState(roots, () => {
     const extra = new Set([ ...same, ...held, ...notices ])
-    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, extra)
+    reconcile(list, fresh, keep, new Set(moved), gone, extra)
     for (const [ element, twin ] of twins) mergeAway(element, twin, keep, new Set(moved), gone, extra, awayGone)
     for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
@@ -199,7 +198,7 @@ function mergeAway(element, twin, keep, moved, gone, extra, awayGone) {
   }
   if (keep.has(element) || extra.has(element)) return
   syncAttributes(element, twin, [ "hidden" ])
-  reconcile(element, [ ...twin.children ], keep, moved, gone, extra)
+  reconcile(element, twin, keep, moved, gone, extra)
 }
 
 // A clean element a script moved out of the list, brought up to date where
@@ -212,7 +211,7 @@ function mergeAway(element, twin, keep, moved, gone, extra, awayGone) {
 export function mergeMoved(element, twin) {
   withState([ element ], () => {
     syncAttributes(element, twin, [ "hidden" ])
-    reconcile(element, [ ...twin.children ], new Set(), new Set(), [], new Set())
+    reconcile(element, twin, new Set(), new Set(), [], new Set())
   })
 }
 
@@ -349,58 +348,34 @@ function displace(root, fresh, keep, { containers = true } = {}) {
   return moved
 }
 
-// Makes `container`'s children those of `fresh`, in that order, around what stays.
-// `keep` are the units that hold unsaved text: only those can be gone. `extra`
-// are what stays for another reason (same version, held by the caller): a clean
-// element is never marked gone, an answer that lacks its level removes it only
-// through its ancestors being removed.
+// `container` (the list, or an element a script moved out of it) reconciled
+// against `fresh`, the answer's element for it, by the core
+// (`live/keep_merge`). `keep` are the units that hold unsaved text: the core
+// keeps them, and only they can be gone (a kept unit the answer lacks, or one
+// inside an element the answer lacks, which stays for it). `extra` are what
+// stays for another reason (same version, held by the caller, a notice): kept
+// only where the answer has them, in the same container, so a clean element
+// is never left behind and never marked gone, and an answer that lacks its
+// level removes it with that level (`within` asks for `keep` alone of an
+// element the answer lacks).
 function reconcile(container, fresh, keep, moved, gone, extra = new Set()) {
-  const wanted = new Set(fresh.map((each) => each.id).filter(Boolean))
-  // What stays although the answer has no such element, each with the id of
-  // the nearest sibling before it that the answer does have (null: first).
-  const stays = []
-  let anchor = null
-  for (const child of [ ...container.children ]) {
-    const survives = Boolean(child.id) && wanted.has(child.id)
-    // Gone from the answer, and nothing in it holds unsaved text: removed,
-    // although a clean element of `extra` is in it.
-    if (!carries(child, keep, extra) || (!survives && !carries(child, keep, new Set()))) {
-      child.remove()
-      if (survives) anchor = child.id
-    } else if (survives) {
-      anchor = child.id
-    } else {
-      stays.push({ element: child, anchor })
-      for (const unit of keep) if ((unit === child || child.contains(unit)) && !moved.has(unit) && !gone.includes(unit)) { unit.dataset.editingGone = "true"; gone.push(unit) }
-    }
+  const home = [ ...extra ].filter((element) => container.contains(element) && atHome(element, container, fresh))
+  const { orphans } = keepMerge(container, [ ...fresh.children ], {
+    kept: new Set([ ...keep, ...home ]),
+    within: (element, twin) => carries(element, keep, twin ? extra : new Set()),
+    sync: (live, twin) => syncAttributes(live, twin)
+  })
+  for (const orphan of orphans) {
+    for (const unit of keep) if ((unit === orphan || orphan.contains(unit)) && !moved.has(unit) && !gone.includes(unit)) { unit.dataset.editingGone = "true"; gone.push(unit) }
   }
+}
 
-  // The order the container ends in: the stayers that belong first, then each
-  // of the answer's elements followed by the stayers that were behind it.
-  const order = stays.filter((stay) => stay.anchor === null).map((stay) => stay.element)
-  for (const twin of fresh) {
-    const live = twin.id ? [ ...container.children ].find((child) => child.id === twin.id) : null
-    if (live && !keep.has(live) && !extra.has(live)) {
-      syncAttributes(live, twin)
-      reconcile(live, [ ...twin.children ], keep, moved, gone, extra)
-    }
-    order.push(live || twin)
-    if (twin.id) for (const stay of stays) if (stay.anchor === twin.id) order.push(stay.element)
-  }
-
-  let after = null
-  for (const node of order) {
-    let expected = after ? after.nextElementSibling : container.firstElementChild
-    // Whoever has the focus is not the one taken out of the document: what
-    // stands in its way is moved to the end instead (and put in its own place
-    // when its turn comes).
-    while (node !== expected && expected && node.contains(document.activeElement)) {
-      container.appendChild(expected)
-      expected = after ? after.nextElementSibling : container.firstElementChild
-    }
-    if (node !== expected) container.insertBefore(node, expected)
-    after = node
-  }
+// Whether the answer has `element`'s id in the same container (`root` and
+// `fresh` standing for each other).
+function atHome(element, root, fresh) {
+  if (!element.id) return false
+  const twin = fresh.querySelector(`#${CSS.escape(element.id)}`)
+  return Boolean(twin) && containerKey(twin, fresh) === containerKey(element, root)
 }
 
 // `left`: attributes not synchronised either way (an away element's `hidden`
