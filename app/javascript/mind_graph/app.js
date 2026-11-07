@@ -151,6 +151,9 @@ export function mount(element) {
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const typeLabels = JSON.parse(element.dataset.typeLabels)
   const buttonClasses = JSON.parse(element.dataset.buttonClasses)
+  // The tree row's classes (`Admin::Ui::TreeItemComponent::CLASSES`): the
+  // list's rows are the Pages tree's row.
+  const treeClasses = JSON.parse(element.dataset.treeClasses)
   // The chips and the card's Close, cloned from the server's own markup.
   const parts = readParts(element)
 
@@ -217,7 +220,7 @@ export function mount(element) {
   // "Not listed on any page" is there only for a viewer the server gave its
   // address (one who reads a page).
   const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, number, dotClasses, typeLabels, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl),
+    text, number, dotClasses, typeLabels, treeClasses, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl),
     onSelect: (id) => {
       const index = state.indexOf.get(id)
       if (index != null) selection.reveal(index)

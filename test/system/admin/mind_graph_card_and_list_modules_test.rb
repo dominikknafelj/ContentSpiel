@@ -5,6 +5,8 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # The parts the card and the list clone, imported beside the module under
   # test as `p`, and their template in the page as the view renders it.
   PARTS = { p: "mind_graph/parts" }.freeze
+  # The tree row's classes, as the view hands them to the list.
+  TREE_CLASSES = Admin::Ui::TreeItemComponent::CLASSES.to_json
 
   setup do
     page.execute_script("document.body.insertAdjacentHTML('beforeend', arguments[0])", ApplicationController.render(Admin::MindGraphScreen::PartsComponent.new, layout: false))
@@ -56,9 +58,11 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       const calls = []
       const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
       const parts = p.readParts(document.body)
-      const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts, onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
+      const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts, onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
                                              onAdd: (row) => calls.push([ "add", row.id ]), onUnlisted: (on) => calls.push([ "unlisted", on ]) })
-      const read = () => Array.from(container.querySelectorAll("h2, button")).map((item) => item.tagName === "H2" ? item.textContent : [ item.querySelector(".truncate").textContent, item.lastChild.textContent, item.style.paddingInlineStart, item.getAttribute("aria-label") ])
+      // A row's level: how many of the tree's children lists it stands in.
+      const level = (item) => { let found = 0; for (let list = item.closest("[data-tree-children]"); list; list = list.parentElement.closest("[data-tree-children]")) found += 1; return found }
+      const read = () => Array.from(container.querySelectorAll("h2, button")).map((item) => item.tagName === "H2" ? item.textContent : [ item.querySelector(".admin-tree-row__title").textContent, item.lastChild.textContent, level(item), item.getAttribute("aria-label") ])
       return { container, calls, list, read, parts }
     })()
   JS
@@ -237,36 +241,61 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                    [ "actions", [ "A", "card.show_tagged()", "/posts?tag=a%20b%26c", "primary" ], [ "A", "card.focus()", "/g?tag=3", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], tag
   end
 
-  test "list: four groups: Pages first, in tree order and indented by depth, then posts and tags by their connections, then the post types as the data has them" do
+  test "list: four groups: Pages first, in tree order a step per level, then posts and tags by their connections, then the post types as the data has them" do
     rows = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
-        const { container, list, read } = #{LIST_SCRIPT}
+        const { container, list, read, parts } = #{LIST_SCRIPT}
         list.render([ { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
-                      { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2, parent: "page-2" }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null },
+                      { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2, parent: "page-2" }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null, home: true },
                       { id: "page-2", kind: "page", title: "Docs", degree: 2, depth: 1, order: 1, parent: "page-1" }, { id: "page-9", kind: "page", title: "Stray", degree: 0, depth: 1, order: 3, parent: null },
                       { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 112, colour_index: 1 }, { id: "type-talk", kind: "type", title: "Talk", degree: 9, count: 1, colour_index: 8 },
                       { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, count: 0, colour_index: null }, { id: "all-posts", kind: "type", title: "All posts", degree: 1, count: 2040, colour_index: null },
                       { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
-        const markOf = (button) => { const mark = button.firstElementChild; return [ mark.tagName, mark.dataset.mark ?? (mark.classList.contains("truncate") ? "truncate" : mark.className.split(" ").pop()), mark.dataset.markOf ?? "-", mark.getAttribute("aria-hidden") ?? "-" ] }
+        const same = (element, names) => names.find((name) => element.isEqualNode(parts.part(name))) ?? "not a part"
+        // The mark box's content: a glyph by the part it is a clone of, else the element.
+        const markOf = (button) => {
+          const mark = button.querySelector(":scope > .admin-tree-row__mark").firstElementChild
+          if (!mark) return [ "empty" ]
+          if (mark.tagName.toLowerCase() === "svg") return [ "glyph", same(mark, [ "tree-home-mark", "tree-page-mark" ]) ]
+          return [ mark.tagName, mark.dataset.mark ?? mark.className.split(" ").pop(), mark.dataset.markOf ?? "-", mark.getAttribute("aria-hidden") ?? "-" ]
+        }
+        // The disclosure box: the part (drawn open), empty, or none on a flat row.
+        const boxOf = (row) => {
+          const box = row.querySelector(":scope > .admin-tree-row__disclosure")
+          if (!box) return row.classList.contains("admin-tree-row--flat") ? "flat" : "none"
+          return box.childElementCount ? same(box, [ "tree-disclosure" ]) : "empty"
+        }
+        list.mark("page-2")
+        const marked = Array.from(container.querySelectorAll("button"), (button) => [ button.classList.contains("admin-tree-row--selected"), button.getAttribute("aria-current") ?? "-" ]).filter(([ selected, current ]) => selected || current !== "-")
+        list.mark("post-1")
+        const moved = [ list.row("page-2").className, list.row("post-1").className ]
+        list.mark(null)
         // Where a page's row stands in the document: the row of the item its list is in, or "top". (No null: the driver drops one from an array.)
         const under = (id) => list.row(id).closest("ul").parentElement.closest("li")?.querySelector("button").dataset.nodeId ?? "top"
-        return { rows: read(), marks: Array.from(container.querySelectorAll("button"), markOf),
+        return { rows: read(), marks: Array.from(container.querySelectorAll("button"), markOf), boxes: Array.from(container.querySelectorAll("h2, button"), boxOf),
+                 marked, moved, cleared: container.querySelectorAll(".admin-tree-row--selected, [aria-current]").length,
+                 classes: [ container.querySelector("[data-mind-graph-rows]").classList.contains("admin-tree"), Array.from(container.querySelectorAll("[data-tree-children]"), (list) => list.className) ],
                  under: [ "page-1", "page-2", "page-3", "page-9" ].map(under),
                  lists: Array.from(container.querySelectorAll("section"), (section) => [ section.querySelector("h2").textContent, section.querySelector("ul").getAttribute("aria-labelledby") === section.querySelector("h2").id, section.querySelector("ul").getAttribute("role") ]),
                  checkbox: [ container.firstElementChild.tagName, container.querySelector("label input").type, container.querySelector("label").textContent ] }
       })()
     JS
 
-    assert_equal [ "list.pages(4)", [ "Home", "1", "12px", "list.select_page(Home,1)" ], [ "Docs", "2", "24px", "list.select_page(Docs,2)" ],
-                   [ "Child", "9", "36px", "list.select_page(Child,9)" ], [ "Stray", "0", "24px", "list.select_page(Stray,0)" ],
-                   "list.posts(1)", [ "Post", "1", "", "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", "", "list.select_tag(tag,2)" ],
-                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", "28px", "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
-                   [ "gone (retired)", "0", "", "list.select_type(gone (retired),0)" ], [ "All posts", "2040", "", "list.select_type(All posts,2040)" ] ], rows["rows"],
-      "a page whose parent is not in the data is listed after the tree, indented once; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row stands under the row of what it hangs off and is no post type: the group still counts four"
+    assert_equal [ "list.pages(4)", [ "Home", "1", 0, "list.select_page(Home,1)" ], [ "Docs", "2", 1, "list.select_page(Docs,2)" ],
+                   [ "Child", "9", 2, "list.select_page(Child,9)" ], [ "Stray", "0", 0, "list.select_page(Stray,0)" ],
+                   "list.posts(1)", [ "Post", "1", 0, "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", 0, "list.select_tag(tag,2)" ],
+                   "list.types(4)", [ "Blog", "112", 0, "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", 1, "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", 0, "list.select_type(Talk,1)" ],
+                   [ "gone (retired)", "0", 0, "list.select_type(gone (retired),0)" ], [ "All posts", "2040", 0, "list.select_type(All posts,2040)" ] ], rows["rows"],
+      "a page steps once per level under its parent, and one whose parent is not in the data stands after the tree at the top; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row is the child of what it hangs off and is no post type: the group still counts four"
     assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's row is in a list inside its parent's item, and one with no parent here at the top"
-    assert_equal [ [ "CANVAS", "page", "-", "true" ] ] * 4 + [ [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
-                 [ [ "CANVAS", "type", "1", "true" ], [ "SPAN", "truncate", "-", "-" ], [ "CANVAS", "type", "8", "true" ], [ "CANVAS", "type", "retired", "true" ], [ "CANVAS", "type", "all-posts", "true" ] ], rows["marks"],
-      "a page's and a post type's mark are the renderer's canvases, each hub saying which it is; a post's dot and a tag's square are CS Studio's own"
+    assert_equal [ [ "glyph", "tree-home-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
+                 [ [ "CANVAS", "type", "1", "true" ], [ "empty" ], [ "CANVAS", "type", "8", "true" ], [ "CANVAS", "type", "retired", "true" ], [ "CANVAS", "type", "all-posts", "true" ] ], rows["marks"],
+      "a page's mark is the tree's glyph, Home's the house; a post type's is the renderer's canvas, each hub saying which it is; a post's dot and a tag's square are CS Studio's own; a pill's box is empty"
+    assert_equal %w[tree-disclosure tree-disclosure tree-disclosure empty empty tree-disclosure flat tree-disclosure flat tree-disclosure tree-disclosure flat flat flat flat], rows["boxes"],
+      "each heading, a page with children here and a hub a pill hangs off draw the disclosure part; a leaf page keeps its box empty; a post, a tag, a type and a pill are flat"
+    assert_equal [ [ [ true, "true" ] ], [ "admin-tree-row", "admin-tree-row admin-tree-row--flat admin-tree-row--selected" ], 0 ], rows.values_at("marked", "moved", "cleared"),
+      "the marked row takes the tree's selected class with aria-current, one at a time, and none is left with the mark cleared"
+    assert_equal [ true, [ "admin-tree__children" ] * 3 ], rows["classes"], "the rows' region is the tree, and a parent's children stand in the tree's children list"
     assert_equal [ [ "list.pages(4)", true, "list" ], [ "list.posts(1)", true, "list" ], [ "list.tags(1)", true, "list" ], [ "list.types(4)", true, "list" ] ], rows["lists"], "each group is a list named by its heading"
     assert_equal [ "LABEL", "checkbox", "list.unlisted()" ], rows["checkbox"]
   end
@@ -295,19 +324,26 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                       { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
         const same = (element, name) => element.isEqualNode(parts.part(name)) ? name : `not ${name}`
         const icons = [ "icon-page", "icon-post", "icon-tag", "icon-type" ]
-        const headings = Array.from(container.querySelectorAll("section > h2"), (heading, index) => [ heading.textContent, same(heading.firstElementChild, icons[index]), heading.firstElementChild.getAttribute("aria-hidden") ])
+        const chipOf = (heading) => heading.querySelector(":scope > .admin-tree-row__mark").firstElementChild
+        const headings = Array.from(container.querySelectorAll("section > h2"), (heading, index) => [ heading.textContent, same(chipOf(heading), icons[index]), chipOf(heading).getAttribute("aria-hidden") ])
+        // A heading is a row of the tree: the disclosure part, the chip in the mark box, the words with the figure in the count style.
+        const row = container.querySelector("section > h2")
+        const look = [ row.className, same(row.firstElementChild, "tree-disclosure"), row.querySelector(".admin-tree-row__title > .text-label").firstChild.textContent,
+                       row.querySelector(".admin-tree-row__title > .text-label > .text-count").textContent, Array.from(container.querySelectorAll("section"), (section) => section.className) ]
         const rows = Array.from(container.querySelectorAll("button[data-node-id]"), (button) => {
           const chips = Array.from(button.querySelectorAll(".admin-status-chip, [data-unpublished-changes]"))
           const held = chips[0]?.parentElement
           return [ button.dataset.nodeId, chips.map((chip) => same(chip, chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`)),
-                   held ? [ held.getAttribute("aria-hidden"), held.previousElementSibling.classList.contains("truncate") ] : "-", button.getAttribute("aria-label") ]
+                   held ? [ held.getAttribute("aria-hidden"), held.previousElementSibling.classList.contains("admin-tree-row__title") ] : "-", button.getAttribute("aria-label") ]
         })
-        return { headings, rows }
+        return { headings, look, rows }
       })()
     JS
 
     assert_equal [ [ "list.pages(3)", "icon-page", "true" ], [ "list.posts(5)", "icon-post", "true" ], [ "list.tags(1)", "icon-tag", "true" ], [ "list.types(1)", "icon-type", "true" ] ], result["headings"],
-      "each group's heading starts with its kind's icon chip, and its words are the heading's whole text"
+      "each group's heading has its kind's icon chip in the mark box, and its words are the heading's whole text"
+    assert_equal [ "admin-tree-row", "tree-disclosure", "list.pages(", "3", [ "not-first:mt-3" ] * 4 ], result["look"],
+      "a heading is the tree's row with the disclosure part, its figure cut out of its words into the count style, and each group but the first stands 12px below the one before"
     hidden = [ "true", true ]
     assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1)" ],
                    [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1)" ],
@@ -334,7 +370,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const words = #{words.to_json}
         const text = { t: (key, values = {}) => Object.entries(values).reduce((said, [ name, value ]) => said.split(`%{${name}}`).join(value), words[key] ?? `missing ${key}`), locale: () => "en" }
         const container = document.createElement("div")
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         const post = { kind: "post", degree: 2, colour_index: 1, type: "blog", changes: null }
         list.showRows({ heading: "Posts", rows: [ { ...post, id: "post-1", title: "Alpha", status: "draft", unpublished: false }, { ...post, id: "post-2", title: "Beta", status: "scheduled", unpublished: true },
                                                   { ...post, id: "post-3", title: "Gamma", status: "live", changes: "unpublished", unpublished: true } ], inView: (id) => id !== "post-3" })
@@ -366,8 +402,8 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       })()
     JS
 
-    assert_equal [ "Posts · 3", [ "Drawn", "3", "", "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", "", "list.add_post(<b>Absent</b>,blog)" ],
-                   [ "Old", "list.not_in_view()", "", "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
+    assert_equal [ "Posts · 3", [ "Drawn", "3", 0, "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", 0, "list.add_post(<b>Absent</b>,blog)" ],
+                   [ "Old", "list.not_in_view()", 0, "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
       "the type's label in lower case, and for a retired type its stored name in lower case in its own sentence: never a bare 'post'"
     assert_equal %w[post-2 post-3], result["absent"]
     assert_equal [ [ "select", "post-1" ], [ "add", "post-2" ], [ "add", "post-3" ], [ "unlisted", true ] ], result["calls"]
@@ -464,7 +500,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       (() => {
         const container = document.createElement("div")
         const text = { t: (key) => key, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: [], parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: [], parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
         list.setUnlisted(true)
         return [ container.querySelectorAll("input, label").length, container.querySelectorAll("button[data-node-id]").length ]
@@ -484,7 +520,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
                                                onAdd() {}, onUnlisted() {}, onMore: (id) => calls.push([ "more", id ]), onBack() {} })
         document.body.append(container)
         const order = () => Array.from(container.querySelectorAll("h2, button[data-node-id]"), (item) => item.tagName === "H2" ? item.textContent : item.dataset.nodeId)
@@ -531,7 +567,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key) => key.split(".").slice(-2).join("."), locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts: p.readParts(document.body), onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts: p.readParts(document.body), onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
         document.body.append(container)
         const back = { label: "Back to the list", onBack: () => calls.push("back") }
         const rows = [ { id: "post-1", title: "One", degree: 0, type: "blog" }, { id: "post-2", title: "Two", degree: 0, type: "blog" } ]

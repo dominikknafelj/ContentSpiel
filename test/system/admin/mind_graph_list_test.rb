@@ -69,7 +69,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     within(LIST) do
       assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
       assert_row "#{ContentTypes.fetch("blog").label}: post type, 2 posts. Shows it in the graph."
-      assert_selector "button[data-node-id='type-blog'] > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
+      assert_selector "button[data-node-id='type-blog'] > .admin-tree-row__mark > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
       assert_equal "2", find("button[data-node-id='type-blog']").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
     end
     # The fourth group is the keyboard's way to a post type's node: its row
@@ -232,17 +232,20 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card" do
     docs = create_page(title: "<b>Docs</b>")
     create_page(title: "Guide", parent: docs)
+    # A post type a page lists: its hub's row has a canvas for its mark.
+    ContentBlock.create!(owner: docs, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     visit admin_mind_graph_path
     await_graph
 
     within(LIST) do
-      assert_equal [ "PAGES · 3" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], all("li button span.truncate").map(&:text)
+      assert_equal [ "PAGES · 3", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], find("section", match: :first).all("li button .admin-tree-row__title").map(&:text)
       assert_no_selector "b"
       # A tree for a screen reader too: a page's row is in a list inside its
       # parent's item, three levels deep here.
       assert_selector "ul[role=list] > li > ul[role=list] > li > ul[role=list] > li > button[data-node-id='#{nid(Page.find_by!(parent: docs))}']"
-      assert_selector "li > button > canvas[data-mark=page][aria-hidden='true']", count: 3
+      assert_selector "li > button > .admin-tree-row__mark > svg[aria-hidden='true']", count: 3
+      assert_selector "li > button > .admin-tree-row__mark > canvas[data-mark=type][aria-hidden='true']", count: 1
     end
     assert_marks_drawn LIST
     # In the Tab order the filter's checkbox is the list's first stop, after
@@ -252,11 +255,11 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
         .filter((element) => element.checkVisibility() && !element.closest("[hidden]") && (element.tagName === "CANVAS" || element.closest("[data-mind-graph-list]")))
         .map((element) => element.tagName === "CANVAS" ? "canvas" : element.type === "checkbox" ? "checkbox" : "row")
     JS
-    assert_equal %w[canvas checkbox row row row], stops
+    assert_equal %w[canvas checkbox row row row row], stops
 
-    # A canvas holds colours, not tokens: a row's mark is drawn again when
-    # the theme changes, like the graph.
-    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=page]".to_json}).toDataURL()"
+    # A canvas holds colours, not tokens: a hub row's mark is drawn again
+    # when the theme changes, like the graph.
+    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=type]".to_json}).toDataURL()"
     before = page.evaluate_script(mark)
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
     begin
@@ -300,7 +303,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     rows.each do |row|
       room = page.evaluate_script(<<~JS)
         (() => {
-          const title = document.querySelector(#{row.to_json}).querySelector("span.truncate")
+          const title = document.querySelector(#{row.to_json}).querySelector(".admin-tree-row__title")
           const range = document.createRange()
           range.setStart(title.firstChild, 0)
           range.setEnd(title.firstChild, 20)
@@ -337,7 +340,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     within(LIST) do
       assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }, "the rows are named by what the pill hangs off"
       assert_selector "section button[data-mind-graph-back]", text: "Back to the list"
-      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+      assert_equal [ "Entry 20", "Entry 21" ], all("li button .admin-tree-row__title").map(&:text)
       assert_selector "button[data-not-in-view]", count: 2
       assert_row "Entry 21, #{entry.downcase} post, not in view. Activate to add it to the graph."
       assert_selector "a[data-mind-graph-posts-link]", text: "Open in Posts →"
@@ -444,7 +447,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     focused.call(nid(posts[20]))
     within(LIST) do
       assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+      assert_equal [ "Entry 20", "Entry 21" ], all("li button .admin-tree-row__title").map(&:text)
     end
     assert_equal "", graph["data-selected"], "the pill is not selected by its row either"
 
@@ -565,7 +568,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
       within(LIST) do
         assert_selector "button[data-mind-graph-back]"
         assert_equal [ "MORE FROM #{entry.upcase} · 5" ], all("h2").map { |heading| heading.text.upcase }
-        assert_equal entries.last(5).map(&:title), all("li button span.truncate").map(&:text)
+        assert_equal entries.last(5).map(&:title), all("li button .admin-tree-row__title").map(&:text)
         assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
       end
 
@@ -573,7 +576,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
       within(LIST) do
         assert_selector "h2", text: /more from pill/i
         assert_equal [ "MORE FROM PILL · 5" ], all("h2").map { |heading| heading.text.upcase }
-        assert_equal pills.last(5).map(&:title), all("li button span.truncate").map(&:text), "the other pill's posts, and none of the first's"
+        assert_equal pills.last(5).map(&:title), all("li button .admin-tree-row__title").map(&:text), "the other pill's posts, and none of the first's"
         assert_equal({ "tag" => "pill" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
       end
       lines = graph["data-edges"].to_i
@@ -619,12 +622,12 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     within(LIST) do
       # (The headings are in the upper-case label style.)
       assert_equal [ "POSTS · 3", "TAGS · 1" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Alpha", "Beta", "Gamma", "shared" ], all("li button span.truncate").map(&:text), "posts then tags, best-connected first, equals by title"
-      assert_equal %w[2 1 1 2], all("li button span:last-child").map(&:text), "each row's number of connections"
+      assert_equal [ "Alpha", "Beta", "Gamma", "shared" ], all("li button .admin-tree-row__title").map(&:text), "posts then tags, best-connected first, equals by title"
+      assert_equal %w[2 1 1 2], all("li button > .admin-tree-row__trailing").map(&:text), "each row's number of connections"
       assert_row "Alpha: post, 2 connections. Shows it in the graph."
       assert_row "Gamma: post, 1 connection. Shows it in the graph."
       assert_row "shared: tag, 2 connections. Shows it in the graph."
-      assert_selector "li button > span[aria-hidden='true']", count: 4
+      assert_selector "li button > .admin-tree-row__mark > span[aria-hidden='true']", count: 4
       assert_no_selector "a", visible: :all
       # Nobody reads a page here (there is none), so "Not listed on any
       # page" would say nothing: the filter is not offered.
@@ -635,7 +638,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     await_graph
     within(LIST) do
       assert_equal [ "POSTS · 3" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal %w[Alpha Beta Gamma], all("li button span.truncate").map(&:text)
+      assert_equal %w[Alpha Beta Gamma], all("li button .admin-tree-row__title").map(&:text)
     end
   end
 
@@ -649,7 +652,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
 
     within(LIST) do
       assert_selector "li", count: 2
-      assert_equal %w[One Two], all("li button span.truncate").map(&:text)
+      assert_equal %w[One Two], all("li button .admin-tree-row__title").map(&:text)
     end
   end
 
@@ -671,7 +674,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_equal nid(a), graph["data-selected"]
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
     assert_equal zoom, graph["data-zoom"], "centring changed the zoom"
-    assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
+    assert_selector "#{LIST} button[aria-current='true'].admin-tree-row--selected", text: "Alpha", count: 1
+    assert_selector "#{LIST} .admin-tree-row--selected", count: 1
     assert_selector "[data-mind-graph-card] h2", text: "Alpha"
     await_frames
     assert_card_beside(a, side: "right")
@@ -682,6 +686,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "#{LIST} button[aria-current='true']", text: "Beta", count: 1
     escape_on_canvas
     assert_no_selector "#{LIST} button[aria-current]"
+    assert_no_selector "#{LIST} .admin-tree-row--selected"
   end
 
   # The other direction: a node selected on the canvas has its row marked, and
@@ -752,7 +757,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
-    assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('span.truncate')?.textContent"), "the focus did not go back to the row"
+    assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('.admin-tree-row__title')?.textContent"), "the focus did not go back to the row"
 
     # Enter on the row again, then Enter on the card: the post.
     page.driver.browser.keyboard.type(:Enter)
@@ -831,7 +836,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    within(LIST) { assert_selector "button span.truncate", exact_text: nasty }
+    within(LIST) { assert_selector "button .admin-tree-row__title", exact_text: nasty }
     fill_in "Find a page, post or tag", with: "onerror"
     within("[data-mind-graph-results]") { assert_link nasty }
 

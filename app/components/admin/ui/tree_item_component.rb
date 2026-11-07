@@ -1,11 +1,14 @@
 module Admin
   module Ui
     # One row of a tree of the site's pages, the one row both trees draw:
-    # Pages renders it. The mind graph's list is to read its classes
-    # (`CLASSES`) and build the same markup; `flat:` and the treeitem rules
-    # are for it and nothing draws them yet. The nesting around it (`<ul>`/`<li>` in Pages, the
-    # treeitems of the graph's list) is the screen's, and so are the title's
-    # link and every extra in the slots.
+    # Pages renders it, and the mind graph's list reads its classes
+    # (`CLASSES`, the view's `data-tree-classes`) and builds the same markup
+    # in `mind_graph/node_list.js`, with the parts' glyphs
+    # (`Admin::MindGraphScreen::PartsComponent`); `test/system/admin/
+    # tree_item_parity_test.rb` measures the two. `flat:` is the graph's
+    # (its posts, tags and post types). The nesting around it (`<ul>`/`<li>`
+    # in both, the children lists in `CLASSES[:children]`) is the screen's,
+    # and so are the title's link and every extra in the slots.
     #
     # Its look is the `.admin-tree` block of `content-spiel.tailwind.css` and
     # its lengths the four `--cs-tree-*` of `content-spiel.css`: every value

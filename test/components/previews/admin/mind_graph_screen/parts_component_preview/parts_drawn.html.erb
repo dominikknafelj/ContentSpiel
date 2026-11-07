@@ -1,6 +1,6 @@
 <dl class="grid grid-cols-[auto_auto] items-center gap-x-4 gap-y-2 p-4 text-sm text-ink">
   <% Admin::MindGraphScreen::PartsComponent::NAMES.each do |name| %>
     <dt class="text-label text-meta"><%= name %></dt>
-    <dd class="m-0"><%= render Admin::MindGraphScreen::PartsComponent.component(name, close_label: t("admin.components.mind_graph_screen.parts.close")) %></dd>
+    <dd class="m-0"><%= Admin::MindGraphScreen::PartsComponent.markup(name, self, close_label: t("admin.components.mind_graph_screen.parts.close")) %></dd>
   <% end %>
 </dl>

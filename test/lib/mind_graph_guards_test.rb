@@ -301,4 +301,53 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
       assert_not_empty status_word_mismatches(planted), "#{source}#{".#{key}" if key} changed alone passed"
     end
   end
+
+  # THE LIST'S ROWS ARE THE TREE'S ROW (`Admin::Ui::TreeItemComponent`): a
+  # row's classes are read from `data-tree-classes`, never written in
+  # `node_list.js`, so the graph's rows cannot part from the Pages tree's. A
+  # row's own look would be written as padding, a text size, the old
+  # selection tint or a weight, so every string of the script that holds one
+  # of those fails, unless it lays out something that is not a row
+  # (`LIST_LAYOUT_LITERALS`, each with its reason).
+  ROW_LOOK = /(?<![\w-])(?:[\w\[\]-]+:)*(?:px-|py-|text-sm(?![\w-])|bg-accent-tint|font-semibold)/
+  LIST_LAYOUT_LITERALS = {
+    "flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-sm text-dim" => "the label of the \"Not listed on any page\" filter, above the tree",
+    "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" =>
+      "\"Back to the list\", a button that reads as a link",
+    "${classes.tree} px-2 pt-2" => "the rows' region: the tree's own class, inside the column's gutter",
+    "m-0 flex min-w-0 items-center gap-2 px-1 pb-1 pt-1 text-label text-meta" => "the heading of a filter's or a pill's rows, which is no row of the tree",
+    "m-0 px-1 py-1 text-sm text-meta" => "the line of a list with nothing drawn",
+    "flex flex-col items-start gap-2 px-1 py-1" => "the box of a failed read's line and its buttons",
+    "m-0 text-sm text-meta" => "a failed read's line",
+    "mx-1 mt-2 inline-block text-sm text-accent underline" => "\"Open in Posts\", under a pill's rows"
+  }.freeze
+
+  # The string literals of a script, its comments stripped: double-quoted,
+  # single-quoted and template strings, as written.
+  def self.literals(source)
+    code = source.gsub(%r{/\*.*?\*/}m, "").gsub(%r{(?<![:"'\\])//.*$}, "")
+    code.scan(/"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'|`((?:[^`\\]|\\.)*)`/m).map(&:compact).map(&:first)
+  end
+
+  def self.row_look_offences(source) = literals(source).select { |literal| literal.match?(ROW_LOOK) } - LIST_LAYOUT_LITERALS.keys
+
+  test "the graph's list writes no class of its own for a row: every row class is read from data-tree-classes" do
+    assert_empty self.class.row_look_offences(script("node_list.js")), "a row's look is the tree's (`data-tree-classes`), or the literal lays out what is no row and stands in LIST_LAYOUT_LITERALS with its reason"
+    sample = %(const ROW = "flex w-full items-center gap-2 px-3 py-1 text-sm aria-[current]:bg-accent-tint"\nconst NOTE = "m-0 text-label" // px-3 in a comment)
+    assert_equal [ "flex w-full items-center gap-2 px-3 py-1 text-sm aria-[current]:bg-accent-tint" ], self.class.row_look_offences(sample), "a row class written in a string is reported, and a comment is not"
+  end
+
+  test "every layout literal the list is let write is still written, and still needs the leave" do
+    held = self.class.literals(script("node_list.js"))
+    assert_empty LIST_LAYOUT_LITERALS.keys - held, "these literals are gone from node_list.js: drop them from LIST_LAYOUT_LITERALS"
+    assert_empty LIST_LAYOUT_LITERALS.keys.grep_v(ROW_LOOK), "these literals hold nothing the row guard reads: they need no place in LIST_LAYOUT_LITERALS"
+  end
+
+  test "every data-tree-classes key the graph reads is one of CLASSES" do
+    source = script("node_list.js").gsub(%r{/\*.*?\*/}m, "").gsub(%r{(?<![:"'])//.*$}, "")
+    read = source.scan(/\bclasses\.(\w+)/).flatten.uniq.map(&:to_sym)
+    assert_includes read, :row, "the list reads no row class from data-tree-classes"
+    assert_empty read - Admin::Ui::TreeItemComponent::CLASSES.keys, "node_list.js reads a tree class TreeItemComponent::CLASSES does not have"
+    assert_no_match(/\bclasses\[/, source, "a class read by a computed name is one this guard cannot check")
+  end
 end
