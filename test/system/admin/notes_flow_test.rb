@@ -251,7 +251,10 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # Each is read through the notes action, by its attachment's id; no
     # Active Storage address is in the page.
     files_path = %r{\A/cs-studio/notes/page/#{@page.id}/threads/#{note.thread_id}/messages/#{note.id}/files/\d+\z}
-    all("#notes-drawer [data-note-files] a").each { |link| assert_match files_path, URI(link[:href]).path }
+    # Read in one call: a live refresh may draw the links again meanwhile.
+    hrefs = page.evaluate_script("Array.from(document.querySelectorAll('#notes-drawer [data-note-files] a'), (link) => link.href)")
+    assert_equal 2, hrefs.size
+    hrefs.each { |href| assert_match files_path, URI(href).path }
     assert_no_selector "#notes-drawer [src*='/rails/active_storage'], #notes-drawer [href*='/rails/active_storage']", visible: :all
 
     # Nobody has reacted: the add control in the meta line shows on hover or

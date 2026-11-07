@@ -173,6 +173,8 @@ export default class extends Controller {
     this.listScroll = null
     this.fromList = false
     this.inside = false
+    // The next panel starts closed, so its first show is an opening.
+    this.showing = false
   }
 
   countsTargetConnected(element) {
