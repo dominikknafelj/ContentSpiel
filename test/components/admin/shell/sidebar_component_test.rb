@@ -43,32 +43,35 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=page]", text: "Dashboard"
   end
 
-  test "each module's icon is on its family's chip: Posts lists, Media media, Forms form, the rest neutral" do
-    render_sidebar(labels: all_modules.map { |entry| entry[:label] }, current_path: "/cs-studio/account")
-    chip = ->(label) { link(label).find("span[aria-hidden=true][class~='rounded-chip']") }
+  def chip(label) = link(label).find("span[aria-hidden=true][class~='rounded-chip']")
 
-    assert_includes chip.call("Posts")[:class].split, "bg-ic-lists-bg"
-    assert_includes chip.call("Media")[:class].split, "bg-ic-media-bg"
-    assert_includes chip.call("Forms")[:class].split, "bg-ic-form-bg"
-    (all_modules.map { |entry| entry[:label] } - %w[Posts Media Forms]).each do |label|
-      assert_includes chip.call(label)[:class].split, "bg-sunken", label
+  test "no module's chip is neutral, and each is its family's" do
+    render_sidebar(labels: all_modules.map { |entry| entry[:label] }, current_path: "/cs-studio/account")
+
+    all_modules.each do |entry|
+      classes = chip(entry[:label])[:class].split
+      assert_includes classes, "bg-ic-#{entry[:family]}-bg", entry[:label]
+      assert_includes classes, "text-ic-#{entry[:family]}", entry[:label]
+      assert_not_includes classes, "bg-sunken", entry[:label]
+      assert_not_includes classes, "bg-accent-tint", entry[:label]
     end
   end
 
-  test "the current module's chip is the accent tint, on the accent tint with accent words" do
+  test "the current module keeps its chip's family on the accent-tint row with accent words" do
     render_sidebar(labels: %w[Dashboard Posts Media])
 
     current = page.find("a[aria-current=page]")
     assert_equal "Posts", current.text.strip
     assert_includes current[:class].split, "bg-accent-tint"
     assert_includes current[:class].split, "text-accent"
-    assert current.has_selector?("span[aria-hidden=true][class~='bg-accent-tint'][class~='text-accent']")
-    assert_no_selector "a:not([aria-current]) [class~='bg-ic-lists-bg']"
+    assert current.has_selector?("span[aria-hidden=true][class~='bg-ic-lists-bg'][class~='text-ic-lists']")
+    assert_no_selector "span[aria-hidden=true][class~='rounded-chip'][class~='bg-accent-tint']"
     # The other rows rest on the column, sunken under the pointer, in 8px corners.
     other = link("Media")
     assert_includes other[:class].split, "rounded-button"
     assert_includes other[:class].split, "hover:bg-sunken"
     assert_not_includes other[:class].split, "bg-accent-tint"
+    assert_includes chip("Media")[:class].split, "bg-ic-media-bg"
   end
 
   test "the labels and headings are read from keys" do

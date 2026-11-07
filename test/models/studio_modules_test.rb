@@ -13,7 +13,6 @@ class StudioModulesTest < ActiveSupport::TestCase
     StudioModules.groups.each { |group| assert I18n.exists?("admin.module_groups.#{group}", :en), "admin.module_groups.#{group} is missing" }
 
     assert_equal %i[content people system], StudioModules.groups
-    assert_equal({ posts: :lists, media: :media, forms: :form }, StudioModules.entries.reject { |entry| entry.family == :neutral }.to_h { |entry| [ entry.name, entry.family ] })
     # The first entry is open to everyone: the Pages index falls back to it.
     assert_nil StudioModules.entries.first.permission
     assert_equal %i[dashboard trash], StudioModules.entries.select(&:badge).map(&:name)
@@ -22,17 +21,46 @@ class StudioModulesTest < ActiveSupport::TestCase
 
   test "a second module of one name is refused, and a badge for an unknown module is refused" do
     StudioModules.with(StudioModules.entries) do
-      error = assert_raises(ArgumentError) { StudioModules.register(:pages, icon: :pages, path: :admin_pages_path, permission: "pages.read", group: :content) }
+      error = assert_raises(ArgumentError) { StudioModules.register(:pages, icon: :pages, family: :structure, path: :admin_pages_path, permission: "pages.read", group: :content) }
       assert_match(/pages/, error.message)
       assert_raises(ArgumentError) { StudioModules.badge(:nowhere) { |viewer:| 1 } }
-      assert_raises(ArgumentError) { StudioModules.register(:elsewhere, icon: :pages, path: :admin_pages_path, permission: nil, group: :sideways) }
+      assert_raises(ArgumentError) { StudioModules.register(:elsewhere, icon: :pages, family: :structure, path: :admin_pages_path, permission: nil, group: :sideways) }
       assert_raises(ArgumentError) { StudioModules.register(:purple, icon: :pages, family: :purple, path: :admin_pages_path, permission: nil, group: :content) }
     end
   end
 
+  # A gem's module would otherwise be the one grey chip in a coloured
+  # sidebar, and accent is the current module's.
+  test "a module must declare its family, and neutral and accent are refused" do
+    StudioModules.with([]) do
+      error = assert_raises(ArgumentError) { StudioModules.register(:plain, icon: :pages, path: :admin_pages_path, permission: nil, group: :content) }
+      assert_match(/missing keyword: :family/, error.message)
+
+      %i[neutral accent purple].each do |family|
+        error = assert_raises(ArgumentError) { StudioModules.register(:plain, icon: :pages, family:, path: :admin_pages_path, permission: nil, group: :content) }
+        assert_equal "plain: no sidebar family is named #{family.inspect}; a module's chip takes one of text, media, code, form, lists, structure, people (accent is the current module's)",
+          error.message
+      end
+      assert_empty StudioModules.entries
+    end
+  end
+
+  test "every built-in module has the spec's family" do
+    expected = {
+      dashboard: :structure, pages: :structure, mind_graph: :structure,
+      posts: :lists, tags: :lists,
+      media: :media,
+      forms: :form,
+      translations: :text,
+      users: :people, groups: :people,
+      trash: :code, settings: :code, ai_assistant: :code, system_status: :code, audit_log: :code
+    }
+    assert_equal expected, StudioModules.entries.to_h { |entry| [ entry.name, entry.family ] }
+  end
+
   test "a module's badge is counted for the viewer it is asked for" do
     StudioModules.with([]) do
-      StudioModules.register(:counted, icon: :pages, path: :admin_pages_path, permission: nil, group: :content)
+      StudioModules.register(:counted, icon: :pages, family: :structure, path: :admin_pages_path, permission: nil, group: :content)
       StudioModules.badge(:counted) { |viewer:| viewer.email_address.length }
 
       assert_equal users(:one).email_address.length, StudioModules.count(:counted, viewer: users(:one))
@@ -54,7 +82,7 @@ class StudioModulesTest < ActiveSupport::TestCase
     before = StudioModules.entries
     StudioModules.with([]) do
       assert_empty StudioModules.entries
-      StudioModules.register(:extra, icon: :pages, path: :admin_pages_path, permission: nil, group: :system)
+      StudioModules.register(:extra, icon: :pages, family: :code, path: :admin_pages_path, permission: nil, group: :system)
       assert_equal %i[extra], StudioModules.entries.map(&:name)
     end
     assert_equal before, StudioModules.entries
@@ -63,10 +91,12 @@ class StudioModulesTest < ActiveSupport::TestCase
     assert_equal before, StudioModules.entries
   end
 
-  # The registry names no component; its families are the chip's, the
-  # current module's accent apart, which the sidebar draws.
+  # The registry names no component; its families are the chip's, without
+  # the current module's accent, which the sidebar draws, and without the
+  # neutral chip, which is a block type's that names no family.
   test "a module's family is one of the icon chip's" do
-    assert_equal Admin::Ui::IconChipComponent::FAMILIES.keys - %i[accent], StudioModules::FAMILIES
+    assert_equal %i[text media code form lists structure people], StudioModules::FAMILIES
+    assert_equal Admin::Ui::IconChipComponent::FAMILIES.keys - %i[accent neutral], StudioModules::FAMILIES
   end
 
   test "reset! empties the registry, for the initializer to fill again" do

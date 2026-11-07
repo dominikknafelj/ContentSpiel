@@ -7,9 +7,14 @@
 # Plain data, as the other registries in this folder: a path is a route
 # helper's NAME, resolved by the component that draws the link, and the
 # registry holds no component and builds no URL (`test/lib/
-# dependency_direction_test.rb`). `family` is the name of the icon chip's hue
-# (`Admin::Ui::IconChipComponent::FAMILIES`), checked when the module is
-# registered.
+# dependency_direction_test.rb`).
+#
+# EVERY MODULE NAMES ITS FAMILY, the hue of its icon chip
+# (`Admin::Ui::IconChipComponent::FAMILIES`): `register` has no default for
+# it, so a gem's module that names none fails at boot with Ruby's missing
+# keyword, rather than being the one grey chip in a coloured sidebar. Neutral
+# is a block type's chip for a type that names no family, never a module's,
+# and accent is the current module's row.
 #
 # WHO SEES A MODULE. `permission` is a key or an Array of keys, any one of
 # which opens the module; nil opens it to every signed-in user. `visible` is a
@@ -37,10 +42,10 @@ module StudioModules
   GROUPS = %i[content people system].freeze
 
   # The chip families an entry may name: `Admin::Ui::IconChipComponent::
-  # FAMILIES` without `:accent`, which is the current module's and drawn by the
-  # sidebar. Written here, not read from the component, because a model names
-  # no component.
-  FAMILIES = %i[text media code form lists structure people neutral].freeze
+  # FAMILIES` without `:accent` (the current module's row, drawn by the
+  # sidebar) and `:neutral` (a block type's that names none). Written here, not
+  # read from the component, because a model names no component.
+  FAMILIES = %i[text media code form lists structure people].freeze
 
   BADGE_STYLES = %i[plain filled].freeze
 
@@ -58,12 +63,13 @@ module StudioModules
   @entries = []
 
   class << self
-    # Raises on a name taken, a group or a family that does not exist.
-    def register(name, icon:, path:, permission:, group:, family: :neutral, visible: nil)
+    # Raises on a name taken, a group that does not exist, and a family that
+    # is missing (Ruby's own missing keyword) or not one of `FAMILIES`.
+    def register(name, icon:, family:, path:, permission:, group:, visible: nil)
       name = name.to_sym
       raise ArgumentError, "a studio module named #{name.inspect} is registered already" if find(name)
       raise ArgumentError, "#{name.inspect}: no sidebar group is named #{group.inspect}; the groups are #{GROUPS.join(", ")}" unless GROUPS.include?(group)
-      raise ArgumentError, "#{name.inspect}: no icon chip family is named #{family.inspect}; the families are #{FAMILIES.join(", ")}" unless FAMILIES.include?(family)
+      raise ArgumentError, "#{name}: no sidebar family is named #{family.inspect}; a module's chip takes one of #{FAMILIES.join(", ")} (accent is the current module's)" unless FAMILIES.include?(family)
 
       @entries << Entry.new(name:, icon:, family:, path:, permission:, group:, visible:, badge: nil, badge_style: :plain)
     end

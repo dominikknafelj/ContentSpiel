@@ -11,8 +11,9 @@ module Admin
     # registry's.
     #
     # Each module's icon stands on its family's chip
-    # (`Admin::Ui::IconChipComponent`); its name beside it is the link's
-    # accessible name.
+    # (`Admin::Ui::IconChipComponent`), the current module's too: the row,
+    # not the chip, says which module is current. The name beside the chip is
+    # the link's accessible name.
     #
     # `url_options` goes on every module link: without it, following a
     # modules link while editing a non-default language would fall back to
@@ -57,16 +58,15 @@ module Admin
       end
 
       # A row rests on the column and is sunken under the pointer; the
-      # current one stands on the accent tint in accent words, its chip the
-      # accent tint too (`chip_family`): a link marked `aria-current`, never
-      # a button.
+      # current one stands on the accent tint in accent words, its chip
+      # keeping its family: a link marked `aria-current`, never a button.
       ROW = "flex items-center gap-2.5 rounded-button px-2 py-1.5 text-sm".freeze
 
       def link_classes(entry)
         current?(entry) ? "#{ROW} bg-accent-tint font-medium text-accent" : "#{ROW} text-dim hover:bg-sunken hover:text-ink"
       end
 
-      def chip_family(entry) = current?(entry) ? :accent : entry[:family]
+      def chip_family(entry) = entry[:family]
 
       # A module's count, handed in by the layout as `badges` by module name
       # (`admin_module_badges`). A module with a registered badge
