@@ -526,6 +526,40 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You added a Code block to “Code block demo”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 1))
   end
 
+  test "one block takes an before a vowel and a before anything else, for every verb, and the counted forms take none" do
+    page = as(@me) { create_page(title: "Pricing") }
+    target = Audit::Sentence::Target.new("Pricing", Audit::Sentence.route_for(page))
+    sentence = ->(action, type, **options) do
+      snapshot = type ? { "block_type" => type } : {}
+      read(Audit::Sentence.build(event(action, subject_type: "ContentBlock", subject_id: 1, snapshot:, **options), viewer: @me, target:))
+    end
+    passed = { metadata: { "answered" => false } }
+    handed = { metadata: { "answered" => true } }
+
+    assert_equal "You added an Image block to “Pricing”", sentence.("block.created", "image")
+    assert_equal "You edited an Image block on “Pricing”", sentence.("block.updated", "image")
+    assert_equal "You deleted an Image block from “Pricing”", sentence.("block.deleted", "image")
+    assert_equal "You took over editing an Image block on “Pricing”", sentence.("block.taken_over", "image", **passed)
+    assert_equal "You handed over editing an Image block on “Pricing”", sentence.("block.taken_over", "image", **handed)
+
+    assert_equal "You added a Rich text block to “Pricing”", sentence.("block.created", "rich_text")
+    assert_equal "You edited a Rich text block on “Pricing”", sentence.("block.updated", "rich_text")
+    assert_equal "You deleted a Rich text block from “Pricing”", sentence.("block.deleted", "rich_text")
+    assert_equal "You took over editing a Rich text block on “Pricing”", sentence.("block.taken_over", "rich_text", **passed)
+
+    # A gem's type whose label nothing here knows is spelled by the same rule,
+    # and an event that recorded no type is "a block".
+    assert_equal "You added an Accordion block to “Pricing”", sentence.("block.created", "accordion")
+    assert_equal "You added a Gallery block to “Pricing”", sentence.("block.created", "gallery")
+    assert_equal "You added a block to “Pricing”", sentence.("block.created", nil)
+    assert_equal "You edited a block on “Pricing”", sentence.("block.updated", nil)
+
+    created = event("block.created", subject_type: "ContentBlock", subject_id: 1, snapshot: { "block_type" => "image" })
+    assert_equal "You added 4 Image blocks to “Pricing”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 4))
+    assert_equal "You added 4 blocks to “Pricing”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 4, mixed: true))
+    assert_equal "You added 60 or more Image blocks to “Pricing”", read(Audit::Sentence.build(created, viewer: @me, target:, count: 60, at_least: true))
+  end
+
   # The owner's O10: uploads collapse too, and the row links to the library.
   test "a counted upload reads uploaded 12 images, linked to the library and not quoted" do
     upload = event("media.uploaded", subject_type: "Media::Asset", subject_id: 5, subject_label: "photo.jpg")
