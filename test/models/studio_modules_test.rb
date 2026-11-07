@@ -38,7 +38,7 @@ class StudioModulesTest < ActiveSupport::TestCase
 
       %i[neutral accent purple].each do |family|
         error = assert_raises(ArgumentError) { StudioModules.register(:plain, icon: :pages, family:, path: :admin_pages_path, permission: nil, group: :content) }
-        assert_equal "plain: no sidebar family is named #{family.inspect}; a module's chip takes one of text, media, code, form, lists, structure, people (accent is the current module's)",
+        assert_equal "plain: no sidebar family is named #{family.inspect}; a module's chip takes one of text, media, code, form, lists, structure, people (accent marks the current module's row, not a chip)",
           error.message
       end
       assert_empty StudioModules.entries
@@ -91,12 +91,11 @@ class StudioModulesTest < ActiveSupport::TestCase
     assert_equal before, StudioModules.entries
   end
 
-  # The registry names no component; its families are the chip's, without
-  # the current module's accent, which the sidebar draws, and without the
-  # neutral chip, which is a block type's that names no family.
+  # The registry names no component; its families are the chip's without
+  # the neutral chip, which is a block type's that names no family.
   test "a module's family is one of the icon chip's" do
     assert_equal %i[text media code form lists structure people], StudioModules::FAMILIES
-    assert_equal Admin::Ui::IconChipComponent::FAMILIES.keys - %i[accent neutral], StudioModules::FAMILIES
+    assert_equal Admin::Ui::IconChipComponent::FAMILIES.keys - %i[neutral], StudioModules::FAMILIES
   end
 
   test "reset! empties the registry, for the initializer to fill again" do

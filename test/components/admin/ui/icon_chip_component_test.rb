@@ -22,9 +22,8 @@ class Admin::Ui::IconChipComponentTest < ViewComponent::TestCase
     assert_selector "span[class~='bg-ic-people-bg'][class~='text-ic-people']"
   end
 
-  test "accent and neutral are the tint pair and the sunken pair" do
-    render_inline Admin::Ui::IconChipComponent.new(icon: :pilcrow, family: :accent)
-    assert_selector "span[class~='bg-accent-tint'][class~='text-accent']"
+  test "neutral is the sunken pair, and there is no accent chip" do
+    assert_raises(ArgumentError) { Admin::Ui::IconChipComponent.new(icon: :pilcrow, family: :accent) }
     render_inline Admin::Ui::IconChipComponent.new(icon: :pilcrow, family: :neutral)
     assert_selector "span[class~='bg-sunken'][class~='text-dim']"
   end

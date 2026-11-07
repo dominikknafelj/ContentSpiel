@@ -13,8 +13,8 @@
 # (`Admin::Ui::IconChipComponent::FAMILIES`): `register` has no default for
 # it, so a gem's module that names none fails at boot with Ruby's missing
 # keyword, rather than being the one grey chip in a coloured sidebar. Neutral
-# is a block type's chip for a type that names no family, never a module's,
-# and accent is the current module's row.
+# is a block type's chip for a type that names no family, never a module's;
+# accent is no chip's, it marks the current module's row.
 #
 # WHO SEES A MODULE. `permission` is a key or an Array of keys, any one of
 # which opens the module; nil opens it to every signed-in user. `visible` is a
@@ -42,9 +42,9 @@ module StudioModules
   GROUPS = %i[content people system].freeze
 
   # The chip families an entry may name: `Admin::Ui::IconChipComponent::
-  # FAMILIES` without `:accent` (the current module's row, drawn by the
-  # sidebar) and `:neutral` (a block type's that names none). Written here, not
-  # read from the component, because a model names no component.
+  # FAMILIES` without `:neutral` (a block type's that names none). Accent is
+  # no chip's: it marks the current module's row. Written here, not read from
+  # the component, because a model names no component.
   FAMILIES = %i[text media code form lists structure people].freeze
 
   BADGE_STYLES = %i[plain filled].freeze
@@ -69,7 +69,7 @@ module StudioModules
       name = name.to_sym
       raise ArgumentError, "a studio module named #{name.inspect} is registered already" if find(name)
       raise ArgumentError, "#{name.inspect}: no sidebar group is named #{group.inspect}; the groups are #{GROUPS.join(", ")}" unless GROUPS.include?(group)
-      raise ArgumentError, "#{name}: no sidebar family is named #{family.inspect}; a module's chip takes one of #{FAMILIES.join(", ")} (accent is the current module's)" unless FAMILIES.include?(family)
+      raise ArgumentError, "#{name}: no sidebar family is named #{family.inspect}; a module's chip takes one of #{FAMILIES.join(", ")} (accent marks the current module's row, not a chip)" unless FAMILIES.include?(family)
 
       @entries << Entry.new(name:, icon:, family:, path:, permission:, group:, visible:, badge: nil, badge_style: :plain)
     end

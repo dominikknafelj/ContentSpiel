@@ -925,7 +925,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/button_component.rb" => "the secondary button",
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
     "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
-    "app/components/admin/ui/icon_chip_component.rb" => "the accent icon chip, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention"
   }.freeze

@@ -6,9 +6,8 @@ module Admin
     # tokens, a family's icon on its chip, measured at 3:1 or better on the
     # surface, rail, chrome and popover in both schemes.
     #
-    # `family` is a block-type family, `:people`, `:accent` (the tint pair
-    # of the secondary button) or `:neutral` (the sunken pair, for a type
-    # that names no family). `size` is `:regular` (24px) or `:small` (22px, a
+    # `family` is a block-type family, `:people` or `:neutral` (the sunken
+    # pair, for a type that names no family). `size` is `:regular` (24px) or `:small` (22px, a
     # tile's and a section's head); the icon is 14px in both.
     #
     # Decoration: a chip always stands beside its type's or module's name,
@@ -23,7 +22,6 @@ module Admin
         lists: "bg-ic-lists-bg text-ic-lists",
         structure: "bg-ic-structure-bg text-ic-structure",
         people: "bg-ic-people-bg text-ic-people",
-        accent: "bg-accent-tint text-accent",
         neutral: "bg-sunken text-dim"
       }.freeze
       SIZES = { regular: "size-6", small: "size-5.5" }.freeze
