@@ -21,7 +21,8 @@ module Admin
 
       def tabs
         panels.map do |panel|
-          RailTabsComponent::Tab.new(key: panel.tab_key, label: panel.tab_label, count: panel.tab_count)
+          RailTabsComponent::Tab.new(key: panel.tab_key, label: panel.tab_label, count: panel.tab_count,
+            count_data: (panel.tab_count_data if panel.respond_to?(:tab_count_data)))
         end
       end
 

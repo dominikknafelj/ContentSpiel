@@ -24,7 +24,7 @@ import { hold, mergeGone, mergeNoteList, mergeThread, scrollerOf } from "notes/m
 // each other.
 //
 // THE SUBSCRIPTIONS. `Notes::RecordChannel`, one per `record` target (an
-// editor's drawer, the media panel's notes, the mind graph's card): a thread
+// editor's Notes tab, the media panel's notes, the mind graph's card): a thread
 // of that record changed, or went with a deleted block.
 //
 // REFRESHING WITHOUT LOSING WORK (§6.3). What is READ is replaced; what is
@@ -36,10 +36,11 @@ import { hold, mergeGone, mergeNoteList, mergeThread, scrollerOf } from "notes/m
 // WHETHER a part is fetched:
 // - A thread that is gone and holds no typed text: the frame goes to the
 //   list (`gone`).
-// - A drawer that is closed gets its counts only (`data-notes-counts-url`,
-//   handed to `admin--notes--drawer#refreshCounts`): fetching a thread is what marks
-//   it read, and nobody is reading a closed drawer. It is remembered as
-//   stale and fetched when it is opened again. The same goes for a THREAD
+// - A part nobody can see gets its counts only (`data-notes-counts-url`,
+//   handed to `admin--notes--drawer#refreshCounts`): fetching a thread is
+//   what marks it read, and nobody is reading notes that are not drawn (an
+//   editor's Notes tab that is not the current one, a hidden part: `seen`).
+//   It is remembered as stale and fetched when it is shown again. The same goes for a THREAD
 //   in a document that is hidden (another tab is in front, the window is
 //   minimised): its GET would read the note on the person's behalf, so it
 //   gets the counts, the toast is raised, the delivery stays unread, and the
@@ -80,7 +81,7 @@ import { hold, mergeGone, mergeNoteList, mergeThread, scrollerOf } from "notes/m
 // confirmation, a chip beside the question): its answer is that message as it
 // now is; and for a link (Edit, Delete, Cancel, Back), which asks for exactly
 // that. This is where the frame is, not where the cable is: the hook is on
-// the document, so it serves the drawer, the media panel and the notes page of
+// the document, so it serves an editor's notes, the media panel and the notes page of
 // a record alike, with or without a socket.
 //
 // THE SOCKET. When it drops, CS Studio works as without push; when it is
@@ -95,6 +96,13 @@ import { hold, mergeGone, mergeNoteList, mergeThread, scrollerOf } from "notes/m
 // NO PAGE REFRESH, NO MORPHING (decision D20): nothing here touches an editor
 // form, the write queue or anything outside the notes parts.
 const COALESCE_MS = 500
+
+// Whether a `record` part is drawn at all: not `hidden`, and not inside
+// something that is not rendered (an editor's Notes tab while another tab
+// of the rail is current, which the stylesheet does not draw).
+function seen(element) {
+  return !element.hidden && (typeof element.checkVisibility !== "function" || element.checkVisibility())
+}
 export default class extends Controller {
   static targets = [ "record" ]
 
@@ -216,7 +224,7 @@ export default class extends Controller {
 
   // The same thread drawn again by Turbo itself (Edit, Delete or Cancel in a
   // message's menu, a saved edit): where its messages have a scroller of
-  // their own (the drawer and the sheet, decision 35) that scroller is a new
+  // their own (the editors' notes, decision 35) that scroller is a new
   // element afterwards and would start at its top, far from the message the
   // person just pressed something on. Its place is put back inside the
   // render, so nothing is painted in between. Where the thread is in the
@@ -234,8 +242,8 @@ export default class extends Controller {
     }
   }
 
-  // `admin--notes--drawer:opened`: a drawer that was closed while its record changed
-  // is fetched now. A task later, when `admin--notes--drawer#show` has either left
+  // `admin--notes--drawer:opened`: notes that were not shown while their
+  // record changed are fetched now. A task later, when `admin--notes--drawer#show` has either left
   // the frame as it is or sent it somewhere (which `refresh` waits for, and
   // `fresh` then says is no longer stale).
   shown() {
@@ -257,7 +265,7 @@ export default class extends Controller {
   visible() {
     if (document.hidden) return
     this.recordTargets.forEach((element) => {
-      if (this.stale.has(element) && !element.hidden) this.soon(element, async () => { if (this.stale.has(element)) await this.refresh(element, null) }, 0)
+      if (this.stale.has(element) && seen(element)) this.soon(element, async () => { if (this.stale.has(element)) await this.refresh(element, null) }, 0)
     })
   }
 
@@ -306,12 +314,12 @@ export default class extends Controller {
     element.dispatchEvent(new CustomEvent("admin--notes--live:changed", { detail: { threadId } }))
 
     const frame = element.querySelector("turbo-frame#notes")
-    // A frame that was never asked for anything (a drawer never opened) has
+    // A frame that was never asked for anything (notes never shown) has
     // no view and no address: counts only.
     const view = frame?.hasAttribute("src") ? frame.querySelector("[data-notes-view]") : null
-    // Nobody is looking: a closed drawer, or a thread in a hidden document.
+    // Nobody is looking: notes not drawn, or a thread in a hidden document.
     // The counts, and the part again when someone is (`shown`, `visible`).
-    if (!view || element.hidden || (view.dataset.notesView === "thread" && document.hidden)) {
+    if (!view || !seen(element) || (view.dataset.notesView === "thread" && document.hidden)) {
       if (view) this.stale.add(element)
       return this.refreshCounts(element)
     }
@@ -429,7 +437,7 @@ export default class extends Controller {
   watching(threadId) {
     if (document.hidden) return false
     return this.recordTargets.some((element) => {
-      const view = element.hidden ? null : element.querySelector("turbo-frame#notes > [data-notes-view='thread']")
+      const view = seen(element) ? element.querySelector("turbo-frame#notes > [data-notes-view='thread']") : null
       return Boolean(view) && view.dataset.noteThread === String(threadId) && !view.querySelector("[data-note-gone]")
     })
   }

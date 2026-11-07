@@ -6,12 +6,9 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
-    <%# Says on <html>, before anything is painted, whether this browser
-        left the notes drawer open (`admin/shared/_notes_head`). %>
-    <%= render "admin/shared/notes_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%# The width this browser chose for the page tree's column, with whether
-        it fits beside the notes (`admin/shared/_tree_head`). After the
+    <%# The width this browser chose for the page tree's column, and its fold
+        (`admin/shared/_tree_head`). After the
         stylesheet's link, because it reads the root's font size as the page
         is laid out with it; still in <head>, so before anything is painted. %>
     <%= render "admin/shared/tree_head" %>
@@ -39,11 +36,12 @@
 
       `admin--notes--drawer` is on <body> for the same reason as `admin--ui--dialog`: the
       editor header's Notes button, the markers on the block cards and the
-      notes drawer are far apart in the document. The two drawer controllers
-      tell each other when one opens (`admin--notes--drawer:opened`,
-      `admin--shell--drawer:opened`), so the notes drawer and a shell drawer are
-      never open together -- but for the page tree folded beside the notes
-      column, which is opened from it (`admin--notes--drawer#shellOpened`).
+      rail's Notes tab are far apart in the document. It hears the rail's
+      `admin--ui--rail:shown` and `:connected` here, since the rail dispatches
+      them on a panel and on its grid, which hold the notes' element. The notes and
+      a shell drawer tell each other when one opens (`admin--notes--drawer:opened`,
+      `admin--shell--drawer:opened`), so the slide-over and a shell drawer are
+      never open together (`admin--notes--drawer#shellOpened`).
 
       `admin--notes--live` and `admin--notes--inbox` are the two things in
       CS Studio that open a socket (notes spec §6; both through
@@ -57,10 +55,10 @@
       is, so that what one page was told and had not said yet goes to the
       next page of the same person only. `admin--notes--live` is the record's
       side, on <body> so that the parts that show one record's notes (its
-      `record` targets: an editor's drawer, the media panel's notes, the mind
+      `record` targets: an editor's Notes tab, the media panel's notes, the mind
       graph's card) are found wherever they are drawn: `tag` writes this
       tab's id on its notes writes; `shown`, `fresh` and `visible` tell it
-      that a drawer was opened, that the notes frame was loaded by Turbo
+      that the notes were shown, that the notes frame was loaded by Turbo
       itself and that the document can be seen again; and `watched` answers
       the inbox's question whether the person is looking at a thread
       (`admin--notes--inbox:watching`).
@@ -90,7 +88,7 @@
         data-admin--notes--inbox-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>" data-admin--notes--inbox-person-value="<%= Current.user&.id %>"
         data-admin--notes--alert-sound-value="<%= Current.user&.notes_sound ? true : false %>" data-admin--notes--alert-desktop-value="<%= Current.user&.notes_desktop ? true : false %>"
         data-admin--notes--alert-person-value="<%= Current.user&.id %>"
-        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes--drawer#selected mousedown->admin--notes--drawer#release:capture admin--notes--drawer:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes--drawer#shellOpened turbo:load@document->admin--notes--drawer#syncAddress turbo:before-fetch-request@document->admin--notes--live#tag turbo:before-fetch-request@document->admin--notes--live#asked turbo:before-frame-render@document->admin--notes--live#answered admin--notes--drawer:opened->admin--notes--live#shown turbo:frame-load@document->admin--notes--live#fresh visibilitychange@document->admin--notes--live#visible admin--notes--inbox:watching@document->admin--notes--live#watched admin--notes--inbox:delivery@document->admin--notes--alert#delivery"
+        data-action="mousedown->admin--ui--dialog#remember click->admin--ui--dialog#backdrop keydown.esc@window->admin--shell--drawer#closeAll turbo:before-visit@document->admin--shell--drawer#visiting turbo:frame-load@document->admin--shell--drawer#frameLoaded selectionchange@document->admin--notes--drawer#selected mousedown->admin--notes--drawer#release:capture admin--notes--drawer:opened->admin--shell--drawer#standAside admin--shell--drawer:opened->admin--notes--drawer#shellOpened admin--ui--rail:shown->admin--notes--drawer#shown admin--ui--rail:connected->admin--notes--drawer#railConnected turbo:load@document->admin--notes--drawer#syncAddress turbo:before-fetch-request@document->admin--notes--live#tag turbo:before-fetch-request@document->admin--notes--live#asked turbo:before-frame-render@document->admin--notes--live#answered admin--notes--drawer:opened->admin--notes--live#shown turbo:frame-load@document->admin--notes--live#fresh visibilitychange@document->admin--notes--live#visible admin--notes--inbox:watching@document->admin--notes--live#watched admin--notes--inbox:delivery@document->admin--notes--alert#delivery"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render "admin/shared/notes_alert_settings" %>
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>

@@ -28,7 +28,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
   end
 
   test "with nothing registered the post rail is a heading" do
-    render_for(users(:one), "tab-aaaaaaaa")
+    Admin::Slots.with("editor.rail.tabs" => []) { render_for(users(:one), "tab-aaaaaaaa") }
     assert_selector "h2#editor-grid-tab-post"
     assert_no_selector "[role=tablist]", wait: 0
   end
@@ -131,7 +131,10 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
 
     assert_selector "#editor-grid.admin-rail-grid[data-controller~='admin--ui--rail']:not(.admin-rail-grid--folded)"
     assert_selector "#editor-grid > form#post-form", count: 1
-    assert_selector "#editor-grid > h2#editor-grid-tab-post", text: "Post"
+    # The tabs stand after the form in the document (the grid puts them in the
+    # rail's first row): Post, then the registered Notes tab.
+    assert_selector "#editor-grid > form#post-form + [role=tablist] #editor-grid-tab-post[role=tab]", text: "Post"
+    assert_selector "#editor-grid > form#post-form + [role=tablist] #editor-grid-tab-notes[role=tab]"
     panel = "#post-form [role=tabpanel]#editor-grid-panel-post[data-current][aria-labelledby='editor-grid-tab-post']"
     assert_selector "#{panel} #post-excerpt"
     assert_selector "#{panel} #post-tag_names"

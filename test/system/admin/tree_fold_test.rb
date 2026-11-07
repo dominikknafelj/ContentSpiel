@@ -179,41 +179,27 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # Folded, the strip is what stands beside the notes: 44 + 400 + 640 is
-  # 1084px with the sidebar a drawer, so at 1060px even the strip does not
-  # fit, and the tree is the drawer beside the notes. That drawer shows the
-  # whole tree, as the one below 1024px does: the fold's rules give way to it,
-  # and "Hide page tree" is not offered in it.
-  test "a folded tree that does not fit beside the open notes is their ordinary drawer, with no fold in it, and the strip again where it fits" do
+  # The notes stand in the editor's rail or over the canvas, never beside the
+  # tree, so opening them changes nothing of the fold.
+  test "a folded tree stays the strip when the notes open, at a docked and at a narrower window" do
     at_window(1600) do
       open_editor
       find(HIDE).click
       assert_tree STRIP
 
-      at_window(1060) do
-        assert_tree STRIP
-        find("#notes-open").click
-        assert_selector "#notes-drawer #notes-list"
-        assert_eventually(message: "the strip was said to fit beside the notes") { !page.evaluate_script("document.documentElement.hasAttribute('data-tree-fits')") }
-        assert_no_selector "#tree-column"
-
-        find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]", text: "Pages").click
-        assert_selector "#tree-column[data-open]"
-        assert_focus_on_new_page
-        within("#tree-column") { assert_selector "#tree a", text: "Documentation" }
-        assert_no_selector SHOW
-        # Folding a drawer means nothing: the fold is not offered in it.
-        assert_selector HIDE, visible: :all
-        assert_no_selector HIDE
-        assert_operator tree_width, :>, 200, "the drawer is the tree, not the strip"
-        page.driver.browser.keyboard.type(:escape)
-        assert_no_selector "#tree-column"
-      end
-
-      # 240 + 44 + 400 + 640 = 1324: at 1600px the strip stands beside the notes.
-      assert_eventually(message: "the strip does not fit beside the notes at 1600px") { page.evaluate_script("document.documentElement.hasAttribute('data-tree-fits')") }
+      find("#notes-open").click
+      assert_selector "#notes-drawer #notes-list"
       assert_tree STRIP
       assert_selector SHOW
+
+      at_window(1060) do
+        assert_tree STRIP
+        assert_selector "#notes-drawer #notes-list"
+        assert_selector SHOW
+        assert_no_selector ".admin-shell__scrim"
+      end
     end
+  ensure
+    page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
   end
 end

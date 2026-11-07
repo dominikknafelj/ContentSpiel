@@ -32,8 +32,7 @@ module Admin
     # (`--admin-tree-column` in content-spiel.tailwind.css: 13.75rem, 17rem,
     # 30rem, 40rem, 15rem), and both scripts multiply each figure by the
     # root's font size over `BASE` before they use it, so a browser set to a
-    # larger font gets a larger tree and a separator that says so. `NOTES`
-    # alone is pixels at any font size, as `--admin-notes-width` is. The
+    # larger font gets a larger tree and a separator that says so. The
     # stylesheet holds the figures as literals, since a media
     # query and `clamp()` cannot be handed a Ruby constant: change one, change
     # the other, and `test/system/admin/tree_column_test.rb` ("the maximum is
@@ -47,12 +46,9 @@ module Admin
     #   The divider stops there before `MAX` on a narrow window.
     # - `SIDEBAR`: the modules sidebar, where it is a column of the grid (from
     #   1280px; below that it is a drawer and takes no room).
-    # - `NOTES`: the notes drawer as a column (`--admin-notes-width`). With
-    #   it open the tree stays beside the editor only while
-    #   sidebar + tree + notes + `EDITOR` fit the window (T3).
     # - `STRIP`: the folded tree, a strip that holds "Show page tree"
-    #   (`--admin-tree-strip`, 2.75rem). While folded it stands in the sum
-    #   above in place of the chosen width, which the fold keeps.
+    #   (`--admin-tree-strip`, 2.75rem): the stylesheet's alone, since the
+    #   fold keeps the chosen width and no script counts the strip.
     #
     # THE TOOLTIP is the shared one (`Admin::Ui::TooltipComponent`), with the
     # divider as its host: on keyboard focus at once, on hover after its own
@@ -67,12 +63,11 @@ module Admin
       MAX = 480
       EDITOR = 640
       SIDEBAR = 240
-      NOTES = 400
       STRIP = 44
-      # The root font size the figures above are for (all but `NOTES`).
+      # The root font size the figures above are for.
       BASE = 16
       # `localStorage`, per browser: a convenience, like the theme and the
-      # notes drawer's "open". The width in pixels, and "1" while folded.
+      # notes' "open". The width in pixels, and "1" while folded.
       STORAGE_KEY = "cs-tree-width".freeze
       FOLD_KEY = "cs-tree-folded".freeze
 
@@ -86,8 +81,8 @@ module Admin
       ].join(" ").freeze
 
       # What keeps the column's state current whatever has the focus: a
-      # resized window, a frame that has loaded (an editor with a notes
-      # drawer may have arrived in `#content`), and the page put away.
+      # resized window, a frame that has loaded (another screen arrived in
+      # `#content`), and the page put away.
       COLUMN_ACTIONS = %w[
         resize@window->admin--shell--tree-width#sync turbo:frame-load@document->admin--shell--tree-width#sync
         turbo:before-cache@document->admin--shell--tree-width#rest
@@ -100,8 +95,7 @@ module Admin
           controller: "admin--shell--tree-width",
           action: COLUMN_ACTIONS,
           "admin--shell--tree-width-min-value": MIN, "admin--shell--tree-width-default-value": DEFAULT, "admin--shell--tree-width-max-value": MAX,
-          "admin--shell--tree-width-editor-value": EDITOR, "admin--shell--tree-width-sidebar-value": SIDEBAR, "admin--shell--tree-width-notes-value": NOTES,
-          "admin--shell--tree-width-strip-value": STRIP,
+          "admin--shell--tree-width-editor-value": EDITOR, "admin--shell--tree-width-sidebar-value": SIDEBAR,
           "admin--shell--tree-width-key-value": STORAGE_KEY, "admin--shell--tree-width-fold-key-value": FOLD_KEY
         }
       end

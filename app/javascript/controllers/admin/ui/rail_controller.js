@@ -31,7 +31,12 @@ import { Controller } from "@hotwired/stimulus"
 //   data-action="admin--ui--rail:reveal->admin--ui--rail#reveal
 //                admin--ui--rail:conceal->admin--ui--rail#conceal"
 // Every selection dispatches `admin--ui--rail:shown` with `{ key }` on the
-// panel it shows.
+// panel it shows. A feature that asks something of the rail as the page
+// arrives (a panel that opens from the address) waits for
+// `admin--ui--rail:connected` on the grid, dispatched once the state above is
+// applied and the docked state written: the controllers are registered as
+// their modules load, in no fixed order, so the rail may connect after the
+// feature that asks.
 //
 // PREVIOUS IS THE TAB LAST LEFT. Every selection that changes the tab, the
 // person's own (a press, a key) and a reveal alike, remembers the tab it
@@ -60,6 +65,7 @@ export default class extends Controller {
     this.measure()
     this.observer = new ResizeObserver(() => this.measure())
     this.observer.observe(this.element)
+    this.dispatch("connected")
   }
 
   disconnect() {

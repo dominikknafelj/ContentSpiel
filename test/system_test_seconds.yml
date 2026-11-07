@@ -57,12 +57,12 @@ test/system/admin/note_inbox_test.rb: 27.7
 test/system/admin/note_reactions_test.rb: 38.2
 test/system/admin/note_thread_answers_test.rb: 143.7
 test/system/admin/notes_alert_test.rb: 113.7
-test/system/admin/notes_column_test.rb: 35.0
 test/system/admin/notes_drawer_test.rb: 124.5
 test/system/admin/notes_flow_test.rb: 45.7
 test/system/admin/notes_live_test.rb: 150.2
 test/system/admin/notes_markers_test.rb: 126.2
 test/system/admin/notes_merge_test.rb: 46.4
+test/system/admin/notes_rail_test.rb: 38.0
 test/system/admin/notes_view_only_test.rb: 8.3
 test/system/admin/password_reset_test.rb: 19.4
 test/system/admin/pending_lock_test.rb: 8.3

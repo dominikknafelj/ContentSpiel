@@ -16,14 +16,16 @@ module Admin
     # a rail of one tab of its own becomes a tablist with the first of them.
     #
     # `count` is a figure beside the label (`text-count`), hidden at zero so
-    # a redraw of the tab can show it again; nil draws none.
+    # a redraw of the tab can show it again; nil draws none. `count_data` are
+    # the figure's own `data-` attributes, the entry's (`tab_count_data`), so
+    # the feature's script can keep the figure current.
     #
     # In the grid (`.admin-rail-grid`) the tabs and the panels stand in the
     # rail's column; the blocks column is the element marked
     # `.admin-rail__main`, and nothing else is placed.
     class RailTabsComponent < AdminComponent
-      Tab = Data.define(:key, :label, :count) do
-        def initialize(key:, label:, count: nil) = super
+      Tab = Data.define(:key, :label, :count, :count_data) do
+        def initialize(key:, label:, count: nil, count_data: nil) = super
       end
 
       def self.tab_id(rail_id, key) = "#{rail_id}-tab-#{key}"

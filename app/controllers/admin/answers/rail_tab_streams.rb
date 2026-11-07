@@ -7,8 +7,9 @@ module Admin
     # answer must not replace it (`Admin::Slots`, the panel shape).
     #
     # A stream's context is smaller than the page's: no `query:` (the request is
-    # the autosave's, not the page's) and no `counts:`, so `tab_count` and
-    # `tab_label` must be answerable from `record` and `viewer` alone. A tab
+    # the autosave's, not the page's) and no `reads:`, so `tab_count` and
+    # `tab_label` must be answerable from `record` and `viewer` alone, or the
+    # entry draws a figure its own script fills as the tab connects. A tab
     # that was not drawn at page load is not added by a stream (replacing a
     # missing id does nothing); it appears at the next page load.
     module RailTabStreams

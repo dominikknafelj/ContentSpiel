@@ -3,39 +3,51 @@ import { messages } from "i18n/messages"
 
 // Notes on an editor screen (notes spec §4.1, §4.3). Lives on <body>, like
 // `admin--ui--dialog`: the header's button, the markers on the block cards and
-// the drawer are far apart in the document, and cards come and go by Turbo
-// Stream without the screen being drawn again.
+// the rail's Notes tab are far apart in the document, and cards come and go by
+// Turbo Stream without the screen being drawn again.
 //
-// THE DRAWER (`drawer` target, `Admin::NotesScreen::DrawerComponent`). Opening
-// sets the notes frame's `src` -- the record's list of notes, the list at a
-// block's group, the list with a new note ready to type, or one thread, which
-// is the frame's other view -- shows the drawer and moves the focus into it
-// once the frame has loaded; closing gives the focus back to what opened it.
-// A thread replaces the list and Back replaces the thread; the list's scroll
-// position is kept for the way back. It is NOT a modal: nothing is made inert,
-// there is no scrim, and Escape closes it only while the focus is inside (the
-// `keydown.esc` action sits on the drawer itself). "Open" is remembered per
-// browser in `localStorage`, a convenience: the next editor opens with its
-// notes showing. A shell drawer opening closes this one, and this one opening
-// tells the shell's to stand aside (`admin--notes--drawer:opened`).
+// THE PANEL (`drawer` target, `Admin::NotesScreen::RailPanelComponent`, the
+// content of the rail's Notes tab). The notes are shown while that tab is
+// the rail's current one, and the rail's controller (`admin--ui--rail`) owns
+// that state: opening dispatches `admin--ui--rail:reveal` from the panel,
+// which makes the Notes tab current and remembers the tab it leaves, and
+// closing dispatches `admin--ui--rail:conceal`, which goes back to the tab
+// the person last left. Nothing here names a tab or a panel of the rail's.
+// The rail says which panel it showed (`admin--ui--rail:shown`, heard on
+// <body> as `shown`): the Notes tab pressed is an opening like the header's
+// button, and another tab pressed while the notes were shown is a closing.
+// Where the rail docks the notes are its Notes tab; below its threshold the
+// stylesheet makes the same element a slide-over over the canvas, and under
+// 640px a sheet (content-spiel.tailwind.css, "THE NOTES PANEL"). Either way
+// it is one element that is never moved, cloned or drawn again, so a note
+// being typed keeps its text and its focus through a tab switch, the rail
+// docking or undocking and a live merge.
 //
-// FROM 1024PX THE DRAWER IS A COLUMN beside the editor and below its sticky
-// header (content-spiel.tailwind.css, "The editors' notes drawer"). Two things
-// of that layout are this controller's: `data-notes-open` on <html>, which is
-// what the stylesheet reads to make the room and, where the tree no longer
-// fits beside the column (`data-tree-fits`), to fold the page tree (set with
-// the drawer's own `hidden` in `setOpen`, and before the first paint by the
-// layout's head script from what is remembered here), and the height of the
-// editor's header, under which the column starts (`measure`, kept current by
-// a ResizeObserver: a "Changed elsewhere" bar or a wrapped row makes the
-// header taller).
+// Opening sets the notes frame's `src` -- the record's list of notes, the
+// list at a block's group, the list with a new note ready to type, or one
+// thread, which is the frame's other view -- and moves the focus into it once
+// the frame has loaded; closing gives the focus back to what opened it. A
+// thread replaces the list and Back replaces the thread; the list's scroll
+// position is kept for the way back. It is NOT a modal: nothing is made
+// inert, there is no scrim, and Escape closes it only while the focus is
+// inside (the `keydown.esc` action sits on the panel itself). "Open" is
+// remembered per browser in `localStorage`, a convenience: the next editor
+// opens its Notes tab where the rail docks (`beside`), and never puts the
+// slide-over over an editor by itself. A shell drawer opening closes the
+// slide-over, and the notes opening tells the shell's drawers to stand aside
+// (`admin--notes--drawer:opened`).
+//
+// THE HEADER'S HEIGHT. Docked, the notes stick under the editor's sticky
+// header, whose height is whatever its rows come to (a "Changed elsewhere"
+// bar or a wrapped row makes it taller): `measure`, kept current by a
+// ResizeObserver, writes it on the panel as `--admin-editor-header-height`.
 //
 // THE FOCUS stays where the person put it. The frame's answers move it only
 // when an opener asked (a press on the header's button, a marker, a link with
-// `?notes=open`), or when it was inside the drawer as the request left and the
+// `?notes=open`), or when it was inside the notes as the request left and the
 // answer removed what held it (a row followed, a note sent): then it goes to
-// the thread, or to the drawer, never out to the page. A drawer that opens by
-// itself because it was open on the last editor takes no focus at all, and
+// the thread, or to the panel, never out to the page. Notes that open by
+// themselves because they were open on the last editor take no focus, and
 // neither does an answer that arrives while the person types in the editor
 // -- the first answer after an opener's press included, when the person has
 // moved into the editor before it is in (`focusStayed`).
@@ -43,14 +55,15 @@ import { messages } from "i18n/messages"
 // THE COUNTS (`counts` target). One record's open-thread counts,
 // `{ total, subjects: { "<key>": n }, unread: [ "<key>" ] }`, written by the
 // server into the page and into every answer of the notes frame; whichever
-// copy arrived last is the truth. From it this fills the header's number
-// (`total`), every marker (`marker`: a count pill; without notes nothing at
-// rest, and the same control as "add a note" on hover or focus of its card)
-// and the warning in a block's delete dialog (`warning`). A card drawn again
-// by a stream connects its marker and is filled like the rest, which is why
-// the server never renders a count into a card.
+// copy arrived last is the truth. From it this fills every `total` (the
+// header's number, the panel's "4 open" and the Notes tab's number, which a
+// save's answer draws again with its number hidden), every marker
+// (`marker`: a count pill; without notes nothing at rest, and the same
+// control as "add a note" on hover or focus of its card) and the warning in a block's delete dialog (`warning`). A card or a tab
+// drawn again by a stream connects its marker or its number and is filled
+// like the rest, which is why the server never renders a count into a card.
 //
-// THE ACTIVE BLOCK. While one thread is the drawer's view, the card or tile
+// THE ACTIVE BLOCK. While one thread is the notes' view, the card or tile
 // of the block it is on carries `data-notes-active` (an accent edge,
 // handoff "Block card marker"): `markActive`, after every load of the frame,
 // on close, and when a marker connects.
@@ -66,19 +79,19 @@ import { messages } from "i18n/messages"
 // passage travels to the frame as `note_quote`, the one name a quote has in a
 // URL (it is filtered from the log under that name).
 //
-// THE ADDRESS FOLLOWS THE DRAWER (the handoff's decision 39; `syncAddress`).
-// While the drawer is open the page's address carries `notes=open`, and
-// `thread=<id>` while a thread is its view; closed, neither. So the address
-// says what is on screen, a reload keeps it (the server opens the drawer for
-// those two parameters), and a copied link opens what its sender saw. It is
+// THE ADDRESS FOLLOWS THE NOTES (the handoff's decision 39; `syncAddress`).
+// While the notes are shown the page's address carries `notes=open`, and
+// `thread=<id>` while a thread is their view; closed, neither. So the address
+// says what is on screen, a reload keeps it (the server opens the Notes tab
+// for those two parameters), and a copied link opens what its sender saw. It is
 // REPLACED, never pushed: Back still leaves the page. The entry is Turbo's,
 // whose state (`history.state.turbo`: its restoration identifier and index)
 // and whose own record of where the document is must both survive, so the
 // replacing is done by Turbo's history with the identifier it has; a bare
 // `replaceState` would leave Turbo believing in the old address. It is
-// written only while the address IS this drawer's editor (`data-path`): an
+// written only while the address IS this panel's editor (`data-path`): an
 // editor reached by a link into `#content` is drawn, and its remembered
-// drawer opened, a moment before Turbo makes the address its own, and the
+// notes opened, a moment before Turbo makes the address its own, and the
 // page before it must not be handed `notes=open`. `turbo:load` is when that
 // has happened, and is heard for it.
 //
@@ -99,36 +112,62 @@ export default class extends Controller {
     this.listScroll = null
     this.fromList = false
     this.inside = false
+    this.revealing = false
+    this.concealing = false
+    // Whether the notes were shown when this last said so (`sync`).
+    this.showing = false
   }
 
   // --- targets coming and going ----------------------------------------------
 
-  // "Open" from memory is for the drawer BESIDE an editor. Below 1024px the
-  // notes are a sheet over the whole editor: reopened by itself it would
-  // cover the page a person has just picked (from the tree drawer, which
-  // closed the sheet to be seen at all). There only an explicit ask opens it
-  // -- a press, or a link with `?notes=open`. The choice stays remembered
-  // for a wider window.
+  // What the panel asks for as it arrives (`arrive`) waits for the rail's
+  // controller, whose events open the Notes tab and whose docked state
+  // decides what "open" from memory means: the controllers are registered as
+  // their modules load, in no fixed order, so the rail may connect after this
+  // target does (`admin--ui--rail:connected`, heard as `railConnected`). A
+  // microtask first, so that within one render the rail is asked after every
+  // controller of that render has connected.
+  //
+  // "Open" from memory is for the Notes tab of a docked rail. Below the
+  // threshold the notes are a slide-over, or a sheet over the whole editor:
+  // reopened by itself it would cover the page a person has just picked.
+  // There only an explicit ask opens it -- a press, or a link with
+  // `?notes=open`. The choice stays remembered for a wider window.
   drawerTargetConnected(drawer) {
     this.header = document.querySelector(".admin-editor-header")
     if (this.header && "ResizeObserver" in window) {
       this.headerObserver = new ResizeObserver(() => this.measure())
       this.headerObserver.observe(this.header)
     }
+    this.measure()
+    this.arriving = drawer
+    queueMicrotask(() => this.arrive())
+  }
 
+  // `admin--ui--rail:connected` on <body>.
+  railConnected(event) {
+    if (this.arriving && event.target instanceof Element && event.target.contains(this.arriving)) this.arrive()
+  }
+
+  arrive() {
+    const drawer = this.arriving
+    if (!drawer || !drawer.isConnected || !this.hasDrawerTarget || this.drawerTarget !== drawer) return
+    const rail = drawer.closest("[data-controller~='admin--ui--rail']")
+    if (rail && !this.application.getControllerForElementAndIdentifier(rail, "admin--ui--rail")) return
+
+    this.arriving = null
     if (drawer.dataset.openOnLoad === "true") this.show({ thread: drawer.dataset.thread || null })
     else if (this.remembered && this.beside) this.show({ focus: false })
-    // What the head script said from memory, where nothing opens after all
-    // (a narrow window that was widened since would keep the empty room).
-    else this.setOpen(false)
+    else this.sync()
   }
 
   // The editor was replaced (another record in `#content`, another screen):
-  // what was asked of the old drawer is nobody's any more.
+  // what was asked of the old panel is nobody's any more.
   drawerTargetDisconnected() {
     this.headerObserver?.disconnect()
     this.headerObserver = null
     this.header = null
+    this.arriving = null
     this.pending = null
     this.returnTo = null
     this.listScroll = null
@@ -175,7 +214,7 @@ export default class extends Controller {
 
   // A marker, or "Add note" in a block's menu (`data-notes-compose`). With a
   // selection in that block: a new note quoting it. A marker with open
-  // threads: the drawer at that block's group. Otherwise: a new note on the
+  // threads: the notes at that block's group. Otherwise: a new note on the
   // block, ready to type.
   open(event) {
     const marker = event.currentTarget
@@ -189,7 +228,7 @@ export default class extends Controller {
     else this.show({ compose: key, trigger: marker })
   }
 
-  // "New note" in the drawer's header: a note on the record itself.
+  // "New note" in the panel's header: a note on the record itself.
   compose() {
     this.show({ compose: this.containerKey })
   }
@@ -199,16 +238,32 @@ export default class extends Controller {
     // An Escape something inside already used (a menu's).
     if (event?.type === "keydown" && event.defaultPrevented) return
 
-    this.setOpen(false)
-    this.markActive()
+    this.conceal()
     this.forget()
     this.trigger?.focus()
     this.returnTo = null
   }
 
+  // `admin--ui--rail:shown` on <body>: the rail showed one of its panels. The
+  // Notes tab, by a press or a key of the person's, is an opening like the
+  // header's button's (the focus stays on the tab); another tab, while the
+  // notes were shown, is a closing like Close's, but the focus is the tab's.
+  // What this controller's own reveal and conceal cause is theirs.
+  shown(event) {
+    if (!this.hasDrawerTarget || this.revealing || this.concealing) return
+    if (event.target instanceof Element && event.target.contains(this.drawerTarget)) {
+      const from = document.activeElement
+      this.show({ focus: false, keep: true, trigger: from && from !== document.body && !this.drawerTarget.contains(from) ? from : null })
+    } else if (this.showing && !this.isOpen) {
+      this.forget()
+      this.returnTo = null
+      this.sync()
+    }
+  }
+
   // Where the focus goes on close (spec §4.1: back to the trigger): what
-  // opened the drawer, or the header's button when nothing a person pressed
-  // did (a link with `?notes=open`, the drawer remembered from the last
+  // opened the notes, or the header's button when nothing a person pressed
+  // did (a link with `?notes=open`, the notes remembered from the last
   // editor) or when what they pressed is gone (a marker on a card a stream
   // has drawn again). Never left to fall to <body>.
   //
@@ -238,22 +293,18 @@ export default class extends Controller {
     return element.getClientRects().length > 0 && window.getComputedStyle(element).visibility !== "hidden"
   }
 
-  // A shell drawer opened (`admin--shell--drawer:opened`): this one makes room, and
-  // the focus is the shell drawer's. Not a "Close": the choice stays
-  // remembered. The exception is the page tree while the notes are a column:
-  // the tree is a drawer there BECAUSE the notes are open (the stylesheet
-  // folds it), so closing them for it would put the tree back as a column
-  // under the pointer that asked for the drawer.
-  shellOpened(event) {
-    if (!this.hasDrawerTarget || !this.isOpen) return
-    if (event?.detail?.name === "tree" && this.beside) return
-    this.setOpen(false)
-    this.markActive()
+  // A shell drawer opened (`admin--shell--drawer:opened`): the slide-over
+  // makes room, and the focus is the shell drawer's. Not a "Close": the
+  // choice stays remembered. The Notes tab of a docked rail is beside the
+  // editor, not over it, and stays.
+  shellOpened() {
+    if (!this.hasDrawerTarget || !this.isOpen || this.beside) return
+    this.conceal()
   }
 
   // `turbo:before-fetch-request` on the notes frame: its view is about to be
   // replaced (a row was followed, a form was sent). Where the list stood is
-  // kept for the way back, and whether the focus was in the drawer, for the
+  // kept for the way back, and whether the focus was in the notes, for the
   // answer. The event bubbles, so the resolved rows' own frame loading inside
   // the list is heard here too, and is not this frame leaving.
   leaving(event) {
@@ -266,7 +317,7 @@ export default class extends Controller {
 
   // `turbo:frame-load` on the notes frame (or called by `show` when the frame
   // already holds what was asked for): put the focus where the opener asked,
-  // keep it in the drawer if the answer took away what held it, and bring
+  // keep it in the notes if the answer took away what held it, and bring
   // the list back to where it was left.
   loaded(event) {
     if (event && event.target !== this.frameTarget) return
@@ -285,11 +336,11 @@ export default class extends Controller {
     const lost = inside && !this.drawerTarget.contains(document.activeElement)
     // What an opener asked for is given only while the focus is where it was
     // at the ask (the button that was pressed, or nowhere) or already in the
-    // drawer. The view is on screen a few frames before this runs -- Turbo
+    // notes. The view is on screen a few frames before this runs -- Turbo
     // repaints between drawing a frame and saying it has loaded, and on a
     // slow machine that is long -- and a person who has clicked into the
-    // editor meanwhile keeps the focus there: taken into the drawer, their
-    // typing went to the wrong place and Escape closed the drawer. (CI's
+    // editor meanwhile keeps the focus there: taken into the notes, their
+    // typing went to the wrong place and Escape closed them. (CI's
     // browser suite met exactly that.)
     const asked = Boolean(pending) && this.focusStayed(pending.from)
 
@@ -313,8 +364,8 @@ export default class extends Controller {
     this.listScroll = null
   }
 
-  // Whether the focus is still where it was when the drawer was asked for
-  // (`from`), or nowhere, or inside the drawer: then nobody has put it
+  // Whether the focus is still where it was when the notes were asked for
+  // (`from`), or nowhere, or inside them: then nobody has put it
   // anywhere else since.
   focusStayed(from) {
     const active = document.activeElement
@@ -323,7 +374,7 @@ export default class extends Controller {
 
   // The block whose thread is showing (handoff: its card's border is accent
   // while the thread is open). One at a time; none in the list view or with
-  // the drawer closed. An attribute, taken back here: nothing a redrawn
+  // the notes closed. An attribute, taken back here: nothing a redrawn
   // card could keep by mistake, and nothing Turbo's snapshot of the page
   // keeps past the next editor's first load.
   markActive() {
@@ -355,23 +406,33 @@ export default class extends Controller {
     this.schedulePaint()
   }
 
-  // --- the drawer ---------------------------------------------------------------
+  // --- the panel ----------------------------------------------------------------
 
-  get isOpen() {
-    return this.hasDrawerTarget && !this.drawerTarget.hidden
+  // The rail's panel the notes stand in: asked for by the target name the
+  // rail's controller gives it, and by nothing of its look.
+  get panel() {
+    return this.hasDrawerTarget ? this.drawerTarget.closest("[data-admin--ui--rail-target~='panel']") : null
   }
 
-  // Whether the drawer is a drawer beside the editor (from 1024px, Tailwind's
-  // `lg`, where its classes make it one) and not the full-screen sheet.
+  // Shown: the Notes tab is the rail's current one (docked, the tab; below,
+  // the slide-over or the sheet).
+  get isOpen() {
+    return Boolean(this.panel?.hasAttribute("data-current"))
+  }
+
+  // Whether the notes stand beside the editor, as the docked rail's Notes
+  // tab (`data-rail-docked`, `admin--ui--rail`'s), and not over it.
   get beside() {
-    return window.matchMedia("(min-width: 1024px)").matches
+    return this.hasDrawerTarget && this.drawerTarget.closest("[data-rail-docked]") !== null
   }
 
   get containerKey() {
     return this.hasDrawerTarget ? this.drawerTarget.dataset.key : null
   }
 
-  show({ thread = null, group = null, compose = null, quote = null, trigger = null, focus = true } = {}) {
+  // `keep`: the Notes tab pressed shows what the frame holds, the list or a
+  // thread, and loads the list only into a frame that holds neither.
+  show({ thread = null, group = null, compose = null, quote = null, trigger = null, focus = true, keep = false } = {}) {
     if (!this.hasDrawerTarget) return
 
     if (trigger) this.returnTo = trigger
@@ -383,38 +444,61 @@ export default class extends Controller {
     this.listScroll = null
     this.fromList = false
     this.inside = false
-    // `from`: where the focus is as the drawer is asked for (`loaded`).
+    // `from`: where the focus is as the notes are asked for (`loaded`).
     this.pending = { thread, group, compose, focus, from: document.activeElement }
 
     const wasOpen = this.isOpen
-    this.setOpen(true)
+    this.reveal()
     this.remember()
     if (!wasOpen) this.dispatch("opened")
 
     // The frame already holds what was asked for: nothing to fetch. It was
     // asked for and holds no view: that load failed (the network, an error
     // page) or was emptied, and the same address is fetched again, or the
-    // drawer would stay on "Loading notes…" for good. Otherwise: go there.
+    // notes would stay on "Loading notes…" for good. Otherwise: go there.
     const frame = this.frameTarget
     const next = url.pathname + url.search
-    const there = this.address(frame.getAttribute("src")) === next
+    const there = this.address(frame.getAttribute("src")) === next || (keep && frame.hasAttribute("src"))
     if (there && frame.querySelector("[data-notes-view]")) this.loaded()
     else if (there) frame.reload()
     else frame.src = next
   }
 
-  // The drawer shown or not, and with it what the stylesheet lays the page
-  // out by (`data-notes-open` on <html>: the room for the column, the folded
-  // page tree). One place, so the two can't disagree.
-  setOpen(open) {
-    if (open) this.measure()
-    this.drawerTarget.hidden = !open
-    document.documentElement.toggleAttribute("data-notes-open", open)
+  // The Notes tab made current, or taken back to the tab the person last
+  // left, by the rail's own events dispatched from inside the panel; then
+  // everything that follows from "shown" is said again. The rail's `shown`
+  // that each causes is this controller's own (`revealing`, `concealing`).
+  reveal() {
+    this.revealing = true
+    try {
+      this.drawerTarget.dispatchEvent(new CustomEvent("admin--ui--rail:reveal", { bubbles: true }))
+    } finally {
+      this.revealing = false
+    }
+    this.sync()
+  }
+
+  conceal() {
+    this.concealing = true
+    try {
+      this.drawerTarget.dispatchEvent(new CustomEvent("admin--ui--rail:conceal", { bubbles: true }))
+    } finally {
+      this.concealing = false
+    }
+    this.sync()
+  }
+
+  // Everything that follows from whether the notes are shown: the openers'
+  // pressed state, the active block and the address. One place, so they
+  // can't disagree.
+  sync() {
+    this.showing = this.isOpen
     this.syncOpeners()
+    this.markActive()
     this.syncAddress()
   }
 
-  // The address as the drawer is now (see "THE ADDRESS FOLLOWS THE DRAWER"):
+  // The address as the notes are now (see "THE ADDRESS FOLLOWS THE NOTES"):
   // called whenever that changes -- opened, closed, a view loaded -- and on
   // `turbo:load`, when the address has become this editor's. The thread is
   // the one asked for while its view is still on its way, else the one in
@@ -437,8 +521,9 @@ export default class extends Controller {
     else window.history.replaceState(window.history.state, "", url.href)
   }
 
-  // Where the column starts: under the editor's sticky header, whose height
-  // is whatever its rows come to. Written on the drawer, read by its `top`.
+  // Where the docked notes stick: under the editor's sticky header, whose
+  // height is whatever its rows come to. Written on the panel, read by its
+  // `top` and its height.
   measure() {
     if (!this.hasDrawerTarget || !this.header?.isConnected) return
     this.drawerTarget.style.setProperty("--admin-editor-header-height", `${this.header.getBoundingClientRect().height}px`)
@@ -463,7 +548,7 @@ export default class extends Controller {
   }
 
   syncOpeners() {
-    // The header's button is a toggle: pressed while the drawer is open.
+    // The header's button is a toggle: pressed while the notes are shown.
     this.openerTargets.forEach((opener) => {
       opener.setAttribute("aria-expanded", this.isOpen ? "true" : "false")
       opener.setAttribute("aria-pressed", this.isOpen ? "true" : "false")
@@ -494,14 +579,15 @@ export default class extends Controller {
     // threads hold a delivery the viewer has not read.
     const unread = new Set(this.counts.unread)
 
-    // The header button's number and the one beside the drawer's title.
+    // The header button's number, the one beside the panel's title and the
+    // Notes tab's.
     this.totalTargets.forEach((element) => {
       element.textContent = String(total)
       element.hidden = total === 0
       element.toggleAttribute("data-unread", unread.size > 0)
       element.closest("[data-admin--notes--drawer-target~='opener']")?.setAttribute("aria-label", text.t("notes.script.total", { count: total }))
     })
-    // A button that connected after the drawer opened (a header drawn again).
+    // A button that connected after the notes opened (a header drawn again).
     this.syncOpeners()
 
     this.markerTargets.forEach((marker) => {

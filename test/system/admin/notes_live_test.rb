@@ -592,7 +592,8 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   # for someone who is not looking. What it holds is fetched when it opens.
   test "a drawer closed while its record changed shows the change when it is opened again" do
     open_list
-    find("#notes-open").click
+    # The slide-over covers the header's end, its button with it: its own ×.
+    find("#notes-drawer button[aria-label='Close']").click
     assert_no_selector "#notes-drawer"
 
     other = as(users(:two)) { Notes::Start.call(@page, body: "While you were away") }.record

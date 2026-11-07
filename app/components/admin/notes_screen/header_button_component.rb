@@ -2,38 +2,34 @@ module Admin
   module NotesScreen
     # The Notes button of the page and post editors' header (notes spec §4.3),
     # registered at the header's `editor.header.actions` slot
-    # (`config/initializers/admin_slots.rb`). A toggle for the drawer
-    # `Admin::NotesScreen::DrawerComponent` draws beside the editor. Its
+    # (`config/initializers/admin_slots.rb`). It shows the rail's Notes tab
+    # (`Admin::NotesScreen::RailPanelComponent`) and closes it again. Its
     # number is the server's as the page loads; `admin--notes--drawer` keeps it
     # current from then on, and is what says "unread for you" (`data-unread`
-    # on the number) and "the drawer is open" (`aria-pressed`).
+    # on the number) and "the notes are shown" (`aria-pressed`).
     #
-    # WHEN IT DRAWS. Before the slot the header drew the button when its
-    # caller handed over the open-thread count, which the two editor views did
-    # for every record they showed (so: every record the viewer could open,
-    # since a record out of their scope is a 404), and which a preview or a
-    # test of the header did not. Now the component decides from the record and
-    # the viewer: it is a saved record of a kind that takes notes, and the
-    # viewer may read its notes (`Notes.readable?`). The same screens, and no
-    # button on a record that has no id to count.
+    # WHEN IT DRAWS: a saved record of a kind that takes notes, whose notes
+    # the viewer may read (`Notes.readable?`). No button on a record that has
+    # no id to count.
     #
-    # THE COUNT. The component reads it for its one record
-    # (`Notes::Counts.for_container`, as the editor view did for the header).
-    # A screen that has already read it for the drawer beside the header hands
-    # it in as `counts:` through the slot's context, so the page costs the same
-    # statements as before; without it the component asks.
+    # THE COUNT is the screen's one read of the record's counts
+    # (`CountsComponent.read`), shared through the slot's `reads:` with the
+    # rail's Notes tab, so the editor reads them once; a host that hands no
+    # `reads:` has the component ask.
     class HeaderButtonComponent < Admin::AdminComponent
-      def initialize(record:, viewer:, data: nil, counts: nil, **)
+      def initialize(record:, viewer:, data: nil, reads: nil, **)
         @record = record
         @viewer = viewer
-        @counts = counts
+        @reads = reads
       end
 
       def render?
         record.persisted? && !RecordKinds.of(record).nil? && ::Notes.readable?(viewer, record)
       end
 
-      def open_notes = (@counts || ::Notes::Counts.for_container(record, user: ::Notes.user_of(viewer))).fetch("total").to_i
+      def open_notes
+        (CountsComponent.read(record, viewer:, reads: @reads) || ::Notes::Counts.for_container(record, user: ::Notes.user_of(viewer))).fetch("total").to_i
+      end
 
       # The shared secondary style of the header (Preview's); its common classes
       # are already `inline-flex`, the row for the icon, the word and the count.

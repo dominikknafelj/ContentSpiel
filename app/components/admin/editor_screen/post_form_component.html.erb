@@ -123,7 +123,10 @@
     column, where the document puts them. Only the grid places them. The fetched answer
     (`form_only`) is the notice area and the form alone, which the record merge replaces
     or keeps whole, the settings panel with it; the rail re-applies its current tab to a
-    panel that connects. The notice area is on one line, so that `:empty` holds without a
+    panel that connects. The tabs stand after the form in the document and in the rail's
+    first row on screen: the tabs are buttons, and inside the form they would be frozen
+    with it (`editing/freeze.js`) and drawn again by every record merge, so the document
+    reads main column, settings, then the tabs and the rail's other panels. The notice area is on one line, so that `:empty` holds without a
     strip: `admin--editing--live` merges the strip around an alert already there. %>
 <% if form_only? %>
 <div id="editor-notice"><%= render hold_strip if held? %></div>
@@ -133,10 +136,10 @@
       data: { controller: "admin--ui--rail", action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal" } do %>
 <% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
                                                 **{ locale: locale, url_options: url_options, query: request.query_parameters, **@slot_context }) %>
+<%= form %>
 <%= render Admin::Ui::RailTabsComponent.new(rail_id: RAIL_ID, current: "post", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "post", label: t("admin.components.editor_screen.rail.tabs.post"))
     ], slot_tabs: rail_slot.tabs) %>
-<%= form %>
 <%= render rail_slot %>
 <% end %>
 <% end %>

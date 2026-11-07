@@ -202,12 +202,12 @@ export default class extends Controller {
   // Which control in the slot has the focus, and its selection, as the focus
   // comes and goes: leaving for another element forgets it, the focus
   // falling to nothing (the panel no longer drawn) does not.
-  noteFocus(event) {
+  keepFocus(event) {
     this.lastFocus = event.target
     this.lastSelection = null
   }
 
-  noteBlur(event) {
+  keepBlur(event) {
     if (event.relatedTarget) this.lastFocus = null
     else if (event.target === this.lastFocus) this.lastSelection = selectionOf(event.target)
   }
@@ -230,8 +230,8 @@ export default class extends Controller {
   // head with the focus it had, and the rail goes back to its other tab for
   // when it docks again. By the time the rail says so the Section panel is
   // no longer drawn and the browser has let the focus fall, so the control
-  // that had it is the one noted as the focus came and went (`noteFocus`,
-  // `noteBlur`), and it takes the focus back only while nothing else has it.
+  // that had it is the one noted as the focus came and went (`keepFocus`,
+  // `keepBlur`), and it takes the focus back only while nothing else has it.
   undocked(event) {
     if (event.detail?.docked !== false || !this.chosen) return
     this.release({ open: true, refocus: true, orphan: "park" })

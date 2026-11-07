@@ -232,13 +232,6 @@ en:
           add_note: "Add note"
         block_tile:
           add_note: "Add note"
-        # The page tree's drawer in the editor header, where the notes column
-        # has folded the tree away and there is no top bar (the top bar's own
-        # button reads the same). `editor_screen.en.yml` holds nothing of the
-        # header's yet (it is not converted); these merge into its scope.
-        header:
-          tree: "Pages ▾"
-          tree_label: "Open page tree"
       # A record's open notes where it is listed (notes spec §4.4): the media
       # tile's, and the posts table's column header. None of these components'
       # other strings live here (they are not converted): these merge into
@@ -275,8 +268,10 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
-        drawer:
+        rail_panel:
           title: "Notes"
+          # The rail's tab (`editor.rail.tabs`), beside Page or Post.
+          tab: "Notes"
           # Beside the title: "4 open". `%{number}` is the element the script
           # rewrites as the count changes, so the sentence has one form.
           open_html: "%{number} open"

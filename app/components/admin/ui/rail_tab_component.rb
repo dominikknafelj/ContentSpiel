@@ -17,7 +17,7 @@ module Admin
         tag.button type: "button", role: "tab", id: RailTabsComponent.tab_id(@rail_id, @tab.key), class: "admin-rail__tab text-sm",
           aria: { selected: @current.to_s, controls: RailTabsComponent.panel_id(@rail_id, @tab.key) }, tabindex: (@current ? 0 : -1),
           data: { "admin--ui--rail-target": "tab", key: @tab.key, action: "admin--ui--rail#select keydown->admin--ui--rail#key" } do
-          safe_join([ @tab.label, (tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?) unless @tab.count.nil?) ])
+          safe_join([ @tab.label, (tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?, data: @tab.count_data) unless @tab.count.nil?) ])
         end
       end
     end

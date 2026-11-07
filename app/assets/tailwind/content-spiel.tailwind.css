@@ -167,12 +167,11 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    as the root's box (`getBoundingClientRect`). So the scripts and this agree
    at any font size and with a classic scrollbar, not at 16px only. A media
    query measures the window with the gutter, and the scripts ask the
-   sidebar's breakpoint through `matchMedia`, the same query. The notes column alone is pixels
-   (`--admin-notes-width`), here and there.
+   sidebar's breakpoint through `matchMedia`, the same query.
 
-   Where the tree is a DRAWER the limit is not asked: below 1024px it keeps
-   its fixed 17rem, and folded beside the notes column (further down) it is
-   the chosen width, laid over the content. */
+   Where the tree is a DRAWER (below 1024px) the limit is not asked: it keeps
+   its fixed 17rem. Nothing else folds it: the notes stand in the editor's
+   rail or over the canvas, never beside the tree. */
 :root {
   --admin-tree-room: calc(100% - 15rem - 40rem);
   --admin-tree-column: clamp(13.75rem, var(--admin-tree-width, 17rem), max(13.75rem, min(30rem, var(--admin-tree-room))));
@@ -243,21 +242,16 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 
    From 1024px only: below, the tree is a drawer of a fixed width and the
    fold means nothing, so the attribute is there and nothing asks it (the
-   fold is back when the window is wide again). Nor while the tree is the
-   drawer beside the open notes (`:root[data-notes-open]:not([data-tree-fits])
-   body:has(#notes-drawer)`, further down: even the strip does not fit there):
-   that drawer shows the whole tree, as the one below 1024px does. Both
-   buttons are drawn from 1024px only, and in neither drawer (the notes'
-   drawer hides "Hide page tree" with its divider, further down): folding a
-   drawer means nothing. */
+   fold is back when the window is wide again). Both buttons are drawn from
+   1024px only: folding a drawer means nothing. */
 :root { --admin-tree-strip: 2.75rem; }
 .admin-tree-fold, .admin-tree-hide { display: none; }
 @media (min-width: 1024px) {
   .admin-tree-hide { display: inline-flex; }
   :root[data-tree-folded] { --admin-tree-column: var(--admin-tree-strip); }
-  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree { display: flex; justify-content: center; align-items: flex-start; padding: 0.75rem 0; }
-  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree > :not(.admin-tree-fold) { display: none; }
-  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-tree-fold { display: inline-flex; position: sticky; top: calc(var(--admin-top-offset) + 0.75rem); }
+  :root[data-tree-folded] .admin-shell__tree { display: flex; justify-content: center; align-items: flex-start; padding: 0.75rem 0; }
+  :root[data-tree-folded] .admin-shell__tree > :not(.admin-tree-fold) { display: none; }
+  :root[data-tree-folded] .admin-tree-fold { display: inline-flex; position: sticky; top: calc(var(--admin-top-offset) + 0.75rem); }
 }
 .admin-top-bar { display: none; }
 .admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
@@ -287,98 +281,6 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1280px) { .admin-shell__scrim { display: none; } }
 @media (min-width: 1024px) { body:not(:has(.admin-shell__sidebar[data-open])) .admin-shell__scrim { display: none; } }
 @media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
-
-/* The editors' notes drawer (`Admin::NotesScreen::DrawerComponent`, notes spec
-   §4.1 and the handoff's decision 1 of 2026-10-09). From 1024px it is a 400px
-   COLUMN to the right of the content and BELOW the editor's sticky header:
-   the header spans both, nothing of the editor is under the drawer, and the
-   drawer scrolls by itself while the content scrolls with the page. Below
-   1024px it is a sheet over the whole editor and none of this applies.
-
-   HOW THE COLUMN IS MADE. The shell's grid is not given a fourth track: the
-   drawer is rendered inside `#content` (a frame navigation replaces it with
-   its editor), and a grid item of `.admin-shell` it is not. Instead the room
-   is taken out of the content column -- `<main>` pads its right side by the
-   drawer's width -- the header's negative margin grows by the same amount so
-   it still reaches the window's edge, and the drawer is fixed in the room
-   that was made, from the header's bottom edge to the window's. The header
-   is stuck to `--admin-top-offset` at every scroll position, so its bottom
-   edge is that plus its height, which `admin--notes--drawer` measures and keeps
-   current (`--admin-editor-header-height`, on the drawer: a notice bar or a
-   wrapped row makes the header taller). No shadow: it is beside the content,
-   not over it.
-
-   WHAT SAYS "OPEN". `data-notes-open` on <html>, together with a drawer in
-   the page. On <html> and not read from the drawer's own `hidden`: the
-   layout's head script sets it before the first paint when this browser
-   remembers the drawer as open, so the page is laid out with the column from
-   the start and the editor does not change width when the script connects.
-   `admin--notes--drawer` owns it from then on (`setOpen`); a screen without a drawer
-   never matches.
-
-   THE PAGE TREE STAYS BESIDE THE EDITOR WHILE IT FITS, AND FOLDS WHEN IT
-   DOES NOT (Claude Design, 2026-10-13, T3; until then it folded at every
-   width). It fits while the editor column would still be 40rem (640px) wide:
-   the modules sidebar (15rem, where it is a column) + the tree at its CHOSEN
-   width + this 400px column + 40rem are no more than the window. At the
-   default tree width and a 16px font that is a window of 1552px: the tree
-   stays at 1600px and folds at 1440px. The sidebar is a column from 1280px
-   only, so the sum steps there: a tree of 220 to 239px stays beside the
-   notes at 1260 to 1279px (the sidebar is a drawer, the editor really has
-   its 640px) and folds from 1280px until the window is 1500px wide. That is
-   the sidebar's breakpoint showing, the same step the editor's width takes
-   there without the notes, and not a fault of the rule, which is the
-   editor's true width. A media query cannot read the chosen width, so the
-   sum is done in script and said on <html> as `data-tree-fits`: by the
-   layout's head script before the first paint (`admin/shared/_tree_head`)
-   and from then on by `admin--shell--tree-width`, on a resize and on every
-   change of the width. The attribute is there or not whether or not the
-   notes are open; only the rules below ask it, and they ask for its ABSENCE,
-   so without the script the tree folds as it always did.
-
-   Studio never narrows the tree to make it fit. It folds at the width it
-   has, and is a column of that same width again when the notes close; while
-   it is a column beside the notes its divider stops at the width that still
-   fits (the script's `ceiling`), so a drag cannot fold it. A reset to the
-   default can: where the default does not fit, it folds like any width.
-
-   FOLDED, it is what it is below 1024px: the same element, the same
-   `data-open`, `admin--shell--drawer` and the scrim -- these rules only add a
-   condition to the ones above -- but at the chosen width and not a fixed
-   one, and with no divider. What opens it is a "Pages ▾" button: from 1024px
-   to 1279px the top bar's own, and from 1280px, where there is no top bar,
-   the one at the start of the page editor's breadcrumb row
-   (`.admin-editor-header__tree`, `Admin::EditorScreen::HeaderComponent`,
-   shown only then). From 1280px the drawer stands BESIDE the modules
-   sidebar, where the tree's column was (`left: 15rem`), and fades in rather
-   than slides: a slide would cross the sidebar. Where the tree fits, none of
-   this applies: no button is shown, and the tree is the column it is without
-   the notes. */
-:root { --admin-notes-width: 400px; }
-.admin-editor-header__tree { display: none; }
-@media (min-width: 1024px) {
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__main { padding-right: calc(1.5rem + var(--admin-notes-width)); }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header { margin-right: calc(-1.5rem - var(--admin-notes-width)); }
-  .admin-notes-drawer { top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); }
-
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: var(--admin-top-offset); bottom: 0; left: 0; width: var(--admin-tree-width, 17rem); overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-divider { display: none; }
-  /* A drawer is not folded: the fold's button is not offered in it. */
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-hide { display: none; }
-  /* The scrim of the folded tree: the two rules above hide it from 1024px
-     unless the modules sidebar is the open drawer, and at all from 1280px. */
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
-}
-@media (min-width: 1280px) {
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: 15rem minmax(0, 1fr); }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { left: 15rem; transform: none; opacity: 0; transition: opacity 0.15s var(--cs-ease), visibility 0s linear 0.15s; }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { opacity: 1; transition: opacity 0.15s var(--cs-ease), visibility 0s; }
-  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
-}
-@media (prefers-reduced-motion: reduce) { :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
 /* Settings' in-page nav (Admin::SettingsScreen::NavComponent): the link of the
    section in view is current. The look is read from `aria-current`, so it
@@ -447,22 +349,13 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    not at all with reduced motion. Nobody fades out and nobody slides: who
    left is not in the next drawing, and the others are where they belong.
    `admin--presence--record` marks the circle that is new in a drawing; here
-   to away is a redraw with no mark, so it changes at once.
-
-   BELOW 1024px THE NOTES ARE A SHEET over the whole editor, and the sheet
-   shows no presence (handoff 15). The sheet only COVERS the editor's header
-   (it is no modal: nothing behind it is made inert, and the header's other
-   controls are still in the Tab order and the accessibility tree there),
-   so the people are taken out of both while it is open. */
+   to away is a redraw with no mark, so it changes at once. */
 .admin-presence [data-presence-arriving] { animation: admin-presence-in 150ms var(--cs-ease); }
 @keyframes admin-presence-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .admin-presence [data-presence-arriving] { animation: none; } }
 /* The "Updated by ..." mark of a card a colleague saved: it fades over 200ms when its time is up (`admin--editing--live#fade`; with reduced motion the script removes it at once). */
 .admin-editing-mark { transition: opacity 200ms var(--cs-ease); }
 .admin-editing-mark--leaving { opacity: 0; }
-@media (max-width: 1023px) {
-  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header .admin-presence { display: none; }
-}
 
 /* Styled native select (design pass spec §4). The chevron is two CSS
    gradients rather than an image so it takes the token colour in both
@@ -710,7 +603,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 }
 /* The dashboard's cards (layout points spec, C and decision 13): one column,
    two from 40rem, three from 60rem, by the DASHBOARD's own width and not the
-   window's (the sidebar and the notes column take room the window does not
+   window's (the sidebar and the tree take room the window does not
    show), and never more than three: a wider window widens the cards and adds
    no fourth, so no `auto-fit`. `turbo-frame.contents` keeps the two notes
    cards, each a frame of its own, grid items. */
@@ -724,7 +617,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 }
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
-   window's: a folded tree or an open notes column changes it while the
+   window's: a folded tree changes it while the
    window stays the same. No `@media` rule names the rail
    (`admin_design_rules_test`).
 
@@ -807,6 +700,49 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
      the settings stand on the rail's ground. */
   .admin-rail-grid:not(.admin-rail-grid--folded) > #post-form { display: contents; }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-post-main { border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: calc(var(--spacing) * 4); }
+  /* The Notes tab (THE NOTES PANEL, below): docked, the same element is the
+     panel's content on the rail's ground, over the slide-over's rules. It
+     sticks under the editor's sticky header, whose height
+     `admin--notes--drawer` measures onto it, so a marker pressed far down
+     the page opens notes that are in view. Its panel keeps no padding: the
+     notes' header and list have their own. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:has(> .admin-notes-drawer) { padding: 0; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-notes-drawer {
+    position: sticky; z-index: auto; inset: auto; top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px));
+    width: auto; height: calc(100vh - var(--admin-top-offset) - var(--admin-editor-header-height, 0px));
+    background: transparent; box-shadow: none; animation: none;
+  }
+}
+/* THE NOTES PANEL (`Admin::NotesScreen::RailPanelComponent`, `#notes-drawer`,
+   the content of the rail's Notes tab). One element at every width, never
+   moved or cloned, so a note being typed keeps its text and its focus when
+   the rail docks or undocks. It is shown while its panel is current
+   (`admin--ui--rail`, which `admin--notes--drawer` asks through
+   `admin--ui--rail:reveal` and `:conceal`), and is nothing otherwise.
+
+   Below the rail's threshold it is a SLIDE-OVER: 400px from the window's
+   right edge, from under the top bar to the bottom, over the canvas at
+   elevation 3 (the popover's ground and shadow), sliding in from the right.
+   Nothing under it moves and nothing is made inert: no scrim, the page
+   scrolls under it, and Escape closes it only while the focus is inside.
+   Under 640px (the window's: the sheet covers the window) it is the
+   full-screen SHEET, with "Back to <title>" in the place of the ×. Docked,
+   the rule inside the rail's container query above makes it the panel's
+   content instead. */
+.admin-notes-drawer {
+  display: flex; flex-direction: column;
+  position: fixed; z-index: 20; top: var(--admin-top-offset); right: 0; bottom: 0; width: 400px;
+  background: var(--cs-popover); box-shadow: var(--cs-shadow-3);
+  animation: admin-notes-in 0.2s var(--cs-ease);
+}
+.admin-rail__panel:not([data-current]) > .admin-notes-drawer { display: none; }
+@keyframes admin-notes-in { from { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .admin-notes-drawer { animation: none; } }
+.admin-notes-drawer__back { display: none; }
+@media (max-width: 639.98px) {
+  .admin-notes-drawer { inset-inline: 0; width: auto; }
+  .admin-notes-drawer__back { display: inline-flex; }
+  .admin-notes-drawer__close { display: none; }
 }
 /* A section's settings region that `admin--editor--section-choice` moved
    into the Section panel: the panel's padding is its edge and the rail its
@@ -865,7 +801,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* A block card's state edge (`Admin::EditorScreen::BlockCardComponent`): a 2px
    outline inside the card's edge, so the card keeps its size and its shadow.
    Held by someone else is the field line, its type gone is danger, its thread
-   open in the notes drawer (`admin--notes--drawer#markActive`) is the accent.
+   open in the notes (`admin--notes--drawer#markActive`) is the accent.
    Where two apply, the later rule wins: unavailable over notes-active over
    held. The three weigh the same, (0,2,0): the notes rule leaves a section's
    card out inside `:where()`, which adds no weight. Each edge is 3:1 or
@@ -901,7 +837,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-block-tile:where(:hover) { box-shadow: var(--cs-shadow-2); background: var(--cs-tile-raised); }
 .admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"])),
 .admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible)) { box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent); background: var(--cs-tile-raised); }
-/* The tile of the block whose thread is open in the notes drawer
+/* The tile of the block whose thread is open in the notes
    (`admin--notes--drawer#markActive`): the card's notes edge, a 2px accent
    outline inside the edge, which leaves the shadow and the ring alone. */
 .admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
@@ -978,22 +914,21 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    and Close -- is not shown, and the thread's first row is the header: "←
    All notes 4", the Notify link and a Close of its own
    (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
-   what the drawer's does. "New note" comes back with the list. Asked of the
+   what the panel's does. "New note" comes back with the list. Asked of the
    frame's view, so the two can't both show or both hide. AT EVERY WIDTH (the
-   handoff's decision 17): below 1024px the notes are a sheet whose header
+   handoff's decision 17): under 640px the notes are a sheet whose header
    holds "Back to <title>", the one way back to the editor, and that header
    is hidden over a thread too -- so there the row ends in a "Back to
    page" of its own (`.admin-note-leave`, a text button) where the
-   drawer's row has Close. One of the two, by the width; and neither is
-   shown anywhere but in the drawer: the same thread view in the media panel
-   and on a record's notes page has no drawer to close or leave. */
+   panel's row has Close. One of the two, by the width; and neither is
+   shown anywhere but in the editors' notes: the same thread view in the
+   media panel and on a record's notes page has nothing to close or leave. */
 .admin-note-close,
 .admin-note-leave { display: none; }
 .admin-notes-drawer:has([data-notes-view="thread"]) > header { display: none; }
-@media (min-width: 1024px) {
-  .admin-notes-drawer .admin-note-close { display: inline-flex; }
-}
-@media (max-width: 1023px) {
+.admin-notes-drawer .admin-note-close { display: inline-flex; }
+@media (max-width: 639.98px) {
+  .admin-notes-drawer .admin-note-close { display: none; }
   .admin-notes-drawer .admin-note-leave { display: inline-flex; }
 }
 /* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL (the handoff's decision 35). In

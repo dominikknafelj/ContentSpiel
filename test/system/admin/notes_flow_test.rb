@@ -351,7 +351,10 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     # The text is the person's draft, back when the field is drawn again.
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    assert_selector "#notes-drawer #notes-list" # open was remembered
+    # Remembered "open" opens the Notes tab of a docked rail only: here the
+    # rail does not dock, so the notes are asked for again.
+    find("#notes-open").click
+    assert_selector "#notes-drawer #notes-list"
     within("#notes-drawer") { press "New note" }
     assert_equal "Half a thought", new_note_field.value
   end

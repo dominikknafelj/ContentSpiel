@@ -25,7 +25,9 @@ module Admin
   #   `url_options:`, and for a screen that has already read something the
   #   feature would read again, that). EVERY slot component must accept `**`
   #   for the context it does not use: a screen may hand through more than
-  #   one feature needs (the editors pass `counts:`);
+  #   one feature needs (the editors pass `reads:`, a Hash the screen's slot
+  #   components share, so that two parts of one feature on one screen read
+  #   what they both draw once);
   # - `options` are the registration's own (`register(name, component,
   #   size: :panel)`), merged after the context, so they win on a clash.
   # `render?` decides whether it draws; one that says no leaves no markup.
@@ -34,7 +36,8 @@ module Admin
   # and `Admin::Ui::RailTabsComponent`, not by `SlotComponent`: each entry is a
   # tab AND its panel. Beside the slot component's arguments it answers
   # `tab_key` (a String of lowercase letters), `tab_label`, `tab_count` (an
-  # Integer, or nil for none) and `render?`; drawn, it is the panel's content.
+  # Integer, or nil for none), optionally `tab_count_data` (the figure's
+  # `data-` attributes) and `render?`; drawn, it is the panel's content.
   # The editors hand it `query:` (the request's query parameters), so a panel
   # reads its own parameters without the host naming them. The tab is drawn
   # again by a save's answer (`Admin::Answers::RailTabStreams`), the panel never,

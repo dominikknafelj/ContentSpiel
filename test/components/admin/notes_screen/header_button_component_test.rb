@@ -10,7 +10,7 @@ class Admin::NotesScreen::HeaderButtonComponentTest < ViewComponent::TestCase
     as(viewer) { render_inline(Admin::NotesScreen::HeaderButtonComponent.new(record: record, viewer: viewer, **options)) }
   end
 
-  test "the button: its id, its drawer wiring, its states and its number" do
+  test "the button: its id, its wiring to the notes, its states and its number" do
     page = create_page(title: "Pricing")
     as(users(:two)) { 2.times { Notes::Start.call(page, body: "A note") } }
 
@@ -38,15 +38,18 @@ class Admin::NotesScreen::HeaderButtonComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "the count comes from the one query the component asks itself, or from the counts the host already has" do
+  test "the count comes from the one query the component asks itself, or from the screen's shared reads" do
     page = create_page(title: "Pricing")
     as(users(:two)) { Notes::Start.call(page, body: "A note") }
-    counts = { "total" => 7, "subjects" => {}, "unread" => [] }
+    reads = { [ :notes_counts, Notes.key(page) ] => { "total" => 7, "subjects" => {}, "unread" => [] } }
 
-    render_button(page, counts: counts)
+    render_button(page, reads: reads)
 
     assert_selector "#notes-open-count", text: "7"
     assert_selector "button#notes-open[aria-label='Notes, 7 open']"
+
+    render_button(page)
+    assert_selector "#notes-open-count", text: "1"
   end
 
   test "it draws for a post" do
