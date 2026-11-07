@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The cable connection CS Studio's scripts share (`app/javascript/live/connection.js`),
 # imported in the browser from a CS Studio page: the project has no JavaScript
 # test runner, and this is a plain module the import map resolves, so a system
-# test can call it directly (as `mind_graph_modules_test.rb` does for the mind
+# test can call it directly (as `mind_graph_*_modules_test.rb` do for the mind
 # graph's modules).
 #
 # The page is the Tags screen: `admin--notes--inbox` is on its <body> and listens

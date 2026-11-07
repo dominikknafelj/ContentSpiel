@@ -55,12 +55,16 @@ test/system/admin/live_connection_test.rb: 21.5
 test/system/admin/media_library_test.rb: 85.8
 test/system/admin/media_picker_test.rb: 89.5
 test/system/admin/messages_test.rb: 25.2
+test/system/admin/mind_graph_card_and_list_modules_test.rb: 40.3
+test/system/admin/mind_graph_data_modules_test.rb: 47.0
 test/system/admin/mind_graph_dragging_test.rb: 47.1
+test/system/admin/mind_graph_drawing_modules_test.rb: 134.2
 test/system/admin/mind_graph_drawing_test.rb: 141.2
+test/system/admin/mind_graph_input_modules_test.rb: 100.7
+test/system/admin/mind_graph_layout_modules_test.rb: 53.7
 test/system/admin/mind_graph_legend_test.rb: 86.3
 test/system/admin/mind_graph_list_test.rb: 125.5
 test/system/admin/mind_graph_loading_test.rb: 86.3
-test/system/admin/mind_graph_modules_test.rb: 375.9
 test/system/admin/mind_graph_notes_test.rb: 70.6
 test/system/admin/mind_graph_search_test.rb: 86.3
 test/system/admin/mind_graph_selection_test.rb: 148.9
