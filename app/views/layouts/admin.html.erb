@@ -13,11 +13,11 @@
         is laid out with it; still in <head>, so before anything is painted. %>
     <%= render "admin/shared/tree_head" %>
     <%= javascript_importmap_tags "admin" %>
-    <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
-        token reveal (admin/api_tokens/create), on the page and post
-        editors (admin/pages/show, admin/posts/show), on the dashboard
-        (admin/dashboard/show) and on every screen with an explicit-save form
-        (`Admin::SaveBarHelper#save_bar_form_data`). %>
+    <%# Per-screen head tags. A screen whose parts a live answer redraws, or
+        that shows a secret once, carries `turbo-cache-control: no-cache`, so
+        Turbo's page cache never restores it stale (the API token reveal, the
+        editors, the dashboard, Tags and every explicit-save form through
+        `Admin::SaveBarHelper#save_bar_form_data`). %>
     <%= yield :head %>
   </head>
 

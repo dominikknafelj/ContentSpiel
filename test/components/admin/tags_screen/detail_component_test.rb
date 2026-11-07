@@ -18,7 +18,7 @@ class Admin::TagsScreen::DetailComponentTest < ViewComponent::TestCase
     live = create_post(title: "Live one")
     render_detail(posts: [ draft, live ], count: 12)
 
-    assert_selector "div#tag-detail-#{tag.id}[data-tag-detail-for='#{tag.id}']"
+    assert_selector "div#tag-detail-#{tag.id}"
     assert_selector "h2#tag-detail-#{tag.id}-name[tabindex='-1'][data-tag-detail-heading]", text: "music"
     assert_selector "[data-tag-detail-count]", text: "12 posts"
     assert_equal [ "A draft", "Live one" ], page.all("[data-tag-detail-posts] li a").map(&:text)

@@ -404,6 +404,14 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert Tag.exists?(source.id)
   end
 
+  test "the tag detail without tags.manage is a 403" do
+    tag = Tag.create!(name: "news")
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/tags/#{tag.id}", headers: { "Turbo-Frame" => "tag-detail" }
+    assert_response :forbidden
+  end
+
   # Merge touches the carrying posts, the repointed blocks and their pages, so
   # whatever form of those is open resends the OLD tag name and would undo it.
   test "after a merge an open post form's save is a 409 and does not bring the source back" do

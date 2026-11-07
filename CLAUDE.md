@@ -134,6 +134,8 @@ A rule a test holds is in the reference file for its area, under this same headi
 **`docs/reference/design-system.md`:**
 
 - A test that asserts a controller's *absence* by a fragment of its name (`[data-controller*='notes-live']`) goes on passing after a rename while it checks nothing. That case has no guard; when a controller file is renamed, search the tests for the old name's fragments by hand.
+- The Tags detail frame is redrawn by stream and never reloaded, and a link into it is never prefetched. **No guard** for a later `reload()` of the frame.
+- A record's state in a list is `Admin::Ui::ListStateComponent`. **No guard** for a list that draws `StatusChipComponent` beside its own unpublished chip.
 - There is one primary button per area (a screen, a dialog, a card with its own save; the editor's are Publish and "+ Add block"). **No guard** counts them: the button tests hold a variant's look, not how many a screen draws.
 - A tile is never lifted by a transform (its hover is an elevation): a tile that moved under the pointer would move under a drag that starts from it. **No guard** for a `transform` on a tile or card; `TILE_STATES` holds only the declarations it lists.
 - A state edge of a card, tile or section is an outline from `data-card-edge` or `data-notes-active`, never a border. The guard reads only the wrapper and head lines of the three files `EDITOR_CARDS` names (`block_card_component.html.erb`, `block_tile_component.html.erb`, `section_card_component.html.erb`): **no guard** for a border utility on a continuation line or in a fourth file that draws a card.
