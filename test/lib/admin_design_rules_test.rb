@@ -1475,8 +1475,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # `tree/open_set.js` alone and read on the server by `TreeOpenSet` alone,
   # which names it (`TreeOpenSet::COOKIE`); no script beside it touches
   # `document.cookie`, and no Ruby writes or deletes a cookie named by either.
-  # Comments are stripped first. Not seen: a theme's or a gem's script, and a
-  # cookie written through a name bound elsewhere.
+  # Comments are stripped first. Not seen: a theme's or a gem's script, a
+  # cookie written through a name bound elsewhere, `document["cookie"]`, and
+  # the Cookie Store API (`cookieStore`).
   OPEN_SET_WRITER = "app/javascript/tree/open_set.js"
   OPEN_SET_READER = "app/values/tree_open_set.rb"
   OPEN_SET_NAMES = /cs_tree_open|TreeOpenSet::COOKIE/

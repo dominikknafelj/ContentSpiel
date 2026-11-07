@@ -372,6 +372,10 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true]"
     page.execute_script("document.activeElement.blur()")
     assert_eventually(message: "an open parent's count still shows at rest") { !shown.call }
+    assert_operator page.evaluate_script("document.querySelector(#{count.to_json}).getBoundingClientRect().width"), :<=, 1, "a clipped count takes no width"
+    page.find("#tree-link-#{@alpha.id}").hover
+    assert_eventually { shown.call }
+    assert_operator page.evaluate_script("document.querySelector(#{count.to_json}).getBoundingClientRect().width"), :>=, 14, "a shown count keeps a figure's width"
   end
 
   # One ring, on what has the focus: a Pages row holds several controls, so

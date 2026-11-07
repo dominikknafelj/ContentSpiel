@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
-# The page tree's column is as wide as the person made it (Claude Design,
-# 2026-10-13: T1 the divider). Only a
-# browser can show any of it: every assertion compares a box with a width
+# The page tree's column is as wide as the person made it with its divider,
+# and from 1024px scrolls on its own beside the page. Only a browser can show
+# any of it: every assertion compares a box with a width
 # the test itself set, a pixel of tolerance and no measured time.
 #
 # THE ARITHMETIC the tests lean on. The modules sidebar is a 240px column
@@ -217,7 +217,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
 
     focus_divider
     assert_selector ".admin-tree-divider [data-tooltip]", text: "Tree width 272px. Arrow keys to resize."
-    # It hangs near the top of the window, not under the page-high divider.
+    # It hangs near the top of the window, not under the window-high divider.
     tip = box(".admin-tree-divider [data-tooltip]")
     assert_operator tip[1], :<, 200
     assert_operator tip[0], :>=, 0
@@ -506,6 +506,46 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
     # The teardown reads the storage of whatever page is open: one without the stub.
     visit "/cs-studio/posts"
+  end
+
+  # From 1024px the column is window-high and scrolls on its own: the
+  # selected row is put in view inside it, with a row's height to spare, by
+  # its `scrollTop` alone, on arrival and after a page picked in the frame.
+  # The window never scrolls, and the divider stays on the column's edge,
+  # window-high, whatever the column has scrolled.
+  test "a selected row deep in a long tree is in view inside the column, and the page did not scroll" do
+    fillers = 40.times.map { |index| create_page(title: format("Filler %02d", index)) }
+    deep = create_page(title: "Deep in the tree")
+    # Rows below it, so the column can leave a row's room under it.
+    3.times { |index| create_page(title: "After #{index}") }
+    column = "document.getElementById('tree-column')"
+    in_view = lambda do |record|
+      page.evaluate_script(<<~JS)
+        (() => { const column = #{column}.getBoundingClientRect(); const row = document.getElementById("tree-row-#{record.id}").getBoundingClientRect()
+                 return row.top >= column.top + row.height - 1 && row.bottom <= column.bottom - row.height + 1 })()
+      JS
+    end
+
+    # A window lower than the 45 rows.
+    at_window(1400, height: 900) do
+      open_editor(deep)
+      assert_operator page.evaluate_script("#{column}.scrollHeight"), :>, page.evaluate_script("#{column}.clientHeight"), "the tree is not taller than its column"
+      assert_in_delta page.evaluate_script("window.innerHeight"), box("#tree-column")[3] - box("#tree-column")[1], 1, "the column is window-high"
+      assert_operator page.evaluate_script("#{column}.scrollTop"), :>, 0
+      assert in_view.call(deep), "the selected row is not in view inside the column"
+      assert_equal 0, page.evaluate_script("window.scrollY")
+      divider = box(".admin-tree-divider")
+      assert_in_delta box("#tree-column")[2], divider[0] + 4.5, 1, "the divider stands on the column's edge"
+      assert_in_delta page.evaluate_script("window.innerHeight"), divider[3] - divider[1], 1, "the divider is window-high"
+
+      page.execute_script("#{column}.scrollTop = 0")
+      click_frame_link { find("#tree-link-#{fillers.first.id}").click }
+      assert_equal 0, page.evaluate_script("#{column}.scrollTop"), "a row in view moved the column"
+      click_frame_link { page.execute_script("document.getElementById('tree-link-#{deep.id}').click()") }
+      assert_selector "#tree-row-#{deep.id}.admin-tree-row--selected"
+      assert_eventually(message: "the row picked was not put in view") { in_view.call(deep) }
+      assert_equal 0, page.evaluate_script("window.scrollY")
+    end
   end
 
   test "below 1024px there is no divider, and the tree's drawer keeps its fixed width whatever was chosen" do

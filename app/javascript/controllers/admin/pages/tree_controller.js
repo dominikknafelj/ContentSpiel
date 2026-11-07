@@ -337,10 +337,11 @@ export default class extends Controller {
     this.scrollToRow(open)
   }
 
-  // Inside the tree's column only (`#tree-column`'s `scrollTop`), and only as
-  // far as needed; never the window, so the editor beside it stays where it
-  // is. A column that is not a scroller (the desktop's, as tall as the page)
-  // does not move.
+  // Inside the tree's column only (`#tree-column`'s `scrollTop`, at once,
+  // never smoothly), and only when the row is out of its view, which it then
+  // stands inside with one row's height to spare; never the window, so the
+  // editor beside it stays where it is. A column that is not a scroller does
+  // not move.
   scrollToRow(id) {
     const column = document.getElementById("tree-column")
     const row = id == null ? null : this.element.querySelector(`#tree-row-${CSS.escape(id)}`)
@@ -348,8 +349,11 @@ export default class extends Controller {
 
     const box = column.getBoundingClientRect()
     const rowBox = row.getBoundingClientRect()
-    if (rowBox.top < box.top) column.scrollTop -= box.top - rowBox.top
-    else if (rowBox.bottom > box.bottom) column.scrollTop += rowBox.bottom - box.bottom
+    if (rowBox.top >= box.top && rowBox.bottom <= box.bottom) return
+
+    const spare = rowBox.height
+    if (rowBox.top < box.top) column.scrollTop -= box.top - rowBox.top + spare
+    else column.scrollTop += rowBox.bottom - box.bottom + spare
   }
 
   openPageId() {

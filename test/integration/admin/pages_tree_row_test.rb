@@ -49,6 +49,24 @@ class Admin::PagesTreeRowTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target='tree-row-#{parent.id}'] template button.admin-tree-row__disclosure[aria-expanded='false']", count: 1
   end
 
+  # A cookie is what the browser sends: bytes that are not text fold nothing
+  # and break no screen that draws the tree.
+  test "a cookie that is not text leaves the Pages screen drawn" do
+    page = create_page(title: "About")
+    # The test client escapes what it is handed, so the browser's raw
+    # `%FF.<id>` reaches the app as the byte 0xFF.
+    cookies[TreeOpenSet::COOKIE] = "\xFF.#{page.id}"
+
+    get admin_pages_path
+    follow_redirect! while response.redirect?
+    assert_response :success
+    assert_select "#tree-row-#{page.id}"
+
+    get admin_page_path(page)
+    assert_response :success
+    assert_select "#tree-row-#{page.id}"
+  end
+
   # The statements of a whole-tree answer were already the same at any size;
   # what grew with the site was the tree read into it and drawn: every
   # visible page's row, sent with every save. So the answer is held at both

@@ -29,6 +29,7 @@ class TreeOpenSetTest < ActiveSupport::TestCase
     assert_not TreeOpenSet.parse("999999", readable_ids: readable).open?(999_999, root: false, on_path: false)
     assert_equal "", TreeOpenSet.parse("1." * 3000, readable_ids: readable).to_s
     assert_equal "", TreeOpenSet.parse(nil, readable_ids: readable).to_s
+    assert_equal "", TreeOpenSet.parse("\xFF.12".dup.force_encoding("UTF-8"), readable_ids: readable).to_s, "bytes that are not text are read as nothing"
     assert_equal "", TreeOpenSet.parse("0.-0.01", readable_ids: [ 0, 1 ]).to_s, "an id is a positive number written plainly"
 
     many = (1..TreeOpenSet::LIMIT + 5).map(&:to_s).join(".")

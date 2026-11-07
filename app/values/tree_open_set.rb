@@ -18,11 +18,12 @@
 # view state and is never stored: the scripts forget the folds on it as a
 # page is opened (`forgetFolds`).
 #
-# WHAT IS READ is held to the viewer and to a size. A value over `MAX_BYTES`
-# is read as nothing, entries past the first `LIMIT` set nothing, an entry
-# that is not an id (or `-` and an id) is skipped, and so is an id the viewer
-# may not see (`readable_ids`): a cookie can't make a row appear, and a
-# hand-written one only folds what the viewer has.
+# WHAT IS READ is held to the viewer and to a size. A value that is not
+# valid text, or is over `MAX_BYTES`, is read as nothing; entries past the
+# first `LIMIT` set nothing; an entry that is not an id (or `-` and an id)
+# is skipped, and so is an id the viewer may not see (`readable_ids`): a
+# cookie can't make a row appear, and a hand-written one only folds what the
+# viewer has.
 class TreeOpenSet
   COOKIE = "cs_tree_open"
   LIMIT = 300
@@ -33,6 +34,9 @@ class TreeOpenSet
   # The set `raw` (the cookie's value, or nil) holds for the pages among
   # `readable_ids`.
   def self.parse(raw, readable_ids:)
+    # A cookie is whatever the browser sends: bytes that are not text are
+    # read as nothing before anything else looks at them.
+    return EMPTY unless raw.is_a?(String) && raw.valid_encoding?
     return EMPTY if raw.blank? || raw.bytesize > MAX_BYTES
 
     readable = readable_ids.to_set
