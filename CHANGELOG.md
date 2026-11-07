@@ -55,7 +55,8 @@
 - The mind graph is drawn on CS Studio's new colours and in the sans: pages stay neutral, a tag is the structure hue, each kind of line has its own colour at a measured contrast, a draft's outline is the Draft chip's edge, and what a selection leaves out fades further. Its card and its list carry the shared chips (a list row shows a record's state as the posts list does and says it in its name), its buttons are the shared buttons, and the legend shows the five status looks as a third group, Status, beside Show and Key.
 - A post type's dot is a little darker in light and a little lighter in dark on every screen, keeping its hue.
 - On the posts list, the Type, Tag and Translation filters stand in a rail beside the list in a wide window and in a row above it otherwise, each under its own label.
-- The New post dialog asks for a title and offers the types in a Type list.
+- The New post dialog asks for a title and offers the types in a Type list. The posts list's New button names the type as "New post (Blog)", in the type's own case.
+- The posts list's Tag filter offers only the tags on posts you can open that are not in the trash, and a Type the site no longer has shows as the chosen Type, so the filter can be seen and cleared.
 
 ### Removed
 

@@ -28,7 +28,5 @@ module Admin
       data[:turbo_action] = "replace" if frame == "content"
       { url: url, method: :get, class: bar ? BAR_CLASS : "contents", data: data }
     end
-
-    def filters_active?(keys) = keys.any? { |key| params[key].present? }
   end
 end

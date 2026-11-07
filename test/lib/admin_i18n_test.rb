@@ -136,6 +136,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
     app/views/admin/posts/index.html.erb
+    app/views/admin/posts/new.html.erb
+    app/views/admin/pages/new.html.erb
     app/helpers/admin/posts_list_helper.rb
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb

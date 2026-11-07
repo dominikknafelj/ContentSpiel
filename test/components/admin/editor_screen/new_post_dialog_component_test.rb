@@ -5,6 +5,11 @@ require "test_helper"
 class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
   include ContentHelper
 
+  # Tests here store words into the shared backend, and reloading in teardown
+  # puts the files' translations back. A reload leaves the backend empty until
+  # its next lookup, which loads the files OVER whatever was stored before it,
+  # so every test starts with the files loaded and a store always wins.
+  setup { I18n.backend.eager_load! }
   teardown { I18n.reload! }
 
   def render_shell(user = users(:one))

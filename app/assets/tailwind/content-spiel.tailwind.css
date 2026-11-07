@@ -140,10 +140,10 @@
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
 /* Nothing at rest; while the sticky footer is stuck over the content
    (`data-stuck`, set by `admin--saving--save-bar`), the strong line and a
-   shadow (Claude Design O2). */
+   shadow. */
 .admin-save-bar[data-stuck] { border-top-color: var(--cs-line-strong); box-shadow: var(--cs-shadow-stuck); }
-/* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT (Claude Design,
-   2026-10-13, T1). `--admin-tree-width` on <html> is the CHOSEN width, in
+/* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT.
+   `--admin-tree-width` on <html> is the CHOSEN width, in
    pixels: the layout's head script puts it there from this browser's memory
    before the first paint (`admin/shared/_tree_head`) and the divider's script
    writes it on every drag and key (`admin--shell--tree-width`). Without it --
@@ -192,12 +192,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    below make the column `fixed`, which holds the (hidden) divider as well. */
 .admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 /* The Translations row's action word sits under the row's stretched link, so it
-   is shown by opacity, never visibility (layout points spec, B). */
+   is shown by opacity, never visibility. */
 .admin-translation-row__action { opacity: 0; }
 .admin-translation-row:hover .admin-translation-row__action,
 .admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
 
-/* The divider (`Admin::Shell::TreeDividerComponent`, T1). AT REST it is
+/* The divider (`Admin::Shell::TreeDividerComponent`). AT REST it is
    nothing but the column's own 1px line: this element is the 8px HIT AREA,
    centred on that line (the line is the column's last pixel, so the area
    starts 4.5px inside the column and ends 3.5px inside the editor) and as
@@ -349,9 +349,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
 
-/* Presence (`Admin::PresenceScreen::PeopleComponent`, the presence handoff's
-   items 14 and 25): someone who arrives fades in, 150ms, opacity only, and
-   not at all with reduced motion. Nobody fades out and nobody slides: who
+/* Presence (`Admin::PresenceScreen::PeopleComponent`): someone who arrives
+   fades in, 150ms, opacity only, and not at all with reduced motion. Nobody fades out and nobody slides: who
    left is not in the next drawing, and the others are where they belong.
    `admin--presence--record` marks the circle that is new in a drawing; here
    to away is a redraw with no mark, so it changes at once. */
@@ -1042,8 +1041,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    outline inside the edge, which leaves the shadow and the ring alone. */
 .admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 
-/* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
-   image and still GIF tile"). Its box is the picture's own size and shows
+/* A picture in a note or a still GIF's tile
+   (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
    the placeholder gradient behind a picture that is partly transparent.
    A GIF's Play / Pause is shown with reduced motion only (the component's
    `motion-reduce:` classes): centred over the still, and in the corner while
@@ -1052,16 +1051,16 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
 
-/* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
-   handoff "Block card marker" and "Section tile marker"). Four states, set by
+/* A block card's and a section tile's notes marker
+   (`Admin::NotesScreen::MarkerComponent`). Four states, set by
    `admin--notes--drawer` as attributes:
    - at rest without notes it is in its place and not shown (the system draws
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
      it is the add-note control: a 24px square holding the icon (18px on a
-     tile, with a 12px icon). Shown at rest for nobody (the handoff's
-     decision 6): every card and tile has "Add note" in its "⋯" menu, which
-     is the way that needs neither a hover nor a keyboard;
+     tile, with a 12px icon). Shown at rest for nobody: every card and tile
+     has "Add note" in its "⋯" menu, which is the way that needs neither a
+     hover nor a keyboard;
    - `data-has-notes`: a pill with the icon and the count, always shown
      (20px high on a card, 18px on a tile); also while text is selected in the
      block, when it reads "Note on selection";
@@ -1109,14 +1108,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-notes-marker--on-image[data-has-notes],
 .admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
 .admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
-/* THE THREAD VIEW'S HEADER (the handoff's decision 11). While a thread is the
+/* THE THREAD VIEW'S HEADER. While a thread is the
    drawer's view the drawer's own header -- the title, the count, "New note"
    and Close -- is not shown, and the thread's first row is the header: "←
    All notes 4", the Notify link and a Close of its own
    (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
    what the panel's does. "New note" comes back with the list. Asked of the
-   frame's view, so the two can't both show or both hide. AT EVERY WIDTH (the
-   handoff's decision 17): under 640px the notes are a sheet whose header
+   frame's view, so the two can't both show or both hide. AT EVERY WIDTH: under 640px the notes are a sheet whose header
    holds "Back to <title>", the one way back to the editor, and that header
    is hidden over a thread too -- so there the row ends in a "Back to
    page" of its own (`.admin-note-leave`, a text button) where the
@@ -1131,7 +1129,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-notes-drawer .admin-note-close { display: none; }
   .admin-notes-drawer .admin-note-leave { display: inline-flex; }
 }
-/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL (the handoff's decision 35). In
+/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL. In
    the drawer and the sheet a thread fills the drawer's body exactly: its two
    rows at the top, the composer at the bottom, and between them the one
    thing that scrolls, `[data-note-scroll]` (the state, the quote, the
@@ -1145,7 +1143,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }
 .admin-notes-drawer [data-note-part="messages"] { min-height: 0; }
 .admin-notes-drawer [data-note-scroll] { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-/* ONE "New note" in the drawer (the handoff's decision 4): its header's
+/* ONE "New note" in the drawer: its header's
    button is the way in, so the list's own link -- above the groups, and the
    empty state's action -- is not shown there, with the element that only
    holds it. The same list in the media panel and on the notes page of a
@@ -1204,7 +1202,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 
 .admin-view-only .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line); background-color: var(--cs-sunken); }
 
-/* A form someone else holds (live-editing handoff 5 to 7): read-only, not disabled-looking.
+/* A form someone else holds: read-only, not disabled-looking.
    `readonly` text stays selectable and keeps full contrast; a control that can only be
    `disabled` (a select, a checkbox, a button) is drawn at full contrast too, and the
    rich-text area has the same fill with no toolbar and no caret. No lock, no tint. */

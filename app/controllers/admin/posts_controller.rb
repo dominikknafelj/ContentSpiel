@@ -27,12 +27,17 @@ module Admin
     before_action -> { require_permission("posts.read") }, only: %i[index bulk]
     before_action -> { require_permission("posts.create") }, only: %i[new create]
 
-    # The list's filters and its reads are `Posts::List`'s.
+    # The list's filters and its reads are `Posts::List`'s. The Tag select
+    # offers the tags on the posts the viewer may read, kept ones only.
     def index
       @content_types = ContentTypes.all
-      @tags = Tag.order(:name)
-      list = posts_list(list_filters)
+      @tags = Tag.on_posts(admin_scope(Post.all)).order(:name)
+      filters = list_filters
+      list = posts_list(filters)
       @scope = list.scope_name
+      # What the filter form shows and "No matches" names: the address's
+      # String values, and only a translation state the list filters by.
+      @filters = %w[q type tag].to_h { |key| [ key.to_sym, filters[key] ] }.merge(translation: list.translation_name)
       @counts = list.counts
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: @counts.fetch(@scope))
       # A page past the end shows the "back to page 1" notice and no rows:
@@ -263,9 +268,6 @@ module Admin
       @new_post_params ||= (params[:post].respond_to?(:permit) ? params[:post] : ActionController::Parameters.new).permit(:title, :content_type)
     end
 
-    # Through the read scope: someone else's post an
-    # author may not read is a 404 -- for show, autosave, publish and delete
-    # alike -- not a 403 that would confirm it exists (Review Focus 2).
     # The ids among `ids` that have a live reservation.
     def held_post_ids(ids)
       numeric = ::Posts::Bulk.normalize_ids(ids).grep(Integer)
@@ -274,6 +276,9 @@ module Admin
       ::Editing::Reservation.live.where(subject_type: Post.polymorphic_name, subject_id: numeric).pluck(:subject_id)
     end
 
+    # Through the read scope: someone else's post an
+    # author may not read is a 404 -- for show, autosave, publish and delete
+    # alike -- not a 403 that would confirm it exists.
     def set_post
       @post = admin_scope(Post.all).find(params[:id])
     end
@@ -342,7 +347,6 @@ module Admin
     def list_filters
       params.to_unsafe_h.slice(*LIST_KEYS.map(&:to_s)).select { |_, value| value.is_a?(String) }
     end
-
 
     # A request no screen of ours sends (a forged action, more ids than the
     # list can show): a plain 422, no redirect to a list that did nothing.

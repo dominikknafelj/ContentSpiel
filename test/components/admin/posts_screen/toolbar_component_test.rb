@@ -68,6 +68,22 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
     assert_selector "a", text: "Clear"
   end
 
+  test "a type filter that names no registered type shows that name as the chosen option, and a known one is not added twice" do
+    render_inline Admin::PostsScreen::ToolbarComponent.new(scope: "all", counts: { "all" => 0, "live" => 0, "drafts" => 0, "scheduled" => 0 },
+      content_types: ContentTypes.all, tags: [], filters: { q: nil, type: "gone_type", tag: nil, translation: nil })
+    assert_selector "select#type option[selected][value=gone_type]", text: "gone_type"
+
+    component = Admin::PostsScreen::ToolbarComponent.new(scope: "all", counts: {}, content_types: ContentTypes.all, tags: [],
+      filters: { q: nil, type: "blog", tag: nil, translation: nil })
+    assert_equal ContentTypes.all.map { |type| [ type.label, type.name ] }, component.type_options
+  end
+
+  test "the translation options are the states Posts::List filters by" do
+    render_inline Admin::PostsScreen::ToolbarComponent.new(scope: "all", counts: { "all" => 0, "live" => 0, "drafts" => 0, "scheduled" => 0 },
+      content_types: [], tags: [], filters: { q: nil, type: nil, tag: nil, translation: nil })
+    assert_equal [ "" ] + Posts::List::TRANSLATIONS, page.all("select#translation option").map(&:value)
+  end
+
   test "the tag options are the tags' names, and a known filter is not added twice" do
     component = Admin::PostsScreen::ToolbarComponent.new(scope: "all", counts: {}, content_types: [], tags: [ Tag.new(name: "music") ],
       filters: { q: nil, type: nil, tag: "music", translation: nil })
@@ -87,7 +103,7 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
     assert_selector "a", text: "Clear"
   end
 
-  # Contrast and buttons spec (D1): a selected pill is inverted, ink with
+  # A selected pill is inverted, ink with
   # paper words (the accent tint was 1.13:1 against the others), and its
   # keyboard ring is paper, since the accent on dark ink is 1.96:1.
   test "a selected pill is inverted, its count with it, and its focus ring is paper" do

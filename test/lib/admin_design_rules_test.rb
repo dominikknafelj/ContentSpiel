@@ -193,13 +193,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort
   end
 
-  # Contrast and buttons spec (C1): a boundary that identifies a control is
+  # A boundary that identifies a control is
   # `--cs-field-line`, 3:1 on every ground; `--cs-line-strong` only groups.
   # Read line by line: a line whose classes make it pressable or typed into
   # (a hover, a focus, a checked state, a placeholder, a pointer cursor)
   # draws no strong line. A control whose line says none of those (a
-  # segmented group's frame, the drop zone) is not seen here: the spec lists
-  # them and review holds them. The public layouts are the theme's, whose
+  # segmented group's frame, the drop zone) is not seen here: review holds
+  # them. The public layouts are the theme's, whose
   # outline token is `--th-meta` (`design_tokens_test.rb`).
   CONTROL_SOURCES = (ADMIN_SOURCES + [ Rails.root.join("app/helpers/setup_helper.rb").to_s ])
     .reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
@@ -712,7 +712,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Layout points spec, decision 1: one cap, one place. The rail's three
+  # One cap, one place. The rail's three
   # widths (the 900px blocks column, the 360px rail, the 28px between them)
   # are tokens of the same kind, beside it.
   RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:900|360|28)px\]|(?:max-|min-)?width:\s*(?:900|360)px|(?:column-)?gap:\s*28px/
@@ -976,7 +976,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
   PEOPLE_HUE = /ic-people/
   ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
-  # Where the people hue may be drawn once built (the spec); none uses it yet.
+  # Where the people hue may be drawn once it is built; none uses it yet.
   PEOPLE_HUE_ALLOWED = %w[
     app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
   ].freeze

@@ -21,7 +21,6 @@ module Admin
     # not the scope itself, so "Drafts 20" is what choosing Drafts would list.
     class ToolbarComponent < Admin::AdminComponent
       FORM_ID = "posts-filters".freeze
-      TRANSLATIONS = %w[needs outdated complete].freeze
 
       # Selected is INVERTED: ink with paper words and count, the system's
       # segmented look; the group around the pills is outlined in the field
@@ -34,7 +33,8 @@ module Admin
                       "has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4".freeze
 
       # `filters` is a Hash of the active values (`q`, `type`, `tag`,
-      # `translation`; blank when unset), `counts` the four scope numbers.
+      # `translation`; blank when unset, and `translation` one of
+      # `Posts::List::TRANSLATIONS`), `counts` the four scope numbers.
       def initialize(scope:, counts:, content_types:, tags:, filters:, url_options: {}, locale: ::Locales.default)
         @scope = scope
         @counts = counts
@@ -60,7 +60,15 @@ module Admin
 
       def count_for(name) = counts.fetch(name)
 
-      def type_options = content_types.map { |type| [ type.label, type.name ] }
+      # The types' labels, and the filter's own name when no registered type
+      # has it (a type unregistered since the address was made): the list is
+      # then filtered to nothing, and the select says by what, as
+      # `tag_options` does, rather than read as "All" over an empty list.
+      def type_options
+        options = content_types.map { |type| [ type.label, type.name ] }
+        wanted = filters[:type]
+        wanted.present? && options.none? { |_, name| name == wanted } ? options + [ [ wanted, wanted ] ] : options
+      end
 
       # The tags' names, and the filter's own name when no tag has it (a tag
       # renamed or deleted since the address was made): the list is then
@@ -72,7 +80,8 @@ module Admin
         wanted.present? && !names.include?(wanted) ? names + [ wanted ] : names
       end
 
-      def translation_options = TRANSLATIONS.map { |value| [ t(".translations.#{value}"), value ] }
+      # One per state `Posts::List` filters by.
+      def translation_options = Posts::List::TRANSLATIONS.map { |value| [ t(".translations.#{value}"), value ] }
 
       private
 

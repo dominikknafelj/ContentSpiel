@@ -2,16 +2,15 @@ require "test_helper"
 require "sitemap_generator"
 require "tmpdir"
 
-# Every narrowing point that must hide trashed pages, posts and images
-# (trash spec §5.4). Each test builds one kept and one trashed record and
+# Every narrowing point that must hide trashed pages, posts and images.
+# Each test builds one kept and one trashed record and
 # fails if the trashed one leaks. A new list, search, picker or public query
 # that reads pages, posts or library images belongs here too.
 #
 # Most tests trash by setting `trashed_at` straight on the record, which
 # needs no permission or audit around it: `update!` still runs the model callbacks, so the
 # trashed page and post lose their `public_paths` rows exactly as a real
-# move to the trash would make them (trash spec §4.1, `PublicSite::Paths
-# #compute_path`).
+# move to the trash would make them (`PublicSite::Paths#compute_path`).
 class TrashVisibilityTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -150,7 +149,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select ".page-children", count: 0
   end
 
-  # Theming spec §7: the tree and previous/next a theme's template asks for
+  # The tree and previous/next a theme's template asks for
   # (`PublicSite::Branch`), drawn here by the second theme. A page in the
   # trash has no address, which alone would keep it out of a branch, so this
   # one is put there around the callbacks: its address row is STILL STORED,
@@ -222,7 +221,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   # A link to a trashed page or post renders as plain text, like a dead link
-  # (trash spec §5.2) -- both on the public site and in preview, where links
+  # -- both on the public site and in preview, where links
   # to drafts otherwise do resolve. The block is written with
   # `update_columns` because a *new* link to a trashed target is refused on
   # save (it's outside every read scope); this is the link that already
@@ -462,7 +461,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total], de.total
   end
 
-  # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
+  # The tree's own counts: a trashed page is no row, no
   # child count and no translation marker; the starter offer counts kept pages.
   test "the page tree's child count and translation markers ignore a trashed page" do
     sign_in_as users(:one)
@@ -647,11 +646,10 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ [ "page", @kept_page.id ], [ "post", @kept_post.id ] ].sort, response.parsed_body.map { |r| [ r["type"], r["id"] ] }.sort
 
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
-    # The trashed post has an open note that mentions the viewer (notes spec
-    # §4.4): the graph counts it nowhere, and the
-    # card's own JSON does not find the post. `Notes::Start` refuses a record
-    # that is already in the trash (decision P6), so the note is written
-    # first and the post trashed again after it.
+    # The trashed post has an open note that mentions the viewer: the graph
+    # counts it nowhere, and the card's own JSON does not find the post.
+    # `Notes::Start` refuses a record that is already in the trash, so the
+    # note is written first and the post trashed again after it.
     @gone_post.update!(trashed_at: nil)
     as(users(:one)) { assert Notes::Start.call(@gone_post, body: "A note").ok? }
     as(users(:two)) { assert Notes::Start.call(@gone_post, body: "For @[#{users(:one).id}]").ok? }
@@ -877,6 +875,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "label[for=posts-scope-live] span", text: "1"
   end
 
+  test "the posts list's Tag select offers a tag a kept post carries and never one only trashed posts carry" do
+    sign_in_as users(:one)
+    PostTag.create!(post: @kept_post, tag: Tag.create!(name: "kept-tag"))
+    PostTag.create!(post: @gone_post, tag: Tag.create!(name: "gone-tag"))
+
+    get "/cs-studio/posts"
+    assert_select "select#tag option[value=kept-tag]"
+    assert_select "select#tag option[value=gone-tag]", count: 0
+    assert_equal [ "kept-tag" ], Tag.on_posts(AccessControl.scope(users(:one), "posts.read", Post.all)).pluck(:name)
+  end
+
   test "Posts::List over the read scope rows and counts kept posts only, under every scope" do
     posts = AccessControl.scope(users(:one), "posts.read", Post.all)
     Posts::List::SCOPES.each do |scope|
@@ -1004,7 +1013,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
   # --- Render cache ------------------------------------------------------------
 
-  # Trash spec §5.3/§9: every move, restore and purge must change
+  # Every move, restore and purge must change
   # `PublicSite.content_version`, or a cached rich-text render could keep
   # linking to (or showing) what just left the site, or keep leaving out
   # what just came back. Called directly, with `Current` reset between
@@ -1099,7 +1108,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
   end
 
-  # Presence follows its record into the trash (presence spec §5.4): a person
+  # Presence follows its record into the trash: a person
   # who has a record open when it is trashed leaves a row behind (it expires
   # by itself), and that row is shown in no door: the record's people are a
   # 404, its marker count is left out of the list's answer, and a tab cannot
@@ -1142,7 +1151,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # The parts an open editor fetches (live-editing spec §3.2) follow their
+  # The parts an open editor fetches follow their
   # record into the trash: an editor open when its page or post is trashed is
   # answered 404 by each of the GETs, as by every other door. The kept record
   # beside it is served, so the test cannot pass by a route that answers nothing.
@@ -1170,10 +1179,10 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Notes follow their record into the trash (notes spec D12, §4.4): hidden
-  # with it, counted nowhere. The records are trashed AFTER their notes were
-  # written, as in life: `Notes::Start` refuses a record that is already in
-  # the trash (decision P6), so a note "on" the setup's trashed records would
+  # Notes follow their record into the trash: hidden with it, counted
+  # nowhere. The records are trashed AFTER their notes were written, as in
+  # life: `Notes::Start` refuses a record that is already in the trash, so a
+  # note "on" the setup's trashed records would
   # never exist and this test would pass with nothing hidden.
   #
   # `Notes::Counts.by_container` and `unread_among` hide nothing themselves:

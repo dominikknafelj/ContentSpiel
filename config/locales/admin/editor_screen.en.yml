@@ -38,7 +38,7 @@ en:
           attention: "Needs attention"
           # A block type's own words on its tile, by type (a slash in its
           # name read as a dot): read by the tile for the parts its `summary`
-          # answers (block types spec, decision 8).
+          # answers.
           types:
             # bin/rails generate block_type adds a type's scope below this line.
             # A Form block's tile: no form chosen, or the one it names is
@@ -114,9 +114,8 @@ en:
           # and is true only of its notes.
           published_body: "Blocks don’t go to the trash. The block is removed from the site only when the changes are published; until then “Discard changes…” brings it back. Its notes are deleted now and do not come back."
           confirm: "Delete block"
-        # The Table block's grid controls (table block spec, "CS Studio";
-        # Claude Design's B5 and its 2026-10-27 follow-up), around the grid of
-        # a Table's card. `warning` is advice, never a refusal (decision 7):
+        # The Table block's grid controls, around the grid of a Table's card.
+        # `warning` is advice, never a refusal:
         # the script says it again as rows and columns change, from these
         # same keys, so `%{count}` is filled by the server and by the script.
         table_controls:
@@ -170,7 +169,7 @@ en:
           add_column: "Add a column"
           add_row_here: "Add a row"
           add_row: "Add row"
-        # Deleting a row or a column that has text asks first (B5).
+        # Deleting a row or a column that has text asks first.
         table_delete_dialogs:
           row:
             title: "Delete this row?"
@@ -279,13 +278,13 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
-        # The tile's avatar of whoever is changing the block (handoff 4): its
+        # The tile's avatar of whoever is changing the block: its
         # tooltip and its text for a screen reader.
         holder_avatar:
           held: "%{name} is editing this block"
           own_tab: "You're editing this in another tab"
         # The mark a card carries for a few seconds after a colleague's save
-        # arrived (live-editing handoff 10).
+        # arrived.
         updated_mark:
           updated_by: "Updated by %{name}"
         # Said in the header's notice area when the open record is in the
@@ -296,9 +295,9 @@ en:
           back: "Back to pages"
           back_post: "Back to posts"
         # What stands between a card's header and its form while someone else
-        # holds the block, and the notices that take its place (live-editing
-        # handoff 1, 13 to 20, 23). Every sentence the hold script shows later
-        # is rendered here; `settings` is the page settings (handoff 23).
+        # holds the block, and the notices that take its place. Every sentence
+        # the hold script shows later is rendered here; `settings` is the page
+        # settings.
         hold_strip:
           take_over: "Take over"
           # The status beside "Take over" (`admin--editing--hold#takeOver`): asked and waiting,
@@ -403,7 +402,7 @@ en:
           cancel_scheduled_keep: "Keep it scheduled"
           cancel_scheduled_confirm: "Cancel scheduled change"
         # A published or scheduled page's address, changed at once through its
-        # own form (drafts spec D7): the settings panel's line and button, and
+        # own form: the settings panel's line and button, and
         # the dialog the button opens.
         page_settings_form:
           address: "Address"
@@ -553,7 +552,7 @@ en:
           own_address:
             page: "This page would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
             post: "This post would lose its own address, %{path} (%{languages}): another page or post holds the address it would get. Publishing is refused until one of them is renamed."
-        # The help under the related-posts chips (O7): the public post page
+        # The help under the related-posts chips: the public post page
         # shows no related posts yet, so the help says only where they show.
         related_posts:
           help: "Related posts are linked to this one in the Mind graph. The site does not show them yet."

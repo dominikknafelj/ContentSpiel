@@ -12,8 +12,7 @@
     opens the New post dialog with that type chosen. %>
 <% may_create = can?("posts.create") %>
 <% creatable_types = may_create ? @content_types.select { |type| can?("posts.create", Post.new(content_type: type.name)) } : [] %>
-<%# "New blog post", "New resume entry": a one-word type name reads better with "post" after it. %>
-<% new_label = ->(type) { type.label.split.one? ? t(".new_type_post", type: type.label.downcase) : t(".new_type", type: type.label.downcase) } %>
+<% new_label = ->(type) { t(".new_type", type: type.label) } %>
 <% new_post_trigger = ->(type) { dialog_trigger("new-post-dialog").merge(turbo_frame: "content", "new-post-type-param": type.name) } %>
 
 <div class="admin-list-rail">
@@ -37,12 +36,12 @@
   </div>
 
   <div class="admin-list-rail__grid">
-    <% filters = { q: params[:q], type: params[:type], tag: params[:tag], translation: params[:translation] }.transform_values { |value| value.is_a?(String) ? value : nil } %>
-    <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags, filters: filters,
+    <%= render Admin::PostsScreen::ToolbarComponent.new(scope: @scope, counts: @counts, content_types: @content_types, tags: @tags, filters: @filters,
           url_options: admin_url_options, locale: admin_locale) %>
 
     <% page_url = ->(page) { admin_posts_path(list_params(*Admin::PostsController::LIST_KEYS).merge("page" => page)) } %>
-    <% filtered = @scope != "all" || filters_active?(%i[q type tag translation]) %>
+    <%# Filtered by what the list applied, never by a forged value it ignored (`tag[]=x`, `translation=bogus`). %>
+    <% filtered = @scope != "all" || @filters.values.any?(&:present?) %>
 
     <div data-controller="admin--posts--bulk-select">
       <%= render Admin::PostsScreen::BulkBarComponent.new(list_fields: list_params(*Admin::PostsController::LIST_KEYS)) %>
@@ -52,7 +51,7 @@
       <% elsif @posts.empty? %>
         <div class="rounded-card bg-surface shadow-1">
           <% if filtered %>
-            <% summary = posts_filter_summary(scope: @scope, filters: filters, content_types: @content_types) %>
+            <% summary = posts_filter_summary(scope: @scope, filters: @filters, content_types: @content_types) %>
             <%= render Admin::Ui::EmptyStateComponent.new(title: t(".no_matches.title"), description: t(".no_matches.description", filters: summary)) do |empty_state| %>
               <% empty_state.with_action do %>
                 <%= link_to t(".no_matches.clear"), admin_posts_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:secondary), data: { turbo_frame: "content", turbo_action: "replace" } %>

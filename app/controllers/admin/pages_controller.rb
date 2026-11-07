@@ -297,7 +297,7 @@ module Admin
       redirect_after Pages::Save.call(@page, attributes: { published_at: at }), success: "Scheduled"
     end
 
-    # A published or scheduled page's slug (drafts spec D7): not in the
+    # A published or scheduled page's slug: not in the
     # autosaving settings form, because a new slug moves the page's address
     # at once and is in no published copy to wait in. Its own form, behind a
     # confirmation. An instant action like Publish: no hold is taken, and it

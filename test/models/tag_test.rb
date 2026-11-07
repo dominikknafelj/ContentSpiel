@@ -125,4 +125,19 @@ class TagTest < ActiveSupport::TestCase
     assert_equal({ ruby.id => 2 }, Tag.posts_counts(visible, [ ruby.id ]))
     assert_equal({}, Tag.posts_counts(Post.none, [ rails.id ]))
   end
+
+  test "on_posts is the tags the given posts carry, none twice, and a tag only other posts carry is not one" do
+    shared, theirs, unused = %w[shared theirs unused].map { |name| Tag.create!(name: name) }
+    first = Post.create!(content_type: :blog, title: "One")
+    second = Post.create!(content_type: :blog, title: "Two")
+    hidden = Post.create!(content_type: :blog, title: "Hidden")
+    first.tags << shared
+    second.tags << shared
+    hidden.tags << [ shared, theirs ]
+
+    assert_equal [ shared ], Tag.on_posts(Post.where(id: [ first.id, second.id ])).to_a
+    assert_equal [ shared, theirs ], Tag.on_posts(Post.all).by_name.to_a
+    assert_empty Tag.on_posts(Post.none)
+    assert_not_includes Tag.on_posts(Post.all), unused
+  end
 end

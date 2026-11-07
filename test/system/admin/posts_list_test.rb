@@ -173,7 +173,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     visit_screen admin_posts_path
 
     find("button[aria-label='Choose another type of post']").click
-    find("[role=menu] a", text: "New resume entry").click
+    find("[role=menu] a", text: "New post (Resume entry)").click
     assert_selector "dialog#new-post-dialog[open]"
     assert_selector "dialog#new-post-dialog select#new-post-type option[value=resume_entry]:checked", visible: :all, wait: 10
 

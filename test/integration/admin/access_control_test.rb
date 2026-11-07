@@ -369,7 +369,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
   # --- Out of scope through a link, a preview, an autosave or a create -------
 
-  test "the editor shows no title for a link to a page the actor can't read (I1)" do
+  test "the editor shows no title for a link to a page the actor can't read" do
     block = ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" },
       translations: { "en" => { body: link_doc("page", @outside.id) } }).record
     assert block.persisted?
@@ -390,7 +390,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "adding a link to an unreadable page fails exactly like a link to a missing one (I1)" do
+  test "adding a link to an unreadable page fails exactly like a link to a missing one" do
     block = ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" }).record
     grant_branch("pages.edit", "pages.publish")
     sign_in_as(users(:editor_branch))
@@ -410,7 +410,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "previewing a readable post listed on an unreadable page is not found (I2)" do
+  test "previewing a readable post listed on an unreadable page is not found" do
     blog = create_page(title: "Blog")
     ContentBlocks::Save.call(blog.content_blocks.new, attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
     publish_changes(blog)
@@ -427,7 +427,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "a preview redirect from an old address checks the target is readable first (M2)" do
+  test "a preview redirect from an old address checks the target is readable first" do
     Pages::Save.call(@outside, translations: { "en" => { slug: "elsewhere" } })
     grant_branch("pages.read")
     sign_in_as(users(:editor_branch))
@@ -440,7 +440,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/preview/elsewhere"
   end
 
-  test "an autosave refused by an area check answers the 403 save-status stream (M5)" do
+  test "an autosave refused by an area check answers the 403 save-status stream" do
     tag = Tag.create!(name: "news")
     sign_in_as(users(:author))
 
@@ -452,7 +452,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal "news", tag.reload.name
   end
 
-  test "creating a page under an unreadable parent is not found, not the homepage (M7)" do
+  test "creating a page under an unreadable parent is not found, not the homepage" do
     grant_branch("pages.create")
     sign_in_as(users(:editor_branch))
 
@@ -564,8 +564,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_nil @own_post.reload.published_at
   end
 
-  # Final fix wave (Important 1): a "Publishers" group (read + publish, no
-  # edit) sees the header's publish buttons and they work.
+  # A "Publishers" group (read + publish, no edit) sees the header's publish
+  # buttons and they work.
   test "a publisher without edit publishes and unpublishes through the header buttons" do
     group = AccessControl::Group.create!(name: "Publishers")
     %w[posts.read posts.publish pages.read pages.publish].each do |key|
@@ -598,9 +598,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal "Other post", @other_post.reload.title
   end
 
-  # Final fix wave (Minor 10): the page editor checks many permissions on
-  # its one page (header buttons, settings, every block card); its branch
-  # is loaded once, not once per check.
+  # The page editor checks many permissions on its one page (header buttons,
+  # settings, every block card); its branch is loaded once, not once per
+  # check.
   test "the page editor loads a branch-scoped page's branch once" do
     grant_branch("pages.read", "pages.edit", "pages.publish", "pages.delete", "pages.create")
     3.times { ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" }) }

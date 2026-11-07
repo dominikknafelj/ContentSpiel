@@ -12,9 +12,8 @@ module Admin
   # plain text (`RichText::BuiltIns#render_internal_link`) rather than ever
   # exposing it, so there's no leak in offering it here too.
   #
-  # Only what the actor may *read* is offered (access-control design spec
-  # §3.3 "Scopes for reading"), for the link picker and the related-posts
-  # picker (`?type=post`) alike: both candidate queries start from
+  # Only what the actor may *read* is offered, for the link picker and the
+  # related-posts picker (`?type=post`) alike: both candidate queries start from
   # `admin_scope`, so a page outside a branch editor's branch, or a post an
   # author can't read, never appears -- not even its title. Someone with
   # neither `pages.read` nor `posts.read` simply gets an empty list.

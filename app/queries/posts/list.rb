@@ -11,13 +11,15 @@ module Posts
   #   `all`. It is the list's one name for the publish state;
   # - `type` is a content type's bare registered name;
   # - `tag` is a tag's stored name, matched exactly;
-  # - `translation` is `needs|outdated|complete` (`by_translation`);
+  # - `translation` is `needs|outdated|complete` (`TRANSLATIONS`,
+  #   `by_translation`), anything else is no filter;
   # - `q` is a title substring matched in the editing language `locale`, not
   #   in every language: an editor filtering the list they read in one
   #   language expects that language's titles to match (`TitleSearch`, which
   #   escapes the text itself).
   class List
     SCOPES = %w[all live drafts scheduled].freeze
+    TRANSLATIONS = %w[needs outdated complete].freeze
 
     def initialize(posts, filters:, locale:)
       @posts = posts
@@ -28,6 +30,12 @@ module Posts
     # The scope the list is under, always one of `SCOPES`.
     def scope_name
       @scope_name ||= string("scope").presence_in(SCOPES) || "all"
+    end
+
+    # The translation state the list is filtered by, one of `TRANSLATIONS`,
+    # or nil: a value the list does not know filters nothing.
+    def translation_name
+      @translation_name ||= string("translation").presence_in(TRANSLATIONS)
     end
 
     # One page of the scope's posts, the most recently changed first (`id`
@@ -69,7 +77,7 @@ module Posts
         scope = @posts
         scope = scope.where(content_type: string("type")) if string("type").present?
         scope = by_tag(scope, string("tag")) if string("tag").present?
-        scope = by_translation(scope, string("translation")) if string("translation")
+        scope = by_translation(scope, translation_name) if translation_name
         scope = scope.title_matching(string("q"), locale: @locale) if string("q").present?
         scope
       end
@@ -98,11 +106,9 @@ module Posts
     # lists exactly the posts with an outdated chip, never one whose only
     # chip in that language is missing.
     def by_translation(scope, name)
-      states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
-      return scope unless states || name == "complete"
-
-      exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states || %w[missing outdated], locales: Translations.target_locales)
-      states ? scope.where(exists) : scope.where.not(exists)
+      states = name == "outdated" ? %w[outdated] : %w[missing outdated]
+      exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states, locales: Translations.target_locales)
+      name == "complete" ? scope.where.not(exists) : scope.where(exists)
     end
 
     def by_scope(scope)
