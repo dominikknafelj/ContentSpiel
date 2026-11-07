@@ -9,7 +9,7 @@ module Admin
     # the viewer may read.
     #
     # ONE ELEMENT AT EVERY WIDTH. The panel is rendered once and is never
-    # cloned, moved or drawn again (a save's answer replaces the tab only),
+    # cloned, moved or drawn again (a save's answer draws only the tab's contents again),
     # so a note being typed in it survives a tab switch, the rail docking or
     # undocking, and a live merge. Where the rail docks it is the Notes tab's
     # content; below the threshold, while the tab is current, the stylesheet

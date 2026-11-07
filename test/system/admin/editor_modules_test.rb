@@ -143,6 +143,35 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
     assert_equal true, result["firstAfterB"]
   end
 
+  # A malformed answer: its first copy of an id is the twin, as on screen,
+  # and the second is dropped, never reconciled into the same element again.
+  test "keepMerge matches the first of two copies of one id in the answer" do
+    result = with_module("live/keep_merge", <<~JS)
+      #{KEEP_MERGE_SETUP}
+      const box = build('<div id="s"><p id="k">typed</p></div><p id="z">old z</p>')
+      document.body.append(box)
+      const s = box.querySelector("#s"), k = box.querySelector("#k")
+      const answer = Array.from(build('<div id="s" data-copy="1"><p id="k">a</p><p id="n1">first</p></div><p id="z">z</p><div id="s" data-copy="2"><p id="k">b</p><p id="n2">second</p></div>').children)
+      const synced = []
+      mod.keepMerge(box, answer, {
+        kept: new Set([ k ]),
+        within: (element) => element.contains(k) && element !== k,
+        sync: (live, twin) => { synced.push(twin.getAttribute("data-copy")); live.setAttribute("data-copy", twin.getAttribute("data-copy")) }
+      })
+      const out = { order: ids(box), inside: ids(s), same: box.querySelector("#s") === s, copy: s.getAttribute("data-copy"), synced, kept: s.querySelector("#k") === k }
+      box.remove()
+      return out
+    JS
+
+    assert_nil result["error"]
+    assert_equal %w[s z], result["order"]
+    assert_equal %w[k n1], result["inside"]
+    assert_equal true, result["same"]
+    assert_equal true, result["kept"]
+    assert_equal "1", result["copy"]
+    assert_equal %w[1], result["synced"]
+  end
+
   test "keepMerge moves the kept element without the focus when two swap" do
     result = with_module("live/keep_merge", <<~JS)
       #{KEEP_MERGE_SETUP}

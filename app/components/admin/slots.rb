@@ -40,9 +40,9 @@ module Admin
   # `data-` attributes) and `tab_current?` (the request asks for this tab to
   # be the one shown as the page is drawn), and `render?`; drawn, it is the panel's content.
   # The editors hand it `query:` (the request's query parameters), so a panel
-  # reads its own parameters without the host naming them. The tab is drawn
-  # again by a save's answer (`Admin::Answers::RailTabStreams`), the panel never,
-  # since it may hold typed text.
+  # reads its own parameters without the host naming them. The tab's contents
+  # are drawn again by a save's answer (`Admin::Answers::RailTabStreams`), the
+  # panel never, since it may hold typed text.
   #
   # A list slot's `loader` is called ONCE per render of the list with all its
   # records and the viewer (`Slots.load`), so a row costs no query of its own:

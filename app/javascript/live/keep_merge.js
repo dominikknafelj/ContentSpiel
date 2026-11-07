@@ -23,7 +23,8 @@
 // focus (what stands in the focused one's way is moved instead).
 //
 // MATCHED BY ID, LEVEL BY LEVEL. For each element of `container`, its TWIN is
-// the answer's element of the same id among `fresh` (none without an id):
+// the answer's first element of the same id among `fresh` (none without an
+// id; a later copy of the id of an element that stays is dropped):
 //   - a kept element with a twin takes the twin's place, and the twin is
 //     dropped;
 //   - any other element with a twin for which `within(element, twin)` is true
@@ -83,8 +84,14 @@ function reconcile(container, fresh, options, orphans) {
   // at the end when it has none in the answer.
   const placed = place ? new Map(stays.map(({ element }) => [ element, place(element, fresh) ])) : null
   const order = place ? [] : stays.filter((stay) => stay.anchor === null).map((stay) => stay.element)
+  // Of two elements of one id in the answer, the first is the twin (`twins`
+  // above): an element on screen that stays is reconciled and placed once,
+  // and a later copy of its id is dropped.
+  const placedIds = new Set()
   for (const twin of fresh) {
     const live = (twin.id && matched.get(twin.id)) || null
+    if (live && placedIds.has(twin.id)) continue
+    if (live) placedIds.add(twin.id)
     if (live && !kept.has(live)) {
       sync?.(live, twin)
       reconcile(live, [ ...twin.children ], options, orphans)

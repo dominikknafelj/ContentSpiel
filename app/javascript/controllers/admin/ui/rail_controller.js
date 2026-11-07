@@ -18,8 +18,8 @@ import { Controller } from "@hotwired/stimulus"
 //
 // THE CURRENT TAB IS THIS CONTROLLER'S. The server draws one current tab
 // and panel; from connect on, `currentValue` is the state, and a tab or
-// panel that is drawn again (a live merge replacing a form, a stream
-// replacing a tab) takes it as it connects, not the server's default, so the
+// panel that is drawn again (a live merge replacing a form) takes it as it
+// connects, not the server's default, so the
 // rail never shows two current panels or none. It is kept for the document
 // only: nothing outlives the document.
 //
@@ -27,7 +27,8 @@ import { Controller } from "@hotwired/stimulus"
 // tab and no panel of the rail's: it dispatches, from an element inside a
 // panel, `admin--ui--rail:reveal` (show the panel that holds it, remembering
 // the one that was current) or `admin--ui--rail:conceal` (go back to that
-// one, if the panel that holds it is current). The grid hears both:
+// one, if the panel that holds it is current; with `detail: { home: true }`
+// to the first tab instead). The grid hears both:
 //   data-action="admin--ui--rail:reveal->admin--ui--rail#reveal
 //                admin--ui--rail:conceal->admin--ui--rail#conceal"
 // Every selection dispatches `admin--ui--rail:shown` with `{ key }` on the
@@ -41,8 +42,10 @@ import { Controller } from "@hotwired/stimulus"
 // PREVIOUS IS THE TAB LAST LEFT. Every selection that changes the tab, the
 // person's own (a press, a key) and a reveal alike, remembers the tab it
 // leaves; so concealing a panel goes back to where the person was before it
-// became current ("close Notes returns to where I was"), never to an older
-// tab. A conceal forgets it.
+// became current (closing a revealed panel returns to where I was), never to
+// an older tab. A conceal forgets it, and a panel concealed while it is not
+// current is no longer a place to go back to: then a later conceal goes to
+// the first tab.
 //
 // A current key that names no panel and no tab (the server's, or one whose
 // tab was taken away) is the first tab's, so one tab is always in the tab
@@ -111,8 +114,13 @@ export default class extends Controller {
 
   conceal(event) {
     const panel = this.panelHolding(event.target)
-    if (!panel || panel.dataset.key !== this.currentValue) return
-    const previous = this.panelTargets.some((other) => other.dataset.key === this.previous) ? this.previous : this.drawnKey(panel.dataset.key)
+    if (!panel) return
+    if (panel.dataset.key !== this.currentValue) {
+      if (this.previous === panel.dataset.key) this.previous = null
+      return
+    }
+    const back = !event.detail?.home && this.panelTargets.some((other) => other.dataset.key === this.previous)
+    const previous = back ? this.previous : this.drawnKey(panel.dataset.key)
     if (previous && previous !== this.currentValue) this.show(previous)
     this.previous = null
   }

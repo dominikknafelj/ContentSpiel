@@ -207,8 +207,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    - keyboard focus: `--cs-accent` along the full height, and no outline box
      (a ring around an 8px strip as tall as the page says less than the line).
    Nothing animates, so there is nothing to turn off for reduced motion.
-   `z-index: 15`: over the editor's sticky header (10), whose left edge the
-   area's last pixels lie on, and under the top bar (20). `touch-action:
+   `z-index: 23`: over the editor's sticky header (21), whose left edge the
+   area's last pixels lie on, and under the top bar (25). `touch-action:
    none`: a finger on it drags the divider, not the page.
 
    `__tip` is where the shared tooltip hangs: a sticky box of no height near
@@ -220,7 +220,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    a marker: accent as a marker means "unread and addressed to you", and this bar
    says only where you are. */
 .admin-tree-row--selected { box-shadow: inset 3px 0 0 var(--cs-accent); }
-.admin-tree-divider { position: absolute; z-index: 15; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
+.admin-tree-divider { position: absolute; z-index: 23; top: 0; bottom: 0; right: -3.5px; width: 8px; outline: none; touch-action: none; }
 .admin-tree-divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; }
 .admin-tree-divider[data-hover] { cursor: col-resize; }
 .admin-tree-divider[data-hover]::after { background: var(--cs-line-strong); }
@@ -734,7 +734,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    Under 640px (the window's: the sheet covers the window) it is the
    full-screen SHEET, with "Back to <title>" in the place of the ×. Docked,
    the rule inside the rail's container query above makes it the panel's
-   content instead. */
+   content instead.
+
+   THE LAYERS of an editor, lowest first: the canvas and what it raises
+   inside itself (a table's strip and the rich-text popover at 20, which
+   the slide-over still covers, coming later in the document); the
+   slide-over (20); the editor's sticky header (21), so a popover of the
+   header (its "⋯" menu, its people) that drops into the slide-over's place
+   is over it, the header being a stacking context that keeps its menus'
+   own z-index inside it; the sheet (22), which covers the header; the
+   tree's divider (23); the top bar (25); the shell's scrim (30) and its
+   drawers (40). */
 .admin-notes-drawer {
   display: flex; flex-direction: column;
   position: fixed; z-index: 20; top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); right: 0; bottom: 0; width: 400px;
@@ -747,7 +757,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .admin-notes-drawer { animation: none; } }
 .admin-notes-drawer__back { display: none; }
 @media (max-width: 639.98px) {
-  .admin-notes-drawer { top: var(--admin-top-offset); inset-inline: 0; width: auto; }
+  .admin-notes-drawer { z-index: 22; top: var(--admin-top-offset); inset-inline: 0; width: auto; }
   .admin-notes-drawer__back { display: inline-flex; }
   .admin-notes-drawer__close { display: none; }
 }

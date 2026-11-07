@@ -246,6 +246,43 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The header's ⋯ menu drops from the header's right end into the
+  # slide-over's place. The header paints above the slide-over, so its menu
+  # is over the notes and its items can be pressed.
+  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{WIDE}px" => [ WIDE, "?locale=de" ] }.each do |where, (width, query)|
+    test "#{where} the header's ⋯ menu opens above the slide-over" do
+      with_locales(%w[en de], default: "en")
+      at_window(width) do
+        open_editor(query)
+        assert_docked(false)
+        open_notes
+
+        within(".admin-editor-header") { find("button[aria-label='More actions']").click }
+        assert_selector ".admin-editor-header [role=menu]", visible: :visible
+        # The rows a record offers depend on its state; four more stand for a
+        # record that offers more, so the menu reaches below the header.
+        page.execute_script(<<~JS)
+          const menu = document.querySelector(".admin-editor-header [role=menu]")
+          const row = menu.lastElementChild
+          for (let n = 0; n < 4; n++) menu.append(row.cloneNode(true))
+        JS
+        last = page.all(".admin-editor-header [role=menu] a, .admin-editor-header [role=menu] button").last
+        drawer = box("#notes-drawer")
+        item = page.evaluate_script("(() => { const box = arguments[0].getBoundingClientRect(); return [ box.left, box.top, box.right, box.bottom ] })()", last)
+        assert_operator item[2], :>, drawer[0] + 8, "the premise: the menu reaches over the slide-over"
+        assert_operator item[1], :>, drawer[1], "the premise: the menu's last row is below the header"
+        assert page.evaluate_script(<<~JS, last), "the slide-over covers the header's menu"
+          (() => {
+            const item = arguments[0]
+            const box = item.getBoundingClientRect()
+            const hit = document.elementFromPoint(Math.max(box.left, #{drawer[0]}) + 4, (box.top + box.bottom) / 2)
+            return hit === item || item.contains(hit)
+          })()
+        JS
+      end
+    end
+  end
+
   test "Escape closes the slide-over only while the focus is inside, and the focus goes back to the opener" do
     at_window(MID) do
       open_editor
@@ -273,6 +310,7 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
       drawer = box("#notes-drawer")
       assert_equal [ 0, room ], [ drawer[0], drawer[2] ].map(&:round), "the sheet is the window's width"
       assert_in_delta 48, drawer[1], 1
+      assert_not pressable?("#notes-open"), "the sheet lies over the editor's header"
       assert_selector "#notes-drawer button", text: "Back to Pricing"
       assert_no_selector "#notes-drawer button[aria-label='Close']"
 
@@ -340,6 +378,37 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A note that arrived while another tab was current marks the list stale
+  # (`admin--notes--live`, counts only); pressing the Notes tab is an opening
+  # like the header's button, and an opening fetches what is stale.
+  test "a note that arrived while another tab was current is in the list when the Notes tab is pressed" do
+    at_window(WIDE) do
+      open_editor
+      await_notes_live
+      open_notes
+      assert_selector "#notes-drawer #notes-list"
+      find(PAGE_TAB).click
+      assert_selector "#editor-grid-panel-page[data-current]"
+
+      using_session(:dana) do
+        sign_in_via_form(users(:two))
+        visit "/cs-studio/notes/page/#{@page.id}?compose=Page-#{@page.id}"
+        await_admin_controllers
+        find("#notes-new textarea[name=body]").send_keys("Look at the prices")
+        within("#notes-new") { press "Add note" }
+        assert_selector "[data-note-thread]"
+      end
+
+      assert_selector "#{NOTES_TAB} .text-count", text: "1", wait: 10
+      assert_no_selector "#notes-drawer #notes-list", text: "Look at the prices", visible: :all
+
+      find(NOTES_TAB).click
+
+      assert_notes_tab_current
+      assert_selector "#notes-drawer #notes-list", text: "Look at the prices"
+    end
+  end
+
   test "the tree never folds for the notes: opening them at 1280px leaves the tree a column" do
     at_window(1280) do
       open_editor
@@ -385,23 +454,35 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # A save's answer draws the tab again (`Admin::Answers::RailTabStreams`)
-  # with its number hidden, and reads no counts: the script fills it.
-  test "a save draws the Notes tab again and its number stays" do
+  # A save's answer draws the tab's contents again
+  # (`Admin::Answers::RailTabStreams`) with its number hidden, and reads no
+  # counts: the script fills it. The tab's button stays, so a tab the
+  # keyboard reached keeps the focus as the answer lands, never losing it
+  # for a moment (Turbo would give a replaced element's id the focus back,
+  # after a blur and on another element).
+  test "a save draws the Notes tab's contents again, its number stays, and a focused tab keeps the focus" do
     as(users(:two)) { Notes::Start.call(@page, body: "One") }
     at_window(WIDE) do
       open_editor
       assert_docked
       assert_selector "#{NOTES_TAB} .text-count", text: "1"
-      page.execute_script("document.querySelector(#{NOTES_TAB.to_json}).dataset.probe = 'old'")
+      page.execute_script("document.querySelector(#{NOTES_TAB.to_json} + ' .text-count').dataset.probe = 'old'")
 
-      fill_in "Title", with: "Prices"
-      assert_eventually(message: "the title was not saved") { @page.reload.title == "Prices" }
+      find(PAGE_TAB).execute_script("this.focus()")
+      keyboard.type(:right)
+      keyboard.type(:right)
+      assert_equal "editor-grid-tab-notes", active_id
+      assert_selector "#notes-drawer #notes-list"
+      page.execute_script("window.__tab = document.activeElement; window.__blurs = 0; window.__tab.addEventListener('blur', () => window.__blurs++)")
+      # A change the autosave sends while the focus stays on the tab.
+      find_field("Title", visible: :all).execute_script("this.value = 'Pricing and more'; this.dispatchEvent(new Event('input', { bubbles: true }))")
+      assert_eventually(message: "the title was not saved") { @page.reload.title == "Pricing and more" }
       assert_writes_settled
 
-      assert_eventually(message: "the save did not draw the tab again") { page.evaluate_script("document.querySelector(#{NOTES_TAB.to_json}).dataset.probe") != "old" }
+      assert_eventually(message: "the save did not draw the tab's contents again") { page.evaluate_script("document.querySelector(#{NOTES_TAB.to_json} + ' .text-count').dataset.probe") != "old" }
       assert_selector "#{NOTES_TAB} .text-count", text: "1"
-      assert_selector "#{PAGE_TAB}[aria-selected=true]"
+      assert_equal [ true, 0 ], page.evaluate_script("[ document.activeElement === window.__tab, window.__blurs ]"), "the answer took the focus off the tab"
+      assert_notes_tab_current
     end
   end
 

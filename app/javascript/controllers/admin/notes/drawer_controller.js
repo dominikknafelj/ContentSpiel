@@ -57,7 +57,7 @@ import { messages } from "i18n/messages"
 // server into the page and into every answer of the notes frame; whichever
 // copy arrived last is the truth. From it this fills every `total` (the
 // header's number, the panel's "4 open" and the Notes tab's number, which a
-// save's answer draws again with its number hidden), every marker
+// save's answer draws into the tab again with its number hidden), every marker
 // (`marker`: a count pill; without notes nothing at rest, and the same
 // control as "add a note" on hover or focus of its card) and the warning in a block's delete dialog (`warning`). A card or a tab
 // drawn again by a stream connects its marker or its number and is filled
@@ -249,9 +249,16 @@ export default class extends Controller {
   // header's button's (the focus stays on the tab); another tab, while the
   // notes were shown, is a closing like Close's, but the focus is the tab's.
   // What this controller's own reveal and conceal cause is theirs.
+  //
+  // Below the threshold the rail has no tabs to press, so a show of the
+  // notes' panel there that this controller did not ask for is a side effect
+  // (another panel concealed, the rail going back to the tab last left) and
+  // never an opening: the panel is concealed again, to the rail's first tab,
+  // and nothing slides over the editor that the person did not open.
   shown(event) {
     if (!this.hasDrawerTarget || this.revealing || this.concealing) return
     if (event.target instanceof Element && event.target.contains(this.drawerTarget)) {
+      if (!this.beside) return this.conceal({ home: true })
       const from = document.activeElement
       this.show({ focus: false, keep: true, trigger: from && from !== document.body && !this.drawerTarget.contains(from) ? from : null })
     } else if (this.showing && !this.isOpen) {
@@ -447,7 +454,9 @@ export default class extends Controller {
     // `from`: where the focus is as the notes are asked for (`loaded`).
     this.pending = { thread, group, compose, focus, from: document.activeElement }
 
-    const wasOpen = this.isOpen
+    // The drawer's own state, not the rail's: a press of the Notes tab has
+    // made the panel current before this runs, and is an opening all the same.
+    const wasOpen = this.showing
     this.reveal()
     this.remember()
     if (!wasOpen) this.dispatch("opened")
@@ -478,10 +487,11 @@ export default class extends Controller {
     this.sync()
   }
 
-  conceal() {
+  // `home`: to the rail's first tab, not to the tab last left.
+  conceal({ home = false } = {}) {
     this.concealing = true
     try {
-      this.drawerTarget.dispatchEvent(new CustomEvent("admin--ui--rail:conceal", { bubbles: true }))
+      this.drawerTarget.dispatchEvent(new CustomEvent("admin--ui--rail:conceal", { bubbles: true, detail: { home } }))
     } finally {
       this.concealing = false
     }

@@ -7,10 +7,11 @@
 # its number of tests, an entry for a file that is gone is ignored, and a stale
 # number only makes the shards a little uneven. To measure again: the per-test
 # lines end in " s = ", and a test's class name finds its file. Three files are
-# from a later run, 42318225796 (2026-11-07): tree_fold_test, editor_modules_test
-# and entry_helpers_test; editor_modules_test held 9 of its 14 tests then.
+# from a later run, 42318225796, #190's (2026-11-06; 00:26 on 2026-11-07 in
+# UTC): tree_fold_test, editor_modules_test and entry_helpers_test;
+# editor_modules_test held 9 of its 15 tests then.
 # notes_rail_test has no run yet: its figure is 4.53 s a test, what
-# notes_column_test, the file it replaced, took in that run, times its 17 tests.
+# notes_column_test, the file it replaced, took in that run, times its 20 tests.
 test/system/admin/account_password_answer_test.rb: 20.6
 test/system/admin/ai_settings_test.rb: 42.5
 test/system/admin/audit_log_test.rb: 7.0
@@ -66,7 +67,7 @@ test/system/admin/notes_flow_test.rb: 45.7
 test/system/admin/notes_live_test.rb: 150.2
 test/system/admin/notes_markers_test.rb: 126.2
 test/system/admin/notes_merge_test.rb: 46.4
-test/system/admin/notes_rail_test.rb: 77.1
+test/system/admin/notes_rail_test.rb: 90.6
 test/system/admin/notes_view_only_test.rb: 8.3
 test/system/admin/password_reset_test.rb: 19.4
 test/system/admin/pending_lock_test.rb: 8.3
