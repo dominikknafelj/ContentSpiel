@@ -672,7 +672,8 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list"
     # The sheet fills the width under the top bar; the drawer's × is the
     # 400px drawer's, and here "Back to <title>" stands for it.
-    assert_equal [ 0, 48, 900 ], page.evaluate_script("(() => { const box = document.querySelector('#notes-drawer').getBoundingClientRect(); return [ box.left, box.top, box.width ] })()")
+    # The width is the window's less the scrollbar's gutter, which CS Studio keeps.
+    assert_equal [ 0, 48, page.evaluate_script("document.documentElement.getBoundingClientRect().width") ], page.evaluate_script("(() => { const box = document.querySelector('#notes-drawer').getBoundingClientRect(); return [ box.left, box.top, box.width ] })()")
     assert_no_selector "#notes-drawer button[aria-label='Close']"
 
     find("button[aria-controls='tree-column']").click

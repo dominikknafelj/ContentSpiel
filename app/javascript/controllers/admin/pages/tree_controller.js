@@ -285,7 +285,7 @@ export default class extends Controller {
   //
   // THE SELECTED ROW IS THE PAGE THAT IS OPEN. The tree column sits outside
   // `#content` and outlives a frame navigation, and a frame answer carries
-  // no tree (`TreeComponent#render?`), so the server's drawing of the
+  // no tree (`admin/pages/_tree`), so the server's drawing of the
   // selection holds only for the page it was drawn with. The open page is
   // the one `#content` names (`[data-tree-open-page]`, drawn by the page
   // editor; nothing on another screen, which selects no row), and this

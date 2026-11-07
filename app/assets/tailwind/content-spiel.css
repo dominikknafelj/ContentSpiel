@@ -246,7 +246,15 @@
    on <html>: the label is 12px there and stays 11px on every page a visitor
    sees, the form-send pages included. The selector's (0,1,1) outweighs
    `:root`'s (0,1,0) in any order; it stands after the `:root` blocks by
-   convention. */
+   convention.
+   The document is CS Studio's scroller, and its gutter is kept whether or
+   not it scrolls (`scrollbar-gutter: stable`): the editors' rail docks by
+   the editor area's width (`.admin-editor-area`, a container query), so a
+   classic scrollbar appearing as the page grows taller (a colleague's list
+   merge, the person's own typing) must take no width from it, or a window
+   near the threshold would undock the rail and move a section's settings
+   under the person. */
 html[data-surface="studio"] {
   --cs-t-label: 12px;
+  scrollbar-gutter: stable;
 }

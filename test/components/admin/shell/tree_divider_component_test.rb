@@ -33,9 +33,9 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
     rem = ->(pixels) { format("%g", pixels.fdiv(Divider::BASE)) + "rem" }
 
     assert_equal %w[13.75rem 17rem 30rem 40rem 15rem], [ Divider::MIN, Divider::DEFAULT, Divider::MAX, Divider::EDITOR, Divider::SIDEBAR ].map(&rem)
-    assert_includes rules, "--admin-tree-room: calc(100vw - #{rem.(Divider::SIDEBAR)} - #{rem.(Divider::EDITOR)});"
+    assert_includes rules, "--admin-tree-room: calc(100% - #{rem.(Divider::SIDEBAR)} - #{rem.(Divider::EDITOR)});"
     assert_includes rules, "--admin-tree-column: clamp(#{rem.(Divider::MIN)}, var(--admin-tree-width, #{rem.(Divider::DEFAULT)}), max(#{rem.(Divider::MIN)}, min(#{rem.(Divider::MAX)}, var(--admin-tree-room))));"
-    assert_includes rules, "@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - #{rem.(Divider::EDITOR)}); } }"
+    assert_includes rules, "@media (max-width: 1279px) { :root { --admin-tree-room: calc(100% - #{rem.(Divider::EDITOR)}); } }"
     assert_no_match(/\d+px(?! \{)/, rules.gsub("1279px", ""), "a pixel length among the tree column's rules")
     assert_match(/^:root \{ --admin-notes-width: #{Divider::NOTES}px; \}/, css)
     assert_match(/^:root \{ --admin-tree-strip: #{rem.(Divider::STRIP)}; \}/, css)

@@ -50,7 +50,9 @@ module Admin
     # markers are drawn after the translation markers.
     class TreeRowComponent < AdminComponent
       # One page's slice of what the tree loads, read for that page alone:
-      # its branch, its readable children's count, whether its parent is
+      # its row's columns afresh (`PageTree.row`: the record handed in may
+      # predate the unpublished-changes mark), its branch, its readable
+      # children's count, whether its parent is
       # readable, its translation counts and its slot data. A fixed number of
       # statements, however many pages the site or the branch holds.
       #
@@ -61,6 +63,7 @@ module Admin
       # readable page is readable and the count is the tree's.
       def self.for_page(page, selected:, locale:, url_options:)
         actor = Current.actor
+        page = ::PageTree.row(page) || page
         AccessControl.preload_branches([ page ])
         child_count = ::PageTree.readable_child_count(page, actor: actor)
         parent_context_only = ::PageTree.parent_context_only?(page, actor: actor)

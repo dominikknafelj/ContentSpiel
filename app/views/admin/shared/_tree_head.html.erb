@@ -57,6 +57,6 @@
     if (folded) root.setAttribute("data-tree-folded", "");
     var tree = folded ? <%= divider::STRIP %> * scale : width;
     var sidebar = window.matchMedia("(min-width: 1280px)").matches ? <%= divider::SIDEBAR %> * scale : 0;
-    if (window.innerWidth >= sidebar + tree + <%= divider::NOTES %> + <%= divider::EDITOR %> * scale) root.setAttribute("data-tree-fits", "");
+    if (root.getBoundingClientRect().width >= sidebar + tree + <%= divider::NOTES %> + <%= divider::EDITOR %> * scale) root.setAttribute("data-tree-fits", "");
   })();
 <% end %>

@@ -160,19 +160,24 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    whole of it grows with a browser set to a larger font. The two scripts
    hold the same figures as `Admin::Shell::TreeDividerComponent`'s constants
    (repeated here because `clamp()` cannot be handed one) and multiply each
-   by the root's font size over 16; `100vw` is what a media query measures
-   and what their `innerWidth` is. So the scripts and this agree at any font
-   size, not at 16px only. The notes column alone is pixels
+   by the root's font size over 16. The window's width here is `100%`, which
+   in the grid's track (where the property is used) is the shell's own width:
+   the document's, less the scrollbar's gutter, which CS Studio keeps
+   (`scrollbar-gutter: stable`, content-spiel.css), and what the scripts read
+   as the root's box (`getBoundingClientRect`). So the scripts and this agree
+   at any font size and with a classic scrollbar, not at 16px only. A media
+   query measures the window with the gutter, and the scripts ask the
+   sidebar's breakpoint through `matchMedia`, the same query. The notes column alone is pixels
    (`--admin-notes-width`), here and there.
 
    Where the tree is a DRAWER the limit is not asked: below 1024px it keeps
    its fixed 17rem, and folded beside the notes column (further down) it is
    the chosen width, laid over the content. */
 :root {
-  --admin-tree-room: calc(100vw - 15rem - 40rem);
+  --admin-tree-room: calc(100% - 15rem - 40rem);
   --admin-tree-column: clamp(13.75rem, var(--admin-tree-width, 17rem), max(13.75rem, min(30rem, var(--admin-tree-room))));
 }
-@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - 40rem); } }
+@media (max-width: 1279px) { :root { --admin-tree-room: calc(100% - 40rem); } }
 .admin-shell--tree { grid-template-columns: 15rem var(--admin-tree-column) minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a

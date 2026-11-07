@@ -95,7 +95,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 - `turbo-rails` is pinned in the `Gemfile`; an upgrade means re-reading `app/javascript/saving/` and the header of `app/javascript/controllers/admin/saving/save_bar_controller.js` against the new Turbo source.
 - A block changes container in three places and no other: `ContentBlocks::Reorder` (with `moved_from`), which is the only one a person asks for by name and in the editor is sent only by `admin--editor--blocks#move` (the drop, the menu and the keyboard all call it) inside `app/javascript/saving/queue.js`, the send itself being `app/javascript/editor/move_queue.js` (`test/lib/editing_tab_header_test.rb` holds only that its send carries the tab header); `ContentBlocks::Destroy#lift` (a column to the top level, "Remove section, keep blocks"); and `ContentBlocks::Save#fold_removed_columns` (a column to the last column left, when a section's layout is narrowed). `ContentBlocks::Save` reads `section_id` and `section_column` from its caller for a new block only.
 - Code asks `capability?(:container)` (`ContentBlock#container?`) and the definition's `columns` (`#column_count`), never `block_type == "section"`.
-- A section's settings in the rail are the same element moved, never a copy; `admin--editor--section-choice` alone moves them and puts them back.
+- `admin--editor--section-choice` alone moves a section's settings region into the rail and puts it back. **No guard** for a second script that moves it (that it is one element moved, never a copy, is held by browser tests: `docs/reference/save-rule-and-write-queue.md`, "A form moved in the document stays one form").
 - An audit event's old-to-new values are `field_changes`, never `changes` (`ActiveRecord::Dirty` owns that name), and the log is append-only in Postgres too: the trigger `db/triggers/audit_events_append_only.sql` is reapplied after every schema load.
 
 **Cases a test lists by hand, so nothing fails for a new one:**
@@ -106,7 +106,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 
 **Page tree's width, `docs/reference/cs-studio-shell-and-dashboard.md`:**
 
-- `--admin-tree-width`, `data-tree-fits` and `data-tree-folded` on `<html>` are written by the layout's head script and `admin--shell--tree-width`, and by nothing else (`test/lib/admin_design_rules_test.rb`: "the tree's width, fits and fold are written by the head script and the tree-width controller alone", by the string or a constant the same file binds to it). **No guard** for a write through an imported or computed name, a `dataset` written whole (`Object.assign(root.dataset, …)`), or an attribute the server draws on `<html>`.
+- `--admin-tree-width`, `data-tree-fits` and `data-tree-folded` on `<html>` have two writers, the layout's head script and `admin--shell--tree-width` (the guard of a write by the name is in the reference file). **No guard** for a write through an imported or computed name, a `dataset` written whole (`Object.assign(root.dataset, …)`), or an attribute the server draws on `<html>`.
 
 **The Mind graph, the same file:**
 

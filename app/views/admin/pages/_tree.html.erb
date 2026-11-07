@@ -1,0 +1,13 @@
+<%# The page tree column of a Pages screen, for a full answer only. The
+    column stands outside `#content` and outlives a frame navigation, and a
+    frame answer keeps only `#content`, so a tree drawn into one would be
+    read and sent for nothing; the tree's script moves the selection to the
+    page the frame opened (`admin--pages--tree`, "The selected row"). The
+    check is the view's and never `TreeComponent`'s: a stream's
+    `replace("tree")` draws the component whatever the request's headers, and
+    a component that drew nothing there would leave the column blank. %>
+<% unless turbo_frame_request? %>
+  <% content_for :tree do %>
+    <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options) %>
+  <% end %>
+<% end %>

@@ -37,16 +37,22 @@ const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 // the region), and never at any other (but a region whose card is gone and
 // that holds text is never put back or removed: see NOTHING TYPED IN IT IS
 // LOST):
-// - the region closing (its Close, Escape in it, a second press of the word:
-//   `admin--editor--section-settings:closed`), and the rail goes back to the
-//   tab the person last left (`admin--ui--rail:conceal`);
+// - the region closing (its Close, Escape in it, a second press of the word
+//   while the region is in sight: `admin--editor--section-settings:closed`),
+//   and the rail goes back to the tab the person last left
+//   (`admin--ui--rail:conceal`). A press of the word while another panel is
+//   current is a press to see it: the card asks again (`open-settings`) and
+//   `take` shows the Section panel;
 // - the rail undocking (`admin--ui--rail:docked` with `docked: false`: a
 //   narrowed window, an unfolded tree): the region stays open under its head,
 //   and the control that had the focus has it again, with its selection. A
 //   rail that docks again says "Choose a section" while that region stays
 //   open in place, where its word closes it;
-// - Turbo's snapshot (`turbo:before-cache`), so a restored page has it where
-//   the server draws it;
+// - Turbo's snapshot (`turbo:before-cache`), so that a snapshot, should the
+//   editor ever be cached, holds the region where the server draws it. Both
+//   editors are drawn `no-cache` (`turbo-cache-control`), so Turbo takes no
+//   snapshot of them and this does not run today: it is the safeguard of the
+//   invariant that no snapshot has the region in the rail;
 // - this controller disconnecting.
 // Choosing another section closes the first one, as its card does, which
 // puts it back, before taking the next.
@@ -232,7 +238,9 @@ export default class extends Controller {
     this.dispatch("conceal", { target: this.emptyTarget, prefix: "admin--ui--rail" })
   }
 
-  // `turbo:before-cache` on the document.
+  // `turbo:before-cache` on the document. A safeguard: the editors are
+  // `no-cache`, so this is heard only should one ever be cached, and then no
+  // snapshot keeps the region in the rail.
   cache() {
     this.release()
   }

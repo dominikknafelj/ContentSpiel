@@ -95,6 +95,18 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
   end
 
+  # The frame check is the views' (`admin/pages/_tree`), never the
+  # component's: a stream's `replace("tree")` answered to a request with a
+  # frame header would otherwise put an empty element in the column.
+  test "a move asked from inside a frame still answers the whole tree" do
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 },
+      headers: { "Turbo-Frame" => "tree" }, as: :turbo_stream
+    assert_response :success
+    assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+    assert_select "turbo-stream[target=tree] template turbo-frame#tree li[data-page-id='#{@child.id}']"
+    assert_select "turbo-stream[target=tree] template turbo-frame#tree li[data-page-id='#{@b.id}']"
+  end
+
   # Final fix wave 1 (reviews A I1 / B I1): `Pages::Move` saves the moved
   # page, so its `updated_at` moves -- and the page settings form of that same
   # page, open next to the tree, used to hold that as its autosave base: its

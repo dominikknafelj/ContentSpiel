@@ -5,9 +5,7 @@
     and the typed values kept. `data-turbo-frame="_top"` on the form makes the
     redirect to the new page's editor a full visit, so the tree shows it. %>
 <% content_for :standalone_new_record, "page" %>
-<% content_for :tree do %>
-  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
-<% end %>
+<%= render "admin/pages/tree", selected: @page %>
 
 <%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>
 <% form = @form || Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,

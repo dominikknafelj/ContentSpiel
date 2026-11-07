@@ -530,6 +530,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
   end
 
+  # The rail docks by the editor area's width: a classic scrollbar that
+  # comes and goes with the page's height must not move it across.
+  test "CS Studio's document keeps its scrollbar gutter, so a scrollbar takes no width from the editor area" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/^html\[data-surface="studio"\]\s*\{[^}]*scrollbar-gutter:\s*stable;/m, css)
+    assert_equal 1, css.scan(/scrollbar-gutter/).size, "the gutter is the studio surface's alone"
+  end
+
   # The form-send pages' required word keeps its capitals: a visitor's page,
   # not CS Studio's. Only a selector under `.form-send-page` is let through: a
   # CS Studio selector beside it in the same list, or on the same line, is not.

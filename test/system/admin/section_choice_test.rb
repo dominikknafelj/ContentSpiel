@@ -134,6 +134,34 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
     end
   end
 
+  # The chosen section's settings are open but not in sight while the Page
+  # tab is current: its word shows them again instead of closing them.
+  test "pressing the chosen section's word with the Page tab current shows the Section tab and keeps the settings open" do
+    at_window(WIDE) do
+      open_docked
+      find(word("width")).click
+      assert_selector in_rail, visible: :visible
+
+      find("#editor-grid-tab-page").click
+      assert_selector "#editor-grid-tab-page[aria-selected=true]"
+      assert_selector in_rail, visible: :hidden
+
+      find(word("width")).click
+
+      assert_selector "#editor-grid-tab-section[aria-selected=true]"
+      assert_selector in_rail, visible: :visible
+      assert_selector "#{card_of(@section)}[data-chosen]"
+      assert_selector "#{word("width")}[aria-expanded='true']"
+      assert_one_region
+      assert_eventually(message: "the focus is not on the Width select") { focus_is_on("#block-#{@section.id}-width") }
+
+      # Now in sight, the same word closes them.
+      find(word("width")).click
+      assert_selector at_home, visible: :hidden
+      assert_no_selector "[data-chosen]"
+    end
+  end
+
   test "Escape and Close in the Section panel put the settings home and give the focus back to the word" do
     at_window(WIDE) do
       open_docked

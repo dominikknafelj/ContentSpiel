@@ -50,10 +50,12 @@ import { messages } from "i18n/messages"
 // column while it stands beside the editor) would not fit the window. A key
 // that asks for more than the ceiling while the choice is already wider than
 // what is shown writes nothing: it moved nothing, and must not throw away the
-// wider choice. The window's width is `innerWidth`, which is what a media
-// query and `100vw` measure, and the lengths are the stylesheet's own in its
-// own unit, so this arithmetic and the stylesheet's agree at any font size
-// (to the rounding of a whole pixel where a rem figure is not one).
+// wider choice. The window's width is the document's less its scrollbar's
+// gutter, which CS Studio keeps (`windowWidth`: the root's box, what
+// the stylesheet's `100%` of the shell is), and the lengths are the
+// stylesheet's own in its own unit, so this arithmetic and the stylesheet's
+// agree at any font size and with a classic scrollbar (to the rounding of a
+// whole pixel where a rem figure is not one).
 //
 // BESIDE THE NOTES (T3). `data-tree-fits` on <html> says whether the tree AT
 // ITS CHOSEN WIDTH (folded: the strip) still fits beside the notes column
@@ -346,7 +348,7 @@ export default class extends Controller {
     const folded = this.folded
     const tree = folded ? this.stripValue * this.scale : this.chosen
     const room = this.sidebar + tree + this.notesValue + this.editor
-    this.root.toggleAttribute(FITS, window.innerWidth >= room)
+    this.root.toggleAttribute(FITS, this.windowWidth >= room)
     this.foldTargets.concat(this.unfoldTargets).forEach((button) => button.setAttribute("aria-expanded", String(!folded)))
 
     if (!this.hasDividerTarget) return
@@ -412,8 +414,15 @@ export default class extends Controller {
   // keeps its least beside the sidebar (where that is a column) and beside
   // the notes (while they are).
   get ceiling() {
-    const room = window.innerWidth - this.sidebar - this.editor - (this.notesBeside ? this.notesValue : 0)
+    const room = this.windowWidth - this.sidebar - this.editor - (this.notesBeside ? this.notesValue : 0)
     return Math.max(this.least, Math.min(this.most, Math.floor(room)))
+  }
+
+  // The window's width the shell is laid out in: the root's box, which is
+  // the window less the scrollbar's gutter. Not `clientWidth`, which leaves
+  // out a scrollbar but not a gutter with none in it.
+  get windowWidth() {
+    return this.root.getBoundingClientRect().width
   }
 
   // The modules sidebar is a column of the grid from 1280px and a drawer

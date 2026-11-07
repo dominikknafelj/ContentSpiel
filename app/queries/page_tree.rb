@@ -19,6 +19,12 @@ module PageTree
   # whatever the ids say.
   def rows(ids) = Page.kept.where(id: ids.to_a).select(*COLUMNS).order(:position, :id)
 
+  # What is `page`'s row now? Its `COLUMNS`, read afresh, for a row drawn
+  # alone after a save: the unpublished-changes mark is written beside the
+  # save by a statement of its own (`Publishing`), so the record the request
+  # holds does not carry it. Nil for a page gone to the trash.
+  def row(page) = Page.kept.select(*COLUMNS).find_by(id: page.id)
+
   # How many children of `page` may `actor` read? Through the read scope, so
   # kept ones only. Read scopes are whole branches, so every child of a
   # readable page is readable, and this is the count the whole tree draws.

@@ -134,11 +134,22 @@ export default class extends Controller {
 
   get settingsOpen() { return Boolean(this.region) && !this.region.hidden }
 
+  // Whether the open region is in sight. A region moved away (into the rail,
+  // `data-editing-away`) is open but out of sight while another of the
+  // rail's panels is current; under its head, open is in sight.
+  get settingsSeen() {
+    const region = this.region
+    if (!region || region.hidden) return false
+    return !region.hasAttribute("data-editing-away") || region.checkVisibility()
+  }
+
   // A word pressed: a second press of the word that opened the settings
-  // closes them; any other opens them (or keeps them open) on its setting.
+  // closes them when they are in sight; any other press opens them (or
+  // keeps them open) on its setting, and one whose region is open out of
+  // sight shows it again, through the same cancelable `open-settings`.
   openSettings(event) {
     const field = event.params.field
-    if (this.settingsOpen && this.openedBy === field) return this.closeSettings()
+    if (this.settingsSeen && this.openedBy === field) return this.closeSettings()
 
     this.showSettings(field)
   }

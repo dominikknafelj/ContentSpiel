@@ -73,15 +73,12 @@ module Admin
         @root_page = root
       end
 
-      # Never drawn into a frame answer: a frame answer keeps only `#content`,
-      # and the tree column outside it outlives the navigation, so a tree
-      # drawn there would be read and sent for nothing. The tree's own script
-      # moves the selection to the page the frame opened
-      # (`admin--pages--tree`, "The selected row").
-      def render? = !helpers.turbo_frame_request?
-
+      # Always drawn when rendered, whatever the request: a stream's
+      # `replace("tree")` must never put an empty element in the column. That
+      # a frame answer carries no tree is decided by the views that put it in
+      # the column (`admin/pages/_tree`).
       def before_render
-        @root = @root_page && load_visible(@root_page) if render?
+        @root = @root_page && load_visible(@root_page)
       end
 
       private

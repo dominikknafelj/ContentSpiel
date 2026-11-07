@@ -19,9 +19,7 @@
   <meta name="turbo-prefetch" content="false">
 <% end %>
 
-<% content_for :tree do %>
-  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
-<% end %>
+<%= render "admin/pages/tree", selected: @page %>
 
 <%# The page this editor opens, named for the page tree, which stands outside
     `#content` and marks this page's row selected (`admin--pages--tree`, "The

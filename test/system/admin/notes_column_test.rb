@@ -60,12 +60,14 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
 
         drawer = box("#notes-drawer")
         header = box(".admin-editor-header")
-        assert_equal [ width - 400, width ], [ drawer[0], drawer[2] ].map(&:round), "the drawer is the window's last 400px"
+        # The window less the scrollbar's gutter, which CS Studio keeps.
+        room = page.evaluate_script("document.documentElement.getBoundingClientRect().width").round
+        assert_equal [ room - 400, room ], [ drawer[0], drawer[2] ].map(&:round), "the drawer is the window's last 400px, before the scrollbar's gutter"
         assert_in_delta header[3], drawer[1], 1, "the drawer starts where the header ends"
         assert_in_delta 900, drawer[3], 1, "and reaches the window's bottom edge"
         # The header spans the content and the drawer, and opening the notes
         # did not change its height.
-        assert_in_delta width, header[2], 1
+        assert_in_delta room, header[2], 1
         assert_in_delta header_before[3] - header_before[1], header[3] - header[1], 1, "the header kept its height"
         assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('#notes-drawer')).boxShadow")
 

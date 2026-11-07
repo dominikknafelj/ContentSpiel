@@ -60,6 +60,20 @@ class Admin::PagesTreeRowTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The mark is written beside the save (`Publishing`, a statement of its
+  # own), so the row is drawn from the page's row as it is now, never from the
+  # record the request holds.
+  test "a save of a live page answers its row with the unpublished-changes mark" do
+    sign_in_as(users(:one))
+    live = create_page(title: "Live page")
+    assert_not live.reload.unpublished_changes?
+
+    save_settings(live, title: "Live page, retitled")
+
+    assert live.reload.unpublished_changes?
+    assert_select "turbo-stream[target='tree-row-#{live.id}'] template [data-unpublished-changes][aria-label='Unpublished changes']", count: 1
+  end
+
   # The tree column outlives a frame navigation, so a frame answer is no
   # place for the tree: it would be read and sent with every page opened
   # from it. The answer names the page it opens, for the tree's script.
