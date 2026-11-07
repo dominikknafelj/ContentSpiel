@@ -15,8 +15,11 @@ en:
       # keys that switch nothing (the notes badge's is in `notes.en.yml`).
       #
       # `status_key` is the dialog that link opens: `title` its name and
-      # `states` its five rows, in the words of the card's status chip (one
-      # set of words; the day of a scheduled change stands only on the chip).
+      # `states` its five rows, in the words of the card's chips (one set of
+      # words, changed together: these, the chips' own `status_chip.labels`
+      # and `unpublished_chip.label` in `ui.en.yml`, and `script.card.status`
+      # in `mind_graph.en.yml`; the day of a scheduled change stands only on
+      # the card).
       #
       # `parts` are the shared pieces the graph's scripts clone: `close` is
       # the card's Close, an icon button named by it.

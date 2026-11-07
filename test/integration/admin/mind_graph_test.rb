@@ -183,6 +183,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # chip's second part (G4) and the whole chip for a screen reader (H6).
     assert_equal [ "Open page", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
                  messages.values_at(*%w[open_page status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
+    # A list row's name says its chips' own words, from the chips' own keys.
+    chip_words = %w[components.ui.status_chip.labels.draft components.ui.status_chip.labels.scheduled components.ui.unpublished_chip.label]
+    assert_equal [ "Draft", "Scheduled", "Unpublished changes" ], messages.values_at(*chip_words)
+    assert_equal chip_words.map { |key| I18n.t("admin.#{key}") }, messages.values_at(*chip_words)
+    assert_equal "%{title}, %{state}", messages["mind_graph.script.list.stated"]
     assert_equal [ { "one" => "%{figure} child page", "other" => "%{figure} child pages" }, { "one" => "lists %{figure} post", "other" => "lists %{figure} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
     # A pill's row is named with its visible words first ("+92 more: …"), so
@@ -193,7 +198,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                     card.status.change_scheduled card.status.live_change_scheduled card.status.live_with_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
                     list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
-                    list.select_page list.select_post list.select_tag list.select_type
+                    list.select_page list.select_post list.select_tag list.select_type list.stated
                     list.tags list.try_again list.types list.unlisted load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type

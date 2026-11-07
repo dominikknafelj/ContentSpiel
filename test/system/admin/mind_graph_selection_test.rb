@@ -563,7 +563,8 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
   # A live record with a change scheduled has the longest chip row: the Live
   # chip and the change's words with its day. In a language whose words are
   # longer it wraps inside the card's padding, and stays under Close. There
-  # is no German UI yet, so the messages are made German for the card.
+  # is no German UI yet, so the messages are made German for the card; on
+  # that pass the row must stand on two lines, or the test held nothing.
   test "a two-state chip wraps inside the card, clear of Close, in German too" do
     post = create_post(title: "Alpha")
     PostRelation.create!(post: post, related_post: create_post(title: "Beta"))
@@ -571,35 +572,34 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     post.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
     assert_equal :live_change_scheduled, Publishing::State.of(post.reload).state
 
-    with_locales(%w[en de], default: "en") do
-      visit admin_mind_graph_path
-      await_graph
-      [ nil, "Änderung geplant für Dienstag, den %{date}" ].each do |words|
-        if words
-          escape_on_canvas
-          page.execute_script(<<~JS)
-            const element = document.querySelector(#{GRAPH.to_json})
-            element.setAttribute("data-messages", JSON.stringify({ ...JSON.parse(element.getAttribute("data-messages")), "@locale": "de", "mind_graph.script.card.status.change_scheduled": #{words.to_json} }))
-          JS
-        end
-        click_node(post)
-        row = element_box("[data-mind-graph-card] > [data-chip-row]")
-        card = element_box("[data-mind-graph-card]")
-        close = element_box("[data-mind-graph-card-close]")
-        padding = page.evaluate_script("parseFloat(getComputedStyle(document.querySelector('[data-mind-graph-card]')).paddingRight)")
-        pieces = page.evaluate_script(<<~JS)
-          Array.from(document.querySelectorAll("[data-mind-graph-card] > [data-chip-row] > *"), (piece) => { const r = piece.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom } })
+    visit admin_mind_graph_path
+    await_graph
+    [ nil, "Änderung geplant für Dienstag, den %{date}" ].each do |words|
+      if words
+        escape_on_canvas
+        page.execute_script(<<~JS)
+          const element = document.querySelector(#{GRAPH.to_json})
+          element.setAttribute("data-messages", JSON.stringify({ ...JSON.parse(element.getAttribute("data-messages")), "@locale": "de", "mind_graph.script.card.status.change_scheduled": #{words.to_json} }))
         JS
-
-        assert_operator row["right"], :<=, card["right"] - padding + 0.5, "the chip row runs into the card's padding (#{words || "English"})"
-        (pieces + [ row ]).each do |box|
-          next if box["top"] >= close["bottom"]
-          overlaps = box["left"] < close["right"] && box["right"] > close["left"]
-          assert_not overlaps, "the chip row runs under Close (#{words || "English"}): #{box} #{close}"
-        end
-        pieces.each { |box| assert_operator box["right"], :<=, card["right"] - padding + 0.5, "a piece of the chip row runs out of the card (#{words || "English"})" }
       end
-      assert_operator page.evaluate_script("document.querySelectorAll('[data-mind-graph-card] > [data-chip-row] > *').length"), :==, 2
+      click_node(post)
+      row = element_box("[data-mind-graph-card] > [data-chip-row]")
+      card = element_box("[data-mind-graph-card]")
+      close = element_box("[data-mind-graph-card-close]")
+      padding = page.evaluate_script("parseFloat(getComputedStyle(document.querySelector('[data-mind-graph-card]')).paddingRight)")
+      pieces = page.evaluate_script(<<~JS)
+        Array.from(document.querySelectorAll("[data-mind-graph-card] > [data-chip-row] > *"), (piece) => { const r = piece.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom } })
+      JS
+
+      assert_operator row["right"], :<=, card["right"] - padding + 0.5, "the chip row runs into the card's padding (#{words || "English"})"
+      (pieces + [ row ]).each do |box|
+        next if box["top"] >= close["bottom"]
+        overlaps = box["left"] < close["right"] && box["right"] > close["left"]
+        assert_not overlaps, "the chip row runs under Close (#{words || "English"}): #{box} #{close}"
+      end
+      pieces.each { |box| assert_operator box["right"], :<=, card["right"] - padding + 0.5, "a piece of the chip row runs out of the card (#{words || "English"})" }
+      assert_operator pieces[1]["top"], :>=, pieces[0]["bottom"], "the German row did not wrap: the test holds nothing" if words
     end
+    assert_equal 2, page.evaluate_script("document.querySelectorAll('[data-mind-graph-card] > [data-chip-row] > *').length")
   end
 end

@@ -54,13 +54,14 @@
 // IconChipComponent`, the sidebar's: a page the structure's, a post, a tag
 // and a post type the lists'), cloned from the parts (`parts.js`).
 //
-// A ROW'S STATE is said as the editors' lists say it: an exception stands
-// out and a plain live row has nothing. After the title, a draft's and a
-// scheduled record's row carries its `StatusChipComponent`, and a live
-// record whose `changes` is set the `UnpublishedChipComponent`, each cloned
-// from the parts and never changed after, in a wrapper hidden from a
-// screen reader: the row's name says what it is, and is the same with a
-// chip or without.
+// A ROW'S STATE is shown as the posts list shows it, by its rule: an
+// exception stands out and a plain live row has nothing. After the title, a
+// draft's and a scheduled record's row carries its `StatusChipComponent`,
+// and any record whose unpublished mark is set (the data's `unpublished`)
+// the `UnpublishedChipComponent`, each cloned from the parts and never
+// changed after, in a wrapper hidden from a screen reader. The row's name
+// says the same words after the title ("Soon, Scheduled: post, 3
+// connections. ..."), read from the chips' own keys.
 //
 // A ROW'S MARK. A page's and a post type's are small canvases drawn by the
 // renderer the graph is drawn by (`swatches.js`: `markCanvas`, painted once
@@ -130,6 +131,13 @@ const byTree = (a, b) => a.order - b.order
 const asGiven = () => 0
 const ROW = "flex w-full cursor-pointer items-center gap-2 px-3 py-1 text-left text-sm text-ink hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-[current]:bg-accent-tint aria-[current]:font-semibold"
 const LIST = "m-0 list-none p-0"
+// A state's part and the key of its chip's own word (`ui.en.yml`), which the
+// row's name says: the same words as the chip, from the same keys.
+const STATE_WORDS = {
+  "status-draft": "components.ui.status_chip.labels.draft",
+  "status-scheduled": "components.ui.status_chip.labels.scheduled",
+  unpublished: "components.ui.unpublished_chip.label"
+}
 const NAMES = { page: "mind_graph.script.list.select_page", post: "mind_graph.script.list.select_post", tag: "mind_graph.script.list.select_tag", type: "mind_graph.script.list.select_type" }
 // A page's indent per level of the tree, in pixels, on top of the row's own
 // (a READING: the design answer says "with indents" and no figure).
@@ -205,6 +213,31 @@ export function createList(container, { text, number = String, dotClasses, typeL
     }
     return wrapper
   }
+  // The parts a page's or a post's row carries after its title, by the
+  // posts list's own rule (`posts_screen/table_component.html.erb`): the
+  // status chip unless the record is live, then the unpublished chip when
+  // the data's `unpublished` (`Publishing::State#changes?`, the posts list's
+  // `unpublished_changes?`) is set. So a scheduled record can carry both,
+  // and a live record with a change scheduled carries the unpublished chip
+  // only when it is marked too.
+  const statesOf = (node) => {
+    if (node.kind !== "page" && node.kind !== "post") return []
+    return [ ...(Object.hasOwn(STATE_WORDS, `status-${node.status}`) ? [ `status-${node.status}` ] : []), ...(node.unpublished ? [ "unpublished" ] : []) ]
+  }
+  // The chips, in one wrapper hidden from a screen reader: the row's name
+  // says the same words (`stated`).
+  const stateChips = (node) => {
+    const names = statesOf(node)
+    if (!names.length) return []
+    const held = element("span", "flex shrink-0 items-center gap-1")
+    held.setAttribute("aria-hidden", "true")
+    held.append(...names.map((name) => parts.part(name)))
+    return [ held ]
+  }
+  // The title as a row's name says it: followed by each chip's own word
+  // ("Soon, Scheduled, Unpublished changes"), so what is seen is heard and
+  // the name begins with what the row shows.
+  const stated = (node) => statesOf(node).reduce((title, name) => text.t("mind_graph.script.list.stated", { title, state: text.t(STATE_WORDS[name]) }), node.title)
   // A post's type as a row that is not in view names it (design answers G5,
   // H7): the type's label in lower case, as the messages' language lowers
   // it ("blog post"); a RETIRED type has no label, and is its stored name in
@@ -212,8 +245,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // because a stored name is data.
   const lower = (words) => String(words ?? "").toLocaleLowerCase(text.locale())
   const addName = (node) => Object.hasOwn(typeLabels, node.type)
-    ? text.t("mind_graph.script.list.add_post", { title: node.title, type: lower(typeLabels[node.type]) })
-    : text.t("mind_graph.script.list.add_retired_post", { title: node.title, type: lower(node.type) })
+    ? text.t("mind_graph.script.list.add_post", { title: stated(node), type: lower(typeLabels[node.type]) })
+    : text.t("mind_graph.script.list.add_retired_post", { title: stated(node), type: lower(node.type) })
   // What stands at a row's end, and what its name counts: a post type's is
   // its posts (H2), every other row's its connections.
   const figure = (node) => (node.kind === "type" ? node.count ?? 0 : node.degree)
@@ -226,29 +259,19 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // The same row while there is no graph to add its post to (the graph is
   // still being read, or its read failed): what it is, and that it is not
   // in view, with no word of activating it.
-  // The chip a row of a page or a post carries after its title, if any.
-  const stateChip = (node) => {
-    if (node.kind !== "page" && node.kind !== "post") return []
-    const name = node.status === "live" ? (node.changes ? "unpublished" : null) : [ "draft", "scheduled" ].includes(node.status) ? `status-${node.status}` : null
-    if (!name) return []
-    const held = element("span", "flex shrink-0")
-    held.setAttribute("aria-hidden", "true")
-    held.append(parts.part(name))
-    return [ held ]
-  }
   const absentName = (node) => Object.hasOwn(typeLabels, node.type)
-    ? text.t("mind_graph.script.list.absent_post", { title: node.title, type: lower(typeLabels[node.type]) })
-    : text.t("mind_graph.script.list.absent_retired_post", { title: node.title, type: lower(node.type) })
+    ? text.t("mind_graph.script.list.absent_post", { title: stated(node), type: lower(typeLabels[node.type]) })
+    : text.t("mind_graph.script.list.absent_retired_post", { title: stated(node), type: lower(node.type) })
   const row = (node, { notInView = false, addable = true } = {}) => {
     const item = document.createElement("li")
     const button = element("button", ROW)
     button.type = "button"
     button.dataset.nodeId = node.id
-    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: node.title, count: figure(node) }))
+    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: stated(node), count: figure(node) }))
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
     const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-count text-meta", figure(node))
-    button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), ...stateChip(node), trailing)
+    button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), ...stateChips(node), trailing)
     item.append(button)
     rows.set(node.id, button)
     if (notInView) {

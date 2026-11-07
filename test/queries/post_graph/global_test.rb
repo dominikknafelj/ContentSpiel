@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `PostGraph::Global` (mind graph canvas spec §3.3): the best-connected
+# `PostGraph::Global`: the best-connected
 # readable posts up to a cap, their tags and edges, and what was left out.
 class PostGraph::GlobalTest < ActiveSupport::TestCase
   def graph(actor: nil, cap: PostGraph::CAP, **options)
@@ -30,7 +30,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     node = graph[:nodes].find { |n| n[:id] == pid(a) }
 
     assert_equal({ id: pid(a), title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
-                   status: "live", changes: nil, change_at: nil, listed: false, url: "/cs-studio/posts/#{a.id}",
+                   status: "live", changes: nil, change_at: nil, unpublished: false, listed: false, url: "/cs-studio/posts/#{a.id}",
                    degree: 1, related_count: 1, tag_count: 0, open_notes: 0 }, node)
   end
 
@@ -261,7 +261,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     pages = graph[:pages]
 
     assert_equal [ page_id(home), page_id(blog), page_id(child) ], pages.map { |page| page[:id] }
-    assert_equal({ id: page_id(blog), title: "Blog", path: "/blog", depth: 1, home: false, parent: page_id(home), order: 1, status: "live",
+    assert_equal({ id: page_id(blog), title: "Blog", path: "/blog", depth: 1, home: false, parent: page_id(home), order: 1, status: "live", unpublished: false,
                    url: "/cs-studio/pages/#{blog.id}", degree: 3, child_count: 1, listed_count: 1, open_notes: 1 }, pages[1].except(:changes, :change_at))
     assert_equal [ true, nil, 0, 1 ], pages[0].values_at(:home, :parent, :depth, :child_count)
   end
@@ -605,7 +605,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
   # of the three facts that state's own exhaustive test lists (3 x 2 x 2),
   # on a page and on a post; and every record here has a copy IN FORCE (the
   # services took one), which is no pending copy.
-  test "for every combination of the time, a pending copy and the mark, a node's status, changes and change_at are what Publishing::State answers by itself" do
+  test "for every combination of the time, a pending copy and the mark, a node's status, changes, change_at and unpublished mark are what Publishing::State answers by itself" do
     times = { none: nil, future: 3.days.from_now, past: 1.day.ago }
     combinations = times.keys.product([ false, true ], [ false, true ])
     assert_equal 12, combinations.size
@@ -625,8 +625,8 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
       pair.map do |record|
         state = Publishing::State.of(record.reload)
         node = nodes.fetch(PostGraph.node_id(record.class.name.underscore, record.id))
-        expected = [ state.status, PostGraph::Builder::CHANGES[state.state], (state.pending_at if state.state == :live_change_scheduled) ]
-        assert_equal expected, node.values_at(:status, :changes, :change_at), "#{record.class} #{facts.inspect}"
+        expected = [ state.status, PostGraph::Builder::CHANGES[state.state], (state.pending_at if state.state == :live_change_scheduled), state.changes? ]
+        assert_equal expected, node.values_at(:status, :changes, :change_at, :unpublished), "#{record.class} #{facts.inspect}"
         state.state
       end
     end

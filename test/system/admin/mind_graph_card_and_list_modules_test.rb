@@ -271,41 +271,79 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_equal [ "LABEL", "checkbox", "list.unlisted()" ], rows["checkbox"]
   end
 
-  # The list says a record's state as the editors' lists do: an exception
-  # stands out (a draft, a scheduled record, a live one with changes) and a
-  # plain live row has nothing. Every chip is a clone of its part, and is
-  # decoration: the row's name says what it is.
-  test "list: each group's heading carries its kind's icon chip, a draft's and a scheduled record's row its status chip, a changed live row the unpublished chip, and a live row none, all hidden from a screen reader" do
+  # The list shows a record's state by the posts list's own rule: the status
+  # chip unless the record is live, then the unpublished chip when its mark
+  # is set (`unpublished`, `Publishing::State#changes?`). A live record with
+  # a change scheduled carries the unpublished chip only when it is marked
+  # too. Every chip is a clone of its part, hidden from a screen reader, and
+  # the row's name says each chip's own word after the title.
+  test "list: each group's heading carries its kind's icon chip, and a row the posts list's chips by its rule, hidden from a screen reader and said in its name" do
     result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
         const { container, list, parts } = #{LIST_SCRIPT}
-        list.render([ { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null, status: "live", changes: null },
-                      { id: "page-2", kind: "page", title: "Draft", degree: 1, depth: 1, order: 1, parent: "page-1", status: "draft", changes: null },
-                      { id: "page-3", kind: "page", title: "Changed", degree: 1, depth: 1, order: 2, parent: "page-1", status: "live", changes: "unpublished" },
-                      { id: "post-1", kind: "post", title: "Soon", degree: 3, colour_index: 1, status: "scheduled", changes: null },
-                      { id: "post-2", kind: "post", title: "Live", degree: 2, colour_index: 1, status: "live", changes: null },
-                      { id: "post-3", kind: "post", title: "Later", degree: 1, colour_index: 1, status: "live", changes: "scheduled" },
+        const page = { kind: "page", degree: 1, depth: 1, parent: "page-1", changes: null, unpublished: false }
+        const post = { kind: "post", degree: 1, colour_index: 1, changes: null, unpublished: false }
+        list.render([ { ...page, id: "page-1", title: "Home", depth: 0, order: 0, parent: null, status: "live" },
+                      { ...page, id: "page-2", title: "Draft", order: 1, status: "draft" },
+                      { ...page, id: "page-3", title: "Changed", order: 2, status: "live", changes: "unpublished", unpublished: true },
+                      { ...post, id: "post-1", title: "Soon", degree: 6, status: "scheduled" },
+                      { ...post, id: "post-2", title: "Soon changed", degree: 5, status: "scheduled", unpublished: true },
+                      { ...post, id: "post-3", title: "Live", degree: 4, status: "live" },
+                      { ...post, id: "post-4", title: "Later", degree: 3, status: "live", changes: "scheduled" },
+                      { ...post, id: "post-5", title: "Later changed", degree: 2, status: "live", changes: "scheduled", unpublished: true },
                       { id: "tag-1", kind: "tag", title: "tag", degree: 2 }, { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 3, colour_index: 1 },
                       { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
         const same = (element, name) => element.isEqualNode(parts.part(name)) ? name : `not ${name}`
         const icons = [ "icon-page", "icon-post", "icon-tag", "icon-type" ]
         const headings = Array.from(container.querySelectorAll("section > h2"), (heading, index) => [ heading.textContent, same(heading.firstElementChild, icons[index]), heading.firstElementChild.getAttribute("aria-hidden") ])
-        const chips = Array.from(container.querySelectorAll("button[data-node-id]"), (button) => {
-          const chip = button.querySelector(".admin-status-chip, [data-unpublished-changes]")
-          if (!chip) return [ button.dataset.nodeId, "-" ]
-          const name = chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`
-          return [ button.dataset.nodeId, same(chip, name), Boolean(chip.closest("[aria-hidden='true']")), chip.closest("button > *").previousElementSibling.classList.contains("truncate"), button.getAttribute("aria-label") ]
+        const rows = Array.from(container.querySelectorAll("button[data-node-id]"), (button) => {
+          const chips = Array.from(button.querySelectorAll(".admin-status-chip, [data-unpublished-changes]"))
+          const held = chips[0]?.parentElement
+          return [ button.dataset.nodeId, chips.map((chip) => same(chip, chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`)),
+                   held ? [ held.getAttribute("aria-hidden"), held.previousElementSibling.classList.contains("truncate") ] : "-", button.getAttribute("aria-label") ]
         })
-        return { headings, chips }
+        return { headings, rows }
       })()
     JS
 
-    assert_equal [ [ "list.pages(3)", "icon-page", "true" ], [ "list.posts(3)", "icon-post", "true" ], [ "list.tags(1)", "icon-tag", "true" ], [ "list.types(1)", "icon-type", "true" ] ], result["headings"],
+    assert_equal [ [ "list.pages(3)", "icon-page", "true" ], [ "list.posts(5)", "icon-post", "true" ], [ "list.tags(1)", "icon-tag", "true" ], [ "list.types(1)", "icon-type", "true" ] ], result["headings"],
       "each group's heading starts with its kind's icon chip, and its words are the heading's whole text"
-    assert_equal [ [ "page-1", "-" ], [ "page-2", "status-draft", true, true, "list.select_page(Draft,1)" ], [ "page-3", "unpublished", true, true, "list.select_page(Changed,1)" ],
-                   [ "post-1", "status-scheduled", true, true, "list.select_post(Soon,3)" ], [ "post-2", "-" ], [ "post-3", "unpublished", true, true, "list.select_post(Later,1)" ],
-                   [ "tag-1", "-" ], [ "type-blog", "-" ], [ "more-type-blog", "-" ] ], result["chips"],
-      "a chip stands after the title, is hidden from a screen reader and leaves the row's name as it was; a live row, a tag, a type and a pill have none"
+    hidden = [ "true", true ]
+    assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1)" ],
+                   [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1)" ],
+                   [ "page-3", %w[unpublished], hidden, "list.select_page(list.stated(Changed,unpublished_chip.label()),1)" ],
+                   [ "post-1", %w[status-scheduled], hidden, "list.select_post(list.stated(Soon,labels.scheduled()),6)" ],
+                   [ "post-2", %w[status-scheduled unpublished], hidden, "list.select_post(list.stated(list.stated(Soon changed,labels.scheduled()),unpublished_chip.label()),5)" ],
+                   [ "post-3", [], "-", "list.select_post(Live,4)" ],
+                   [ "post-4", [], "-", "list.select_post(Later,3)" ],
+                   [ "post-5", %w[unpublished], hidden, "list.select_post(list.stated(Later changed,unpublished_chip.label()),2)" ],
+                   [ "tag-1", [], "-", "list.select_tag(tag,2)" ], [ "type-blog", [], "-", "list.select_type(Blog,3)" ],
+                   [ "more-type-blog", [], "-", "list.more_row(3,3,Blog,+3 more)" ] ], result["rows"],
+      "the posts list's chips after the title, hidden, each word said after the title in the name; a live row, a scheduled change without the mark, a tag, a type and a pill have none"
+  end
+
+  # The name as a screen reader hears it, in the locale file's own words.
+  test "list: a row's name says its state in the chips' own words" do
+    words = { "mind_graph.script.list.stated" => "%{title}, %{state}", "mind_graph.script.list.select_post" => I18n.t("admin.mind_graph.script.list.select_post.other"),
+              "mind_graph.script.list.add_post" => I18n.t("admin.mind_graph.script.list.add_post"), "mind_graph.script.list.not_in_view" => I18n.t("admin.mind_graph.script.list.not_in_view"),
+              "components.ui.status_chip.labels.draft" => I18n.t("admin.components.ui.status_chip.labels.draft"),
+              "components.ui.status_chip.labels.scheduled" => I18n.t("admin.components.ui.status_chip.labels.scheduled"),
+              "components.ui.unpublished_chip.label" => I18n.t("admin.components.ui.unpublished_chip.label") }
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const words = #{words.to_json}
+        const text = { t: (key, values = {}) => Object.entries(values).reduce((said, [ name, value ]) => said.split(`%{${name}}`).join(value), words[key] ?? `missing ${key}`), locale: () => "en" }
+        const container = document.createElement("div")
+        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const post = { kind: "post", degree: 2, colour_index: 1, type: "blog", changes: null }
+        list.showRows({ heading: "Posts", rows: [ { ...post, id: "post-1", title: "Alpha", status: "draft", unpublished: false }, { ...post, id: "post-2", title: "Beta", status: "scheduled", unpublished: true },
+                                                  { ...post, id: "post-3", title: "Gamma", status: "live", changes: "unpublished", unpublished: true } ], inView: (id) => id !== "post-3" })
+        return Array.from(container.querySelectorAll("button[data-node-id]"), (button) => button.getAttribute("aria-label"))
+      })()
+    JS
+
+    assert_equal [ "Alpha, Draft: post, 2 connections. Shows it in the graph.", "Beta, Scheduled, Unpublished changes: post, 2 connections. Shows it in the graph.",
+                   "Gamma, Unpublished changes, blog post, not in view. Activate to add it to the graph." ], result
   end
 
   test "list: a row that is not in view is named with its type and asks to be added, one in view selects, and the checkbox reports its change" do

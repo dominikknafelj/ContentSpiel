@@ -1,6 +1,6 @@
 require "test_helper"
 
-# `PostGraph::Rows` (pages in the mind graph, spec §3, decision 10): the rows
+# `PostGraph::Rows` (decision 10): the rows
 # of the list's two filters, each a post's node as the graph's data has it.
 class PostGraph::RowsTest < ActiveSupport::TestCase
   def rows(actor: nil, limit: PostGraph::ROW_LIMIT) = PostGraph::Rows.new(actor: actor, limit: limit, url_for: ->(post) { "/cs-studio/posts/#{post.id}" })
@@ -23,7 +23,7 @@ class PostGraph::RowsTest < ActiveSupport::TestCase
     assert_equal 2, result[:total]
     assert_equal [ "post-#{@new.id}", "post-#{@old.id}" ], result[:rows].map { |row| row[:id] }
     assert_equal({ id: "post-#{@new.id}", title: "New", type: "blog", colour_index: ContentTypes.fetch("blog").colour_index, status: "draft", changes: nil,
-                   change_at: nil, listed: false, url: "/cs-studio/posts/#{@new.id}", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, unconnected: true }, result[:rows].first)
+                   change_at: nil, unpublished: false, listed: false, url: "/cs-studio/posts/#{@new.id}", degree: 0, related_count: 0, tag_count: 0, open_notes: 0, unconnected: true }, result[:rows].first)
   end
 
   # The whole graph's notice counts the posts with no connection as not

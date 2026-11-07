@@ -72,6 +72,11 @@
 # everything" (`show.opened.everything` is what is written on it), which
 # says how many lines pressing it draws; `%{figure}` is the grouped count.
 #
+# `script.list.stated` is a row's title in its name with one state after it,
+# once per chip the row shows ("Soon, Scheduled, Unpublished changes");
+# `%{state}` is the chip's own word (`ui.en.yml`, the status chip's and the
+# unpublished chip's keys), so the name says what the row shows.
+#
 # `script.list.more_row` is the whole name of a "+N more" pill's row in the
 # list (its visible words are the pill's own, `script.more`): `%{target}` is
 # the post type or tag the pill hangs off, `%{figure}` the grouped count and
@@ -241,6 +246,7 @@ en:
           add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
           absent_post: "%{title}, %{type} post, not in view."
           absent_retired_post: "%{title}, %{type}, retired type, not in view."
+          stated: "%{title}, %{state}"
         search:
           count:
             one: "%{count} result"
