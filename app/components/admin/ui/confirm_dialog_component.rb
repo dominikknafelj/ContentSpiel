@@ -26,7 +26,7 @@ module Admin
         accessibility: "The shared dialog (a native modal named by its title, Escape closes it) with a Cancel button and the caller's confirm; a destructive one puts the focus on Cancel.",
         motion: :reduced,
         content_edges: %i[short long],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[id title body cancel_label destructive open_on_load],
         limits: [
           "The confirm action is the caller's slot: it performs no write of its own.",

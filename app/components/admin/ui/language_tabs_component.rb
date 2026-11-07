@@ -43,7 +43,7 @@ module Admin
         accessibility: "A navigation named Languages: in links mode links with the current one aria-current, in buttons mode a tablist of buttons with aria-selected; each language's missing or outdated mark says its state in screen-reader text.",
         motion: :none,
         content_edges: %i[many short],
-        widths: :container,
+        widths: :from_container,
         interface: %i[current missing outdated url visible mode button_data panel_id],
         limits: [
           "Switching language is the caller's: links mode follows the URL it is handed, and buttons mode's behaviour is the caller's controller.",

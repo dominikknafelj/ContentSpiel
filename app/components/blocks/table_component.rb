@@ -19,12 +19,12 @@ module Blocks
       accessibility: "A focusable region named by the caption, or by the word \"Table\" without one, so a keyboard scrolls a wide table; a header row is th scope=col and a header column th scope=row.",
       motion: :none,
       content_edges: %i[long many missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page rows header_row? header_column? column_count caption],
       words: %w[public.blocks.table.label],
       limits: [
         "Wider than its column it scrolls inside its own box; the edges' fades follow the scroll position (a scroll-driven animation), with nothing that moves on its own.",
-        "It draws no sorting, no filter and no merged cells.",
+        "It draws no sorting, no filtering and no merged cells.",
         "An empty table renders nothing."
       ]
     )

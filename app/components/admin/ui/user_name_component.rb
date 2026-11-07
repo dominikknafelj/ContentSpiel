@@ -15,7 +15,7 @@ module Admin
         widths: :fluid,
         interface: %i[user user_id],
         limits: [
-          "A user who is gone and no user at all each have one fixed name.",
+          "A user who is gone and no user at all each have one name that never changes.",
           "Those two names (a deleted user, System) are English in the code, not keys."
         ],
         states: %i[named email_fallback deleted_user system],

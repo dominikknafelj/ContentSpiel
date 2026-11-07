@@ -15,11 +15,11 @@ module Admin
         accessibility: "A tabpanel labelled by its tab, with no focus of its own.",
         motion: :none,
         content_edges: %i[none long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[rail_id key current docked_only],
         limits: [
           "Its content is drawn once and never cloned; which panel shows is the rail's script from the first draw on.",
-          "A docked_only panel is hidden below the rail's threshold.",
+          "A docked_only panel is not shown below the rail's threshold.",
           "It is a target of admin--ui--rail, which the editor's rail attaches, not this panel."
         ],
         states: %i[rest current docked_only],

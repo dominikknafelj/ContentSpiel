@@ -10,7 +10,7 @@ class PublicContractSampleComponent < ApplicationComponent
     accessibility: "A paragraph with no role, and nothing in it takes focus.",
     motion: :none,
     content_edges: %i[short],
-    widths: :container,
+    widths: :from_container,
     limits: [ "It is a sample." ]
   }.freeze
 
@@ -50,10 +50,10 @@ end
 # theme contract's, and its words are `string`'s and `site_string`'s guard.
 class Theme::ComponentContractTest < ActiveSupport::TestCase
   # Where `Forms::PublicField` reads the words an input draws through it:
-  # `field.word(:x)` is `public.forms.x`, and `field.error_text(error)` one of
-  # `public.forms.errors`.
-  FIELD_WORD_SCOPE = "public.forms".freeze
-  FIELD_ERROR_WORDS = "public.forms.errors.*".freeze
+  # `field.word(:x)` is `<WORD_SCOPE>.x`, and `field.error_text(error)` one
+  # of `ERROR_WORDS`.
+  FIELD_WORD_SCOPE = Forms::PublicField::WORD_SCOPE
+  FIELD_ERROR_WORDS = "#{Forms::PublicField::ERROR_WORDS}.*".freeze
 
   def public_components
     ContractLedger::COMPONENTS.keys.map { |path| path.camelize.constantize }

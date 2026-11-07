@@ -11,10 +11,10 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A navigation named Pagination, its links Previous, Next and the page numbers, the current page aria-current; the gap is hidden from a screen reader.",
+        accessibility: "A navigation named Pagination, its links Previous, Next and the page numbers, the current page aria-current; the gap is aria-hidden.",
         motion: :none,
         content_edges: %i[many],
-        widths: :container,
+        widths: :from_container,
         interface: %i[pagination url],
         limits: [
           "Nothing renders on a single page or past the last.",

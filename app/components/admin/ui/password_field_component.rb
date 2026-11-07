@@ -26,7 +26,7 @@ module Admin
         accessibility: "A labelled password input with a Show button that controls it; errors and the meter's hint are tied to it by aria-describedby, and the hint is a polite live region.",
         motion: :none,
         content_edges: %i[none long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[name id label meter autocomplete errors required],
         limits: [
           "The password is never drawn back: the input has no value.",

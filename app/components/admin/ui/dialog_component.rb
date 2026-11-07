@@ -24,7 +24,7 @@ module Admin
         accessibility: "A native modal dialog named by its title (aria-labelledby) with a Close button; Escape closes it, and the browser keeps the focus inside while it is open.",
         motion: :none,
         content_edges: %i[long short],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[id title width destructive open_on_load hang steady],
         limits: [
           "It draws the frame, the title, Close and the footer slot: the actions and the form inside are the caller's.",

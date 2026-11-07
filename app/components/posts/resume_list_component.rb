@@ -8,7 +8,7 @@ module Posts
       accessibility: "A plain list; each entry's title is its link, and the period, the company and the role are text.",
       motion: :none,
       content_edges: %i[none many long missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[posts page],
       words: [],
       limits: [

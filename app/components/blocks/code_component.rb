@@ -34,7 +34,7 @@ module Blocks
       accessibility: "A figure whose pre takes the focus so a keyboard scrolls a long line; the Copy button is named \"Copy code\" (described by the file name), and a status line says Copied or Not copied.",
       motion: :none,
       content_edges: %i[long short missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page lines code language language_label filename caption string],
       words: %w[public.blocks.code.copy public.blocks.code.copy_code public.blocks.code.copied public.blocks.code.failed],
       limits: [

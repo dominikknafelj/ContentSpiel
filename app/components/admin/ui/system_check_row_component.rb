@@ -26,10 +26,10 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A list item: the state's word beside a dot hidden from a screen reader, the check's name and message, a command with a Copy button named for its check and a polite status, and the links the screen hands over.",
+        accessibility: "A list item: the state's word beside an aria-hidden dot, the check's name and message, a command with a Copy button named for its check and a polite status, and the links the screen hands over.",
         motion: :reduced,
         content_edges: %i[long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[result copyable mail_settings_href image_settings_href forms_href],
         limits: [
           "Without copyable (the setup wizard) the command is selectable text with no Copy button.",

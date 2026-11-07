@@ -30,7 +30,7 @@ module Admin
         accessibility: "A label tied to its input by for and id (an input that names itself draws its own), the help line and the error slot beside it; the keyboard is the input's.",
         motion: :reduced,
         content_edges: %i[none short long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[field form_name value original locale errors id_prefix translation_state translation_confirm translation_record placeholder],
         limits: [
           "It draws the chrome around a field; the input is the Admin::Fields class of the field's type.",

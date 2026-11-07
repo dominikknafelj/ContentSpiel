@@ -22,7 +22,7 @@ module Admin
         accessibility: "No role, name or keyboard of its own: each registered entry's component brings its own.",
         motion: :none,
         content_edges: %i[none many],
-        widths: :container,
+        widths: :from_container,
         interface: %i[name record viewer loaded],
         limits: [
           "It draws no wrapper and no markup of its own: with nothing registered it renders nothing.",

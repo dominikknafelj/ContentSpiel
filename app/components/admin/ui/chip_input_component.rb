@@ -63,7 +63,7 @@ module Admin
         accessibility: "A labelled combobox with a listbox of suggestions and a list of chips, each removable by a button named Remove and the chip; ArrowDown and Enter pick, Escape closes, Backspace in the empty field removes the last chip, and a polite status says what was added or removed.",
         motion: :none,
         content_edges: %i[none many long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[name id label search_url chips create noun placeholder errors hidden_note help single exclude lowercase max_length track],
         limits: [
           "Its hidden inputs are what the form submits; the text input has no name and typing alone never saves.",

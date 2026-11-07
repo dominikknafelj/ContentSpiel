@@ -28,7 +28,7 @@ module Admin
         accessibility: "No role of its own: each toast in it is its own status or alert.",
         motion: :none,
         content_edges: %i[none many],
-        widths: :container,
+        widths: :from_container,
         interface: %i[flash relay],
         limits: [
           "It renders even when empty, so a stream has a target; with relay it draws the toasts without the region.",

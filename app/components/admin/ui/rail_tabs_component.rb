@@ -30,7 +30,7 @@ module Admin
         accessibility: "A tablist named Settings of tab buttons, one of them in the tab order, walked with the arrow keys, Home and End; a rail of one tab is a heading instead.",
         motion: :none,
         content_edges: %i[many short],
-        widths: :container,
+        widths: :from_container,
         interface: %i[rail_id tabs current slot_tabs],
         limits: [
           "It draws only where the rail docks, and the current tab is the server's only on the first draw.",

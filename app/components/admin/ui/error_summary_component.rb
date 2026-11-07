@@ -26,7 +26,7 @@ module Admin
         accessibility: "An alert that takes the focus when it is drawn (role=alert, tabindex -1, autofocus), headed by the count, with a link to each field it can name.",
         motion: :none,
         content_edges: %i[many long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[errors field_ids],
         limits: [
           "A field without an id in field_ids prints its message as text, with no link.",

@@ -18,7 +18,7 @@ module Admin
         accessibility: "A text input named by the caller's label, joined to a read-only prefix; an invalid one is aria-invalid and described by the caller's error slot.",
         motion: :none,
         content_edges: %i[short long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[name id value prefix errors],
         limits: [
           "The error text is the caller's, in the element of id <id>-errors; it only marks the input and the border.",

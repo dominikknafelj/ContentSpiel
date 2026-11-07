@@ -10,7 +10,7 @@ module Blocks
         accessibility: "One checkbox named by the label beside it, with \"required\" in words; its help and its error describe it, and aria-invalid marks an error.",
         motion: :none,
         content_edges: %i[short long missing],
-        widths: :container,
+        widths: :from_container,
         interface: %i[field value error],
         words: %w[public.forms.required public.forms.errors.*],
         limits: [

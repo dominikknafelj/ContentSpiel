@@ -18,7 +18,7 @@ module Admin
         accessibility: "Decoration hidden from a screen reader, with no focus: the row it stands in says the date in words.",
         motion: :none,
         content_edges: %i[short],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[at],
         limits: [
           "It draws a month and a day in the site's time zone, never a time.",

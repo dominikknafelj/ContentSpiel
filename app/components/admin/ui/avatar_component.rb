@@ -27,7 +27,7 @@ module Admin
         accessibility: "Decoration hidden from a screen reader, with no role and no focus: whoever draws it names the person beside it.",
         motion: :none,
         content_edges: %i[short],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[initials size tone ring],
         limits: [
           "It is told the initials and knows nothing of users.",

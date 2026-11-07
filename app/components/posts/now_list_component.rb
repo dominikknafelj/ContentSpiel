@@ -11,7 +11,7 @@ module Posts
       accessibility: "The latest post's body beside two text lines, \"Now\" and its date; nothing takes focus but the body's links.",
       motion: :none,
       content_edges: %i[none long],
-      widths: :container,
+      widths: :from_container,
       interface: %i[posts page],
       words: [],
       limits: [

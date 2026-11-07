@@ -40,7 +40,7 @@ module Admin
         accessibility: "One line of text with no role and no heading, read where the rows would be; its action slot brings its own name and keyboard.",
         motion: :none,
         content_edges: %i[short long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[title description],
         limits: [
           "It draws no border of its own: it stands inside the card the rows would be in.",

@@ -10,7 +10,7 @@ module Blocks
       accessibility: "A div with no role or name of its own: the headings, lists and links are the rich text's, and nothing but its links takes focus.",
       motion: :none,
       content_edges: %i[long short],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page],
       words: [],
       limits: [

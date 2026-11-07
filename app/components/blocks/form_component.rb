@@ -39,8 +39,11 @@ module Blocks
       accessibility: "A form that posts without a script; each field says \"required\" in words, the script fills the error summary (role=alert) or shows the thank-you (role=status) in place of the body and moves the focus there, and the honeypot is hidden from people and screen readers.",
       motion: :none,
       content_edges: %i[many short long missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page form_name fields action locale page_id drawn honeypot submit_label thank_you unavailable string],
+      # STRINGS also holds required, choose and error_summary, which a theme's
+      # template may ask for and these files do not read (the inputs read the
+      # first two through their field), so they are no words of its own.
       words: %w[public.forms.sending public.forms.network public.forms.submit public.forms.sent public.forms.unavailable],
       limits: [
         "Without a script it posts and the endpoint answers with a plain page; form-send only sends it in place.",

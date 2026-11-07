@@ -13,7 +13,7 @@ module Posts
       accessibility: "An article whose h1 is the post's title, with its date and excerpt as text, the body as rich text and the tags as one line of text after a \"Tagged\" label.",
       motion: :none,
       content_edges: %i[long short missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[post],
       words: %w[public.site.tagged],
       limits: [

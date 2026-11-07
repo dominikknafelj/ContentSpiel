@@ -8,7 +8,13 @@
 # - `motion:` `:none`, or `:reduced` (it moves, and holds still under
 #   `prefers-reduced-motion`).
 # - `content_edges:` the edges of content it is drawn for (`EDGES`).
-# - `widths:` how it takes its width: from its container, fluid, or fixed.
+# - `widths:` how it takes its width: from its container, fluid, or fixed
+#   (`WIDTHS`).
+#
+# The stylesheets scan a component's file as they scan any source, so no
+# word of a declaration may be a Tailwind utility (`from_container`, not
+# `container`), or the declaration adds a rule to a stylesheet
+# (test/components/component_contract_test.rb).
 # - `interface:` what a caller hands it or calls on it.
 # - `limits:` at least one sentence of what it does not do.
 #
@@ -18,7 +24,7 @@
 module ComponentContract
   COMMON = %i[accessibility motion content_edges widths interface limits].freeze
   EDGES = %i[long short none many missing].freeze
-  WIDTHS = %i[container fluid fixed].freeze
+  WIDTHS = %i[from_container fluid fixed_width].freeze
   MOTION = %i[none reduced].freeze
 
   Declaration = Data.define(*COMMON)

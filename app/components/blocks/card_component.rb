@@ -12,10 +12,10 @@ module Blocks
     include Blocks::Contract
 
     contract(
-      accessibility: "A div with an h3 title; its one link is the title, else the text, else the image (then named by the image's alt, else its title); the icon is hidden from a screen reader.",
+      accessibility: "A div with an h3 title; its one link is the title, else the text, else the image (then named by the image's alt, else its title); the icon is aria-hidden.",
       motion: :none,
       content_edges: %i[short long missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page title text link icon icon_name image],
       words: [],
       limits: [

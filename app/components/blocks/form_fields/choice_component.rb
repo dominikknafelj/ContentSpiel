@@ -12,7 +12,7 @@ module Blocks
         accessibility: "Radios in a fieldset named by its legend, or a select named by its label whose first option is \"Choose\"; \"required\" in words, the help and the error describe it, and aria-invalid marks an error.",
         motion: :none,
         content_edges: %i[short long missing many],
-        widths: :container,
+        widths: :from_container,
         interface: %i[field value error],
         words: %w[public.forms.required public.forms.choose public.forms.errors.*],
         limits: [

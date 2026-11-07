@@ -20,7 +20,7 @@ module Admin
         accessibility: "An alert (role=alert) of one sentence with a link to Mail settings.",
         motion: :none,
         content_edges: %i[long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[mail_settings href],
         limits: [
           "It draws itself only while mail's last send failed, and who sees it is the screen's.",

@@ -15,7 +15,7 @@ module Admin
         accessibility: "No role or name of its own: each registered entry's panel is a tabpanel named by its tab, and brings its own content.",
         motion: :none,
         content_edges: %i[none many],
-        widths: :container,
+        widths: :from_container,
         interface: %i[rail_id record viewer reserved],
         limits: [
           "With nothing registered it draws no tab and no markup.",

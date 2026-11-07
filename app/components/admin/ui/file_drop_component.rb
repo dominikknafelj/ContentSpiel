@@ -25,7 +25,7 @@ module Admin
         accessibility: "A visually hidden file input named by its label (or by its Choose file label), whose label is drawn as a button and rings when the input has the keyboard's focus; a polite live region says the chosen file's name.",
         motion: :reduced,
         content_edges: %i[none short long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[name id accept multiple hint label],
         limits: [
           "It never uploads: whoever owns the upload listens to the input's change.",

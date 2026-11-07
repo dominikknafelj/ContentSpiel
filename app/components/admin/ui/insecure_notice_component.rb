@@ -31,7 +31,7 @@ module Admin
         accessibility: "An alert (role=alert) of one sentence, with no focus of its own.",
         motion: :none,
         content_edges: %i[long],
-        widths: :container,
+        widths: :from_container,
         interface: %i[request production],
         limits: [
           "It shows only in production on a request that is not HTTPS, and decides nothing of who sees it in the shell.",

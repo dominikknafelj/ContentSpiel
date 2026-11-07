@@ -20,7 +20,7 @@ module Admin
         accessibility: "Decoration hidden from a screen reader, with no words and no focus: it always stands beside its type's or module's name.",
         motion: :none,
         content_edges: %i[none],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[icon family size],
         limits: [
           "It is the one place an icon's hue is drawn, in a family's pair and nowhere else.",

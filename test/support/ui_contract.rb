@@ -47,11 +47,20 @@ module UiContract
   # that starts a line: the declaration names its controller and says its
   # sentences, so a check of the rest of the source, or of the source's words
   # (test/lib/admin_i18n_test.rb), reads around it.
-  def self.outside_contract(source)
+  def self.outside_contract(source) = contract_partition(source).last
+
+  # The text of the `contract(...)` calls that start a line: what a
+  # stylesheet's scan reads of a declaration
+  # (test/components/component_contract_test.rb).
+  def self.contract_text(source) = contract_partition(source).first.map { |_, _, text| text }.join
+
+  # The lexer tokens split in two: those of the `contract(...)` calls that
+  # start a line, and the rest.
+  def self.contract_partition(source)
     lines = source.lines
     # The parentheses still open in a `contract(` call, while inside one.
     depth = nil
-    Ripper.lex(source).reject do |(line, _column), type, text|
+    Ripper.lex(source).partition do |(line, _column), type, text|
       if depth.nil? && type == :on_ident && text == "contract" && lines[line - 1].to_s.strip.start_with?("contract(")
         depth = 0
         next true

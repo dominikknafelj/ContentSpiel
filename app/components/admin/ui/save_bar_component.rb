@@ -17,7 +17,7 @@ module Admin
         accessibility: "A Save button and a Cancel link, with a polite live region for the count of changes and a status for the blocked hint.",
         motion: :reduced,
         content_edges: %i[short],
-        widths: :container,
+        widths: :from_container,
         interface: %i[form_id cancel_url save_label save_data contained],
         limits: [
           "The count, the blocked hint and Save's disabled state are written by admin--saving--save-bar on the form; without JavaScript Save is a plain working submit.",

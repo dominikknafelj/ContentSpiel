@@ -25,7 +25,7 @@ module Admin
         accessibility: "Decoration with no role, name or focus: the circle, the chip and the empty slot are hidden from a screen reader, and the sentence beside it names the actor.",
         motion: :none,
         content_edges: %i[none missing],
-        widths: :fixed,
+        widths: :fixed_width,
         interface: %i[actor],
         limits: [
           "It draws one mark in a 28px slot and never the actor's name.",

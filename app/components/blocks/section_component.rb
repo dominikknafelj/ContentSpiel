@@ -15,11 +15,11 @@ module Blocks
       accessibility: "A section with no name of its own, so not a landmark, whose anchor is its id; its columns read in order, as they stack on a narrow screen, and it takes no focus.",
       motion: :none,
       content_edges: %i[none many],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page columns layout background width style anchor],
       words: [],
       limits: [
-        "Its full width reaches the window's edges; every other width is its container's.",
+        "Its full width reaches the window's edges; at the content width it is as wide as what holds it.",
         "A style or a layout it does not know is drawn as none or as two columns, and a section in which nothing draws renders nothing."
       ]
     )

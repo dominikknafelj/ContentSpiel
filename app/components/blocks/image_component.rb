@@ -11,7 +11,7 @@ module Blocks
       accessibility: "A figure holding one img, named by its alt text (the block's, else the image's), with the caption as its figcaption; it takes no focus.",
       motion: :none,
       content_edges: %i[short long missing],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page asset alt caption sizes],
       words: [],
       limits: [

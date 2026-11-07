@@ -12,7 +12,7 @@ module Blocks
       accessibility: "A section with no name of its own, so not a landmark; the list it renders says the rest.",
       motion: :none,
       content_edges: %i[none many],
-      widths: :container,
+      widths: :from_container,
       interface: %i[block page list_component],
       words: [],
       limits: [
