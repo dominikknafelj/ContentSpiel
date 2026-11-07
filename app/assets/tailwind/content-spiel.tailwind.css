@@ -387,6 +387,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-row--selected { background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-row--selected .admin-tree-row__title { font-weight: 600; }
 .admin-tree-row--selected .admin-tree-row__mark { color: var(--cs-ink); }
+/* A folded parent a drag opened (`admin--pages--tree`), while the pointer
+   is in it: the sunken ground with a field's line inside the row's box, so
+   nothing moves. */
+.admin-tree-drop-target > .admin-tree-row { background: var(--cs-sunken); box-shadow: inset 0 0 0 1.5px var(--cs-field-line); }
 /* A find's match keeps the title's own ink on the accent's tint. */
 .admin-tree mark { background: var(--cs-accent-tint); color: inherit; border-radius: var(--cs-radius); }
 @media (prefers-reduced-motion: reduce) { .admin-tree-row__disclosure svg { transition: none; } }

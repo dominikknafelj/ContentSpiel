@@ -353,6 +353,100 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A FOLDED PARENT UNDER A DRAGGED ROW opens after a moment
+  # (`admin--pages--tree`'s `OPEN_ON_HOVER_MS`), so a page can be dropped
+  # among children the fold hid. The drag is Cuprite's mouse in steps, as in
+  # `tree_test.rb`'s mouse drag: SortableJS samples the pointer on a timer of
+  # its own. Alpha holds one leaf, Child, and is folded by default on Pages.
+  def handle_centre(record)
+    page.evaluate_script(<<~JS)
+      (() => { const r = document.querySelector("#tree-row-#{record.id} .admin-tree-node__handle").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2] })()
+    JS
+  end
+
+  def row_middle(record)
+    page.evaluate_script("(() => { const r = document.getElementById('tree-row-#{record.id}').getBoundingClientRect(); return r.top + r.height / 2 })()")
+  end
+
+  # Beta, lifted by its handle, rests on Alpha's row until Alpha opens, then
+  # is let go among Alpha's children, beside Child: wherever SortableJS puts
+  # the slot in Alpha's list, as long as it is Alpha's own (Child's empty
+  # list is a drop target too).
+  def drag_beta_into_folded_alpha
+    Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
+    visit_screen "/cs-studio/pages"
+    assert children_hidden?(@alpha), "Alpha is folded by default"
+
+    from_x, from_y = handle_centre(@beta)
+    start_y = row_middle(@alpha)
+    mouse = drag_pointer(from_x, from_y, start_y)
+    assert_eventually(wait: 3, message: "the folded parent under the dragged row did not open") { !children_hidden?(@alpha) }
+    assert_selector "li[data-page-id='#{@alpha.id}'].admin-tree-drop-target"
+
+    # Onto Child's row, one step in: the pointer leaves the gutter for the
+    # row itself, so it is over Alpha's list.
+    child_x, child_y = handle_centre(@child)
+    3.times do |step|
+      mouse.move(x: from_x + ((child_x + 40 - from_x) * (step + 1) / 3.0), y: start_y + ((child_y - start_y) * (step + 1) / 3.0))
+      sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer rests one tick plus margin per step
+    end
+    # The pointer rests there, stirred by a pixel, until SortableJS's own
+    # timer has put the slot in Alpha's list.
+    slot_in_alpha = "document.querySelector('#tree-children-#{@alpha.id} > li.admin-drag-ghost') !== null"
+    10.times do |step|
+      break if page.evaluate_script(slot_in_alpha)
+
+      mouse.move(x: child_x + 40 + (step % 2), y: child_y)
+      sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own
+    end
+    await_js slot_in_alpha, message: "the slot never reached Alpha's list"
+    mouse.up
+  end
+
+  test "dragging a page over a folded parent opens it after a moment, and the page drops among its children" do
+    drag_beta_into_folded_alpha
+
+    assert_eventually(wait: 10) { @beta.reload.parent_id == @alpha.id }
+    assert_equal [ @beta.id, @child.id ].sort, Page.where(parent_id: @alpha.id).pluck(:id).sort
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
+    assert_selector "#tree-children-#{@alpha.id} > li[data-page-id='#{@beta.id}']"
+    assert_no_selector ".admin-tree-drop-target"
+  end
+
+  # The move's answer redraws the tree from the open set, and the moved
+  # page's new parent is in it, so the page is shown where it went.
+  test "a page dropped into a parent that hovering opened is shown there after the tree is redrawn" do
+    drag_beta_into_folded_alpha
+
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true]"
+    assert_selector "#tree-row-#{@beta.id}"
+    assert_includes open_set, @alpha.id.to_s
+  end
+
+  test "a drag that leaves a folded parent before the moment does not open it" do
+    Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
+    visit_screen "/cs-studio/pages"
+    from_x, from_y = handle_centre(@beta)
+    alpha_y = row_middle(@alpha)
+    away_y = from_y + 60
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    [ (from_y + alpha_y) / 2, alpha_y, (alpha_y + away_y) / 2, away_y ].each do |y|
+      mouse.move(x: from_x, y: y)
+      sleep 0.06 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer passes Alpha's row in well under the moment
+    end
+    sleep 0.9 # sleep: longer than the moment (600 ms) after the pointer left Alpha's row, so a timer that was not cancelled would have opened it
+    assert children_hidden?(@alpha), "a parent the pointer left before the moment was opened"
+    assert_no_selector ".admin-tree-drop-target"
+    mouse.up
+
+    assert children_hidden?(@alpha)
+    assert_not_includes open_set, @alpha.id.to_s
+  end
+
   # A folded parent says how many pages it hides, at rest; open, the count
   # rests out of sight like the row's other markers.
   test "a folded parent shows its subpage count at rest" do

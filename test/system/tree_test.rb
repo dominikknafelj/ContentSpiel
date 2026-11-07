@@ -133,6 +133,40 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal @alpha, @beta.reload.parent
   end
 
+  # A folded sibling is opened by the move into it, as a drag that rests on
+  # it opens it, and the announcer says so before the position.
+  test "moving a page right into a folded sibling opens it and says so" do
+    Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
+    sign_in_via_form(users(:one))
+    visit_screen admin_pages_path
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=false]", visible: :all
+
+    handle("Beta").send_keys(:space, :right)
+    assert_selector "[data-admin--pages--tree-target=announcer]", text: /\AOpened Alpha\. Position 2 of 2/, visible: :all
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true]"
+    assert_selector "#tree-row-#{@child.id}"
+    assert_selector "li[data-page-id='#{@beta.id}'][data-picked]", visible: :all
+
+    handle("Beta").send_keys(:space)
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
+    assert_equal @alpha, @beta.reload.parent
+    assert_equal [ @child.id, @beta.id ], @alpha.children.order(:position).pluck(:id)
+  end
+
+  # A page that had no children becomes a parent by the move, and the
+  # move's answer redraws the tree from the open set: the move wrote the new
+  # parent open before it was sent, or the redraw would fold it by default.
+  test "a page moved into a page with no children is shown under it after the tree is redrawn" do
+    sign_in_via_form(users(:one))
+    visit_screen admin_pages_path
+
+    handle("Beta").send_keys(:space, :right, :space)
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Beta./, wait: 10
+    assert_equal @alpha, @beta.reload.parent
+    assert_selector "#tree-row-#{@alpha.id} > .admin-tree-row__disclosure[aria-expanded=true]"
+    assert_selector "#tree-children-#{@alpha.id} > li[data-page-id='#{@beta.id}'] > #tree-row-#{@beta.id}"
+  end
+
   test "ArrowLeft moves a nested page out one level, after its old parent" do
     Current.set(actor: users(:one)) { @child = create_page(title: "Child", parent: @alpha) }
     sign_in_via_form(users(:one))

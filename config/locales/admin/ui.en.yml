@@ -177,3 +177,5 @@ en:
           # A parent's disclosure, named by what pressing it does to the branch.
           fold: "Fold %{title}"
           unfold: "Unfold %{title}"
+          # Said before the position when a keyboard move into a folded page opens it.
+          opened: "Opened %{title}."

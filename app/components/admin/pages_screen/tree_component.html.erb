@@ -9,11 +9,13 @@
     answered (`live/state`). %>
 <%# The selected row's class and the markers' class at rest, handed to
     `admin--pages--tree`, which keeps the row of the open page the one
-    selected (its "The selected row"); and the words it announces a keyboard
-    move in (`data-messages`). %>
+    selected (its "The selected row"); the class of a parent a drag opened,
+    while the pointer is in it; and the words it announces a keyboard move in
+    (`data-messages`). %>
 <turbo-frame id="tree" data-controller="admin--pages--tree admin--presence--list" data-admin--pages--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>"
              data-admin--pages--tree-selected-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:row_selected] %>"
              data-admin--pages--tree-marker-at-rest-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:reveal] %>"
+             data-admin--pages--tree-drop-target-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:drop_target] %>"
              data-messages="<%= messages_data("components.pages_screen.tree.moves.picked_up", "components.pages_screen.tree.moves.dropped",
                                                "components.pages_screen.tree.moves.position", "components.pages_screen.tree.moves.cancelled",
                                                "components.pages_screen.tree_row.untitled") %>"
@@ -70,7 +72,7 @@
         and names each button in the words it is handed. %>
     <ul id="tree-list" class="<%= Admin::Ui::TreeItemComponent::CLASSES[:tree] %>" data-controller="admin--tree--disclosure"
         data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>" data-tree-locale="<%= locale %>"
-        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold") %>">
+        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold", "components.ui.tree_item.opened") %>">
       <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options, open_set: open_set, path_ids: path_ids) %>
     </ul>
   <% else %>

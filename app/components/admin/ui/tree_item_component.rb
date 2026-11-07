@@ -45,7 +45,7 @@ module Admin
           "It draws one row and never its nesting: the list around it, and the step between levels, are the screen's markup on the tree's own classes."
         ],
         states: %i[rest hover focus selected folded open leaf context_only flat root],
-        keys: %w[fold unfold],
+        keys: %w[fold unfold opened],
         slots: %i[handle mark title state trailings add],
         controller: nil,
         keyboard: [ "test/system/admin/tree_test.rb", "a row's disclosure folds and unfolds its branch by mouse and by keyboard" ]
@@ -67,7 +67,8 @@ module Admin
         reveal: "admin-tree-row__reveal",
         add: "admin-tree-row__add",
         handle: "admin-tree-node__handle",
-        children: "admin-tree__children"
+        children: "admin-tree__children",
+        drop_target: "admin-tree-drop-target"
       }.freeze
 
       # The drag handle, in the gutter left of the row.
