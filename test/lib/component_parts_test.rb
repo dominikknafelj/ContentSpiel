@@ -25,8 +25,25 @@ end
 # sample.
 class ComponentPartsTest < ActiveSupport::TestCase
   include UiContract
+  include ComponentTestHelper
 
   ROOT = Rails.root
+
+  # The most each list may hold. A list only shrinks, so a name added to one
+  # to skip a rule fails here; the figure is lowered by hand when the list
+  # shrinks, and never raised.
+  LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
+
+  # What a list holds over its limit, as a sentence, or nil.
+  def self.over_limit(name, listed, limit)
+    "#{name} holds #{listed.size}, over its #{limit}: it only shrinks" if listed.size > limit
+  end
+
+  # The components among `names` with no `<name>Preview` among `previews`
+  # (preview class names).
+  def self.without_preview(names, previews)
+    names.reject { |name| previews.include?("#{name}Preview") }
+  end
 
   # The components among `names` that have no test at
   # test/components/admin/ui/<name>_test.rb.
@@ -82,8 +99,10 @@ class ComponentPartsTest < ActiveSupport::TestCase
 
   test "every Admin::Ui component's preview has an example for each previewable state it declares" do
     previews = ViewComponent::Preview.all.index_by(&:name)
+    assert_empty self.class.without_preview(names, previews.keys),
+      "these shared components have no <name>Preview in test/components/previews/admin/ui/"
     problems = ui_components.filter_map do |klass|
-      preview = previews["#{klass.name}Preview"] or next "#{klass.name} has no preview (#{klass.name}Preview in test/components/previews/admin/ui/)"
+      preview = previews["#{klass.name}Preview"] or next
       missing = self.class.missing_examples(klass.contract.states, preview.examples)
       "#{preview.name} has no example of #{missing.join(', ')}" if missing.any?
     end
@@ -115,11 +134,30 @@ class ComponentPartsTest < ActiveSupport::TestCase
       "UiContract::MADE_BEFORE_CONTRACT names what it should not: it only shrinks, so a component that declares its keyboard test leaves it"
   end
 
+  test "the made-before and keyboard not-yet lists never grow" do
+    problems = [ self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT, LIST_LIMITS.fetch("UiContract::MADE_BEFORE_CONTRACT")),
+                 self.class.over_limit("UiContract::KEYBOARD_NOT_YET", KEYBOARD_NOT_YET.keys, LIST_LIMITS.fetch("UiContract::KEYBOARD_NOT_YET")) ].compact
+    assert_empty problems, "a list that only shrinks has grown: a new component meets the rule instead"
+  end
+
+  # The slot previews register their own entries for one render, which
+  # `Admin::Slots.with` takes back.
+  test "the slot previews leave the slots' registry as they found it" do
+    before = Admin::Slots::NAMES.to_h { |name| [ name, Admin::Slots.entries(name) ] }
+
+    render_preview(:rest, from: Admin::Ui::SlotComponentPreview)
+    render_preview(:rest, from: Admin::Ui::RailSlotComponentPreview)
+
+    assert_equal before, Admin::Slots::NAMES.to_h { |name| [ name, Admin::Slots.entries(name) ] }
+  end
+
   test "each part guard can fail" do
     missing = "Admin::Ui::NoSuchThingComponent"
     sample = ComponentPartsMadeAfterSampleComponent
 
     assert_equal [ missing ], self.class.without_test([ "Admin::Ui::ButtonComponent", missing ])
+
+    assert_equal [ missing ], self.class.without_preview([ "Admin::Ui::ButtonComponent", missing ], %w[Admin::Ui::ButtonComponentPreview])
 
     assert_equal %i[disabled], self.class.missing_examples(%i[rest hover focus pressed disabled], %w[rest])
     assert_empty self.class.missing_examples(%i[rest hover focus], %w[rest])
@@ -137,5 +175,9 @@ class ComponentPartsTest < ActiveSupport::TestCase
     assert_empty self.class.without_keyboard([ sample ], not_yet: { sample.name => "its test comes later" })
     assert_equal [ "#{missing} is not a component in app/components/admin/ui/", "Admin::Ui::MenuComponent declares its keyboard test" ],
       self.class.stale_keyboard_list([ missing, "Admin::Ui::MenuComponent", "Admin::Ui::ButtonComponent" ], names)
+
+    assert_equal "UiContract::MADE_BEFORE_CONTRACT holds 41, over its 40: it only shrinks",
+      self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT + [ missing ], 40)
+    assert_nil self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT, 40)
   end
 end
