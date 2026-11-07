@@ -458,4 +458,53 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_selector "#{POST_PANEL}[data-current]"
     end
   end
+
+  # The body's Link popover, with its search answering, hangs past the canvas
+  # over the settings that follow it below the threshold, and on a
+  # translation tab at every width: each of its rows that stands over the
+  # Excerpt field is the topmost element at its centre, so it is drawn over
+  # the field and a click on it reaches it.
+  def assert_link_popover_over_the_post_settings
+    5.times { |index| create_page(title: "About #{index}", translations: { de: { title: "About #{index}" }, es: { title: "About #{index}" } }) }
+    find("#{POST_MAIN} .ProseMirror[contenteditable=true]").click
+    keyboard.type("see this")
+    page.execute_script("document.execCommand('selectAll')")
+    within(POST_MAIN) { press "Link" }
+    within("#{POST_MAIN} .admin-rich-text-popover") do
+      fill_in "URL or search", with: "abo"
+      assert_selector "[role=option]", count: 5
+    end
+    covered = page.evaluate_script(<<~JS)
+      (() => {
+        const popover = document.querySelector(#{"#{POST_MAIN} .admin-rich-text-popover".to_json})
+        const excerpt = document.getElementById("post-excerpt").getBoundingClientRect()
+        const rows = Array.from(popover.querySelectorAll("[role=option], button"))
+          .filter((row) => { const box = row.getBoundingClientRect(); return box.top > excerpt.top && box.bottom < excerpt.bottom })
+        if (rows.length === 0) return "no row stands over the Excerpt field"
+        return rows.filter((row) => {
+          const box = row.getBoundingClientRect()
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+          return !(row === hit || row.contains(hit))
+        }).map((row) => row.textContent.trim())
+      })()
+    JS
+    assert_equal [], covered, "the Link popover's rows are drawn under the post settings"
+  end
+
+  test "below the threshold the body's Link popover stands over the post settings that follow it" do
+    at_window(1100) do
+      open_post
+      assert_docked(false)
+      assert_link_popover_over_the_post_settings
+    end
+  end
+
+  test "on a translation tab the body's Link popover stands over the post settings that follow it" do
+    at_window(WIDE) do
+      @post = create_post(title: "Notes", published: false)
+      visit_editor(@post, locale: "de")
+      assert_docked(false)
+      assert_link_popover_over_the_post_settings
+    end
+  end
 end

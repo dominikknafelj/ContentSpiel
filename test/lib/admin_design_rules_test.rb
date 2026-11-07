@@ -1021,10 +1021,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # writes `z-index: var(--cs-z-<name>)`, or `auto`, which is no layer. Any
   # other spelling of a z-index is refused wherever CS Studio's code is: a
   # Tailwind value, another custom property, an arbitrary property, an
-  # inline style, a script's `style.zIndex`, an `@apply`. The public site is
-  # the theme's and out of scope, as for elevation: its components and
-  # layouts (the language switcher and the preview bar keep their own
-  # values), its entry script `site.js` and the theme folders.
+  # inline style, a script's `style.zIndex`, an `@apply`. The tree it reads
+  # is CS Studio's: its scripts and helpers, and every component and view
+  # but what only a visitor's page draws. The public site's templates,
+  # blocks and scripts are left out, because a visitor's page loads the
+  # theme's stylesheet, which defines no `--cs-z-*`: a token written there
+  # is invalid at computed time and falls back to `auto` without a word.
+  # Left out are the public components and layouts (the language switcher
+  # and the preview bar keep their own values), the blocks and the posts'
+  # components, the page templates and the form-send pages, the entry
+  # script `site.js` and the two controllers it alone draws with
+  # (`code-copy`, `form-send`), and the theme folders.
   RAW_Z_UTILITY = /(?<![\w-])-?z-(?:\d+|\[[^\]]*\]|auto)(?![\w-])/
   Z_OTHER_PROPERTY = /(?<![\w-])-?z-\((?!--cs-z-[a-z-]+\))/
   # Outside a stylesheet a z-index has no spelling but the utility: the
@@ -1035,8 +1042,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   Z_TOKEN_VAR = /var\(--cs-z-([a-z-]+)\)/
   Z_CODE_SOURCES = (Dir[Rails.root.join("app/javascript/**/*.js")] + Dir[Rails.root.join("app/helpers/**/*.rb")] +
                     Dir[Rails.root.join("app/{components,views}/**/*.{rb,erb}")] -
-                    Dir[Rails.root.join("app/{views/layouts/public,components/public}/**/*")] - VISITOR_LAYOUTS -
-                    [ Rails.root.join("app/javascript/site.js").to_s ]).freeze
+                    Dir[Rails.root.join("app/{views/layouts/public,components/public,components/blocks,components/posts,views/pages,views/form_sends}/**/*")] -
+                    VISITOR_LAYOUTS -
+                    %w[site.js controllers/code_copy_controller.js controllers/form_send_controller.js].map { |name| Rails.root.join("app/javascript", name).to_s }).freeze
   Z_STYLESHEET_SOURCES = (Dir[Rails.root.join("app/assets/{tailwind,stylesheets}/**/*.css")] - Dir[Rails.root.join("app/assets/tailwind/themes/**/*")]).freeze
   Z_STYLESHEETS = Z_STYLESHEET_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root.join("app/assets/tailwind")).to_s }.freeze
   # Lowest first; each covers the one before it wherever the two meet.
@@ -1075,7 +1083,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[app/javascript/editor/drag.js app/javascript/admin.js app/helpers/setup_helper.rb app/components/admin/ui/menu_component.rb
        app/views/admin/media/index.html.erb].each { |path| assert_includes Z_CODE_SOURCES, Rails.root.join(path).to_s, path }
     %w[application.css content-spiel.css content-spiel.tailwind.css admin-rich-text.css].each { |name| assert_includes Z_STYLESHEETS, name }
-    assert_not_includes Z_CODE_SOURCES, Rails.root.join("app/components/public/preview_bar_component.html.erb").to_s
+    %w[app/components/public/preview_bar_component.html.erb app/components/blocks/code_component.html.erb app/views/pages/show.html.erb
+       app/javascript/controllers/code_copy_controller.js app/javascript/controllers/form_send_controller.js app/javascript/site.js].each do |path|
+      assert Rails.root.join(path).exist?, "#{path} is gone: name another of the public site's files"
+      assert_not_includes Z_CODE_SOURCES, Rails.root.join(path).to_s, "#{path} is the public site's"
+    end
     assert Z_STYLESHEETS.none? { |name| name.start_with?("themes/") }, "a theme's stylesheet is the theme's"
   end
 
@@ -1113,17 +1125,25 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # open entry, a block's menus) inside a stacking context of its own, so the
   # notes slide-over and the editor's sticky header, page layers over it,
   # cover all of them whatever their tokens.
-  test "the canvas is its own stacking context" do
-    assert_match(/isolation:\s*isolate/, single_rule(".admin-rail__main"))
+  test "the canvas is its own stacking context, at lift" do
+    rule = single_rule(".admin-rail__main")
+    assert_match(/isolation:\s*isolate/, rule)
+    assert_match(/z-index:\s*var\(--cs-z-lift\)/, rule)
   end
 
   # The rail's other panels raise their popovers (the tags' and related
-  # posts' suggestions) inside a context at `raised`: over the canvas, under
-  # the slide-over. The notes' panel holds the slide-over and stays out.
-  test "every rail panel but the notes' is a context of its own at raised" do
+  # posts' suggestions) inside a context of their own, under the slide-over;
+  # the notes' panel holds the slide-over and stays out. Of a panel and the
+  # canvas, the one first in the document is the higher, since its popovers
+  # drop onto the other: a panel before the canvas at `raised`, over the
+  # canvas's `lift`, and one after it at level 0, under it.
+  test "every rail panel but the notes' is a context of its own: at raised before the canvas, under it after" do
     rule = single_rule(".admin-rail__panel:not(:has(> .admin-notes-drawer))")
     assert_match(/position:\s*relative/, rule)
     assert_match(/z-index:\s*var\(--cs-z-raised\)/, rule)
+    after = single_rule(":is(.admin-rail__main ~ .admin-rail__panel, :has(.admin-rail__main) ~ .admin-rail__panel):not(:has(> .admin-notes-drawer))")
+    assert_match(/z-index:\s*auto/, after)
+    assert_match(/isolation:\s*isolate/, after)
   end
 
   # A card is told apart by its shadow. These keep an edge because the edge is

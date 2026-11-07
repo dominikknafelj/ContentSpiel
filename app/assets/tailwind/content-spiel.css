@@ -251,10 +251,11 @@
 
      The first three are LOCAL layers, for raising a thing over its
      neighbours: `lift`, a focused control over its neighbours (a table
-     strip's button); `raised`, over its own row or cell (a row's second
+     strip's button) and an editor's canvas over a rail panel that follows
+     it; `raised`, over its own row or cell (a row's second
      link over its stretched one, a matrix cell's link, a table strip's
      entry and its "+", the mind graph's card and tooltip) and an editor's
-     rail panel over the canvas; `raised-top`, over `raised` in the same
+     rail panel over a canvas that follows it; `raised-top`, over `raised` in the same
      context (the matrix's sticky title cell, an open or focused strip
      entry). Not every user of `lift` and `raised` makes a stacking context
      of its own (a row's second link meets the page's layers), so both stay
@@ -277,10 +278,13 @@
      everything but a dialog. A dialog opens with `showModal()` in the top
      layer and takes no z-index.
 
-     The canvas (`.admin-rail__main`) is `isolation: isolate`: what it
-     raises, a popover at `popover` included, stays inside it, and the
+     The canvas (`.admin-rail__main`) is a stacking context at `lift`: what
+     it raises, a popover at `popover` included, stays inside it, and the
      slide-over and the editor's header, which stand outside it (the header
-     before the rail's grid), cover all of it. */
+     before the rail's grid), cover all of it. Of the canvas and a rail
+     panel, whichever comes first in the document is the higher, since its
+     popovers drop onto the other (`.admin-rail__main` in
+     content-spiel.tailwind.css). */
   --cs-z-lift: 1;
   --cs-z-raised: 10;
   --cs-z-raised-top: 20;
