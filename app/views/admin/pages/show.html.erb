@@ -70,11 +70,11 @@
                       "turbo:before-cache@document->admin--editor--section-choice#cache " \
                       "turbo:before-stream-render@document->admin--editor--section-choice#streamed " \
                       "admin--editing--live:merged@document->admin--editor--section-choice#merged" } do %>
-<%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: "page", tabs: [
+<%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: rail_slot.current_key || "page", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: t("admin.components.editor_screen.rail.tabs.page")),
       Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: t("admin.components.editor_screen.rail.tabs.section"))
     ], slot_tabs: rail_slot.tabs) %>
-<%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: true) do %>
+<%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: rail_slot.current_key.nil?) do %>
   <%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 <% end %>
 <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "section", docked_only: true) do %>

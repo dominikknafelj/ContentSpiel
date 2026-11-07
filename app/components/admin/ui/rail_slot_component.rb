@@ -28,9 +28,15 @@ module Admin
 
       def render? = panels.any?
 
+      # The key of the entry that asks to be the current tab as the page is
+      # drawn (`tab_current?`, an entry opened by the request's own address),
+      # or nil. The host draws its own default current tab only without one,
+      # so the first paint already shows the asked-for panel.
+      def current_key = panels.find { |panel| panel.respond_to?(:tab_current?) && panel.tab_current? }&.tab_key
+
       def call
         safe_join(panels.map do |panel|
-          render(RailPanelComponent.new(rail_id: @rail_id, key: panel.tab_key)) { render(panel) }
+          render(RailPanelComponent.new(rail_id: @rail_id, key: panel.tab_key, current: panel.tab_key == current_key)) { render(panel) }
         end)
       end
 

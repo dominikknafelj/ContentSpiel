@@ -37,7 +37,8 @@ module Admin
   # tab AND its panel. Beside the slot component's arguments it answers
   # `tab_key` (a String of lowercase letters), `tab_label`, `tab_count` (an
   # Integer, or nil for none), optionally `tab_count_data` (the figure's
-  # `data-` attributes) and `render?`; drawn, it is the panel's content.
+  # `data-` attributes) and `tab_current?` (the request asks for this tab to
+  # be the one shown as the page is drawn), and `render?`; drawn, it is the panel's content.
   # The editors hand it `query:` (the request's query parameters), so a panel
   # reads its own parameters without the host naming them. The tab is drawn
   # again by a save's answer (`Admin::Answers::RailTabStreams`), the panel never,

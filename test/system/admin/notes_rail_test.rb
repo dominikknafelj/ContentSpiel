@@ -64,9 +64,10 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
     await_js("document.getElementById('notes-drawer').getAnimations().length === 0", message: "the notes are still sliding in")
   end
 
-  # Where the blocks column stands: its left, top and right edges. Its height
-  # is the rail's grid row's, which the notes' panel may make taller.
-  def blocks_place = box(".admin-content-blocks").first(3).map(&:round)
+  # Where the blocks column stands, and how tall it is: docked it starts at
+  # the grid's top and is as tall as its own content (`align-self: start`),
+  # so a taller rail does not stretch it.
+  def blocks_place = box(".admin-content-blocks").map(&:round)
 
   def assert_notes_tab_current
     assert_selector "#{NOTES_TAB}[aria-selected=true]"
@@ -174,9 +175,8 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
 
       drawer = box("#notes-drawer")
       assert_equal [ room - 400, room ], [ drawer[0], drawer[2] ].map(&:round), "the panel is the window's last 400px"
-      assert_in_delta 48, drawer[1], 1, "it starts under the top bar"
+      assert_in_delta header[3], drawer[1], 1, "it starts under the editor's header"
       assert_in_delta 900, drawer[3], 1, "and reaches the window's bottom edge"
-      assert_operator drawer[1], :<, header[3], "it stands over the editor's header, not under it"
       assert_equal "fixed", computed("#notes-drawer", "position")
       page.execute_script("const probe = document.createElement('div'); probe.id = 'shadow-probe'; probe.style.boxShadow = 'var(--cs-shadow-3)'; document.body.append(probe)")
       assert_equal computed("#shadow-probe", "boxShadow"), computed("#notes-drawer", "boxShadow")
@@ -202,6 +202,47 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
       drawer = box("#notes-drawer")
       assert_in_delta rail[0], drawer[0], 1
       assert_in_delta rail[2], drawer[2], 1, "docked, the notes are the panel's width"
+    end
+  end
+
+  # Whether a press at the middle of the element reaches it.
+  def pressable?(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.querySelector(#{selector.to_json})
+        const box = element.getBoundingClientRect()
+        const hit = document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2)
+        return Boolean(hit) && (hit === element || element.contains(hit))
+      })()
+    JS
+  end
+
+  # The slide-over starts under the editor's header, so the header's actions
+  # stay in reach: the Notes button closes what it opened. A translation tab
+  # never docks the rail, so there it is the slide-over at a wide window too.
+  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{WIDE}px" => [ WIDE, "?locale=de" ] }.each do |where, (width, query)|
+    test "#{where} the header's Publish and Notes stay pressable while the slide-over is open, and Notes closes it" do
+      with_locales(%w[en de], default: "en")
+      at_window(width) do
+        open_editor(query)
+        assert_docked(false)
+        open_notes
+
+        assert pressable?("#notes-open"), "the slide-over covers the header's Notes button"
+        publish = within(".admin-editor-header") { find_button("Publish", match: :first) }
+        assert page.evaluate_script(<<~JS, publish), "the slide-over covers Publish"
+          (() => {
+            const button = arguments[0]
+            const box = button.getBoundingClientRect()
+            const hit = document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2)
+            return hit === button || button.contains(hit)
+          })()
+        JS
+
+        find("#notes-open").click
+        assert_no_selector "#notes-drawer"
+        assert_equal "notes-open", active_id
+      end
     end
   end
 

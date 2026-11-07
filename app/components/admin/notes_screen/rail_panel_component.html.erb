@@ -20,7 +20,7 @@
     <h2 class="text-[15px] font-semibold text-ink"><%= t(".title") %></h2>
     <%# Nothing at zero (the system's rule for a count): the number hides
         itself, and the line with it. %>
-    <p class="text-count text-meta has-[[hidden]]:hidden"><%= open_count %></p>
+    <% if counts %><p class="text-count text-meta has-[[hidden]]:hidden"><%= open_count %></p><% end %>
     <div class="ml-auto flex items-center gap-1">
       <%= render Admin::Ui::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes--drawer#compose" }) %>
       <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { action: "admin--notes--drawer#close" },
@@ -41,5 +41,5 @@
       <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".loading") %></p>
     <% end %>
   </div>
-  <%= render Admin::NotesScreen::CountsComponent.new(counts: counts, id: "notes-counts") %>
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: counts, id: "notes-counts") if counts %>
 <% end %>

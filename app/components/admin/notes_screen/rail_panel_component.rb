@@ -64,17 +64,29 @@ module Admin
       # stream hands no `reads:` and reads nothing: the tab is drawn with its
       # number hidden, and as it connects `admin--notes--drawer` fills it from
       # the counts this tab already holds, as it fills a marker a stream drew.
-      def tab_count = counts.fetch("total").to_i
+      def tab_count = counts ? counts.fetch("total").to_i : 0
 
       # The tab's number is a `total` of `admin--notes--drawer`.
       def tab_count_data = { "admin--notes--drawer-target": "total" }
+
+      # `?notes=open` in the request: the Notes tab is drawn current, so the
+      # first paint shows the notes and not the host's own tab first.
+      def tab_current? = open?
+
+      def open? = @query["notes"] == "open"
 
       private
 
       attr_reader :record, :viewer
 
+      # The screen's read, or nil: a host that hands no `reads:` gets a panel
+      # with no counts at all (no `#notes-counts`, no figures), never zeros,
+      # which `admin--notes--drawer` would take for the truth and clear every
+      # marker and the header's number with.
       def counts
-        @counts ||= CountsComponent.read(record, viewer:, reads: @reads) || { "total" => 0, "subjects" => {}, "unread" => [] }
+        return @counts if defined?(@counts)
+
+        @counts = CountsComponent.read(record, viewer:, reads: @reads)
       end
 
       def title = ::Locales.read(record, :title, locale: @locale.presence || ::Locales.default).presence || t(".untitled")
@@ -89,8 +101,6 @@ module Admin
       # screen, by the route its kind has (`Audit::Sentence.route_for`),
       # resolved from the notes' list of routes like every other.
       def path = helpers.note_route_path(::Audit::Sentence.route_for(record))
-
-      def open? = @query["notes"] == "open"
 
       # Digits or nothing: it becomes a path segment in the script.
       def thread = @query["thread"].to_s[/\A\d+\z/]

@@ -89,6 +89,27 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     assert_select "#editor-grid-tab-notes span.text-count", text: "1"
   end
 
+  # Drawn current by the server, so the first paint shows the notes and not
+  # the Page panel first.
+  test "?notes=open draws the Notes tab and panel current and the host's own tab not" do
+    sign_in_as(users(:two))
+
+    get "/cs-studio/pages/#{@page.id}", params: { notes: "open" }
+    assert_select "#editor-grid-tab-notes[aria-selected=true][tabindex='0']"
+    assert_select "#editor-grid-tab-page[aria-selected=false]"
+    assert_select "#editor-grid-panel-notes[data-current]"
+    assert_select "#editor-grid-panel-page[data-current]", count: 0
+
+    get "/cs-studio/posts/#{@post.id}", params: { notes: "open" }
+    assert_select "#editor-grid-tab-notes[aria-selected=true]"
+    assert_select "#editor-grid-panel-notes[data-current]"
+    assert_select "#editor-grid-panel-post[data-current]", count: 0
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "#editor-grid-panel-page[data-current]"
+    assert_select "#editor-grid-panel-notes[data-current]", count: 0
+  end
+
   test "a thread that is not a number does not travel, and without ?notes=open the drawer stays shut" do
     sign_in_as(users(:two))
 

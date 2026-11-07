@@ -66,4 +66,24 @@ class Admin::NotesScreen::RailPanelComponentTest < ViewComponent::TestCase
     assert_selector "#notes-drawer[data-open-on-load=false]"
     assert_no_selector "#notes-drawer[data-thread]", wait: 0
   end
+
+  # Only a save's stream goes without the screen's reads, and it draws the
+  # tab alone. A panel drawn without them draws no counts at all: zeros in
+  # `#notes-counts` would be taken for the truth and clear every marker.
+  test "drawn without the screen's reads the panel draws no counts, never zeros" do
+    page = create_page(title: "Pricing")
+    as(users(:two)) { Notes::Start.call(page, body: "A note") }
+
+    as(users(:one)) { render_inline panel(page, locale: "en") }
+
+    assert_selector "#notes-drawer turbo-frame#notes"
+    assert_no_selector "#notes-counts", visible: :all, wait: 0
+    assert_no_selector "#notes-drawer [data-admin--notes--drawer-target~=total]", visible: :all, wait: 0
+  end
+
+  test "?notes=open asks for the Notes tab to be the current one as the page is drawn" do
+    page = create_page(title: "Pricing")
+    assert panel(page, query: { "notes" => "open" }).tab_current?
+    assert_not panel(page, query: {}).tab_current?
+  end
 end

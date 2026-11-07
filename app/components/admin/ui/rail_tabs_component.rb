@@ -35,8 +35,9 @@ module Admin
         @rail_id = rail_id
         @tabs = tabs + slot_tabs
         # A `current` that names no tab is the first tab, so one tab is
-        # always in the tab order.
-        @current = tabs.map { |tab| tab.key.to_s }.then { |keys| keys.include?(current.to_s) ? current.to_s : keys.first }
+        # always in the tab order. A slot's tab may be current
+        # (`RailSlotComponent#current_key`).
+        @current = @tabs.map { |tab| tab.key.to_s }.then { |keys| keys.include?(current.to_s) ? current.to_s : keys.first }
       end
 
       private

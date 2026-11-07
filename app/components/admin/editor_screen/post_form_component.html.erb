@@ -30,6 +30,10 @@
     threshold it reads title, address, body, then the settings, and the
     focus follows what is seen at both widths (docked, the grid places each
     column explicitly, so the order moves nothing on screen). %>
+<%# The rail's registered tabs, built before the form: the Post panel inside it is the
+    current one unless a registered tab asks to be (`current_key`). %>
+<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
+                                                **{ locale: locale, url_options: url_options, query: request.query_parameters, **@slot_context }) %>
 <% form = capture do %>
 <%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-card bg-surface shadow-1 p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
@@ -61,7 +65,7 @@
       ) %>
   </div>
 
-  <%= render Admin::Ui::RailPanelComponent.new(rail_id: RAIL_ID, key: "post", current: true) do %>
+  <%= render Admin::Ui::RailPanelComponent.new(rail_id: RAIL_ID, key: "post", current: form_only? || rail_slot.current_key.nil?) do %>
   <div class="flex flex-col gap-4">
   <%= render Admin::Columns::PlainColumnComponent.new(
         name: "excerpt", id: field_id("excerpt"), html_name: field_html_name("excerpt"),
@@ -134,10 +138,8 @@
 <% else %>
 <%= tag.div id: RAIL_ID, class: [ "admin-rail-grid", ("admin-rail-grid--folded" if translation_tab?) ],
       data: { controller: "admin--ui--rail", action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal" } do %>
-<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
-                                                **{ locale: locale, url_options: url_options, query: request.query_parameters, **@slot_context }) %>
 <%= form %>
-<%= render Admin::Ui::RailTabsComponent.new(rail_id: RAIL_ID, current: "post", tabs: [
+<%= render Admin::Ui::RailTabsComponent.new(rail_id: RAIL_ID, current: rail_slot.current_key || "post", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "post", label: t("admin.components.editor_screen.rail.tabs.post"))
     ], slot_tabs: rail_slot.tabs) %>
 <%= render rail_slot %>
