@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { float } from "ui/float"
 import { createSuggestions } from "search/suggestions"
 import { messages } from "i18n/messages"
 
@@ -67,6 +68,8 @@ export default class extends Controller {
   disconnect() {
     clearTimeout(this.announceTimer)
     this.suggestions?.destroy()
+    this.release?.()
+    this.release = null
   }
 
   // --- Events that must not reach the form ---------------------------------
@@ -168,14 +171,20 @@ export default class extends Controller {
     if (!this.createValue) this.announce(this.text("components.ui.chip_input.search_failed"))
   }
 
+  // Inside a docked rail panel that scrolls, the list is lifted out of the
+  // panel's clip (`ui/float`), under the field and as wide as it, until it
+  // closes.
   open() {
     this.listboxTarget.hidden = false
+    this.release ||= float(this.listboxTarget, this.listboxTarget.parentElement, { width: true })
     this.inputTarget.setAttribute("aria-expanded", "true")
   }
 
   close() {
     // A request still in flight must not reopen the list once it answers.
     this.suggestions.cancel()
+    this.release?.()
+    this.release = null
     this.listboxTarget.hidden = true
     this.inputTarget.setAttribute("aria-expanded", "false")
     this.inputTarget.removeAttribute("aria-activedescendant")

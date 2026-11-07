@@ -76,6 +76,10 @@ pin_all_from "app/javascript/editor", under: "editor", preload: "admin"
 # The one suggestions search (debounce, abort, stale answers) the chip input and
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"
+# The shared controls' plain modules, imported by `controllers/admin/ui/`:
+# `ui/float`, which lifts an open menu or list of suggestions out of a docked
+# rail panel that scrolls, so the panel's edge does not cut it.
+pin_all_from "app/javascript/ui", under: "ui", preload: "admin"
 
 # The strings a script shows, read from the server's `data-messages`
 # (`Admin::MessagesHelper`; docs/reference/i18n.md). Only CS Studio's

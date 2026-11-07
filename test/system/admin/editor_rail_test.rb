@@ -133,6 +133,119 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # StudioRail: the docked rail stays in view down a long page. Its ground is
+  # the grid's `::before`, measured through its computed height.
+  def ground_height = page.evaluate_script("parseFloat(getComputedStyle(document.getElementById('editor-grid'), '::before').height)")
+
+  def header_bottom = box(".admin-editor-header")[3]
+
+  def long_page(count = 30)
+    count.times { |index| @page.content_blocks.create!(block_type: "rich_text", position: index + 1) }
+  end
+
+  def scroll_to_end = page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+
+  # Whether the element is drawn where it stands: the point at its centre
+  # hits it, or something inside it, and is inside the window.
+  def hit?(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.querySelector(#{selector.to_json})
+        const box = element.getBoundingClientRect()
+        const x = box.left + box.width / 2, y = box.top + box.height / 2
+        if (y < 0 || y > window.innerHeight) return false
+        const top = document.elementFromPoint(x, y)
+        return element === top || element.contains(top)
+      })()
+    JS
+  end
+
+  test "scrolled to the last block of a long page, the rail's tabs and its panel are in view under the header and its ground is no taller than they are" do
+    long_page
+    at_window(WIDE) do
+      visit_editor(@page)
+      assert_docked
+      scroll_to_end
+      assert_eventually(message: "the page did not scroll") { page.evaluate_script("window.scrollY") > 1000 }
+
+      tabs = box(".admin-rail__tabs")
+      panel = box("#editor-grid-panel-page")
+      assert_in_delta header_bottom, tabs[1], 1, "the tabs stick under the editor's header"
+      assert_in_delta tabs[3], panel[1], 1, "the panel sticks under the tabs"
+      assert_operator panel[3], :<=, page.evaluate_script("window.innerHeight"), "the panel ends inside the window"
+      assert_operator ground_height, :<=, (panel[3] - tabs[1]) + 1, "the ground is no taller than the tabs and the panel"
+      assert hit?("#editor-grid-tab-page"), "the Page tab can be pressed down the page"
+      assert_operator box(".admin-content-blocks")[3] - box(".admin-content-blocks")[1], :>, ground_height * 2, "the blocks column is far taller than the rail"
+    end
+  end
+
+  test "a panel taller than the window scrolls inside the rail" do
+    at_window(WIDE, height: 520) do
+      visit_editor(@page)
+      assert_docked
+      panel = "#editor-grid-panel-page"
+      sizes = page.evaluate_script("(() => { const panel = document.querySelector(#{panel.to_json}); return [panel.scrollHeight, panel.clientHeight] })()")
+      assert_operator sizes[0], :>, sizes[1], "the Page panel is taller than the room under the tabs"
+      assert_operator box(panel)[3] - box(".admin-rail__tabs")[1], :<=, 520 - header_bottom - 22 + 1, "the tabs and the panel fit under the header, --cs-sp-4 above the window's bottom"
+      page.execute_script("document.querySelector(#{panel.to_json}).scrollTop = 10000")
+      assert_operator page.evaluate_script("document.querySelector(#{panel.to_json}).scrollTop"), :>, 0, "the panel scrolls inside itself"
+      assert_equal 0, page.evaluate_script("window.scrollY"), "and the page does not move"
+    end
+  end
+
+  # A menu inside a panel that scrolls is drawn over what is below it, not
+  # cut at the panel's edge: the section's layout menu, opened in the
+  # Section panel of a short window.
+  test "a menu in a scrolling rail panel opens whole, over what is below the panel" do
+    at_window(WIDE, height: 460) do
+      visit_editor(@page)
+      assert_docked
+      find("#section-#{@section.id}-words button[data-admin--editor--section-field-param='layout']").click
+      assert_selector "#editor-grid-panel-section #section-#{@section.id}-settings", visible: :visible
+      menu = "#editor-grid-panel-section [data-controller~='admin--ui--menu']"
+      find("#{menu} button[aria-haspopup]").click
+      assert_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      items = "#{menu} [data-admin--ui--menu-target=panel] [role=menuitem]"
+      assert_operator box(items.sub("[role=menuitem]", ""))[3], :>, box("#editor-grid-panel-section")[3], "the menu reaches past the panel's bottom"
+      page.execute_script("document.querySelectorAll(#{items.to_json}).forEach((item, index, all) => { if (index === all.length - 1) item.id = 'last-layout' })")
+      assert hit?("#last-layout"), "the menu's last item is drawn over what is below the panel"
+      menu_box = box("#{menu} [data-admin--ui--menu-target=panel]")
+      button_box = box("#{menu} button[aria-haspopup]")
+      assert_in_delta button_box[3] + 4, menu_box[1], 1, "the menu hangs 4px under its button"
+      assert_in_delta button_box[0], menu_box[0], 1, "at its button's left edge"
+      page.execute_script("document.querySelector('#editor-grid-panel-section').scrollTop = 30")
+      assert_in_delta box("#{menu} button[aria-haspopup]")[3] + 4, box("#{menu} [data-admin--ui--menu-target=panel]")[1], 1, "and follows it as the panel scrolls"
+      find("#{menu} button[aria-haspopup]").click
+      assert_no_selector "#{menu} [data-admin--ui--menu-target=panel]", visible: :visible
+      assert_equal "", page.evaluate_script("document.querySelector(#{(menu + " [data-admin--ui--menu-target=panel]").to_json}).style.position"), "closed, the menu is the absolute box its classes draw"
+    end
+  end
+
+  # A tall window, so the Post panel is shorter than the room it may take
+  # and its last field, Related posts, stands near its bottom edge, with the
+  # window below.
+  test "the related posts' suggestions in a scrolling post panel open whole" do
+    %w[Alpha Beta Gamma Delta Epsilon].each { |name| create_post(title: "Linked #{name}") }
+    at_window(WIDE, height: 1400) do
+      open_post
+      assert_docked
+      assert_equal "auto", page.evaluate_script("getComputedStyle(document.querySelector('#{POST_PANEL}')).overflowY")
+      field = find("#post-related_post_ids")
+      field.send_keys("Linked")
+      listbox = "#post-related_post_ids-listbox"
+      assert_selector "#{listbox} [role=option]", minimum: 5
+      assert_operator box(listbox)[3], :>, box(POST_PANEL)[3], "the suggestions reach past the panel's bottom"
+      assert_operator box(listbox)[3], :<, 1400, "and stay inside the window"
+      page.execute_script("document.querySelectorAll('#{listbox} [role=option]').forEach((option, index, all) => { if (index === all.length - 1) option.id = 'last-suggestion' })")
+      assert hit?("#last-suggestion"), "the last suggestion is drawn over what is below the panel"
+      wrapper = page.evaluate_script("(() => { const box = document.querySelector('#{listbox}').parentElement.getBoundingClientRect(); return [box.left, box.bottom, box.width] })()")
+      assert_in_delta wrapper[0], box(listbox)[0], 1, "under the field, at its left edge"
+      assert_in_delta wrapper[2], box(listbox)[2] - box(listbox)[0], 1, "as wide as the field"
+      field.send_keys(:escape)
+      assert_no_selector listbox, visible: :visible
+    end
+  end
+
   test "below the threshold the page settings stand above the blocks at 760px and there are no tabs" do
     at_window(NARROW) do
       visit_editor(@page)

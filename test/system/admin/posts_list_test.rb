@@ -270,6 +270,19 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "scrolled down a long list, the docked filters stay in view under the window's top" do
+    30.times { |index| create_post(title: "Long list #{index}", published: false) }
+    at_window(1600, height: 600) do
+      visit_screen admin_posts_path
+      assert docked?(layout), layout.inspect
+      page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+      assert_eventually(message: "the list did not scroll") { page.evaluate_script("window.scrollY") > 300 }
+      panel = layout["panel"]
+      assert_in_delta 22, panel["top"], 1, "the rail sticks --cs-sp-4 under the window's top"
+      assert_operator panel["bottom"], :<=, 600 - 22 + 1, "and ends inside the window"
+    end
+  end
+
   test "at 1100px the filters stand above the list, under the search and the segments" do
     at_window(1100) do
       visit_screen admin_posts_path

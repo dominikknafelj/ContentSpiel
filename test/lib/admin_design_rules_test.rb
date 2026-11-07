@@ -783,7 +783,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/--admin-rail-docked:\s*1;/, grid, "the controller reads the docked state from the property the query sets")
     ground = docked.first[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{([^}]*)\}/, 1]
     assert ground, "the rail's ground is the grid's ::before"
-    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*-1].each do |declaration|
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2].each do |declaration|
       assert_match(/#{declaration};/, ground)
     end
     assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-rail__main\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1\s*\/\s*-1;\s*\}/, docked.first)
@@ -797,6 +797,35 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
+  end
+
+  # StudioRail: the docked rail's ground is as tall as the tabs and the
+  # current panel, never the blocks column, and the three stick under the
+  # editor's header; a panel taller than the window scrolls inside itself.
+  test "the rail's ground spans the tabs' and the panel's rows only, and the rail sticks under the header" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-top:\s*calc\(var\(--admin-top-offset\) \+ var\(--admin-editor-header-height, 0px\)\);/, css, "one top for every rail item, from the header's measured height")
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/).first
+    grid = docked[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)\s*\{([^}]*)\}/, 1]
+    assert_match(/grid-template-rows:\s*auto auto 1fr;/, grid, "the tabs, the panel, then a row that takes the canvas's remaining height")
+    ground = docked[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{([^}]*)\}/, 1]
+    assert_match(%r{grid-row:\s*1\s*/\s*3;}, ground, "the ground spans the tabs' and the panel's rows only")
+    assert_no_match(%r{grid-row:\s*1\s*/\s*-1}, ground)
+    assert_match(/position:\s*sticky;\s*top:\s*var\(--admin-rail-top\);/, ground)
+    tabs = docked[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) :is\(\.admin-rail__tabs, \.admin-rail__heading\)\s*\{([^}]*)\}/, 1]
+    assert tabs, "the tabs and a one-tab rail's heading stick alike"
+    %w[position:\s*sticky top:\s*var\(--admin-rail-top\) height:\s*var\(--admin-rail-tabs-height\)].each { |declaration| assert_match(/#{declaration};/, tabs) }
+    panel = docked[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-rail__panel\s*\{([^}]*)\}/, 1]
+    [ 'position:\s*sticky', 'top:\s*calc\(var\(--admin-rail-top\) \+ var\(--admin-rail-tabs-height\)\)', 'align-self:\s*start',
+      'max-height:\s*calc\(100dvh - var\(--admin-rail-top\) - var\(--admin-rail-tabs-height\) - var\(--cs-sp-4\)\)', 'overflow-y:\s*auto' ].each do |declaration|
+      assert_match(/#{declaration};/, panel)
+    end
+    # The notes are as tall as the panel may be and scroll their own list.
+    assert_match(/\.admin-rail__panel:has\(> \.admin-notes-drawer\)\s*\{[^}]*overflow:\s*visible;/, docked)
+    assert_match(/\.admin-notes-drawer\s*\{[^}]*height:\s*calc\(100dvh - var\(--admin-rail-top\) - var\(--admin-rail-tabs-height\) - var\(--cs-sp-4\)\);/m, docked)
+    # The header's height is measured by the rail, the one writer.
+    writers = Dir[Rails.root.join("app/javascript/**/*.js")].select { |path| File.read(path).match?(/setProperty\(\s*["']--admin-editor-header-height/) }
+    assert_equal [ "app/javascript/controllers/admin/ui/rail_controller.js" ], writers.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
   end
 
   # Design System: a filter bar is 38px, set by the bar, never by a control.
@@ -866,6 +895,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert rail, "the docked block grounds .admin-list-rail__rail"
     %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*span\s*2].each do |declaration|
       assert_match(/#{declaration};/, rail)
+    end
+    [ 'position:\s*sticky', 'top:\s*calc\(var\(--admin-top-offset\) \+ var\(--cs-sp-4\)\)',
+      'max-height:\s*calc\(100dvh - var\(--admin-top-offset\) - 2 \* var\(--cs-sp-4\)\)', 'overflow-y:\s*auto' ].each do |declaration|
+      assert_match(/#{declaration};/, rail, "docked, the list's rail sticks and scrolls inside itself")
     end
     assert_no_match(/>\s*\.admin-list-rail__rail/, css, "the rail is matched anywhere in the grid, not only as a child")
     assert_match(/\.admin-list-rail__head\s*\{[^}]*max-width:\s*var\(--cs-content-max\);/, docked.first, "the heading row stops with the composition")
