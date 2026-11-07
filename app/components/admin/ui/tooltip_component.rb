@@ -29,7 +29,7 @@ module Admin
         interface: %i[text],
         limits: [
           "It is drawn hidden, so a render on the server shows nothing of it: showing, placing and hiding it is admin--ui--tooltip's, on the host that carries host_data.",
-          "It has no arrow and no shadow, and is at most 240px wide.",
+          "It has no arrow and no elevation, and is at most 240px wide.",
           "Its bubble is a target of admin--ui--tooltip, which its host attaches through host_data."
         ],
         states: [],

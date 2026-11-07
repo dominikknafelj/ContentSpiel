@@ -31,7 +31,7 @@ module Admin
         interface: %i[label variant type size icon],
         limits: [
           "It is drawn in five variants and two sizes, and a look outside them is refused rather than added by a caller's class.",
-          "Under reduced motion the fill and the lift change at once and the primary's one-pixel press does not move; its press is told by its shadow going.",
+          "Under reduced motion the fill and the lift change at once and the primary's one-pixel press does not move; its press is told by its elevation going.",
           "Busy is set by admin--ui--busy on the button's form; the button only keeps its variant's look while it is busy."
         ],
         states: %i[rest hover focus pressed disabled],
