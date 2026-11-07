@@ -1,8 +1,9 @@
 # CS Studio's modules: the entries of the sidebar, in its order, and the
 # destinations ⌘K offers by name (`Jump::Search`). A feature adds its module
 # with `register` and a count beside it with `badge`, in
-# `config/initializers/studio_modules.rb`; the sidebar draws what is here and
-# names no module itself.
+# `config/initializers/studio_modules.rb`, and a gem through the hook
+# `ContentSpiel::Plugins.studio_modules`, which that file replays after the
+# built-ins; the sidebar draws what is here and names no module itself.
 #
 # Plain data, as the other registries in this folder: a path is a route
 # helper's NAME, resolved by the component that draws the link, and the
@@ -35,6 +36,9 @@
 # RELOADING. This file is autoloaded, so a development reload unloads it and
 # the registry starts empty; the initializer fills it again in `to_prepare`
 # (which also runs at boot), after `reset!`, so nothing is registered twice.
+# That `reset!` is why a gem registers through the hook and never here
+# directly: a gem's own `to_prepare` runs before it at boot, and its
+# `after_initialize` before the first reload's.
 # A badge or `visible` callable names the classes it uses inside its body,
 # where they are looked up when it is called, so no class replaced by a reload
 # is kept. A test changes the registry through `with`, which puts it back.

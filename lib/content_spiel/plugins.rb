@@ -73,12 +73,31 @@ module ContentSpiel
 
     REPLAYED_FORM_FIELD_TYPES = "ContentSpiel::Plugins.form_field_types, called at".freeze
     REPLAYED_FORM_DESTINATIONS = "ContentSpiel::Plugins.form_destinations, called at".freeze
-    # The words a replayed hook's error can carry.
+    # The words a replayed type hook's error can carry, which the theme's
+    # refusal on a reload looks for. The studio modules' hook is replayed by
+    # its own initializer, not with the types, and is not among them.
     REPLAYED_ALL = [ REPLAYED, REPLAYED_FORM_FIELD_TYPES, REPLAYED_FORM_DESTINATIONS ].freeze
+    REPLAYED_STUDIO_MODULES = "ContentSpiel::Plugins.studio_modules, called at".freeze
+
+    # What a studio modules hook's block is handed: `register` and `badge`
+    # with `StudioModules`' own signatures, and nothing else of the registry
+    # (no `reset!`, no `entries`). A module's name is bare, as the built-ins'
+    # are, because it is the key of its label (`admin.modules.<name>`, which
+    # the gem's locale file gives); a name already taken is refused by the
+    # registry, with the place of the hook in the message.
+    class ModuleRegistrar
+      def initialize(registry)
+        @registry = registry
+      end
+
+      def register(name, **options) = @registry.register(name, **options)
+
+      def badge(name, **options, &counter) = @registry.badge(name, **options, &counter)
+    end
 
     # One hook list per registry: a hook is replayed into its own registry
     # only, in the order it was called.
-    @hooks = { block_types: [], form_field_types: [], form_destinations: [] }
+    @hooks = { block_types: [], form_field_types: [], form_destinations: [], studio_modules: [] }
 
     class << self
       def block_types(&block)
@@ -120,6 +139,27 @@ module ContentSpiel
         keep(:form_destinations, block, caller_locations(1, 1).first)
       end
 
+      # A gem's entry in CS Studio's sidebar and ⌘K, with its count:
+      #
+      #   ContentSpiel::Plugins.studio_modules do |modules|
+      #     modules.register :acme_reports, icon: :status, family: :code, path: :acme_reports_path,
+      #       permission: "acme_reports.view", group: :system
+      #     modules.badge(:acme_reports) { |viewer:| Acme::Report.unread_for(viewer).count }
+      #   end
+      #
+      # The arguments are `StudioModules.register`'s and `.badge`'s (its
+      # comment says what each means; `family:` is required). Kept and
+      # replayed as the block types are, by config/initializers/
+      # studio_modules.rb after the built-ins on every `to_prepare`: a gem's
+      # own `to_prepare` runs before the application's `reset!`, its
+      # `after_initialize` is lost on a development reload, and its
+      # initializer runs before `StudioModules` can be loaded.
+      def studio_modules(&block)
+        raise ArgumentError, "ContentSpiel::Plugins.studio_modules takes a block" unless block
+
+        keep(:studio_modules, block, caller_locations(1, 1).first)
+      end
+
       # Every kept block, in the order the hooks were called (the Gemfile's
       # order), each with a registrar of its own. Whatever a block raises is
       # raised again, as the same class, with the place of the hook's call in
@@ -144,6 +184,14 @@ module ContentSpiel
           Registrar.new(registry, location, owners, kind: "form destination", takes: %i[attributes block],
             build: ->(name, attributes, definition) { registry.register(name, **attributes, &definition) })
         end
+      end
+
+      # Every kept studio modules hook, replayed the same way into
+      # `StudioModules`, after the built-ins: the sidebar's order within a
+      # group is the built-ins', then the gems' in the order their hooks
+      # were called.
+      def register_studio_modules(registry)
+        replay(:studio_modules, REPLAYED_STUDIO_MODULES) { ModuleRegistrar.new(registry) }
       end
 
       # Tests only: a hook a test kept is taken out again.

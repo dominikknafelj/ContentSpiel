@@ -5,7 +5,8 @@
 # types.rb`, `admin_slots.rb`): it runs at boot and after each development
 # reload, which unloads the registry; it is emptied first, so nothing is
 # registered twice. A badge names its classes inside its body, so it reaches
-# the ones loaded now.
+# the ones loaded now. A gem's modules come last, through the hook that keeps
+# them across every reload (`ContentSpiel::Plugins.studio_modules`).
 Rails.application.config.to_prepare do
   StudioModules.reset!
 
@@ -44,4 +45,20 @@ Rails.application.config.to_prepare do
   # What the viewer could act on in the trash, the sum of the Trash screen's
   # own tab counts (`Admin::TrashController.badge_count`).
   StudioModules.badge(:trash) { |viewer:| Admin::TrashController.badge_count(viewer) }
+
+  # A gem's modules and badges, after every built-in, in the order their
+  # hooks were called (lib/content_spiel/plugins.rb). A hook that raises
+  # stops the boot, naming its place. On a development reload it is logged
+  # instead: the built-ins above are registered, and the reload goes on to
+  # the other initializers' `to_prepare` (the types), which a raise here
+  # would leave empty; a gem's files are not reloaded, so the server is
+  # restarted once the gem is corrected.
+  begin
+    ContentSpiel::Plugins.register_studio_modules(StudioModules)
+  rescue StandardError => error
+    raise unless ThemeFolder.booted?
+
+    Rails.logger.error("[ContentSpiel] #{error.class}: #{error.message}. The sidebar's own modules are registered; " \
+      "this hook's modules and those of the hooks after it are missing. A gem's own files are not reloaded: restart the server after correcting it.")
+  end
 end

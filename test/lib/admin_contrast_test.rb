@@ -409,7 +409,7 @@ class AdminContrastTest < ActiveSupport::TestCase
     families
   end
 
-  test "every sidebar module's chip is 3:1 on the sidebar's ground and on the current row" do
+  test "every sidebar module's icon is 3:1 on the sidebar's ground and on the current row" do
     families = sidebar_families
     each_scheme do |scheme, colour|
       families.each do |family|
