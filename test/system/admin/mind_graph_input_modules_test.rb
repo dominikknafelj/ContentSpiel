@@ -145,7 +145,7 @@ class Admin::MindGraphInputModulesSystemTest < Admin::MindGraphModulesSystemTest
     assert_operator result["topLeft"][1], :>=, 60
   end
 
-  # Review focus 5: one node, or all nodes at one point.
+  # A fit of one node, or of all nodes at one point, is a finite camera.
   test "camera: fitting a single point does not divide by zero or zoom past 3" do
     result = js_module("mind_graph/camera", "(() => { const c = m.fit({ minX: 7, minY: 7, maxX: 7, maxY: 7 }, 800, 600); return [c.k, ...m.toScreen(c, 7, 7)] })()")
 

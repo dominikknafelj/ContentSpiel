@@ -386,7 +386,6 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     assert_operator widths["link"], :<, widths["card"] / 2, "the card's action stretches across the card: #{widths}"
   end
 
-  # Review focus 4.
   test "a box that changes size is redrawn at the new size and still holds every node" do
     posts = 5.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_mind_graph_path

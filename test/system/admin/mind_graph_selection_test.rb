@@ -173,7 +173,6 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     assert_equal before[c], pixels_of(c).first
   end
 
-  # Review focus 1.
   test "a title with markup in it is text in the card" do
     a = create_post(title: %(</script><img src=x onerror="window.pwned=1"> "quoted" 🎉))
     PostRelation.create!(post: a, related_post: create_post(title: "B"))

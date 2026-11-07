@@ -125,8 +125,8 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     end
   end
 
-  # Review focus 2. Leaving while the request is out, and leaving while the
-  # layout is still running. For the second the graph has to be big enough to
+  # Leaving while the request is out, and leaving while the layout is still
+  # running, leaves nothing running and nothing raised. For the second the graph has to be big enough to
   # be settling for seconds, so the endpoint's answer is replaced by 1,500
   # posts and 30 tags made in the page (`BIG_GRAPH`); the worker is the real one.
   test "leaving while the graph is loading or settling raises nothing and stops the worker" do
@@ -208,7 +208,7 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     assert page.evaluate_script("window.leftGraph.mindGraph === undefined"), "the element that was left still carries its hook"
   end
 
-  # Review focus 3. Turbo restores the page as it was left -- `data-state=
+  # Turbo restores the page as it was left -- `data-state=
   # "ready"`, `data-settled`, the counts -- before anything is fetched, so the
   # controller takes those back on connect; `data-url` is fetched once more
   # and the graph drawn from it.

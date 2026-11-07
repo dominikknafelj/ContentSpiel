@@ -76,6 +76,7 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
   test "the guard reads the system test cases under test/support" do
     names = sources.map { |path| File.basename(path) }
     assert_includes names, "mind_graph_system_test_case.rb"
+    assert_includes names, "mind_graph_modules_system_test_case.rb"
     assert_includes names, "sections_system_test_case.rb"
   end
 

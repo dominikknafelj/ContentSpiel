@@ -115,8 +115,8 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     assert_nil page.evaluate_script("window.pwned")
   end
 
-  # A mention typed by hand of someone who may not read the post (Review
-  # Focus 2) is refused by the service; the card says why and keeps the text.
+  # A mention typed by hand of someone who may not read the post is refused
+  # by the service; the card says why and keeps the text.
   test "a note the server refuses is answered in the card, and what was typed stays in the field" do
     stranger = User.create!(email_address: "stranger@example.com", password: "password-password", name: "Sam")
     a = create_post(title: "Alpha")
