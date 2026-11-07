@@ -223,7 +223,7 @@ module Admin
       streams << tree_row_stream if result.ok?
       streams.concat(publishing_state_streams(@page)) if result.ok?
       streams.concat(Admin::Answers::RailTabStreams.for(result.record, view: view_context, viewer: Current.actor, locale: admin_locale,
-        url_options: admin_url_options, query: request.query_parameters)) if result.ok?
+        url_options: admin_url_options)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end

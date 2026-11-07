@@ -11,7 +11,8 @@ module Admin
     class RailSlotComponent < AdminComponent
       KEY = /\A[a-z]+\z/
 
-      def initialize(rail_id:, record:, viewer:, **context)
+      def initialize(rail_id:, record:, viewer:, reserved: [], **context)
+        @reserved = reserved
         @rail_id = rail_id
         @record = record
         @viewer = viewer
@@ -34,11 +35,22 @@ module Admin
 
       private
 
+      # Two tabs of one key would be two elements of one id, so a key that is
+      # the host's own (`reserved:`) or another entry's is refused.
+      def unique!(taken, key, component)
+        raise ArgumentError, "#{component} answers tab_key #{key.inspect}, which another tab of this rail already has" if taken.include?(key)
+
+        taken << key
+      end
+
       def panels
+        taken = @reserved.map(&:to_s)
         @panels ||= Admin::Slots.entries("editor.rail.tabs").filter_map do |entry|
           panel = entry.component.new(record: @record, viewer: @viewer, data: nil, **@context, **entry.options)
           next unless panel.render?
           raise ArgumentError, "#{entry.component} answers tab_key #{panel.tab_key.inspect}; a tab key is lowercase letters" unless KEY.match?(panel.tab_key.to_s)
+
+          unique!(taken, panel.tab_key.to_s, entry.component)
 
           panel
         end

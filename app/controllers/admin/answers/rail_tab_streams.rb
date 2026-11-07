@@ -5,6 +5,12 @@ module Admin
     #
     # ONLY THE TABS ARE SENT. A panel may hold text being typed, and a save's
     # answer must not replace it (`Admin::Slots`, the panel shape).
+    #
+    # A stream's context is smaller than the page's: no `query:` (the request is
+    # the autosave's, not the page's) and no `counts:`, so `tab_count` and
+    # `tab_label` must be answerable from `record` and `viewer` alone. A tab
+    # that was not drawn at page load is not added by a stream (replacing a
+    # missing id does nothing); it appears at the next page load.
     module RailTabStreams
       def self.for(record, view:, viewer:, rail_id: "editor-grid", **context)
         builder = Answers.stream_builder(view)

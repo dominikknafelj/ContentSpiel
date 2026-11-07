@@ -131,8 +131,8 @@
 <% else %>
 <%= tag.div id: RAIL_ID, class: [ "admin-rail-grid", ("admin-rail-grid--folded" if translation_tab?) ],
       data: { controller: "admin--ui--rail", action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal" } do %>
-<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, locale: locale, url_options: url_options,
-                                                query: request.query_parameters, **@slot_context) %>
+<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
+                                                **{ locale: locale, url_options: url_options, query: request.query_parameters, **@slot_context }) %>
 <%= render Admin::Ui::RailTabsComponent.new(rail_id: RAIL_ID, current: "post", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "post", label: t("admin.components.editor_screen.rail.tabs.post"))
     ], slot_tabs: rail_slot.tabs) %>

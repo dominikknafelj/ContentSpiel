@@ -61,7 +61,7 @@
     closes (`admin--editor--section-choice`, which says what moves it and when). %>
 <% rail_id = "editor-grid" %>
 <%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
-<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, locale: admin_locale, url_options: admin_url_options,
+<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
                                                 query: request.query_parameters, counts: note_counts) %>
 <%= tag.div id: rail_id, class: [ "admin-rail-grid", ("admin-rail-grid--folded" unless admin_locale.to_s == Locales.default.to_s) ],
       data: { controller: "admin--ui--rail admin--editor--section-choice",

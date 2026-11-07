@@ -41,6 +41,19 @@ class Admin::Ui::RailSlotComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "two entries with one tab key are refused" do
+    Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe, RailTabProbe ]) do
+      assert_raises(ArgumentError) { slot.tabs }
+    end
+  end
+
+  test "a tab key that is a host tab's is refused" do
+    Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe ]) do
+      assert_raises(ArgumentError) { slot(reserved: %w[probe]).tabs }
+      assert_equal %w[probe], slot(reserved: %w[page]).tabs.map(&:key)
+    end
+  end
+
   test "a tab key that is not lowercase letters is refused" do
     bad = Class.new(RailTabProbe) { def tab_key = "Bad key" }
     Admin::Slots.with("editor.rail.tabs" => [ bad ]) do
