@@ -10,6 +10,19 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     as(actor, channel: :admin) { render_inline(Admin::EditorScreen::HeaderComponent.new(record: record, locale: locale)) }
   end
 
+  test "review=publish opens Publish changes from a GET and not from a PATCH (a save's answer)" do
+    page = create_page(title: "Pricing")
+    assert Pages::Save.call(page, translations: { "en" => { title: "Pricing, edited" } }).ok?
+    open = "dialog#publish-changes-page-#{page.id}[data-admin--ui--dialog-open-on-load]"
+
+    with_request_url("/cs-studio/pages/#{page.id}?review=publish", method: :get) { render_header(page.reload) }
+    assert_selector open, visible: :all
+
+    with_request_url("/cs-studio/pages/#{page.id}?review=publish", method: :patch) { render_header(page.reload) }
+    assert_selector "dialog#publish-changes-page-#{page.id}", visible: :all
+    assert_no_selector open, visible: :all
+  end
+
   test "a draft: breadcrumb, title, Draft chip, Preview and one primary Publish, the rest in the menu" do
     page = create_page(title: "About", published: false)
     render_header(page)
