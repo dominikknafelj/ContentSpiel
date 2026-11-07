@@ -55,8 +55,9 @@
 // and a post type the lists'), cloned from the parts (`parts.js`).
 //
 // A ROW'S STATE is shown as the posts list shows it, by its rule: an
-// exception stands out and a plain live row has nothing. After the title, a
-// draft's and a scheduled record's row carries its `StatusChipComponent`,
+// exception stands out and a plain live row has nothing. Under the title, on
+// a line of their own, a draft's and a scheduled record's row carries its
+// `StatusChipComponent`,
 // and any record whose unpublished mark is set (the data's `unpublished`)
 // the `UnpublishedChipComponent`, each cloned from the parts and never
 // changed after, in a wrapper hidden from a screen reader. The row's name
@@ -213,7 +214,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     }
     return wrapper
   }
-  // The parts a page's or a post's row carries after its title, by the
+  // The parts a page's or a post's row carries under its title, by the
   // posts list's own rule (`posts_screen/table_component.html.erb`): the
   // status chip unless the record is live, then the unpublished chip when
   // the data's `unpublished` (`Publishing::State#changes?`, the posts list's
@@ -229,10 +230,22 @@ export function createList(container, { text, number = String, dotClasses, typeL
   const stateChips = (node) => {
     const names = statesOf(node)
     if (!names.length) return []
-    const held = element("span", "flex shrink-0 items-center gap-1")
+    const held = element("span", "flex shrink-0 flex-wrap items-center gap-1")
     held.setAttribute("aria-hidden", "true")
     held.append(...names.map((name) => parts.part(name)))
     return [ held ]
+  }
+  // A row's title, and on a line of their own under it its chips when it
+  // has any: the title keeps the row's whole width and is cut only by the
+  // row's edge, so in the list's narrow column a row with two chips, or a
+  // page deep in the tree, still says which record it is. The chips wrap
+  // rather than run past the row's figure.
+  const titled = (node) => {
+    const chips = stateChips(node)
+    if (!chips.length) return element("span", "min-w-0 flex-1 truncate", node.title)
+    const stack = element("span", "flex min-w-0 flex-1 flex-col gap-0.5")
+    stack.append(element("span", "min-w-0 truncate", node.title), ...chips)
+    return stack
   }
   // The title as a row's name says it: followed by each chip's own word
   // ("Soon, Scheduled, Unpublished changes"), so what is seen is heard and
@@ -271,7 +284,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     // A page stands under its parent: indented by its depth in the tree.
     if (node.kind === "page") button.style.paddingInlineStart = `${ROW_PADDING + (node.depth || 0) * INDENT}px`
     const trailing = notInView ? element("span", "shrink-0 text-label text-meta", text.t("mind_graph.script.list.not_in_view")) : element("span", "shrink-0 text-count text-meta", figure(node))
-    button.append(markFor(node), element("span", "min-w-0 flex-1 truncate", node.title), ...stateChips(node), trailing)
+    button.append(markFor(node), titled(node), trailing)
     item.append(button)
     rows.set(node.id, button)
     if (notInView) {
