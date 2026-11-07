@@ -100,8 +100,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/media_library/panel_component.html.erb
     app/components/admin/pages_screen/tree_component.rb
     app/components/admin/pages_screen/tree_component.html.erb
-    app/components/admin/pages_screen/tree_node_component.rb
-    app/components/admin/pages_screen/tree_node_component.html.erb
+    app/components/admin/pages_screen/tree_row_component.rb
+    app/components/admin/pages_screen/tree_row_component.html.erb
     app/components/admin/posts_screen/table_component.rb
     app/components/admin/shell/sidebar_component.rb
   ].freeze

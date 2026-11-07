@@ -1,0 +1,14 @@
+<% count = ->(tab) do %>
+  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero? %><% end %>
+<% end %>
+<% if single? %>
+  <% tab = tabs.first %>
+  <%= tag.h2 id: tab_id(tab), class: "admin-rail__tabs admin-rail__heading text-sm font-medium text-ink" do %><%= tab.label %><% count.(tab) %><% end %>
+<% else %>
+  <div class="admin-rail__tabs" role="tablist" aria-label="<%= t(".label") %>">
+    <% tabs.each do |tab| %>
+      <%= tag.button type: "button", role: "tab", id: tab_id(tab), class: "admin-rail__tab text-sm",
+            aria: { selected: current?(tab).to_s, controls: panel_id(tab) }, tabindex: (current?(tab) ? 0 : -1), data: tab_data(tab) do %><%= tab.label %><% count.(tab) %><% end %>
+    <% end %>
+  </div>
+<% end %>

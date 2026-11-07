@@ -440,9 +440,11 @@ export default class extends Controller {
         const host = unit.closest("[data-controller~='admin--editor--section']")
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.open(unit.dataset.blockId)
       }
-      const region = unit.closest("[data-admin--editor--section-target~='settings']")
+      const region = unit.closest("[data-controller~='admin--editor--section-settings']")
       if (region?.hidden) {
-        const host = region.closest("[data-controller~='admin--editor--section']")
+        // The card by the region's section, not by where the region stands:
+        // the editor's rail holds it outside its card.
+        const host = document.querySelector(`[data-controller~='admin--editor--section'][data-block-id="${CSS.escape(region.dataset.sectionId)}"]`)
         if (host) this.application.getControllerForElementAndIdentifier(host, "admin--editor--section")?.showSettings()
       }
       const body = unit.querySelector("[data-block-body].hidden")
@@ -502,7 +504,9 @@ export default class extends Controller {
   // A deleted block's card, its tile and its panel go.
   remove(event) {
     const id = event.currentTarget.dataset.editingSubject.slice("block-".length)
-    this.element.querySelectorAll(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel`).forEach((each) => each.remove())
+    // A section's settings region goes too: in the editor's rail it stands
+    // outside its card, and the strip's Remove is how it is let go.
+    this.element.querySelectorAll(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel, #section-${CSS.escape(id)}-settings`).forEach((each) => each.remove())
   }
 
   // "Take over" on a strip or in a card's menu (handoff 2). One request per press: the

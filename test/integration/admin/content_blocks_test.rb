@@ -257,7 +257,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target='block-#{stays.id}-panel']", count: 0
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "2 blocks"
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template" do
-      assert_select "button[data-admin--editor--section-layout-param='one'][aria-current='true']"
+      assert_select "button[data-admin--editor--section-settings-layout-param='one'][aria-current='true']"
       assert_select "button[aria-current='true']", count: 1
     end
     assert_select "turbo-stream[action=replace][target='block-#{section.id}-base-updated-at']"
@@ -283,7 +283,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
-    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--editor--section-layout-param='one_two'][aria-current='true']"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--editor--section-settings-layout-param='one_two'][aria-current='true']"
   end
 
   test "a section's style is saved and audited as a setting, its select drawn only under the choices theme, and an autosave after the theme dropped the style saves" do

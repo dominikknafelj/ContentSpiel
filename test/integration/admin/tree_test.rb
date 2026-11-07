@@ -34,19 +34,24 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   # the head script that lays the column out at the remembered width before
   # the first paint is on every CS Studio screen, since a Turbo visit keeps
   # <html> as the first screen's head left it.
-  test "a screen with a tree draws the divider once, last in the column and outside the tree's frame, and a screen without a tree draws none" do
+  test "a screen with a tree draws the divider once, last in the column and outside the tree's frame, the fold's two buttons, and a screen without a tree none of them" do
     get "/cs-studio/pages/#{@b.id}"
     assert_select "aside#tree-column > [role=separator].admin-tree-divider[aria-orientation=vertical][tabindex='0'][aria-valuenow='272'][aria-valuemin='220'][aria-valuemax='480']", count: 1
     assert_select "aside#tree-column > :last-child[role=separator]"
     assert_select "turbo-frame#tree [role=separator]", count: 0
     assert_select "[role=separator][aria-label=?]", "Page tree width"
+    # The column carries the width's controller; the strip's button is its
+    # first child, outside the frame, and the head's is inside the frame.
+    assert_select "aside#tree-column[data-controller~='admin--shell--tree-width'][data-admin--shell--drawer-target=panel]", count: 1
+    assert_select "aside#tree-column > :first-child.admin-tree-fold[aria-label='Show page tree'][aria-controls=tree-column][aria-expanded=false][data-admin--shell--tree-width-target=unfold]"
+    assert_select "turbo-frame#tree button.admin-tree-hide[aria-label='Hide page tree'][aria-controls=tree-column][aria-expanded=true][data-admin--shell--tree-width-target=fold]", count: 1
 
     get "/cs-studio/posts"
     assert_select "#tree-column", count: 0
     assert_select ".admin-tree-divider", count: 0
   end
 
-  test "the head script applies the remembered width and says whether the tree fits beside the notes, on every screen, guarded, in the stylesheet's unit" do
+  test "the head script applies the remembered width and fold and says whether the tree fits beside the notes, on every screen, guarded, in the stylesheet's unit" do
     [ "/cs-studio/pages/#{@b.id}", "/cs-studio/posts" ].each do |path|
       get path
       script = css_select("head script").map(&:text).find { |text| text.include?("--admin-tree-width") }
@@ -57,7 +62,11 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
       assert_includes script, "stored >= 220 * scale && stored <= 480 * scale"
       assert_includes script, "var width = 272 * scale;"
       assert_includes script, "240 * scale : 0"
-      assert_includes script, "sidebar + width + 400 + 640 * scale"
+      assert_includes script, %(try { folded = localStorage.getItem("cs-tree-folded") === "1"; } catch (e) {})
+      assert_includes script, %(if (folded) root.setAttribute("data-tree-folded", "");)
+      # Folded, the strip stands beside the notes, not the chosen width.
+      assert_includes script, "var tree = folded ? 44 * scale : width;"
+      assert_includes script, "sidebar + tree + 400 + 640 * scale"
       assert_includes script, %(root.setAttribute("data-tree-fits", ""))
       # After the stylesheet's link (a script waits for the stylesheets before
       # it, so the font size it reads is the page's) and still in <head>.
@@ -84,6 +93,18 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal @b, @child.reload.parent
     assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+  end
+
+  # The frame check is the views' (`admin/pages/_tree`), never the
+  # component's: a stream's `replace("tree")` answered to a request with a
+  # frame header would otherwise put an empty element in the column.
+  test "a move asked from inside a frame still answers the whole tree" do
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 },
+      headers: { "Turbo-Frame" => "tree" }, as: :turbo_stream
+    assert_response :success
+    assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+    assert_select "turbo-stream[target=tree] template turbo-frame#tree li[data-page-id='#{@child.id}']"
+    assert_select "turbo-stream[target=tree] template turbo-frame#tree li[data-page-id='#{@b.id}']"
   end
 
   # Final fix wave 1 (reviews A I1 / B I1): `Pages::Move` saves the moved

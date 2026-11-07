@@ -518,3 +518,16 @@ en:
         # shows no related posts yet, so the help says only where they show.
         related_posts:
           help: "Related posts are linked to this one in the Mind graph. The site does not show them yet."
+        # The editors' rail where it docks: the page editor's two tabs
+        # (`admin/pages/show`), the page's settings and the chosen section's,
+        # and the post editor's one (`PostFormComponent`), its heading.
+        rail:
+          tabs:
+            page: "Page"
+            post: "Post"
+            section: "Section"
+        # The Section tab with no section chosen (`admin--editor--section-choice`):
+        # what to press to choose one.
+        section_choice:
+          empty: "Choose a section"
+          help: "Press a section's settings, such as “3 columns ▾”, to change them here."

@@ -71,7 +71,8 @@
 // of a section is open (a section reads that from its panels' `hidden`, so
 // the panel's `hidden` is what is restored, and its tile's `aria-expanded`),
 // whether a section's settings region is open (its `hidden`, and its words'
-// `aria-expanded`), and where the focus is. A CLEAN FORM THAT HAS THE FOCUS IS STILL REPLACED
+// `aria-expanded`), which section is chosen (`data-chosen`, by id: a clean
+// card is replaced), and where the focus is. A CLEAN FORM THAT HAS THE FOCUS IS STILL REPLACED
 // (a hold by someone else must be able to make it read-only): the focus goes
 // back to the same control once it exists (an editor mounts a moment after
 // its card arrives, so this waits for it, until the person focuses or
@@ -98,17 +99,34 @@
 // version is the server's (`Editing.version`); an element with none is
 // always replaced.
 //
-// Otherwise this module touches the document only inside the element it is
+// WHAT A SCRIPT MOVED AWAY (`away`, a list merge's only). An element of the
+// list that a script has moved out of it (a section's settings region, shown
+// in the rail) carries `data-editing-away` and its own id, and the caller
+// hands it in. A merge never moves a unit, so it never puts such an element
+// back: every element of that id is taken out of the answer before
+// anything is drawn, so the list gets no second copy of it, and the away
+// element is merged WHERE IT STANDS, as an ancestor of a kept unit is in the
+// list: its attributes synced but for `hidden` and RUNTIME, its children
+// reconciled with the same kept, same and held sets. The kept units, `same`
+// and what the person did to the screen (`withState`) cover the away elements
+// as they cover the list. When the answer has no element of its id (its
+// section is gone) it is left where it stands: a kept unit in it is marked
+// gone, as everywhere, and an away element with none is returned in
+// `awayGone`, for the script that moved it to remove. `mergeUnits` takes no
+// `away`: the one answer that holds a section's region is the list's (a
+// section's own is a 204).
+//
+// Otherwise this module touches the document only inside the elements it is
 // handed, opens no connection, fetches nothing, raises no toast and knows no
 // controller. Its tests are `test/system/admin/editing_merge_test.rb`.
 
 const UNIT = "[data-editing-unit]"
 const PANEL = "[data-admin--editor--section-target~='panel']"
 // A section's settings region: opened by its head's words, closed as drawn.
-const SETTINGS = "[data-admin--editor--section-target~='settings']"
+const SETTINGS = "[data-controller~='admin--editor--section-settings']"
 const FOCUSABLE = "input:not([type=hidden]), textarea, select, button, a[href], summary, [tabindex]:not([tabindex='-1']), [contenteditable=true]"
 // Set by a script on an element that stays, and not the server's to take away.
-const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gone" ]
+const RUNTIME = [ "inert", "data-picked", "data-notes-active", "data-editing-gone", "data-chosen", "data-editing-away" ]
 // How long a focus waits for a field that a controller is still mounting.
 const FOCUS_WAIT = 3000
 // How long the block being read is held in place while the cards above it grow.
@@ -123,25 +141,79 @@ export function holds(unit, unsaved) {
   return forms.some((form) => unsaved(form))
 }
 
-export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = null }) {
-  const keep = new Set([ ...list.querySelectorAll(UNIT) ].filter((unit) => holds(unit, unsaved)))
+export function mergeList(list, fresh, { unsaved, onlyChanged = false, hold = null, away = [] }) {
+  // What a script moved out of the list (see WHAT A SCRIPT MOVED AWAY above).
+  const movedOut = away.filter((element) => element.id && element.isConnected && !list.contains(element))
+  const roots = [ list, ...movedOut ]
+  const keep = new Set(roots.flatMap((root) => [ ...root.querySelectorAll(UNIT) ]).filter((unit) => holds(unit, unsaved)))
   const moved = displace(list, fresh, keep)
-  const same = onlyChanged ? unchanged(list, fresh, keep, { containers: true }) : []
+  const twins = takeTwins(movedOut, fresh)
+  const same = onlyChanged ? [
+    ...unchanged(list, fresh, keep, { containers: true }),
+    ...movedOut.flatMap((element) => twins.get(element) ? unchanged(element, twins.get(element), keep, { containers: true }) : [])
+  ] : []
   // Parts the caller holds (`hold`: a tile whose menu or dialog is open) stay
   // as they are, like `same` ones: left in place, never marked gone.
   const held = hold ? [ ...list.querySelectorAll("[data-editing-part]") ].filter((part) => !keep.has(part) && reachable(part, list) && hold(part)) : []
   const gone = []
+  const awayGone = []
   // A notice slot that shows an alert (a lost claim, a deleted block) stays
   // as it is, wherever it stands: a section's own slot is outside its unit,
   // and the answer's empty or "held" one must not take away what the person
   // has still to copy or discard.
   const notices = [ ...list.querySelectorAll("[data-editing-strip-slot]") ].filter((slot) => slot.querySelector("[role=alert]:not(:empty)") && reachable(slot, list))
-  withState(list, () => {
-    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, new Set([ ...same, ...held, ...notices ]))
+  withState(roots, () => {
+    const extra = new Set([ ...same, ...held, ...notices ])
+    reconcile(list, [ ...fresh.children ], keep, new Set(moved), gone, extra)
+    for (const [ element, twin ] of twins) mergeAway(element, twin, keep, new Set(moved), gone, extra, awayGone)
     for (const unit of keep) if (!gone.includes(unit)) unit.removeAttribute("data-editing-gone")
     for (const unit of keep) if (unit.matches(PANEL) && unit.hidden && !tileOf(list, unit)) unit.hidden = false
   })
-  return { kept: [ ...keep, ...held ], gone, moved, same }
+  return { kept: [ ...keep, ...held ], gone, moved, same, awayGone }
+}
+
+// The answer's element of each away element's id, taken out of the answer
+// before anything is drawn, so the list gets no second copy of it: every
+// element of that id is removed, and the first is the twin (null: none).
+function takeTwins(movedOut, fresh) {
+  return new Map(movedOut.map((element) => {
+    const copies = [ ...fresh.querySelectorAll(`#${CSS.escape(element.id)}`) ]
+    copies.forEach((copy) => copy.remove())
+    return [ element, copies[0] || null ]
+  }))
+}
+
+// One element a script moved out of the list, merged where it stands against
+// the answer's element of its id (`twin`), as an ancestor of a kept unit is in
+// the list: its attributes synced but for `hidden` (where it stands, its
+// owner shows it) and RUNTIME, its children reconciled. With no twin (its
+// section is gone) it is left in place: a kept unit in it is marked gone, as
+// everywhere, and one with none is handed back in `awayGone` for its owner to
+// remove.
+function mergeAway(element, twin, keep, moved, gone, extra, awayGone) {
+  if (!twin) {
+    const units = [ ...keep ].filter((unit) => element === unit || element.contains(unit))
+    if (!units.length) { awayGone.push(element); return }
+    for (const unit of units) if (!moved.has(unit) && !gone.includes(unit)) { unit.dataset.editingGone = "true"; gone.push(unit) }
+    return
+  }
+  if (keep.has(element) || extra.has(element)) return
+  syncAttributes(element, twin, [ "hidden" ])
+  reconcile(element, [ ...twin.children ], keep, moved, gone, extra)
+}
+
+// A clean element a script moved out of the list, brought up to date where
+// it stands from a fresh copy of it that something else drew (`twin`: a
+// stream that redrew its card), by the same rule as `mergeAway`: its
+// attributes synced but for `hidden`, its children reconciled, and what the
+// person did to it (focus, open settings) kept. With nothing kept, every
+// field takes the copy's value and the form the copy's base. The caller
+// hands in only an element with no unsaved text, and removes the twin.
+export function mergeMoved(element, twin) {
+  withState([ element ], () => {
+    syncAttributes(element, twin, [ "hidden" ])
+    reconcile(element, [ ...twin.children ], new Set(), new Set(), [], new Set())
+  })
 }
 
 // Whether every ancestor of `element` up to `root` has an id: the merge
@@ -331,38 +403,51 @@ function reconcile(container, fresh, keep, moved, gone, extra = new Set()) {
   }
 }
 
-function syncAttributes(live, twin) {
-  for (const { name } of [ ...live.attributes ]) if (!twin.hasAttribute(name) && !RUNTIME.includes(name)) live.removeAttribute(name)
-  for (const { name, value } of [ ...twin.attributes ]) if (live.getAttribute(name) !== value) live.setAttribute(name, value)
+// `left`: attributes not synchronised either way (an away element's `hidden`
+// is its owner's, wherever it stands).
+function syncAttributes(live, twin, left = []) {
+  for (const { name } of [ ...live.attributes ]) if (!twin.hasAttribute(name) && !RUNTIME.includes(name) && !left.includes(name)) live.removeAttribute(name)
+  for (const { name, value } of [ ...twin.attributes ]) if (!left.includes(name) && live.getAttribute(name) !== value) live.setAttribute(name, value)
 }
 
-function withState(root, draw) {
-  const collapsed = [ ...root.querySelectorAll("[data-block-body].hidden") ].map((body) => body.id).filter(Boolean)
-  const open = [ ...root.querySelectorAll(`${PANEL}:not([hidden])`) ].map((panel) => panel.id).filter(Boolean)
-  const settings = [ ...root.querySelectorAll(`${SETTINGS}:not([hidden])`) ].map((region) => region.id).filter(Boolean)
-  const focus = focusOf(root)
+// `roots`: the element the merge was handed, or that and what a script moved
+// out of it (`away`), whose state is the person's too.
+function withState(roots, draw) {
+  roots = [ roots ].flat()
+  const inside = (element) => Boolean(element) && roots.some((root) => root.contains(element))
+  const all = (selector) => roots.flatMap((root) => [ ...(root.matches(selector) ? [ root ] : []), ...root.querySelectorAll(selector) ])
+  const collapsed = all("[data-block-body].hidden").map((body) => body.id).filter(Boolean)
+  const open = all(`${PANEL}:not([hidden])`).map((panel) => panel.id).filter(Boolean)
+  const settings = all(`${SETTINGS}:not([hidden])`).map((region) => region.id).filter(Boolean)
+  // A section chosen in the editor: a selection the answer knows nothing of.
+  const chosen = all("[data-chosen]").filter((element) => element.id).map((element) => [ element.id, element.getAttribute("data-chosen") ])
+  const focus = focusOf(roots)
 
   draw()
 
   for (const id of collapsed) {
     const body = document.getElementById(id)
-    if (!body || !root.contains(body)) continue
+    if (!inside(body)) continue
     body.classList.add("hidden")
-    root.querySelector(`[aria-controls="${CSS.escape(id)}"]`)?.setAttribute("aria-expanded", "false")
+    all(`[aria-controls="${CSS.escape(id)}"]`)[0]?.setAttribute("aria-expanded", "false")
   }
   for (const id of open) {
     const panel = document.getElementById(id)
-    if (!panel || !root.contains(panel)) continue
+    if (!inside(panel)) continue
     panel.hidden = false
-    root.querySelector(`.admin-block-tile__face[aria-controls="${CSS.escape(id)}"]`)?.setAttribute("aria-expanded", "true")
+    all(`.admin-block-tile__face[aria-controls="${CSS.escape(id)}"]`)[0]?.setAttribute("aria-expanded", "true")
   }
   for (const id of settings) {
     const region = document.getElementById(id)
-    if (!region || !root.contains(region)) continue
+    if (!inside(region)) continue
     region.hidden = false
-    root.querySelectorAll(`[aria-controls="${CSS.escape(id)}"]`).forEach((word) => word.setAttribute("aria-expanded", "true"))
+    all(`[aria-controls="${CSS.escape(id)}"]`).forEach((word) => word.setAttribute("aria-expanded", "true"))
   }
-  restoreFocus(root, focus)
+  for (const [ id, value ] of chosen) {
+    const element = document.getElementById(id)
+    if (inside(element) && !element.hasAttribute("data-chosen")) element.setAttribute("data-chosen", value)
+  }
+  restoreFocus(roots, focus)
 }
 
 const signature = (element) => [ element.tagName, element.getAttribute("type"), element.getAttribute("name"), element.getAttribute("aria-label"), element.isContentEditable ].join("|")
@@ -370,9 +455,9 @@ const signature = (element) => [ element.tagName, element.getAttribute("type"), 
 // Where the focus is, as something that survives its element being replaced:
 // the element's own id, or the nearest ancestor with one and the control's
 // place among that ancestor's controls, with what kind of control it is.
-function focusOf(root) {
+function focusOf(roots) {
   const element = document.activeElement
-  if (!element || element === document.body || !root.contains(element)) return null
+  if (!element || element === document.body || !roots.some((root) => root.contains(element))) return null
   const own = Boolean(element.id)
   const holder = own ? element : element.closest("[id]")
   if (!holder) return null
@@ -383,13 +468,13 @@ function focusOf(root) {
   return { element, id: holder.id, own, index, kind: signature(element), selection }
 }
 
-function restoreFocus(root, focus) {
+function restoreFocus(roots, focus) {
   if (!focus || document.activeElement === focus.element) return
   // Something else has it already (the person moved on, or a menu took it).
   if (document.activeElement && document.activeElement !== document.body) return
   const find = () => {
     const holder = document.getElementById(focus.id)
-    if (!holder || !root.contains(holder)) return null
+    if (!holder || !roots.some((root) => root.contains(holder))) return null
     const target = focus.own ? holder : holder.querySelectorAll(FOCUSABLE)[focus.index]
     return target && signature(target) === focus.kind ? target : null
   }
@@ -417,7 +502,7 @@ function restoreFocus(root, focus) {
   const timer = setTimeout(finish, FOCUS_WAIT)
   addEventListener("pointerdown", finish, true)
   addEventListener("focusin", finish, true)
-  observer.observe(root, { childList: true, subtree: true })
+  roots.forEach((root) => observer.observe(root, { childList: true, subtree: true }))
 }
 
 function viewOf(scroller) {

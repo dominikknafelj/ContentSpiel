@@ -7,8 +7,8 @@ require "tmpdir"
 # fails if the trashed one leaks. A new list, search, picker or public query
 # that reads pages, posts or library images belongs here too.
 #
-# Trashing is done by setting `trashed_at` straight on the record (the trash
-# services come later): `update!` still runs the model callbacks, so the
+# Most tests trash by setting `trashed_at` straight on the record, which
+# needs no permission or audit around it: `update!` still runs the model callbacks, so the
 # trashed page and post lose their `public_paths` rows exactly as a real
 # move to the trash would make them (trash spec §4.1, `PublicSite::Paths
 # #compute_path`).
@@ -72,7 +72,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # own query, apart from the navigation: asserted inside `.page-children`,
   # because the header's navigation names the kept page on every page anyway.
   # A trashed page keeps its `published_at`, so "published" alone doesn't
-  # hide it -- and it has no URL any more, so its link would point nowhere.
+  # hide it -- and it has no URL, so its link would point nowhere.
   test "a trashed page's and a trashed post's published copy is served nowhere: not at its address, in the menu, in a list of subpages or in a post list" do
     listing = create_page(title: "Copy listing", published: false)
     ContentBlocks::Save.call(ContentBlock.new(owner: listing), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
@@ -488,6 +488,22 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A settings save answers the saved page's row alone, read for that page
+  # (`TreeRowComponent.for_page`): its child count is of kept children too.
+  test "the tree row a settings save answers with counts kept children only" do
+    sign_in_as users(:one)
+    create_page(title: "Kept child", parent: @kept_page)
+    create_page(title: "Gone child", parent: @kept_page).update!(trashed_at: Time.current)
+
+    patch "/cs-studio/pages/#{@kept_page.id}", as: :turbo_stream,
+      params: { base_updated_at: @kept_page.reload.settings_changed_at.iso8601(6), page: { title: "Kept page, renamed" } }
+
+    assert_response :success
+    row = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='tree-row-#{@kept_page.id}'] template")
+    assert row, "the save answered no row"
+    assert_equal "1", Nokogiri::HTML5.fragment(row.inner_html).at_css("[data-child-count]")&.text
+  end
+
   # The translations matrix keeps a trashed record's `translation_states` rows
   # (a restore needs no work), so only the readers' scopes hide it: not as a
   # row, not in the type filter's counts, not in a language's percentage.
@@ -835,7 +851,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   end
 
   # The posts list's own filters, search, scope counts and pagination, and the
-  # bulk endpoints (design pass round 2): every one of them is kept
+  # bulk endpoints: every one of them is kept
   # posts only, a trashed id is "not found", and Undo restores only trashed ones.
   test "the posts list's search, scope, type, tag and translation filters, counts and pager never include a trashed post" do
     sign_in_as users(:one)

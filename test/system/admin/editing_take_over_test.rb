@@ -237,7 +237,6 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
 
   def release_reads = page.execute_script("window.__reads.open = true; window.__reads.held.splice(0).forEach((send) => send())")
 
-  def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
 
   def await_merged(block = @block) = await_js("window.__merged.includes('block:#{block.id}')", wait: LIVE)
 

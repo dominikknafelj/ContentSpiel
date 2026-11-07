@@ -76,11 +76,17 @@
   <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
   <span class="sr-only" aria-live="polite" data-editing-announcer></span>
 
+  <%# Where the settings region belongs: the editor's rail puts a region it showed back
+      after this marker (`admin--editor--section-choice#release`), wherever the region
+      stood meanwhile. Empty, and drawn nothing. %>
+  <span hidden data-section-settings-home></span>
+
   <%# The one element that holds the section's settings form (see the component): hidden
-      until a word of the head opens it, never replaced by an answer. Close is outside the
-      form, so a reader's disabled fieldset does not disable it. %>
+      until a word of the head opens it, never replaced by an answer, and carrying its own
+      controller, so its menu, Close and Escape work wherever it stands. Close is outside
+      the form, so a reader's disabled fieldset does not disable it. %>
   <%= tag.div id: settings_id, hidden: true, class: "admin-section-card__settings mx-3 mb-3 rounded-card bg-rail p-3",
-        data: { "admin--editor--section-target": "settings" } do %>
+        data: { controller: "admin--editor--section-settings", section_id: section.id, action: "keydown.esc->admin--editor--section-settings#escape" } do %>
     <%# The section's own settings (see the component): an autosave form like a block
         card's, with the same ids. No form may be nested in it. %>
     <%= form_with url: form_url, method: :patch, id: form_id, class: "flex flex-wrap items-center gap-2", data: form_data.merge(editing_unit: "", editing_subject: ::Editing.key(section), editing_version: editing_version, **held_marks) do %>
@@ -129,7 +135,7 @@
     <% end %>
 
     <div class="mt-2 flex justify-end">
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".close_settings"), variant: :tertiary, size: :small, data: { action: "admin--editor--section#closeSettings" }) %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".close_settings"), variant: :tertiary, size: :small, data: { action: "admin--editor--section-settings#close" }) %>
     </div>
   <% end %>
   <% end %>

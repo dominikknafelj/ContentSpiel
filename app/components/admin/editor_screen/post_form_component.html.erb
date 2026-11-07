@@ -16,18 +16,28 @@
     than nested inside this form, needs no Stimulus target here to reach
     it) -- and only on an editable post (`form_data`). The `<fieldset>`
     (`contents`, so it doesn't affect the form's layout) disables every
-    field at once for a view-only one. %>
-<%# The fetched answer (`form_only`) carries the notice area too, so that the strip comes and
-    goes with the hold: `admin--editing--live` merges it around an alert already there. On one
-    line, so that `:empty` holds without a strip. %>
-<% if form_only? %><div id="editor-notice"><%= render hold_strip if held? %></div><% end %>
+    field at once for a view-only one.
 
+    The form holds both of the post's columns: `.admin-post-main` (the
+    title, the address and the body) and then the settings panel (the
+    excerpt, the type's own fields, the tags and the related posts, in the
+    rail where it docks). It is one form at every width, so one autosave,
+    one base and one `data-editing-subject="record"` unit cover both, and a
+    record merge replaces or keeps the two together.
+
+    The main column comes first in the document because a post's title is
+    not a setting: a person writing a post starts at its title, so below the
+    threshold it reads title, address, body, then the settings, and the
+    focus follows what is seen at both widths (docked, the grid places each
+    column explicitly, so the order moves nothing on screen). %>
+<% form = capture do %>
 <%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-card bg-surface shadow-1 p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?), ("admin-held" if read_only_hold?) ] do %>
 <%= fields do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
+  <div class="admin-post-main admin-rail__main flex flex-col gap-4">
   <%# Wraps title + slug only, for `admin--editor--slug-preview` -- same pairing
       `Admin::EditorScreen::PageSettingsFormComponent` already uses. %>
   <div data-controller="admin--editor--slug-preview" data-action="input->admin--editor--slug-preview#update">
@@ -44,6 +54,15 @@
         ) %>
   </div>
 
+  <%= render Admin::Columns::RichTextColumnComponent.new(
+        name: "body", id: field_id("body"), html_name: field_html_name("body"),
+        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
+        editable: editable? && !read_only_hold?, **translation(:body)
+      ) %>
+  </div>
+
+  <%= render Admin::Ui::RailPanelComponent.new(rail_id: RAIL_ID, key: "post", current: true) do %>
+  <div class="flex flex-col gap-4">
   <%= render Admin::Columns::PlainColumnComponent.new(
         name: "excerpt", id: field_id("excerpt"), html_name: field_html_name("excerpt"),
         value: value(:excerpt), original: original(:excerpt), locale: locale, multiline: true, errors: field_errors("excerpt"),
@@ -60,8 +79,8 @@
       "post_fields") -- see `Admin::PostsController#post_error_fields`'s own
       comment for why every id here has to agree with that bare prefix. %>
   <% if fields_group? %>
-    <%# Titled with the type's label ("RESUME ENTRY FIELDS", design pass round 2, handoff §9 B23) so the
-        type's own fields read as one group between Excerpt and Body rather than more loose columns. %>
+    <%# Titled with the type's label ("Resume entry fields") so the type's own
+        fields read as one group among the settings rather than more loose columns. %>
     <section class="admin-fields-group flex flex-col gap-1 rounded-cs border border-line p-3" data-editor-fields-group aria-labelledby="<%= field_id("fields-group-title") %>">
       <h2 id="<%= field_id("fields-group-title") %>" class="text-label text-meta" data-fields-group-title><%= fields_group_title %></h2>
     <% schema_fields.each do |field| %>
@@ -80,12 +99,6 @@
     </section>
   <% end %>
 
-  <%= render Admin::Columns::RichTextColumnComponent.new(
-        name: "body", id: field_id("body"), html_name: field_html_name("body"),
-        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
-        editable: editable? && !read_only_hold?, **translation(:body)
-      ) %>
-
   <%# Tags are shared by every language (they are not translated), and a new name is created on save. %>
   <%= render Admin::Ui::ChipInputComponent.new(
         name: "#{field_html_name("tag_names")}[]", id: field_id("tag_names"), label: "Tags", chips: tag_chips,
@@ -96,6 +109,31 @@
   <%= render Admin::EditorScreen::RelatedPostsComponent.new(
         post: post, locale: locale, url_options: url_options, errors: field_errors("related_post_ids")
       ) %>
+  </div>
+  <% end %>
 <% end %>
+<% end %>
+<% end %>
+<% end %>
+
+<%# The rail (`Admin::Ui::RailTabsComponent`, `RailPanelComponent`, `admin--ui--rail`), as in
+    the page editor: where the editor area has the room, the post's settings stand in the
+    rail under the one heading Post, right of the main column; below it, and on a
+    translation tab (`--folded`, whose pairs need the width), they stand below the main
+    column, where the document puts them. Only the grid places them. The fetched answer
+    (`form_only`) is the notice area and the form alone, which the record merge replaces
+    or keeps whole, the settings panel with it; the rail re-applies its current tab to a
+    panel that connects. The notice area is on one line, so that `:empty` holds without a
+    strip: `admin--editing--live` merges the strip around an alert already there. %>
+<% if form_only? %>
+<div id="editor-notice"><%= render hold_strip if held? %></div>
+<%= form %>
+<% else %>
+<%= tag.div id: RAIL_ID, class: [ "admin-rail-grid", ("admin-rail-grid--folded" if translation_tab?) ],
+      data: { controller: "admin--ui--rail", action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal" } do %>
+<%= render Admin::Ui::RailTabsComponent.new(rail_id: RAIL_ID, current: "post", tabs: [
+      Admin::Ui::RailTabsComponent::Tab.new(key: "post", label: t("admin.components.editor_screen.rail.tabs.post"))
+    ]) %>
+<%= form %>
 <% end %>
 <% end %>

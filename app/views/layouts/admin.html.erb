@@ -108,14 +108,22 @@
       </div>
 
       <% if content_for?(:tree) %>
-        <aside id="tree-column" class="admin-shell__tree" data-admin--shell--drawer-target="panel" data-drawer="tree" tabindex="-1">
+        <%# The column carries the controller of its width and its fold
+            (`admin--shell--tree-width`, `TreeDividerComponent.column_data`),
+            which reaches the divider, the tree head's "Hide page tree" and
+            the strip's "Show page tree" as its targets. %>
+        <%= tag.aside id: "tree-column", class: "admin-shell__tree", tabindex: "-1",
+              data: { "admin--shell--drawer-target": "panel", drawer: "tree" }.merge(Admin::Shell::TreeDividerComponent.column_data) do %>
+          <%# The folded tree's strip ("Show page tree"): first, outside the
+              tree's frame, shown only while folded from 1024px. %>
+          <%= render Admin::Shell::TreeFoldComponent.new %>
           <%= yield :tree %>
           <%# The divider the column is resized by, on its right edge
               (`Admin::Shell::TreeDividerComponent`): last, after the tree's
               own frame, which a move replaces. Not shown where the tree is a
               drawer. %>
           <%= render Admin::Shell::TreeDividerComponent.new %>
-        </aside>
+        <% end %>
       <% end %>
 
       <%# `p-6` stays on <main>: the save bar (`sticky bottom-0 -mx-6`) is
@@ -168,7 +176,7 @@
         do nothing here, and it sits outside every form. %>
     <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
 
-    <%# The one Leave dialog (design pass spec §4; round 3 decision D24):
+    <%# The one Leave dialog (design pass spec §4):
         `admin--saving--save-bar` opens it when a Turbo visit, a link into the content
         frame or Back / Forward would drop unsaved changes. Here, outside
         `#content` and every form, like every dialog.
@@ -197,14 +205,14 @@
         on <body>, which also owns the ⌘K / Ctrl+K shortcut. %>
     <%= render Admin::Shell::CommandPaletteComponent.new %>
 
-    <%# The one media picker (media library Task 8) -- here, outside the
+    <%# The one media picker -- here, outside the
         `#content` frame and every form, so there's exactly one per page
         however many image fields and editors open it, and its own inputs
         never feed an autosave. Renders nothing without `media.upload`
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
 
-    <%# The New page and New post dialogs (design pass round 2, Task 15): once
+    <%# The New page and New post dialogs: once
         each, here, outside `#content` and every form. Every "+ New page" /
         "New post" trigger (tree header and rows, ⌘K, the pages empty state,
         the dashboard, the posts list) opens one of these. Only the SHELL is
@@ -217,8 +225,8 @@
       <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options) %>
     <% end %>
 
-    <%# The rich-text editor's image, YouTube and Page link dialogs (design pass
-        round 2, Task 13): one of each, here for the same reason as the picker
+    <%# The rich-text editor's image, YouTube and Page link dialogs: one of
+        each, here for the same reason as the picker
         -- outside `#content` and every autosave form. The editor that opens
         one is the only one that hears its answer. %>
     <%= render Admin::EditorScreen::RichTextDialogsComponent.new %>

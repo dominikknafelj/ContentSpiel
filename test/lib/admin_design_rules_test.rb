@@ -102,11 +102,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # Every place a translation STATE is drawn: red is for destruction and
-  # failure, never for "missing" or "outdated" (final review C, M13).
+  # failure, never for "missing" or "outdated".
   test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
     %w[
       app/components/admin/ui/translation_chip_component.rb app/components/admin/ui/language_tabs_component.html.erb
-      app/components/admin/pages_screen/tree_node_component.html.erb app/components/admin/pages_screen/tree_node_component.rb
+      app/components/admin/pages_screen/tree_row_component.html.erb app/components/admin/pages_screen/tree_row_component.rb
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
       app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb
@@ -155,9 +155,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
-    # Round 3: Languages is a card of the Settings screen, an image's detail a
-    # panel beside the Media grid, and the audit log words its rows through
-    # `Audit::Sentence` -- the screens and helper they replaced stay deleted.
+    # Languages is a card of the Settings screen, an image's detail a panel
+    # beside the Media grid, and the audit log words its rows through
+    # `Audit::Sentence`: no screen or helper draws them a second way.
     %w[
       app/views/admin/languages/index.html.erb app/views/admin/media/show.html.erb
       app/views/admin/shared/_image_upload_field.html.erb app/views/admin/api_tokens/_connection.html.erb
@@ -165,7 +165,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     ].each do |file|
       assert_not Rails.root.join(file).exist?, file
     end
-    # The translation states live in `translation_states` (`Translations::StateIndex`) now.
+    # The translation states live in `translation_states` (`Translations::StateIndex`).
     assert_not Rails.root.join("app/models/translations/cached_status.rb").exist?
   end
 
@@ -315,8 +315,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A button is `Admin::Ui::ButtonComponent`'s (or its `.classes`, which a
   # link, a label and a script take): an outlined box with a field-line edge on
-  # a button, a menu's trigger or anything a pointer presses is the old look
-  # drawn by hand. A script takes the strings from the view (a `data-` value),
+  # a button, a menu's trigger or anything a pointer presses is a button drawn
+  # by hand, outside the component. A script takes the strings from the view (a `data-` value),
   # or, where it cannot, is held to them string for string (the popover, below).
   # What may keep a field-line edge and still be pressed is a control that is
   # not a button, each named with its reason.
@@ -438,11 +438,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_not rules.any? { |selectors, _| selectors.include?(".admin-column") && selectors.include?("textarea") }, "a comma inside :is() split the list"
   end
 
-  # The old field was a white box with a full field-line outline and an
-  # accent focus. A text field is a well, from its wrapper (`.admin-column`,
+  # A text field is a well, from its wrapper (`.admin-column`,
   # `.admin-field`, `.admin-filter-bar`, the popover, the suggestion box) or
-  # from `.admin-well`, so neither that outline nor a focus colour of its own
-  # stands on an input in CS Studio's markup.
+  # from `.admin-well`, so neither a full field-line outline nor a focus
+  # colour of its own stands on an input in CS Studio's markup.
   TEXT_INPUT = /text_field_tag|search_field_tag|text_area_tag|email_field_tag|password_field_tag|number_field_tag|date_field_tag|url_field_tag|<input|<textarea|tag\.input|tag\.textarea|element\("(?:input|textarea)"|createElement\("(?:input|textarea)"\)|(?<![\w-])(?:focus|focus-visible|focus-within):(?:outline|border)-accent(?![\w-])/
   FULL_FIELD_LINE = /\A(?=.*(?<![\w:-])border(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*border-field-line(?![\w-]))/
 
@@ -529,6 +528,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert roots.all? { |at| at < studio }, "the studio rule comes after every :root block that sets --cs-t-label"
     %w[admin product setup].each { |name| assert_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, '<html data-surface="studio"', name }
     %w[form_send application].each { |name| assert_not_includes Rails.root.join("app/views/layouts/#{name}.html.erb").read, 'data-surface="studio"', name }
+  end
+
+  # The rail docks by the editor area's width: a classic scrollbar that
+  # comes and goes with the page's height must not move it across.
+  test "CS Studio's document keeps its scrollbar gutter, so a scrollbar takes no width from the editor area" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/^html\[data-surface="studio"\]\s*\{[^}]*scrollbar-gutter:\s*stable;/m, css)
+    assert_equal 1, css.scan(/scrollbar-gutter/).size, "the gutter is the studio surface's alone"
   end
 
   # The form-send pages' required word keeps its capitals: a visitor's page,
@@ -666,11 +673,24 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Layout points spec, decision 1: one cap, one place.
+  # Layout points spec, decision 1: one cap, one place. The rail's three
+  # widths (the 900px blocks column, the 360px rail, the 28px between them)
+  # are tokens of the same kind, beside it.
+  RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:900|360|28)px\]|(?:max-|min-)?width:\s*(?:900|360)px|(?:column-)?gap:\s*28px/
+  RAIL_WIDTH_ALLOWED = {
+    "app/views/admin/system_status/show.html.erb" => "System status's own column, a list screen's cap that is not the editor's",
+    "app/views/layouts/product.html.erb" => "the sign-in pages' centred column, a whole-screen form's width that is not the rail's"
+  }.freeze
+
   test "the form column's width is a token: 760px and 1144px are written once, in content-spiel.css" do
     tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
     assert_equal 1, tokens.scan("--cs-form-max: 760px;").size
     assert_equal 1, tokens.scan("--cs-form-max-pair: 1144px;").size
+    assert_equal 1, tokens.scan("--cs-editor-column: 900px;").size
+    assert_equal 1, tokens.scan("--cs-rail-width: 360px;").size
+    assert_equal 1, tokens.scan("--cs-rail-gap: 28px;").size
+    assert_equal 1, tokens.scan(/\b900px/).size, "900px is the token's alone in content-spiel.css"
+    assert_equal 1, tokens.scan(/\b360px/).size, "360px is the token's alone in content-spiel.css"
 
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-form-column\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
@@ -678,6 +698,65 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/@container \(min-width: 824px\)\s*\{\s*\.admin-translation-pair\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 560px\)\);/m, css)
     assert_no_match(/\b(?:760|1144)px/, css)
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
+
+    assert_no_match(/\b(?:900|360|28)px/, css)
+    assert_empty design_offences(RAIL_WIDTH_LITERAL, except: RAIL_WIDTH_ALLOWED.keys)
+    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} no longer writes the width: drop its allowance" }
+  end
+
+  test "the rail width pattern matches a hard-coded column, rail or gap, and not a token or a type size" do
+    [ "max-w-[900px]", "w-[360px]", "gap-x-[28px]", "max-width: 900px", "width: 360px", "column-gap: 28px" ].each { |sample| assert_match RAIL_WIDTH_LITERAL, sample }
+    [ "max-w-(--cs-editor-column)", "text-[28px]", "width: var(--cs-rail-width)", "28px 56px" ].each { |sample| assert_no_match RAIL_WIDTH_LITERAL, sample }
+  end
+
+  # A CSS block's body by its head (`@container …`, `@media …`): from the head's
+  # brace to the brace that closes it, comments stripped.
+  def self.css_blocks(name, head)
+    css = Rails.root.join("app/assets/tailwind", name).read.gsub(%r{/\*.*?\*/}m, "")
+    css.to_enum(:scan, head).map do
+      start = Regexp.last_match.end(0)
+      depth = 1
+      finish = (start...css.size).find do |index|
+        depth += 1 if css[index] == "{"
+        depth -= 1 if css[index] == "}"
+        depth.zero?
+      end
+      css[start...finish]
+    end
+  end
+
+  # The editors' rail: the editor area is the container, so a folded tree or
+  # a narrower content column gives the rail room the window does not show.
+  # The blocks column opts in by its class, found anywhere in the grid (a
+  # `display: contents` form between), and nothing else is placed in it.
+  test "the rail is laid out by the editor area's container, never the window" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-editor-area\s*\{\s*container:\s*admin-editor\s*\/\s*inline-size;\s*\}/, css)
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks the rail"
+    grid = docked.first[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)\s*\{([^}]*)\}/, 1]
+    assert grid, "the docked grid is .admin-rail-grid:not(.admin-rail-grid--folded)"
+    assert_match(/grid-template-columns:\s*minmax\(0, var\(--cs-editor-column\)\) var\(--cs-rail-width\);/, grid)
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/justify-content:\s*start;/, grid)
+    assert_match(/--admin-rail-docked:\s*1;/, grid, "the controller reads the docked state from the property the query sets")
+    ground = docked.first[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{([^}]*)\}/, 1]
+    assert ground, "the rail's ground is the grid's ::before"
+    %w[background:\s*var\(--cs-rail\) box-shadow:\s*var\(--cs-shadow-2\) border-radius:\s*var\(--cs-radius-rail\) grid-column:\s*2 grid-row:\s*1\s*/\s*-1].each do |declaration|
+      assert_match(/#{declaration};/, ground)
+    end
+    assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-rail__main\s*\{\s*grid-column:\s*1;\s*grid-row:\s*1\s*\/\s*-1;\s*\}/, docked.first)
+    assert_no_match(/\.admin-rail-grid[^{,]*>\s*:not\(/, docked.first, "nothing but the marked blocks column is placed in the first column")
+    %w[admin-rail__tabs admin-rail__panel admin-rail__main].each do |item|
+      assert_no_match(/\.admin-rail-grid[^{,]*>\s*\.#{item}/, docked.first, "#{item} is matched anywhere in the grid, not only as a child")
+    end
+    assert_match(/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-form-column\s*\{\s*max-width:\s*var\(--cs-editor-column\);\s*\}/, docked.first)
+    assert_match(/\.admin-rail-grid\s*\{[^}]*--admin-rail-docked:\s*0;[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column below the threshold")
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
   end
 
   # Design System: a filter bar is 38px, set by the bar, never by a control.
@@ -961,5 +1040,64 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-live-ness", "text-delivered", "live-region", "bg-sunken" ].each { |sample| assert_no_match LIVE_SCHEDULED_FILL, sample }
     [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
     [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
+  end
+
+  # The page tree's width state on <html>: the chosen width
+  # (`--admin-tree-width`), whether the tree fits beside the notes
+  # (`data-tree-fits`) and the fold (`data-tree-folded`). The layout's head
+  # script writes them before the first paint and `admin--shell--tree-width`
+  # from then on; a third writer would lay the column out by a rule neither
+  # of them knows. A write is a `setProperty` or `removeProperty` of the
+  # property, a `setAttribute`, `toggleAttribute` or `removeAttribute` of an
+  # attribute, or a `dataset` assignment or delete (`.treeFits` or
+  # `["treeFits"]`), each named by its string or by a constant the same file
+  # binds to that string. Not seen: a name imported or computed, and an
+  # attribute the server draws on <html> (CLAUDE.md names both).
+  TREE_STATE_NAMES = %w[--admin-tree-width data-tree-fits data-tree-folded].freeze
+  TREE_STATE_WRITERS = %w[app/views/admin/shared/_tree_head.html.erb app/javascript/controllers/admin/shell/tree_width_controller.js].freeze
+  TREE_STATE_SOURCES = Dir[Rails.root.join("app/{javascript,views,components}/**/*.{erb,rb,js}")]
+
+  def self.tree_state_write?(source)
+    quoted = TREE_STATE_NAMES.map { |name| %(["'`]#{Regexp.escape(name)}["'`]) }
+    constants = source.scan(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["'`](#{TREE_STATE_NAMES.map { |name| Regexp.escape(name) }.join("|")})["'`]/).map(&:first)
+    named = Regexp.union(quoted.map { |pattern| Regexp.new(pattern) } + constants.map { |name| /(?<![\w$])#{Regexp.escape(name)}(?![\w$])/ })
+    source.match?(/\b(?:setProperty|removeProperty|setAttribute|toggleAttribute|removeAttribute)\(\s*(?:#{named.source})/) ||
+      source.match?(/\bdataset(?:\.tree(?:Fits|Folded)|\[\s*["'`]tree(?:Fits|Folded)["'`]\s*\])\s*=(?!=)|\bdelete\s+[\w$.]*dataset(?:\.tree(?:Fits|Folded)\b|\[\s*["'`]tree(?:Fits|Folded)["'`]\s*\])/)
+  end
+
+  test "the tree's width, fits and fold are written by the head script and the tree-width controller alone" do
+    writers = TREE_STATE_SOURCES.select { |path| self.class.tree_state_write?(File.read(path)) }.map { |path| path.delete_prefix("#{Rails.root}/") }
+    assert_equal TREE_STATE_WRITERS.sort, writers.sort, "the tree's width state on <html> has two writers, the head script and admin--shell--tree-width"
+  end
+
+  test "the writer pattern matches each way of writing the three" do
+    [
+      %(root.style.setProperty("--admin-tree-width", "300px")),
+      %(document.documentElement.style.removeProperty('--admin-tree-width')),
+      %(root.setAttribute("data-tree-fits", "")),
+      %(root.toggleAttribute("data-tree-folded", true)),
+      %(this.root.removeAttribute("data-tree-folded")),
+      %(const PROPERTY = "--admin-tree-width"\nthis.root.style.setProperty(PROPERTY, width)),
+      %(const FITS = "data-tree-fits"\nthis.root.toggleAttribute(FITS, fits)),
+      %(const FOLDED = "data-tree-folded"\nthis.root.setAttribute(FOLDED, "")),
+      %(const FOLDED = "data-tree-folded"\nthis.root.removeAttribute( FOLDED )),
+      %(document.documentElement.dataset.treeFolded = ""),
+      %(root.dataset.treeFits = "true"),
+      %(root.dataset["treeFolded"] = ""),
+      %(root.dataset['treeFits']="1"),
+      %(delete document.documentElement.dataset.treeFits),
+      %(delete root.dataset["treeFolded"])
+    ].each { |sample| assert self.class.tree_state_write?(sample), "not seen as a write: #{sample}" }
+
+    [
+      %(root.hasAttribute("data-tree-folded")),
+      %(root.style.getPropertyValue("--admin-tree-width")),
+      %(:root[data-tree-folded] { --admin-tree-column: var(--admin-tree-strip); }),
+      %(const FOLDED = "data-tree-folded"\nif (root.hasAttribute(FOLDED)) open()),
+      %(const OTHER = "data-other"\nroot.setAttribute(OTHER, "")),
+      %(root.setAttribute("data-tree-resizing", "")),
+      %(if (root.dataset.treeFolded === "") fold()),
+      %(if (root.dataset["treeFits"] == null) fold())
+    ].each { |sample| assert_not self.class.tree_state_write?(sample), "seen as a write: #{sample}" }
   end
 end

@@ -107,4 +107,49 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
     as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "de") }
     assert_selector "form#post-form.admin-form-column.admin-form-column--pair"
   end
+
+  test "the post's settings panel is inside the form and after the main column" do
+    as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "en") }
+
+    assert_selector "#editor-grid.admin-rail-grid[data-controller~='admin--ui--rail']:not(.admin-rail-grid--folded)"
+    assert_selector "#editor-grid > form#post-form", count: 1
+    assert_selector "#editor-grid > h2#editor-grid-tab-post", text: "Post"
+    panel = "#post-form [role=tabpanel]#editor-grid-panel-post[data-current][aria-labelledby='editor-grid-tab-post']"
+    assert_selector "#{panel} #post-excerpt"
+    assert_selector "#{panel} #post-tag_names"
+    assert_selector "#{panel} #post-related_post_ids"
+    assert_selector "#post-form .admin-post-main.admin-rail__main #post-title"
+    assert_selector "#post-form .admin-post-main #post-slug"
+    assert_selector "#post-form .admin-post-main [data-field-name='body']"
+    assert_no_selector "#{panel} #post-title"
+
+    ids = Capybara.string(rendered_content).all("#post-form #editor-grid-panel-post, #post-form .admin-post-main").map { |node| node[:id] || node[:class] }
+    assert_equal "editor-grid-panel-post", ids.last, "the main column comes before the settings panel"
+    assert_equal 2, ids.size
+  end
+
+  test "a type's own fields stand in the settings panel; a translation tab folds the rail; the form-only answer is the form alone" do
+    ContentTypes.register "test/event" do |t|
+      t.label "Event"
+      t.list_component Posts::BlogListComponent
+      t.detail_component Posts::DetailComponent
+      t.field :venue, :string
+    end
+    with_locales(%w[en de], default: "en") do
+      saved = Posts::Save.call(attributes: { content_type: "test/event" }, translations: { "en" => { title: "Gig" } })
+      assert saved.ok?, saved.errors.to_sentence
+
+      as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: saved.record, locale: "en") }
+      assert_selector "#editor-grid-panel-post [data-editor-fields-group]"
+
+      as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: saved.record, locale: "de") }
+      assert_selector "#editor-grid.admin-rail-grid--folded > form#post-form"
+
+      as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: saved.record, locale: "en", form_only: true) }
+      assert_no_selector "#editor-grid"
+      assert_selector "form#post-form #editor-grid-panel-post"
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end

@@ -50,7 +50,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     open_settings("background")
 
     select "Strong", from: "block-#{@section.id}-background"
-    find("#{settings_region} button[data-action='admin--editor--section#closeSettings']").click
+    find("#{settings_region} button[data-action='admin--editor--section-settings#close']").click
 
     assert_selector settings_region, visible: :hidden
     assert_selector word("background"), text: "Strong background"
@@ -111,7 +111,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     open_settings
     claim_by_typing
 
-    find("#{settings_region} button[data-action='admin--editor--section#closeSettings']").click
+    find("#{settings_region} button[data-action='admin--editor--section-settings#close']").click
 
     assert_selector settings_region, visible: :hidden
     assert_released
@@ -144,7 +144,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     open_settings
     find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Layout']").click
-    find("button[data-admin--editor--section-layout-param='one']").click
+    find("button[data-admin--editor--section-settings-layout-param='one']").click
 
     assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
@@ -164,7 +164,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     find(face(@right)).click
     open_settings
     find(layout_button).click
-    find("button[data-admin--editor--section-layout-param='one']").click
+    find("button[data-admin--editor--section-settings-layout-param='one']").click
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
 
     assert_selector "#{face(@right)}[aria-expanded='true']"
@@ -176,8 +176,8 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     assert_no_text "CHANGED ELSEWHERE"
     assert_equal "Typed after the fold", @right.reload.caption
     find(layout_button).click
-    assert_selector "#{section_card} button[data-admin--editor--section-layout-param='one'][aria-current='true']"
-    assert_selector "#{section_card} button[data-admin--editor--section-layout-param][aria-current='true']", count: 1
+    assert_selector "#{section_card} button[data-admin--editor--section-settings-layout-param='one'][aria-current='true']"
+    assert_selector "#{section_card} button[data-admin--editor--section-settings-layout-param][aria-current='true']", count: 1
     assert_equal "one", @section.reload.settings["layout"]
   end
 
@@ -192,7 +192,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     # element clicks it first, which would be the pointer opening the menu.
     page.execute_script("document.querySelector(#{layout_button.to_json}).focus()")
     page.driver.browser.keyboard.type(:enter)
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-settings-layout-param]", count: 6
     # Opening focuses the first choice; two steps down is "Three columns".
     page.driver.browser.keyboard.type(:down, :down, :enter)
 
@@ -209,7 +209,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     open_settings
     count_writes
     find(layout_button).click
-    find("button[data-admin--editor--section-layout-param='two']").click
+    find("button[data-admin--editor--section-settings-layout-param='two']").click
 
     assert_no_selector "#{section_card} [role=menu]"
     await_frames
@@ -225,7 +225,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     open_settings
     find(layout_button).click
-    find("button[data-admin--editor--section-layout-param='one']").click
+    find("button[data-admin--editor--section-settings-layout-param='one']").click
 
     assert_selector "#block-#{@section.id}-save-status", text: "CHANGED ELSEWHERE"
     assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 2
@@ -288,13 +288,13 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     select "Tinted", from: "block-#{@section.id}-background"
     find(layout_button).click
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-settings-layout-param]", count: 6
 
     assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
     assert_writes_settled
     await_frames
     assert_equal "tinted", @section.reload.settings["background"]
-    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-layout-param]", count: 6
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--editor--section-settings-layout-param]", count: 6
     assert_selector "#{layout_button}[aria-expanded='true']"
   end
 
@@ -317,7 +317,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     open_settings
     find(layout_button).click
-    find("button[data-admin--editor--section-layout-param='one']").click
+    find("button[data-admin--editor--section-settings-layout-param='one']").click
     # Not `assert_writes_settled`: a form whose save failed is not settled.
     assert_eventually(message: "the layout was never sent") { page.evaluate_script("window.__writes") == 1 }
     assert_no_selector "#{section_card} [role=menu]"
@@ -326,7 +326,7 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
     # The pick alone, with the menu closed: opening the menu moves the focus
     # inside the form, and a form whose save failed sends again on that by
     # itself -- which is not the rule this is about.
-    page.execute_script("document.querySelector(#{"#{section_card} button[data-admin--editor--section-layout-param='one']".to_json}).click()")
+    page.execute_script("document.querySelector(#{"#{section_card} button[data-admin--editor--section-settings-layout-param='one']".to_json}).click()")
 
     assert_selector "#section-#{@section.id}-lanes [data-admin--editor--blocks-target='lane']", count: 1
     assert_writes_settled

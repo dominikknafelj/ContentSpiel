@@ -160,19 +160,24 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    whole of it grows with a browser set to a larger font. The two scripts
    hold the same figures as `Admin::Shell::TreeDividerComponent`'s constants
    (repeated here because `clamp()` cannot be handed one) and multiply each
-   by the root's font size over 16; `100vw` is what a media query measures
-   and what their `innerWidth` is. So the scripts and this agree at any font
-   size, not at 16px only. The notes column alone is pixels
+   by the root's font size over 16. The window's width here is `100%`, which
+   in the grid's track (where the property is used) is the shell's own width:
+   the document's, less the scrollbar's gutter, which CS Studio keeps
+   (`scrollbar-gutter: stable`, content-spiel.css), and what the scripts read
+   as the root's box (`getBoundingClientRect`). So the scripts and this agree
+   at any font size and with a classic scrollbar, not at 16px only. A media
+   query measures the window with the gutter, and the scripts ask the
+   sidebar's breakpoint through `matchMedia`, the same query. The notes column alone is pixels
    (`--admin-notes-width`), here and there.
 
    Where the tree is a DRAWER the limit is not asked: below 1024px it keeps
    its fixed 17rem, and folded beside the notes column (further down) it is
    the chosen width, laid over the content. */
 :root {
-  --admin-tree-room: calc(100vw - 15rem - 40rem);
+  --admin-tree-room: calc(100% - 15rem - 40rem);
   --admin-tree-column: clamp(13.75rem, var(--admin-tree-width, 17rem), max(13.75rem, min(30rem, var(--admin-tree-room))));
 }
-@media (max-width: 1279px) { :root { --admin-tree-room: calc(100vw - 40rem); } }
+@media (max-width: 1279px) { :root { --admin-tree-room: calc(100% - 40rem); } }
 .admin-shell--tree { grid-template-columns: 15rem var(--admin-tree-column) minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a
@@ -224,6 +229,36 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-divider[data-dragging]::after { background: var(--cs-accent); }
 .admin-tree-divider__tip { position: sticky; top: calc(var(--admin-top-offset) + 3rem); display: block; height: 0; }
 :root[data-tree-resizing], :root[data-tree-resizing] * { cursor: col-resize; user-select: none; }
+/* THE TREE FOLDS TO A STRIP. "Hide page tree" in the tree's head
+   (`.admin-tree-hide`) sets `data-tree-folded` on <html>, and "Show page
+   tree", the strip's one button (`.admin-tree-fold`,
+   `Admin::Shell::TreeFoldComponent`), takes it away; the layout's head
+   script sets it before the first paint where this browser remembers the
+   fold (`admin/shared/_tree_head`), and `admin--shell--tree-width` from then
+   on. Folded, the grid's track is the strip (`--admin-tree-strip`, 2.75rem,
+   `TreeDividerComponent::STRIP`), everything in the column but the strip's
+   button is hidden and so is the divider. `--admin-tree-width` keeps the
+   CHOSEN width all along: the fold does not touch it, so the column comes
+   back at it.
+
+   From 1024px only: below, the tree is a drawer of a fixed width and the
+   fold means nothing, so the attribute is there and nothing asks it (the
+   fold is back when the window is wide again). Nor while the tree is the
+   drawer beside the open notes (`:root[data-notes-open]:not([data-tree-fits])
+   body:has(#notes-drawer)`, further down: even the strip does not fit there):
+   that drawer shows the whole tree, as the one below 1024px does. Both
+   buttons are drawn from 1024px only, and in neither drawer (the notes'
+   drawer hides "Hide page tree" with its divider, further down): folding a
+   drawer means nothing. */
+:root { --admin-tree-strip: 2.75rem; }
+.admin-tree-fold, .admin-tree-hide { display: none; }
+@media (min-width: 1024px) {
+  .admin-tree-hide { display: inline-flex; }
+  :root[data-tree-folded] { --admin-tree-column: var(--admin-tree-strip); }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree { display: flex; justify-content: center; align-items: flex-start; padding: 0.75rem 0; }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-shell__tree > :not(.admin-tree-fold) { display: none; }
+  :root[data-tree-folded]:not([data-notes-open]:not([data-tree-fits]):has(#notes-drawer)) .admin-tree-fold { display: inline-flex; position: sticky; top: calc(var(--admin-top-offset) + 0.75rem); }
+}
 .admin-top-bar { display: none; }
 .admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
 
@@ -331,6 +366,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-divider { display: none; }
+  /* A drawer is not folded: the fold's button is not offered in it. */
+  :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer) .admin-tree-hide { display: none; }
   /* The scrim of the folded tree: the two rules above hide it from 1024px
      unless the modules sidebar is the open drawer, and at all from 1280px. */
   :root[data-notes-open]:not([data-tree-fits]) body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
@@ -685,6 +722,99 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 @container admin-dashboard (min-width: 60rem) {
   .admin-dashboard-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* The editors' rail. The editor area (`#editing`, the live region) is the
+   container, so what the rail asks is the room the editor has, never the
+   window's: a folded tree or an open notes column changes it while the
+   window stays the same. No `@media` rule names the rail
+   (`admin_design_rules_test`).
+
+   `.admin-rail-grid` holds, in document order, the tabs
+   (`Admin::Ui::RailTabsComponent`), the panels
+   (`Admin::Ui::RailPanelComponent`) and the blocks column: settings come
+   before the blocks at every width, and only the grid places them, so the
+   focus goes header, tabs, settings, blocks. The post editor is the one
+   exception: its main column (title, address, body) comes before its
+   settings in the document, because a post's title is not a setting, so
+   there the focus goes header, main column, settings. Below the threshold
+   it is one column: no tabs, every panel in the page but a docked-only one,
+   each where the document puts it.
+
+   Docked, the blocks column stands at the content's left edge and the rail
+   `--cs-rail-gap` right of it; spare width falls right of the rail, since
+   the tracks are fixed and `justify-content: start`. The rail is two rows,
+   the tabs and the one current panel, in the second column. The blocks
+   column opts in with `.admin-rail__main`, in the first column across both
+   rows, so the rail's rows never push the blocks down; nothing else is
+   placed, so a stray grid item falls into a row of its own below rather
+   than over the blocks. Every one of the three is matched anywhere inside
+   the grid, not only as a child, so each may stand inside an element that
+   is `display: contents` in the grid (the post form) and stay inside it.
+   The rail's ground is the grid's own `::before` across both rows, not a
+   box around the rail, for the same reason.
+   `--admin-rail-docked` is the docked state that `admin--ui--rail` reads
+   and writes onto the grid as `data-rail-docked`; the query alone sets it.
+   `--folded` (an editor's translation tab) never docks. */
+.admin-editor-area { container: admin-editor / inline-size; }
+.admin-rail-grid { --admin-rail-docked: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.admin-rail__tabs { display: none; }
+.admin-rail__panel--docked-only { display: none; }
+.admin-rail__tab { display: inline-flex; align-items: center; gap: 0.375rem; padding-block: 0.5rem; color: var(--cs-meta); cursor: pointer; }
+.admin-rail__tab:hover { color: var(--cs-ink); }
+/* The selected tab is a 2px accent underline with its words at the selected
+   weight: a selection, so the accent; measured on the rail's ground
+   (`admin_contrast_test`). */
+.admin-rail__tab[aria-selected="true"] { color: var(--cs-ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--cs-accent); }
+.admin-rail__tab:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+@container admin-editor (min-width: 1200px) {
+  .admin-rail-grid:not(.admin-rail-grid--folded) { --admin-rail-docked: 1; grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; }
+  .admin-rail-grid:not(.admin-rail-grid--folded)::before { content: ""; grid-column: 2; grid-row: 1 / -1; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { grid-column: 1; grid-row: 1 / -1; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__tabs { display: flex; gap: var(--cs-sp-4); grid-column: 2; grid-row: 1; padding: var(--cs-sp-3) var(--cs-sp-4) 0; }
+  /* A rail of one tab: its heading, spaced as a heading and not as a row of tabs. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__heading { align-items: center; gap: 0.375rem; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-2); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel { grid-column: 2; grid-row: 2; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:not([data-current]) { display: none; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel--docked-only[data-current] { display: block; }
+  /* The blocks column's cap, over `.admin-form-column`'s (0,1,0) by weight. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: var(--cs-editor-column); }
+  /* Its top is the rail's: the space it keeps under the settings when they
+     stand above it is not kept beside them. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { margin-top: 0; }
+  /* The page settings in the Page panel: always open, since the tab is the
+     choice to see them, so the summary is not drawn and the content is
+     forced visible whatever the `<details>`' own `open` (as a translation
+     pair's reference card is), and the person's open or closed is theirs
+     again below the threshold. On the rail's ground they are not a card of
+     their own: the rail is already their ground and their elevation, and a
+     card's ground and shadow on it would be a second depth. Only where
+     `::details-content` is understood: a browser without it could not show
+     a folded `<details>`, so there the settings stay the card they are
+     below the threshold, with their summary to open them. */
+  @supports selector(::details-content) {
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
+    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
+  }
+  /* The post form (`Admin::EditorScreen::PostFormComponent`) generates no
+     box while docked, so its settings panel and its main column are the
+     grid's items and stand in their two columns. It is `display: contents`
+     and not a grid of its own, because the settings panel must stay inside
+     the one form (one autosave, one base, one unit for the live merge) while
+     it stands in the rail's column, and the rail's other panels (Notes) must
+     stand outside every form, as siblings of the form in the same grid. The
+     card look the form has below the threshold is the main column's here:
+     the settings stand on the rail's ground. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) > #post-form { display: contents; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-post-main { border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: calc(var(--spacing) * 4); }
+}
+/* A section's settings region that `admin--editor--section-choice` moved
+   into the Section panel: the panel's padding is its edge and the rail its
+   ground, so it keeps none of the room it takes under a head. Keyed on
+   `data-editing-away`, the one mark the choice writes on the region, which
+   live editing's merge leaves alone (its RUNTIME set): a class written by
+   the script would be taken away by the next list merge. */
+.admin-section-card__settings[data-editing-away] { margin: 0; padding: 0; background: transparent; }
 /* A section's header controls (sections spec §4.1). A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen
@@ -750,6 +880,14 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
 .admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
+/* The section chosen in the editor's rail (`admin--editor--section-choice`):
+   a selection, so the accent, 2px outside the frame (3:1 on the canvas,
+   `admin_contrast_test`). Written after the state edges and as heavy, so it
+   wins over a held edge: the chosen section is the one the person is
+   acting on, and its hold says itself in words, in the strip and the
+   read-only form. A section whose type is gone draws no words and is never
+   chosen. */
+.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 /* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
    its states are elevations, with no border. At rest the first; under the
    pointer the second, raised, and never moved, so nothing shifts under a

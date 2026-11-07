@@ -60,12 +60,14 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
 
         drawer = box("#notes-drawer")
         header = box(".admin-editor-header")
-        assert_equal [ width - 400, width ], [ drawer[0], drawer[2] ].map(&:round), "the drawer is the window's last 400px"
+        # The window less the scrollbar's gutter, which CS Studio keeps.
+        room = page.evaluate_script("document.documentElement.getBoundingClientRect().width").round
+        assert_equal [ room - 400, room ], [ drawer[0], drawer[2] ].map(&:round), "the drawer is the window's last 400px, before the scrollbar's gutter"
         assert_in_delta header[3], drawer[1], 1, "the drawer starts where the header ends"
         assert_in_delta 900, drawer[3], 1, "and reaches the window's bottom edge"
         # The header spans the content and the drawer, and opening the notes
         # did not change its height.
-        assert_in_delta width, header[2], 1
+        assert_in_delta room, header[2], 1
         assert_in_delta header_before[3] - header_before[1], header[3] - header[1], 1, "the header kept its height"
         assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('#notes-drawer')).boxShadow")
 
@@ -103,16 +105,16 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
     at_width(1024) do
       open_editor
       assert_operator box("#tree-column")[2], :<=, box(".admin-shell__main")[0] + 1, "the premise: the tree is a column at 1024px"
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
 
       open_notes
       assert_no_selector "#tree-column"
-      assert_selector "button[aria-controls='tree-column'][aria-expanded=false]", text: "Pages"
+      assert_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger][aria-expanded=false]", text: "Pages"
       assert_in_delta 0, box(".admin-shell__main")[0], 1, "the content column starts at the window's edge"
 
       # The tree opens as a drawer and the notes stay: it is a drawer because
       # they are open.
-      find("button[aria-controls='tree-column']").click
+      find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]").click
       assert_selector "#tree-column[data-open]"
       assert_selector ".admin-shell__scrim"
       assert_selector "#notes-drawer #notes-list"
@@ -123,7 +125,7 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
       find("#notes-drawer button[aria-label='Close']").click
       assert_no_selector "#notes-drawer"
       assert_selector "#tree-column"
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
       assert_operator box("#tree-column")[2], :<=, box(".admin-shell__main")[0] + 1
     end
   end
@@ -193,7 +195,7 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
       find("#notes-open").click
       assert_selector "#notes-drawer #notes-list"
 
-      assert_no_selector "button[aria-controls='tree-column']", visible: :all
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]", visible: :all
       content = box("form.admin-translation-form")
       assert_operator content[2], :<=, box("#notes-drawer")[0]
     end

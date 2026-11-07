@@ -7,6 +7,10 @@ module Admin
     # (`live/state`; `await_notes_live` in the system tests waits for it).
     # Everything the scripts need from the server is a value here: they hold
     # no address, no number and no wording.
+    #
+    # It is also the editor area, the container the rail's layout asks
+    # (`.admin-editor-area`, `content-spiel.tailwind.css`): the room the
+    # editor has, never the window's.
     class LiveRegionComponent < AdminComponent
       def initialize(record:, locale:, url_options: {})
         @record = record

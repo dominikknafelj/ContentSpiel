@@ -11,10 +11,15 @@ module Admin
     # `EditorScreen::BlockCardComponent`'s own `error_prefix` does. Every id here is the bare
     # literal "post" (`ID_PREFIX`), matching `Admin::PostsController`'s own
     # `autosave_stream(error_prefix: "post", ...)` and `post_error_fields`.
+    #
+    # Below the header the form stands in the editors' rail grid (`RAIL_ID`,
+    # the page editor's too): its settings panel in the rail where it docks,
+    # its main column left of it, both inside the one form.
     class PostFormComponent < AdminComponent
       include HeldUnit
 
       ID_PREFIX = "post"
+      RAIL_ID = "editor-grid"
 
       # `slot_context` is the header's (`HeaderComponent`): what the screen has
       # already read that a feature at the header's slots would read again.

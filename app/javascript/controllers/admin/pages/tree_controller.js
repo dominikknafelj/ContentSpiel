@@ -22,27 +22,25 @@ import { loadSortable } from "editor/drag"
 // server says nothing (offline, signed out, an error page), nothing is
 // rendered: the row is put back where it was and a toast says why (`save`).
 //
-// A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor (final
-// fix wave 1, reviews A I1 / B I1), so it takes its turn in the page's write
-// queue (`enqueue`) like a block write (`admin--editor--blocks`,
+// A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor, so it
+// takes its turn in the page's write queue (`enqueue`) like a block write (`admin--editor--blocks`,
 // `saving/queue.js`): it is never on the wire together with an autosave of
 // the same page. The toast's Undo is the same PATCH, sent by Turbo from
 // `#toasts`: it is caught by its URL and held in the same queue (`holdUndo`).
 //
 // IT SAYS NOTHING TO THE OPEN SETTINGS FORM. `Pages::Move` saves the page, so
 // its `updated_at` moves, but not the settings form's base: a move is not a
-// change of the page's settings (`Page::SETTINGS_BASE_IGNORES`, live editing's
-// final review I1). Until then a move carried the open form's base as
-// `X-Page-Base-Updated-At` and wrote the answer's new one into the hidden
-// field; that only ever helped the mover's own tab, and a colleague's move
-// still refused whoever held the form. Both went: no header, no base written.
+// change of the page's settings (`Page::SETTINGS_BASE_IGNORES`). So a move
+// sends no base and writes none: the form's base stays valid in the mover's
+// tab and in a colleague's alike.
 //
 // No generation is handed to `enqueue`: the tree column sits outside
 // `#content` and outlives a frame navigation, so "the page showing as the
 // move is queued" is the page the move belongs to.
 export default class extends Controller {
-  static targets = ["list", "announcer"]
+  static targets = ["list", "announcer", "row"]
   static values = { moveUrl: String }
+  static classes = ["selected", "selectedTitle", "markerAtRest"]
 
   connect() {
     this.holdUndo = (event) => {
@@ -126,8 +124,7 @@ export default class extends Controller {
   // hold the queue either.
   //
   // What came back is judged by `sendOrder` (`saving/order_request.js`,
-  // which also says what this used to do with an expired session's sign-in
-  // page):
+  // which also says why an expired session's sign-in page is not rendered):
   // - a Turbo Stream is the endpoint's answer, at any status, and is
   //   rendered: it redraws the whole tree as the server has it, which is
   //   also what undoes the optimistic DOM move of a refused drop;
@@ -193,7 +190,7 @@ export default class extends Controller {
   // neither does a context-only page's list, so ArrowLeft out to a level
   // whose parent is context-only does nothing. (ArrowRight never meets a
   // context-only sibling: a row only has a handle when its parent is a page
-  // the editor can read -- `Admin::PagesScreen::TreeNodeComponent#movable?` -- and every
+  // the editor can read -- `Admin::PagesScreen::TreeRowComponent#movable?` -- and every
   // page under a readable one is readable.) A page can only nest under a
   // *sibling*, never into its own subtree.
   //
@@ -282,6 +279,54 @@ export default class extends Controller {
     // its handle so the keyboard user isn't dropped at the top of the page.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
+  }
+
+  // ---- The selected row -------------------------------------------------
+  //
+  // THE SELECTED ROW IS THE PAGE THAT IS OPEN. The tree column sits outside
+  // `#content` and outlives a frame navigation, and a frame answer carries
+  // no tree (`admin/pages/_tree`), so the server's drawing of the
+  // selection holds only for the page it was drawn with. The open page is
+  // the one `#content` names (`[data-tree-open-page]`, drawn by the page
+  // editor; nothing on another screen, which selects no row), and this
+  // marks exactly that row, whoever drew it: as each row connects (a full
+  // visit, a restored snapshot, a move's redrawn tree, a save's redrawn row)
+  // and after every load of the content frame (`follow`). Turbo's snapshot
+  // keeps what this marked, which is right for the URL it is kept under,
+  // and a restored one is marked again as its rows connect.
+  //
+  // The marks are the server's own classes, handed over as Stimulus classes
+  // (`TreeRowComponent::SELECTED_CLASS`, `SELECTED_TITLE_CLASS`,
+  // `MARKER_AT_REST`): the row's ground and bar, the title's weight with
+  // `aria-current="page"`, and the translation markers shown rather than at
+  // rest. Only rows that can be selected are `row` targets (a context-only
+  // row never is).
+  rowTargetConnected(row) {
+    this.mark(row, row.dataset.pageId === this.openPageId())
+  }
+
+  follow(event) {
+    if (event.target.id !== "content") return
+
+    const open = this.openPageId()
+    this.rowTargets.forEach((row) => this.mark(row, row.dataset.pageId === open))
+  }
+
+  openPageId() {
+    return document.querySelector("#content [data-tree-open-page]")?.dataset.treeOpenPage ?? null
+  }
+
+  mark(row, selected) {
+    this.selectedClasses.forEach((name) => row.classList.toggle(name, selected))
+    const title = row.querySelector(`#tree-link-${row.dataset.pageId}`)
+    if (title) {
+      this.selectedTitleClasses.forEach((name) => title.classList.toggle(name, selected))
+      if (selected) title.setAttribute("aria-current", "page")
+      else title.removeAttribute("aria-current")
+    }
+    row.querySelectorAll("[data-translation-marker]").forEach((marker) => {
+      this.markerAtRestClasses.forEach((name) => marker.classList.toggle(name, !selected))
+    })
   }
 
   // Focus leaving the handle. A DOM move (`moved`) blurs it too and refocuses

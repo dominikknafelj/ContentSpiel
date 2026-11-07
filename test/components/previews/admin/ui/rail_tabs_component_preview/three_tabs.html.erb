@@ -1,0 +1,11 @@
+<div class="admin-editor-area">
+  <div id="preview-rail" class="admin-rail-grid" data-controller="admin--ui--rail">
+    <%= render Admin::Ui::RailTabsComponent.new(rail_id: "preview-rail", tabs: tabs, current: tabs.first.key) %>
+    <% tabs.each_with_index do |tab, index| %>
+      <%= render Admin::Ui::RailPanelComponent.new(rail_id: "preview-rail", key: tab.key, current: index.zero?) do %>
+        <p class="text-sm text-dim"><%= tab.label %></p>
+      <% end %>
+    <% end %>
+    <div class="admin-rail__main admin-form-column min-h-40 rounded-card bg-surface p-4 shadow-1"></div>
+  </div>
+</div>

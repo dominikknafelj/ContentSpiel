@@ -157,9 +157,10 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "#editor-notice:empty"
   end
 
-  # Design pass round 2 (handoff §9 B23): the type's own fields are one group
-  # between Excerpt and Body, titled with the type's label.
-  test "the content type's fields sit in their own titled group between Excerpt and Body" do
+  # The type's own fields are one group among the post's settings, after the
+  # main column (title, address, body) and after Excerpt, titled with the
+  # type's label.
+  test "the content type's fields sit in their own titled group after Body and Excerpt" do
     post_record = create_post(title: "Engineer", content_type: "resume_entry")
     get "/cs-studio/posts/#{post_record.id}"
     assert_response :success
@@ -167,8 +168,8 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "[data-editor-fields-group] input[name='post[fields][start_date]'][type=text][pattern][placeholder='yyyy-mm-dd']"
     assert_select "[data-editor-fields-group] select.cs-select[name='post[fields][role_type]']"
     body = response.body
+    assert body.index('data-field-name="body"') < body.index('data-field-name="excerpt"')
     assert body.index('data-field-name="excerpt"') < body.index("data-editor-fields-group")
-    assert body.index("data-editor-fields-group") < body.index('data-field-name="body"')
   end
 
   test "a date typed in the wrong form is a field error after the save, not a 500" do

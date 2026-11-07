@@ -1,8 +1,7 @@
 require "test_helper"
 
 class Admin::LanguagesTest < ActionDispatch::IntegrationTest
-  # Only needed by the carried-in post-level test below (Task 9, from Task
-  # 8's review) -- see `test/support/test_types.rb`'s own comment for why
+  # Only needed by the post-level test of a typed field below -- see `test/support/test_types.rb`'s own comment for why
   # every file that calls `with_test_types` includes this module itself.
   include TestTypes
 
@@ -12,10 +11,9 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
     @page = create_page(title: "About")
   end
 
-  # Fix (final-fixes round, finding 5): the modules column's own Dashboard/
-  # Pages/Posts/Tags links used to drop `?locale=` outright, silently
-  # bouncing an editor back to `Locales.default` the moment they followed
-  # one while working in another language.
+  # The modules column's own Dashboard/Pages/Posts/Tags links carry
+  # `?locale=`: without it an editor working in another language would be
+  # sent back to `Locales.default` by following one.
   test "the modules column's own links keep the editing locale" do
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
 
@@ -31,12 +29,11 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Languages'] [title='Missing required fields']"
   end
 
-  # Fix (final-fixes round, finding 1): the switcher lives inside the
-  # layout's own `<turbo-frame id="content">`, so without `_top` targeting
-  # a locale switch would only ever refresh that frame -- the page tree
-  # outside it (`Admin::PagesScreen::TreeNodeComponent#title` reads the current locale)
-  # would keep showing every node's title in whichever language was
-  # selected before the switch.
+  # The switcher lives inside the layout's own `<turbo-frame id="content">`,
+  # and a language is a setting of the whole shell: `_top` makes a switch a
+  # full visit, which draws the sidebar's links and the page tree's titles
+  # (`Admin::PagesScreen::TreeRowComponent#title` reads the current locale)
+  # in the new language with the content.
   test "the switcher's own links target the top level, not just the content frame" do
     get "/cs-studio/pages/#{@page.id}"
     assert_select "nav[aria-label='Languages'] a[data-turbo-frame='_top']"
@@ -56,8 +53,8 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
 
   # `limit` is a post_list block's own untranslated schema field (`t.field
   # :limit, :integer, min: 1` -- no `translated: true`) -- on a non-default
-  # locale it is no longer an input at all but a read-only line in the card's
-  # "Shared fields" list (design pass round 2, Task 7), and a forged save of
+  # locale it is not an input at all but a read-only line in the card's
+  # "Shared fields" list, and a forged save of
   # it must still never write a `translated_settings["de"]` entry the way a
   # *translated* field's own save would.
   test "a block's untranslated field is listed under Shared fields, and saving it in a non-default locale never creates a translated entry" do
@@ -80,8 +77,7 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
     assert_not block.translated_settings.key?("de")
   end
 
-  # Carried in from Task 8's review (Task 9's own brief): the same
-  # untranslated-field rule as the block-level test just above, but for a
+  # The same untranslated-field rule as the block-level test just above, but for a
   # post's own typed `fields` -- `test/event#venue` (`t.field :venue,
   # :string`, no `translated: true`) is `Post#fields_are_valid`'s
   # equivalent of a block's untranslated settings field, so it has to show

@@ -1,7 +1,7 @@
 # CS Studio's shell, the components in `app/components/admin/shell/`
 # (docs/reference/i18n.md). A component's keys are
 # `admin.components.shell.<its class name without Admin::Shell:: and Component, underscored>`.
-# The sidebar and the page tree's divider are converted; the top bar and the
+# The sidebar, the page tree's divider and its fold are converted; the top bar and the
 # palette still hold their English as literals and move here with the rest of
 # the shell (`CONVERTED` in test/lib/admin_i18n_test.rb).
 #
@@ -48,3 +48,7 @@ en:
           # The shared tooltip, on keyboard focus and on hover. The script writes
           # it again with the current width (`admin--shell--tree-width`).
           tooltip: "Tree width %{width}px. Arrow keys to resize."
+        tree_fold:
+          # The folded tree's strip: its one button, which unfolds the column
+          # (its name, and the shared tooltip's text).
+          show: "Show page tree"

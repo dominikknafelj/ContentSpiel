@@ -29,6 +29,9 @@ test/system/admin/editing_merge_test.rb: 179.1
 test/system/admin/editing_take_over_test.rb: 270.7
 test/system/admin/editor_fields_test.rb: 27.6
 test/system/admin/editor_header_test.rb: 25.5
+test/system/admin/editor_modules_test.rb: 27.0
+test/system/admin/editor_rail_test.rb: 26.0
+test/system/admin/entry_helpers_test.rb: 13.0
 test/system/admin/entry_point_test.rb: 2.6
 test/system/admin/field_error_border_test.rb: 13.1
 test/system/admin/filter_bar_test.rb: 28.6
@@ -69,6 +72,7 @@ test/system/admin/presence_test.rb: 300.8
 test/system/admin/promotion_hold_test.rb: 60.2
 test/system/admin/publish_dialog_steady_test.rb: 25.2
 test/system/admin/rich_text_test.rb: 150.7
+test/system/admin/section_choice_test.rb: 44.0
 test/system/admin/sections_adding_test.rb: 15.9
 test/system/admin/sections_menu_moves_test.rb: 75.6
 test/system/admin/sections_moves_test.rb: 99.3
@@ -89,6 +93,7 @@ test/system/admin/translation_status_test.rb: 6.8
 test/system/admin/translations_test.rb: 119.8
 test/system/admin/trash_test.rb: 23.9
 test/system/admin/tree_column_test.rb: 117.6
+test/system/admin/tree_fold_test.rb: 16.0
 test/system/admin/tree_test.rb: 14.1
 test/system/admin/unpublished_changes_test.rb: 18.8
 test/system/admin/unsaved_order_test.rb: 33.9

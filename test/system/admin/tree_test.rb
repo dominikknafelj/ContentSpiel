@@ -75,14 +75,12 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     assert_equal @beta, @alpha.reload.parent
   end
 
-  # Final fix wave 1 (reviews A I1 / B I1): moving the page that is open in
-  # the editor moves its `updated_at`, which its settings form holds as its
-  # autosave base. The move used to go around the save queue and tell the form
-  # nothing: the next edit was refused as "Changed elsewhere" -- against the
-  # editor's own move -- and the form was dead until Reload. Now the move takes
-  # its turn in the queue (never on the wire together with an autosave) and
-  # does not move the form's base at all (`Page::SETTINGS_BASE_IGNORES`, live
-  # editing's final review I1). The toast's Undo is the same request.
+  # Moving the page that is open in the editor is a write of that page: it
+  # takes its turn in the queue (never on the wire together with an
+  # autosave), and it does not move the settings form's base
+  # (`Page::SETTINGS_BASE_IGNORES`), so the next edit is not refused as
+  # "Changed elsewhere" against the editor's own move. The toast's Undo is
+  # the same request.
   test "moving the page that is open, and undoing it, leaves its editor able to save" do
     visit "/cs-studio/pages/#{@alpha.id}"
     await_admin_controllers
@@ -153,5 +151,57 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     page.execute_script("document.activeElement.blur()")
     assert_eventually { @beta.reload.subtitle == "Still saving" }
     assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # The tree column outlives a frame navigation, and a settings save
+  # redraws only the saved page's row. One row is selected, and it is the
+  # page that is open: after opening a page from the tree, and after saving it.
+  test "opening a page from the tree and saving it leaves that page's row the one selected" do
+    visit_editor(@alpha)
+    selected = "#tree .admin-tree-row--selected"
+    current = "#tree a[aria-current=page]"
+    assert_selector "#{selected}#tree-row-#{@alpha.id}", count: 1
+
+    find("#tree-row-#{@beta.id} a[title='Beta']").click
+    assert_selector "#content h1", text: "Beta"
+    assert_selector selected, count: 1
+    assert_selector "#{selected}#tree-row-#{@beta.id}"
+    assert_selector current, count: 1
+
+    fill_in "Title", with: "Beta, renamed"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually { @beta.reload.title == "Beta, renamed" }
+    assert_selector "#tree-row-#{@beta.id} a[aria-current=page]", text: "Beta, renamed"
+    assert_selector selected, count: 1
+    assert_selector current, count: 1
+    assert_no_selector "#tree-row-#{@alpha.id}.admin-tree-row--selected"
+  end
+
+  # A link in the tree pressed with the keyboard keeps the focus while the
+  # tree is drawn again for the page it opened.
+  test "a page opened from the tree by the keyboard keeps the focus on its link" do
+    visit_editor(@alpha)
+    page.execute_script("document.querySelector(\"#tree-row-#{@beta.id} a[title='Beta']\").focus()")
+    page.send_keys(:enter)
+    assert_selector "#content h1", text: "Beta"
+    assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected"
+    assert_eventually { page.evaluate_script("document.activeElement?.closest('#tree-row-#{@beta.id}') != null") }
+  end
+
+  # Turbo's snapshot keeps the selection the tree's script marked, and Back
+  # to a page opened from the tree shows that page's row as the one selected.
+  test "Back to a page opened from the tree selects that page's row" do
+    visit_editor(@alpha)
+    find("#tree-row-#{@beta.id} a[title='Beta']").click
+    assert_selector "#content h1", text: "Beta"
+    find("#tree-row-#{@alpha.id} a[title='Alpha']").click
+    assert_selector "#content h1", text: "Alpha"
+    assert_selector "#tree .admin-tree-row--selected#tree-row-#{@alpha.id}", count: 1
+
+    page.go_back
+    assert_selector "#content h1", text: "Beta"
+    assert_selector "#tree .admin-tree-row--selected", count: 1
+    assert_selector "#tree-row-#{@beta.id}.admin-tree-row--selected a[aria-current=page]"
+    assert_selector "#tree a[aria-current=page]", count: 1
   end
 end

@@ -2,8 +2,9 @@ module Admin
   module Ui
     # A short text shown under its host while the pointer is on it or the
     # keyboard's focus is (presence handoff 7, 12 and 18: "never a `title`",
-    # which a keyboard does not reach and a touch never shows). CS Studio's
-    # icon buttons still use `title`; they move here in a sweep of their own.
+    # which a keyboard does not reach and a touch never shows). Icon buttons
+    # drawn by `ButtonComponent` (`icon:`) host it; the hand-built icon
+    # buttons that still use `title` move here in a sweep of their own.
     #
     # THE HOST is the element this is rendered INSIDE. It carries `HOST`
     # (`relative`: the bubble is placed against it) and `host_data` (the

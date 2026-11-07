@@ -38,15 +38,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     page.execute_script("try { window.localStorage.removeItem('cs-notes-open'); window.localStorage.removeItem('#{WIDTH_KEY}') } catch (error) {}")
   end
 
-  # A test that resizes the window puts the size back, because the browser
-  # is shared.
-  def at_width(width)
-    original = page.current_window.size
-    page.current_window.resize_to(width, 900)
-    yield
-  ensure
-    page.current_window.resize_to(*original)
-  end
+  def at_width(width, &block) = at_window(width, &block)
 
   def open_editor(record = @docs, query = "")
     visit "/cs-studio/pages/#{record.id}#{query}"
@@ -67,7 +59,9 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
 
   def fits? = page.evaluate_script("document.documentElement.hasAttribute('data-tree-fits')")
 
-  def window_width = page.evaluate_script("window.innerWidth")
+  # The width the shell is laid out in: the window less the scrollbar's
+  # gutter, which CS Studio keeps (`scrollbar-gutter: stable`).
+  def window_width = page.evaluate_script("document.documentElement.getBoundingClientRect().width").round
 
   # Found by its class: `role=separator` is also a line in a menu.
   def on_divider? = page.evaluate_script("document.activeElement.classList.contains('admin-tree-divider')")
@@ -262,9 +256,11 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
 
     at_width(1280) do
       # Shown narrower, chosen as it was: the grid's own clamp, and the
-      # separator's values follow on the resize.
-      assert_eventually(message: -> { "the separator's maximum is #{value(:max)}" }) { value(:max) == 400 }
-      assert_tree 400
+      # separator's values follow on the resize. 1280 - 240 - 640 = 400, less
+      # the scrollbar's gutter where the browser draws one.
+      most = window_width - 240 - 640
+      assert_eventually(message: -> { "the separator's maximum is #{value(:max)}, not #{most}" }) { value(:max) == most }
+      assert_tree most
       assert_equal "480px", chosen
       assert_in_delta 640, window_width - box(".admin-shell__main")[0], 1, "the editor column has exactly its 640px"
 
@@ -272,22 +268,23 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       # shown must not throw away the wider choice kept for a wider window.
       keys(:right)
       keys(:end)
-      assert_tree 400
+      assert_tree most
       assert_equal "480px", chosen
       assert_equal "480", stored
     end
 
     # 1024px to 1279px: the sidebar is a drawer and takes no room.
     at_width(1100) do
-      assert_eventually { value(:max) == 460 }
-      assert_tree 460, sidebar: 0
+      most = window_width - 640
+      assert_eventually { value(:max) == most }
+      assert_tree most, sidebar: 0
       assert_equal "480px", chosen
       assert_in_delta 640, window_width - box(".admin-shell__main")[0], 1
 
       # A step from what is SHOWN is a choice, and is stored as one.
       keys(:left)
-      assert_tree 444, sidebar: 0
-      assert_equal "444px", chosen
+      assert_tree most - 16, sidebar: 0
+      assert_equal "#{most - 16}px", chosen
     end
   end
 
@@ -384,12 +381,13 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
         assert_not fits?
         page.execute_script("window.localStorage.removeItem('#{WIDTH_KEY}')")
 
-        # The tree stays beside the notes from 1840px, not from 1552px.
+        # The tree stays beside the notes from 1840px, not from 1552px (and
+        # the scrollbar's gutter, where the browser draws one, on top).
         open_editor(@docs, "?notes=open")
         assert_selector "#notes-drawer #notes-list"
         assert_not fits?
         assert_no_selector "#tree-column"
-        page.current_window.resize_to(1850, 900)
+        page.current_window.resize_to(1870, 900)
         assert_selector "#tree-column"
         assert fits?
         assert_tree 340, sidebar: 300
@@ -536,19 +534,21 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       open_notes
 
       assert_tree 272
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
       drawer = box("#notes-drawer")
-      assert_equal [ 1200, 1600 ], [ drawer[0], drawer[2] ].map(&:round), "the notes are the window's last 400px"
+      assert_equal [ window_width - 400, window_width ], [ drawer[0], drawer[2] ].map(&:round), "the notes are the window's last 400px, before the scrollbar's gutter"
       assert_operator drawer[0] - box(".admin-shell__main")[0], :>=, 640, "the editor keeps 640px between the tree and the notes"
 
-      # 1600 - 240 - 400 - 640 = 320.
-      assert_eventually(message: -> { "the separator's maximum is #{value(:max)}" }) { value(:max) == 320 }
+      # 1600 - 240 - 400 - 640 = 320, less the scrollbar's gutter where the
+      # browser draws one.
+      most = window_width - 240 - 400 - 640
+      assert_eventually(message: -> { "the separator's maximum is #{value(:max)}, not #{most}" }) { value(:max) == most }
       focus_divider
       keys(:end)
-      assert_tree 320
+      assert_tree most
       assert_in_delta 640, drawer[0] - box(".admin-shell__main")[0], 1
       mouse = drag_divider(to: 480)
-      assert_tree 320
+      assert_tree most
       mouse.up
       assert fits?, "a drag beside the notes never folds the tree"
       assert_selector "#tree-column"
@@ -556,15 +556,15 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       # Without the notes the divider goes on to the maximum.
       close_notes
       assert_eventually(message: -> { "the separator's maximum is #{value(:max)}" }) { value(:max) == 480 }
-      assert_tree 320
+      assert_tree most
     end
   end
 
   # M1 of the review, ruled: a reset is the default, also where the default
-  # does not fit beside the notes. 240 + 240 + 400 + 640 = 1520 fits a 1530px
-  # window; the default's 1552 does not.
+  # does not fit beside the notes. 240 + 240 + 400 + 640 = 1520 fits a 1540px
+  # window, less a gutter of up to 20px; the default's 1552 does not.
   test "Enter beside the open notes resets to the default although it does not fit: the tree folds, and is the default column when the notes close" do
-    at_width(1530) do
+    at_width(1540) do
       open_editor
       focus_divider
       keys(:left, :left)
@@ -572,7 +572,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert fits?
       open_notes
       assert_tree 240
-      assert_equal 250, value(:max)
+      assert_equal window_width - 240 - 400 - 640, value(:max)
 
       focus_divider
       keys(:enter)
@@ -588,11 +588,13 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
     end
   end
 
-  # M3 of the review. The sidebar is a column from 1280px only, so the sum
-  # steps there: at 1270px a 220px tree leaves the editor 1270 - 220 - 400 =
-  # 650px and stays; at 1280px the sidebar's 240px are in the sum and it folds.
-  test "either side of the sidebar's breakpoint: a 220px tree stays beside the notes at 1270px and folds at 1280px" do
-    at_width(1270) do
+  # The sidebar is a column from 1280px only (a media query, which measures
+  # the window with the scrollbar's gutter), so the sum steps there: at 1279px
+  # a 220px tree leaves the editor 1279 - 220 - 400 = 659px, less a gutter of
+  # up to 19px, and stays; at 1280px the sidebar's 240px are in the sum and
+  # it folds.
+  test "either side of the sidebar's breakpoint: a 220px tree stays beside the notes at 1279px and folds at 1280px" do
+    at_width(1279) do
       open_editor
       focus_divider
       keys(:home)
@@ -601,7 +603,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       open_notes
 
       assert_tree 220, sidebar: 0
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
       assert_operator box("#notes-drawer")[0] - box(".admin-shell__main")[0], :>=, 640, "the editor really has its 640px"
 
       page.current_window.resize_to(1280, 900)
@@ -677,7 +679,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_selector "#notes-drawer #notes-list"
       assert fits?
       assert_tree 272
-      assert_no_selector "button[aria-controls='tree-column']"
+      assert_no_selector "button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]"
     end
 
     at_width(1440) do
@@ -700,7 +702,7 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
       assert_no_selector ".admin-tree-divider"
       assert_equal "480px", chosen
 
-      find("button[aria-controls='tree-column']").click
+      find("button[aria-controls='tree-column'][data-admin--shell--drawer-target=trigger]").click
       assert_selector "#tree-column[data-open]"
       assert_eventually(message: -> { "the drawer is #{tree_width}px wide" }) { (tree_width - 272).abs <= 1 }
       assert_no_selector ".admin-tree-divider"

@@ -132,7 +132,6 @@ class Admin::EditingLiveSystemTest < ApplicationSystemTestCase
 
   def live_controller_js = "window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editing'), 'admin--editing--live')"
 
-  def listen_merged = page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
 
   def set_value(name, value) = page.execute_script("document.getElementById('editing').setAttribute('data-admin--editing--live-#{name}-value', #{value.to_json})")
 

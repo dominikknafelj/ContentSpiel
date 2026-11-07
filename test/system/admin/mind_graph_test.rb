@@ -1721,62 +1721,70 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # there when the view moves: after a pan and after a zoom it is where the
   # node is.
   test "the card opens beside the clicked node and follows it through a pan and a zoom" do
-    a = create_post(title: "A")
-    PostRelation.create!(post: a, related_post: create_post(title: "B"))
-    visit admin_mind_graph_path
-    await_graph
+    # A canvas with room right of the node for the card, whatever the
+    # scrollbar's gutter takes from the window.
+    at_window(1600, height: 1400) do
+      a = create_post(title: "A")
+      PostRelation.create!(post: a, related_post: create_post(title: "B"))
+      visit admin_mind_graph_path
+      await_graph
 
-    click_node(a)
-    assert_card_beside(a, side: "right")
+      click_node(a)
+      assert_card_beside(a, side: "right")
 
-    box = canvas_box
-    mouse = page.driver.browser.mouse
-    before = screen_position(a)
-    mouse.move(x: box[0] + 200, y: box[3] - 12)
-    mouse.down
-    mouse.move(x: box[0] + 160, y: box[3] - 42)
-    mouse.move(x: box[0] + 120, y: box[3] - 72)
-    mouse.up
-    await_frames
-    assert_in_delta before["x"] - 80, screen_position(a)["x"], 2, "the view did not pan"
-    assert_card_beside(a, side: "right")
+      box = canvas_box
+      mouse = page.driver.browser.mouse
+      before = screen_position(a)
+      mouse.move(x: box[0] + 200, y: box[3] - 12)
+      mouse.down
+      mouse.move(x: box[0] + 160, y: box[3] - 42)
+      mouse.move(x: box[0] + 120, y: box[3] - 72)
+      mouse.up
+      await_frames
+      assert_in_delta before["x"] - 80, screen_position(a)["x"], 2, "the view did not pan"
+      assert_card_beside(a, side: "right")
 
-    zoom = graph["data-zoom"]
-    # (A zoom is around the canvas's middle, so it moves the node; the card
-    # stands on whichever side has the room there.)
-    press "Zoom in"
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
-    await_frames
-    assert_card_beside(a)
-    assert_equal nid(a), graph["data-selected"]
+      zoom = graph["data-zoom"]
+      # (A zoom is around the canvas's middle, so it moves the node; the card
+      # stands on whichever side has the room there.)
+      press "Zoom in"
+      await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
+      await_frames
+      assert_card_beside(a)
+      assert_equal nid(a), graph["data-selected"]
+    end
   end
 
   # Near the canvas's right edge there is no room on the right: the card
   # stands left of the node, the same distance away.
   test "the card flips to the node's left near the canvas's right edge" do
-    a = create_post(title: "A")
-    PostRelation.create!(post: a, related_post: create_post(title: "B"))
-    visit admin_mind_graph_path
-    await_graph
-    click_node(a)
-    assert_card_beside(a, side: "right")
+    # A canvas with room right of the node for the card, whatever the
+    # scrollbar's gutter takes from the window.
+    at_window(1600, height: 1400) do
+      a = create_post(title: "A")
+      PostRelation.create!(post: a, related_post: create_post(title: "B"))
+      visit admin_mind_graph_path
+      await_graph
+      click_node(a)
+      assert_card_beside(a, side: "right")
 
-    # Pan the node to 60 px from the right edge, by a drag on empty space.
-    box = canvas_box
-    node = screen_position(a)
-    shift = box[2] - 60 - node["x"]
-    mouse = page.driver.browser.mouse
-    mouse.move(x: box[0] + 12, y: box[3] - 12)
-    mouse.down
-    mouse.move(x: box[0] + 12 + (shift / 2), y: box[3] - 12)
-    mouse.move(x: box[0] + 12 + shift, y: box[3] - 12)
-    mouse.up
-    await_frames
+      # Pan the node to 60 px from the right edge, by a drag on empty space.
+      box = canvas_box
+      node = screen_position(a)
+      shift = box[2] - 60 - node["x"]
+      mouse = page.driver.browser.mouse
+      mouse.move(x: box[0] + 12, y: box[3] - 12)
+      mouse.down
+      mouse.move(x: box[0] + 12 + (shift / 2), y: box[3] - 12)
+      mouse.move(x: box[0] + 12 + shift, y: box[3] - 12)
+      mouse.up
+      await_frames
 
-    assert_in_delta box[2] - 60, screen_position(a)["x"], 2
-    assert_card_beside(a, side: "left")
-    card = element_box("[data-mind-graph-card]")
-    assert_operator card["right"], :<, box[2]
+      assert_in_delta box[2] - 60, screen_position(a)["x"], 2
+      assert_card_beside(a, side: "left")
+      card = element_box("[data-mind-graph-card]")
+      assert_operator card["right"], :<, box[2]
+    end
   end
 
   test "the card is out of the way while its own node is dragged, and is back beside it after the drop" do

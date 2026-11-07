@@ -1,6 +1,4 @@
-<% content_for :tree do %>
-  <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
-<% end %>
+<%= render "admin/pages/tree", selected: @page %>
 
 <%# Reached only by a viewer who can't open Home (`PagesController#index`
     redirects everyone else to Home's editor), so the panel is a plain

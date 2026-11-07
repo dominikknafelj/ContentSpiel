@@ -375,9 +375,16 @@ export default class extends Controller {
     if (part === "blocks") {
       if (!answer.fragment) return
       const list = this.element.querySelector("#content-blocks-list")
-      const before = new Set(list.querySelectorAll("[data-editing-gone]"))
-      const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart }))
-      result.gone.filter((unit) => !before.has(unit)).forEach((unit) => this.dispatch("deleted", { detail: { blockId: unit.dataset.blockId, unit } }))
+      // What a script moved out of the list (a section's settings in the
+      // rail) is merged where it stands; one whose section is gone comes
+      // back in `awayGone`, for that script to remove.
+      const away = [ ...this.element.querySelectorAll("[data-editing-away]") ]
+      const before = new Set([ list, ...away ].flatMap((root) => [ ...root.querySelectorAll("[data-editing-gone]") ]))
+      const result = anchored(list, () => mergeList(list, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart, away }))
+      // A section's own settings form names its block by its region's
+      // `data-section-id`, as a card or a panel names it by `data-block-id`.
+      const blockOf = (unit) => unit.dataset.blockId ?? unit.closest("[data-section-id]")?.dataset.sectionId
+      result.gone.filter((unit) => !before.has(unit)).forEach((unit) => this.dispatch("deleted", { detail: { blockId: blockOf(unit), unit } }))
       if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
       return this.dispatch("merged", { detail: { part, replaced: [], ...result } })
     }
@@ -386,7 +393,7 @@ export default class extends Controller {
       const result = mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart })
       if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
       if (result.missing && this.hasBlocksUrlValue) this.want("blocks")
-      return this.dispatch("merged", { detail: { part, gone: [], ...result } })
+      return this.dispatch("merged", { detail: { part, gone: [], awayGone: [], ...result } })
     }
     // One block. 204: a section, whose card holds other blocks' forms. 410:
     // deleted since. Either way the list says what is true now.
@@ -396,7 +403,7 @@ export default class extends Controller {
     if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
     if (result.missing) this.want("blocks")
     result.replaced.forEach((unit) => this.fade(unit.querySelector("[data-editing-mark]")))
-    this.dispatch("merged", { detail: { part, gone: [], ...result } })
+    this.dispatch("merged", { detail: { part, gone: [], awayGone: [], ...result } })
   }
 
   // A block that holds unsaved text was moved by someone else and stays where

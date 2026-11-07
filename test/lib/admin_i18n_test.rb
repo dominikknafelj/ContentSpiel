@@ -78,6 +78,7 @@ class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/components/admin/shell/sidebar_component.rb
     app/components/admin/shell/sidebar_component.html.erb
+    app/components/admin/shell/tree_fold_component.rb
     app/components/admin/ui/icon_chip_component.rb
     app/components/admin/forms_screen/list_component.rb
     app/components/admin/forms_screen/list_component.html.erb
@@ -168,6 +169,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/translation_screen/state_cell_component.rb
     app/components/admin/ui/language_tabs_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/rail_tabs_component.rb
+    app/components/admin/ui/rail_tabs_component.html.erb
+    app/components/admin/ui/rail_panel_component.rb
     app/components/admin/ui/pagination_component.rb
     app/components/admin/ui/pagination_component.html.erb
     app/components/admin/ui/time_ago_component.rb
@@ -186,6 +190,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/presence/record_controller.js
     app/components/admin/presence_screen/row_marker_component.rb
     app/components/admin/presence_screen/row_marker_component.html.erb
+    app/components/admin/pages_screen/tree_node_component.rb
+    app/components/admin/pages_screen/tree_node_component.html.erb
+    app/components/admin/pages_screen/tree_row_component.rb
+    app/components/admin/pages_screen/tree_row_component.html.erb
     app/javascript/controllers/admin/presence/list_controller.js
     app/components/admin/ui/menu_component.rb
     app/components/admin/ui/menu_component.html.erb

@@ -155,6 +155,92 @@ class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
     assert_equal({ "seenPending" => true, "sortable" => "none", "mark" => nil }, result)
   end
 
+  # The editor's rail takes a section's settings region out of its card. Its
+  # layout menu, its Close and Escape are its own controller's, so they work
+  # wherever the region stands; the card finds the region by its id.
+  test "a section's settings region works outside its card: layout, Close and Escape" do
+    region = "#section-#{@narrow.id}-settings"
+    word = "#section-#{@narrow.id}-words button[data-admin--editor--section-field-param='layout']"
+    layout_button = "#{region} button[aria-label='Layout']"
+    focused = ->(selector) { page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})") }
+    page.execute_script("document.body.append(document.querySelector(#{region.to_json}))")
+
+    find(word, text: "1 column").click
+    assert_selector "body > #{region}", visible: :visible
+    assert_eventually(message: "the focus is not on the Layout button of the region") { focused.call(layout_button) }
+
+    find(layout_button).click
+    find("#{region} [role=menuitem][data-admin--editor--section-settings-layout-param='two']").click
+
+    assert_selector "#section-#{@narrow.id}-form #block-#{@narrow.id}-save-status", text: "SAVED"
+    assert_selector word, text: "2 columns"
+    assert_writes_settled
+    assert_equal "two", @narrow.reload.settings["layout"]
+    assert_eventually(message: "the focus is not on the Layout button the answer brought") { focused.call(layout_button) }
+
+    page.driver.browser.keyboard.type(:escape)
+
+    assert_selector region, visible: :hidden
+    assert_selector "#{word}[aria-expanded='false']", text: "2 columns"
+    assert_eventually(message: "the focus did not go back to the word") { focused.call(word) }
+
+    # Its Close button closes it too, and gives the focus to the word.
+    find(word).click
+    assert_selector region, visible: :visible
+    find("#{region} button[data-action='admin--editor--section-settings#close']").click
+    assert_selector region, visible: :hidden
+    assert_eventually(message: "Close did not give the focus to the word") { focused.call(word) }
+  end
+
+  # The region remembers the menu a pick was made in (`pickedIn`) on its own
+  # controller, whose instance a move keeps: a region moved back under its
+  # head while the layout's save is on the wire still gives the focus to the
+  # menu the answer brings.
+  test "a layout's answer gives the focus to the new menu after the region moved between the pick and the answer" do
+    region = "#section-#{@narrow.id}-settings"
+    layout_button = "#{region} button[aria-label='Layout']"
+    page.execute_script("document.body.append(document.querySelector(#{region.to_json}))")
+    find("#section-#{@narrow.id}-words button[data-admin--editor--section-field-param='layout']").click
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() !== "PATCH") return originalFetch(url, options)
+        return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })
+      }
+    JS
+
+    find(layout_button).click
+    find("#{region} [role=menuitem][data-admin--editor--section-settings-layout-param='two']").click
+    await_js "typeof window.__releaseSave === 'function'", message: "the layout's save was never sent"
+    page.execute_script(<<~JS)
+      const card = document.querySelector(#{card(@narrow).to_json})
+      card.querySelector(":scope > [data-editing-announcer]").after(document.querySelector(#{region.to_json}))
+      document.activeElement?.blur()
+      window.__releaseSave()
+    JS
+
+    assert_selector "#{card(@narrow)} > #{region} #block-#{@narrow.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    assert_eventually(message: "the focus is not on the Layout button the answer brought") do
+      page.evaluate_script("document.activeElement === document.querySelector(#{layout_button.to_json})")
+    end
+  end
+
+  # A hold's `reveal` opens a hidden region to show its frozen form, through
+  # the card's `showSettings`, and finds the card by the region's section,
+  # not by where the region stands.
+  test "a hold's reveal opens a section's settings region that stands outside its card" do
+    region = "#section-#{@narrow.id}-settings"
+    hold = "[data-controller~='admin--editing--hold']"
+    page.execute_script("document.querySelector(#{hold.to_json}).append(document.querySelector(#{region.to_json}))")
+    assert_selector "#{hold} > #{region}", visible: :hidden
+
+    page.execute_script("window.Stimulus.getControllerForElementAndIdentifier(document.querySelector(#{hold.to_json}), 'admin--editing--hold').reveal(#{Editing.key(@narrow).to_json})")
+
+    assert_selector "#{hold} > #{region}", visible: :visible
+    assert_no_selector "#section-#{@narrow.id}-words button[aria-expanded='false']"
+  end
+
   test "the keyboard path's sentences are the locale's words" do
     announcer = "[data-admin--editor--blocks-target=announcer]"
     announced = -> { page.evaluate_script("document.querySelector(#{announcer.to_json}).textContent") }

@@ -138,6 +138,43 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The rail's tabs (`.admin-rail__tab`, `Admin::Ui::RailTabsComponent`) stand
+  # on the rail's ground, the grid's `::before`. A tab's words and the selected
+  # tab's are text; the selected tab's underline is a state's mark. Each colour
+  # is read from the rule that draws it, so a changed rule is measured too.
+  test "the rail's tabs: a tab's words and the selected tab's are 4.5:1 on the rail, its underline 3:1" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    ground = css[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{[^}]*background:\s*var\((--cs-[\w-]+)\)/, 1]
+    words = css[/\.admin-rail__tab\s*\{[^}]*(?<![\w-])color:\s*var\((--cs-[\w-]+)\)/, 1]
+    selected = css[/\.admin-rail__tab\[aria-selected="true"\]\s*\{([^}]*)\}/, 1]
+    assert ground && words && selected, "the rail's ground, a tab's words and the selected tab are drawn by the stylesheet"
+    assert_equal "--cs-rail", ground
+    selected_words = selected[/(?<![\w-])color:\s*var\((--cs-[\w-]+)\)/, 1]
+    underline = selected[/box-shadow:\s*inset 0 -2px 0 var\((--cs-[\w-]+)\)/, 1]
+    assert selected_words && underline, "the selected tab names its words and a 2px underline"
+    assert_equal "--cs-accent", underline
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.(words), colour.(ground), "a tab's #{words} words on #{ground} (#{scheme})")
+      assert_ratio(4.5, colour.(selected_words), colour.(ground), "the selected tab's #{selected_words} words on #{ground} (#{scheme})")
+      assert_ratio(3.0, colour.(underline), colour.(ground), "the selected tab's #{underline} underline on #{ground} (#{scheme})")
+    end
+  end
+
+  # The section chosen in the page editor's rail (`.admin-section-card[data-chosen]`):
+  # an outline 2px outside the frame, so it stands on the canvas. Its colour is
+  # read from the rule that draws it.
+  test "the chosen section's outline is 3:1 or better on the canvas, in both schemes" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    rule = css[/\.admin-section-card\[data-chosen\]\s*\{([^}]*)\}/, 1]
+    assert rule, "the chosen section is drawn by the stylesheet"
+    outline = rule[/outline:\s*2px solid var\((--cs-[\w-]+)\)/, 1]
+    assert_equal "--cs-accent", outline, "a selection is the accent"
+    assert_match(/outline-offset:\s*2px/, rule, "the outline stands outside the frame, on the canvas")
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.(outline), colour.("--cs-paper"), "the chosen section's #{outline} outline on the canvas (#{scheme})")
+    end
+  end
+
   # A section's head (`.admin-section-card__head`): its words in the
   # structure ink on the structure tint, and a word under the pointer or
   # focused on the ink thinned to 12% over that tint (`.admin-section-word`).

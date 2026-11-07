@@ -6,12 +6,19 @@ module Admin
     # (`Admin::PagesController`, `Admin::TreeController`) renders this exact
     # same component -- on a normal page load via `content_for :tree`, and
     # again inside a Turbo Stream `replace` after a move -- so there is
-    # exactly one thing "what the tree looks like right now" can mean.
+    # exactly one thing "what the tree looks like right now" can mean. The
+    # tree's shape changes only through a move, a create or a trash; a
+    # settings save changes one page's row and nothing else, so its answer
+    # replaces that row alone (`TreeRowComponent.for_page`, drawing what the
+    # row draws here).
     #
     # `root`'s own children (and their descendants) are preloaded here, in one
     # query, rather than left to each node to call its own `#children`:
     # closure_tree's `#children` is a query per node, which would make
-    # rendering an N-page tree cost N queries instead of one.
+    # rendering an N-page tree cost N queries instead of one. That query asks
+    # for the visible, kept pages only and for the columns the rows read
+    # (`PageTree.rows`, `PageTree::COLUMNS`), so a page the viewer can't see
+    # or one in the trash is never loaded at all.
     #
     # Only the pages the actor may see are rendered (access-control design
     # spec §3.3 "The page tree"): the readable ones, plus `context_only`
@@ -63,7 +70,15 @@ module Admin
         @context_only_ids = Set.new
         @translation_counts = {}
         @loaded = {}
-        @root = root && load_visible(root)
+        @root_page = root
+      end
+
+      # Always drawn when rendered, whatever the request: a stream's
+      # `replace("tree")` must never put an empty element in the column. That
+      # a frame answer carries no tree is decided by the views that put it in
+      # the column (`admin/pages/_tree`).
+      def before_render
+        @root = @root_page && load_visible(@root_page)
       end
 
       private
@@ -73,7 +88,7 @@ module Admin
       def load_visible(root)
         visibility = AccessControl.tree_visibility(Current.actor)
         visible_ids = visibility[:readable] | visibility[:context_only]
-        pages = AccessControl.preload_branches(Page.all.to_a.select { |page| visible_ids.include?(page.id) })
+        pages = AccessControl.preload_branches(::PageTree.rows(visible_ids).to_a)
 
         @context_only_ids = visibility[:context_only]
         @children_by_parent = pages.group_by(&:parent_id)
@@ -94,8 +109,9 @@ module Admin
 
       def new_page_path = helpers.new_admin_page_path(**url_options)
 
-      # "Home and nothing else, counting kept pages" (design pass bug 4); the
-      # cheap checks first, since the tree re-renders after every autosave.
+      # "Home and nothing else, counting kept pages": a trashed page does not
+      # make the site any less empty. The cheap checks first, since the tree
+      # is drawn on every editor visit.
       def offer_starter_pages?
         return @offer_starter_pages if defined?(@offer_starter_pages)
 
