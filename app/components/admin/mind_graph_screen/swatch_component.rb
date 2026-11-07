@@ -14,7 +14,7 @@ module Admin
     # `data-width` and `data-height`, because it writes the bitmap's own size
     # (the device's pixels) into `width` and `height`. The names are the
     # scenes' in `mind_graph/swatches.js`, and
-    # `test/system/admin/mind_graph_modules_test.rb` holds the two lists
+    # `test/system/admin/mind_graph_drawing_modules_test.rb` holds the two lists
     # equal and every drawing inside its size.
     #
     # Decoration: the name stands beside it, so it is hidden from a screen

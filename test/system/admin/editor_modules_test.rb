@@ -5,8 +5,8 @@ require "application_system_test_case"
 # `notes/merge` draw an answer with, imported in the browser from the page
 # editor: the project has no JavaScript test runner, and these
 # are plain modules the import map resolves, so a system test can call them
-# directly against the page's real containers (as `mind_graph_modules_test`
-# does for the graph's). The keyboard path is driven through its handle,
+# directly against the page's real containers (as `mind_graph_*_modules_test.rb`
+# do for the graph's). The keyboard path is driven through its handle,
 # because what it is asked for is what a screen reader hears.
 class Admin::EditorModulesSystemTest < ApplicationSystemTestCase
   setup do

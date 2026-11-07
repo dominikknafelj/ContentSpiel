@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The merge rule by itself (`app/javascript/notes/merge.js`): "what is read is
 # replaced, what is typed is never touched". The module is imported in the
 # browser and called directly (the project has no JavaScript test runner; see
-# `mind_graph_modules_test.rb`), on an editor whose drawer shows a real thread
+# `mind_graph_*_modules_test.rb`), on an editor whose drawer shows a real thread
 # or the list, with the answer the server gives for that view at that moment.
 #
 # The page's own live controller must not do the merging for the test, so each

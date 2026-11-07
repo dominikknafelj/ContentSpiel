@@ -1,6 +1,5 @@
-// Every mark of the mind graph and its size (mind graph canvas spec §5.1;
-// pages in the mind graph, spec §4, whose values are the design answer's --
-// its later parts where they replace the earlier ones).
+// Every mark of the mind graph and its size (the values are the design
+// answer's, its later parts where they replace the earlier ones).
 // Everything is in SCREEN pixels, the same at every zoom.
 //
 // THE KINDS, each a shape of its own so none is told by colour alone:
@@ -20,19 +19,18 @@
 // - a TAG is a square; "+N more" is a pill with its words inside it.
 //
 // THE STATE is one table, `LOOKS`, which a page, a post and a ring type's
-// inner mark all read (spec §4; never worked out here: `status` and
+// inner mark all read (never worked out here: `status` and
 // `changes` are `Publishing::State`'s, from the data). A draft is DASHED on
 // every mark, so no state rests on colour alone. The corners are then:
 // notes top-left, pin top-right (`renderer.js`), changes bottom-right.
 //
-// A MARK'S SIZE IS ITS OUTER SIZE (the ruling on this task's review): an
-// outline is drawn INSIDE the mark's edge, so an outlined mark is exactly as
-// large as a filled one -- a draft page is 14 by 10, a ring type's hub and a
-// retired hub 12px across, a ring post's ring ends at its radius, the pill
-// is 60 by 16 with its border in it. `inside` below traces the path such a
-// stroke is centred on. Two marks are older than that rule and are left as
-// they were: a live filled post's own outline in its hue and a tag's
-// square are centred on the edge.
+// A MARK'S SIZE IS ITS OUTER SIZE: an outline is drawn INSIDE the mark's
+// edge, so an outlined mark is exactly as large as a filled one -- a draft
+// page is 14 by 10, a ring type's hub and a retired hub 12px across, a
+// ring post's ring ends at its radius, the pill is 60 by 16 with its border
+// in it. `inside` below traces the path such a stroke is centred on. Two
+// marks are older than that rule and are left as they were: a live filled
+// post's own outline in its hue and a tag's square are centred on the edge.
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`),
 // and a value of the table is a theme KEY.
@@ -108,7 +106,7 @@ export function lookOf(node) {
   return node.changes === "scheduled" ? "change_scheduled" : node.changes === "unpublished" ? "unpublished" : "live"
 }
 
-// A pill's width for its words as the canvas measures them (`app.js` writes
+// A pill's width for its words as the canvas measures them (`state.js` writes
 // the answer on the node as `width`): a whole number of pixels.
 export const moreWidth = (wordsWidth) => Math.max(MORE_MIN_WIDTH, Math.ceil(wordsWidth) + MORE_PADDING * 2)
 
@@ -141,7 +139,7 @@ export function topCorner(node, radius) {
   return box ? { x: box.width / 2, y: box.height / 2 } : { x: radius * CIRCLE_CORNER, y: radius * CIRCLE_CORNER }
 }
 
-// A post or a page with open notes (notes spec §4.4, handoff "Mind graph node
+// A post or a page with open notes (the notes handoff's "Mind graph node
 // badge"): the count in a small pill on the mark's top-left corner. Half its
 // height (the handoff's 14px line), half a character's advance at 10px mono,
 // the room beside the text (`px-1`), and how far a POST's pill reaches over

@@ -1,4 +1,4 @@
-// Draws one frame of the mind graph (mind graph canvas spec §4.3, §5.1).
+// Draws one frame of the mind graph.
 // Order: edges, marks (each with its pin), labels, notes badges, rings. Everything is in SCREEN pixels: the
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
@@ -11,8 +11,7 @@
 // to far right crosses the whole view.) Zoomed in, most of the graph is
 // outside, and a path of long dashed lines costs the rasteriser by its length,
 // seen or not -- measured at 2,000 posts and the largest zoom, about one frame
-// in fifty took two frames' time while panning without this, none with it
-// (spec §7).
+// in fifty took two frames' time while panning without this, none with it.
 //
 // THE STATES (the round of 2026-10-08), which combine:
 // - HOVERED (`hovered`, by the pointer or by its row in the list): a 1px ink
@@ -24,7 +23,7 @@
 // - PINNED (`pinned`, a Set of indexes): a small ink dot with a surface ring
 //   at the mark's top-right. It is drawn with the node, at the node's
 //   strength, whatever else the node is.
-// - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's; notes spec §4.4):
+// - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's):
 //   the count in a small mono badge on the mark's top-LEFT corner, opposite
 //   the pin, so a node can carry both: the badge keeps its right edge where
 //   it is and grows to the LEFT with its text, away from the pin. A card's
@@ -39,7 +38,7 @@
 // box the pin and the notes badge are at the box's own corners
 // (`marks.js`, `topCorner`), not where a circle as wide as it would have them.
 //
-// A LABEL (pages spec §4; design answer F6): a page's and a post type's in
+// A LABEL (design answer F6): a page's and a post type's in
 // ink, a tag's in mono `meta`, a post's in `dim`; the selected node's is
 // semibold (a tag's still mono) and the hovered node's on its backing, both
 // in full ink. A node
@@ -53,7 +52,7 @@ import { drawMark, boxOf, radiusFor, topCorner, notesPill, notesLabel, NOTES_BAD
 export { radiusFor }
 
 const DIM = 0.28
-// One path per style (pages spec §4): Shares a tag dashed `meta`, Related
+// One path per style: Shares a tag dashed `meta`, Related
 // solid ink, a hub's line to what it brings in faint, Lists dotted `dim`,
 // Tree solid in `tree` (dim; in dark dim at 60%). Drawn in this order, so a tree line
 // is on top of a tag's. A value of `colour` is a theme key.
@@ -76,12 +75,12 @@ export const LINE_STYLES = {
 // not change with it.
 const HIDE_TAG_LINES_BELOW = 0.4
 // The font a node's label is drawn in, and so the font its width is measured
-// in (`app.js`): a tag's is mono, like a tag everywhere else in CS Studio,
+// in (`state.js`): a tag's is mono, like a tag everywhere else in CS Studio,
 // and the selected node's is semibold in its own face.
 export const labelFont = (theme, node, selected) =>
   node.kind === "tag" ? (selected ? theme.strongMonoFont : theme.monoFont) : selected ? theme.strongFont : theme.font
 
-// A label's colour by kind, as a theme key (pages spec §4): a page's and a
+// A label's colour by kind, as a theme key: a page's and a
 // type's read first, a post's is `dim` until it is hovered or selected.
 const LABEL_COLOURS = { page: "ink", type: "ink", tag: "meta", post: "dim", more: "dim" }
 // The width of the surface-coloured outline under a label, which keeps a title
@@ -100,7 +99,7 @@ const NODE_MARGIN = 30
 const HOVER_RING = 2.5
 const SELECTED_RING = 4
 const FOCUS_RING = 5
-// `edges[i].source` / `.target` are node INDEXES (`app.js` converts the ids
+// `edges[i].source` / `.target` are node INDEXES (`state.js` converts the ids
 // once), `visibleNodes` / `visibleEdges` indexes too. `width` and `height` are
 // CSS pixels; the bitmap is `ratio` times that, which the transform takes up.
 // A label of `labels` marked `hover` is the hovered node's.

@@ -519,3 +519,5 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 end
 
 require_relative "support/sections_system_test_case" # a subclass, so it is read after the class above
+require_relative "support/mind_graph_system_test_case" # the same, for the Mind graph's browser files
+require_relative "support/mind_graph_modules_system_test_case" # the same, for the modules' browser files

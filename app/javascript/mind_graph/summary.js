@@ -1,8 +1,8 @@
-// What the canvas says of itself (pages in the mind graph, spec §6; design
-// answers G6 and H5). The canvas is one image to a screen reader, and its
-// name says what is on it NOW: the counts in view by type, then the lines,
-// then the scope. A plain function over what the page holds, with no canvas
-// and no element, so a test can ask it for every form.
+// What the canvas says of itself (design answers G6 and H5). The canvas is
+// one image to a screen reader, and its name says what is on it NOW: the
+// counts in view by type, then the lines, then the scope. A plain function
+// over what the page holds, with no canvas and no element, so a test can
+// ask it for every form.
 //
 //   the whole graph   "Mind graph: 9 pages, 3 post types, 13 posts and 4 tags, 27 connections. Showing everything."
 //   a local view      "Mind graph around Blog, depth 2: 7 pages, 1 post type and 20 of 112 posts. 92 more are in the list."
@@ -54,7 +54,7 @@ export function summaryOf({ nodes, visibleNodes, lines, data, off, toggles, arou
   const more = inView.filter((node) => node.kind === "more").reduce((sum, pill) => sum + pill.count, 0)
   const listed = more > 0 && focus?.kind === "page" ? nodes.find((node) => node.id === focus.node_id)?.listed_count ?? null : null
   // "N of M posts" is of the posts the page LISTS: a post THE PERSON ADDED
-  // from "Not listed on any page" (`added`, written by `app.js`, and
+  // from "Not listed on any page" (`added`, written by `state.js`, and
   // `listed: false`, the row's own word) is in view and is none of them, so
   // it is counted beside them, as posts are counted anywhere else ("20 of
   // 112 posts and 1 post"): N and "more" add up to M. Only an added one: a

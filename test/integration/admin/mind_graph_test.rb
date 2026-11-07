@@ -4,7 +4,7 @@ require "test_helper"
 # legend, filter, an empty canvas -- with NO graph data in it. The
 # `admin--mind-graph--graph` controller fetches the data from the URL the page names
 # (`test/integration/admin/mind_graph_data_test.rb` covers that endpoint) and
-# draws it (`test/system/admin/mind_graph_test.rb`). Same session gate as every
+# draws it (`test/system/admin/mind_graph_*_test.rb`). Same session gate as every
 # other CS Studio screen -- not public.
 class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   setup { site_settings(:default).update!(setup_completed_at: Time.current) }

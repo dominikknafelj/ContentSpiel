@@ -54,8 +54,14 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
     end
   end
 
+  # The system tests and the bases they share: a helper that lives in a base
+  # under test/support is under the guard as much as one in a test file.
+  def sources
+    Dir[Rails.root.join("test/system/**/*.rb"), Rails.root.join("test/application_system_test_case.rb"), Rails.root.join("test/support/*system_test_case.rb")]
+  end
+
   def offences
-    paths = Dir[Rails.root.join("test/system/**/*.rb"), Rails.root.join("test/application_system_test_case.rb")]
+    paths = sources
     assert_operator paths.size, :>, 20, "the sources moved: this guard is looking at too little"
     paths.flat_map do |path|
       code_lines(path).filter_map do |number, line, code|
@@ -65,6 +71,13 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
         "#{Pathname(path).relative_path_from(Rails.root)}:#{number}: #{line.strip}"
       end
     end
+  end
+
+  test "the guard reads the system test cases under test/support" do
+    names = sources.map { |path| File.basename(path) }
+    assert_includes names, "mind_graph_system_test_case.rb"
+    assert_includes names, "mind_graph_modules_system_test_case.rb"
+    assert_includes names, "sections_system_test_case.rb"
   end
 
   test "every sleep in a system test carries a reason" do

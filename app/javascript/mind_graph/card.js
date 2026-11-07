@@ -1,12 +1,11 @@
-// The selection card (mind graph canvas spec §5.3; pages in the mind graph,
-// spec §7): what a click on a node opens, and the only place a selection
-// leads anywhere. HTML over the canvas, standing beside its node
-// (`card_placement.js`; `app.js` moves it), so its links are links --
+// The selection card: what a click on a node opens, and the only place a
+// selection leads anywhere. HTML over the canvas, standing beside its node
+// (`card_placement.js`; `selection.js` moves it), so its links are links --
 // reachable by keyboard, opened in a new tab like any other -- and a click on
 // the canvas never navigates by itself.
 //
 // FOUR CARDS, one per kind of node that can be selected ("+N more" is not
-// selected: a press on it opens the list, `app.js`). Each reads top to
+// selected: a press on it opens the list, `list_reads.js`). Each reads top to
 // bottom, ON SCREEN AND IN THE DOCUMENT alike (the notes handoff's decision
 // 12), so the Tab key walks the card as it reads:
 //
@@ -261,7 +260,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     ]
   }
 
-  // A page (pages spec §7; design answer, part one §5): its address and its
+  // A page (design answer, part one §5): its address and its
   // state, its title, "4 child pages · lists 112 posts", its open notes as
   // on a post's card, then "Open page", "Focus" and Pin. A page with no
   // address in the editing language or the default has none written.
