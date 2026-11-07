@@ -59,6 +59,7 @@
 - The posts list's Tag filter offers only the tags on posts you can open that are not in the trash, and a Type the site no longer has shows as the chosen Type, so the filter can be seen and cleared.
 - On Tags, each tag shows a bar for how many posts use it. Details opens the tag in a panel beside the list (above it in a narrow window) with its newest posts, Merge into… and Delete tag…. The row has no ⋯ menu.
 - Added `GET <admin>/tags/:id`, the tag panel. It answers only the Tags screen's panel and otherwise sends back to the list.
+- On a wide window CS Studio uses the room: the dashboard, the posts list, Tags and the page and post editors stand at the content's left edge and grow with the window up to 1680px, the rail staying 360px at their right. In the editors a field of running text keeps a readable width (about 72 characters, a Code field about 100), while images, tables, sections and a card's or form's rows take the whole column. The dashboard's Pick up where you left off shows four drafts a row where it has the room.
 
 ### Removed
 

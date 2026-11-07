@@ -69,9 +69,10 @@ module Admin
       # one border, the well's line underneath (`border-0 border-b` in
       # `setup_input_class`). The bounds are border boxes, so a change of that
       # border is a change of these numbers, or the field is a fraction of a
-      # line off six and twenty-four.
+      # line off six and twenty-four. `admin-code-input` is how the editor's
+      # stylesheet finds the Code field, to give it the code measure.
       def input_class
-        "#{setup_input_class} font-cs-mono text-sm whitespace-pre overflow-auto [tab-size:2] " \
+        "#{setup_input_class} admin-code-input font-cs-mono text-sm whitespace-pre overflow-auto [tab-size:2] " \
           "[field-sizing:content] min-h-[calc(6lh+1rem+1px)] max-h-[calc(24lh+1rem+1px)]"
       end
 

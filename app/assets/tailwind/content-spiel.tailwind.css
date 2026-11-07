@@ -692,17 +692,18 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    here and none is `auto-fit`: a wider dashboard widens the columns and adds
    none. Below the threshold the rail's panels follow the main column as
    cards, one column, two from 40rem. Docked, the main column stands at the
-   content's left edge and the rail `--cs-rail-gap` right of it on the
-   rail's ground; the tracks are fixed and `justify-content: start`, so
-   spare width falls right of the rail, and the heading row and the mail
-   notice end where the rail does, so New post… stands over the rail and
-   not out in that spare width. On that ground an information panel has no
+   content's left edge and takes what the rail leaves, the rail
+   `--cs-rail-width` wide and `--cs-rail-gap` right of it on the rail's
+   ground, and the whole grows to `--cs-content-max` and no further, so on
+   a wider window the spare width falls right of the rail; the heading row
+   and the mail notice stop at the same cap, so New post… stands over the
+   rail and not out in that spare width. On that ground an information panel has no
    card and no band, and its heading keeps its warm ink; its rows, its empty
    line and its footer lose their inset with the head's, so all start at
    the rail's padding. The main column is a container of its own
    (`admin-dashboard-main`), so Waiting for you and Notes for you stand side
-   by side, and the tiles take two or three columns, by the room the main
-   column has. `turbo-frame.contents` keeps those two frames' panels grid
+   by side, and the tiles take two, three or four columns, by the room the
+   main column has. `turbo-frame.contents` keeps those two frames' panels grid
    items. These are plain rules, unlayered, so they win over the rows'
    padding utilities; the docked head outweighs a kind's tint by
    specificity (0,3,0 against 0,2,0). The tiles' columns override the
@@ -721,11 +722,14 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 @container admin-dashboard-main (min-width: 48rem) {
   .admin-draft-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+@container admin-dashboard-main (min-width: 64rem) {
+  .admin-draft-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 @container admin-dashboard (min-width: 40rem) {
   .admin-dashboard__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container admin-dashboard (min-width: 1200px) {
-  .admin-dashboard__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
+  .admin-dashboard__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
   .admin-dashboard__rail { grid-template-columns: minmax(0, 1fr); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
   .admin-dashboard__rail .admin-dashboard-panel { background: transparent; box-shadow: none; }
   .admin-dashboard__rail .admin-dashboard-panel .admin-dashboard-panel__head { background: transparent; padding-inline: 0; }
@@ -733,7 +737,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-dashboard__rail .admin-dashboard-panel > [data-panel-empty],
   .admin-dashboard__rail .admin-dashboard-panel > footer { padding-inline: 0; }
   .admin-dashboard__head,
-  .admin-dashboard__notice { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
+  .admin-dashboard__notice { max-width: var(--cs-content-max); }
 }
 /* The lists' rail (the posts list's filters; the Tags screen's detail). The
    container is the LIST's own width, never the window's (the sidebar and
@@ -756,11 +760,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    at every width, so the focus goes heading row, the bar, the rail, the
    list, and only the grid places them; nothing is moved by script. Below
    the threshold it is one column and the rail is a row of the page in that
-   order. Docked, the list stands at the content's left edge and the rail
-   `--cs-rail-gap` right of it, across the first two rows, on the rail's
-   ground; the tracks are fixed and `justify-content: start`, so spare
-   width falls right of the rail, and the heading row ends where the rail
-   does, so New post stands over the rail and not out in that spare width.
+   order. Docked, the list stands at the content's left edge and takes what
+   the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
+   right of it, across the first two rows, on the rail's ground; the whole
+   grows to `--cs-content-max` and no further, so on a wider window the
+   spare width falls right of the rail, and the heading row stops at the
+   same cap, so New post stands over the rail and not out in that spare
+   width.
    Nothing else is placed: the list falls into the first column's next row.
    That row is `1fr`, so a rail taller than the bar grows the list's row
    and never the bar's, and the list stays the bar's margin under it.
@@ -791,8 +797,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    that shows the empty line, wherever either stands. */
 .admin-list-rail__grid:has(#tags-list [data-empty-state-title]) .admin-tag-detail { display: none; }
 @container admin-list (min-width: 1200px) {
-  .admin-list-rail__head { max-width: calc(var(--cs-editor-column) + var(--cs-rail-gap) + var(--cs-rail-width)); }
-  .admin-list-rail__grid { grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; align-items: start; }
+  .admin-list-rail__head { max-width: var(--cs-content-max); }
+  .admin-list-rail__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
   .admin-list-rail__rail { grid-column: 2; grid-row: 1 / span 2; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
   .admin-filter-panel > legend { position: static; float: left; width: auto; height: auto; margin: 0 0 0.25rem; overflow: visible; clip-path: none; white-space: normal; }
@@ -816,9 +822,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    it is one column: no tabs, every panel in the page but a docked-only one,
    each where the document puts it.
 
-   Docked, the blocks column stands at the content's left edge and the rail
-   `--cs-rail-gap` right of it; spare width falls right of the rail, since
-   the tracks are fixed and `justify-content: start`. The rail is two rows,
+   Docked, the blocks column stands at the content's left edge and takes
+   what the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
+   right of it; the whole grows to `--cs-content-max` and no further, so on
+   a wider window the spare width falls right of the rail. Inside the grown
+   column a field of running text keeps a measure (THE MEASURE, below),
+   and a wide block takes the column. The rail is two rows,
    the tabs and the one current panel, in the second column. The blocks
    column opts in with `.admin-rail__main`, in the first column across both
    rows, so the rail's rows never push the blocks down; nothing else is
@@ -871,7 +880,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-rail__tab[aria-selected="true"] { color: var(--cs-ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--cs-accent); }
 .admin-rail__tab:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 @container admin-editor (min-width: 1200px) {
-  .admin-rail-grid:not(.admin-rail-grid--folded) { --admin-rail-docked: 1; grid-template-columns: minmax(0, var(--cs-editor-column)) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); justify-content: start; }
+  .admin-rail-grid:not(.admin-rail-grid--folded) { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); }
   .admin-rail-grid:not(.admin-rail-grid--folded)::before { content: ""; grid-column: 2; grid-row: 1 / -1; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { grid-column: 1; grid-row: 1 / -1; }
   /* As tall as its own content, not the rail's: a rail taller than a short
@@ -883,8 +892,22 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel { grid-column: 2; grid-row: 2; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4); }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:not([data-current]) { display: none; }
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel--docked-only[data-current] { display: block; }
-  /* The blocks column's cap, over `.admin-form-column`'s (0,1,0) by weight. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: var(--cs-editor-column); }
+  /* The blocks column takes its track whole, over `.admin-form-column`'s
+     (0,1,0) by weight: what keeps running text readable is the measure on
+     its fields, never a cap on the column. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: none; }
+  /* THE MEASURE. A field of running text in the blocks column (the wrapper
+     `.admin-column` or `.admin-field`, so its label, its well, its help,
+     its Translate box and its error lines together) is `--cs-text-measure`
+     wide at most, and the Code field `--cs-code-measure`. What is wide
+     takes the column: the image field and its preview, the Table block's
+     grid (a body that holds a table), a group's rows (`groups`, whose own
+     fields keep the measure); the block card, its head, a section's frame
+     and lanes and the add menu are no field, and carry none. A translation
+     tab never docks (`--folded`), so its pairs keep their own width. */
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field) { max-width: var(--cs-text-measure); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field):has(.admin-code-input) { max-width: var(--cs-code-measure); }
+  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field):is([data-controller~="admin--media--field"], :has(.admin-rich-text-table, .admin-groups-field)) { max-width: none; }
   /* Its top is the rail's: the space it keeps under the settings when they
      stand above it is not kept beside them. */
   .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { margin-top: 0; }
