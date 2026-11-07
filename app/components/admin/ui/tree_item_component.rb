@@ -1,9 +1,9 @@
 module Admin
   module Ui
     # One row of a tree of the site's pages, the one row both trees draw:
-    # Pages renders it, and the mind graph's list reads its classes
-    # (`CLASSES`, handed to the script as `data-tree-classes`) and builds the
-    # same markup. The nesting around it (`<ul>`/`<li>` in Pages, the
+    # Pages renders it. The mind graph's list is to read its classes
+    # (`CLASSES`) and build the same markup; `flat:` and the treeitem rules
+    # are for it and nothing draws them yet. The nesting around it (`<ul>`/`<li>` in Pages, the
     # treeitems of the graph's list) is the screen's, and so are the title's
     # link and every extra in the slots.
     #

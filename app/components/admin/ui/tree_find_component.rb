@@ -24,7 +24,7 @@ module Admin
 
       contract(
         accessibility: "A search landmark round a search field with a real label, naming the tree it narrows and its shortcut, the slash; a polite status line says the count once the typing stops; Down Arrow reaches the first match and Escape clears.",
-        motion: :none,
+        motion: :reduced,
         content_edges: %i[short long],
         widths: :fluid,
         interface: %i[controls noun moving],

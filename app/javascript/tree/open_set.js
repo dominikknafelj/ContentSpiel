@@ -66,9 +66,8 @@ function write(tree, entries) {
 }
 
 // `{ opened, folded }`, two Sets of bare page ids (strings), read from `seed`
-// (a value in the cookie's format: the graph's `data-tree-open`, which the
-// server drew from the cookie for the pages the viewer reads) when one is
-// given, else from the cookie.
+// (a value in the cookie's format, for the mind graph's list, which does not
+// read it yet) when one is given, else from the cookie.
 export function readOpenSet(seed = null) {
   const opened = new Set()
   const folded = new Set()

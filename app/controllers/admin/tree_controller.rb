@@ -10,8 +10,8 @@ module Admin
   # reads the person's open set from the request's cookie
   # (`TreeOpenSet::COOKIE`), so its folds are the ones the browser stored. A
   # moved page's new parent stays open only once the open set holds it,
-  # which only the browser stores (`admin--pages--tree#save` is where a move
-  # would); this answer writes nothing into it.
+  # which only the browser stores, in `admin--pages--tree#save` before the
+  # move is sent; this answer writes nothing into it.
   #
   # A move is a write to the moved page (`Pages::Move` saves it, so its
   # `updated_at` moves), made from OUTSIDE that page's editor forms -- and the

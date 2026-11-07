@@ -31,10 +31,8 @@ class ComponentPartsTest < ActiveSupport::TestCase
 
   # The most each list may hold, so a name added to one to skip a rule fails
   # here. The made-before list only shrinks: its figure is lowered by hand
-  # when it does, and never raised. The keyboard not-yet list's figure is the
-  # number of new components of the open pull request whose keyboard test
-  # comes in a later commit of it, raised with the component and lowered
-  # with its test, and 0 when the pull request is merged.
+  # when it does, and never raised. The keyboard not-yet list's figure is 0 on
+  # main: a component names its keyboard test when it is made.
   LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
 
   # What a list holds over its limit, as a sentence, or nil.

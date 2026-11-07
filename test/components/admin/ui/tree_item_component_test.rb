@@ -113,6 +113,15 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-tree-row__state"
   end
 
+  test "the title is as wide as its words, and the first part after it takes the rest of the row, so the trailing parts stand at the row's end" do
+    assert_match(/\.admin-tree-row__title\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/, stylesheet)
+    pusher = stylesheet[/([^{}]*)\{\s*margin-inline-start:\s*auto;\s*\}/, 1].to_s.squish
+    %w[title state].product(%w[trailing add]).each do |before, after|
+      assert_includes pusher, ".admin-tree-row__#{before} + .admin-tree-row__#{after}", "a #{after} part after the #{before} is pushed to the end"
+    end
+    assert_match(/\.admin-tree-row\s*\{[^}]*display:\s*flex;/, stylesheet, "the row stays full width, so its hover and press area do not change")
+  end
+
   test "a parent's disclosure names the list it folds: a parent without controls is refused" do
     assert_raises(ArgumentError) { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true) }
     assert_raises(ArgumentError) { Admin::Ui::TreeItemComponent.new(id: "r", title: "A", parent: true, controls: "") }

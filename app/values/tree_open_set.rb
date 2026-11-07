@@ -1,8 +1,8 @@
 # WHICH BRANCHES OF A PAGE TREE A PERSON HAS OPENED OR FOLDED, read from the
-# cookie `cs_tree_open` (`COOKIE`). Both trees draw their folds from it: the
-# Pages tree on the server from the first paint (`Admin::PagesScreen::
-# TreeComponent`, `TreeRowComponent.for_page`), the mind graph's list from
-# `to_s`. The browser writes it, through `tree/open_set.js` alone; no Ruby
+# cookie `cs_tree_open` (`COOKIE`). The Pages tree draws its folds from it on the
+# server from the first paint (`Admin::PagesScreen::TreeComponent`,
+# `TreeRowComponent.for_page`); `to_s` is the hook for the mind graph's list,
+# which does not read it yet. The browser writes it, through `tree/open_set.js` alone; no Ruby
 # writes it (`admin_design_rules_test.rb`, "the open set has one writer").
 #
 # THE FORMAT. Page ids joined by `.`, the newest first: a bare id is a branch
@@ -21,7 +21,7 @@
 # WHAT IS READ is held to the viewer and to a size. A value that is not
 # valid text, or is over `MAX_BYTES`, is read as nothing; entries past the
 # first `LIMIT` set nothing; an entry that is not an id (or `-` and an id)
-# is skipped, and so is an id the viewer may not see (`readable_ids`): a
+# is skipped, and so is an id the viewer cannot read (`readable_ids`: the readable pages, not the ancestors drawn only as a path): a
 # cookie can't make a row appear, and a hand-written one only folds what the
 # viewer has.
 class TreeOpenSet
@@ -71,7 +71,7 @@ class TreeOpenSet
   end
 
   # The value as it was kept, in the cookie's format and order: what the
-  # graph is handed (`data-tree-open`).
+  # graph's list is to be handed (`data-tree-open`); nothing hands it yet.
   def to_s = @entries.map { |id, kind| kind == :folded ? "-#{id}" : id.to_s }.join(".")
 
   EMPTY = new([])

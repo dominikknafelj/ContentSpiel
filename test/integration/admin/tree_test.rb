@@ -91,6 +91,22 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
   end
 
+  # The redraw is drawn from the person's open set, which only the browser
+  # writes: a branch the cookie opens stays open through a move, and one it
+  # does not mention is folded.
+  test "a move's answer reads the open set from the cookie" do
+    other = create_page(title: "Other")
+    create_page(title: "Other child", parent: other)
+
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, as: :turbo_stream
+    assert_select "turbo-stream[target=tree] template li[data-page-id='#{other.id}'][data-folded]", count: 1
+
+    cookies[TreeOpenSet::COOKIE] = other.id.to_s
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @a.id, position: 0 }, as: :turbo_stream
+    assert_select "turbo-stream[target=tree] template li[data-page-id='#{other.id}']", count: 1
+    assert_select "turbo-stream[target=tree] template li[data-page-id='#{other.id}'][data-folded]", count: 0
+  end
+
   # The frame check is the views' (`admin/pages/_tree`), never the
   # component's: a stream's `replace("tree")` answered to a request with a
   # frame header would otherwise put an empty element in the column.

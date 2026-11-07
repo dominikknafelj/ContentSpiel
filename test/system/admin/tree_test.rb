@@ -285,6 +285,17 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: spy["identifier"]) if spy
   end
 
+  # The cookie's path is the admin path, so a visitor's page never sees it.
+  test "after a fold a public page's document.cookie lacks the open set" do
+    visit_screen "/cs-studio/pages"
+    disclosure(root_page).click
+    assert_equal [ "-#{root_page.id}" ], open_set
+    assert_includes page.evaluate_script("document.cookie"), "cs_tree_open="
+
+    visit "/"
+    assert_not_includes page.evaluate_script("document.cookie").to_s, "cs_tree_open"
+  end
+
   test "a full load of a page under a folded ancestor draws its path open and its row selected, and the fold is forgotten" do
     make_branch
     visit_editor(@grandchild)

@@ -110,7 +110,7 @@ module Admin
         # The row markers features register, read once for the readable rows.
         @loaded = Admin::Slots.load("tree.row.markers", readable, viewer: Current.actor)
         @paths = ::PageTree.paths(readable.map(&:id), locale: locale)
-        @open_set = TreeOpenSet.parse(@open_cookie, readable_ids: visible_ids)
+        @open_set = TreeOpenSet.parse(@open_cookie, readable_ids: readable.map(&:id))
         @path_ids = ancestor_ids_of(selected, pages)
         pages.find { |page| page.id == root.id }
       end
