@@ -3,7 +3,9 @@
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
 // The marks and the five looks of a record's state are `marks.js`'s
-// (`drawMark`); the lines are the five styles of `LINE_STYLES` below.
+// (`drawMark`); the lines are the five styles of `LINE_STYLES` below, each
+// in its own theme key (`lineTree`, `lineLists`, `lineRelated`, `lineTag`,
+// `lineBrings`), whose token carries its strength.
 //
 // WHAT IS OUTSIDE THE CANVAS IS NOT DRAWN. A node whose mark lies wholly
 // outside is skipped, and so is an edge that can't cross the canvas: both its
@@ -13,20 +15,22 @@
 // seen or not -- measured at 2,000 posts and the largest zoom, about one frame
 // in fifty took two frames' time while panning without this, none with it.
 //
-// THE STATES (the round of 2026-10-08), which combine:
+// THE STATES, which combine:
 // - HOVERED (`hovered`, by the pointer or by its row in the list): a 1px ink
 //   ring round the mark, and its label in full ink on a backing, drawn even
 //   where the label rule hides it. Hovering dims nothing.
 // - SELECTED: a 2px accent ring with a gap, a semibold label in full ink, its
-//   edges brightened in ink (each keeps its kind's dash and cap; the accent
-//   stays the ring's), and every node and edge not connected to it at DIM.
+//   edges brightened in ink at full strength (each keeps its kind's dash and
+//   cap; the accent stays the ring's), and every node and edge not connected
+//   to it at the theme's `faded`.
 // - PINNED (`pinned`, a Set of indexes): a small ink dot with a surface ring
 //   at the mark's top-right. It is drawn with the node, at the node's
 //   strength, whatever else the node is.
 // - WITH OPEN NOTES (`open_notes` above zero, a post's and a page's):
-//   the count in a small mono badge on the mark's top-LEFT corner, opposite
-//   the pin, so a node can carry both: the badge keeps its right edge where
-//   it is and grows to the LEFT with its text, away from the pin. A card's
+//   the count in a small badge, in the count's sans, on the mark's top-LEFT
+//   corner, opposite the pin, so a node can carry both: the badge keeps its
+//   right edge where it is and grows to the LEFT with its text, away from
+//   the pin. A card's
 //   badge stands OUTSIDE it, over whatever it lands on, on a 2px ring of the
 //   ground (`marks.js`, `notesPill`). Not a ring:
 //   a ring means hovered, selected or focused. Drawn after the labels, at
@@ -38,24 +42,23 @@
 // box the pin and the notes badge are at the box's own corners
 // (`marks.js`, `topCorner`), not where a circle as wide as it would have them.
 //
-// A LABEL (design answer F6): a page's and a post type's in
-// ink, a tag's in mono `meta`, a post's in `dim`; the selected node's is
-// semibold (a tag's still mono) and the hovered node's on its backing, both
-// in full ink. A node
-// with no label (the "+N more" pill: its words are inside it) has none.
+// A LABEL (design answer F6), in the sans: a page's and a post type's in
+// ink, a tag's in the tag hue (`tag`), a post's in `dim`; the selected node's
+// is semibold and the hovered node's on its backing, both in full ink. A
+// node with no label (the "+N more" pill: its words are inside it) has none.
 //
-// Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
-// what dims is dimmed by `globalAlpha`.
+// Nothing here is a colour or a strength: every colour comes in with `theme`
+// (`theme.js`), and what a selection leaves out is drawn at `theme.faded`.
+// The one other strength is a label's fade-in (`labels.js`), which is motion.
 import { drawMark, boxOf, radiusFor, topCorner, notesPill, notesLabel, NOTES_BADGE, NOTES_RING } from "mind_graph/marks"
 
 // The app and the module tests ask for a node's size here.
 export { radiusFor }
 
-const DIM = 0.28
-// One path per style: Shares a tag dashed `meta`, Related
-// solid ink, a hub's line to what it brings in faint, Lists dotted `dim`,
-// Tree solid in `tree` (dim; in dark dim at 60%). Drawn in this order, so a tree line
-// is on top of a tag's. A value of `colour` is a theme key.
+// One path per style: Shares a tag dashed, Related solid, a hub's line to
+// what it brings in a hairline, Lists dotted, Tree solid. Drawn in this
+// order, so a tree line is on top of a tag's. A value of `colour` is a theme
+// key, and each line's strength is its token's own (`--cs-graph-line-*`).
 //
 // LISTS (design answer G3): 1.5px with ROUND caps and a dash of 0.1 / 3.5.
 // A dash that short is its two caps, so each is a round dot 1.5px across,
@@ -63,11 +66,11 @@ const DIM = 0.28
 // BRINGS (the third answers' "Local view lines", G2, H1): a page's local
 // view only, the hub's line to each post it brings in and to "+N more".
 export const LINE_STYLES = {
-  tag: { colour: "meta", width: 1, dash: [ 4, 3 ], alpha: 0.8, cap: "butt" },
-  related: { colour: "ink", width: 1.5, dash: [], alpha: 0.35, cap: "butt" },
-  brings: { colour: "faint", width: 1, dash: [], alpha: 1, cap: "butt" },
-  lists: { colour: "dim", width: 1.5, dash: [ 0.1, 3.5 ], alpha: 1, cap: "round" },
-  tree: { colour: "tree", width: 1, dash: [], alpha: 1, cap: "butt" }
+  tag: { colour: "lineTag", width: 1, dash: [ 4, 3 ], cap: "butt" },
+  related: { colour: "lineRelated", width: 1.5, dash: [], cap: "butt" },
+  brings: { colour: "lineBrings", width: 1, dash: [], cap: "butt" },
+  lists: { colour: "lineLists", width: 1.5, dash: [ 0.1, 3.5 ], cap: "round" },
+  tree: { colour: "lineTree", width: 1, dash: [], cap: "butt" }
 }
 // Below this zoom the lines of shared tags are not drawn (design answer,
 // part one §6): zoomed out they are most of the ink and say the least. A
@@ -75,14 +78,12 @@ export const LINE_STYLES = {
 // not change with it.
 const HIDE_TAG_LINES_BELOW = 0.4
 // The font a node's label is drawn in, and so the font its width is measured
-// in (`state.js`): a tag's is mono, like a tag everywhere else in CS Studio,
-// and the selected node's is semibold in its own face.
-export const labelFont = (theme, node, selected) =>
-  node.kind === "tag" ? (selected ? theme.strongMonoFont : theme.monoFont) : selected ? theme.strongFont : theme.font
+// in (`state.js`): the sans, the selected node's semibold.
+export const labelFont = (theme, node, selected) => (selected ? theme.strongFont : theme.font)
 
 // A label's colour by kind, as a theme key: a page's and a
 // type's read first, a post's is `dim` until it is hovered or selected.
-const LABEL_COLOURS = { page: "ink", type: "ink", tag: "meta", post: "dim", more: "dim" }
+const LABEL_COLOURS = { page: "ink", type: "ink", tag: "tag", post: "dim", more: "dim" }
 // The width of the surface-coloured outline under a label, which keeps a title
 // readable where it crosses an edge.
 const LABEL_HALO = 3
@@ -133,7 +134,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
         context.lineTo(toX, toY)
       }
       const bright = pass === "bright"
-      context.globalAlpha = bright ? 0.9 : style.alpha * (pass === "faded" ? DIM : 1)
+      context.globalAlpha = pass === "faded" ? theme.faded : 1
       context.strokeStyle = bright ? theme.ink : theme[style.colour]
       context.lineWidth = style.width + (bright ? 0.5 : 0)
       context.lineCap = style.cap
@@ -148,7 +149,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   const badged = []
   for (const index of visibleNodes) {
     if (beyond(x(index), y(index), radii[index] + NODE_MARGIN)) continue
-    context.globalAlpha = dimmed(index) ? DIM : 1
+    context.globalAlpha = dimmed(index) ? theme.faded : 1
     const node = nodes[index]
     drawMark(context, theme, node, x(index), y(index), radii[index])
     if (pinned.has(index)) drawPin(context, theme, x(index), y(index), topCorner(node, radii[index]))
@@ -175,7 +176,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
       context.fillText(node.label, label.x, label.y)
       continue
     }
-    context.globalAlpha = label.alpha * (dimmed(label.index) ? DIM : 1)
+    context.globalAlpha = label.alpha * (dimmed(label.index) ? theme.faded : 1)
     context.lineWidth = LABEL_HALO
     context.strokeStyle = theme.surface
     context.fillStyle = chosen ? theme.ink : theme[LABEL_COLOURS[node.kind]]
@@ -186,7 +187,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   // The notes badges, over every mark and label, each on a ring of the
   // canvas's ground, at its node's strength.
   for (const index of badged) {
-    context.globalAlpha = dimmed(index) ? DIM : 1
+    context.globalAlpha = dimmed(index) ? theme.faded : 1
     drawNotes(context, theme, nodes[index], x(index), y(index), radii[index])
   }
 
@@ -243,8 +244,9 @@ function drawPin(context, theme, x, y, corner) {
 
 // A neutral pill, like the count badges of the lists: surface, a line, ink
 // (handoff: `bg-surface border-line-strong text-ink`), whatever the viewer
-// has read. Never the only cue: the node's card says the count in words.
-// More than ninety-nine reads "99+". It stands on a ring of the canvas's
+// has read. The count is the sans (`theme.countFont`, as `text-count`).
+// Never the only cue: the node's card says the count in words. More than
+// ninety-nine reads "99+". It stands on a ring of the canvas's
 // ground (`NOTES_RING`), which is what lets it cover a neighbour cleanly.
 //
 // THE RIGHT EDGE IS FIXED and the pill grows to the left (`marks.js`): the

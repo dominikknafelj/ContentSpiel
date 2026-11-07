@@ -37,6 +37,9 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "#{GRAPH}[data-state='failed']"
     assert_text "The graph could not be loaded."
     assert_no_selector "#{GRAPH}[data-settled]"
+    # Retry is the shared button's tertiary look, handed to the script by the view.
+    tertiary = JSON.parse(graph["data-button-classes"]).fetch("tertiary").split
+    assert_empty tertiary - find_button("Retry")[:class].split, "Retry is not the tertiary button"
 
     page.execute_script("window.failGraph = false")
     press "Retry"
@@ -313,6 +316,8 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
         around_home.call
         assert_current_path admin_mind_graph_path, ignore_query: false
         assert_selector "#{bar} button[type=button][aria-label='Show everything: all 4 connections'][aria-describedby='mind-graph-opened-line']", exact_text: "Show everything"
+        everything = find("#{bar} button[aria-label='Show everything: all 4 connections']")
+        assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split.sort, everything[:class].split.sort, "Show everything is not the shared small tertiary button"
         assert_no_selector "[data-mind-graph-focus]"
         assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", text: "Showing the area around Home. The site has 5 pages.", visible: :all
         assert_nil screen_position("page-#{Page.find_by!(parent: first).id}")

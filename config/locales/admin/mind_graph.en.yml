@@ -53,15 +53,15 @@
 # language groups it ("1,214"), handed over by the script; `count` only
 # chooses the form.
 #
-# `script.card.status`: `draft`, `scheduled` and `live` are the chip's first
-# part, with its dot. A live record that has more to say gets a second part
-# after a "·" (design answer G4, verbatim): `unpublished_changes`, with no
-# dot, or `change_scheduled` behind a warn dot, where `%{date}` is the node's
-# `change_on`, a day the SERVER has already written in CS Studio's short date
-# format, so the script formats no date. Those two rows are for the eye;
-# `live_with_changes` and `live_change_scheduled` are the whole chip as a
-# screen reader is given it, the Status key's own words with the day added
-# (H6: one set of words). `card.child_pages` and `card.lists_posts` are the
+# `script.card.status`: a record in one state is the shared status chip,
+# which says its own word, and a live record with unpublished changes adds
+# the shared unpublished chip. `change_scheduled` is the words beside the
+# Live chip of a live record with a change scheduled, where `%{date}` is the
+# node's `change_on`, a day the SERVER has already written in CS Studio's
+# short date format, so the script formats no date. That row is for the
+# eye; `live_with_changes` and `live_change_scheduled` are the whole state
+# as a screen reader is given it, the legend's status words with the day
+# added (one set of words). `card.child_pages` and `card.lists_posts` are the
 # two halves of a page's line of counts ("4 child pages · lists 112 posts");
 # a post type's card says its posts with `card.tag_posts`. In every count of
 # the card `%{figure}` is the count as the messages' language groups it
@@ -71,6 +71,11 @@
 # sentence and `everything_name` the whole accessible name of "Show
 # everything" (`show.opened.everything` is what is written on it), which
 # says how many lines pressing it draws; `%{figure}` is the grouped count.
+#
+# `script.list.stated` is a row's title in its name with one state after it,
+# once per chip the row shows ("Soon, Scheduled, Unpublished changes");
+# `%{state}` is the chip's own word (`ui.en.yml`, the status chip's and the
+# unpublished chip's keys), so the name says what the row shows.
 #
 # `script.list.more_row` is the whole name of a "+N more" pill's row in the
 # list (its visible words are the pill's own, `script.more`): `%{target}` is
@@ -204,13 +209,8 @@ en:
           pin: "Pin"
           unpin: "Unpin"
           show_tagged: "Show posts with this tag"
-          close: "Close"
           tag: "Tag"
           status:
-            draft: "Draft"
-            scheduled: "Scheduled"
-            live: "Live"
-            unpublished_changes: "Unpublished changes"
             change_scheduled: "Change scheduled %{date}"
             live_with_changes: "Live, unpublished changes"
             live_change_scheduled: "Live, change scheduled %{date}"
@@ -246,6 +246,7 @@ en:
           add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
           absent_post: "%{title}, %{type} post, not in view."
           absent_retired_post: "%{title}, %{type}, retired type, not in view."
+          stated: "%{title}, %{state}"
         search:
           count:
             one: "%{count} result"

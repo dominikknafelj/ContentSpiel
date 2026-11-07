@@ -116,6 +116,7 @@ import { attachGestures } from "mind_graph/gestures"
 import { createSelection } from "mind_graph/selection"
 import { createListReads, LOAD_TIMEOUT_MS } from "mind_graph/list_reads"
 import { say, announce } from "mind_graph/notice"
+import { readParts } from "mind_graph/parts"
 
 const BUTTON_ZOOM = 1.4
 
@@ -150,6 +151,8 @@ export function mount(element) {
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const typeLabels = JSON.parse(element.dataset.typeLabels)
   const buttonClasses = JSON.parse(element.dataset.buttonClasses)
+  // The chips and the card's Close, cloned from the server's own markup.
+  const parts = readParts(element)
 
   // A figure that goes into a sentence is written the way the sentence's
   // language writes it (the messages' `@locale`), not the browser's own. A
@@ -194,6 +197,7 @@ export function mount(element) {
     typeLabels,
     dotClasses,
     buttonClasses,
+    parts,
     // The button goes with the card it is in; the focus goes back to where the
     // card was opened from.
     onClose: () => selection.closeCard(),
@@ -213,7 +217,7 @@ export function mount(element) {
   // "Not listed on any page" is there only for a viewer the server gave its
   // address (one who reads a page).
   const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, number, dotClasses, typeLabels, retryClass: buttonClasses.secondary, unlisted: Boolean(element.dataset.unlistedUrl),
+    text, number, dotClasses, typeLabels, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl),
     onSelect: (id) => {
       const index = state.indexOf.get(id)
       if (index != null) selection.reveal(index)
@@ -559,7 +563,9 @@ export function mount(element) {
       setState("failed")
       const retry = document.createElement("button")
       retry.type = "button"
-      retry.className = "pointer-events-auto cursor-pointer font-semibold text-ink underline"
+      // The shared tertiary button; the notice lets the pointer through to
+      // the canvas, and this one button takes it back.
+      retry.className = `pointer-events-auto ${buttonClasses.tertiary}`
       retry.textContent = text.t("mind_graph.script.retry")
       retry.addEventListener("click", () => load(), { once: true })
       say(notice, text.t("mind_graph.script.load_failed"), retry)

@@ -133,36 +133,23 @@ class Admin::MindGraphLegendSystemTest < Admin::MindGraphSystemTestCase
     await_graph
   end
 
-  # Status is not a filter. The key is a dialog
-  # named "Status key" behind the legend's "Status key…" button, in the chip's words.
-  test "the Status key opens from the keyboard as a dialog, and Escape gives the focus back" do
+  # Status is not a filter: the five looks are a key on the legend's row,
+  # whose swatches the graph's own renderer draws (that they are five
+  # different looks is the drawing modules' "no two alike"). They are marks
+  # and hold no stop, so the Tab key goes from the last toggle to the zoom.
+  test "the legend's status looks are drawn by the canvas's renderer, and Tab goes from the last toggle to the zoom buttons" do
     create_post(title: "Alpha", tags: [ "t" ])
     create_post(title: "Beta", tags: [ "t" ])
     visit admin_mind_graph_path
     await_graph
-    key = "dialog#mind-graph-status-key"
-    assert_no_selector "#{key}[open]", visible: :all
-    before = [ graph["data-nodes"], graph["data-edges"] ]
 
-    button = find("#{GRAPH} [data-mind-graph-legend] button", text: "Status key…")
-    button.execute_script("this.focus()")
-    page.driver.browser.keyboard.type(:Enter)
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], all("#{GRAPH} [data-legend-section=status] li[data-legend-state]").map { |item| item.text.squish }
+    assert_swatches_drawn("#{GRAPH} [data-legend-section=status]", count: 5)
 
-    assert_selector "#{key}[open] h2", text: "Status key"
-    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], all("#{key} li[data-legend-state]").map { |item| item.text.squish }
-    await_js("document.querySelector('#mind-graph-status-key').contains(document.activeElement)")
-    assert_no_selector "#{key} .admin-dialog__body input, #{key} .admin-dialog__body button, #{key} .admin-dialog__body a"
-    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the key filters nothing"
-    # Its five swatches are drawn (by the graph's own renderer), each its own.
-    await_js("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]')).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))")
-    drawings = page.evaluate_script("Array.from(document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())")
-    assert_equal 5, drawings.uniq.size, "two looks of the key are one drawing"
+    find("#{GRAPH} input[name=mind_graph_lines][value=tag]").execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Tab)
 
-    page.driver.browser.keyboard.type(:Escape)
-
-    assert_no_selector "#{key}[open]", visible: :all
-    await_js("document.activeElement?.textContent.trim() === 'Status key…'")
-    assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "Escape closed the key and nothing of the graph"
+    await_js("document.activeElement?.getAttribute('aria-label') === 'Zoom out'")
   end
 
   test "a kind switched off takes the selection and the card of its node with it, and switched on again the node is back where it was, pinned as it was and not selected" do

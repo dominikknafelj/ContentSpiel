@@ -417,10 +417,10 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     draws = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()")
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
     # A swatch is a canvas too: it holds colours, not tokens, so the
-    # legend's and the Status key's are drawn again with the theme (the key
-    # is a closed dialog outside the graph's element, with its own painter).
-    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch], #mind-graph-status-key canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
-    await_js("#{swatches}.length === 11 && document.querySelector('#mind-graph-status-key canvas').getContext('2d').getImageData(0, 0, 18, 18).data.some((value) => value > 0)")
+    # legend's, its five status looks among them, are drawn again with the
+    # theme.
+    swatches = "Array.from(document.querySelectorAll('[data-mind-graph-legend] canvas[data-swatch]'), (canvas) => canvas.toDataURL())"
+    assert_swatches_drawn("[data-mind-graph-legend]", count: 11)
     painted = page.evaluate_script(swatches)
     begin
       page.execute_script("document.documentElement.setAttribute('data-theme', #{(theme == "dark" ? "light" : "dark").to_json})")
@@ -430,6 +430,55 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
       await_js("(() => { const before = #{painted.to_json}; return #{swatches}.every((drawing, index) => drawing !== before[index]) })()")
     ensure
       page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
+    end
+  end
+
+  # The zoom's figure is a count (`text-count`): the sans, with digits of one
+  # width, so the readout does not shift as the figure changes.
+  test "the zoom readout is a figure in the sans with even digits, beside the zoom buttons" do
+    2.times { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
+    visit admin_mind_graph_path
+    await_graph
+    zoom = "#{GRAPH} [data-mind-graph-zoom]"
+    before = find(zoom).text
+
+    find("#{GRAPH} button[aria-label='Zoom in']").click
+
+    assert_no_selector zoom, exact_text: before
+    assert_match(/\A\d+\s?%\z/, find(zoom).text)
+    readout = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{zoom.to_json})); return [ style.fontVariantNumeric, style.fontFamily ] })()")
+    sans = page.evaluate_script("getComputedStyle(document.body).fontFamily")
+    assert_includes readout.first, "tabular-nums"
+    assert_equal sans, readout.last, "the readout is in the page's sans"
+    assert_selector "#{zoom} + button[aria-label='Zoom in']"
+    assert_selector "button[aria-label='Zoom out'] + #{zoom.split.last}"
+  end
+
+  # A label is measured once per load, so a face the canvas asks for that has
+  # not loaded is measured in the fallback's widths, and the hit test with
+  # it. Each of the theme's three fonts is a face the page has LOADED when
+  # the graph is drawn: `document.fonts.check` alone would not do, as it
+  # answers true for a family no face matches.
+  test "the canvas's fonts are faces the page has loaded when the graph is drawn" do
+    create_post(title: "One", tags: [ "t" ])
+    visit admin_mind_graph_path
+    await_graph
+
+    fonts = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("mind_graph/theme").then(({ readTheme }) => {
+        const theme = readTheme(document.querySelector(#{GRAPH.to_json}))
+        const loaded = Array.from(document.fonts).filter((face) => face.status === "loaded").map((face) => `${face.family.replace(/"/g, "")} ${face.weight}`)
+        done({ fonts: [ theme.font, theme.strongFont, theme.countFont ], loaded })
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "theme: #{fonts["error"]}" if fonts["error"]
+
+    fonts["fonts"].zip([ 400, 600, 500 ]).each do |font, weight|
+      stated, family = font.match(/\A(?:(\d+) )?(\d+px) (.+)\z/).values_at(1, 3)
+      assert_equal weight, (stated || 400).to_i, "#{font} is drawn at the weight the design gives it"
+      first = family.split(",").first.strip.delete('"')
+      assert_includes fonts["loaded"], "#{first} #{weight}", "#{font}: no loaded face of #{first} at #{weight} (#{fonts["loaded"].join(", ")})"
     end
   end
 

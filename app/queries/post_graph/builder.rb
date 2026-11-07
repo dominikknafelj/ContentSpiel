@@ -1,6 +1,5 @@
-# The part `PostGraph::Global` and `PostGraph::Local` share (mind graph canvas
-# spec §3.3; pages in the mind graph, spec §1, §4): given what to draw and
-# what connects it, the `{ nodes, tags, pages, types, edges }` the page
+# The part `PostGraph::Global` and `PostGraph::Local` share: given what to
+# draw and what connects it, the `{ nodes, tags, pages, types, edges }` the page
 # draws. FIVE KINDS OF NODE: a post (`nodes`), a tag, a page, a post type
 # and the one "All posts" node (both in `types`); a page's local view adds
 # its "+N more" pills (`more`). Each node carries its `degree`, the number of
@@ -50,7 +49,7 @@
 # scheduled change comes into force and no words: the controller writes the
 # day.
 #
-# A post and a page also carry `open_notes` (notes spec §4.4): the number of
+# A post and a page also carry `open_notes`: the number of
 # their open threads, which the page draws as a neutral badge on the node.
 # Nothing about the viewer is in it: what is unread for them is said on the
 # rows of the node's card, which come from the notes' own endpoint.
@@ -64,7 +63,7 @@ module PostGraph
   class Builder
     COLUMNS = %i[id title content_type published_at unpublished_changes_at].freeze
     # The two looks of a live record that the cheap status does not tell
-    # apart (spec §4): the rows have moved on, or a change is scheduled.
+    # apart: the rows have moved on, or a change is scheduled.
     CHANGES = { live_with_changes: "unpublished", live_change_scheduled: "scheduled" }.freeze
 
     Plan = Struct.new(:post_ids, :page_ids, :related, :by_tag, :tag_counts, :lists, :more, :edges, keyword_init: true)
@@ -179,6 +178,7 @@ module PostGraph
           status: state.status,
           changes: CHANGES[state.state],
           change_at: (pending[post.id] if state.state == :live_change_scheduled),
+          unpublished: state.changes?,
           listed: @site.listings.listed?(post.id),
           url: @url_for.call(post),
           degree: degree.fetch(id, 0),
@@ -221,6 +221,7 @@ module PostGraph
           status: state.status,
           changes: CHANGES[state.state],
           change_at: (pending[page_id] if state.state == :live_change_scheduled),
+          unpublished: state.changes?,
           url: @url_for.call(record),
           degree: degree.fetch(id, 0),
           child_count: tree.children(page_id).size,

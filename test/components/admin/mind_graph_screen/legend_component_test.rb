@@ -15,7 +15,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_equal %w[blog resume_entry], page.all("[data-legend-type]").map { |li| li["data-legend-type"] }
   end
 
-  # Mind graph canvas spec §5.1: a post whose type is no longer registered is
+  # A post whose type is no longer registered is
   # a grey ring with a stroke through it, and the legend says so once -- the
   # stored name is not a label, and the type has no colour slot for a dot.
   test "a retired type adds the Retired type entry, drawn with a stroke through it, and gets no dot of its own" do
@@ -35,12 +35,12 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
 
   def legend(content_types: %w[blog], pages: true) = render_inline(Admin::MindGraphScreen::LegendComponent.new(content_types: content_types, pages: pages))
 
-  # Pages spec §6 (design answers part one §4, F6): the legend is the filter.
-  # Spec decision 8: "a new visit starts from the defaults". Firefox puts a
+  # The legend is the filter (design answers part one §4, F6), and a new
+  # visit starts from the defaults (pages decision 8). Firefox puts a
   # form's state back on a reload, so there a toggle switched off would have
   # stayed off (the graph agrees with the checkbox either way: the state is
   # read from it). `autocomplete="off"` is what tells a browser not to
-  # (Task 6's review, M12). What a browser does with it is not tested here:
+  # (M12). What a browser does with it is not tested here:
   # the suite's browser restores nothing.
   test "every toggle asks the browser not to put its state back on a reload" do
     legend
@@ -72,22 +72,50 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     legend(content_types: %w[blog gone/type])
 
     names = page.all("[data-mind-graph-legend] canvas[data-swatch]").map { |canvas| canvas["data-swatch"] }
-    assert_equal %w[page post tag type line-tree line-lists line-related line-tag retired pinned notes], names
+    assert_equal %w[page post tag type line-tree line-lists line-related line-tag retired pinned notes] +
+                 %w[state-live state-draft state-scheduled state-live-with-changes state-live-change-scheduled], names
     assert_selector "[data-mind-graph-legend][data-controller='admin--mind-graph--swatches']"
     assert_selector "label[data-legend-toggle=tag] canvas[data-swatch=tag]"
     assert_selector "fieldset[data-legend-group=lines] label[data-legend-toggle=tag] canvas[data-swatch=line-tag][data-width='22'][data-height='8'][width='22'][height='8'][aria-hidden=true]"
     assert_no_selector "svg"
   end
 
-  # Third design answers: status is not a filter. The five looks are a key
-  # behind a "Status key…" button (H6: a dialog), not in the legend's row.
-  test "the legend's Status button opens the key and is no filter" do
+  # Status is not a filter: the five looks are a key that switches nothing,
+  # on the legend's row after Key, in the chip's words (one set of words;
+  # `test/lib/mind_graph_guards_test.rb` holds them to the chips'), each
+  # with the canvas's own drawing of it.
+  test "the legend's Status group holds the five looks in the chip's words, each with its canvas swatch, after the keys" do
     legend
 
-    assert_selector "button[type=button][data-legend-status][aria-haspopup=dialog][data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='mind-graph-status-key']", text: "Status key…"
-    assert_no_selector "[data-legend-state]", visible: :all
-    assert_no_selector "dialog", visible: :all
-    assert_no_text "Draft or scheduled"
+    assert_equal %w[show key status], page.all("[data-mind-graph-legend] > [data-legend-section]").map { |section| section["data-legend-section"] }
+    assert_selector "[data-legend-section=status] > span#mind-graph-legend-states.text-label:first-child", exact_text: "Status"
+    assert_selector "span#mind-graph-legend-states + ul[data-legend-states][aria-labelledby=mind-graph-legend-states]:last-child"
+    states = page.all("ul[data-legend-states] > li")
+    assert_equal %w[live draft scheduled live_with_changes live_change_scheduled], states.map { |item| item["data-legend-state"] }
+    assert_equal Admin::MindGraphScreen::LegendComponent::STATES.map(&:to_s), states.map { |item| item["data-legend-state"] }
+    assert_equal [ "Live", "Draft", "Scheduled", "Live, unpublished changes", "Live, change scheduled" ], states.map { |item| item.text.squish }
+    Admin::MindGraphScreen::LegendComponent::STATES.each do |state|
+      assert_selector "li[data-legend-state=#{state}] canvas[data-swatch]", count: 1
+      assert_selector "li[data-legend-state=#{state}] canvas[data-swatch=state-#{state.to_s.dasherize}][data-width='18'][data-height='18'][aria-hidden=true]"
+    end
+    assert_no_match(/\d/, page.find("[data-legend-section=status]").text, "no date: the day of a scheduled change stands only on a card's chip")
+  end
+
+  # The names are `Publishing::State`'s: a sixth state fails here until the
+  # legend has a row for it.
+  test "the legend has a row for every state a record can be in, and no other" do
+    assert_equal Publishing::State::STATES.sort, Admin::MindGraphScreen::LegendComponent::STATES.sort
+  end
+
+  # Every control of the legend is a toggle: the keys, the status looks
+  # included, are marks with their names, and nothing opens from it.
+  test "the legend opens no dialog and has no button" do
+    legend
+
+    assert_no_selector "[data-mind-graph-legend] button, [data-mind-graph-legend] a, [data-mind-graph-legend] [aria-haspopup]", visible: :all
+    assert_no_selector "[data-mind-graph-legend] dialog, [data-mind-graph-legend] [data-action*='dialog']", visible: :all
+    assert_no_selector "ul[data-legend-states] input, ul[data-legend-keys] input", visible: :all
+    assert_no_text "Status key"
   end
 
   # A kind that can be drawn has its toggle and its key, and one that cannot
@@ -120,20 +148,18 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     end
   end
 
-  # Layout points spec, D and decision 14; Claude Design's O5: two groups a
-  # person can see, "Show" over the toggles of both kinds and "Key" over the
-  # marks, "Status key…" last in Key. The marks hold no stop, so the Tab
-  # order is still the toggles, then the button.
-  test "the legend is two labelled groups: Show over both kinds of toggle, then Key over the marks, with Status key… last" do
+  # The legend is three groups a person can see: "Show" over the toggles of
+  # both kinds, "Key" over the marks, then "Status" over the five looks. The
+  # marks and the looks hold no stop, so the Tab order is the toggles alone.
+  test "the legend is three labelled groups: Show over both kinds of toggle, Key over the marks, Status over the looks" do
     legend(content_types: %w[blog])
 
-    assert_selector "[data-mind-graph-legend] > [data-legend-section=show] + [data-legend-section=key]"
+    assert_selector "[data-mind-graph-legend] > [data-legend-section=show] + [data-legend-section=key] + [data-legend-section=status]:last-child"
     assert_selector "[data-legend-section=show] > span[aria-hidden=true]:first-child", exact_text: "Show"
     assert_selector "[data-legend-section=show] > fieldset[data-legend-group=nodes] + fieldset[data-legend-group=lines]"
     assert_selector "[data-legend-section=key] > span#mind-graph-legend-key:first-child", exact_text: "Key"
-    assert_selector "span#mind-graph-legend-key + ul[data-legend-keys][aria-labelledby=mind-graph-legend-key] + button[data-legend-status]:last-child", exact_text: "Status key…"
-    assert_selector "[data-legend-section] > span.text-label", count: 2
-    assert_no_selector "ul[data-legend-keys] button, ul[data-legend-keys] input"
+    assert_selector "span#mind-graph-legend-key + ul[data-legend-keys][aria-labelledby=mind-graph-legend-key]:last-child"
+    assert_selector "[data-legend-section] > span.text-label", count: 3
     assert_no_selector "[aria-label='Legend']"
   end
 
@@ -147,7 +173,7 @@ class Admin::MindGraphScreen::LegendComponentTest < ViewComponent::TestCase
     assert_selector "[data-legend=pinned] canvas[data-swatch=pinned]"
   end
 
-  # A post with open notes (notes spec §4.4): the canvas draws its count in a
+  # A post with open notes: the canvas draws its count in a
   # small badge at the node's top-left, opposite the pin, and the legend
   # names it after the pin.
   test "names the notes badge, last, after the pin" do

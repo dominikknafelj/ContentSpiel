@@ -1,18 +1,16 @@
-<%# The legend is the filter (pages in the mind graph, spec §6): two groups of
-    native checkboxes, everything on, drawn as two labelled groups (Claude
-    Design's O5): "Show" over the toggles of both kinds, then "Key" over the
-    marks that are no controls, with "Status key…" last in Key. The Tab order
-    is unchanged, since the marks hold no stop: the toggles, then the button.
+<%# The legend is the filter: two groups of native checkboxes, everything
+    on, drawn as three labelled groups: "Show" over the
+    toggles of both kinds, "Key" over the marks that are no controls, then
+    "Status" over the five looks. The marks and the looks hold no stop, so
+    the Tab order is the toggles alone.
     A toggle's count is the script's: the page holds no graph data. Until it
     is written the toggle's name is its label; then the script gives the
     input one name with the count in it ("Pages, 200"), which the
     controller's `reset` takes back. The count itself is hidden from a
     screen reader, which would otherwise hear it twice.
 
-    STATUS IS NOT A FILTER (the third design answers): the five looks are a
-    key of their own, a dialog (`StatusKeyComponent`, design answer H6),
-    and here is only the "Status key…" button that opens it: a button that reads as
-    a link, wired to the one dialog controller on <body>.
+    STATUS IS NOT A FILTER: the five looks are a key on the row, each a
+    swatch and its name in the chip's words.
 
     A NEW VISIT STARTS FROM THE DEFAULTS (pages spec, decision 8), in every
     browser: `autocomplete="off"` keeps Firefox from putting a toggle's state
@@ -59,15 +57,23 @@
         <%= render Admin::MindGraphScreen::SwatchComponent.new(:pinned) %>
         <%= t(".pinned") %>
       </li>
-      <%# A post or a page with open notes (notes spec §4.4): the count badge the
+      <%# A post or a page with open notes: the count badge the
           canvas draws on the mark's top-left corner, opposite the pin. %>
       <li class="inline-flex items-center gap-1.5" data-legend="notes">
         <%= render Admin::MindGraphScreen::SwatchComponent.new(:notes) %>
         <%= t(".notes") %>
       </li>
     </ul>
-    <%= tag.button t(".status"), type: "button", aria: { haspopup: "dialog" },
-          class: "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-          data: { legend_status: true, **dialog_trigger(Admin::MindGraphScreen::StatusKeyComponent::ID) } %>
+  </div>
+  <div data-legend-section="status" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+    <span id="mind-graph-legend-states" class="text-label text-meta"><%= t(".states_label") %></span>
+    <ul data-legend-states class="m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0" aria-labelledby="mind-graph-legend-states">
+      <% STATES.each do |state| %>
+        <li class="inline-flex items-center gap-1.5" data-legend-state="<%= state %>">
+          <%= render Admin::MindGraphScreen::SwatchComponent.new("state-#{state.to_s.dasherize}") %>
+          <%= t(".states.#{state}") %>
+        </li>
+      <% end %>
+    </ul>
   </div>
 </div>

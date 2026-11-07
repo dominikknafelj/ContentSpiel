@@ -94,7 +94,6 @@ test/components/admin/media_library/panel_component_test.rb: 3.8
 test/components/admin/media_library/tile_component_test.rb: 0.6
 test/components/admin/media_library/toolbar_component_test.rb: 0.1
 test/components/admin/mind_graph_screen/legend_component_test.rb: 0.2
-test/components/admin/mind_graph_screen/status_key_component_test.rb: 0.0
 test/components/admin/mind_graph_screen/swatch_component_test.rb: 0.0
 test/components/admin/notes_screen/avatar_component_test.rb: 0.0
 test/components/admin/notes_screen/body_component_test.rb: 0.0

@@ -47,10 +47,10 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   # page's local view.
   SHARED_ID_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: "post-12", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/twelve", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 },
-               { id: "post-13", title: "Thirteen", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, listed: true, url: "/thirteen", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 } ],
+      nodes: [ { id: "post-12", title: "Twelve", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, unpublished: false, listed: true, url: "/twelve", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 },
+               { id: "post-13", title: "Thirteen", type: "blog", colour_index: 1, status: "live", changes: null, change_at: null, unpublished: false, listed: true, url: "/thirteen", degree: 2, related_count: 1, tag_count: 1, open_notes: 0 } ],
       tags: [ { id: "tag-12", name: "twelve", count: 2, degree: 3 } ],
-      pages: [ { id: "page-12", title: "Page twelve", path: "/twelve", depth: 0, home: true, parent: null, order: 0, status: "live", changes: null, change_at: null, url: "/pages/12", degree: 2, child_count: 0, listed_count: 2, open_notes: 0 } ],
+      pages: [ { id: "page-12", title: "Page twelve", path: "/twelve", depth: 0, home: true, parent: null, order: 0, status: "live", changes: null, change_at: null, unpublished: false, url: "/pages/12", degree: 2, child_count: 0, listed_count: 2, open_notes: 0 } ],
       types: [ { id: "type-blog", name: "blog", label: "Blog post", colour_index: 1, count: 2, degree: 1 } ],
       edges: [ { source: "post-12", target: "post-13", kind: "related" }, { source: "post-12", target: "tag-12", kind: "tag" }, { source: "post-13", target: "tag-12", kind: "tag" },
                { source: "page-12", target: "tag-12", kind: "lists" }, { source: "page-12", target: "type-blog", kind: "lists" },
@@ -143,6 +143,17 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
         const canvases = Array.from(document.querySelectorAll(#{"#{selector} canvas[data-mark]".to_json}))
         return canvases.length > 0 && canvases.every((canvas) => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))
       })()
+    JS
+  end
+
+  # Every swatch inside `selector` has been drawn by the graph's renderer:
+  # something is on each one (a canvas that was never painted is all zeros).
+  # `count:` the swatches there must be, so an empty match is no pass.
+  def assert_swatches_drawn(selector, count:)
+    assert_equal count, page.evaluate_script("document.querySelectorAll(#{"#{selector} canvas[data-swatch]".to_json}).length"), "swatches in #{selector}"
+    await_js(<<~JS)
+      Array.from(document.querySelectorAll(#{"#{selector} canvas[data-swatch]".to_json}))
+        .every((canvas) => canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))
     JS
   end
 

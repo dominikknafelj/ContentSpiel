@@ -1,6 +1,6 @@
 # Pin npm packages by running ./bin/importmap
 #
-# Three entry points (final fix wave, D; theming spec §4): `application`
+# Three entry points: `application`
 # (setup and sign-in -- Turbo plus the site's own controllers), `admin`
 # (CS Studio's layout only -- `application` plus `controllers/admin/*`, see
 # app/javascript/admin.js) and `site` (the public layout only --
@@ -33,7 +33,7 @@ pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "@hotwired/stimulus", to: "stimulus.min.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
 # A theme's Stimulus controllers, from <theme>/javascript/controllers
-# (theming spec §4): `ThemeFolder#pins` says how. Under `controllers/theme/`,
+# (`docs/reference/theming.md`): `ThemeFolder#pins` says how. Under `controllers/theme/`,
 # so `copy_controller.js` is the identifier `theme--copy` and cannot be one
 # of the CMS's; preloaded for the `site` entry point alone. A theme adds no
 # pin of its own and no third-party script: a controller imports
@@ -43,7 +43,7 @@ ThemeFolder.current.pins&.then do |pins|
   pin_all_from pins[:dir], under: pins[:under], to: pins[:to], preload: pins[:preload]
 end
 pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", preload: "admin"
-# The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by
+# The Tiptap editor's own extensions/schema, imported by
 # `controllers/admin/rich_text/editor_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
 # The one-at-a-time write queue every autosaving form and block action shares.
@@ -88,7 +88,7 @@ pin_all_from "app/javascript/media", under: "media", preload: "admin"
 
 # The mind graph's modules: imported only by the two controllers of
 # `controllers/admin/mind_graph/` (`graph_controller.js`, and
-# `swatches_controller.js` for the legend's and the Status key's swatches),
+# `swatches_controller.js` for the legend's swatches),
 # each through a dynamic `import()`, so no other CS Studio screen fetches
 # them -- `preload: false`. `layout_worker.js` is in this directory too but is never
 # imported: it is started as a module Worker from its asset URL.
@@ -100,7 +100,7 @@ pin "sortablejs", preload: false # @1.15.7
 # imports it, so it is not preloaded; the pin stays so `bin/importmap audit`
 # and `outdated` still see the package.
 pin "d3-force", preload: false # @3.0.0
-# Tiptap 3 and its ProseMirror dependencies (tiptap spec §4.1), vendored by
+# Tiptap 3 and its ProseMirror dependencies, vendored by
 # `bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link`
 # and, for the Table block's grid (table spec decision 11), `bin/importmap pin
 # @tiptap/extension-table@3.31.3`, which brought `@tiptap/pm/tables` and

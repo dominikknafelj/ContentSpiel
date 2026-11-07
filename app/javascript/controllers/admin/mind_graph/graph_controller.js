@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-// CS Studio's mind graph (`admin/mind_graph/show`; mind graph canvas spec §4).
+// CS Studio's mind graph (`admin/mind_graph/show`).
 // Deliberately thin: every `controllers/admin/*` file is loaded on every CS
 // Studio page, so the graph's own modules -- and, through its worker,
 // d3-force -- are imported only here, only when this screen is on the page
@@ -26,10 +26,8 @@ import { Controller } from "@hotwired/stimulus"
 // them, and a visit that comes back starts with none. (The legend's
 // checkboxes are restored too, and they are kept: the graph shows what the
 // legend says. Their counts, and the names made of them, are taken back.)
-// The legend's swatches and the "Status" key are not this controller's:
-// `admin--mind-graph--swatches` draws the first again on its own connect, and
-// the key is a dialog outside this element, opened by `admin--ui--dialog` and
-// closed natively, in which the graph writes nothing.
+// The legend's swatches, its five status looks among them, are
+// `admin--mind-graph--swatches`' own, drawn on its connect.
 //
 // A failed `import()` is left unhandled on purpose: the rejection is a
 // JavaScript error, loud in the console and in the system tests, and never a

@@ -20,7 +20,7 @@
 // hit test may answer for.
 //
 // A LABEL'S WIDTH is measured in the font the label is drawn in
-// (`renderer.js`, `labelFont`): a tag's in mono, and the selected node's in
+// (`renderer.js`, `labelFont`): the sans, and the selected node's in
 // semibold. Each label is measured in both, once per load and never in a
 // frame (`plainWidths`, `strongWidths`), and `widths` is the first with the
 // selected node's entry from the second (`selectIndex`). The label rule, the

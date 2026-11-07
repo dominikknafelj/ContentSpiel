@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Design pass spec §3: tokens only, red only for destruction and failure,
+# The design pass: tokens only, red only for destruction and failure,
 # and none of the components the shared parts replaced. These rules are easy to
 # break one innocent edit at a time, so they are pinned here.
 class AdminDesignRulesTest < ActiveSupport::TestCase
@@ -1223,7 +1223,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/users_screen/invite_dialog_component.html.erb
     app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/password_field_controller.js
-    app/javascript/mind_graph/card.js
     app/views/admin/accounts/edit.html.erb
     app/views/admin/passwords/edit.html.erb
     app/views/admin/passwords/new.html.erb

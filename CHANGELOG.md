@@ -52,9 +52,12 @@
 - Switching between light and dark cross-fades: in CS Studio over 250ms, ease-out; on the public site's footer toggle by the browser's default fade, which a theme may style with `::view-transition-old(root)` and `::view-transition-new(root)` in its own stylesheet. There is no fade under reduced motion, where the browser has no view transitions, or on first paint.
 - Every module in CS Studio's sidebar stands on a chip of its own colour family (Dashboard, Pages and Mind graph structure, Posts and Tags lists, Media media, Forms form, Translations text, Users and Groups people, Trash and the system modules (Settings, AI assistant, System status, Audit log) code); the current module's chip keeps its colour on the accent-tint row.
 - CS Studio's layers are one scale: the save bar takes the lowest page layer, the media library's drop overlay and the shell's scrim over an open menu, and the rich-text popover and the mind graph's search results at the menus' layer. A menu inside the editor's canvas scrolls under the editor's header and the top bar.
+- The mind graph is drawn on CS Studio's new colours and in the sans: pages stay neutral, a tag is the structure hue, each kind of line has its own colour at a measured contrast, a draft's outline is the Draft chip's edge, and what a selection leaves out fades further. Its card and its list carry the shared chips (a list row shows a record's state as the posts list does and says it in its name), its buttons are the shared buttons, and the legend shows the five status looks as a third group, Status, beside Show and Key.
+- A post type's dot is a little darker in light and a little lighter in dark on every screen, keeping its hue.
 
 ### Removed
 
+- The mind graph's Status key dialog and its button: the five status looks stand on the legend's row.
 - The dashboard's quick-create row: a draft is begun from "New post…" or "Start a draft", in the New post dialog.
 - `POST <admin>/dashboard/draft`, which the quick-create row sent: it is a 404 now.
 - `GET <admin>/notes/open_threads`, the Open threads panel's frame: it is a 404 now. Its list is part of Waiting for you, `GET <admin>/dashboard/waiting`.

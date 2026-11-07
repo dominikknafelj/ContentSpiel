@@ -262,20 +262,56 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     assert_equal "2", graph["data-nodes"], "Tags is still switched off, so the tag is not drawn"
     assert_equal "1", graph["data-edges"]
     assert_selector CANVAS, count: 1
-    # The swatches are drawn again in the restored page: a snapshot keeps a
-    # canvas and none of its pixels.
-    # So are the Status key's, outside the graph's element: the whole body is
-    # the snapshot's.
-    drawn = ->(selector) { "Array.from(document.querySelectorAll(#{selector.to_json})).every((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value) => value > 0))" }
-    assert_equal [ 6, 5 ], page.evaluate_script("[ document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json}).length, document.querySelectorAll('#mind-graph-status-key canvas[data-swatch]').length ]")
-    await_js(drawn.call("#{GRAPH} canvas[data-swatch]"))
-    await_js(drawn.call("#mind-graph-status-key canvas[data-swatch]"))
+    # The swatches are drawn again in the restored page, the five status
+    # looks among them: a snapshot keeps a canvas and none of its pixels.
+    assert_swatches_drawn("#{GRAPH} [data-mind-graph-legend]", count: 11)
+    assert_equal 11, page.evaluate_script("document.querySelectorAll(#{"#{GRAPH} canvas[data-swatch]".to_json}).length"), "a swatch outside the legend"
     assert_equal 1, page.evaluate_script("window.graphFetches")
     box = canvas_box
     [ a, b ].each do |post|
       point = screen_position(post)
       assert point["x"].between?(box[0], box[2]) && point["y"].between?(box[1], box[3]), "#{post.id} is outside the canvas after Back: #{point} in #{box}"
     end
+  end
+
+  # The legend's status looks are the swatches controller's, drawn on its
+  # connect, so a restored page shows them drawn before its data has come.
+  # The chips the script cloned into the list and the card are the visit
+  # that was left: `reset()` empties both, and the chips are back only with
+  # this visit's data.
+  test "Back to the graph draws the legend's status looks again and shows no chip from the visit that was left" do
+    draft = create_post(title: "Unfinished", published: false)
+    PostRelation.create!(post: draft, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    assert_selector "#{LIST} .admin-status-chip[data-status=draft]"
+    click_node(draft)
+    assert_selector "[data-mind-graph-card] .admin-status-chip[data-status=draft]"
+
+    within("nav[aria-label='Modules']") { click_link "Tags" }
+    assert_selector "h1", text: "Tags"
+    page.execute_script(<<~JS)
+      window.graphFetches = 0
+      const original = window.fetch
+      window.realFetch ??= original
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return original(url, options)
+        window.graphFetches += 1
+        return new Promise((resolve) => { window.releaseGraph = () => resolve(original(url, options)) })
+      }
+    JS
+    page.go_back
+    assert_selector "h1", text: "Mind graph"
+    await_js("window.graphFetches === 1")
+
+    assert_selector "#{GRAPH}[data-state='loading']"
+    assert_swatches_drawn("#{GRAPH} [data-legend-section=status]", count: 5)
+    assert_no_selector "#{LIST} .admin-status-chip", visible: :all
+    assert_no_selector "[data-mind-graph-card] .admin-status-chip", visible: :all
+    page.execute_script("window.releaseGraph()")
+    await_graph
+    assert_selector "#{LIST} .admin-status-chip[data-status=draft]"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
   end
 
   # Turbo's snapshot is the page as it was left, card and all; Back shows a

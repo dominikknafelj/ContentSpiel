@@ -21,14 +21,14 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
       assert_text(/1 related\s*·\s*0 tags/i)
       assert_link "Focus", href: /mind_graph\?post=#{a.id}\z/
       assert_button "Pin"
-      assert_selector "button[aria-label='Close']", text: "×"
+      assert_selector "button[aria-label='Close'][data-mind-graph-card-close]"
       click_link "Open post"
     end
     assert_current_path admin_post_path(a)
   end
 
   # In order: the type's dot, the type and
-  # the status chip with Close at the end of the row; the title; the counts;
+  # the shared status chip, with Close in the corner; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
   # and not underlined links. A post's notes stand under the title and its
   # counts and the actions follow them, in the document as on screen.
@@ -47,7 +47,8 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     # it stands in the card's top-right corner.
     assert_equal %w[DIV H2 P SECTION DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
     within(card) do
-      assert_selector ":scope > div:first-child span[aria-hidden='true'].rounded-full", count: 2 # the type's dot, the status chip's
+      assert_selector ":scope > div:first-child > span[aria-hidden='true'].rounded-full", count: 1 # the type's dot
+      assert_selector ":scope > div:first-child > .admin-status-chip.bg-live[data-status=live]", exact_text: "Live"
       assert_selector ":scope > button:last-child[data-mind-graph-card-close][aria-label='Close']"
       assert_selector "h2", text: "Alpha"
       assert_text(/2 related\s*·\s*2 tags/i)
@@ -83,7 +84,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
 
     click_node(a)
 
-    assert_selector "[data-mind-graph-card] [data-status='draft']", text: "Draft"
+    assert_selector "[data-mind-graph-card] > div:first-child > .admin-status-chip.border-field-line[data-status='draft']", text: "Draft"
   end
 
   test "a click on a tag opens its card, with the posts list filtered by it" do
@@ -423,7 +424,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
   # the page's own, "Open page" is the page's editor, and Enter on a selected
   # page opens it. (Each card's order, the five states of the chip and a
   # retired type's card are held against plain data in the modules test.)
-  test "a page's card says its address, state, counts and notes and opens the page, a scheduled change says its day behind a warn dot, and a post type's and All posts' cards say their posts" do
+  test "a page's card says its address, state, counts and notes and opens the page, a scheduled change says its day beside the Live chip, and a post type's and All posts' cards say their posts" do
     home = root_page
     blog = create_page(title: "Blog")
     create_page(title: "Archive", parent: blog)
@@ -437,10 +438,9 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     day = I18n.l(at, format: :"admin.short")
     assert_equal :live_change_scheduled, Publishing::State.of(pending.reload).state, "the test's page has no change scheduled: it shows nothing"
     state = Publishing::State.of(blog.reload).state
-    seen = { live: "Live", live_with_changes: "Live · Unpublished changes" }.fetch(state)
+    seen = { live: "Live", live_with_changes: "Live Unpublished changes" }.fetch(state)
     as(users(:two)) { assert Notes::Start.call(blog, body: "Check the intro").ok? }
-    chip = "[data-mind-graph-card] .admin-status-chip"
-    dots = -> { all("#{chip} span.rounded-full").map { |dot| dot[:class][/bg-[a-z]+/] } }
+    row = "[data-mind-graph-card] > [data-chip-row][aria-hidden='true']"
 
     with_reduced_motion do
       visit admin_mind_graph_path
@@ -450,7 +450,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
       within("[data-mind-graph-card]") do
         assert_selector "span.text-small", exact_text: "/blog"
         assert_no_match(/mono/i, find("span.text-small", exact_text: "/blog").evaluate_script("getComputedStyle(this).fontFamily"))
-        assert_equal seen, find(".admin-status-chip[data-status='#{state}']#{" span[data-chip-seen]" unless state == :live}").text.squish
+        assert_equal seen, find(state == :live ? ":scope > div:first-child > .admin-status-chip[data-status='live']" : ":scope > [data-chip-row][data-status='#{state}']").text.squish
         assert_selector "h2", exact_text: "Blog"
         assert_text(/1 child page\s*·\s*lists 2 posts/i)
         assert_selector "canvas[data-mark=page][aria-hidden='true']"
@@ -468,12 +468,12 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
       assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(blog)}']"
       assert_equal [ [ "Page", blog.id ] ] * 2, Notes::Thread.order(:id).last(2).map { |thread| [ thread.container_type, thread.container_id ] }
 
-      # A live page with a change scheduled: "● Live · ● Change scheduled 14 Oct".
+      # A live page with a change scheduled: the Live chip, then "Change scheduled 14 Oct".
       escape_on_canvas
       click_node(nid(pending))
-      assert_equal "Live · Change scheduled #{day}", find("#{chip}[data-status='live_change_scheduled'] span[data-chip-seen]").text.squish
-      assert_equal "Live, change scheduled #{day}", find("#{chip} .sr-only", visible: :all).text(:all).squish
-      assert_equal %w[bg-ok bg-warn], dots.call, "a warn dot before the second part"
+      assert_equal "Live Change scheduled #{day}", find("#{row}[data-status='live_change_scheduled']").text.squish
+      assert_selector "#{row} > .admin-status-chip.bg-live[data-status='live'] + span", exact_text: "Change scheduled #{day}"
+      assert_equal "Live, change scheduled #{day}", find("[data-mind-graph-card] > div:first-child > .sr-only", visible: :all).text(:all).squish
 
       # A post type a page lists, and "All posts": no link, the posts the viewer reads.
       escape_on_canvas
@@ -528,5 +528,78 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     assert_equal 0, page.evaluate_script("window.notesFetches"), "the card's notes were fetched again"
   ensure
     page.execute_script("if (window.realFetch) { window.fetch = window.realFetch; delete window.realFetch }") # the window is shared with what follows
+  end
+
+  # The card's chips are cloned markup that draws from the tokens, so a theme
+  # switched while the card is open changes their colours with nothing
+  # cloned again, and a note half typed in the card stays.
+  test "the card's chips follow the theme, and what is typed in the card stays" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a)
+    find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
+    chip = "[data-mind-graph-card] .admin-status-chip[data-status='live']"
+    find(chip).execute_script("this.dataset.same = 'yes'")
+    # A token's colour as the page resolves it, in the scheme that is on.
+    live = "(() => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--cs-live)'; document.body.append(probe); const colour = getComputedStyle(probe).backgroundColor; probe.remove(); return colour })()"
+    filled = "getComputedStyle(document.querySelector(#{chip.to_json})).backgroundColor"
+    theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
+    light = page.evaluate_script(filled)
+
+    begin
+      page.execute_script("document.documentElement.setAttribute('data-theme', 'dark')")
+      await_js("#{filled} !== #{light.to_json}") unless theme == "dark"
+
+      assert_equal page.evaluate_script(live), page.evaluate_script(filled), "the Live chip is not --cs-live in dark"
+      assert_selector "#{chip}[data-same='yes']", count: 1
+      assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
+    ensure
+      page.execute_script("document.documentElement.setAttribute('data-theme', #{theme.to_json})")
+    end
+  end
+
+  # A live record with a change scheduled has the longest chip row: the Live
+  # chip and the change's words with its day. In a language whose words are
+  # longer it wraps inside the card's padding, and stays under Close. There
+  # is no German UI yet, so the messages are made German for the card; on
+  # that pass the row must stand on two lines, or the test held nothing.
+  test "a two-state chip wraps inside the card, clear of Close, in German too" do
+    post = create_post(title: "Alpha")
+    PostRelation.create!(post: post, related_post: create_post(title: "Beta"))
+    Publishing::Version.take!(post, live_at: 3.days.from_now)
+    post.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    assert_equal :live_change_scheduled, Publishing::State.of(post.reload).state
+
+    visit admin_mind_graph_path
+    await_graph
+    [ nil, "Änderung geplant für Dienstag, den %{date}" ].each do |words|
+      if words
+        escape_on_canvas
+        page.execute_script(<<~JS)
+          const element = document.querySelector(#{GRAPH.to_json})
+          element.setAttribute("data-messages", JSON.stringify({ ...JSON.parse(element.getAttribute("data-messages")), "@locale": "de", "mind_graph.script.card.status.change_scheduled": #{words.to_json} }))
+        JS
+      end
+      click_node(post)
+      row = element_box("[data-mind-graph-card] > [data-chip-row]")
+      card = element_box("[data-mind-graph-card]")
+      close = element_box("[data-mind-graph-card-close]")
+      padding = page.evaluate_script("parseFloat(getComputedStyle(document.querySelector('[data-mind-graph-card]')).paddingRight)")
+      pieces = page.evaluate_script(<<~JS)
+        Array.from(document.querySelectorAll("[data-mind-graph-card] > [data-chip-row] > *"), (piece) => { const r = piece.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom } })
+      JS
+
+      assert_operator row["right"], :<=, card["right"] - padding + 0.5, "the chip row runs into the card's padding (#{words || "English"})"
+      (pieces + [ row ]).each do |box|
+        next if box["top"] >= close["bottom"]
+        overlaps = box["left"] < close["right"] && box["right"] > close["left"]
+        assert_not overlaps, "the chip row runs under Close (#{words || "English"}): #{box} #{close}"
+      end
+      pieces.each { |box| assert_operator box["right"], :<=, card["right"] - padding + 0.5, "a piece of the chip row runs out of the card (#{words || "English"})" }
+      assert_operator pieces[1]["top"], :>=, pieces[0]["bottom"], "the German row did not wrap: the test holds nothing" if words
+    end
+    assert_equal 2, page.evaluate_script("document.querySelectorAll('[data-mind-graph-card] > [data-chip-row] > *').length")
   end
 end

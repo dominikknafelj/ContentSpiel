@@ -275,6 +275,42 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_no_selector "#{GRAPH} [data-mind-graph-results] b"
   end
 
+  # A row's chips stand under its title, so a title is cut only by the row's
+  # own edge: neither a row with both chips nor a page's row three levels
+  # down leaves its title too narrow to tell one record from another. Each
+  # title must have room for its first twenty characters, measured against
+  # the text itself, not a width in pixels.
+  test "in the list's column a row with two chips and a page three levels down each keep room for twenty characters of the title" do
+    level = create_page(title: "Section of the site")
+    level = create_page(title: "Subsection of the site", parent: level)
+    deep = create_page(title: "Deep page with a long title to read", parent: level)
+    deep.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    soon = create_post(title: "Scheduled post with a long title to read")
+    PostRelation.create!(post: soon, related_post: create_post(title: "Beta"))
+    soon.update_columns(published_at: 3.days.from_now, unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
+    assert_equal :scheduled, Publishing::State.of(soon.reload).state
+    assert Publishing::State.of(soon).changes?, "the post carries both chips"
+
+    visit admin_mind_graph_path
+    await_graph
+    rows = [ nid(soon), nid(deep) ].map { |id| "#{LIST} button[data-node-id='#{id}']" }
+    assert_selector "#{rows[0]} .admin-status-chip[data-status='scheduled']"
+    assert_selector "#{rows[0]} [data-unpublished-changes]"
+    assert_selector "#{rows[1]} [data-unpublished-changes]"
+    rows.each do |row|
+      room = page.evaluate_script(<<~JS)
+        (() => {
+          const title = document.querySelector(#{row.to_json}).querySelector("span.truncate")
+          const range = document.createRange()
+          range.setStart(title.firstChild, 0)
+          range.setEnd(title.firstChild, 20)
+          return { room: title.getBoundingClientRect().width, needed: range.getBoundingClientRect().width }
+        })()
+      JS
+      assert_operator room["room"], :>=, room["needed"], "#{row}: the title has no room for its first twenty characters"
+    end
+  end
+
   # Around a page
   # at depth 2 the twenty newest posts it lists are drawn, each hanging off
   # the hub that brings it in; the rest stand behind "+N more", which hangs
@@ -710,9 +746,9 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card] textarea"
     page.driver.browser.keyboard.type(:Tab)
     assert_equal "TEXTAREA", page.evaluate_script("document.activeElement.tagName")
-    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.textContent.trim())")
+    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.getAttribute('aria-label') ?? stop.textContent.trim())")
     assert_operator stops.index("field"), :<, stops.index("Open post")
-    assert_equal [ "Open post", "Focus", "Pin", "×" ], stops.last(4)
+    assert_equal [ "Open post", "Focus", "Pin", "Close" ], stops.last(4)
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
@@ -782,10 +818,10 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     JS
 
     assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
-    # The toggles, then "Status key…", and every one of them a stop the Tab key
-    # makes: none is taken out of the order.
+    # The toggles alone, and every one of them a stop the Tab key makes: none
+    # is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
-    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ], [ "Status key…", 0 ] ], legend
+    assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ] ], legend
   end
 
   test "a title with markup in it is text in the list and in the search results" do

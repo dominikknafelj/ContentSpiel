@@ -1,5 +1,5 @@
-// The legend's and the Status key's swatches (pages in the mind graph, spec
-// §6): each is a small canvas, and what is on it is drawn by THE RENDERER
+// The legend's swatches, its five status looks among them: each is a small
+// canvas, and what is on it is drawn by THE RENDERER
 // THE GRAPH IS DRAWN BY (`renderer.js`, and through it `marks.js`), from a
 // scene of one node or one line. So a swatch is not a copy of a mark in CSS
 // or SVG that could drift from it: change a look in `marks.js`'s `LOOKS`, a
@@ -15,13 +15,13 @@
 //   pinned   the node carries the pin
 //   hue      a theme key that stands in for a post type's colour. The hues
 //            mean post types, and a swatch that names no type has none:
-//            the toggles' post is `dim`, as "All posts" is, and the Status
-//            key's mark `ink`, as a page is.
+//            the toggles' post is `dim`, as "All posts" is, and the
+//            status looks' mark `ink`, as a page is.
 //
 // A swatch's mark is the SMALLEST the canvas draws (`radiusFor` of a node
 // with no connections), in the same pixels.
 //
-// A ROW'S MARK (pages spec §7; design answer H2) is the same thing for a
+// A ROW'S MARK (design answer H2) is the same thing for a
 // node of the data: `markCanvas(node)` answers a small canvas for a PAGE or
 // a POST TYPE, where a row of the list, a search result or a card shows what
 // the node is, and `paintMarks(root)` draws every one inside `root` with the
@@ -45,9 +45,8 @@ import { ALL_POSTS } from "mind_graph/ids"
 
 const post = (more = {}) => ({ kind: "post", colour_index: 1, status: "live", ...more })
 
-// The mark the five looks are shown on in the Status key. A READING (the
-// pages plan, Task 6: "a neutral filled mark"): a post's dot in ink. For
-// the designer: a page's card would do as well.
+// The mark the five looks are shown on in the legend: a neutral filled
+// mark, a post's dot in ink (a reading; a page's card would do as well).
 const KEY_MARK = { node: post(), hue: "ink" }
 const look = (more) => ({ ...KEY_MARK, node: { ...KEY_MARK.node, ...more } })
 
@@ -111,8 +110,8 @@ export function paintSwatches(root) {
 // its drawing has there. A post type's hub is 10px across where the canvas
 // draws it at 12 (design answer H2: "a smaller copy of the hub as drawn,
 // 10px with the inner ring"). A page's card is 10 wide where the canvas
-// draws it 14 by 10: a READING (the pages plan, Task 7: "a 10 by 7 ink
-// card"), by the same rule as the hub; its canvas is 8 high so that the
+// draws it 14 by 10: a reading of "a 10 by 7 ink card", by the same rule
+// as the hub; its canvas is 8 high so that the
 // card's 7.14 pixels are not cut.
 export const ROW_MARKS = {
   page: { width: 10, height: 8, scale: 10 / 14 },

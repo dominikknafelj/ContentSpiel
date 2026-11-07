@@ -1,6 +1,6 @@
 require "test_helper"
 
-# One swatch of the Mind graph's legend or Status key: a canvas the graph's
+# One swatch of the Mind graph's legend, a status look's included: a canvas the graph's
 # own renderer draws (`mind_graph/swatches.js`), sized here so the row does
 # not move when it is drawn.
 class Admin::MindGraphScreen::SwatchComponentTest < ViewComponent::TestCase

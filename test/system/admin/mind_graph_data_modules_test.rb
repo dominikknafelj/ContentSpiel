@@ -348,7 +348,7 @@ class Admin::MindGraphDataModulesSystemTest < Admin::MindGraphModulesSystemTestC
   # as wide as its characters, and a semibold one wider, so the two widths
   # of each label tell the fonts apart.
   STATE = <<~JS.freeze
-    const theme = { font: "12px sans", strongFont: "600 12px sans", monoFont: "12px mono", strongMonoFont: "600 12px mono", countFont: "11px mono" }
+    const theme = { font: "12px sans", strongFont: "600 12px sans", countFont: "500 11px sans" }
     const context = { font: "", measureText(words) { return { width: Array.from(words).length * (this.font.startsWith("600") ? 8 : 6) } } }
     const words = { allPosts: "All posts", more: (count) => `+${count} more`, retired: (name) => `${name} (retired)` }
     const graph = () => ({

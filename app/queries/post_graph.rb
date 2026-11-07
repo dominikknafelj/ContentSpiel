@@ -1,4 +1,4 @@
-# The mind graph's data (mind graph canvas spec §3): the queries behind CS
+# The mind graph's data: the queries behind CS
 # Studio's Mind graph screen and its two JSON reads.
 #
 # - `PostGraph::Global`: every readable page, and the best-connected readable
@@ -11,9 +11,9 @@
 # - `PostGraph::Search`: readable pages, posts and tags by name.
 # - `PostGraph::Builder`: the nodes and lines the first two share, in two
 #   steps: `plan` (which lines; no statement) and `build`.
-# - `PostGraph::Site`: the readable posts and pages, loaded once (pages in
-#   the mind graph, spec §1), with `PostGraph::Tree` (the page tree as far as
-#   the viewer reads it) and `PostGraph::Listings` (which page lists what).
+# - `PostGraph::Site`: the readable posts and pages, loaded once, with
+#   `PostGraph::Tree` (the page tree as far as the viewer reads it) and
+#   `PostGraph::Listings` (which page lists what).
 # - `PostGraph::Kinds`: which kinds of node and of line a viewer may be
 #   shown at all, by what they read: the legend's toggles ask it.
 #
@@ -30,12 +30,12 @@
 # `node_id`'s):
 #
 #   nodes[]: { id: "post-<id>", title, type, colour_index, status, changes,
-#              change_at, listed, url, degree, related_count, tag_count,
-#              open_notes }
+#              change_at, unpublished, listed, url, degree, related_count,
+#              tag_count, open_notes }
 #   tags[]:  { id: "tag-<id>", name, count, degree }
 #   pages[]: { id: "page-<id>", title, path, depth, home, parent, order,
-#              status, changes, change_at, url, degree, child_count,
-#              listed_count, open_notes }                    in tree order
+#              status, changes, change_at, unpublished, url, degree,
+#              child_count, listed_count, open_notes }       in tree order
 #   types[]: { id: "type-<name>" | "all-posts", name, label, colour_index,
 #              count, degree }     by colour slot, then the retired types by
 #                                  name, then "all-posts" last. `count` is
@@ -76,7 +76,12 @@
 # "live") and `changes` (nil, "unpublished", "scheduled": the two looks of a
 # live record that `status` does not tell apart) are `Publishing::State`'s,
 # together one of its five states; `change_at` is the time a scheduled
-# change comes into force, in that state alone. No words: the controller
+# change comes into force, in that state alone. `unpublished` is
+# `Publishing::State#changes?`, the record's unpublished mark, which the
+# posts list asks (`unpublished_changes?`) to draw its Unpublished chip:
+# the graph's list draws the same chip from it, in any state that has it
+# (a scheduled record too, and a live one with a change scheduled only when
+# it is also marked). No words: the controller
 # adds `change_on`, the day as CS Studio writes it.
 #
 # Every query takes `actor:` with no default, so nothing draws the whole graph
