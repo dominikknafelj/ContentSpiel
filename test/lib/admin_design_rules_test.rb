@@ -1670,6 +1670,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       "no tree rule takes a focused element's ring away"
   end
 
+  # The selected row is a place, not a row being worked on: at rest it shows
+  # its markers and count, never its handle or "+", which show on any row
+  # by hover, focus within and a coarse pointer alone.
+  test "no tree rule reveals the handle or the + from the selected row" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    parts = Admin::Ui::TreeItemComponent::CLASSES.values_at(:handle, :add)
+    selected = Admin::Ui::TreeItemComponent::CLASSES[:row_selected]
+    revealing = rules.select do |selectors, body|
+      selectors.any? { |selector| selector.include?(selected) && (parts.any? { |part| selector.include?(part) } || body.match?(/(?<![\w-])opacity:/)) }
+    end
+    assert_empty revealing.map(&:first), "the selection reveals the handle or the +"
+    shown = rules.select { |selectors, body| body.match?(/opacity:\s*1;/) && selectors.any? { |selector| parts.all? { |part| selector.include?(part) } } }
+    assert_equal 2, shown.size, "the handle and the + are shown by hover and focus within, and by a coarse pointer"
+    assert shown.flat_map(&:first).none? { |selector| selector.include?(selected) }
+  end
+
   test "the tree's rules are one block" do
     rules = self.class.css_rules("content-spiel.tailwind.css")
     tree = /\.admin-tree(?:-row|-node__handle|__children|(?![\w-]))/

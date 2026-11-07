@@ -18,4 +18,5 @@
   <% if trailings? %>
     <span class="<%= CLASSES[:trailing] %>"><% trailings.each do |part| %><%= part %><% end %></span>
   <% end %>
+  <%= add if add? %>
 <% end %>

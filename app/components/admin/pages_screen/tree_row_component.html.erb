@@ -16,13 +16,13 @@
         stands in the step's gutter (the block's `__handle` rule): every
         movable row has that gutter, since only the homepage is not in a
         children list, and it has no handle. It rests transparent and keeps
-        its room (`__reveal-opacity`), so it stays in the Tab order and under
+        its room (the block's rule), so it stays in the Tab order and under
         the pointer: a press where it is starts the drag. It shows while the
         focus is in its row, which covers a row picked up with Space after a
         click on its handle, so what holds the row is in sight. %>
     <% if movable? %>
       <% item.with_handle do %>
-        <button type="button" class="<%= ROW[:handle] %> <%= ROW[:reveal_opacity] %>"
+        <button type="button" class="<%= ROW[:handle] %>"
                 aria-label="<%= t(".move", title: title) %>" aria-describedby="tree-drag-help"
                 data-action="keydown->admin--pages--tree#key focusout->admin--pages--tree#blur">⠿</button>
       <% end %>
@@ -77,13 +77,11 @@
       <% end %>
     <% end %>
 
-    <%# Transparent at rest and keeping its 20px box, shown with the handle. %>
+    <%# The row's "+": the shared row draws it; this row names it and hands
+        it the New page dialog's trigger, presetting Inside. %>
     <% if can_add_child? %>
-      <% item.with_trailing do %>
-        <%= link_to "+", new_child_path, data: dialog_trigger("new-page-dialog").merge("new-page-parent-id-param": page.id, turbo_frame: "content"),
-              class: "#{ROW[:reveal_opacity]} inline-grid size-5 place-items-center rounded-cs text-meta hover:bg-surface hover:text-ink",
-              aria: { label: t(".add_child", title: title) } %>
-      <% end %>
+      <% item.with_add(label: t(".add_child", title: title), href: new_child_path,
+           data: dialog_trigger("new-page-dialog").merge("new-page-parent-id-param": page.id, turbo_frame: "content")) %>
     <% end %>
   <% end %>
 <% end %>

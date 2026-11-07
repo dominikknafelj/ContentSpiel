@@ -1,12 +1,15 @@
 <%# A tree row's own glyphs (`Admin::Ui::TreeItemComponent`): the 12px
-    chevron of its disclosure (stroke 1.6), and the 14px page and home marks
+    chevron of its disclosure and the 12px "+" (stroke 1.6), and the 14px
+    page and home marks
     (stroke 1.3). They are the tree's sizes and strokes, not the modules
     column's icon set (`_icon.html.erb`). Hidden from a screen reader: the
-    disclosure is named by its words and the mark says nothing the title
-    does not. %>
+    disclosure and the "+" are named by their words and the mark says
+    nothing the title does not. %>
 <% case name
 when :chevron %>
   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 2.75 7.75 6 4.5 9.25" /></svg>
+<% when :plus %>
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 2.5v7 M2.5 6h7" /></svg>
 <% when :page %>
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.75 1.75h5.5l3 3v9.5h-8.5z M9.25 1.75v3h3" /></svg>
 <% when :home %>

@@ -79,16 +79,17 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-tree-row__mark svg"
   end
 
-  test "the slots are drawn in their order: handle, disclosure, mark, title, state, trailing" do
+  test "the slots are drawn in their order: handle, disclosure, mark, title, state, trailing, add" do
     render_row(parent: true, controls: "tree-children-1") do |item|
-      item.with_handle { %(<button type="button" class="admin-tree-node__handle admin-tree-row__reveal-opacity" data-part="handle">⠿</button>).html_safe }
+      item.with_handle { %(<button type="button" class="admin-tree-node__handle" data-part="handle">⠿</button>).html_safe }
       item.with_state { %(<span data-part="state"></span>).html_safe }
       item.with_trailing { %(<span data-part="first"></span>).html_safe }
       item.with_trailing { %(<span data-part="second"></span>).html_safe }
+      item.with_add(label: "Add a page under About us", href: "/new")
     end
 
     parts = page.find("div.admin-tree-row").native.element_children.map { |child| child["data-part"] || child["class"].split.first }
-    assert_equal %w[handle admin-tree-row__disclosure admin-tree-row__mark admin-tree-row__title admin-tree-row__state admin-tree-row__trailing], parts
+    assert_equal %w[handle admin-tree-row__disclosure admin-tree-row__mark admin-tree-row__title admin-tree-row__state admin-tree-row__trailing admin-tree-row__add], parts
     assert_selector ".admin-tree-row__state > [data-part=state]"
     assert_equal %w[first second], page.all(".admin-tree-row__trailing > span").map { |span| span["data-part"] }
     assert_selector ".admin-tree-row__title[title='About us'] > a[data-tree-focus]", text: "About us"
@@ -127,6 +128,24 @@ class Admin::Ui::TreeItemComponentTest < ViewComponent::TestCase
 
   test "a row is given its title" do
     assert_raises(ArgumentError) { render_inline(Admin::Ui::TreeItemComponent.new(id: "r", title: "A")) }
+  end
+
+  # "+" is the row's own part: the screen names it and hands it its address
+  # and hooks, and the row draws its box and glyph; with no address it is a
+  # button. A class from the screen is refused.
+  test "the row's + is its own part, named by the screen, with no class of the screen's" do
+    render_row { |item| item.with_add(label: "Add a page under About us", href: "/new?parent_id=1", data: { turbo_frame: "content" }) }
+    add = page.find("div.admin-tree-row > a.admin-tree-row__add[href='/new?parent_id=1'][aria-label='Add a page under About us'][data-turbo-frame=content]")
+    assert_equal [ "admin-tree-row__add" ], add[:class].split
+    assert_equal %w[12 12 1.6], add.native.at_css("svg").then { |svg| [ svg["width"], svg["height"], svg["stroke-width"] ] }
+    assert_equal "true", add.native.at_css("svg")["aria-hidden"]
+
+    render_row { |item| item.with_add(label: "Add") }
+    assert_selector "div.admin-tree-row > button.admin-tree-row__add[type=button][aria-label=Add]"
+
+    assert_raises(ArgumentError) { render_row { |item| item.with_add(label: "Add", data: { class: "text-ink" }) } }
+    assert_match(/\.admin-tree-row__add\s*\{[^}]*width:\s*20px;[^}]*height:\s*20px;[^}]*color:\s*var\(--cs-meta\);/, stylesheet)
+    assert_match(/\.admin-tree-row__add:hover\s*\{\s*color:\s*var\(--cs-ink\);\s*\}/, stylesheet)
   end
 
   test "every CLASSES value is a class of the .admin-tree block" do

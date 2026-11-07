@@ -25,7 +25,7 @@ module Admin
 
       def leaf
         row(title: "Move pages") do |item|
-          item.with_trailing { "<span class=\"admin-tree-row__reveal-opacity\" aria-hidden=\"true\">+</span>".html_safe }
+          item.with_add(label: "Add a page under Move pages", href: "#")
         end
       end
 

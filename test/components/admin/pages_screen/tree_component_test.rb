@@ -7,7 +7,6 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
   ROW = Admin::Ui::TreeItemComponent::CLASSES
 
   setup { Current.actor = users(:one) }
-  teardown { I18n.reload! }
 
   def paragraph(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
 
@@ -170,6 +169,8 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::PagesScreen::TreeComponent.new(root: nil, locale: "en"))
     assert_text "Noch keine Seiten."
+  ensure
+    I18n.reload!
   end
 
   # `admin--pages--tree` announces a keyboard move in these words, read from
@@ -395,7 +396,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     render_tree
 
     handle = page.find("li[data-page-id='#{alpha.id}'] > div > button[aria-label='Move Alpha'][aria-describedby=tree-drag-help]")
-    assert_equal [ ROW[:handle], ROW[:reveal_opacity] ], handle[:class].split
+    assert_equal [ ROW[:handle] ], handle[:class].split
     # The homepage has no handle and no gutter to put one in.
     assert_no_selector "li[data-page-id='#{root_page.id}'] > div .#{ROW[:handle]}"
   end
@@ -417,15 +418,15 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{leaf.id}'] > div > .#{ROW[:title]}[title='#{leaf.title}'] > a"
   end
 
-  # "+" rests transparent and keeps its room, shown with the row's reveals
-  # and on any coarse pointer by the tree's rule, never by a utility of its own.
-  test "a row's + is the tree's reveal, with no pointer utility of its own" do
+  # "+" is the shared row's own part, last in the row: the Pages row names
+  # it and hands it the dialog's trigger, and gives it no class of its own.
+  test "a row's + is the tree's own part, named by the row, with no class of its own" do
     about = create_page(title: "About")
     render_tree
 
-    add = page.find("li[data-page-id='#{about.id}'] > div > .#{ROW[:trailing]} > a[aria-label='Add a page under About']")
-    assert_includes add[:class].split, ROW[:reveal_opacity]
-    assert_empty add[:class].split.grep(/opacity|pointer|group-/) - [ ROW[:reveal_opacity] ]
+    add = page.find("li[data-page-id='#{about.id}'] > div > a.#{ROW[:add]}:last-child[aria-label='Add a page under About']")
+    assert_equal [ ROW[:add] ], add[:class].split
+    assert_equal "new-page-dialog", add["data-admin--ui--dialog-id-param"]
   end
 
   test "a live page with unpublished changes carries the mark; a draft with a stale mark does not" do

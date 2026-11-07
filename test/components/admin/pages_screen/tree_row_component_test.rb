@@ -124,14 +124,14 @@ class Admin::PagesScreen::TreeRowComponentTest < ViewComponent::TestCase
       assert_equal [ parts[:row] ], row[:class].split
       assert_equal parent.id.to_s, row["data-page-id"]
       assert_equal "row", row["data-admin--pages--tree-target"]
-      assert_equal [ parts[:handle], parts[:disclosure], parts[:mark], parts[:title], parts[:trailing] ],
+      assert_equal [ parts[:handle], parts[:disclosure], parts[:mark], parts[:title], parts[:trailing], parts[:add] ],
         row.native.element_children.map { |part| part["class"].split.first }
       assert_selector "#tree-row-#{parent.id} > .#{parts[:title]}[title='Parent'] > a#tree-link-#{parent.id}[data-tree-focus][data-turbo-frame=content]", text: "Parent"
       assert_selector "#tree-row-#{parent.id} > button.#{parts[:disclosure]}[aria-controls='tree-children-#{parent.id}'][aria-expanded=true]"
       trailing = page.find("#tree-row-#{parent.id} > .#{parts[:trailing]}", visible: :all)
       assert trailing.find("[data-translation-marker=missing]", visible: :all)[:class].split.include?(parts[:reveal])
       assert_equal [ parts[:count], parts[:reveal] ], trailing.find("[data-child-count]", visible: :all)[:class].split
-      assert trailing.find("a[aria-label='Add a page under Parent']", visible: :all)[:class].split.include?(parts[:reveal_opacity])
+      assert_equal [ parts[:add] ], page.find("#tree-row-#{parent.id} > a[aria-label='Add a page under Parent']", visible: :all)[:class].split
       own = row.native.element_children.flat_map { |part| part["class"].split } + [ row.native.at_css("#tree-link-#{parent.id}")["class"].to_s ]
       assert_empty own.reject(&:empty?) - parts.values,
         "a row draws its geometry, ground and weight through the tree's classes, not utilities"

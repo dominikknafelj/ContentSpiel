@@ -308,25 +308,32 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    never touches it. */
 .admin-tree-row__state { flex: none; display: inline-flex; align-items: center; margin-inline-start: 6px; }
 .admin-tree-row__trailing { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; }
+/* The row's "+", last: a 20px box with a 12px glyph, meta and ink under
+   the pointer. */
+.admin-tree-row__add { flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-inline-start: 6px; border-radius: var(--cs-radius); color: var(--cs-meta); }
+.admin-tree-row__add:hover { color: var(--cs-ink); }
 .admin-tree-row__count { min-width: 14px; text-align: end; font-size: var(--cs-t-count); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--cs-meta); }
 /* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
    clipped at rest, never `hidden` and never removed, so a screen reader
-   still hears "3 subpages" and they take no room; the "+" and the handle
-   (`__reveal-opacity`) keep their room and turn transparent, since a press
-   where they are must still reach them. Both show on the row's hover and
-   while the focus is in it, on the selected row, and always where any
-   pointer of the device is coarse (`any-pointer`, not `pointer`: on a touch
-   laptop the first pointer is the mouse, and the finger cannot hover). A
-   folded parent's count shows at rest too: it says what the fold holds. */
+   still hears "3 subpages" and they take no room; they show on the row's
+   hover, while the focus is in it, and on the selected row, which says what
+   is left to do on the page you are on. The handle and the "+" keep their
+   room and turn transparent, since a press where they are must still reach
+   them; they show on the row's hover and while the focus is in it, and
+   never by the selection: the selected row is a place, not a row being
+   worked on. All of them show always where any pointer of the device is
+   coarse (`any-pointer`, not `pointer`: on a touch laptop the first pointer
+   is the mouse, and the finger cannot hover). A folded parent's count
+   shows at rest too: it says what the fold holds. */
 .admin-tree-row__reveal { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.admin-tree-row__reveal-opacity { opacity: 0; }
+.admin-tree-node__handle, .admin-tree-row__add { opacity: 0; }
 .admin-tree-row:is(:hover, :focus-within, .admin-tree-row--selected) .admin-tree-row__reveal,
 .admin-tree-row:has(> .admin-tree-row__disclosure[aria-expanded="false"]) .admin-tree-row__count,
 [role="treeitem"][aria-expanded="false"] > .admin-tree-row .admin-tree-row__count { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-.admin-tree-row:is(:hover, :focus-within, .admin-tree-row--selected) .admin-tree-row__reveal-opacity { opacity: 1; }
+.admin-tree-row:is(:hover, :focus-within) > :is(.admin-tree-node__handle, .admin-tree-row__add) { opacity: 1; }
 @media (any-pointer: coarse) {
   .admin-tree-row .admin-tree-row__reveal { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
-  .admin-tree-row .admin-tree-row__reveal-opacity { opacity: 1; }
+  .admin-tree-row > :is(.admin-tree-node__handle, .admin-tree-row__add) { opacity: 1; }
 }
 /* One level is `--cs-tree-step`: this margin, the 1px guide and this
    padding (13 + 1 + 6), so the guide drops from the centre of the parent's

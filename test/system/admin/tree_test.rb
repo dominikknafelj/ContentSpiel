@@ -235,13 +235,17 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
         (() => {
           const ring = (element) => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor] }
           const focused = document.querySelector(arguments[0])
-          return { active: document.activeElement === focused, visible: focused.matches(":focus-visible"), own: ring(focused), row: ring(focused.closest("[data-tree-row]")) }
+          const node = focused.closest("li[data-tree-node]")
+          const ringed = [ node, ...node.querySelectorAll("*") ].filter((element) => element !== focused && getComputedStyle(element).outlineStyle !== "none")
+          return { active: document.activeElement === focused, visible: focused.matches(":focus-visible"), own: ring(focused), row: ring(focused.closest("[data-tree-row]")),
+                   others: ringed.map((element) => element.id || element.className || element.tagName) }
         })()
       JS
       assert seen["active"], "#{control} has the focus"
       assert seen["visible"], "#{control} has the keyboard's focus"
       assert_equal [ "solid", "2px", "-2px", accent ], seen["own"], "#{control} draws the tree's ring"
       assert_equal "none", seen["row"].first, "the row of #{control} draws no outline"
+      assert_empty seen["others"], "nothing else in the row's node draws an outline while #{control} has the focus"
     end
   end
 end

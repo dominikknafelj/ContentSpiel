@@ -10,7 +10,7 @@ module Admin
     # are `TreeNodeComponent`'s, so a row can be drawn and replaced alone.
     # The row hands the shared row no class: the classes of the tree's parts
     # here are `TreeItemComponent::CLASSES`, and a slot's own utilities draw
-    # only that part (the markers' ink, the "+"'s box).
+    # only that part (the markers' ink).
     #
     # TWO WAYS IN, ONE ROW. `TreeNodeComponent` hands each row its slice of
     # what `TreeComponent` loaded once for the whole tree; `for_page` reads
@@ -26,8 +26,9 @@ module Admin
     #
     # The column is narrow and a title is what a row is for: the drag handle
     # stands in the step's gutter to the row's left, and it, the "+", the
-    # markers and the child count rest out of sight until the row is hovered,
-    # holds the focus or is selected, or any pointer is coarse (the block's
+    # markers and the child count rest out of sight until the row is hovered
+    # or holds the focus, or any pointer is coarse; the selected row shows
+    # its markers and count at rest, never its handle or "+" (the block's
     # reveal rules). A title that does not fit is cut with an ellipsis and
     # whole in its tooltip; a row never wraps (rows of uneven height make drop
     # targets jump).

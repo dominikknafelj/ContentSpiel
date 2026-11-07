@@ -20,6 +20,11 @@ module Admin
     # post types). The button carries no action: the tree's script folds the
     # branch. `folded:` is what the server drew; the script toggles it after.
     #
+    # `with_add` draws the row's "+", a part of the row like the disclosure:
+    # the screen hands it only its name, the address it opens and its
+    # behaviour hooks, never a class. It rests transparent and shows as the
+    # handle does, never by the selection.
+    #
     # `path:` is the page's address, for a find that starts with "/"
     # (`data-tree-path`), and `node_id:` the bare page id (`data-tree-id`).
     # `data:` is merged onto the row for the screen's behaviour hooks.
@@ -39,7 +44,7 @@ module Admin
         ],
         states: %i[rest hover focus selected folded open leaf context_only flat root],
         keys: %w[fold unfold],
-        slots: %i[handle mark title state trailings],
+        slots: %i[handle mark title state trailings add],
         controller: nil
       )
 
@@ -57,7 +62,7 @@ module Admin
         trailing: "admin-tree-row__trailing",
         count: "admin-tree-row__count",
         reveal: "admin-tree-row__reveal",
-        reveal_opacity: "admin-tree-row__reveal-opacity",
+        add: "admin-tree-row__add",
         handle: "admin-tree-node__handle",
         children: "admin-tree__children"
       }.freeze
@@ -75,6 +80,18 @@ module Admin
       # `with_trailing`. The plural name is ViewComponent's: `renders_many
       # :trailing` would make `with_trailing` the setter of the whole list.
       renders_many :trailings
+      # The row's "+", last: its name (`label:`), the address it opens
+      # (`href:`; a button without one) and the screen's hooks (`data:`).
+      renders_one :add, ->(label:, href: nil, data: {}) do
+        raise ArgumentError, "the row's + takes no class from its screen: its look is the .admin-tree block's" if data.key?(:class) || data.key?("class")
+
+        glyph = render("admin/shared/tree_glyph", name: :plus)
+        if href
+          link_to(glyph, href, class: CLASSES[:add], aria: { label: label }, data: data)
+        else
+          tag.button(glyph, type: "button", class: CLASSES[:add], aria: { label: label }, data: data)
+        end
+      end
 
       def initialize(id:, title:, parent: false, folded: false, controls: nil, selected: false, context_only: false, flat: false, root: false, path: nil, node_id: nil, data: {})
         raise ArgumentError, "a tree row takes no class from its screen: its look is the .admin-tree block's" if data.key?(:class) || data.key?("class")
