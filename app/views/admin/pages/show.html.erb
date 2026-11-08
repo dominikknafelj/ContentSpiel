@@ -53,7 +53,8 @@
     settings first in the document, then the blocks, at every width; where the editor area
     has the room the grid places the settings in a rail right of the blocks, with a Page
     and a Section tab, and below it they stand above the blocks as one column. A
-    translation tab never docks it (`--folded`): its pairs need the width. The page's
+    translation tab docks it as the default tab does, with no Section tab: a
+    translation tab draws no section's settings. The page's
     settings are rendered once, in the Page panel. A section's settings region is moved
     into the Section panel when its words are pressed and back under its head when it
     closes (`admin--editor--section-choice`, which says what moves it and when). %>
@@ -61,7 +62,8 @@
 <%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
 <% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
                                                 query: request.query_parameters, **slot_context) %>
-<%= tag.div id: rail_id, class: [ "admin-rail-grid", ("admin-rail-grid--folded" unless admin_locale.to_s == Locales.default.to_s) ],
+<% default_tab = admin_locale.to_s == Locales.default.to_s %>
+<%= tag.div id: rail_id, class: "admin-rail-grid",
       data: { controller: "admin--ui--rail admin--editor--section-choice",
               action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal " \
                       "admin--editor--section:open-settings->admin--editor--section-choice#take " \
@@ -72,11 +74,12 @@
                       "admin--editing--live:merged@document->admin--editor--section-choice#merged" } do %>
 <%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, current: rail_slot.current_key || "page", tabs: [
       Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: t("admin.components.editor_screen.rail.tabs.page")),
-      Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: t("admin.components.editor_screen.rail.tabs.section"))
-    ], slot_tabs: rail_slot.tabs) %>
+      (Admin::Ui::RailTabsComponent::Tab.new(key: "section", label: t("admin.components.editor_screen.rail.tabs.section")) if default_tab)
+    ].compact, slot_tabs: rail_slot.tabs) %>
 <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "page", current: rail_slot.current_key.nil?) do %>
   <%= render Admin::EditorScreen::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, holds: holds) %>
 <% end %>
+<% if default_tab %>
 <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "section", docked_only: true) do %>
   <%# The chosen section's settings region stands here; nothing is drawn in it. %>
   <div data-admin--editor--section-choice-target="slot"
@@ -85,6 +88,7 @@
     <p class="text-sm font-medium text-ink"><%= t("admin.components.editor_screen.section_choice.empty") %></p>
     <p class="mt-1 text-sm text-meta"><%= t("admin.components.editor_screen.section_choice.help") %></p>
   </div>
+<% end %>
 <% end %>
 <%= render rail_slot %>
 

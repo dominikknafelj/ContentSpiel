@@ -156,18 +156,21 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
   # The draft tiles' columns, counted from the computed grid.
   def tile_columns = page.evaluate_script("getComputedStyle(document.querySelector('.admin-draft-tiles')).gridTemplateColumns.split(' ').length")
 
-  test "at 2400px the dashboard stops at the content max, at the left edge, with four draft tiles a row" do
+  test "at 2400px the dashboard stops at the content max, centred, with four draft tiles a row" do
     fill_dashboard
     sign_in_via_form(users(:one))
     at_window(2400) do
       visit_screen admin_root_path
       boxes = layout
       assert docked?(boxes), boxes.inspect
-      assert_in_delta boxes["dashboard"]["left"], boxes["main"]["left"], 1, "the main column starts at the dashboard's left edge"
       assert_in_delta 1680, boxes["rail"]["right"] - boxes["main"]["left"], 1, "the composition stops at the content max"
       assert_in_delta 1292, boxes["main"]["width"], 1
       assert_in_delta 360, boxes["rail"]["width"], 1
-      assert_operator boxes["dashboard"]["right"] - boxes["rail"]["right"], :>, 300, "the spare width falls right of the rail"
+      left = boxes["main"]["left"] - boxes["dashboard"]["left"]
+      right = boxes["dashboard"]["right"] - boxes["rail"]["right"]
+      assert_operator left, :>, 150, "the premise: the window leaves spare width"
+      assert_in_delta left, right, 1, "the spare width is split evenly either side"
+      assert_in_delta boxes["main"]["left"], boxes["head"]["left"], 1, "the heading row starts with the composition"
       assert_in_delta boxes["rail"]["right"], boxes["head"]["right"], 1, "the heading row stops with the composition"
       assert_equal 4, tile_columns, "the tiles take four columns from 64rem of the main column"
     end

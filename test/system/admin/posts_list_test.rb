@@ -257,15 +257,18 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "at 2400px the list stops at the content max, at the left edge" do
+  test "at 2400px the list stops at the content max, centred" do
     at_window(2400) do
       visit_screen admin_posts_path
       boxes = layout
       assert docked?(boxes), boxes.inspect
-      assert_in_delta boxes["container"]["left"], boxes["list"]["left"], 1, "the list starts at the content's left edge"
       assert_in_delta 1680, boxes["panel"]["right"] - boxes["list"]["left"], 1, "the composition stops at the content max"
       assert_in_delta 1292, boxes["list"]["width"], 1
-      assert_operator boxes["container"]["right"] - boxes["panel"]["right"], :>, 300, "the spare width falls right of the rail"
+      left = boxes["list"]["left"] - boxes["container"]["left"]
+      right = boxes["container"]["right"] - boxes["panel"]["right"]
+      assert_operator left, :>, 150, "the premise: the window leaves spare width"
+      assert_in_delta left, right, 1, "the spare width is split evenly either side"
+      assert_in_delta boxes["list"]["left"], boxes["head"]["left"], 1, "the heading row starts with the composition"
       assert_in_delta boxes["panel"]["right"], boxes["head"]["right"], 1, "the heading row stops with the composition"
     end
   end

@@ -3,7 +3,7 @@ require "application_system_test_case"
 # The editors' rail (`admin/pages/show` and `Admin::EditorScreen::PostFormComponent`,
 # `.admin-rail-grid`, `admin--ui--rail`): where the editor area has 1200px, the
 # page settings stand in a 360px rail 28px right of a blocks column that takes
-# the rest, up to 1680px for the whole (`--cs-content-max`), with
+# the rest, up to 1680px for the whole (`--cs-content-max`, centred past it), with
 # a Page and a Section tab, and a post's settings in the same rail beside its
 # title, address and body, under the one heading Post; below that the page
 # settings stand above the blocks and a post's settings below its main
@@ -115,7 +115,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "at a 2400px content width the editor stops at the content max, at the left edge" do
+  test "at a 2400px content width the editor stops at the content max, centred" do
     wide_blocks
     visit_editor(@page)
     fold_tree
@@ -125,8 +125,13 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
       area = box("#editing")
       grid = box("#editor-grid")
-      assert_in_delta area[0], grid[0], 1, "the composition stands at the content's left edge"
-      assert_in_delta 1680, grid[2] - grid[0], 1, "and stops at the content max"
+      assert_in_delta 2400, area[2] - area[0], 1
+      assert_in_delta 1680, grid[2] - grid[0], 1, "the composition stops at the content max"
+      assert_in_delta grid[0] - area[0], area[2] - grid[2], 1, "the spare width is split evenly either side"
+      row = box(".admin-editor-header > div:first-child")
+      assert_in_delta grid[0], row[0], 1, "the header row starts with the composition"
+      assert_in_delta grid[2], row[2], 1, "and stops with it, so Publish stands over the rail's right edge"
+      assert_operator box(".admin-editor-header")[2] - box(".admin-editor-header")[0], :>, 2400, "the header's own line keeps the window's width"
       assert_in_delta 1292, width_of(".admin-content-blocks"), 1
       assert_in_delta grid[2], box("#editor-grid-panel-page")[2], 1, "the rail ends the composition"
       assert_in_delta 650, width_of(in_block(@text, ".admin-rich-text-box")), 30, "running text keeps its measure"
@@ -344,15 +349,85 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "a translation tab never docks the rail" do
-    at_window(WIDE) do
+  test "a translation tab docks the rail at 1200px of the editor" do
+    with_locales(%w[en de], default: "en")
+    visit_editor(@page)
+    fold_tree
+    at_window(content_window(1199)) do
       visit_editor(@page, locale: "de")
-
-      assert_selector "#editor-grid.admin-rail-grid--folded"
       await_frames
       assert_docked(false)
       assert_no_selector "#editor-grid [role=tablist]"
       assert_operator box("#page-settings")[3], :<, box(".admin-content-blocks")[1]
+    end
+    at_window(content_window(1200)) do
+      visit_editor(@page, locale: "de")
+      assert_docked
+      assert_in_delta 1200, width_of("#editing"), 1
+      assert_in_delta 812, width_of(".admin-content-blocks"), 1
+      assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
+      assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
+      # A translation tab draws no section's settings, so it has no Section tab.
+      assert_equal %w[editor-grid-tab-page editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
+    end
+  end
+
+  # The Page tab is the settings form's translated fields, each a pair: in
+  # the 360px rail the pair stacks, the original first, its Translate box
+  # under the field.
+  test "on a translation tab the Page tab holds the settings' pairs, the original first" do
+    with_locales(%w[en de], default: "en")
+    Mobility.with_locale(:en) { @page.update!(subtitle: "Plans for every team") }
+    at_window(WIDE) do
+      visit_editor(@page, locale: "de")
+      assert_docked
+      panel = "#editor-grid-panel-page"
+      assert_selector "#{panel} #page-settings form.admin-translation-form"
+      %w[title subtitle].each do |name|
+        original = box("#{panel} [data-original-for='#{name}']")
+        field = box("#{panel} [data-field-name='#{name}'] .admin-translation-pair > div:first-child")
+        assert_operator original[3], :<=, field[1] + 1, "#{name}: the original stands above the field"
+        assert_in_delta original[0], field[0], 1, "#{name}: one column"
+      end
+      assert_selector "#{panel} [data-original-for='title'] details[open]"
+      assert_operator box("#{panel} [data-field-name='title'] [data-translate-slot]")[1], :>=, box("#{panel} [data-field-name='title'] .admin-translation-pair > div:first-child input")[3], "the Translate box stands under the field"
+    end
+  end
+
+  # A docked post's form is `display: contents`, so no pair container: the
+  # Post tab's pairs stack in the rail, and the main column's sit side by
+  # side from 1212px of the editor (824px of the column). Typing saves, and
+  # the save's answer leaves both columns drawn.
+  test "on a translation tab a post's pairs stack in the rail and sit side by side in the main column, and a save keeps both drawn" do
+    with_locales(%w[en de], default: "en")
+    @post = create_post(title: "Notes", published: false)
+    Mobility.with_locale(:en) { @post.update!(excerpt: "A short summary") }
+    at_window(WIDE) do
+      visit_editor(@post, locale: "de")
+      assert_docked
+      assert_operator width_of("#editing"), :>=, 1212, "the premise: the main column is 824px or more"
+
+      excerpt_original = box("#{POST_PANEL} [data-original-for='excerpt']")
+      excerpt_field = box("#{POST_PANEL} [data-field-name='excerpt'] .admin-translation-pair > div:first-child")
+      assert_operator excerpt_original[3], :<=, excerpt_field[1] + 1, "in the rail the original stands above the field"
+      title_original = box("#{POST_MAIN} [data-original-for='title']")
+      title_field = box("#{POST_MAIN} [data-field-name='title'] .admin-translation-pair > div:first-child")
+      assert_in_delta title_field[1], title_original[1], 4, "in the main column the field and its original share a row"
+      assert_operator title_field[2], :<, title_original[0], "the field on the left"
+
+      find("#post-excerpt").send_keys("Kurz")
+      assert_writes_settled
+      assert_eventually(message: "the excerpt was not saved") { Mobility.with_locale(:de) { @post.reload.excerpt } == "Kurz" }
+      assert_operator box("#post-title")[3] - box("#post-title")[1], :>, 20, "the main column is still drawn after the save's answer"
+      assert_operator box("#post-excerpt")[3] - box("#post-excerpt")[1], :>, 20, "the rail is still drawn after the save's answer"
+    end
+    at_window(content_window(1211) - 44) do
+      visit_editor(@post, locale: "de")
+      assert_docked
+      assert_in_delta 1211, width_of("#editing"), 1
+      title_original = box("#{POST_MAIN} [data-original-for='title']")
+      title_field = box("#{POST_MAIN} [data-field-name='title'] .admin-translation-pair > div:first-child")
+      assert_operator title_original[3], :<=, title_field[1] + 1, "below 1212px of the editor the main column's pair stacks"
     end
   end
 
@@ -680,8 +755,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
   end
 
   # The body's Link popover, with its search answering, hangs past the canvas
-  # over the settings that follow it below the threshold, and on a
-  # translation tab at every width: each of its rows that stands over the
+  # over the settings that follow it below the threshold, on either tab:
+  # each of its rows that stands over the
   # Excerpt field is the topmost element at its centre, so it is drawn over
   # the field and a click on it reaches it.
   def assert_link_popover_over_the_post_settings
@@ -719,8 +794,8 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "on a translation tab the body's Link popover stands over the post settings that follow it" do
-    at_window(WIDE) do
+  test "below the threshold on a translation tab the body's Link popover stands over the post settings that follow it" do
+    at_window(1100) do
       @post = create_post(title: "Notes", published: false)
       visit_editor(@post, locale: "de")
       assert_docked(false)

@@ -87,7 +87,59 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
+  # Docked (the tree folded, so the editor area is the content's width), the
+  # pair keeps its own threshold, 824px of the block form: at 1200px of
+  # editor the blocks column is 812px and the pair stacks; at 1600px the
+  # form is past 824px and the halves share it, wider than the 560px they
+  # keep undocked.
+  test "docked, a block's pair sits side by side once its form is 824px wide" do
+    page_record = create_page(title: "About")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("Hello **there**") } }).record
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_admin_controllers
+    page.execute_script("window.localStorage.setItem('cs-tree-folded', '1')")
+    form = "[data-block-id='#{block.id}'] form.admin-translation-form"
+    original = "[data-block-id='#{block.id}'] [data-original-for='body']"
+    field = "[data-block-id='#{block.id}'] .admin-translation-pair > div:first-child"
+
+    page.driver.resize(content_window(1200), 1000)
+    visit "/cs-studio/pages/#{page_record.id}?locale=de"
+    await_admin_controllers
+    assert_selector "[data-block-id='#{block.id}'] .ProseMirror"
+    assert_eventually(message: "the premise: the rail docks at 1200px of editor") { docked? }
+    assert_operator widths_of(form).first, :<, 824, "the premise: at 1200px the block form is under 824px"
+    top_of_original, top_of_field = tops_of(original, field)
+    assert_operator top_of_original, :<, top_of_field - 4, "stacked, the original stands above the field"
+
+    page.driver.resize(content_window(1600), 1000)
+    visit "/cs-studio/pages/#{page_record.id}?locale=de"
+    await_admin_controllers
+    assert_selector "[data-block-id='#{block.id}'] .ProseMirror"
+    assert_eventually(message: "the rail docks") { docked? }
+    assert_operator widths_of(form).first, :>=, 824
+    tops = tops_of(field, original)
+    assert_in_delta tops[0], tops[1], 4, "side by side, the field and its original share a row"
+    field_box, original_box = boxes_of(field, original)
+    assert_operator field_box[2], :<, original_box[0], "the field on the left, the original on the right"
+    assert_operator field_box[2] - field_box[0], :>, 561, "the halves are not capped at 560px"
+    assert_in_delta field_box[2] - field_box[0], original_box[2] - original_box[0], 1, "the two halves share the form"
+  ensure
+    page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
+    page.driver.resize(1400, 1400)
+  end
+
   private
+
+  def docked? = page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')")
+
+  # The window whose editor area is `content` wide with the tree folded: the
+  # sidebar (240), the strip (44), `<main>`'s padding (48) and the scrollbar.
+  def content_window(content) = content + 240 + 44 + 48 + page.evaluate_script("Math.round(window.innerWidth - document.documentElement.getBoundingClientRect().width)")
+
+  def boxes_of(*selectors)
+    selectors.map { |selector| page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return [ box.left, box.top, box.right, box.bottom ] })()") }
+  end
 
   def tops_of(*selectors)
     selectors.map { |selector| page.evaluate_script("document.querySelector(#{selector.to_json}).getBoundingClientRect().top").to_f }
