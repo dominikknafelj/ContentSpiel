@@ -1231,6 +1231,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-accent", "text-ink", "bg-white-ish", "text-on-accent", "bg-cat-1" ].each { |sample| assert_no_match PALETTE, sample }
   end
 
+  # The accent fill means "press me" or "this needs you": a button, a count
+  # pill, the unread bubble, a progress bar, and the unsaved marks -- the save
+  # bar's dot here, and a changed field's dot, which the stylesheet draws from
+  # `data-save-bar-changed` and no utility carries.
   ACCENT_FILL = /(?<![\w-])bg-accent(?![\w-])/
   ACCENT_FILL_ALLOWED = {
     "app/components/admin/ui/button_component.rb" => "the buttons",
@@ -1244,10 +1248,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
     "app/javascript/media/upload_tiles.js" => "a progress bar",
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
-    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser"
+    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",
+    "app/components/admin/ui/save_bar_component.html.erb" => "the save bar's unsaved dot, beside its words"
   }.freeze
 
-  test "only a button, the checkbox, a count pill, the unread bubble and a progress bar carry the accent fill" do
+  test "only a button, the checkbox, a count pill, the unread bubble, a progress bar and the unsaved marks carry the accent fill" do
     assert_empty class_offences(ACCENT_FILL, allowed: ACCENT_FILL_ALLOWED)
   end
 

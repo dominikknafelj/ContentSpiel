@@ -137,13 +137,13 @@ en:
     # `admin/accounts/edit.html.erb` and `Admin::AccountsController`. The
     # card is one of two in the account screen's first form, "Your account"
     # (the handoff's decisions 19 and 20): Profile, the name, and Notes, with
-    # one footer, whose button is "Save" and whose toast is the app's own
-    # "Settings saved" (no full stop, as on the Settings screen).
+    # one footer, whose button is the bar's own "Save changes" and whose
+    # toast is the app's own "Settings saved" (no full stop, as on the
+    # Settings screen).
     accounts:
       # The screen's heading, its title in the browser's tab and the
       # sidebar's entry that leads to it (the handoff's decision 25).
       title: "Your account"
-      save: "Save"
       saved: "Settings saved"
       profile:
         title: "Profile"

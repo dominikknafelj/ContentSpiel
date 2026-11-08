@@ -51,9 +51,9 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
 
     rows[2].find("button[aria-label='Remove “Email address”']").click
     assert_equal [ "Notes", "Your name", "Message", "Company", "Second address" ], labels
-    assert_selector "[aria-live=polite]", text: "“Email address” removed. Cancel brings it back.", visible: :all
+    assert_selector "[aria-live=polite]", text: "“Email address” removed. Discard brings it back.", visible: :all
 
-    press "Save"
+    press "Save changes"
     assert_selector "#toasts", text: I18n.t("admin.forms.update.saved")
     form.reload
     assert_equal [ "Notes", "Your name", "Message", "Company", "Second address" ], form.fields.map { |field| field.label_in("en") }
@@ -77,7 +77,7 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     end
     assert_selector footer, text: /unsaved change/i
 
-    press "Save"
+    press "Save changes"
     assert_selector "#toasts", text: I18n.t("admin.forms.update.saved")
     field = form.reload.fields.find { |stored| stored.key == "f_topic002" }
     assert_equal [ "Events", "Offers" ], field.choices.map { |choice| choice.label_in("en") }

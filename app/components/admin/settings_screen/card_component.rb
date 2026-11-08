@@ -15,10 +15,12 @@ module Admin
     #
     # Slots: `head_end`, at the end of the heading's row (the Site card's
     # language tabs, the Mail state); `head_note`, under the intro (the
-    # Languages card's pending hint).
+    # Languages card's pending hint); `heading_mark`, inside the heading after
+    # its word (the Languages card's changed order).
     class CardComponent < Admin::AdminComponent
       renders_one :head_end
       renders_one :head_note
+      renders_one :heading_mark
 
       # The key of a section's name, which the nav says too.
       def self.word_key(section) = "admin.components.settings_screen.sections.#{section.id}"

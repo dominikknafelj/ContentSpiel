@@ -15,7 +15,7 @@ import { messages } from "i18n/messages"
 //        `ai_card.save_first`: "Save provider and model first. Tests the saved settings."
 //      - the main form has unsaved changes (any `admin--saving--save-bar` on the page,
 //        heard as `admin--saving--save-bar:state`) -> disabled,
-//        `save_bar.blocked`: "Save or cancel your changes first."
+//        `save_bar.blocked`: "Save or discard your changes first."
 //    Both can apply at once (a changed field is itself a pending change);
 //    then only the more specific hint shows. The button is deliberately not an
 //    `admin--saving--pending-lock` control: that controller would re-enable it on its

@@ -45,6 +45,7 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/services/settings/save.rb" => "the one writer of the settings and the login (the screens' saves)",
     "app/components/admin/settings_screen/mail_card_component.rb" => "the Settings form's fields: the site's own value to edit; whether the host sets one is asked of MailSettings",
     "app/components/admin/settings_screen/mail_card_component.html.erb" => "the Settings form's fields, as above",
+    "app/components/admin/settings_screen/values.rb" => "the Settings form's fields, typed against saved, for the save bar's unsaved marks; never a delivery",
     "app/components/admin/settings_screen/mail_login_component.rb" => "the login's form fields and its \"Set on\" date, never a value",
     "app/views/admin/settings/show.html.erb" => "the error summary's links to the card's fields",
     "app/controllers/setup_controller.rb" => "the wizard's Mail step permits the fields it hands to Settings::Save",

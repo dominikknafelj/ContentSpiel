@@ -1,5 +1,5 @@
 <%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("forms"), id: "settings-forms-card") do %>
-  <div class="admin-column p-4" data-field-name="form_keep_days">
+  <div class="admin-column p-4" data-field-name="form_keep_days" <%= tag.attributes(data: { save_bar_changed: values.saved_change("form_keep_days") }) %>>
     <div class="flex flex-wrap items-center gap-2 text-ink">
       <label for="<%= field_id %>"><%= t(".keep_label") %></label>
       <%= number_field_tag "site_setting[form_keep_days]", values.form_keep_days, id: field_id, min: range.min, max: range.max, step: 1,

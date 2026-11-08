@@ -114,7 +114,7 @@
       </div>
     </section>
 
-    <%= render Admin::Ui::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: t("admin.accounts.save")) %>
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options)) %>
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>

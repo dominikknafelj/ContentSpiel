@@ -147,10 +147,40 @@
    wraps onto two or three lines is taller than any fixed offset), 4rem until
    it has been measured. */
 body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
-/* Nothing at rest; while the sticky footer is stuck over the content
-   (`data-stuck`, set by `admin--saving--save-bar`), the strong line and a
-   shadow. */
-.admin-save-bar[data-stuck] { border-top-color: var(--cs-line-strong); box-shadow: var(--cs-shadow-stuck); }
+/* THE CHANGED MARK. `admin--saving--save-bar#refresh` writes
+   `data-save-bar-changed` on the `[data-field-name]` wrapper of each changed
+   control, and the server writes `="saved"` after a refused or stale save.
+   A wrapper that holds a well marks the well with a 2px accent edge inside
+   its bottom; one that holds none (a segmented control, a checkbox, the logo)
+   or says it is a list (`data-save-bar-mark="dot"`, the social links) puts the
+   8px accent dot after its label or legend. A field that is also invalid --
+   `aria-invalid`, or a filled error slot, which is how Settings' own fields
+   say it -- shows its invalid edge alone. A wrapper marked as a heading
+   (`data-save-bar-mark="heading"`, the Languages card's order) shows its own
+   dot after the heading and never marks the fields inside it, which are
+   wrappers of their own. */
+[data-save-bar-changed]:not([data-save-bar-mark], :has([aria-invalid="true"]), :has(> [id$="-errors"] > p)) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], :where(.admin-prefix-input input, .admin-chip-field input)), textarea, select, .admin-rich-text-editor, .admin-chip-field, .admin-well) {
+  box-shadow: inset 0 -2px 0 var(--cs-accent);
+}
+:is(
+  [data-save-bar-changed]:not([data-save-bar-mark], :has([aria-invalid="true"]), :has(> [id$="-errors"] > p), :has(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="submit"], [type="button"]), textarea, select)),
+  [data-save-bar-changed][data-save-bar-mark="dot"]:not(:has([aria-invalid="true"]), :has(> [id$="-errors"] > p))
+) > :is(label, legend, p):first-child::after,
+:is(
+  [data-save-bar-changed]:not([data-save-bar-mark], :has([aria-invalid="true"]), :has(> [id$="-errors"] > p), :has(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"], [type="submit"], [type="button"]), textarea, select)),
+  [data-save-bar-changed][data-save-bar-mark="dot"]:not(:has([aria-invalid="true"]), :has(> [id$="-errors"] > p))
+) > fieldset:first-child > legend::after,
+[data-save-bar-mark="heading"][data-save-bar-changed] .admin-save-bar-heading-mark {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-accent);
+}
+.admin-save-bar-heading-mark { display: none; }
 /* THE PAGE TREE'S COLUMN IS AS WIDE AS THE PERSON MADE IT.
    `--admin-tree-width` on <html> is the CHOSEN width, in
    pixels: the layout's head script puts it there from this browser's memory

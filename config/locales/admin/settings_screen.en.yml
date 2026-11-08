@@ -52,6 +52,14 @@ en:
           time_zone_help: "Used for scheduled publishing."
           social_links: "Social links"
           add_link: "+ Add link"
+          # What the save bar calls a changed field whose label is not plain;
+          # a title or tagline is said with its language
+          # (`ui.save_bar.per_language`).
+          names:
+            title: "Title"
+            tagline: "Tagline"
+            social_links: "Social links"
+            logo: "Logo"
         languages_card:
           intro: "The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default."
           drag_help: "Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back."
@@ -68,6 +76,11 @@ en:
           add_label: "Add a language"
           add: "Add language"
           all_on: "Every available language is already on."
+          # What the save bar calls the order and a row's fallback, which is
+          # said with its language (`ui.save_bar.per_language`).
+          names:
+            language_order: "Language order"
+            fallback: "Falls back to"
         language_dialogs:
           items:
             one: "%{count} item"

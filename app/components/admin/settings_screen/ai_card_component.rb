@@ -12,7 +12,7 @@ module Admin
     # Provider or Model differ from `data-saved-value` ("Save provider and model
     # first. Tests the saved settings.") and, as every instant action is
     # while the main form has unsaved changes, while anything is pending
-    # ("Save or cancel your changes first."). The two can both apply -- a
+    # ("Save or discard your changes first."). The two can both apply -- a
     # changed field is itself a pending change -- and then only the specific
     # one shows. `admin--saving--pending-lock` (same root) locks the key's
     # controls and carries the key row's own hint; Test connection is NOT one

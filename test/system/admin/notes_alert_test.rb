@@ -525,7 +525,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
 
   def save_switches(*ids)
     ids.each { |id| find(id).click }
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
     assert_selector "#toasts .admin-toast", text: "Settings saved"
   end
 
@@ -601,7 +601,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     original = Users::UpdateProfile.method(:call)
     Users::UpdateProfile.define_singleton_method(:call) { |*, **| refusal }
     find("#notes_desktop").click
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector ".admin-error-summary", text: "Name is too long."
     assert_equal %w[true false], alert_values
@@ -617,7 +617,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     fill_in "Current password", with: "password"
     fill_in "New password", with: "a-new-long-password"
     fill_in "Confirm new password", with: "a-new-long-password"
-    assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave\z/
+    assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave changes\z/
     assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
 
     find("#notes_desktop").click
@@ -627,10 +627,10 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_selector "#profile-form .admin-save-bar", text: "3 unsaved changes"
     # Changing the password would draw the screen again, over the switches.
     assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
-    assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel your changes first."
+    assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or discard your changes first."
     assert_equal [ nil, true, false ], users(:one).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
 
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes", wait: LIVE
     assert_no_selector "dialog#leave-dialog[open]"

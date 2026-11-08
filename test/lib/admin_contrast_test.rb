@@ -640,6 +640,25 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The changed-field mark: a well's 2px accent edge on the well's own fill,
+  # and the accent dot after a label on the card. The spec's figure for the
+  # edge on the card is 6.9 / 7.1:1.
+  test "the changed mark is 3:1 or better on the field's fill and on the card, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-field-fill"), "the changed edge on the field's fill (#{scheme})")
+      assert_ratio(floor({ light: 6.9, dark: 7.1 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-surface"), "the changed mark on the card (#{scheme})")
+    end
+  end
+
+  # The floating save bar stands on the popover's ground: the count (ink,
+  # bold), the names (dim), "No unsaved changes" (meta) and the accent dot.
+  test "the floating bar's words and dot read on the popover ground" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-popover"), "#{ink} on the bar (#{scheme})") }
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-popover"), "the bar's dot (#{scheme})")
+    end
+  end
+
   # The Notes tab stands on the rail's ground docked and on the popover's in
   # the slide-over; the thread's reply dock paints the ground the drawer
   # names (`--cs-notes-ground`), so a message, a time, a mention, Reply and

@@ -17,7 +17,7 @@ import { messages } from "i18n/messages"
 // A REMOVED ROW STAYS IN THE PAGE, hidden, and leaves the order: the server
 // reads the rows the order names and drops the rest (`Admin::FormsScreen::
 // Draft`), and its inputs, unchanged, count nothing, so a removal is one
-// change too. The save bar's Cancel, which reloads, brings it back.
+// change too. The save bar's Discard, which reloads, brings it back.
 //
 // FOCUS AND WORDS. The focus stays on the arrow pressed; at
 // the end of the list it goes to the row's other arrow. After a removal it

@@ -11,7 +11,7 @@
 
     <div class="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_8rem]">
       <% %i[mail_server mail_port].each do |name| %>
-        <div class="admin-column" data-field-name="<%= name %>">
+        <div class="admin-column" data-field-name="<%= name %>" <%= tag.attributes(data: { save_bar_changed: values.saved_change(name) }) %>>
           <% if from_host?(name) %>
             <span class="<%= setup_label_class %>"><%= t(".#{name.to_s.delete_prefix("mail_")}") %></span>
             <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(name) %></div>
@@ -31,7 +31,7 @@
       <% end %>
     </div>
 
-    <div class="admin-column" data-field-name="mail_security">
+    <div class="admin-column" data-field-name="mail_security" <%= tag.attributes(data: { save_bar_changed: values.saved_change("mail_security") }) %>>
       <% if from_host?(:mail_security) %>
         <span class="<%= setup_label_class %>"><%= t(".security") %></span>
         <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(:mail_security) %></div>
@@ -58,7 +58,7 @@
 
     <div class="grid gap-3.5 sm:grid-cols-2">
       <% %i[mail_sender_name mail_sender_address].each do |name| %>
-        <div class="admin-column" data-field-name="<%= name %>">
+        <div class="admin-column" data-field-name="<%= name %>" <%= tag.attributes(data: { save_bar_changed: values.saved_change(name) }) %>>
           <% if from_host?(name) %>
             <span class="<%= setup_label_class %>"><%= t(".#{name.to_s.delete_prefix("mail_")}") %></span>
             <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-ink"><%= host_value(name) %></div>

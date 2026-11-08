@@ -101,7 +101,7 @@
 
     <%= render Admin::FormsScreen::PlacementsComponent.new(placements: placements, url_options: url_options) %>
 
-    <%= render Admin::Ui::SaveBarComponent.new(form_id: FORM_ID, cancel_url: cancel_path, save_label: t(".save")) %>
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: FORM_ID, cancel_url: cancel_path) %>
   <% end %>
 
   <p class="sr-only" aria-live="polite" data-admin--forms--builder-target="status"></p>

@@ -80,7 +80,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     original = Users::UpdateProfile.method(:call)
     Users::UpdateProfile.define_singleton_method(:call) { |*, **| refusal }
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector ".admin-error-summary[role=alert]", text: "Name is too long."
     assert_no_selector "#password .admin-error-summary"
@@ -119,7 +119,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     visit admin_account_path
     await_admin_controllers
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal "/cs-studio/account", address

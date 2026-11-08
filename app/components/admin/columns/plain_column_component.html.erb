@@ -2,7 +2,7 @@
 <%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
     its reference card): one id, `SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
 <% box_button = translate || (show_original? ? suggest_update_button : nil) %>
-<div class="admin-column mb-4" data-field-name="<%= name %>">
+<%= tag.div class: "admin-column mb-4", data: field_data do %>
   <%# One side of the translation pair (or the whole field, with no original to show): label,
       input, the per-field Translate button and the suggestion box under it. The error slot
       stays a DIRECT child of `.admin-column` (below the pair) -- the invalid border follows it. %>
@@ -40,4 +40,4 @@
   <% end %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
-</div>
+<% end %>

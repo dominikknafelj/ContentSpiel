@@ -27,7 +27,7 @@ class Admin::SettingsMailSystemTest < ApplicationSystemTestCase
     assert_selector "#{test_button}[disabled]"
     assert_selector "#settings-mail-test", text: "Save your changes first"
 
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     await_admin_controllers
     assert_selector "#{test_button}:not([disabled])"

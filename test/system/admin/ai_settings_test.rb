@@ -52,10 +52,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_text "Save provider and model first. Tests the saved settings."
     assert_selector "#settings-ai-key button[disabled]", text: "Replace"
     assert_selector "#settings-ai-key button[disabled]", text: "Remove…"
-    assert_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_selector "#settings-ai-key", text: "Save or discard your changes first."
 
     # Save the model: the test is available again, against the saved settings.
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     await_admin_controllers
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
@@ -120,7 +120,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
 
   # Round 2, N3: a typed key locked the footer's Save ("Save or cancel the API
   # key first.") while the changed form locked the key's input and Save key
-  # ("Save or cancel your changes first."): neither could be saved.
+  # ("Save or discard your changes first."): neither could be saved.
   test "a typed key and a changed form don't lock each other: Save key stays pressable, and then the main Save is" do
     site_settings(:default).update!(ai_api_key: "sk-old-key-0000")
     visit "/cs-studio/settings"
@@ -134,7 +134,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
     assert_selector "#settings-ai_api_key:not([disabled])"
     assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
-    assert_no_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_no_selector "#settings-ai-key", text: "Save or discard your changes first."
     # Test connection has nothing to do with the entry: still locked.
     assert_selector "button[disabled]", text: "Test connection"
 
@@ -147,7 +147,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-ai-key button[type=submit][disabled]", text: "Save key"
     assert_selector "#settings-ai_api_key:not([disabled])"
     assert_equal "settings-ai_api_key", page.evaluate_script("document.activeElement.id")
-    assert_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_selector "#settings-ai-key", text: "Save or discard your changes first."
     assert_selector "#{footer} button[type=submit]:not([disabled])", text: "Save"
     fill_in "API key", with: KEY
     assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
@@ -161,7 +161,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # The key's own actions are instant ones again: locked while the form is unsaved.
     assert_selector "#settings-ai-key button[disabled]", text: "Replace"
     assert_selector "#settings-ai-key button[disabled]", text: "Remove…"
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal "another-model", site_settings(:default).reload.ai_model
   end
@@ -235,12 +235,12 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     original = find_field("settings-trash_retention_days").value
     fill_in "settings-trash_retention_days", with: "9"
     assert_selector "button[form='settings-ai-test-form'][disabled]"
-    assert_text "Save or cancel your changes first."
+    assert_text "Save or discard your changes first."
     assert_no_text "Save provider and model first."
 
     fill_in "settings-trash_retention_days", with: original
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
-    assert_no_text "Save or cancel your changes first."
+    assert_no_text "Save or discard your changes first."
   end
 
   test "Save key with an empty input shows the error with the input still open, and Cancel clears it" do

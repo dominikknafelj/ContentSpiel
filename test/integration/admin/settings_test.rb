@@ -655,4 +655,55 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  # -- what the save bar can say ------------------------------------------------
+
+  # Review Focus 2: the bar names what changed by the control's own words
+  # (`saving/form_snapshot.js`, `nameOf`): a `data-save-bar-name` on the
+  # control or its `[data-field-name]` wrapper, a legend, or a `label[for]`.
+  # A control with none of them would be counted and never named.
+  test "every control the Settings form submits has a name the bar can say" do
+    with_locales(%w[en de], default: "en")
+    @site.update!(social_links: { "Mastodon" => "https://social.example/@site" })
+
+    get "/cs-studio/settings"
+
+    assert_response :success
+    form = Nokogiri::HTML(response.body).at_css("#settings-form")
+    controls = form.css("input[name], select[name], textarea[name]").reject do |control|
+      control["type"].in?(%w[submit button]) || control.key?("data-save-bar-ignore") ||
+        (control["type"] == "hidden" && !control.key?("data-save-bar-track")) || control.ancestors("template").any?
+    end
+    assert_operator controls.size, :>, 20, "the form moved: this guard is looking at too little"
+
+    nameless = controls.reject do |control|
+      wrapper = control.ancestors("[data-field-name]").first
+      named = control["data-save-bar-name"].present? || wrapper&.[]("data-save-bar-name").present?
+      named ||= control.ancestors("fieldset").any? { |fieldset| fieldset.at_css("> legend")&.text.present? }
+      named || (control["id"].present? && form.document.at_css("label[for='#{control["id"]}']")&.text.present?)
+    end
+    assert_empty nameless.map { |control| control["name"] }
+    # Each language's pair is its own wrapper, named with its language.
+    assert_select "[data-field-name='title.de'] input[data-save-bar-name='Deutsch: Title']"
+    assert_select "[data-field-name='tagline.en'] input[data-save-bar-name='English: Tagline']"
+    assert_select "[data-field-name='languages.de.fallback'][data-save-bar-name='Deutsch: Falls back to'] select"
+    assert_select "section#settings-languages-card[data-field-name=language_order][data-save-bar-name='Language order'][data-save-bar-mark=heading] h2#languages .admin-save-bar-heading-mark .sr-only", text: "Language order changed"
+    assert_select "[data-field-name=social_links][data-save-bar-name='Social links'][data-save-bar-mark=dot]"
+    assert_select "[data-field-name=logo][data-save-bar-name='Logo']"
+    assert_select "[data-save-bar-changed]", count: 0
+  end
+
+  # After a refusal the typed values are the browser's baseline, so the
+  # server marks the wrappers that differ from what is stored.
+  test "a refused save marks the typed fields that differ from the saved settings, and no other" do
+    with_locales(%w[en de], default: "en")
+    @site.update!(mail_server: "smtp.saved.test")
+
+    save mail_server: "smtp.typed.test", trash_retention_days: -1
+
+    assert_response :unprocessable_entity
+    assert_select "[data-field-name=mail_server][data-save-bar-changed=saved]"
+    assert_select "[data-field-name=trash_retention_days][data-save-bar-changed=saved]"
+    assert_select "[data-save-bar-changed]", count: 2
+  end
 end

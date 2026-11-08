@@ -1,13 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
-// Instant actions wait for pending changes (design pass round 3, decision
-// D10). An explicit-save screen also has actions that happen at once -- Add
+// Instant actions wait for pending changes. An explicit-save screen also has actions that happen at once -- Add
 // language, Turn off, Test connection, Save key -- and each answers by
 // re-rendering the screen, which would throw away whatever the main form
 // holds unsaved. So while any `admin--saving--save-bar` form on the page is unsaved,
 // every `control` target inside this element is disabled and the `hint`
-// target says why: "Save or cancel your changes first." Both revert the
+// target says why: "Save or discard your changes first." Both revert the
 // moment the form is clean again (saved, cancelled, or typed back).
 //
 //   <div data-controller="admin--saving--pending-lock">
@@ -39,12 +38,12 @@ import { messages } from "i18n/messages"
 // `elements` like a field: it is skipped too, with a warning in the console
 // naming it.
 //
-// ONE EXEMPTION (final wave B round 2, N3). Something typed BESIDE the form
+// ONE EXEMPTION. Something typed BESIDE the form
 // that the form's Save would drop holds that Save back (`admin--saving--save-bar`,
 // `data-save-bar-holds` -- Settings' API key entry). Locking the entry too,
 // because the form has changes, left the two locking each other: the footer
 // said "Save or cancel the API key first." and the key's own Save said "Save
-// or cancel your changes first.". So a control inside an element that carries
+// or discard your changes first.". So a control inside an element that carries
 // `data-save-bar-holds` is never locked -- that is the way out the footer's
 // sentence names -- and a hint beside it is not shown. Safe only because that
 // action's answer keeps the form's fields (the key write answers with streams

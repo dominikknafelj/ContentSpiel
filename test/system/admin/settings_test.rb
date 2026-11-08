@@ -4,7 +4,7 @@ require "application_system_test_case"
 # footer. Switching the language tabs is not a change and asks nothing, a
 # sidebar link or Back with a typed change asks first, a social link row added
 # and removed is counted and uncounted, Save toasts "Settings saved" with both
-# languages persisted, and the footer's Cancel discards without asking.
+# languages persisted, and the footer's Discard discards without asking.
 class Admin::SettingsSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -171,7 +171,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       assert_selector "#settings-glance-mail .admin-state-chip[data-state-tone=ok]", text: "Working"
 
       fill_in "settings-mail_server", with: "smtp.other.test"
-      click_on "Save"
+      click_on "Save changes"
 
       assert_selector "#toasts .admin-toast", text: "Settings saved"
       assert_selector "#settings-glance-mail .admin-state-chip[data-state-tone=warn]", text: "Saved, not tested"
@@ -219,7 +219,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     click_on "English"
     fill_in "settings-en-tagline", with: "Things I learned lately"
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_selector footer, text: /No unsaved changes/i
     site = site_settings(:default).reload
@@ -239,14 +239,45 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     fields = page.all("[data-admin--settings--repeat-rows-target=row]").last
     fields.find("input[name$='[name]']").set("Blog")
     fields.find("input[name$='[url]']").set("https://example.org/blog")
-    click_on "Save"
+    click_on "Save changes"
 
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal({ "GitHub" => "https://github.com/dana", "Blog" => "https://example.org/blog" }, site_settings(:default).reload.social_links)
     assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
   end
 
-  test "Back with a typed change asks first, and Cancel discards without asking" do
+  # Review Focus 1. A refused save brings back what was typed, which is then
+  # the browser's own baseline: the server says which fields differ from the
+  # saved settings. A field both changed and invalid shows its invalid edge
+  # alone (Port), and is named all the same.
+  test "after a refused save the typed fields that differ from the saved settings carry the mark and the bar names them" do
+    site_settings(:default).update!(mail_server: "smtp.saved.test", mail_port: 587)
+    visit_screen admin_settings_path
+    fill_in "settings-mail_server", with: "smtp.typed.test"
+    # The browser would stop the number at its own limit; the server's rule
+    # is the one under test.
+    page.execute_script("document.getElementById('settings-mail_port').removeAttribute('max')")
+    fill_in "settings-mail_port", with: "70000"
+    click_on "Save changes"
+
+    assert_selector "#settings-mail_port-errors p"
+    assert_selector "[data-field-name=mail_server][data-save-bar-changed=saved]"
+    assert_selector "[data-field-name=mail_port][data-save-bar-changed=saved]"
+    edge = ->(id) { page.evaluate_script("(() => { const s = getComputedStyle(document.getElementById('#{id}')); return [ s.boxShadow, s.borderBottomColor ] })()") }
+    danger = page.evaluate_script("(() => { const p = document.createElement('i'); p.style.color = 'var(--cs-danger)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c })()")
+    assert_match(/inset/, edge.("settings-mail_server")[0])
+    port = edge.("settings-mail_port")
+    assert_equal "none", port[0]
+    assert_equal danger, port[1]
+    assert_selector footer, text: "2 unsaved changes · Server, Port"
+
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_current_path admin_settings_path
+  end
+
+  test "Back with a typed change asks first, and Discard discards without asking" do
     visit admin_root_path
     await_admin_controllers
     within("nav[aria-label='Modules']") { click_link "Settings" }
@@ -260,7 +291,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_current_path admin_settings_path
     assert_equal "Typed before Back", find_field("settings-en-title").value
 
-    within(footer) { click_link "Cancel" }
+    within(footer) { click_link "Discard" }
     assert_no_selector "dialog#leave-dialog[open]"
     assert_field "settings-en-title", with: "Dana's Notes"
     assert_selector footer, text: /No unsaved changes/i
@@ -359,7 +390,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /unsaved change/i
     assert_no_selector "[data-admin--settings--repeat-rows-target=row]"
     assert_selector "button[data-action='admin--settings--repeat-rows#add']:focus"
-    press "Save"
+    press "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal({}, site_settings(:default).reload.social_links.to_h)
     visit admin_settings_path
@@ -373,7 +404,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     click_on "English"
     fill_in "settings-en-title", with: ""
     click_on "Deutsch"
-    click_on "Save"
+    click_on "Save changes"
 
     assert_selector ".admin-error-summary a[href='#settings-en-title']"
     assert_selector "#settings-en-title"
@@ -407,15 +438,15 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "", page.evaluate_script("location.hash")
   end
 
-  # Cancel on Settings leads to Settings. A reload is no new place.
-  test "the footer's Cancel reloads the screen without a second history entry" do
+  # Discard on Settings leads to Settings. A reload is no new place.
+  test "the footer's Discard reloads the screen without a second history entry" do
     visit admin_settings_path
     await_admin_controllers
     fill_in "settings-en-title", with: "Typed, then cancelled"
     entries = page.evaluate_script("history.length")
     page.execute_script("document.querySelector('#settings-form').dataset.before = 'yes'")
 
-    within(footer) { click_link "Cancel" }
+    within(footer) { click_link "Discard" }
     assert_no_selector "#settings-form[data-before]"
     assert_selector footer, text: /No unsaved changes/i
     assert_equal entries, page.evaluate_script("history.length")
@@ -474,21 +505,21 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
 
-    # Default, Turn off and Add wait for Save or Cancel, and say so.
+    # Default, Turn off and Add wait for Save or Discard, and say so.
     assert_selector "#settings-languages-card button[disabled]", text: "Make default…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Turn off…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Add language"
     assert_selector "#settings-languages-card select#language-add-code[disabled]"
-    assert_selector "#settings-languages-card", text: "Save or cancel your changes first."
+    assert_selector "#settings-languages-card", text: "Save or discard your changes first."
 
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_selector footer, text: /No unsaved changes/i
     assert_equal %w[de en es], site_settings(:default).reload.locale_codes
     assert_language_order %w[de en es]
     assert_equal "Deutsch", language_tab_names.first
     assert_selector "#settings-languages-card button:not([disabled])", text: "Make default…", count: 2
-    assert_no_text "Save or cancel your changes first."
+    assert_no_text "Save or discard your changes first."
   end
 
   test "Escape puts a picked row back and counts nothing" do
@@ -510,7 +541,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     select "English", from: "language-de-fallback"
     assert_selector footer, text: /\b1 unsaved change\b/i
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal [ "en" ], site_settings(:default).reload.locale_entry("de")["fallbacks"]
   end

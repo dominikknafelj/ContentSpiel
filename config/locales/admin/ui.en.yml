@@ -50,17 +50,34 @@ en:
           dropped: "That didn't go through — the screen changed. Try again."
 
         save_bar:
-          save: "Save"
-          cancel: "Cancel"
-          # The footer's count line, written by `admin--saving--save-bar`.
+          # The default Save; a screen with a word of its own ("Save group")
+          # hands it in as `save_label:`.
+          save_changes: "Save changes"
+          # The way out that throws the changes away without asking.
+          discard: "Discard"
+          # The footer's count line, written by `admin--saving--save-bar`:
+          # the count, then the names of what changed, at most three
+          # (`NAMES_SHOWN`) and how many more, joined by the separator.
           changes:
             one: "%{count} unsaved change"
             other: "%{count} unsaved changes"
+          names: "%{changes} · %{names}"
+          more:
+            one: "%{names} and 1 more"
+            other: "%{names} and %{count} more"
+          separator: ", "
+          # The name of a field kept per language ("Deutsch: Title"), the
+          # language as the language tabs write it. Read by the server.
+          per_language: "%{language}: %{label}"
+          # The changed mark on a list's heading (the Languages card's order),
+          # said to a screen reader.
+          order_changed: "Language order changed"
           unsaved: "Unsaved changes"
           no_changes: "No unsaved changes"
           # Shown while another form on the screen has to be saved first; also
-          # `admin--saving--pending-lock`'s hint on an instant action.
-          blocked: "Save or cancel your changes first."
+          # `admin--saving--pending-lock`'s hint on an instant action, and the
+          # AI card's while a test waits for a save.
+          blocked: "Save or discard your changes first."
 
         save_status:
           saving: "SAVING…"

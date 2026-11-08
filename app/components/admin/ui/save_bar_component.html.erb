@@ -1,17 +1,26 @@
 <%# The form's footer: always there, so a form never looks as if it had no
-    way to save. It sits in the form's own column, under the fields, and
-    sticks to the bottom of the window while a long form (a group's
-    permissions) scrolls. `admin--saving--save-bar#refresh` writes the count -- a
-    polite live region, so a screen reader hears the number change -- and
-    disables Save while an existing record has nothing to save. Without
-    JavaScript nothing disables it, so it is a plain working submit button.
+    way to save. `admin--saving--save-bar#refresh` writes the count and the
+    names of what changed into a polite live region, so a screen reader hears
+    them change, shows the dot while anything is unsaved, and disables Save
+    while an existing record has nothing to save. Without JavaScript nothing
+    disables it, so it is a plain working submit button.
 
-    Cancel is a link into the content frame, which the leave guard asks about
+    Discard is a link into the content frame, which the leave guard asks about
     like any other -- except this one: `data-save-bar-cancel` marks
     it as the way to discard, so it leaves without "Leave without saving?". %>
-<div data-admin--saving--save-bar-target="bar" class="<%= bar_class %>">
+<% discard = capture do %>
+  <%= link_to t(".discard"), cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_tertiary_link_class %>
+<% end %>
+<% save = capture do %>
   <%= render Admin::Ui::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--saving--save-bar-target": "save")) %>
-  <%= link_to t(".cancel"), cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_tertiary_link_class %>
+<% end %>
+<div data-admin--saving--save-bar-target="bar" class="<%= bar_class %>">
+  <% if contained? %>
+    <%= save %>
+    <%= discard %>
+  <% else %>
+    <span data-admin--saving--save-bar-target="dot" aria-hidden="true" class="size-2 shrink-0 rounded-full bg-accent" hidden></span>
+  <% end %>
   <span data-admin--saving--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
   <%# Shown while another form on the screen has to be saved first
       (`save_bar_form_data(after:)`); the controller writes the sentence. %>
@@ -19,4 +28,10 @@
   <%# Anything the screen wants at the far end of the bar (the account
       screen's "Forgot your current password?"). %>
   <% if content.present? %><div class="ml-auto"><%= content %></div><% end %>
+  <% unless contained? %>
+    <div class="ml-auto flex items-center gap-3">
+      <%= discard %>
+      <%= save %>
+    </div>
+  <% end %>
 </div>

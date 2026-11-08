@@ -77,9 +77,8 @@ en:
           thank_you: "Thank-you message"
           thank_you_placeholder: "Thank you. Your answers have been sent."
           thank_you_help: "Shown in place of the form once it is sent."
-          save: "Save"
           moved: "“%{label}” moved to %{position} of %{count}."
-          removed: "“%{label}” removed. Cancel brings it back."
+          removed: "“%{label}” removed. Discard brings it back."
           added: "%{type} field added."
         field_row:
           no_label: "No label yet"

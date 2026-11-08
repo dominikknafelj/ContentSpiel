@@ -54,6 +54,9 @@ module Admin
       # `PublicUrlsGuardTest` would take for a hand-built public URL.
       def path(code) = default?(code) ? "/" : [ "", code ].join("/")
 
+      # What the save bar calls a row's fallback: "Deutsch: Falls back to".
+      def fallback_name(code) = t("admin.components.ui.save_bar.per_language", language: name(code), label: t(".names.fallback"))
+
       def order_value = rows.map { |row| row[:code] }.join(",")
 
       # "None (default)" first, then every OTHER enabled language.

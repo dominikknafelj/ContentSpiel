@@ -33,13 +33,16 @@
 <% tab = @tab_locale || admin_locale %>
 <% manage_settings = can?("settings.manage") %>
 <% manage_languages = can?("languages.manage") %>
-<% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
 <%# What is saved, for every word that says a state (the AI key, mail, the
-    images, the rail): after a refused save `Settings::Save` leaves what was
-    typed on `@site_setting`, which the fields show, but nothing of it was
-    saved. Read again only then, so the screen's ordinary draw costs nothing. %>
+    images, the rail, the logo, the fields' unsaved marks): after a refused
+    save `Settings::Save` leaves what was typed on `@site_setting`, which the
+    fields show, but nothing of it was saved. Read again only then, so the
+    screen's ordinary draw costs nothing. %>
 <% stored = (@errors.present? || @stale_form) ? SiteSetting.find(@site_setting.id) : @site_setting %>
+<%# The fields show what was typed; the server's unsaved marks compare it
+    with `stored` (`Values#changed_fields`). %>
+<% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted, stored: stored) %>
 <% images_fingerprint = (ImageSettings.current(stored).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
 <% mail_settings = (MailSettings.current(stored) if manage_settings) %>

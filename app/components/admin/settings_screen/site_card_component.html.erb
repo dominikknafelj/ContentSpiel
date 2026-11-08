@@ -22,19 +22,21 @@
         <%= render Admin::Columns::PlainColumnComponent.new(
               name: "title", label: t(".title_label"), id: field_id(code, "title"), html_name: html_name(code, "title"),
               value: values.text(code, :title), original: original(code, :title), locale: code,
-              errors: (default?(code) ? errors_for(:title) : []), **translation(code, :title)
+              errors: (default?(code) ? errors_for(:title) : []), **translation(code, :title),
+              field_name: "title.#{code}", field_changed: values.saved_change("title.#{code}"), data: { save_bar_name: field_name_words(code, :title) }
             ) %>
         <%= render Admin::Columns::PlainColumnComponent.new(
               name: "tagline", label: t(".tagline_label"), id: field_id(code, "tagline"), html_name: html_name(code, "tagline"),
               value: values.text(code, :tagline), original: original(code, :tagline), locale: code,
-              errors: (default?(code) ? errors_for(:tagline) : []), **translation(code, :tagline)
+              errors: (default?(code) ? errors_for(:tagline) : []), **translation(code, :tagline),
+              field_name: "tagline.#{code}", field_changed: values.saved_change("tagline.#{code}"), data: { save_bar_name: field_name_words(code, :tagline) }
             ) %>
       <% end %>
     <% end %>
 
     <%# Logo: the stored one, if any, the shared drop zone, and an
         explicit remove box -- a blank file input never detaches it. %>
-    <div class="admin-column" data-field-name="logo">
+    <%= tag.div class: "admin-column", data: { field_name: "logo", save_bar_name: t(".names.logo"), save_bar_changed: values.saved_change("logo") } do %>
       <p class="<%= setup_label_class %> mb-1" id="settings-logo-label"><%= t(".logo") %></p>
       <div class="flex flex-wrap items-start gap-3.5">
         <% logo = values.logo %>
@@ -53,18 +55,21 @@
         </div>
       </div>
       <%= helpers.render "admin/shared/field_errors", id: "settings-logo-errors", messages: errors_for(:logo) %>
-    </div>
+    <% end %>
 
-    <div class="admin-column max-w-sm" data-field-name="time_zone">
+    <%= tag.div class: "admin-column max-w-sm", data: { field_name: "time_zone", save_bar_changed: values.saved_change("time_zone") } do %>
       <%= label_tag "settings-time_zone", t(".time_zone"), class: setup_label_class %>
       <%= select_tag "site_setting[time_zone]", options_for_select(time_zone_options, values.time_zone), id: "settings-time_zone",
             class: setup_select_class, aria: { describedby: "settings-time_zone-help" } %>
       <p id="settings-time_zone-help" class="mt-1 text-xs text-meta"><%= t(".time_zone_help") %></p>
       <%= helpers.render "admin/shared/field_errors", id: "settings-time_zone-errors", messages: errors_for(:time_zone) %>
-    </div>
+    <% end %>
 
-    <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--settings--repeat-rows"
-              data-admin--settings--repeat-rows-next-value="<%= values.social_rows.size %>">
+    <%# A list, so its changed mark is the dot after the legend, never an edge
+        on its rows' fields (`data-save-bar-mark="dot"`). %>
+    <%= tag.fieldset class: "admin-column", id: "settings-social-links",
+          data: { field_name: "social_links", save_bar_name: t(".names.social_links"), save_bar_mark: "dot", save_bar_changed: values.saved_change("social_links"),
+                  controller: "admin--settings--repeat-rows", "admin--settings--repeat-rows-next-value": values.social_rows.size } do %>
       <legend class="<%= setup_label_class %> mb-1"><%= t(".social_links") %></legend>
       <%# The form says it carries the links, so no rows means none; a client
           that posts nothing leaves them. %>
@@ -79,6 +84,6 @@
       </template>
       <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--settings--repeat-rows#add"><%= t(".add_link") %></button>
       <%= helpers.render "admin/shared/field_errors", id: "settings-social_links-errors", messages: errors_for(:social_links) %>
-    </fieldset>
+    <% end %>
   </div>
 <% end %>

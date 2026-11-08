@@ -72,7 +72,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     # two cards, as it was.
     assert_select "form#password-form section[aria-labelledby=account-password] > .admin-save-bar.admin-save-bar--contained.border-t:last-child button[type=submit]", text: "Change password"
     assert_select "form#password-form section ~ .admin-save-bar", count: 0
-    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save"
+    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save changes"
     assert_select "form#profile-form section .admin-save-bar", count: 0
     assert_select "h1 + p", count: 0
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
@@ -211,13 +211,13 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--saving--save-bar']" do
       # Decisions 19 and 20: "Your account", then two cards of one width,
-      # Profile and Notes, and one footer under both, whose button is "Save".
+      # Profile and Notes, and one footer under both, whose button is "Save changes".
       assert_select "section.max-w-\\[560px\\]", count: 2
       assert_select "section[aria-labelledby=account-profile] h3#account-profile", text: "Profile"
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
       assert_select "section[aria-labelledby=account-profile] input[name=name]"
       assert_select "section[aria-labelledby=account-notes] h3#account-notes", text: "Notes"
-      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save"
+      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save changes"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"

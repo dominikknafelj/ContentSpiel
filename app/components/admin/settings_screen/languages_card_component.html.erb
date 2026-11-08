@@ -1,7 +1,14 @@
 <%# The whole card is the `admin--saving--pending-lock` scope: every
-    `control` below is an instant action. %>
+    `control` below is an instant action. It is also the order's field for
+    the save bar: the order has no label of its own, so its changed mark is
+    the dot after the card's heading (`data-save-bar-mark="heading"`), and
+    each row's fallback is a field of its own inside it. %>
 <%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("languages"), id: "settings-languages-card", intro: t(".intro"),
-      data: { controller: "admin--saving--pending-lock admin--settings--sortable-rows" }) do |card| %>
+      data: { controller: "admin--saving--pending-lock admin--settings--sortable-rows",
+              field_name: "language_order", save_bar_name: t(".names.language_order"), save_bar_mark: "heading", save_bar_changed: values.saved_change("language_order") }) do |card| %>
+  <% card.with_heading_mark do %>
+    <span class="admin-save-bar-heading-mark"><span class="sr-only"><%= t("admin.components.ui.save_bar.order_changed") %></span></span>
+  <% end %>
   <% card.with_head_note do %>
     <p id="language-drag-help" class="sr-only"><%= t(".drag_help") %></p>
     <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
@@ -42,11 +49,12 @@
           <% end %>
         </div>
 
-        <div class="inline-flex items-center gap-2 text-sm text-ink">
+        <%= tag.div class: "inline-flex items-center gap-2 text-sm text-ink",
+              data: { field_name: "languages.#{code}.fallback", save_bar_name: fallback_name(code), save_bar_changed: values.saved_change("languages.#{code}.fallback") } do %>
           <label for="language-<%= code %>-fallback"><%= t(".falls_back_to") %><span class="sr-only"> <%= t(".falls_back_for", language: name(code)) %></span></label>
           <%= select_tag "site_setting[languages][][fallback]", options_for_select(fallback_options(code), (default?(code) ? "" : row[:fallback])),
                 id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto" %>
-        </div>
+        <% end %>
 
         <%# The default can't be turned off. Its row keeps the button's place
             with the button itself, unseen and inert, in the same variant,

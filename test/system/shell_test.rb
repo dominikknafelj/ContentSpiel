@@ -134,7 +134,7 @@ class ShellTest < ApplicationSystemTestCase
     assert_current_path admin_account_path
 
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
     assert_selector "#sidebar a#account-identity[href='#{admin_account_path}'] span[title='Ada']"
   end
 end
