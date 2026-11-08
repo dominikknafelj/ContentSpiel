@@ -239,9 +239,21 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
     find(FIND).fill_in(with: "alp")
     assert_selector match
 
+    assert_selector "#tree-column [role=status]", text: "1 match"
     click_node(a)
+    # The new view's data is held back: while it loads, no count of the
+    # view that was left stands under the kept query.
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.realFetch ??= original
+      window.fetch = (url, options) => String(url).includes("/mind_graph/data") ? new Promise((resolve) => { window.releaseGraph = () => resolve(original(url, options)) }) : original(url, options)
+    JS
     click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
     assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
+    await_js("typeof window.releaseGraph === 'function'")
+    assert_equal "alp", find(FIND).value
+    assert_equal "", find("#tree-column [role=status]").text, "a count of the view that was left stands while the new one loads"
+    page.execute_script("window.fetch = window.realFetch; window.releaseGraph()")
     await_graph
     narrowed.call("after Focus")
 

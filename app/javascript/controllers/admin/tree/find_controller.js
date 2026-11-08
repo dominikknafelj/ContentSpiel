@@ -42,7 +42,15 @@ const SAY_AFTER_MS = 300
 // frame rendered); a visit of the whole page dispatches `turbo:before-cache`
 // before anything is rendered. So a `turbo:frame-load` of a frame that
 // advances (`data-turbo-action`) marks the next `turbo:before-cache` as the
-// frame's own, and `turbo:load`, which ends either visit, unmarks it.
+// frame's own. The mark covers ONE snapshot: `reset()` takes it off as it
+// uses it, so a frame load that proposes no visit (a `src` set or a
+// `reload()` by script, a frame's visit cancelled by a whole-page one) can
+// leave it standing for at most the next `turbo:before-cache` it was meant
+// for; and `turbo:load`, which ends either kind of visit, takes it off too,
+// so a mark no snapshot used never outlives the visit that set it. A kept
+// query keeps no count of the view that was left: the status line is
+// emptied with the snapshot, and the count is said again for the tree on
+// screen.
 export default class extends Controller {
   static targets = ["field", "hint", "clear", "status"]
   static values = { noun: String, moving: Boolean, keep: Boolean }
@@ -244,7 +252,18 @@ export default class extends Controller {
   // Before Turbo's snapshot: an empty field and the whole tree, unless the
   // query is kept across the content frame's navigation.
   reset() {
-    if (this.keepValue && this.inFrameVisit) return
+    const kept = this.keepValue && this.inFrameVisit
+    this.inFrameVisit = false
+    if (kept) {
+      // The count goes, and the query runs again over whatever tree is on
+      // screen now: none yet (the line stays empty until the new tree is
+      // drawn and `tree:changed` runs it), or the new view's, if its owner
+      // drew it before this snapshot.
+      this.said = null
+      this.statusTarget.replaceChildren()
+      this.apply()
+      return
+    }
     cancelAnimationFrame(this.frame)
     this.empty()
   }
