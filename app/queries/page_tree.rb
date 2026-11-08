@@ -19,6 +19,15 @@ module PageTree
   # whatever the ids say.
   def rows(ids) = Page.kept.where(id: ids.to_a).select(*COLUMNS).order(:position, :id)
 
+  # What is each page's address in `locale`? `{ page id => path }` for the
+  # pages among `ids` that have a live one in that language, one statement
+  # over `public_paths`, for a find that starts with "/"; a page without an
+  # address there is left out. `ids` are rows the viewer may read; it
+  # applies no scope itself.
+  def paths(ids, locale:)
+    PublicPath.current.where(record_type: Page.polymorphic_name, record_id: ids.to_a, locale: locale.to_s).pluck(:record_id, :path).to_h
+  end
+
   # What is `page`'s row now? Its `COLUMNS`, read afresh, for a row drawn
   # alone after a save: the unpublished-changes mark is written beside the
   # save by a statement of its own (`Publishing`), so the record the request

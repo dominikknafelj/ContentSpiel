@@ -1471,6 +1471,59 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal TREE_STATE_WRITERS.sort, writers.sort, "the tree's width state on <html> has two writers, the head script and admin--shell--tree-width"
   end
 
+  # THE OPEN SET HAS ONE WRITER. The cookie `cs_tree_open` is written by
+  # `tree/open_set.js` alone and read on the server by `TreeOpenSet` alone,
+  # which names it (`TreeOpenSet::COOKIE`); no script beside it touches
+  # `document.cookie`, and no Ruby writes or deletes a cookie named by either.
+  # Comments are stripped first. Not seen: a theme's or a gem's script, a
+  # cookie written through a name bound elsewhere, `document["cookie"]`, and
+  # the Cookie Store API (`cookieStore`).
+  OPEN_SET_WRITER = "app/javascript/tree/open_set.js"
+  OPEN_SET_READER = "app/values/tree_open_set.rb"
+  OPEN_SET_NAMES = /cs_tree_open|TreeOpenSet::COOKIE/
+  COOKIE_WRITE = /\bcookies\b(?:\s*\.\s*\w+)*\s*\[[^\]]*\]\s*=(?![=~>])|\bcookies\b(?:\s*\.\s*\w+)*\s*\.\s*delete\b/
+
+  # `{ path => text }` -> the paths whose text breaks the rule above.
+  def self.open_set_offences(sources)
+    sources.filter_map do |path, raw|
+      text = uncommented(raw, path)
+      if path.end_with?(".js")
+        path if path != OPEN_SET_WRITER && text.match?(/\bdocument\s*\.\s*cookie\b|cs_tree_open/)
+      elsif path != OPEN_SET_READER && (text.include?("cs_tree_open") || text.each_line.any? { |line| line.match?(OPEN_SET_NAMES) && line.match?(COOKIE_WRITE) })
+        path
+      end
+    end
+  end
+
+  def self.open_set_sources
+    Dir[Rails.root.join("{app,lib,config}/**/*.{rb,erb,js}")].to_h { |path| [ Pathname(path).relative_path_from(Rails.root).to_s, File.read(path) ] }
+  end
+
+  test "the open set has one writer" do
+    sources = self.class.open_set_sources
+    assert_empty self.class.open_set_offences(sources), "cs_tree_open is written by tree/open_set.js alone, and named in Ruby by TreeOpenSet alone"
+    assert_match(/document\.cookie\s*=/, self.class.without_comments(Rails.root.join(OPEN_SET_WRITER).to_s), "the writer writes the cookie")
+    assert_includes File.read(Rails.root.join(OPEN_SET_READER)), %(COOKIE = "cs_tree_open")
+    assert sources.any? { |path, text| path.end_with?("authentication.rb") && text.match?(COOKIE_WRITE) }, "the session cookie's write is in the sources read, and not matched"
+  end
+
+  test "the open set's writer guard reports each sample" do
+    assert_equal [ "app/javascript/other.js" ], self.class.open_set_offences("app/javascript/other.js" => %(document.cookie = "x"\n))
+    assert_equal [ "app/javascript/other.js" ], self.class.open_set_offences("app/javascript/other.js" => %(const name = "cs_tree_open"\n))
+    assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies[TreeOpenSet::COOKIE] = "1"\n))
+    assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies.permanent[TreeOpenSet::COOKIE] = { value: "1" }\n))
+    assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(cookies.delete(TreeOpenSet::COOKIE)\n))
+    assert_equal [ "app/controllers/x.rb" ], self.class.open_set_offences("app/controllers/x.rb" => %(raw = "cs_tree_open"\n))
+
+    assert_empty self.class.open_set_offences(
+      "app/javascript/tree/open_set.js" => %(document.cookie = `cs_tree_open=1`\n),
+      "app/javascript/other.js" => %(// document.cookie is open_set.js's\n),
+      "app/controllers/concerns/authentication.rb" => %(cookies.signed.permanent[:session_id] = { value: 1 }\ncookies.delete(:session_id)\n),
+      "app/controllers/x.rb" => %(open_cookie: cookies[TreeOpenSet::COOKIE]\n# cookies[TreeOpenSet::COOKIE] = "1"\n),
+      "app/views/x.html.erb" => %(<%= render Tree.new(open_cookie: cookies[TreeOpenSet::COOKIE]) %>\n<%# cookies.delete(TreeOpenSet::COOKIE) %>\n)
+    )
+  end
+
   test "the writer pattern matches each way of writing the two" do
     [
       %(root.style.setProperty("--admin-tree-width", "300px")),
@@ -1565,5 +1618,135 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
+  end
+
+  # THE TREE: both trees draw one row (`Admin::Ui::TreeItemComponent`), whose
+  # geometry is the four `--cs-tree-*` lengths and whose looks are the one
+  # `.admin-tree` block. The files that draw a tree row, where an indent or a
+  # tint of their own would part the two trees.
+  TREE_FILES = [
+    "app/components/admin/pages_screen/tree_*", "app/components/admin/ui/tree_item_component.*",
+    "app/components/admin/ui/tree_find_component.*", "app/javascript/mind_graph/node_list.js"
+  ].freeze
+  TREE_LENGTHS = %w[--cs-tree-row --cs-tree-disclosure --cs-tree-mark --cs-tree-step].freeze
+  # A tree file let through both tree rules, with the reason.
+  TREE_RULES_NOT_YET = {
+    "app/javascript/mind_graph/node_list.js" => "the graph's list is not on the shared row yet"
+  }.freeze
+  TREE_INDENT = /(?<![\w-])(?:[\w\[\]-]+:)*-?(?:ml|pl|ms|ps)-|(?<![\w-])(?:margin|padding)-(?:left|inline-start)(?![\w-])|\b(?:margin|padding)(?:Left|InlineStart)\b/
+  TREE_TINT = /(?<![\w-])(?:[\w\[\]-]+:)*bg-accent-tint(?![\w-])/
+
+  # A tree file's text without its comments: ERB's `<%# %>`, Ruby's `#`, and
+  # a script's `//` and `/* */`.
+  def self.without_comments(path) = uncommented(File.read(path), path)
+
+  # `text`, as the file at `path` would hold it, without its comments.
+  def self.uncommented(text, path)
+    text = text.gsub(/<%#.*?%>/m, "") if path.end_with?(".erb")
+    text = text.gsub(/^\s*#.*$/, "").gsub(/\s#\s.*$/, "") if path.end_with?(".rb")
+    text = text.gsub(%r{/\*.*?\*/}m, "").gsub(%r{(?<![:"'])//.*$}, "") if path.end_with?(".js")
+    text
+  end
+
+  def self.tree_files = TREE_FILES.flat_map { |glob| Dir[Rails.root.join(glob)] }.sort.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+
+  # The tree files whose text, comments stripped, matches `pattern`.
+  def self.tree_offences(pattern, files = tree_files)
+    files.select { |path| without_comments(Rails.root.join(path).to_s).match?(pattern) }
+  end
+
+  # Each `--cs-tree-*` declaration in `content-spiel.css`, comments
+  # stripped, as `[selector of the rule it stands in, name, value]`.
+  def tree_length_declarations
+    self.class.css_rules("content-spiel.css").flat_map do |selectors, body|
+      body.scan(/(--cs-tree-[\w-]+):\s*([^;]+);/).map { |name, value| [ selectors.join(", "), name, value.strip ] }
+    end
+  end
+
+  test "a tree's geometry is its four tokens, written once" do
+    declarations = tree_length_declarations
+    assert_equal TREE_LENGTHS.sort, declarations.map { |_, name, _| name }.sort, "each tree length is defined once in content-spiel.css"
+    assert_equal [ ":root" ], declarations.map(&:first).uniq, "the tree lengths are defined on :root"
+    assert_no_match(/--cs-tree-[\w-]+:/, self.class.stylesheet_without_comments("content-spiel.tailwind.css"), "a tree length is written once, in content-spiel.css")
+
+    step = declarations.find { |_, name, _| name == "--cs-tree-step" }.last
+    rule = single_rule(".admin-tree__children")
+    margin = rule[/margin-inline-start:\s*(\d+)px/, 1]
+    guide = rule[/border-inline-start:\s*(\d+)px solid var\(--cs-line-strong\)/, 1]
+    padding = rule[/padding-inline-start:\s*(\d+)px/, 1]
+    assert [ margin, guide, padding ].all?, "the children list's margin, guide and padding are pixels: #{rule.squish}"
+    assert_equal step, "#{margin.to_i + guide.to_i + padding.to_i}px", "one level's step is the children list's margin, guide and padding"
+
+    offences = self.class.tree_offences(TREE_INDENT) - TREE_RULES_NOT_YET.keys
+    assert_empty offences, "a tree file sets no indent of its own (ml-, pl-, padding-inline-start): the step is the .admin-tree block's"
+  end
+
+  test "the match's tint is the tree's own rule, with the title's ink" do
+    rule = single_rule(".admin-tree mark")
+    assert_match(/background:\s*var\(--cs-accent-tint\);/, rule)
+    assert_match(/(?<![\w-])color:\s*inherit;/, rule)
+    offences = self.class.tree_offences(TREE_TINT) - TREE_RULES_NOT_YET.keys
+    assert_empty offences, "a tree file draws no accent tint of its own: a match's is the .admin-tree block's"
+  end
+
+  test "a tree-rules exception that no longer breaks a rule fails" do
+    files = self.class.tree_files
+    stale = TREE_RULES_NOT_YET.keys.reject { |path| files.include?(path) && self.class.tree_offences(Regexp.union(TREE_INDENT, TREE_TINT), [ path ]).any? }
+    assert_empty stale, "these exceptions break neither tree rule any more: drop them from TREE_RULES_NOT_YET"
+  end
+
+  test "the tree patterns match an indent and a tint, and not a token, a margin of another side or a comment" do
+    [ "ml-2", "pl-[7px]", "hover:pl-1", "ms-2", "ps-1", "-ml-4", "-pl-1", "-ms-2", "md:-ps-1", "padding-inline-start: 4px", "margin-inline-start: 13px",
+      "margin-left: 4px", "padding-left: 2px", "button.style.paddingInlineStart = x", "el.style.marginInlineStart = x", "el.style.marginLeft = x",
+      "el.style.paddingLeft = x" ].each { |sample| assert_match TREE_INDENT, sample }
+    [ "html-", "mr-2", "pr-1", "me-2", "pe-1", "url-path", "items-center", "steps-2", "margin-inline-end: 8px", "padding-right: 2px",
+      "el.style.marginRight = x", "admin-tree-row__mark" ].each { |sample| assert_no_match TREE_INDENT, sample }
+    [ "bg-accent-tint", "aria-[current]:bg-accent-tint" ].each { |sample| assert_match TREE_TINT, sample }
+    [ "bg-accent", "text-accent-tint", "bg-accent-tint-strong" ].each { |sample| assert_no_match TREE_TINT, sample }
+    Dir.mktmpdir do |dir|
+      { "a.html.erb" => "<%# ml-2 %>\n<li>", "b.rb" => "# pl-2\nx = 1 # ml-1\n", "c.js" => "// pl-2\n/* ml-2 */ const a = \"https://x\"" }.each do |name, text|
+        path = File.join(dir, name)
+        File.write(path, text)
+        assert_no_match TREE_INDENT, self.class.without_comments(path), name
+      end
+    end
+  end
+
+  # One ring, on the focused element: a row never draws an outline from a
+  # focus inside it, which would stand beside the control's own.
+  test "no tree row draws an outline from :has(:focus-visible)" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    from_inside = rules.select { |selectors, body| body.match?(/(?<![\w-])outline(?:-[\w-]+)?:/) && selectors.any? { |selector| selector.match?(/:has\([^)]*:focus/) && selector.include?("admin-tree") } }
+    assert_empty from_inside.map(&:first), "a tree row draws no outline for a focus inside it"
+    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible' ])
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, ring)
+    assert_match(/outline-offset:\s*-2px;/, ring)
+    assert_empty rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
+      "no tree rule takes a focused element's ring away"
+  end
+
+  # The selected row is a place, not a row being worked on: at rest it shows
+  # its markers and count, never its handle or "+", which show on any row
+  # by hover, focus within and a coarse pointer alone.
+  test "no tree rule reveals the handle or the + from the selected row" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    parts = Admin::Ui::TreeItemComponent::CLASSES.values_at(:handle, :add)
+    selected = Admin::Ui::TreeItemComponent::CLASSES[:row_selected]
+    revealing = rules.select do |selectors, body|
+      selectors.any? { |selector| selector.include?(selected) && (parts.any? { |part| selector.include?(part) } || body.match?(/(?<![\w-])opacity:/)) }
+    end
+    assert_empty revealing.map(&:first), "the selection reveals the handle or the +"
+    shown = rules.select { |selectors, body| body.match?(/opacity:\s*1;/) && selectors.any? { |selector| parts.all? { |part| selector.include?(part) } } }
+    assert_equal 2, shown.size, "the handle and the + are shown by hover and focus within, and by a coarse pointer"
+    assert shown.flat_map(&:first).none? { |selector| selector.include?(selected) }
+  end
+
+  test "the tree's rules are one block" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    tree = /\.admin-tree(?:-row|-node__handle|__children|(?![\w-]))/
+    indices = rules.each_index.select { |index| rules[index].first.any? { |selector| selector.match?(tree) } }
+    assert_operator indices.size, :>=, 10, "the .admin-tree block was not found"
+    assert_equal (indices.first..indices.last).to_a, indices, "every rule of the tree stands in the one .admin-tree block, with no other rule between"
+    assert_equal 1, rules.count { |selectors, _| selectors == [ ".admin-tree-row--selected" ] }, ".admin-tree-row--selected is defined once"
   end
 end

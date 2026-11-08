@@ -5,8 +5,13 @@ import { orderErrorToast, sendOrder } from "saving/order_request"
 import { TAB_HEADER } from "editing/requests"
 import { TAB } from "live/connection"
 import { loadSortable } from "editor/drag"
+import { messages } from "i18n/messages"
+import { idOf, isFolded, openPathIn, setFolded, setOpen } from "tree/open_set"
 
-// Drives the page tree column (cs-studio spec §4.2). Every page's own
+// How long a dragged row rests on a folded parent before the parent opens.
+const OPEN_ON_HOVER_MS = 600
+
+// Drives the page tree column. Every page's own
 // children <ul> is a `list` target (Admin::PagesScreen::TreeNodeComponent); they all
 // share one `group`, so a node can be dropped under any other page in the
 // tree, not just reordered among its current siblings -- a nested-list
@@ -34,13 +39,18 @@ import { loadSortable } from "editor/drag"
 // sends no base and writes none: the form's base stays valid in the mover's
 // tab and in a colleague's alike.
 //
+// A MOVED PAGE'S NEW PARENT IS OPEN in the open set before the move is sent
+// (`save`): the move's answer redraws the tree, and the redraw folds by the
+// open set (`admin--tree--disclosure` on connect), so without it a page
+// dropped into a folded or childless parent would vanish into the fold.
+//
 // No generation is handed to `enqueue`: the tree column sits outside
 // `#content` and outlives a frame navigation, so "the page showing as the
 // move is queued" is the page the move belongs to.
 export default class extends Controller {
   static targets = ["list", "announcer", "row"]
   static values = { moveUrl: String }
-  static classes = ["selected", "selectedTitle", "markerAtRest"]
+  static classes = ["selected", "markerAtRest", "dropTarget"]
 
   connect() {
     this.holdUndo = (event) => {
@@ -52,6 +62,10 @@ export default class extends Controller {
       holdTurboRequest(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.holdUndo)
+    this.settleHover = () => this.endHover()
+    document.addEventListener("turbo:before-cache", this.settleHover)
+    this.narrowed = false
+    this.arrive()
     this.element.dataset.sortable = "pending"
     const token = this.loadToken = {}
     loadSortable().then((Sortable) => {
@@ -65,8 +79,8 @@ export default class extends Controller {
           // Only the ⠿ handle starts a drag -- the row's own title stays a
           // normal, clickable link.
           handle: ".admin-tree-node__handle",
-          // The drag look (handoff §9 A9): a dashed placeholder where the row
-          // would land, and the lifted row itself with a shadow.
+          // The drag look: a dashed placeholder where the row would land, and
+          // the lifted row itself with a shadow.
           ghostClass: "admin-drag-ghost",
           chosenClass: "admin-drag-chosen",
           // SortableJS's own pointer-driven drag instead of native HTML5
@@ -83,7 +97,13 @@ export default class extends Controller {
           fallbackOnBody: true,
           fallbackClass: "admin-drag-fallback",
           fallbackTolerance: 3,
-          onEnd: (event) => this.onDrop(event)
+          onStart: (event) => this.startHover(event.item),
+          onMove: (event, pointer) => this.hoverOver(event.related, pointer),
+          onEnd: (event) => {
+            this.endHover()
+            this.onDrop(event)
+          },
+          disabled: this.narrowed
         })
       )
       this.element.dataset.sortable = "ready"
@@ -93,6 +113,8 @@ export default class extends Controller {
   disconnect() {
     this.loadToken = null
     document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
+    document.removeEventListener("turbo:before-cache", this.settleHover)
+    this.endHover()
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = null
     delete this.element.dataset.sortable
@@ -133,7 +155,15 @@ export default class extends Controller {
   //   where it was dropped, a place it was never saved to. It is put back
   //   at `origin` (`{ list, next }`: where it stood before the move) and an
   //   error toast says why.
+  //
+  // Before anything is sent, the list's parent is written open in the open
+  // set (see the class comment): a hover-opened parent, a page the drop made
+  // a parent and a sibling a keyboard move nested into alike. A move that is
+  // refused leaves that open stored, which is harmless: the open set is
+  // bounded, and an open of a page with no children means only "open once
+  // it has some".
   async save(item, list, index, origin = null) {
+    this.storeOpen(list.closest("[data-tree-node]"))
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
     const pageId = item.dataset.pageId
     const body = JSON.stringify({ page_id: pageId, parent_id: list.dataset.parentId, position: index })
@@ -167,6 +197,155 @@ export default class extends Controller {
     }).catch(() => {})
   }
 
+  // ---- A folded parent under a dragged row ---------------------------------
+  //
+  // THE POINTER RESTS ON A FOLDED PARENT'S ROW for `OPEN_ON_HOVER_MS`, and
+  // the parent opens: drawn, stored open as a person's open (`unfold`), and
+  // marked the drop target while the pointer is inside it, so its children
+  // take the drop.
+  //
+  // SortableJS moves the slot past a row as soon as the pointer enters it,
+  // which would move a folded row out from under the pointer before it
+  // could rest there. So `onMove` (`hoverOver`) refuses the move (`false`)
+  // while the pointer is in the middle half of a folded row, where the
+  // timer starts, and in the quarter on the slot's side, which the pointer
+  // crosses to reach the middle; only the far quarter lets the slot pass
+  // it. A slot resting beside a folded parent therefore never opens it.
+  //
+  // The node is the one `related` stands in (a row's `<li>`, or the empty
+  // list of a leaf, whose node is the leaf), and any other node cancels the
+  // timer. The pointer is followed for the whole drag (`followPointer`),
+  // since SortableJS calls `onMove` only where it would move the slot:
+  // leaving the parent's row cancels the timer, leaving an opened parent
+  // takes its mark away, and coming back over a parent this drag opened
+  // marks it again. Boxes are judged by their height inside the tree's
+  // width, never by what is hit under the pointer: the handle a drag holds
+  // stands in the gutter, outside its row's box.
+  //
+  // The timer and the mark go on drag end (the drop), Escape,
+  // `turbo:before-cache` and disconnect (`endHover`), so neither outlives a
+  // drag nor is kept in Turbo's snapshot. Escape ends opening on hover for
+  // the rest of that drag (the drag itself goes on: SortableJS has no
+  // Escape). What an open writes (the fold's drawing and the open set) is
+  // the open set's own, which stays.
+  startHover(item) {
+    this.endHover()
+    this.dragged = item
+    this.openedThisDrag = []
+    this.pointerFollower = (event) => this.followPointer(event)
+    this.escapeFollower = (event) => { if (event.key === "Escape") this.endHover() }
+    document.addEventListener("pointermove", this.pointerFollower)
+    document.addEventListener("keydown", this.escapeFollower)
+  }
+
+  // SortableJS's `onMove`: `false` keeps the slot where it is.
+  hoverOver(related, pointer) {
+    if (!this.pointerFollower) return undefined
+    const node = related?.closest?.("[data-tree-node]") ?? null
+    if (node !== this.hovered) this.cancelHover()
+    if (!node || !isFolded(node) || !this.dropListOf(node)) return undefined
+
+    const box = node.querySelector(":scope > [data-tree-row]")?.getBoundingClientRect()
+    if (!box?.height || pointer?.clientY == null) return undefined
+    const at = (pointer.clientY - box.top) / box.height
+    if (at < 0 || at > 1) return undefined
+
+    const slotAbove = !!(this.dragged && (this.dragged.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING))
+    const middle = at >= 0.25 && at <= 0.75
+    const slotSide = slotAbove ? at < 0.25 : at > 0.75
+    if (!middle && !slotSide) {
+      // The slot passes the row, which moves from under the pointer.
+      this.cancelHover()
+      return undefined
+    }
+    if (middle && !this.hovered) {
+      this.hovered = node
+      this.hoverTimer = setTimeout(() => this.openUnder(node), OPEN_ON_HOVER_MS)
+    }
+    return false
+  }
+
+  followPointer(event) {
+    const tree = this.element.querySelector(".admin-tree")?.getBoundingClientRect()
+    const inTree = !!tree && event.clientX >= tree.left && event.clientX <= tree.right
+    const at = (element) => {
+      const box = element?.getBoundingClientRect()
+      return inTree && !!box && event.clientY >= box.top && event.clientY <= box.bottom
+    }
+    if (this.hovered && !at(this.hovered.querySelector(":scope > [data-tree-row]"))) this.cancelHover()
+    if (this.dropTarget && !at(this.dropTarget)) this.unmarkDropTarget()
+    if (!this.dropTarget) {
+      // The innermost parent this drag opened that the pointer is back in.
+      const back = this.openedThisDrag.filter((node) => node.isConnected && !isFolded(node) && at(node))
+        .sort((a, b) => a.getBoundingClientRect().height - b.getBoundingClientRect().height)[0]
+      if (back) this.markDropTarget(back)
+    }
+  }
+
+  openUnder(node) {
+    this.hoverTimer = null
+    this.hovered = null
+    if (!node.isConnected || !isFolded(node)) return
+
+    this.unfold(node)
+    this.openedThisDrag?.push(node)
+    this.markDropTarget(node)
+  }
+
+  markDropTarget(node) {
+    this.unmarkDropTarget()
+    this.dropTarget = node
+    this.dropTargetClasses.forEach((name) => node.classList.add(name))
+  }
+
+  cancelHover() {
+    clearTimeout(this.hoverTimer)
+    this.hoverTimer = null
+    this.hovered = null
+  }
+
+  unmarkDropTarget() {
+    this.dropTarget?.classList.remove(...this.dropTargetClasses)
+    this.dropTarget = null
+  }
+
+  endHover() {
+    this.cancelHover()
+    this.unmarkDropTarget()
+    this.dragged = null
+    this.openedThisDrag = []
+    if (!this.pointerFollower) return
+    document.removeEventListener("pointermove", this.pointerFollower)
+    document.removeEventListener("keydown", this.escapeFollower)
+    this.pointerFollower = null
+    this.escapeFollower = null
+  }
+
+  // Opens a folded `node` as a person's open: drawn, stored, and told to the
+  // tree's other scripts.
+  unfold(node) {
+    setFolded(node, false)
+    this.storeOpen(node)
+    node.closest(".admin-tree")?.dispatchEvent(new CustomEvent("tree:changed", { bubbles: true }))
+  }
+
+  // The node's own children list, when it takes a drop.
+  dropListOf(node) {
+    return node.querySelector(":scope > ul[data-admin--pages--tree-target='list']")
+  }
+
+  // Writes `node`'s branch open in the open set, against its default: the
+  // root and the open page's ancestors are open by default
+  // (`tree/open_set.js`).
+  storeOpen(node) {
+    const tree = node?.closest(".admin-tree")
+    const id = node && idOf(node)
+    if (!tree || !id) return
+
+    const openByDefault = node.hasAttribute("data-tree-root") || node.hasAttribute("data-tree-on-path")
+    setOpen(tree, id, true, { openByDefault })
+  }
+
   // Puts a row whose move was not saved back where it stood. Not when the
   // tree has been redrawn since the drop (an earlier move's answer replaces
   // the whole frame, this row's element with it): what is on screen then is
@@ -178,7 +357,36 @@ export default class extends Controller {
     origin.list.insertBefore(item, origin.next)
   }
 
-  // ---- Keyboard path (handoff §9 A9) -------------------------------------
+  // ---- While a find narrows the tree ---------------------------------------
+  //
+  // A NARROWED TREE DOES NOT MOVE: a drop among hidden siblings would land
+  // at a place the person cannot see. While the find field narrows it
+  // (`tree-find:filtered`, from `admin--tree--find` on the tree), every
+  // Sortable is disabled (one made while it is, too), a pick-up is refused
+  // (`key`), and the tree carries `data-filtered`, under which the block
+  // draws no handle, so none is in the Tab order either. "+" stays. When
+  // the find gives the tree back (`tree-find:cleared`) all of it comes back,
+  // and the selected row, which the narrowing may have moved, is scrolled
+  // into the column again. The find takes its narrowing back before Turbo's
+  // snapshot, and with it `data-filtered`.
+  filtered(event) {
+    if (event.target !== this.element.querySelector(".admin-tree")) return
+    this.setFiltered(event.target, true)
+  }
+
+  unfiltered(event) {
+    if (event.target !== this.element.querySelector(".admin-tree")) return
+    this.setFiltered(event.target, false)
+    this.scrollToRow(this.openPageId())
+  }
+
+  setFiltered(tree, filtered) {
+    this.narrowed = filtered
+    tree.toggleAttribute("data-filtered", filtered)
+    this.sortables?.forEach((sortable) => sortable.option("disabled", filtered))
+  }
+
+  // ---- Keyboard path ------------------------------------------------------
   //
   // Space on a row's handle picks the row up; ArrowUp/ArrowDown move it among
   // its siblings, ArrowRight nests it under the sibling above, ArrowLeft moves
@@ -199,7 +407,7 @@ export default class extends Controller {
   // that isn't real.
   key(event) {
     const row = event.currentTarget.closest("li[data-page-id]")
-    if (!row) return
+    if (!row || this.narrowed) return
 
     if (event.key === " ") {
       event.preventDefault()
@@ -229,7 +437,7 @@ export default class extends Controller {
     this.origin = { list: row.parentElement, next: row.nextElementSibling }
     row.dataset.picked = "true"
     row.classList.add("admin-drag-chosen")
-    this.announce(`Picked up ${this.titleOf(row)}. ${this.positionOf(row)}`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.picked_up", { title: this.titleOf(row), position: this.positionOf(row) }))
   }
 
   step(row, direction) {
@@ -241,12 +449,19 @@ export default class extends Controller {
 
   nest(row) {
     // Under the sibling above: the last child of its own list, if that list
-    // is a real drop target.
+    // is a real drop target. A folded sibling is opened first, and stored
+    // open, as a drag resting on it opens it: a row moved into a hidden list
+    // would lose the focus, and with it the pick-up.
     const above = row.previousElementSibling
-    const list = above?.querySelector(":scope > ul[data-admin--pages--tree-target='list']")
+    const list = above && this.dropListOf(above)
     if (!list) return
+    const opened = isFolded(above)
+    if (opened) this.unfold(above)
     list.append(row)
-    this.moved(row)
+    if (!opened) return this.moved(row)
+
+    this.focusHandle(row)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.opened", { title: this.titleOf(above), position: this.positionOf(row) }))
   }
 
   outdent(row) {
@@ -272,13 +487,13 @@ export default class extends Controller {
     const list = row.parentElement
     const index = Array.from(list.children).indexOf(row)
     const id = row.dataset.pageId
-    this.announce(`Dropped ${this.titleOf(row)}. ${this.positionOf(row)}`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.dropped", { title: this.titleOf(row), position: this.positionOf(row) }))
     await this.save(row, list, index, origin)
     // The answer replaces the whole tree (this controller's own element with
     // it), so the row the editor was on is a new element: give focus back to
     // its handle so the keyboard user isn't dropped at the top of the page.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
+    document.querySelector(`li[data-page-id='${id}'] > [data-tree-row] .admin-tree-node__handle`)?.focus()
   }
 
   // ---- The selected row -------------------------------------------------
@@ -295,14 +510,22 @@ export default class extends Controller {
   // keeps what this marked, which is right for the URL it is kept under,
   // and a restored one is marked again as its rows connect.
   //
-  // The marks are the server's own classes, handed over as Stimulus classes
-  // (`TreeRowComponent::SELECTED_CLASS`, `SELECTED_TITLE_CLASS`,
-  // `MARKER_AT_REST`): the row's ground and bar, the title's weight with
-  // `aria-current="page"`, and the translation markers shown rather than at
-  // rest. Only rows that can be selected are `row` targets (a context-only
-  // row never is).
+  // The marks are the shared row's own classes, handed over as Stimulus
+  // classes (`TreeItemComponent::CLASSES[:row_selected]` and `[:reveal]`):
+  // the row's selection (its ground, its bar and its title's weight), the
+  // title's `aria-current="page"`, and the translation markers shown rather
+  // than at rest. Only rows that can be selected are `row` targets (a
+  // context-only row never is).
+  //
+  // A row redrawn alone (a save's answer) stands under a node whose fold the
+  // person may have changed since the server drew the row: its disclosure is
+  // drawn again from the node. Every row that connects is told to the tree's
+  // other scripts (`tree:changed` on the tree).
   rowTargetConnected(row) {
     this.mark(row, row.dataset.pageId === this.openPageId())
+    const node = row.closest("[data-tree-node]")
+    if (node) setFolded(node, isFolded(node))
+    row.closest(".admin-tree")?.dispatchEvent(new CustomEvent("tree:changed", { bubbles: true }))
   }
 
   follow(event) {
@@ -310,6 +533,39 @@ export default class extends Controller {
 
     const open = this.openPageId()
     this.rowTargets.forEach((row) => this.mark(row, row.dataset.pageId === open))
+    this.arrive()
+  }
+
+  // ARRIVING AT A PAGE (a full load, a restored snapshot, a redrawn tree, a
+  // page opened from the tree) opens the path to it, forgetting the folds on
+  // that path (`openPathIn`), so the selected row is never inside a folded
+  // branch, and scrolls the selected row into view inside the column.
+  arrive() {
+    const tree = this.element.querySelector(".admin-tree")
+    if (!tree) return
+
+    const open = this.openPageId()
+    openPathIn(tree, open)
+    this.scrollToRow(open)
+  }
+
+  // Inside the tree's column only (`#tree-column`'s `scrollTop`, at once,
+  // never smoothly), and only when the row is out of its view, which it then
+  // stands inside with one row's height to spare; never the window, so the
+  // editor beside it stays where it is. A column that is not a scroller does
+  // not move.
+  scrollToRow(id) {
+    const column = document.getElementById("tree-column")
+    const row = id == null ? null : this.element.querySelector(`#tree-row-${CSS.escape(id)}`)
+    if (!column || !row) return
+
+    const box = column.getBoundingClientRect()
+    const rowBox = row.getBoundingClientRect()
+    if (rowBox.top >= box.top && rowBox.bottom <= box.bottom) return
+
+    const spare = rowBox.height
+    if (rowBox.top < box.top) column.scrollTop -= box.top - rowBox.top + spare
+    else column.scrollTop += rowBox.bottom - box.bottom + spare
   }
 
   openPageId() {
@@ -319,11 +575,8 @@ export default class extends Controller {
   mark(row, selected) {
     this.selectedClasses.forEach((name) => row.classList.toggle(name, selected))
     const title = row.querySelector(`#tree-link-${row.dataset.pageId}`)
-    if (title) {
-      this.selectedTitleClasses.forEach((name) => title.classList.toggle(name, selected))
-      if (selected) title.setAttribute("aria-current", "page")
-      else title.removeAttribute("aria-current")
-    }
+    if (selected) title?.setAttribute("aria-current", "page")
+    else title?.removeAttribute("aria-current")
     row.querySelectorAll("[data-translation-marker]").forEach((marker) => {
       this.markerAtRestClasses.forEach((name) => marker.classList.toggle(name, !selected))
     })
@@ -345,7 +598,7 @@ export default class extends Controller {
     this.origin.list.insertBefore(row, this.origin.next)
     this.clearPicked(row)
     if (refocus) this.focusHandle(row)
-    this.announce(`Cancelled. ${this.titleOf(row)} is back where it was.`)
+    this.announce(messages(this.element).t("components.pages_screen.tree.moves.cancelled", { title: this.titleOf(row) }))
   }
 
   clearPicked(row) {
@@ -355,17 +608,21 @@ export default class extends Controller {
     this.origin = null
   }
 
+  // A row's parts are found from its `<li>` through the shared row's own
+  // hook (`[data-tree-row]`), never by the markup's shape.
   focusHandle(row) {
-    row.querySelector(":scope > div .admin-tree-node__handle")?.focus()
+    row.querySelector(":scope > [data-tree-row] .admin-tree-node__handle")?.focus()
   }
 
+  // The whole title the server drew the row with (`data-tree-title`).
   titleOf(row) {
-    return row.querySelector(":scope > div a")?.textContent.trim() || "page"
+    return row.querySelector(":scope > [data-tree-row]")?.dataset.treeTitle?.trim() ||
+      messages(this.element).t("components.pages_screen.tree_row.untitled")
   }
 
   positionOf(row) {
     const siblings = row.parentElement.children
-    return `Position ${Array.from(siblings).indexOf(row) + 1} of ${siblings.length}.`
+    return messages(this.element).t("components.pages_screen.tree.moves.position", { position: Array.from(siblings).indexOf(row) + 1, count: siblings.length })
   }
 
   announce(message) {

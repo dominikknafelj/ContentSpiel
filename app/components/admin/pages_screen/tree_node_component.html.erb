@@ -1,15 +1,17 @@
-<li data-page-id="<%= page.id %>" data-parent-id="<%= page.parent_id %>" class="admin-tree-node"<%= " data-context-only" if context_only? %>>
-  <%= render Admin::PagesScreen::TreeRowComponent.new(page: page, child_count: child_count, translation_counts: translation_counts.fetch(page.id, {}), loaded: loaded, selected: selected, locale: locale, url_options: url_options, context_only: context_only?, parent_context_only: context_only_ids.include?(page.parent_id)) %>
+<li data-page-id="<%= page.id %>" data-parent-id="<%= page.parent_id %>" class="admin-tree-node" data-tree-node<%= " data-context-only" if context_only? %><%= " data-folded" if folded? %><%= " data-tree-root" if root? %><%= " data-tree-on-path" if on_path? %>>
+  <%= render Admin::PagesScreen::TreeRowComponent.new(page: page, child_count: child_count, translation_counts: translation_counts.fetch(page.id, {}), loaded: loaded, selected: selected, locale: locale, url_options: url_options, context_only: context_only?, parent_context_only: context_only_ids.include?(page.parent_id), public_path: paths[page.id], folded: folded?) %>
 
   <%# Always rendered, even with no children -- every node's children list is
       a real SortableJS drop target (`data-admin--pages--tree-target="list"`), so a
       currently-childless page can still receive a dropped page. Except under
-      a context-only page (see the component's comment). %>
-  <%# 16px of indent a level (T2): 8px to the guide line, the 1px line, 7px
-      to the row. A row's handle stands in exactly that gutter. %>
-  <ul <%= tag.attributes("data-admin--pages--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-2 flex flex-col gap-0.5 border-l border-line pl-[7px]">
+      a context-only page (see the component's comment). One level is the
+      tree's step (`.admin-tree__children`), and a row's handle stands in its
+      gutter. Its id is the one the row's disclosure names, and a folded
+      branch's list is `hidden`. %>
+  <%= tag.ul id: Admin::PagesScreen::TreeRowComponent.children_list_id(page), class: Admin::Ui::TreeItemComponent::CLASSES[:children], hidden: folded?,
+        data: { tree_children: true, parent_id: page.id, "admin--pages--tree-target": ("list" if drop_target?) } do %>
     <% children.each do |child| %>
-      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, selected: selected, locale: locale, url_options: url_options) %>
+      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options, open_set: open_set, path_ids: path_ids) %>
     <% end %>
-  </ul>
+  <% end %>
 </li>

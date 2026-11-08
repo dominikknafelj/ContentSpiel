@@ -4,6 +4,8 @@ require "test_helper"
 # must cost the same handful of queries however many pages (and blocks) it
 # shows; its markers are one read of the stored `translation_states`.
 class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
+  ROW = Admin::Ui::TreeItemComponent::CLASSES
+
   setup { Current.actor = users(:one) }
 
   def paragraph(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
@@ -73,9 +75,9 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_equal small, large, "the tree ran a notes query per page"
   end
 
-  # Both features that mark a row, each read once for the whole tree
-  # (presence plan, Review Focus 5): notes' pill and presence's marker, with
-  # a note and two people on every page.
+  # Both features that mark a row, each read once for the whole tree:
+  # notes' pill and presence's marker, with a note and two people on every
+  # page.
   test "the tree with notes and people on every page costs the same queries for 3 pages as for 30, and marks each row with both" do
     mark_all = lambda do |pages|
       as(users(:two)) { pages.each { |page| Notes::Start.call(page, body: "A note") } }
@@ -94,8 +96,8 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_equal small, large, "the tree ran a query per page"
   end
 
-  # Presence handoff 10: the marker is the last of the row's markers, after
-  # the notes pill, in the row's own 6px gap; every readable row has its
+  # Presence's marker is the last of the row's markers, after the notes
+  # pill, among the row's trailing parts; every readable row has its
   # element, hidden where nobody is, and a context-only row has none.
   test "each readable row ends its markers with presence's, shown where someone else is here, and the tree is the list its script reads" do
     busy, quiet = add_pages(2, "Row")
@@ -108,16 +110,16 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "turbo-frame#tree[data-controller='admin--pages--tree admin--presence--list'][data-live-part=waiting]" \
                     "[data-admin--presence--list-kind-value=page][data-admin--presence--list-url-value='/cs-studio/presence/here?kind=page']"
     row = "li[data-page-id='#{busy.id}'] > div"
-    assert_selector "#{row}.flex.items-center.gap-1\\.5 > [data-notes-marker] + [data-presence-marker='page-#{busy.id}']:not([hidden])"
-    assert_selector "#{row} > [data-presence-marker] > [data-presence-marker-label][data-presence-lead='']", text: "#{PersonName.of(users(:two))} is here", exact_text: true
+    assert_selector "#{row}.#{ROW[:row]} > .#{ROW[:trailing]} > [data-notes-marker] + [data-presence-marker='page-#{busy.id}']:not([hidden])"
+    assert_selector "#{row} [data-presence-marker] > [data-presence-marker-label][data-presence-lead='']", text: "#{PersonName.of(users(:two))} is here", exact_text: true
     # Beside the title's link, never inside it.
     assert_no_selector "#{row} a [data-presence-marker]", visible: :all
-    assert_selector "li[data-page-id='#{quiet.id}'] > div > [data-presence-marker='page-#{quiet.id}'][hidden]", visible: :all
+    assert_selector "li[data-page-id='#{quiet.id}'] > div [data-presence-marker='page-#{quiet.id}'][hidden]", visible: :all
     assert_selector "[data-presence-marker]", count: Page.kept.count, visible: :all
   end
 
-  # Handoff §10 B24: "↻N" outdated and "○N" missing, summed over the target
-  # languages, no box, no "!", the tooltip naming the languages.
+  # "↻N" outdated and "○N" missing, summed over the target languages, no
+  # box, no "!", the tooltip naming the languages.
   test "a row shows outdated and missing counts summed over the languages, with labels and a tooltip" do
     with_locales(%w[en de es], default: "en") do
       row = create_page(title: "Counted", translations: { "en" => { title: "Counted", subtitle: "Sub" }, "de" => { title: "Gezählt", subtitle: "Unter" } })
@@ -151,6 +153,60 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "a[href='/cs-studio/pages/new']", text: "+ New page"
   end
 
+  test "the head, the drag help and the empty line are keys" do
+    assert_equal "Pages", I18n.t("admin.components.pages_screen.tree.heading") # the files are loaded, so what is stored stays
+    I18n.backend.store_translations(:en, admin: { components: { pages_screen: { tree: {
+      heading: "Seiten", new_page: "+ Neue Seite", more_actions: "Weitere Aktionen", starter_pages: "Startseiten anlegen",
+      drag_help: "Leertaste zum Aufnehmen", empty: "Noch keine Seiten."
+    } } } })
+
+    render_tree
+    assert_selector "h2", text: "Seiten", exact_text: true
+    assert_selector "a[href='/cs-studio/pages/new']", text: "+ Neue Seite", exact_text: true
+    assert_selector "button[aria-label='Weitere Aktionen']"
+    assert_selector "[role=menu] button", text: "Startseiten anlegen", visible: :all
+    assert_selector "#tree-drag-help", text: "Leertaste zum Aufnehmen", exact_text: true, visible: :all
+
+    render_inline(Admin::PagesScreen::TreeComponent.new(root: nil, locale: "en"))
+    assert_text "Noch keine Seiten."
+  ensure
+    I18n.reload!
+  end
+
+  # `admin--pages--tree` announces a keyboard move in these words, read from
+  # the frame (`i18n/messages.js`), and names a row without a title by the
+  # row's own fallback.
+  test "the frame hands the script its move words" do
+    render_tree
+
+    words = JSON.parse(page.find("turbo-frame#tree")["data-messages"])
+    %w[picked_up dropped position cancelled].each do |key|
+      assert_equal I18n.t("admin.components.pages_screen.tree.moves.#{key}"), words.fetch("components.pages_screen.tree.moves.#{key}"), key
+    end
+    assert_equal "(untitled)", words.fetch("components.pages_screen.tree_row.untitled")
+    assert_includes words.fetch("components.pages_screen.tree.moves.picked_up"), "%{title}"
+    assert_no_selector "turbo-frame#tree[data-admin--pages--tree-selected-title-class]"
+  end
+
+  # A find matches a row by its title or, from "/", by its address in the
+  # editing language; both are on the row, with the page's bare id. A
+  # context-only row is matched by its title alone.
+  test "each row carries its title and its address for find" do
+    with_locales(%w[en de], default: "en") do
+      about = create_page(title: "About", translations: { "de" => { title: "Über uns" } })
+      team = create_page(title: "Team", parent: about)
+
+      render_tree
+      assert_selector "#tree-row-#{root_page.id}[data-tree-row][data-tree-title='#{root_page.title}'][data-tree-path='/'][data-tree-id='#{root_page.id}']"
+      assert_selector "#tree-row-#{about.id}[data-tree-title='About'][data-tree-path='/about'][data-tree-id='#{about.id}']"
+      assert_selector "#tree-row-#{team.id}[data-tree-title='Team'][data-tree-path='/about/team']", visible: :all
+      assert_selector "ul#tree-list.#{ROW[:tree]} > li[data-tree-node][data-page-id='#{root_page.id}']"
+
+      render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, locale: "de"))
+      assert_selector "#tree-row-#{about.id}[data-tree-title='Über uns'][data-tree-path='#{PublicSite::Paths.current_path(about, "de")}']"
+    end
+  end
+
   test "the header's New page and each row's + open the New page dialog, the row presetting Inside" do
     about = create_page(title: "About")
     render_tree
@@ -181,9 +237,8 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
-  # Contrast and buttons spec (C2, Rulings 8 and 9): a mark after the title
-  # only when a page is not simply live, named for a screen reader in the
-  # status chip's and the unpublished chip's own words.
+  # A mark after the title only when a page is not simply live, named for a
+  # screen reader in the status chip's and the unpublished chip's own words.
   test "a draft is a hollow meta ring, a scheduled page a warn dot, a live page with changes a dim dot, and a live page nothing" do
     draft = create_page(title: "Draft one", published: false)
     soon = create_page(title: "Soon")
@@ -194,11 +249,12 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
 
     render_tree
 
-    assert_selector "li[data-page-id='#{draft.id}'] > div .admin-tree-mark[data-status=draft][role=img][aria-label='Draft'][title='Draft'][class~='border-meta'][class~='border-[1.5px]'][class~='size-1.5']"
+    assert_selector "li[data-page-id='#{draft.id}'] > div > .#{ROW[:state]} > .admin-tree-mark[data-status=draft][role=img][aria-label='Draft'][title='Draft'][class~='border-meta'][class~='border-[1.5px]'][class~='size-1.5']"
     assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[data-status=scheduled][aria-label='Scheduled'][class~='bg-warn']"
     assert_selector "li[data-page-id='#{soon.id}'] > div .admin-tree-mark[title^='Scheduled · ']"
     assert_selector "li[data-page-id='#{changed.id}'] > div .admin-tree-mark[data-unpublished-changes][aria-label='Unpublished changes'][class~='bg-dim']"
     assert_no_selector "li[data-page-id='#{plain.id}'] > div .admin-tree-mark"
+    assert_no_selector "li[data-page-id='#{plain.id}'] > div > .#{ROW[:state]}", visible: :all
     assert_no_selector ".admin-status-chip"
   end
 
@@ -222,19 +278,19 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_no_match(/shadow-/, row[:class])
   end
 
-  test "the selected row has the sunken ground, a semibold title and the accent bar's class" do
+  # The selection's ground, bar and title weight are the tree's selected
+  # rule (`.admin-tree-row--selected`): the row adds no utility for them.
+  test "the selected row is the tree's selected row, and its title link takes no weight of its own" do
     chosen = create_page(title: "Chosen")
     other = create_page(title: "Other")
     render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: chosen, locale: "en"))
 
-    assert_selector "li[data-page-id='#{chosen.id}'] > div.admin-tree-row--selected[class~='bg-sunken']"
-    assert_selector "li[data-page-id='#{chosen.id}'] > div a.font-semibold"
-    assert_no_selector "li[data-page-id='#{chosen.id}'] > div[class*='shadow-']"
-    assert_no_selector "li[data-page-id='#{other.id}'] > div[class~='bg-sunken']"
-    assert_no_selector "li[data-page-id='#{other.id}'] > div.admin-tree-row--selected"
+    assert_equal [ ROW[:row], ROW[:row_selected] ], page.find("li[data-page-id='#{chosen.id}'] > div")[:class].split
+    assert_selector "li[data-page-id='#{chosen.id}'] > div > .#{ROW[:title]} > a#tree-link-#{chosen.id}[aria-current=page]:not([class])"
+    assert_equal [ ROW[:row] ], page.find("li[data-page-id='#{other.id}'] > div")[:class].split
   end
 
-  HIDDEN_AT_REST = %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only].freeze
+  HIDDEN_AT_REST = [ ROW[:reveal] ].freeze
 
   test "a row's translation markers are hidden at rest but read, and shown on the selected row" do
     with_locales(%w[en de es], default: "en") do
@@ -313,51 +369,135 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "li[data-page-id='#{parent.id}'] > div [data-child-count]", text: "1"
   end
 
-  # Claude Design, 2026-10-13, T2: more of a title in a narrow column.
-  test "a level indents 16px: 8px to the guide line, the line, 7px to the row" do
+  # One level is `--cs-tree-step`, drawn by `.admin-tree__children` alone:
+  # a children list carries the tree's class and its hooks, never a margin
+  # or padding of its own, and the parent's disclosure names it.
+  test "a level is the tree's step: each children list is a data-tree-children list with no indent class of its own" do
     parent = create_page(title: "Parent")
     create_page(title: "Child", parent: parent)
     render_tree
 
-    lists = page.all("ul[data-parent-id]")
-    assert_operator lists.size, :>=, 2
+    lists = page.all("ul[data-parent-id]", visible: :all)
+    assert_operator lists.size, :>=, 3
     lists.each do |list|
-      classes = list[:class].split
-      assert_equal %w[border-l border-line ml-2 pl-[7px]], classes.grep(/\A(ml|pl|border)-/).sort, "a children list indents 8 + 1 + 7 and keeps its guide line"
+      assert_equal [ ROW[:children] ], list[:class].split, "a children list is the tree's step and nothing else"
+      assert_equal "tree-children-#{list["data-parent-id"]}", list[:id]
+      assert list["data-tree-children"], "a children list is the scripts' data-tree-children"
     end
+    disclosure = page.find("#tree-row-#{parent.id} > button.#{ROW[:disclosure]}")
+    assert_equal "tree-children-#{parent.id}", disclosure["aria-controls"]
+    assert_equal "admin--tree--disclosure#toggle", disclosure["data-action"]
+    assert_no_selector "li[data-page-id='#{parent.children.first.id}'] > div > button.#{ROW[:disclosure]}", visible: :all
   end
 
-  test "the drag handle stands in the row's gutter, 16px wide to its left, and is shown by opacity on hover and focus" do
+  def render_tree_with(selected: nil, open_cookie: nil)
+    render_inline(Admin::PagesScreen::TreeComponent.new(root: root_page.reload, selected: selected, locale: "en", open_cookie: open_cookie))
+  end
+
+  def folded?(page) = page_node(page).native.key?("data-folded")
+
+  def page_node(page) = self.page.find("li[data-page-id='#{page.id}']", visible: :all)
+
+  def disclosure_of(page) = self.page.find("#tree-row-#{page.id} > button.#{ROW[:disclosure]}", visible: :all)
+
+  # The default fold: the root's branch is open, so Home's children are
+  # shown, and each of their branches is folded, its children list
+  # `hidden` and its button saying so. A leaf is never folded.
+  test "Home is open and its children shown; every deeper branch is folded, with hidden children" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    create_page(title: "People", parent: team)
+    leaf = create_page(title: "Leaf")
+    render_tree_with
+
+    home = page_node(root_page)
+    assert home.native.key?("data-tree-root")
+    assert_not folded?(root_page)
+    assert_equal "true", disclosure_of(root_page)["aria-expanded"]
+    assert_selector "#tree-row-#{about.id}"
+    assert_selector "#tree-row-#{leaf.id}"
+
+    assert folded?(about)
+    assert_equal "false", disclosure_of(about)["aria-expanded"]
+    assert_equal "Unfold About", disclosure_of(about)["aria-label"]
+    assert page.find("ul#tree-children-#{about.id}", visible: :all).native.key?("hidden")
+    assert_no_selector "#tree-row-#{team.id}"
+    assert folded?(team), "a branch inside a folded one is folded too"
+    assert_not folded?(leaf), "a page without children is never folded"
+    assert_not page.find("ul#tree-children-#{leaf.id}", visible: :all).native.key?("hidden")
+    assert_no_selector "li[data-tree-on-path]", visible: :all
+  end
+
+  # The path to the selected page is drawn open whatever the cookie says,
+  # and each ancestor on it is marked for the scripts.
+  test "the open path to the selected page is drawn open, even under a folded ancestor" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    people = create_page(title: "People", parent: team)
+    render_tree_with(selected: people, open_cookie: "-#{about.id}.-#{root_page.id}")
+
+    [ root_page, about, team ].each do |ancestor|
+      assert page_node(ancestor).native.key?("data-tree-on-path"), "#{ancestor.title} is on the path"
+      assert_not folded?(ancestor), "#{ancestor.title} is drawn open"
+      assert_equal "true", disclosure_of(ancestor)["aria-expanded"]
+    end
+    assert_selector "#tree-row-#{people.id}.#{ROW[:row_selected]}"
+    assert_not page_node(people).native.key?("data-tree-on-path"), "the selected page is not its own ancestor"
+  end
+
+  test "the cookie's opens and folds are honoured, and junk in it is ignored" do
+    about = create_page(title: "About")
+    team = create_page(title: "Team", parent: about)
+    create_page(title: "People", parent: team)
+    render_tree_with(open_cookie: "#{about.id}.junk.-#{root_page.id}.999999.-")
+
+    assert folded?(root_page), "a fold folds the root"
+    assert_equal "false", disclosure_of(root_page)["aria-expanded"]
+    assert_not folded?(about), "an open opens a branch the default folds"
+    assert_equal "Fold About", disclosure_of(about)["aria-label"]
+    assert folded?(team)
+
+    render_tree_with(open_cookie: "x" * 5000)
+    assert_not folded?(root_page)
+    assert folded?(about)
+  end
+
+  test "the drag handle stands in the row's gutter by the tree's own classes, and rests transparent" do
     alpha = create_page(title: "Alpha")
     render_tree
 
-    row = page.find("li[data-page-id='#{alpha.id}'] > div")
-    assert_includes row[:class].split, "relative", "the handle is placed against its row"
-    handle = row.find("button.admin-tree-node__handle[aria-label='Move Alpha'][aria-describedby=tree-drag-help]")
-    classes = handle[:class].split
-    %w[absolute inset-y-0 -left-4 w-4 opacity-0 group-hover/node:opacity-100 focus:opacity-100 any-pointer-coarse:opacity-100].each do |token|
-      assert_includes classes, token
-    end
-    # Out of the row's flow: it takes none of the title's room.
-    assert_not_includes classes, "shrink-0"
+    handle = page.find("li[data-page-id='#{alpha.id}'] > div > button[aria-label='Move Alpha'][aria-describedby=tree-drag-help]")
+    assert_equal [ ROW[:handle] ], handle[:class].split
     # The homepage has no handle and no gutter to put one in.
-    assert_no_selector "li[data-page-id='#{root_page.id}'] > div .admin-tree-node__handle"
+    assert_no_selector "li[data-page-id='#{root_page.id}'] > div .#{ROW[:handle]}"
   end
 
-  test "the child count takes no room at rest: it is read by a screen reader and shown on hover and focus of its row" do
+  test "the subpage count is the tree's count, hidden at rest by the tree's rule and never removed" do
     parent = create_page(title: "Parent")
     create_page(title: "Child", parent: parent)
     render_tree
 
-    count = page.find("li[data-page-id='#{parent.id}'] > div [data-child-count][role=img][aria-label='1 subpage']")
-    classes = count[:class].split
-    %w[sr-only group-hover/node:not-sr-only group-focus-within/node:not-sr-only any-pointer-coarse:not-sr-only].each { |token| assert_includes classes, token }
+    count = page.find("li[data-page-id='#{parent.id}'] > div > .#{ROW[:trailing]} > [data-child-count][role=img][aria-label='1 subpage']", visible: :all)
+    assert_equal [ ROW[:count], ROW[:reveal] ], count[:class].split
+    assert_nil count[:hidden]
+    assert_nil count["aria-hidden"]
   end
 
   test "the full title is available as a tooltip when the row truncates" do
     leaf = create_page(title: "A rather long page title that the narrow tree column will cut off")
     render_tree
-    assert_selector "li[data-page-id='#{leaf.id}'] > div a[title='#{leaf.title}']"
+    assert_selector "li[data-page-id='#{leaf.id}'] > div > .#{ROW[:title]}[title='#{leaf.title}'] > a"
+  end
+
+  # "+" is the shared row's own part, last in the row: the Pages row names
+  # it and hands it the dialog's trigger, and gives it no class of its own.
+  test "a row's + is the tree's own part, named by the row, with no class of its own" do
+    about = create_page(title: "About")
+    render_tree
+
+    add = page.find("li[data-page-id='#{about.id}'] > div > a.#{ROW[:add]}:last-child[aria-label='Add a page under About']")
+    assert_equal [ ROW[:add] ], add[:class].split
+    assert_equal "new-page-dialog", add["data-admin--ui--dialog-id-param"]
   end
 
   test "a live page with unpublished changes carries the mark; a draft with a stale mark does not" do

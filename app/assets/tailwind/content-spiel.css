@@ -286,6 +286,15 @@
      lanes, a group's rows) take the column. */
   --cs-text-measure: 72ch;
   --cs-code-measure: 100ch;
+  /* A tree's row (`.admin-tree` in content-spiel.tailwind.css): its least
+     height, its disclosure's and its mark's widths, and one level's step,
+     which is the children list's 13px margin, its 1px guide and its 6px
+     padding (13 + 1 + 6, held by `admin_design_rules_test.rb`). Both trees,
+     Pages and the mind graph's list, read them; a screen sets none. */
+  --cs-tree-row: 28px;
+  --cs-tree-disclosure: 20px;
+  --cs-tree-mark: 16px;
+  --cs-tree-step: 20px;
   /* THE LAYERS: every z-index in CS Studio is one of these, written as
      `z-index: var(--cs-z-…)` or the utility `z-(--cs-z-…)`
      (`admin_design_rules_test.rb` refuses any other value; `auto` is no

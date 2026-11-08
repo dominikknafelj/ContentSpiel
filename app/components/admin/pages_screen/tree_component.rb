@@ -1,7 +1,7 @@
 module Admin
   module PagesScreen
-    # The page tree column (cs-studio spec §4.2): one `<turbo-frame id="tree">`
-    # wrapping the whole tree, rendered from `root` down through nested
+    # The page tree column: one `<turbo-frame id="tree">` wrapping the whole
+    # tree, rendered from `root` down through nested
     # `Admin::PagesScreen::TreeNodeComponent`s. Every controller that touches the tree
     # (`Admin::PagesController`, `Admin::TreeController`) renders this exact
     # same component -- on a normal page load via `content_for :tree`, and
@@ -20,22 +20,21 @@ module Admin
     # (`PageTree.rows`, `PageTree::COLUMNS`), so a page the viewer can't see
     # or one in the trash is never loaded at all.
     #
-    # Only the pages the actor may see are rendered (access-control design
-    # spec §3.3 "The page tree"): the readable ones, plus `context_only`
-    # ancestors -- pages they can't read that sit above one they can, shown
-    # greyed out, unlinked and without actions so the readable page still has
-    # its path to the root. Everything else is left out, titles and all. Each
-    # remaining row asks `can?` for its own actions (add a child, move), and
-    # `AccessControl.preload_branches` gives every listed page its branch up
-    # front, so those checks read no closure rows of their own: the whole
-    # tree costs the same handful of queries (the pages, the actor's grants,
-    # the readable ids and their ancestors, one branch preload) however many
-    # pages it shows.
+    # Only the pages the actor may see are rendered: the readable ones, plus
+    # `context_only` ancestors -- pages they can't read that sit above one
+    # they can, shown greyed out, unlinked and without actions so the
+    # readable page still has its path to the root. Everything else is left
+    # out, titles and all. Each remaining row asks `can?` for its own actions
+    # (add a child, move), and `AccessControl.preload_branches` gives every
+    # listed page its branch up front, so those checks read no closure rows
+    # of their own: the whole tree costs the same handful of queries (the
+    # pages, the actor's grants, the readable ids and their ancestors, one
+    # branch preload) however many pages it shows.
     #
     # Each readable row's outdated and missing translated fields per target
-    # language (handoff §10 B24: "↻N" and "○N", summed over the languages, the
-    # tooltip naming them) are worked out here too, once for the whole tree,
-    # and handed down like `children_by_parent`. They go through
+    # language ("↻N" and "○N", summed over the languages, the tooltip naming
+    # them) are worked out here too, once for the whole tree, and handed down
+    # like `children_by_parent`. They go through
     # `Translations::StateIndex.counts_for`, the stored `translation_states`
     # rows -- one query for the whole tree, however many pages it shows, and
     # nothing recomputed after an autosave (the save service already
@@ -49,27 +48,41 @@ module Admin
     # here once for the whole tree, for the readable rows -- `Admin::Slots.load`
     # calls each entry's loader once with all of them, and the result is handed
     # down like `children_by_parent`. A context-only row draws no markers, so
-    # none is loaded for it (`tree_visibility` lists kept pages only).
+    # none is loaded for it (`tree_visibility` lists kept pages only). So are
+    # the readable rows' addresses in the editing language (`PageTree.paths`,
+    # one statement), which a context-only row is not given either.
     #
-    # The header (handoff §10 C34) holds "Pages", "+ New page" where the actor
-    # may create under Home, and a "⋯" menu with "Create starter pages" while
-    # Home is the only kept page -- design spec §6.1: offered only when
-    # `StarterContents::Add` would get past its own permission checks, so the
-    # button and the refusal can't disagree.
+    # The header holds "Pages", "+ New page" where the actor may create under
+    # Home, and a "⋯" menu with "Create starter pages" while Home is the only
+    # kept page: offered only when `StarterContents::Add` would get past its
+    # own permission checks, so the button and the refusal can't disagree.
+    #
+    # WHICH BRANCHES ARE OPEN is drawn here from the first paint, so a fold
+    # never flickers in after the script runs: `open_cookie` is the raw
+    # `cs_tree_open` (`TreeOpenSet::COOKIE`), read against the pages this tree
+    # draws, and each node is open or folded by `TreeOpenSet#open?`, with the
+    # root and the selected page's ancestors (`path_ids`, walked once through
+    # the loaded pages) handed to it. So by default Home is open and every
+    # branch below its children folded, and the selected row is never drawn
+    # inside a folded branch.
     #
     # `root` is swapped for its copy in the loaded list, so the checks on the
     # homepage's own row use the preload too. With no visible root (no pages,
     # or none the actor may see) there's nothing to hang the tree on, and
     # the empty state shows instead.
     class TreeComponent < AdminComponent
-      def initialize(root:, selected: nil, locale:, url_options: {})
+      def initialize(root:, selected: nil, locale:, url_options: {}, open_cookie: nil)
         @selected = selected
+        @open_cookie = open_cookie
+        @open_set = TreeOpenSet::EMPTY
+        @path_ids = Set.new
         @locale = locale
         @url_options = url_options
         @children_by_parent = {}
         @context_only_ids = Set.new
         @translation_counts = {}
         @loaded = {}
+        @paths = {}
         @root_page = root
       end
 
@@ -83,7 +96,7 @@ module Admin
 
       private
 
-      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :loaded
+      attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_counts, :loaded, :paths, :open_set, :path_ids
 
       def load_visible(root)
         visibility = AccessControl.tree_visibility(Current.actor)
@@ -96,7 +109,24 @@ module Admin
         @translation_counts = translation_counts_for(readable)
         # The row markers features register, read once for the readable rows.
         @loaded = Admin::Slots.load("tree.row.markers", readable, viewer: Current.actor)
+        @paths = ::PageTree.paths(readable.map(&:id), locale: locale)
+        @open_set = TreeOpenSet.parse(@open_cookie, readable_ids: readable.map(&:id))
+        @path_ids = ancestor_ids_of(selected, pages)
         pages.find { |page| page.id == root.id }
+      end
+
+      # The ids of `page`'s ancestors among the loaded `pages`, walked up
+      # their parents: the path drawn open to the selected row.
+      def ancestor_ids_of(page, pages)
+        return Set.new unless page
+
+        parent_of = pages.to_h { |each| [ each.id, each.parent_id ] }
+        ids = Set.new
+        id = parent_of[page.id]
+        while id && ids.add?(id)
+          id = parent_of[id]
+        end
+        ids
       end
 
       def translation_counts_for(pages)

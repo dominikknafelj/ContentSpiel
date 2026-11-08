@@ -1,39 +1,42 @@
-<%# `data-admin--pages--tree-move-url-value` is read once by the Stimulus controller
-    on connect -- every drop PATCHes that one URL regardless of which node in
-    the tree moved (spec §4.2): one fixed URL, with the moved page's id
+<%# `data-admin--pages--tree-move-url-value` is read once by the Stimulus
+    controller on connect -- every drop PATCHes that one URL regardless of
+    which node in the tree moved: one fixed URL, with the moved page's id
     travelling in the body instead. %>
 <%# The tree is also a LIST whose rows are marked where someone else is
     working (`admin--presence--list`, which reads the markers again when
     presence changes and touches nothing else of the tree). `data-live-part`:
     the list holds a cable subscription, and says here whether it has been
     answered (`live/state`). %>
-<%# The selected row's marks, handed to `admin--pages--tree`, which keeps the
-    row of the open page the one selected (its "The selected row"). %>
+<%# The selected row's class and the markers' class at rest, handed to
+    `admin--pages--tree`, which keeps the row of the open page the one
+    selected (its "The selected row"); the class of a parent a drag opened,
+    while the pointer is in it; and the words it announces a keyboard move in
+    (`data-messages`). %>
 <turbo-frame id="tree" data-controller="admin--pages--tree admin--presence--list" data-admin--pages--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>"
-             data-admin--pages--tree-selected-class="<%= Admin::PagesScreen::TreeRowComponent::SELECTED_CLASS %>"
-             data-admin--pages--tree-selected-title-class="<%= Admin::PagesScreen::TreeRowComponent::SELECTED_TITLE_CLASS %>"
-             data-admin--pages--tree-marker-at-rest-class="<%= Admin::PagesScreen::TreeRowComponent::MARKER_AT_REST %>"
-             data-action="turbo:frame-load@document->admin--pages--tree#follow"
+             data-admin--pages--tree-selected-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:row_selected] %>"
+             data-admin--pages--tree-marker-at-rest-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:reveal] %>"
+             data-admin--pages--tree-drop-target-class="<%= Admin::Ui::TreeItemComponent::CLASSES[:drop_target] %>"
+             data-messages="<%= messages_data("components.pages_screen.tree.moves.picked_up", "components.pages_screen.tree.moves.dropped",
+                                               "components.pages_screen.tree.moves.position", "components.pages_screen.tree.moves.cancelled",
+                                               "components.pages_screen.tree.moves.opened",
+                                               "components.pages_screen.tree_row.untitled") %>"
+             data-action="turbo:frame-load@document->admin--pages--tree#follow tree-find:filtered->admin--pages--tree#filtered tree-find:cleared->admin--pages--tree#unfiltered"
              data-live-part="waiting" data-admin--presence--list-kind-value="page" data-admin--presence--list-chunk-value="<%= Presence::HERE_IDS %>" data-admin--presence--list-url-value="<%= helpers.admin_presence_here_path(kind: "page") %>">
-  <%# A flash-style status for the last move, replaced on its own by
-      Admin::TreeController#update -- kept empty (not `sr-only`'d away
-      entirely) on an ordinary page load, since there is nothing to report
-      yet. %>
-  <%# Handoff §10 C34. "+ New page" opens the New page dialog (Inside = Home, the
-      default); the `href` is the no-JS page, and the trigger is a data attribute
-      on the link so it keeps working after this frame is replaced by a Turbo
+  <%# "+ New page" opens the New page dialog (Inside = Home, the default);
+      the `href` is the no-JS page, and the trigger is a data attribute on
+      the link so it keeps working after this frame is replaced by a Turbo
       Stream. %>
   <div class="mb-2 flex items-center gap-2 px-1">
-    <h2 class="flex-1 text-sm font-semibold text-ink">Pages</h2>
+    <h2 class="flex-1 text-sm font-semibold text-ink"><%= t(".heading") %></h2>
     <% if can_add_page? %>
-      <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>
+      <%= link_to t(".new_page"), new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>
     <% end %>
     <% if offer_starter_pages? %>
-      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>
+      <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".more_actions")) do |menu| %>
         <% menu.with_item do %>
           <%# Posts to `_top`: the new pages land in the tree, outside the `content`
               frame, so the redirect back has to replace the whole shell. %>
-          <%= helpers.button_to "Create starter pages", helpers.admin_starter_contents_path(**url_options), method: :post, form: { data: { turbo_frame: "_top" } } %>
+          <%= helpers.button_to t(".starter_pages"), helpers.admin_starter_contents_path(**url_options), method: :post, form: { data: { turbo_frame: "_top" } } %>
         <% end %>
       <% end %>
     <% end %>
@@ -50,19 +53,38 @@
           data: { "admin--shell--tree-width-target": "fold", action: "admin--shell--tree-width#fold" }) %>
   </div>
 
+  <%# The find field narrows the tree below to the pages that match and
+      their paths; the tree is still while it is narrowed
+      (`tree-find:filtered`, heard above), so its line says how to move a
+      page again. Only over a tree: an empty site has nothing to find. %>
+  <% if root %>
+    <%= render Admin::Ui::TreeFindComponent.new(controls: "tree-list", noun: :pages, moving: true) %>
+  <% end %>
+
+  <%# A flash-style status for the last move, replaced on its own by
+      Admin::TreeController#update -- kept empty (not `sr-only`'d away
+      entirely) on an ordinary page load, since there is nothing to report
+      yet. %>
   <p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm"></p>
 
-  <%# The keyboard path for a drag (handoff §9 A9): one instruction every
-      handle points at, and the live region `admin--pages--tree` announces a pick-up
-      and each step in. %>
-  <p id="tree-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
+  <%# The keyboard path for a drag: one instruction every handle points at,
+      and the live region `admin--pages--tree` announces a pick-up and each
+      step in. %>
+  <p id="tree-drag-help" class="sr-only"><%= t(".drag_help") %></p>
   <p data-admin--pages--tree-target="announcer" aria-live="assertive" class="sr-only"></p>
 
   <% if root %>
-    <ul class="admin-tree flex flex-col gap-0.5">
-      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, selected: selected, locale: locale, url_options: url_options) %>
+    <%# The tree: the list a find narrows and names (`aria-controls`), and
+        the element its scripts know as the tree. It folds and unfolds its
+        branches (`admin--tree--disclosure`), writing the open set on the
+        admin path only (`data-tree-open-path`; the constant has no slash),
+        and names each button in the words it is handed. %>
+    <ul id="tree-list" class="<%= Admin::Ui::TreeItemComponent::CLASSES[:tree] %>" data-controller="admin--tree--disclosure"
+        data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>" data-tree-locale="<%= locale %>"
+        data-messages="<%= messages_data("components.ui.tree_item.fold", "components.ui.tree_item.unfold") %>">
+      <%= render Admin::PagesScreen::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, loaded: loaded, paths: paths, selected: selected, locale: locale, url_options: url_options, open_set: open_set, path_ids: path_ids) %>
     </ul>
   <% else %>
-    <%= render Admin::Ui::EmptyStateComponent.new(title: "No pages yet.") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty")) %>
   <% end %>
 </turbo-frame>

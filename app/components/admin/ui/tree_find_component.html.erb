@@ -1,0 +1,29 @@
+<%# The field is a well 32px tall, the magnifier in its start and its trailing
+    box (the "/" hint while it is empty, Clear while it holds text, the
+    script toggling each by `hidden`) in its end; the field's own padding keeps
+    the text clear of both. The status line under it is the polite live
+    region the script writes the count into, 300ms after the last keystroke;
+    the figure's look and the moving sentence's line are handed to the script
+    as Stimulus classes. %>
+<div role="search" class="mb-2" data-controller="admin--tree--find"
+     data-admin--tree--find-noun-value="<%= noun %>" data-admin--tree--find-moving-value="<%= moving %>"
+     data-admin--tree--find-figure-class="font-medium text-dim" data-admin--tree--find-line-class="block"
+     data-action="keydown@document->admin--tree--find#slash keydown@document->admin--tree--find#treeKey tree:changed@document->admin--tree--find#changed turbo:before-cache@document->admin--tree--find#reset"
+     data-messages="<%= script_messages %>">
+  <label for="<%= field_id %>" class="sr-only"><%= t(".label.#{noun}") %></label>
+  <div class="relative">
+    <span class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-meta">
+      <%= helpers.render "admin/shared/icon", name: :search, size: "size-3.5" %>
+    </span>
+    <input type="search" id="<%= field_id %>" placeholder="<%= t(".placeholder.#{noun}") %>" autocomplete="off"
+           aria-controls="<%= controls %>" aria-keyshortcuts="/"
+           class="admin-well block h-8 w-full px-8 text-sm text-ink placeholder:text-meta [&::-webkit-search-cancel-button]:appearance-none"
+           data-admin--tree--find-target="field" data-action="input->admin--tree--find#filter keydown->admin--tree--find#key">
+    <span class="absolute inset-y-0 right-1 flex items-center">
+      <kbd aria-hidden="true" data-admin--tree--find-target="hint" class="pointer-events-none me-1 rounded-cs border border-line-strong px-1 text-count text-meta">/</kbd>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".clear"), icon: :x, variant: :tertiary, size: :small, hidden: true,
+            data: { "admin--tree--find-target": "clear", action: "admin--tree--find#clear" }) %>
+    </span>
+  </div>
+  <p role="status" aria-live="polite" class="mt-1 px-1 text-small text-meta" data-admin--tree--find-target="status"></p>
+</div>

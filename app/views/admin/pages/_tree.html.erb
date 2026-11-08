@@ -8,6 +8,7 @@
     a component that drew nothing there would leave the column blank. %>
 <% unless turbo_frame_request? %>
   <% content_for :tree do %>
-    <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options) %>
+    <%= render Admin::PagesScreen::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options,
+          open_cookie: cookies[TreeOpenSet::COOKIE]) %>
   <% end %>
 <% end %>

@@ -29,9 +29,10 @@ class ComponentPartsTest < ActiveSupport::TestCase
 
   ROOT = Rails.root
 
-  # The most each list may hold. A list only shrinks, so a name added to one
-  # to skip a rule fails here; the figure is lowered by hand when the list
-  # shrinks, and never raised.
+  # The most each list may hold, so a name added to one to skip a rule fails
+  # here. The made-before list only shrinks: its figure is lowered by hand
+  # when it does, and never raised. The keyboard not-yet list's figure is 0 on
+  # main: a component names its keyboard test when it is made.
   LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
 
   # What a list holds over its limit, as a sentence, or nil.

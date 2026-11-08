@@ -1,11 +1,11 @@
 require "application_system_test_case"
 
-# Presence in the lists (presence spec §5.1; handoff 9 to 12 and 27): a row
-# of the page tree and of the posts list is marked where someone ELSE is
-# working on that record, with a count from two people, and the marker
-# follows what happens without the list being redrawn. Two people are two
-# Capybara sessions. `await_notes_live` waits for the list's subscription too
-# (`live/state`), so a signal caused after it is heard.
+# Presence in the lists: a row of the page tree and of the posts list is
+# marked where someone ELSE is working on that record, with a count from
+# two people, and the marker follows what happens without the list being
+# redrawn. Two people are two Capybara sessions. `await_notes_live` waits
+# for the list's subscription too (`live/state`), so a signal caused after
+# it is heard.
 class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   LIVE = 8
   LIST = "[data-controller~='admin--presence--list']".freeze
@@ -98,14 +98,18 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
   def show_document = page.execute_script("window.__hidden = false; document.dispatchEvent(new Event('visibilitychange'))")
 
-  # What a marker looks like, measured. What stands before it is the last sibling
-  # in the flow: a translation marker at rest is `sr-only` (absolute, 1px) and takes no room.
+  # What a marker looks like, measured. What stands before it is the last
+  # sibling in the flow: a translation marker at rest is clipped (absolute,
+  # 1px) and takes no room. With none in its own box (the tree row's trailing
+  # parts), it is the last in the flow before that box (the title, or the
+  # state mark after it).
   def look(marker)
     page.evaluate_script(<<~JS)
       (() => {
         const marker = document.querySelector(#{marker.to_json})
         const [ icon, count ] = [ marker.querySelector("svg"), marker.querySelector("[data-presence-marker-count]") ]
-        const before = [ ...marker.parentElement.children ].slice(0, [ ...marker.parentElement.children ].indexOf(marker)).filter((each) => each.getClientRects().length && getComputedStyle(each).position !== "absolute").pop()
+        const inFlowBefore = (element) => [ ...element.parentElement.children ].slice(0, [ ...element.parentElement.children ].indexOf(element)).filter((each) => each.getClientRects().length && getComputedStyle(each).position !== "absolute").pop()
+        const before = inFlowBefore(marker) || inFlowBefore(marker.parentElement)
         const probe = document.body.appendChild(Object.assign(document.createElement("span"), { className: "text-meta" }))
         const meta = getComputedStyle(probe).color
         probe.remove()
@@ -141,9 +145,14 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:dana, @dana)
     assert_selector shown(tree_marker), wait: LIVE
-    # Handoff 9 and 10: the icon at 12px in meta, alone for one person, last
-    # of the row's markers and 6px after what stands before it.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(tree_marker))
+    # The icon at 12px in meta, alone for one person, last of the row's
+    # markers, and at the row's end: the trailing parts stand there, past the
+    # title and its state, with room left for the "+".
+    seen = look(tree_marker)
+    assert_operator seen.delete("after"), :>, 6
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
+    at_end = page.evaluate_script("(() => { const row = document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row'); return row.getBoundingClientRect().right - document.querySelector(#{tree_marker.to_json}).getBoundingClientRect().right })()")
+    assert_operator at_end, :<=, 40, "the marker stands at the row's end, not after the title"
     # Nobody marks themselves: Dana's own tree marks where I am, not her page.
     using_session(:dana) do
       assert_selector shown(tree_marker(@elsewhere)), wait: LIVE
@@ -157,8 +166,8 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector "#{shown(tree_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
     # From two the count, in 11px, 4px after the icon; the names in
     # order of arrival.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => { "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 },
-                   "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker))
+    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => { "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 },
+                   "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker).except("after"))
 
     leave(:dana)
     assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "reader is here", exact_text: true, visible: :all, wait: LIVE
@@ -180,7 +189,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:dana, @dana, path: "/cs-studio/posts/#{@post.id}")
     assert_selector shown(post_marker), wait: LIVE
-    # Handoff 27: right after the title text, 6px after it, on the title's
+    # Right after the title text, 6px after it, on the title's
     # line; the path line under it is where it was.
     assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
     lines = page.evaluate_script(<<~JS)
@@ -225,7 +234,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal plain, accessible_name("tr#post_#{@post.id} th[scope=row] a")
   end
 
-  # Handoff 27, for a screen reader: the marker's words join the link's
+  # For a screen reader, the marker's words join the link's
   # accessible name. And nothing interactive is nested in the link.
   test "the posts row's link is named with the people, and stays the row's one link" do
     open_posts
@@ -248,9 +257,9 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-editor-header h1", text: "Translating Everything With Mobility"
   end
 
-  # Handoff 12 and 32: the shared tooltip says the marker's words, the same
+  # The shared tooltip says the marker's words, the same
   # a screen reader hears, for the pointer; a name is put in the page as the
-  # text it is. Handoff 35: where the tree is a column a long bubble may
+  # text it is. Where the tree is a column a long bubble may
   # reach past the column, inside the window and on top of the content.
   test "hovering a marker shows its words in the shared tooltip, in the tree and in the posts list, whole and on top, and a name is text" do
     @reader.update!(name: %(<img src=x onerror="window.__owned = true">))
@@ -267,26 +276,26 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_nil page.evaluate_script("window.__owned")
     assert_no_selector "#tree [title*='Dana']", visible: :all
     # The bubble is whole: inside the window (the tree's column clips nothing
-    # at this width, so it may reach over the column's edge; handoff 18, 30).
+    # at this width, so it may reach over the column's edge).
     whole = page.evaluate_script("(() => { const tip = document.querySelector(#{tree_marker.to_json} + ' [data-tooltip]').getBoundingClientRect(); return tip.left >= 0 && tip.right <= document.documentElement.clientWidth && tip.width <= 240 })()")
     assert_equal true, whole
-    # The tree is a column here (not a drawer), the bubble reaches past it
-    # over the content, and it is the bubble that is on top there. The
+    # The tree is a column here (not a drawer), the bubble stands whole in it
+    # (the column scrolls, so it is held inside), and it is the bubble that is
+    # on top there. The
     # bubble lets the pointer through (`pointer-events: none`), and
     # `elementFromPoint` skips such an element: switched on for the question.
     top = page.evaluate_script(<<~JS)
       (() => {
         const tip = document.querySelector(#{tree_marker.to_json} + " [data-tooltip]")
-        const [ box, column ] = [ tip.getBoundingClientRect(), document.querySelector("#tree-column").getBoundingClientRect() ]
+        const box = tip.getBoundingClientRect()
         tip.style.pointerEvents = "auto"
         const point = (x) => document.elementFromPoint(x, box.top + box.height / 2) === tip
-        const answer = { column: getComputedStyle(document.querySelector("#tree-column")).position !== "fixed", past: box.right > column.right,
-                         centre: point(box.left + box.width / 2), overContent: point(box.right - 2), viewport: box.top >= 0 && box.bottom <= document.documentElement.clientHeight }
+        const answer = { column: getComputedStyle(document.querySelector("#tree-column")).position !== "fixed",                          centre: point(box.left + box.width / 2), overContent: point(box.right - 2), viewport: box.top >= 0 && box.bottom <= document.documentElement.clientHeight }
         tip.style.pointerEvents = ""
         return answer
       })()
     JS
-    assert_equal({ "column" => true, "past" => true, "centre" => true, "overContent" => true, "viewport" => true }, top)
+    assert_equal({ "column" => true, "centre" => true, "overContent" => true, "viewport" => true }, top)
     find("main h1").hover
     assert_no_selector "#{tree_marker} [data-tooltip]"
 
@@ -312,7 +321,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal({ "across" => true, "down" => true, "scrolls" => false }, box)
   end
 
-  # Handoff 9: "Away people do not count."
+  # Away people do not count.
   test "someone who is only away is not marked, and is again once they are back" do
     open_tree
     set_timing("interval", 600)
@@ -325,7 +334,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(tree_marker), wait: LIVE
   end
 
-  # Review Focus 5: a list does not ask constantly. However many signals
+  # A list does not ask constantly. However many signals
   # arrive, it asks once, and once more for those that came after that
   # reading began, no sooner than the interval after it.
   test "any number of signals within the interval cause one fetch, and one more after it" do
@@ -355,7 +364,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal 2, fetches
   end
 
-  # Review Focus 2, in a list: a crashed tab sends no leave and no signal.
+  # In a list, a crashed tab sends no leave and no signal.
   test "a crashed person's marker goes within the stale time without any signal" do
     open_tree
     join(:dana, @dana)
@@ -394,7 +403,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal 1, fetches
   end
 
-  # Handoff 10: the folded tree (the "Pages" menu below 1024px) is the same
+  # The folded tree (the "Pages" menu below 1024px) is the same
   # component, so a row is marked there too.
   test "the marker shows in the folded tree below 1024px" do
     original = page.current_window.size

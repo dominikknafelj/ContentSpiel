@@ -233,9 +233,10 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       row = nodes.first.at_css("> div")
       assert_nil row.at_css("a"), "a context-only node has no link or actions"
       assert_nil row.at_css(".admin-tree-node__handle")
+      assert_nil row["data-tree-path"], "a context-only row carries no address for a find"
       assert_includes row.text, "Home"
       assert_equal 1, Translations::StateIndex.counts_for([ @root.reload ]).values.first["de"][:outdated]
-      assert_select nodes.first, "> div span.text-meta[title='You can’t open this page']"
+      assert_select nodes.first, "> div.admin-tree-row--context-only > .admin-tree-row__title > span[title='You can’t open this page']"
       assert_nil row.at_css("[data-translation-marker]"), "a context-only row shows no counts"
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@branch.id}']:not([data-context-only]) a[href='/cs-studio/pages/#{@branch.id}']"
