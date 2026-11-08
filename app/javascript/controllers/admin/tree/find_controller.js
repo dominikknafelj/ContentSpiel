@@ -98,9 +98,13 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
+  // The field emptied by the find itself (Clear, Escape, the snapshot) is
+  // told as typing is, an `input` on the field, so whatever follows the
+  // field's text hears it (the mind graph's last line); the find's own
+  // `filter` is that input's action.
   empty() {
     this.fieldTarget.value = ""
-    this.filter()
+    this.fieldTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   // The tree's rows were drawn again: the query runs over them, once a frame.

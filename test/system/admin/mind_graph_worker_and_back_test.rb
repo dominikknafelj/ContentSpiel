@@ -367,4 +367,69 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     await_graph
     assert_selector "#{home}[aria-expanded='true']"
   end
+
+  # The list stands in the tree column, outside the graph's element, and
+  # Turbo's snapshot keeps the column as it was left: its rows, the whole
+  # site's results, the find field's text. A page restored from it shows,
+  # before its data has come, none of the rows, an empty field and no last
+  # line: the find cleans its field before the snapshot, and the
+  # controller's `reset` takes back the rest.
+  test "a mind graph restored from Turbo's cache has no stale rows in the column and an empty find field" do
+    a = create_post(title: "Ruby notes", tags: [ "ruby" ])
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit_screen admin_mind_graph_path
+    await_graph
+    assert_selector "#{LIST} [role=treeitem]"
+    search_whole_site("ruby")
+    assert_selector "#{RESULTS} [data-search-group=post]"
+
+    within("nav[aria-label='Modules']") { click_link "Tags" }
+    assert_selector "h1", text: "Tags"
+    page.execute_script(<<~JS)
+      window.graphFetches = 0
+      const original = window.fetch
+      window.realFetch ??= original
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return original(url, options)
+        window.graphFetches += 1
+        return new Promise((resolve) => { window.releaseGraph = () => resolve(original(url, options)) })
+      }
+    JS
+    page.go_back
+    assert_selector "h1", text: "Mind graph"
+    await_js("window.graphFetches === 1")
+
+    assert_no_selector "#tree-column [role=treeitem], #tree-column [data-search-group]", visible: :all
+    assert_no_selector RESULTS, visible: :visible
+    assert_equal "", find(FIND).value
+    assert_selector SEARCH_SITE, visible: :hidden
+    assert_equal "", find(SEARCH_SITE, visible: :hidden).text(:all).strip
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#tree-column [data-mind-graph-rows]').length"), "a second list stands beside the first"
+
+    page.execute_script("window.releaseGraph()")
+    await_graph
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(a)}']"
+  end
+
+  # The card's links to another screen are visits of the whole page, so the
+  # screen they lead to draws its own column: a page's editor its Pages
+  # tree, never the graph's list left standing beside it.
+  test "the card's Open page leads to the page's editor with its Pages tree, and Back to the graph with its list" do
+    docs = create_page(title: "Docs")
+    visit_screen admin_mind_graph_path
+    await_graph
+
+    click_node(docs)
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Open page" } }
+
+    assert_current_path admin_page_path(docs)
+    assert_selector "#tree-column #tree [data-tree-row][data-tree-id='#{docs.id}']"
+    assert_no_selector "#tree-column [data-mind-graph-list]", visible: :all
+    assert_selector "button[aria-controls='tree-column'][aria-label='Open page tree']", visible: :all
+
+    page.go_back
+    await_graph
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(docs)}']"
+    assert_no_selector "#tree-column #tree", visible: :all
+  end
 end

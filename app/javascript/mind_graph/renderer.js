@@ -42,7 +42,7 @@
 // box the pin and the notes badge are at the box's own corners
 // (`marks.js`, `topCorner`), not where a circle as wide as it would have them.
 //
-// A LABEL (design answer F6), in the sans: a page's and a post type's in
+// A LABEL, in the sans: a page's and a post type's in
 // ink, a tag's in the tag hue (`tag`), a post's in `dim`; the selected node's
 // is semibold and the hovered node's on its backing, both in full ink. A
 // node with no label (the "+N more" pill: its words are inside it) has none.
@@ -60,10 +60,10 @@ export { radiusFor }
 // order, so a tree line is on top of a tag's. A value of `colour` is a theme
 // key, and each line's strength is its token's own (`--cs-graph-line-*`).
 //
-// LISTS (design answer G3): 1.5px with ROUND caps and a dash of 0.1 / 3.5.
+// LISTS: 1.5px with ROUND caps and a dash of 0.1 / 3.5.
 // A dash that short is its two caps, so each is a round dot 1.5px across,
 // 3.6px from the next; with a butt cap it would be a hairline.
-// BRINGS (the third answers' "Local view lines", G2, H1): a page's local
+// BRINGS: a page's local
 // view only, the hub's line to each post it brings in and to "+N more".
 export const LINE_STYLES = {
   tag: { colour: "lineTag", width: 1, dash: [ 4, 3 ], cap: "butt" },
@@ -72,8 +72,7 @@ export const LINE_STYLES = {
   lists: { colour: "lineLists", width: 1.5, dash: [ 0.1, 3.5 ], cap: "round" },
   tree: { colour: "lineTree", width: 1, dash: [], cap: "butt" }
 }
-// Below this zoom the lines of shared tags are not drawn (design answer,
-// part one §6): zoomed out they are most of the ink and say the least. A
+// Below this zoom the lines of shared tags are not drawn: zoomed out they are most of the ink and say the least. A
 // DRAWING rule only: the filter, its counts and a selection's neighbours do
 // not change with it.
 const HIDE_TAG_LINES_BELOW = 0.4
@@ -243,7 +242,7 @@ function drawPin(context, theme, x, y, corner) {
 }
 
 // A neutral pill, like the count badges of the lists: surface, a line, ink
-// (handoff: `bg-surface border-line-strong text-ink`), whatever the viewer
+// (the badge's `bg-surface border-line-strong text-ink`), whatever the viewer
 // has read. The count is the sans (`theme.countFont`, as `text-count`).
 // Never the only cue: the node's card says the count in words. More than
 // ninety-nine reads "99+". It stands on a ring of the canvas's

@@ -17,7 +17,12 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   GRAPH = "[data-controller~='admin--mind-graph--graph']".freeze
   # The graph's own canvas: the legend's swatches are canvases too.
   CANVAS = "#{GRAPH} canvas[data-admin--mind-graph--graph-target='canvas']".freeze
-  LIST = "#{GRAPH} [data-mind-graph-list]".freeze
+  # The list, its find field, its last line and the whole site's results
+  # stand in the shell's tree column, outside the graph's element.
+  LIST = "#tree-column [data-mind-graph-list]".freeze
+  FIND = "#tree-column input[aria-controls='mind-graph-tree']".freeze
+  SEARCH_SITE = "#{LIST} [data-mind-graph-search-site]".freeze
+  RESULTS = "#{LIST} [data-mind-graph-results]".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -237,7 +242,7 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
       (() => {
         const box = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
         return {
-          box: box(#{GRAPH.to_json}), canvas: box(#{CANVAS.to_json}), list: box(#{LIST.to_json}), search: box("#mind-graph-search"),
+          box: box(#{GRAPH.to_json}), canvas: box(#{CANVAS.to_json}), list: box(#{LIST.to_json}), find: box(#{FIND.to_json}), column: box("#tree-column"),
           main: document.querySelector("main").getBoundingClientRect().width, viewport: window.innerHeight, page: document.documentElement.scrollHeight
         }
       })()
@@ -296,6 +301,14 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   def worker_messages = page.evaluate_script("window.workerMessages")
 
   def graph = find(GRAPH)
+
+  # Types `query` into the column's find field and presses the last line,
+  # "Search the whole site for …", which shows the whole site's results in
+  # the list's place.
+  def search_whole_site(query)
+    find(FIND).fill_in(with: query)
+    find("#{SEARCH_SITE} button", text: "Search the whole site for “#{query}”").click
+  end
 
   # A toggle of the legend, by the name on it. No `await_graph` is needed to
   # read what it shows: `data-nodes`, `data-edges`, the list and the canvas's

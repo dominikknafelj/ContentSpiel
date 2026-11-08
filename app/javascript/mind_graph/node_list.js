@@ -1,6 +1,6 @@
-// Every node the graph draws, as a row beside the canvas: the path for a keyboard and a
-// screen reader, since nothing on a canvas can take focus, and a way to find
-// a node by name for everyone.
+// Every node the graph draws, as a row in the tree column beside the
+// canvas: the path for a keyboard and a screen reader, since nothing on a
+// canvas can take focus, and a way to find a node by name for everyone.
 //
 // THE LIST IS ONE TREE, an ARIA tree (`ul#mind-graph-tree[role=tree]`,
 // named by the region's own name) with ONE TAB STOP: one item holds
@@ -23,8 +23,8 @@
 // on the treeitem itself, and selects. Hovering or focusing a row lights
 // its node up on the canvas (`onHover`), and the item of the selected node
 // is `aria-selected`, takes the tree's selected look and is scrolled into
-// view INSIDE the panel -- never with `scrollIntoView`, which would scroll
-// the page as well where the panel stands under the canvas.
+// view INSIDE the column (`scroller`, the column's `scrollTop`) -- never
+// with `scrollIntoView`, which would scroll the page as well.
 //
 // THE FOLDS. A page's branch folds as it does in Pages and with the same
 // open set (`tree/open_set.js`, the cookie both trees read): the first
@@ -91,7 +91,7 @@
 // the focus goes to the first of them (the rule under "THE FOCUS IS NOT
 // LOST").
 //
-// A PILL'S ROWS (`showRows` with `back`) are a second tree, of one level,
+// A PILL'S ROWS (`showRows` with `back`) are a tree of their own, of one level,
 // under a heading that names them ("More from Blog · 92") with "Back to the
 // list" beside it, a button, before the rows in the document; ESCAPE pressed anywhere in the rows is
 // the same way back (`back.onBack`), and so it is on the error line of a
@@ -166,23 +166,35 @@
 // on the item of the same node, else on the first, and when the focus was
 // in that region it is put there, else on the checkbox. A redraw is told
 // to the tree's other scripts as `tree:changed` on the tree. A find that
-// hides the stop's item (`tree-find:filtered`) moves the stop to the
-// nearest item that shows. There is no type-ahead: the find is the way to
-// a row by its name.
+// hides the stop's item (`tree-find:filtered`) moves the stop off it, to the
+// nearest ancestor that still shows, else to the first item that shows.
+// There is no type-ahead: the find is the way to a row by its name.
+//
+// THE WHOLE SITE'S RESULTS (`showResults({ query, rows, failed, back })`)
+// stand in the region in place of the checkbox and the rows, which are
+// hidden and kept as they are (a redraw while the results show goes on
+// under them): "Back to the list" first, a tertiary small button that
+// takes the focus, then the heading that names the query, then the groups
+// `search_box.js` draws, or one line that nothing matched, or the failure
+// in the danger ink (`role="alert"`). Back, and Escape anywhere in the
+// results, take them away (`closeResults`) and call `back.onBack`.
 //
 // Text goes in with `textContent`; no path is written here but the one the
 // app hands in (`link`). `createList(container, { text, number, dotClasses,
 // typeLabels, treeClasses, retryClass, parts, unlisted, treeData, onSelect,
 // onHover, onAdd, onMore, onUnlisted })` answers `{ render(nodes),
 // showRows({ heading, rows, inView, link, back }), fail(line, { label,
-// onRetry, focus, back }), clear(), setUnlisted(on), setBusy(on), mark(id),
-// row(id), destroy() }`: `render` replaces the rows with the four groups
+// onRetry, focus, back }), showResults(…), closeResults(), clear(),
+// setUnlisted(on), setBusy(on), mark(id), row(id), destroy() }`: `render` replaces the rows with the four groups
 // (the app calls it once per load and once per filter change), `clear`
 // empties the rows while another graph is loaded, `mark` moves the mark to
 // the item of `id` (null for none), and `row` answers the treeitem of `id`.
 // `treeData` is the graph's element, whose `data-tree-open-path`,
 // `data-tree-locale` and `data-tree-open` the tree carries (the last a seed
-// the list uses up). `back` is
+// the list uses up). `scroller` is the element that scrolls the rows into
+// view, the container's by default. The list puts its parts before what the
+// container already holds (the last line, the app's) and takes back only its
+// own. `back` is
 // `{ label, onBack }`. `onSelect(id)`, `onMore(id)` and `onHover(id | null)`
 // get a node's id as the data has it; `number` groups a figure as the
 // messages' language does. A pill's node carries `of`, the name of what it
@@ -192,6 +204,7 @@
 // node's id for any other, so the two never meet.
 import { dotClass, TAG_MARK } from "mind_graph/card"
 import { recordId } from "mind_graph/ids"
+import { renderResults } from "mind_graph/search_box"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 import { expanderOf, idOf, openByRule, openPathIn, readOpenSet, setFolded, setOpen } from "tree/open_set"
 
@@ -201,7 +214,9 @@ const byTree = (a, b) => a.order - b.order
 // then "All posts" last.
 const asGiven = () => 0
 const LIST = "m-0 list-none p-0"
-// The tree's id, which a find names (`aria-controls`).
+// The tree's id, which a find names (`aria-controls`). Whichever tree the
+// list shows carries it (the four groups' or the rows of `showRows`): the
+// region holds one tree at a time, so the find narrows the one in view.
 const TREE_ID = "mind-graph-tree"
 const ITEM = '[role="treeitem"]'
 // A state's part and the key of its chip's own word (`ui.en.yml`), which the
@@ -225,7 +240,7 @@ const PATH_JOIN = " › "
 // The open set's id of a node's row: a page's bare id, any other node's own.
 const treeIdOf = (node) => (node.kind === "page" ? recordId(node.id) : node.id)
 
-export function createList(container, { text, number = String, dotClasses, typeLabels = {}, treeClasses: classes, retryClass = "", parts, unlisted: filterable = true, treeData = null, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
+export function createList(container, { text, number = String, dotClasses, typeLabels = {}, treeClasses: classes, retryClass = "", parts, unlisted: filterable = true, treeData = null, scroller = container, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
   let rows = new Map()
   let absent = new Map()
   let marked = null
@@ -246,7 +261,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
 
   // The filter and the rows' own region: `render` and `showRows` replace the
   // region and never the checkbox, so the focus stays on it while it is used.
-  const filter = element("label", "flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-sm text-dim")
+  const filter = element("label", "flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-ink")
   const unlisted = document.createElement("input")
   unlisted.type = "checkbox"
   unlisted.className = "cs-checkbox"
@@ -256,7 +271,13 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // tree's block (`CLASSES.tree`).
   const body = element("div", "px-2 pt-2")
   body.dataset.mindGraphRows = ""
-  container.replaceChildren(...(filterable ? [ filter ] : []), body)
+  container.prepend(...(filterable ? [ filter ] : []), body)
+  // The whole site's results, in the place of the filter and the rows while
+  // they show.
+  const results = element("div", "px-2 pt-2")
+  results.dataset.mindGraphResults = ""
+  results.hidden = true
+  body.after(results)
   const changed = () => onUnlisted(unlisted.checked)
   unlisted.addEventListener("change", changed)
 
@@ -265,12 +286,13 @@ export function createList(container, { text, number = String, dotClasses, typeL
   const treeOf = ({ main = false } = {}) => {
     const tree = element("ul", `${classes.tree} ${LIST}`)
     tree.setAttribute("role", "tree")
-    if (!main) return tree
     tree.id = TREE_ID
+    const given = treeData?.dataset ?? {}
+    if (given.treeLocale != null) tree.dataset.treeLocale = given.treeLocale
+    if (!main) return tree
     const label = container.getAttribute("aria-label")
     if (label) tree.setAttribute("aria-label", label)
-    const given = treeData?.dataset ?? {}
-    for (const name of [ "treeOpenPath", "treeLocale", "treeOpen" ]) {
+    for (const name of [ "treeOpenPath", "treeOpen" ]) {
       if (given[name] != null) tree.dataset[name] = given[name]
     }
     return tree
@@ -686,8 +708,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
     over(event)
   }
   // A find narrowed the tree, or gave it back: the stop moves off an item
-  // the find hid to the nearest that shows (the parent that holds it), else
-  // to the first, so Tab still enters the tree.
+  // the find hid, to its nearest ancestor that still shows, else to the
+  // first item that shows, so Tab still enters the tree.
   const restop = (event) => {
     const tree = event.target.closest?.('[role="tree"]')
     if (!tree || !body.contains(tree)) return
@@ -716,14 +738,37 @@ export function createList(container, { text, number = String, dotClasses, typeL
     rowIn(marked).classList.add(classes.row_selected)
     // The stop goes to it, unless the person is on another item of the tree.
     if (!tree.contains(document.activeElement)) rove(marked)
-    // Its row into view within the panel only, and only as far as needed.
-    const box = container.getBoundingClientRect()
+    // Its row into view within the column only, and only as far as needed.
+    const box = scroller.getBoundingClientRect()
     const rowBox = rowIn(marked).getBoundingClientRect()
-    if (rowBox.top < box.top) container.scrollTop -= box.top - rowBox.top
-    else if (rowBox.bottom > box.bottom) container.scrollTop += rowBox.bottom - box.bottom
+    if (rowBox.top < box.top) scroller.scrollTop -= box.top - rowBox.top
+    else if (rowBox.bottom > box.bottom) scroller.scrollTop += rowBox.bottom - box.bottom
   }
 
   const line = (content) => element("p", "m-0 px-1 py-1 text-small text-dim", content)
+
+  // The whole site's results go, and the filter and the rows show again.
+  let resultsBack = null
+  const closeResults = () => {
+    if (results.hidden) return
+    results.hidden = true
+    results.replaceChildren()
+    resultsBack = null
+    filter.hidden = false
+    body.hidden = false
+  }
+  const leaveResults = () => {
+    const back = resultsBack
+    closeResults()
+    back?.()
+  }
+  const resultsKey = (event) => {
+    if (event.key !== "Escape" || event.defaultPrevented || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return
+    event.preventDefault()
+    event.stopPropagation()
+    leaveResults()
+  }
+  results.addEventListener("keydown", resultsKey)
 
   return {
     render(nodes) {
@@ -823,13 +868,45 @@ export function createList(container, { text, number = String, dotClasses, typeL
       if (on) body.setAttribute("aria-busy", "true")
       else body.removeAttribute("aria-busy")
     },
+    // The whole site's results for `query`: `rows` the search's answer, or
+    // `failed`. Back takes the focus.
+    showResults({ query, rows: found = [], failed = false, back }) {
+      resultsBack = back?.onBack ?? null
+      const backButton = element("button", retryClass, back?.label ?? "")
+      backButton.type = "button"
+      backButton.dataset.mindGraphBack = ""
+      backButton.addEventListener("click", leaveResults)
+      const heading = element("h2", "m-0 mt-2 px-1 text-sm font-semibold text-ink", text.t("mind_graph.script.list.search_site_heading", { query }))
+      const shown = [ backButton, heading ]
+      if (failed) {
+        const said = element("p", "m-0 mt-2 px-1 text-small text-danger-ink", text.t("mind_graph.script.search.failed"))
+        said.setAttribute("role", "alert")
+        shown.push(said)
+      } else if (!found.length) {
+        shown.push(line(text.t("mind_graph.script.search.none")))
+      }
+      results.replaceChildren(...shown)
+      if (!failed && found.length) {
+        const groups = element("div", `mt-2 ${classes.tree}`)
+        renderResults(groups, found, { text, dotClasses, classes, parts })
+        results.append(groups)
+      }
+      filter.hidden = true
+      body.hidden = true
+      results.hidden = false
+      backButton.focus()
+    },
+    closeResults,
     mark,
     row: (id) => rows.get(id) || null,
     destroy() {
       useSeed()
       unlisted.removeEventListener("change", changed)
+      results.removeEventListener("keydown", resultsKey)
       Object.entries(listeners).forEach(([ name, handler ]) => body.removeEventListener(name, handler))
-      container.replaceChildren()
+      filter.remove()
+      body.remove()
+      results.remove()
     }
   }
 }

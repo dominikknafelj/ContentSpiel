@@ -1,5 +1,4 @@
-// The graph's data as the page holds it (pages in the mind graph, spec §1,
-// §4): plain functions over the payload, with no canvas and no element, so
+// The graph's data as the page holds it: plain functions over the payload, with no canvas and no element, so
 // each can be asked directly by a test.
 //
 // A node is `{ …what the server sent, kind, title }`; `kind` is "page",
@@ -10,12 +9,12 @@
 // server sends them.
 import { ALL_POSTS } from "mind_graph/ids"
 
-// A page's fixed bonus over a post with as many links, in links (design
-// answer, part one §6: "a fixed bonus"; half a link is a READING).
+// A page's fixed bonus over a post with as many links, in links: half a
+// link, enough to put a page first among its equals and no more.
 const PAGE_BONUS = 0.5
 
-// A type that is no longer registered has no colour slot, and is not "All
-// posts" (design answer G1): its hub is drawn as an outline (`marks.js`) and
+// A retired type (one not registered) has no colour slot, and is not "All
+// posts": its hub is drawn as an outline (`marks.js`) and
 // its label ends "(retired)", in the messages' words.
 const retiredType = (type) => type.id !== ALL_POSTS && type.colour_index == null
 
@@ -32,20 +31,19 @@ export function nodesOf(data, { allPosts, more, retired }) {
   ]
 }
 
-// The node the layout holds at the centre, by its id, or null (pages spec
-// §5 with the ruling on Task 5's review): Home in the WHOLE graph, the focus
+// The node the layout holds at the centre, by its id, or null: Home in the WHOLE graph, the focus
 // in a local view -- a person who asks for the graph around something
 // expects it in the middle -- where Home, if it is drawn, is a page like any
 // other.
 export const anchorOf = (data) => (data.focus ? data.focus.node_id : (data.pages || []).find((page) => page.home)?.id ?? null)
 
-// Whose label comes first (design answer, part one §6 and F1): Home, then
+// Whose label comes first: Home, then
 // the top-level pages and the type nodes, then everything else by its links.
 export const rank = (node) => (node.kind === "page" && node.home ? 0 : (node.kind === "page" && node.depth === 1) || node.kind === "type" ? 1 : 2)
 
 const weight = (node) => (node.degree ?? 0) + (node.kind === "page" ? PAGE_BONUS : 0)
 
-// "+N more" is a pill with its words inside it (design answer G2): it has
+// "+N more" is a pill with its words inside it: it has
 // no label beside it and takes no place in the order.
 const labelled = (node) => node.kind !== "more"
 
@@ -57,14 +55,14 @@ export const orderOf = (nodes, indexes) =>
 // The nodes whose label is always shown and uses up none of the budget.
 export const freeOf = (nodes, indexes) => new Set(indexes.filter((index) => labelled(nodes[index]) && rank(nodes[index]) < 2))
 
-// WHAT THE LEGEND SHOWS (pages spec §6). `on.nodes` and `on.lines` are the
+// WHAT THE LEGEND SHOWS. `on.nodes` and `on.lines` are the
 // names of the toggles that are switched on. A kind of node that is off:
 // its nodes are not shown, nor any line that touches one. A kind of line
 // that is off: its lines are not shown, AND NOTHING ELSE -- a node is hidden
 // by its own toggle only. "+N more" stands for posts and goes with them. A
 // hub's faint line to what it brings in (`brings`, a page's local view) is
 // part of how a page lists: it has no toggle of its own and follows
-// "Lists" (design answer H1: "they follow the Lists toggle").
+// "Lists".
 //
 // A pill whose posts have all been added from the list stands for nothing
 // and is not shown, whatever is switched on.
@@ -107,12 +105,12 @@ export function counts(nodes, edges) {
 // says so, and every figure a person reads is read from there -- the pill's
 // words, the canvas's name (`summary.js` adds up the pills in view) and the
 // notice's "N other posts ... aren't shown". ONE SOURCE, so the three cannot
-// disagree (the ruling on the review of the pages plan's Task 7).
+// disagree.
 //
 // - A row of a page's "+N more" names the target that brings its post in
 //   (`row.via`): the pill on that target stands for one post fewer. The
 //   answer is that pill's index, for the caller to write its words and its
-//   width again; at none the pill is no longer shown (`visible`).
+//   width again; at none the pill is not shown (`visible`).
 // - A row of "Not listed on any page" names none, and says whether its post
 //   has no connection at all (`row.unconnected`, `PostGraph::Rows`). In the
 //   WHOLE graph such a post is one the notice counts (`data.isolated`): one

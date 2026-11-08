@@ -1,7 +1,7 @@
-// A post's or a page's open notes in the selection card (the notes handoff, "Node card
-// thread list"): each thread's first message, who wrote it and how many
-// replies it has, a link into the record's editor with the drawer open at that
-// thread, and a field to start a note without leaving the graph.
+// A post's or a page's open notes in the selection card: each thread's
+// first message, who wrote it and how many replies it has, a link into the
+// record's editor with the drawer open at that thread, and a field to start
+// a note without leaving the graph.
 //
 // Read as JSON from the notes endpoint scoped to that record (`url`: a
 // post's or a page's, the template the view built for its `type`), so what a
@@ -62,7 +62,7 @@ import { draftKey } from "controllers/admin/notes/composer_controller"
 import { recordId } from "mind_graph/ids"
 
 const LABEL = "m-0 text-label text-meta"
-// Three rows, then "+N more" (handoff, "Node card thread list").
+// Three rows, then "+N more".
 const ROWS = 3
 // The person as a round mark with their initials, as the drawer draws one
 // (`Admin::NotesScreen::AvatarComponent`, whose classes and rule these are:
@@ -139,14 +139,14 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
     return target.pathname + target.search
   }
 
-  // Zero threads: only the field, no heading (handoff, "Node card thread list").
+  // Zero threads: only the field, no heading.
   function title(count) {
     heading.textContent = text.t("mind_graph.script.card.notes.title", { count })
     heading.hidden = count === 0
     list.hidden = count === 0
   }
 
-  // The handoff's row: the avatar, the first line cut with an ellipsis (ink
+  // A thread's row: the avatar, the first line cut with an ellipsis (ink
   // while unread, else dim) over who wrote it and its replies, and the unread
   // dot. The first line is the link.
   function row(thread) {
@@ -159,6 +159,8 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
     const lines = element("span", "flex min-w-0 flex-col gap-0.5")
     const link = element("a", `truncate no-underline hover:underline ${thread.unread ? "text-ink" : "text-dim"}`, thread.text)
     link.href = notesUrl(thread.id)
+    // Into the editor: a visit of the whole page, as the card's own links.
+    link.dataset.turboFrame = "_top"
     const facts = thread.replies > 0 ? `${who} · ${text.t("mind_graph.script.card.notes.replies", { count: thread.replies })}` : who
     lines.append(link, element("span", "truncate text-[12px] text-meta", facts))
     item.append(avatar, lines)
@@ -194,6 +196,7 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
         const link = element("a", "text-[12px] text-accent hover:underline", text.t("mind_graph.script.card.notes.more", { count: rest }))
         link.dataset.noteMore = ""
         link.href = notesUrl()
+        link.dataset.turboFrame = "_top"
         more.append(link)
         list.append(more)
       }
@@ -210,8 +213,8 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
     event.preventDefault()
     submit.disabled = true
     field.readOnly = true
-    // Said only when the send is still out after 300ms, as in a composer
-    // (the notes handoff's decision 41): the text dim, the button
+    // Said only when the send is still out after 300ms, as in a composer,
+    // so a quick send does not flicker: the text dim, the button
     // "Sending…" and busy. The card's field has no other controls.
     const saying = setTimeout(() => {
       field.classList.replace("text-ink", "text-dim")

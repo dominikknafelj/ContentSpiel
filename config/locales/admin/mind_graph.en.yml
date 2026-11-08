@@ -4,7 +4,7 @@
 #
 # `show.canvas_label` names the canvas until the data has arrived, and is the
 # summary's first words. `script.summary.*` is the name it has afterwards
-# (`mind_graph/summary.js`; design answers G6 and H5): WHOLE SENTENCES and
+# (`mind_graph/summary.js`): WHOLE SENTENCES and
 # the parts of one, and the script puts one space between two sentences and
 # nothing else of its own. "Mind graph: 9 pages, 3 post types, 13 posts and 4
 # tags, 27 connections. Showing everything." is `whole`, then `everything`;
@@ -28,10 +28,10 @@
 # punctuation of its own: what it is, how connected (a post type: how many
 # posts it has, the number its row shows), and what pressing it does.
 # `script.list.add_post` is the whole name of a row whose post the canvas
-# does not draw, the design answer's sentence (G5): `%{type}` is the post
+# does not draw: `%{type}` is the post
 # TYPE's label in lower case, so the row says "blog post" and never a bare
-# "post"; `add_retired_post` is its form for a post of a type that is no
-# longer registered (H7: "talk, retired type"), where `%{type}` is the
+# "post"; `add_retired_post` is its form for a post of a retired type, one
+# that is not registered ("talk, retired type"), where `%{type}` is the
 # stored name in lower case. `absent_post` and `absent_retired_post` are the
 # same rows' names while there is no graph to add a post to (it is still
 # being read, or its read failed): the design's sentence without its second
@@ -42,7 +42,11 @@
 # figure is the read's whole total. `failed` and `try_again` are the design
 # answer's too (G5): a read of the list's that failed, said in the list.
 #
-# `script.search.groups.*` head the three groups of the search's results.
+# `script.list.search_site` is the list's last line while the find field
+# holds text, `%{query}` what it holds; pressing it asks the whole site, and
+# `script.list.search_site_heading` heads the results in the tree's place.
+# `script.search.groups.*` head their three groups, `script.search.none` and
+# `failed` stand where nothing came back.
 #
 # `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
 # `aria-label` and tooltip); what is drawn on them is a glyph, or `fit_short`.
@@ -89,7 +93,7 @@
 # at. `script.more` is a "+N more" pill's words: `%{count}` is the figure as
 # the script has already grouped it ("+1,980 more"), not a plural's number,
 # because the words have one form. `script.retired_type` is the whole label
-# of the hub of a post type that is no longer registered.
+# of the hub of a retired post type, one that is not registered.
 en:
   admin:
     mind_graph:
@@ -105,6 +109,7 @@ en:
         fit_short: "Fit"
         card_label: "Selected in the graph"
         list_label: "Pages, posts, tags and post types in this graph"
+        column_heading: "Pages, posts and tags"
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
@@ -114,9 +119,6 @@ en:
           whole: "Whole graph"
         opened:
           everything: "Show everything"
-        search:
-          label: "Find a page, post or tag"
-          placeholder: "Find a page, post or tag…"
       script:
         loading: "Loading the graph…"
         load_failed: "The graph could not be loaded."
@@ -250,10 +252,9 @@ en:
           unlisted_none: "Everything in view is listed on a page."
           ancestors: "%{path}"
           under: "%{title}, under %{path}"
+          search_site: "Search the whole site for “%{query}”"
+          search_site_heading: "Whole site: “%{query}”"
         search:
-          count:
-            one: "%{count} result"
-            other: "%{count} results"
           none: "No page, post or tag matches."
           failed: "Search failed — check your connection."
           groups:

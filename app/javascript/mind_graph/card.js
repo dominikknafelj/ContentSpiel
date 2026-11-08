@@ -4,22 +4,29 @@
 // reachable by keyboard, opened in a new tab like any other -- and a click on
 // the canvas never navigates by itself.
 //
+// A LINK TO ANOTHER SCREEN ("Open post", "Open page", "Show posts with
+// this tag", a note) is a visit of the whole page (`data-turbo-frame="_top"`):
+// the graph's list stands in the shell's tree column, which a frame
+// navigation keeps, and the screen it leads to draws its own column (the
+// Pages tree, or none). "Focus" stays on this screen and is a frame
+// navigation, whose graph fills the same column again.
+//
 // FOUR CARDS, one per kind of node that can be selected ("+N more" is not
 // selected: a press on it opens the list, `list_reads.js`). Each reads top to
-// bottom, ON SCREEN AND IN THE DOCUMENT alike (the notes handoff's decision
-// 12), so the Tab key walks the card as it reads:
+// bottom, ON SCREEN AND IN THE DOCUMENT alike, so the Tab key walks the
+// card as it reads:
 //
 //   a POST   its type's dot and name with its status chip; the title; "3
 //            related · 2 tags" (left out for a post added from the list,
 //            whose lines nobody counted); its open notes; "Open post",
 //            "Focus", Pin
-//   a PAGE   (design answer, part one §5) its mark and its address
+//   a PAGE   its mark and its address
 //            with its status chip; the title; "4 child pages · lists 112
 //            posts"; its open notes, as on a post's card; "Open page",
 //            "Focus", Pin. Home's is the same card
 //   a TAG    the square and "Tag"; its name; "2 posts"; "Show posts with
 //            this tag", "Focus", Pin
-//   a POST TYPE a page lists, and "All posts" (design answer F1) its hub's
+//   a POST TYPE a page lists, and "All posts": its hub's
 //            mark and "Post type"; its name (a retired type's ends
 //            "(retired)", `graph_data.js`); how many posts of it the viewer
 //            reads; Pin. NO LINK: it leads nowhere, and the pages that list
@@ -107,7 +114,7 @@ const stateOf = (node) => (node.status === "live" && node.changes ? (node.change
 export const fill = (template, placeholder, value) => template.replace(placeholder, () => encodeURIComponent(value))
 
 // A type's dot by its colour slot (`dotClasses` are slots 1-12 in order); a
-// type that is no longer registered has no slot and gets the neutral ring, as
+// retired type (one not registered) has no slot and gets the neutral ring, as
 // `Admin::Ui::ContentTypeDotComponent` gives it. `node_list.js` marks its rows
 // with the same two.
 export const dotClass = (dotClasses, node) =>
@@ -139,6 +146,12 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     anchor.href = href
     return anchor
   }
+  // A link to another screen: a visit of the whole page, which draws that
+  // screen's own tree column.
+  const away = (anchor) => {
+    anchor.dataset.turboFrame = "_top"
+    return anchor
+  }
   const label = (content) => element("span", "text-label text-meta", content)
   // A count in its sentence: the figure grouped as the messages' language
   // groups it ("lists 2,040 posts"); the number only chooses the form.
@@ -146,7 +159,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   // "Open post" or "Open page", marked so that Enter on the selected node
   // can press it. The address is the node's own, which the server built.
   const openLink = (node, key) => {
-    const anchor = link(buttonClasses.primary, text.t(key), node.url)
+    const anchor = away(link(buttonClasses.primary, text.t(key), node.url))
     anchor.dataset.mindGraphCardOpen = ""
     return anchor
   }
@@ -218,7 +231,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
   }
 
   function post(node) {
-    // A type that is no longer registered has no label: its stored name, as
+    // A retired type (one not registered) has no label: its stored name, as
     // the type dot shows it everywhere else. `hasOwn`, because a stored name
     // is data and `typeLabels.constructor` is not a label.
     const kind = element("span", "min-w-0 truncate text-sm text-dim", Object.hasOwn(typeLabels, node.type) ? typeLabels[node.type] : node.type)
@@ -240,7 +253,7 @@ export function createCard(container, { text, number = String, urls, typeLabels,
     ]
   }
 
-  // A page (design answer, part one §5): its address and its
+  // A page: its address and its
   // state, its title, "4 child pages · lists 112 posts", its open notes as
   // on a post's card, then "Open page", "Focus" and Pin. A page with no
   // address in the editing language or the default has none written.
@@ -266,13 +279,13 @@ export function createCard(container, { text, number = String, urls, typeLabels,
       title(node),
       counts,
       actions(
-        link(buttonClasses.primary, text.t("mind_graph.script.card.show_tagged"), fill(urls.tagPosts, "__NAME__", node.title)),
+        away(link(buttonClasses.primary, text.t("mind_graph.script.card.show_tagged"), fill(urls.tagPosts, "__NAME__", node.title))),
         link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.tagFocus, "__ID__", recordId(node.id)))
       )
     ]
   }
 
-  // A post type a page lists, and "All posts" (design answer F1): what it
+  // A post type a page lists, and "All posts": what it
   // is, its name, how many posts of it the viewer reads, and Pin. It leads
   // nowhere: the pages that list it are its neighbours on the canvas.
   function type(node) {

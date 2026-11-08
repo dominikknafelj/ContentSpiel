@@ -87,8 +87,8 @@
   --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
   --text-count: var(--cs-t-count);
-  /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
-     read faint); an explicit `font-*` class beside it still wins. */
+  /* Every mono label is 11px at weight 500 (10px thin reads faint); an
+     explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
   --text-count--font-weight: 500;
   /* A panel's heading and a tile's title. */
@@ -327,6 +327,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    holds the drag handle, which stands in the gutter left of the row. */
 .admin-tree-row { position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
 .admin-tree-row:hover { background: var(--cs-sunken); }
+/* A heading drawn on the row's geometry (a group of the whole site's
+   results, `mind_graph/search_box.js`) is pressed by nobody: no hover. */
+h3.admin-tree-row:hover { background: none; }
 .admin-tree-row__disclosure { flex: none; display: grid; place-items: center; width: var(--cs-tree-disclosure); height: var(--cs-tree-row); color: var(--cs-meta); }
 .admin-tree-row:hover .admin-tree-row__disclosure { color: var(--cs-ink); }
 .admin-tree-row__disclosure svg { transition: transform 120ms var(--cs-ease); }

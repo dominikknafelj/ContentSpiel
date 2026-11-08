@@ -223,4 +223,33 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
   ensure
     page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
   end
+
+  # The graph's list folds as the Pages tree does, in its own words ("Hide
+  # list", "Show list"), and the box beside it takes the room it gives up:
+  # the canvas widens, and the graph draws into the wider canvas.
+  test "the mind graph's column folds to its strip with its own words, and the canvas widens" do
+    words = "admin.components.shell.tree_subject.mind_graph"
+    canvas = "[data-controller~='admin--mind-graph--graph'] canvas[data-admin--mind-graph--graph-target='canvas']"
+    at_window(1600) do
+      visit_screen admin_mind_graph_path
+      assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+      before = width_of(canvas)
+      column = tree_width
+
+      find("button[aria-label='#{I18n.t("#{words}.hide")}']").click
+      assert_tree STRIP
+      assert folded?
+      assert_no_selector "#tree-column [data-mind-graph-list]"
+      assert_eventually(message: -> { "the focus is on #{focused_label.inspect}" }) { focused_label == I18n.t("#{words}.show") }
+      assert_eventually(message: -> { "the canvas is #{width_of(canvas)}px wide" }) { (width_of(canvas) - (before + column - STRIP)).abs <= 1 }
+      assert_eventually(message: "the canvas's bitmap did not follow its box") do
+        page.evaluate_script("(() => { const c = document.querySelector(#{canvas.to_json}); return c.width === Math.round(c.getBoundingClientRect().width * window.devicePixelRatio) })()")
+      end
+
+      find("button[aria-label='#{I18n.t("#{words}.show")}']").click
+      assert_tree column
+      assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+      assert_eventually(message: -> { "the canvas is #{width_of(canvas)}px wide" }) { (width_of(canvas) - before).abs <= 1 }
+    end
+  end
 end

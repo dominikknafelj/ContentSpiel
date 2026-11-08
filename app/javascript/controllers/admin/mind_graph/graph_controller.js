@@ -14,9 +14,9 @@ import { Controller } from "@hotwired/stimulus"
 // `connect()` also takes back what a Turbo snapshot carries. Turbo caches the
 // page as it stood when it was left -- `data-state="ready"`, `data-settled`,
 // the counts, the canvas's name with its summary of them, the notice's lines,
-// an open selection card and where it stood, the search's text and results,
-// the list's rows (a post added from the list among them, and a pill's rows
-// in the groups' place), the zoom's figure, the number of pinned nodes and
+// an open selection card and where it stood, the list's rows in the tree
+// column (a post added from the list among them, a pill's rows in the
+// groups' place, the whole site's results) and its last line, the zoom's figure, the number of pinned nodes and
 // the button that releases them, and on a large site the bar of the view it
 // opened in with its figure, or the whole graph after "Show everything" --
 // and Back restores exactly that, before
@@ -27,7 +27,9 @@ import { Controller } from "@hotwired/stimulus"
 // checkboxes are restored too, and they are kept: the graph shows what the
 // legend says. Their counts, and the names made of them, are taken back.)
 // The legend's swatches, its five status looks among them, are
-// `admin--mind-graph--swatches`' own, drawn on its connect.
+// `admin--mind-graph--swatches`' own, drawn on its connect. The column's find
+// field is `admin--tree--find`'s, which cleans it before the snapshot: this
+// controller never touches it.
 //
 // A failed `import()` is left unhandled on purpose: the rejection is a
 // JavaScript error, loud in the console and in the system tests, and never a
@@ -87,21 +89,28 @@ export default class extends Controller {
     // the graph shows what the legend says.
     for (const count of this.element.querySelectorAll("[data-legend-count]")) count.replaceChildren()
     for (const input of this.element.querySelectorAll("[data-mind-graph-legend] input")) input.removeAttribute("aria-label")
-    // The search: the snapshot holds the typed text and the open results of
-    // the visit that was left. Back shows the field empty and the list closed.
-    const field = this.element.querySelector("[data-mind-graph-search] input")
-    if (field) field.value = ""
-    this.element.querySelector("[data-mind-graph-status]")?.replaceChildren()
-    // The list: its rows are the visit that was left, and come back with the
-    // data. The zoom's figure and "Release N pinned" are that visit's too.
-    this.element.querySelector("[data-mind-graph-list]")?.replaceChildren()
+    // The list stands in the tree column, OUTSIDE this element, and Turbo's
+    // snapshot keeps the column as it was: its rows, a pill's rows or the
+    // whole site's results are the visit that was left, and come back with
+    // the data. All but the last line is the list's, and goes; the last line
+    // is the server's, hidden and empty until the find narrows the tree.
+    const list = document.querySelector("#tree-column [data-mind-graph-list]")
+    if (list) {
+      for (const child of Array.from(list.children)) if (!child.matches("[data-mind-graph-search-site]")) child.remove()
+      const lastLine = list.querySelector("[data-mind-graph-search-site]")
+      if (lastLine) {
+        lastLine.hidden = true
+        lastLine.querySelector("button")?.replaceChildren()
+      }
+    }
+    // The zoom's figure and "Release N pinned" are that visit's too.
     this.element.querySelector("[data-mind-graph-zoom]")?.replaceChildren()
     const release = this.element.querySelector("[data-mind-graph-release]")
     if (release) {
       release.hidden = true
       release.replaceChildren()
     }
-    for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip], [data-mind-graph-results]")) {
+    for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip]")) {
       floating.hidden = true
       floating.replaceChildren()
       // Where the script had put it (the card beside its node, the tooltip
