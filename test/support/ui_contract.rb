@@ -39,9 +39,7 @@ module UiContract
   # A new component whose keyboard browser test comes in a later task of the
   # same pull request, mapped to the reason, so no commit between the two is
   # red. Empty when a pull request is merged.
-  KEYBOARD_NOT_YET = {
-    "Admin::Ui::StateChipComponent" => "its keyboard test is the rail's, written with the rail"
-  }.freeze
+  KEYBOARD_NOT_YET = {}.freeze
 
   PLURAL_KEYS = %i[zero one two few many other].freeze
 

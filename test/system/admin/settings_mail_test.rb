@@ -1,10 +1,10 @@
 require "application_system_test_case"
 require "support/held_test_mail"
 
-# Settings → Mail in a real browser (spec "Settings → Mail", design answer
-# M2): "Send test mail" uses the SAVED settings, so it waits while the
-# Settings form holds unsaved changes. The suite's mail is Rails' `:test`
-# delivery (the stand-in), so a send succeeds without a server.
+# Settings → Mail in a real browser: "Send test mail" uses the SAVED
+# settings, so it waits while the Settings form holds unsaved changes. The
+# suite's mail is Rails' `:test` delivery (the stand-in), so a send succeeds
+# without a server.
 class Admin::SettingsMailSystemTest < ApplicationSystemTestCase
   include HeldTestMail
 
@@ -36,6 +36,7 @@ class Admin::SettingsMailSystemTest < ApplicationSystemTestCase
     find(test_button).click
     assert_selector "#settings-mail-test", text: "Test mail sent to one@example.com. Check your inbox."
     assert_selector "#settings-mail-state[data-mail-state=working]", text: "Working"
+    assert_selector "#settings-glance-mail .admin-state-chip[data-state-tone=ok]", text: "Working"
     assert_selector "#{test_button}:not([disabled])"
   end
 

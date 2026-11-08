@@ -1,8 +1,7 @@
 require "test_helper"
 
-# The Settings screen is one form with one save footer (decisions
-# D4/D6/D9): every enabled language's title and tagline are in the
-# page at once, a save is an ordinary PATCH that redirects (303) with a toast,
+# The Settings screen is one form with one save footer: every enabled
+# language's title and tagline are in the page at once, a save is an ordinary PATCH that redirects (303) with a toast,
 # a refusal re-renders at 422 with the error summary, and a save on a stale
 # base is refused at 409. Nothing here answers a Turbo Stream.
 class Admin::SettingsTest < ActionDispatch::IntegrationTest
@@ -545,6 +544,41 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "#publishing, #ai", count: 0
     assert_select "form#settings-form input[name^='site_setting[translations]']", count: 0
     assert_select "nav[aria-label='Modules'] a", text: "Settings"
+  end
+
+  # The rail must not tell a languages-only viewer whether mail works,
+  # whether an AI key is saved or how many images failed.
+  test "a viewer with languages.manage alone sees the languages row and no other state" do
+    with_mail_state(:failed) do
+      @site.update_columns(ai_provider: "anthropic")
+      sign_in_as(user_holding("languages.manage"))
+
+      get "/cs-studio/settings"
+
+      assert_response :success
+      assert_select "aside.admin-settings-glance a", 1
+      assert_select "aside.admin-settings-glance a#settings-glance-languages[href='#languages']", text: /3 languages/
+      assert_select "#settings-glance-ai, #settings-glance-mail, #settings-glance-images", count: 0
+      assert_select ".admin-state-chip", count: 0
+      [ "Last send failed", "No key", "Not set up", "No images yet", "Ready" ].each { |word| assert_not_includes response.body, word }
+    end
+  end
+
+  # The rail is drawn from what the screen already read: the mail settings,
+  # the images' counts, the site's languages. Measured against the same
+  # screen with the rail not drawn, after a first request has warmed what
+  # is cached per process.
+  test "the rail costs no statement of its own" do
+    get "/cs-studio/settings"
+    with_rail = count_statements { get "/cs-studio/settings" }
+    assert_select "aside.admin-settings-glance a", 4
+
+    glance = Admin::SettingsScreen::GlanceComponent
+    drawn = glance.method(:new)
+    without_rail = with_singleton_override(glance, :new, ->(**options) { drawn.call(**options, sections: []) }) { count_statements { get "/cs-studio/settings" } }
+    assert_select "aside.admin-settings-glance", 0
+
+    assert_equal without_rail, with_rail
   end
 
   test "a user with neither right gets the 403 page" do

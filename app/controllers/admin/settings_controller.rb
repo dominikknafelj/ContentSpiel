@@ -22,6 +22,7 @@ module Admin
     include StaleForm
     include MailTestLimit
     include MailTestSending
+    include GlanceRows
 
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
@@ -143,12 +144,13 @@ module Admin
 
     private
 
-    # The card's foot and its state, as they are after a test mail.
+    # The card's foot, its state and the rail's Mail row, as they are after a test mail.
     def mail_test_streams(**result)
       [
         turbo_stream.replace(Admin::SettingsScreen::MailTestResultComponent::ID,
           Admin::SettingsScreen::MailTestResultComponent.new(address: Current.user.email_address, **result)),
-        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current))
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current)),
+        glance_row_stream("mail")
       ]
     end
 
@@ -174,10 +176,10 @@ module Admin
     # nil when no rows were posted (the language part is then not in the call).
     # Rows arrive as `languages[][code]`/`languages[][fallback]` in row order.
     #
-    # DECISION D7: the card's select stores ONE fallback, but a language may be
-    # stored with several. A row's stored list is rewritten only when the
-    # posted value differs from the stored FIRST entry -- the one the select
-    # showed -- so an untouched row keeps all of its fallbacks, and a row whose
+    # The card's select stores ONE fallback, but a language may be stored
+    # with several. A row's stored list is rewritten only when the posted
+    # value differs from the stored FIRST entry -- the one the select showed
+    # -- so an untouched row keeps all of its fallbacks, and a row whose
     # select was changed (to another language, or to "None") keeps only the
     # new choice. A row posting no `fallback` at all (the default's select is
     # disabled) is untouched too.
@@ -222,8 +224,13 @@ module Admin
       errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
     end
 
+    # The result under the button and the rail's AI row, which says
+    # Connected or Not connected for the rest of this visit.
     def ai_test_result_stream(milliseconds: nil, message: nil)
-      turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message))
+      [
+        turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message)),
+        glance_row_stream("ai", ai_result: message ? :failed : :connected)
+      ]
     end
   end
 end

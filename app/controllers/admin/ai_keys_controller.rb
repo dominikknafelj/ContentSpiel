@@ -4,8 +4,8 @@ module Admin
   # of the Settings form -- it is never rendered, so it can't be a pending
   # change -- so each action is its own form beside it and answers with Turbo
   # Streams that replace ONLY the key component and its forms (plus the main
-  # form's base and a toast): whatever the editor has typed into the main form
-  # and not saved is left alone.
+  # form's base, the rail's AI row and a toast): whatever the editor has typed
+  # into the main form and not saved is left alone.
   #
   # `settings.manage` only: the Settings module also opens for `languages.manage`
   # alone, and this is not a languages action. `Settings::Save` is the writer
@@ -55,7 +55,7 @@ module Admin
       # A successful key write makes a shown "CONNECTED · N MS" stale (it was
       # measured against the key just replaced or removed): back to the empty slot.
       streams << turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new) if notice
-      respond_with_streams(streams, anchor: "ai", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
+      respond_with_streams(streams, anchor: "ai", glance: "ai", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
     end
   end
 end

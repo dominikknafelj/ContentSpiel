@@ -1,10 +1,10 @@
 require "test_helper"
 
-# Settings → Mail (spec "Settings → Mail", design answers M2 and M3): five
-# fields of the Settings form, the login written once through its own forms
-# (`Admin::MailLoginsController`), the state in the card's header, "Send test
-# mail" outside the save bar, and the sentence a site without encryption keys
-# answers for the mail login and the AI key alike.
+# Settings → Mail: five fields of the Settings form, the login written once
+# through its own forms (`Admin::MailLoginsController`), the state in the
+# card's header and on the rail, "Send test mail" outside the save bar, and
+# the sentence a site without encryption keys answers for the mail login and
+# the AI key alike.
 class Admin::SettingsMailTest < ActionDispatch::IntegrationTest
   include LogCapture
   USERNAME = "mail-login-user-4711".freeze
@@ -175,8 +175,8 @@ class Admin::SettingsMailTest < ActionDispatch::IntegrationTest
     assert_empty ActionMailer::Base.deliveries
   end
 
-  # Ruling F2: the mail gem raised on such an address before the delivery,
-  # which answered 500 under the card's own "Send a test mail" sentence.
+  # The mail gem raises on such an address before the delivery, so it is
+  # answered as the card's sentence, never a 500.
   test "a host's sender address that is not one address: the card says so, and Send test mail answers it and sends nothing" do
     sentence = "Not set up: the sender address the host sets (MAIL_SENDER_ADDRESS) is not one address, like no-reply@example.com."
     with_mail_env("MAIL_SENDER_ADDRESS" => "no-reply@") do
@@ -284,5 +284,31 @@ class Admin::SettingsMailTest < ActionDispatch::IntegrationTest
     save_login
     assert_response :forbidden
     assert_not @site.reload.mail_login_set?
+  end
+
+  # The rail's Mail row follows in the answer that changes the state: a test
+  # mail sent makes it Working, and a new login makes a verified site
+  # untested again.
+  test "Test connection, Send test mail and a saved key update their rail row in the same answer" do
+    with_mail_state(:untested) do
+      send_test_mail
+
+      assert_response :success
+      assert_select "turbo-stream[action=replace][target=settings-glance-mail] template" do
+        assert_select "a#settings-glance-mail[href='#mail'] .admin-state-chip[data-state-tone=ok]", text: "Working"
+      end
+
+      save_login
+
+      assert_response :success
+      assert_select "turbo-stream[action=replace][target=settings-glance-mail] template" do
+        assert_select "a#settings-glance-mail .admin-state-chip[data-state-tone=warn]", text: "Saved, not tested"
+      end
+
+      remove_login
+
+      assert_select "turbo-stream[action=replace][target=settings-glance-mail]", 1
+      assert_select "turbo-stream[target=settings-glance-ai]", 0
+    end
   end
 end

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Translation helpers spec §6.2: the Settings module's "AI translation"
+# The Settings module's "AI translation"
 # section -- provider, model and an API key that is stored encrypted and
 # never rendered, logged or audited; a blank key keeps the stored one,
 # Remove key clears it, and Test connection reports OK or the provider's
@@ -82,7 +82,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "input[name='site_setting[ai_model]'][data-saved-value='']"
   end
 
-  # -- the chip (D11) -----------------------------------------------------------
+  # -- the chip ------------------------------------------------------------------
 
   test "no key reads Off without a provider and No key with one, with Add key" do
     get "/cs-studio/settings"
@@ -161,9 +161,9 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select_in_stream "settings-ai-key", /Key saved · added/
     assert_not_nil @site.ai_api_key_saved_at
     assert_select "turbo-stream[action=append][target=toasts]", /API key saved/
-    # Only the key component and its forms are replaced: the main form's fields are left alone.
+    # Only the key component, its forms and the rail's AI row are replaced: the main form's fields are left alone.
     assert_select "turbo-stream[action=replace]" do |streams|
-      assert_equal %w[settings-ai-key settings-ai-key-forms settings-ai-test-result settings-base-updated-at], streams.map { |stream| stream["target"] }.sort
+      assert_equal %w[settings-ai-key settings-ai-key-forms settings-ai-test-result settings-base-updated-at settings-glance-ai], streams.map { |stream| stream["target"] }.sort
     end
     # The replaced forms keep their own wrapper id (or a second action would find no target)
     # and carry the moved base for the next press.
@@ -437,5 +437,45 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
 
     assert_response :forbidden
+  end
+
+  # The rail's AI row follows in the answer that changes the state: Test
+  # connection says Connected or Not connected for this visit, and a saved
+  # or removed key says the stored state again.
+  test "Test connection, Send test mail and a saved key update their rail row in the same answer" do
+    @site.update!(ai_provider: "test/stub")
+
+    save_key(KEY)
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai[href='#ai'] .admin-state-chip[data-state-tone=ok]", text: "Key saved"
+    end
+
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=ok]", text: "Connected"
+    end
+
+    save_key("sk-ant-wrong")
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=danger]", text: "Not connected"
+    end
+
+    remove_key
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=warn]", text: "No key"
+    end
+    assert_select "turbo-stream[target=settings-glance-mail]", 0
+  end
+
+  # A refused key changes no state, so its answer leaves the row alone.
+  test "a blank key's refusal leaves the rail's row alone" do
+    save_key(" ")
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target=settings-glance-ai]", 0
   end
 end

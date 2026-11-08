@@ -975,6 +975,44 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-tag-detail { margin-bottom: 0; }
   .admin-tag-detail:has([data-tag-detail-empty]) { display: block; }
 }
+/* Settings' layout and its "At a glance" rail
+   (`Admin::SettingsScreen::GlanceComponent`). `.admin-settings-layout` is
+   the container, so the rail docks by the room the Settings area has,
+   never the window's (the sidebar takes room the window does not show).
+   It docks at 1200px, the editors', the dashboard's and the lists'
+   threshold, written here again because a container query cannot read a
+   custom property (`admin_design_rules_test` holds them to one).
+
+   The grid (`__grid`) holds, in document order, the nav's wrapper (the
+   heading and the nav, `__nav`), the rail, then the cards' column
+   (`__cards`): the focus goes nav, rail, cards at every width, and only
+   the grid's areas place them; nothing is moved by script and no rule
+   outside the docked block names the rail's place.
+   - Below 1024px of the window, one column: nav, rail, cards. The rail is
+     a compact card above the first card.
+   - From 1024px (the nav's own window rule, which names the grid alone),
+     the nav at the left across both rows, sticky; the rail is still the
+     compact card, above the first card in the cards' column.
+   - Docked, the three are columns: the nav, the cards' column (which
+     narrows from `--cs-form-max` as the area does), and the rail,
+     `--cs-rail-width` wide and `--cs-rail-gap` right of the cards, on the
+     rail's ground and sticky under the window's top with `--cs-sp-4`
+     above it, scrolling inside itself when it is taller than the window.
+     Spare width falls right of the rail; the whole stops at
+     `--cs-content-max` and past it is centred in the content area. */
+.admin-settings-layout { container: admin-settings / inline-size; }
+.admin-settings-layout__grid { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "nav" "glance" "cards"; align-items: start; column-gap: var(--cs-rail-gap); row-gap: 1rem; }
+.admin-settings-layout__nav { grid-area: nav; }
+.admin-settings-layout__cards { grid-area: cards; min-width: 0; max-width: var(--cs-form-max); }
+.admin-settings-glance { grid-area: glance; min-width: 0; max-width: var(--cs-form-max); border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); }
+@media (min-width: 1024px) {
+  .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)); grid-template-areas: "nav glance" "nav cards"; }
+}
+@container admin-settings (min-width: 1200px) {
+  .admin-settings-layout__grid { grid-template-columns: 170px minmax(0, var(--cs-form-max)) var(--cs-rail-width); grid-template-areas: "nav cards glance"; max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-settings-glance { max-width: none; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail);
+    position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-4)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
+}
 /* The editors' rail. The editor area (`#editing`, the live region) is the
    container, so what the rail asks is the room the editor has, never the
    window's: a folded tree changes it while the

@@ -15,10 +15,11 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
   def footer = ".admin-save-bar"
 
-  test "at 1600px every card is 760px wide, a text field fills it and Time zone keeps its own width" do
-    page.current_window.resize_to(1600, 1000)
-    visit admin_settings_path
-    await_admin_controllers
+  # Docked, the cards' column narrows below 1346px of the Settings area
+  # (nav, gaps and rail take 586px); at 1900px it has its full width.
+  test "at 1900px every card is 760px wide, a text field fills it and Time zone keeps its own width" do
+    page.current_window.resize_to(1900, 1000)
+    visit_screen admin_settings_path
 
     width = ->(selector) { page.evaluate_script("document.querySelector(#{selector.to_json}).getBoundingClientRect().width") }
     %w[#settings-site-card [aria-labelledby=languages] [aria-labelledby=publishing] [aria-labelledby=ai]].each do |card|
@@ -28,6 +29,152 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_operator width.("#settings-time_zone"), :<=, 384
   ensure
     page.current_window.resize_to(1400, 1400)
+  end
+
+  # -- the rail -----------------------------------------------------
+
+  # The layout's boxes, from the DOM: the Settings area (the container),
+  # the nav's wrapper, the rail, the cards' column and the first card, with
+  # the rail's ground and the two grounds it may stand on (read from a probe
+  # that uses each token, so all are computed values).
+  def layout
+    page.evaluate_script(<<~JS)
+      (() => {
+        const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } }
+        const token = (name) => {
+          const probe = document.createElement("div")
+          probe.style.backgroundColor = `var(${name})`
+          document.body.append(probe)
+          const value = getComputedStyle(probe).backgroundColor
+          probe.remove()
+          return value
+        }
+        const rail = document.querySelector("aside.admin-settings-glance")
+        return {
+          container: box(document.querySelector(".admin-settings-layout")),
+          nav: box(document.querySelector(".admin-settings-layout__nav")),
+          rail: box(rail),
+          cards: box(document.querySelector(".admin-settings-layout__cards")),
+          first_card: box(document.querySelector("#settings-site-card")),
+          rail_background: getComputedStyle(rail).backgroundColor,
+          rail_token: token("--cs-rail"),
+          surface_token: token("--cs-surface"),
+          gap: parseFloat(getComputedStyle(document.body).getPropertyValue("--cs-sp-4"))
+        }
+      })()
+    JS
+  end
+
+  def docked?(boxes) = boxes["rail"]["left"] >= boxes["cards"]["right"] && (boxes["rail"]["top"] - boxes["cards"]["top"]).abs < 1
+
+  test "at 1600px the rail stands right of the cards, on the rail's ground, and stays in view down the page" do
+    at_window(1600, height: 700) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert docked?(boxes), boxes.inspect
+      assert_in_delta boxes["cards"]["right"] + 28, boxes["rail"]["left"], 1, "the rail stands --cs-rail-gap right of the cards"
+      assert_in_delta 360, boxes["rail"]["width"], 1, "the rail is --cs-rail-width"
+      assert_in_delta boxes["nav"]["right"] + 28, boxes["cards"]["left"], 1, "the cards stand --cs-rail-gap right of the nav"
+      assert_in_delta boxes["container"]["left"], boxes["nav"]["left"], 1, "below the content max the composition stands at the left"
+      assert_equal boxes["rail_token"], boxes["rail_background"]
+      assert_selector "aside.admin-settings-glance a", count: 4
+
+      page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+      assert_eventually(message: "the page did not scroll") { page.evaluate_script("window.scrollY") > 300 }
+      rail = layout["rail"]
+      assert_in_delta boxes["gap"], rail["top"], 1, "the rail sticks --cs-sp-4 under the window's top"
+      assert_operator rail["bottom"], :<=, 700 - boxes["gap"] + 1, "and ends inside the window"
+    end
+  end
+
+  test "at 1100px the rail is a card above the first card, beside the nav" do
+    at_window(1100) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert_not docked?(boxes), boxes.inspect
+      assert_operator boxes["rail"]["left"], :>=, boxes["nav"]["right"], "beside the nav"
+      assert_in_delta boxes["first_card"]["left"], boxes["rail"]["left"], 1, "in the cards' column"
+      assert_operator boxes["rail"]["bottom"], :<=, boxes["cards"]["top"], "above the first card"
+      assert_in_delta boxes["first_card"]["width"], boxes["rail"]["width"], 1, "as wide as the cards"
+      assert_equal boxes["surface_token"], boxes["rail_background"], "a card's ground"
+    end
+  end
+
+  # Below 1280px the sidebar is a drawer and takes no width, so a 1279px
+  # window gives the Settings area more room than a 1280px one. The widths
+  # are asserted first: a change of the sidebar's width then fails here by
+  # name rather than passing for another reason.
+  test "the rail follows the Settings area's own width: a 1279px window docks it, a 1280px one does not" do
+    at_window(1279) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert_operator boxes["container"]["width"], :>=, 1200
+      assert docked?(boxes), boxes.inspect
+    end
+    at_window(1280) do
+      visit_screen admin_settings_path
+      boxes = layout
+      assert_operator boxes["container"]["width"], :<, 1200
+      assert_not docked?(boxes), boxes.inspect
+    end
+  end
+
+  # The rail comes after the nav and before the cards in the document, so
+  # the Tab order is the nav's links, the rail's rows, then the first card;
+  # a row is one stop, its state chips none.
+  test "the rail's states are words a keyboard passes over: each row is one link, and no chip takes the focus" do
+    at_window(1600) do
+      visit_screen admin_settings_path
+      # A press on the heading puts the sequential focus starting point there.
+      find(".admin-settings-layout h1").click
+      stops = Array.new(12) do
+        page.send_keys(:tab)
+        page.evaluate_script(<<~JS)
+          (() => {
+            const element = document.activeElement
+            if (element.closest(".admin-state-chip")) return "chip"
+            if (element.closest("nav[aria-label='Settings sections']")) return element.getAttribute("href")
+            if (element.closest("aside.admin-settings-glance")) return element.id
+            if (element.closest("#settings-site-card")) return "site card"
+            return element.outerHTML
+          })()
+        JS
+      end
+      assert_equal [ *%w[#site #languages #publishing #forms #ai #mail #images],
+                     *%w[settings-glance-languages settings-glance-ai settings-glance-mail settings-glance-images], "site card" ], stops
+    end
+  end
+
+  # A row is a same-page link, as the nav's are: nothing is left, so the
+  # leave guard does not ask, and the typed change stays counted.
+  test "a rail link with typed changes jumps to its card without asking" do
+    visit_screen admin_settings_path
+    fill_in "settings-en-title", with: "Typed, then glanced"
+    assert_selector footer, text: /\b1 unsaved change\b/i
+    entries = page.evaluate_script("history.length")
+
+    find("a#settings-glance-mail").click
+
+    assert_selector "#mail:focus"
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_equal entries, page.evaluate_script("history.length")
+    assert_equal "Typed, then glanced", find_field("settings-en-title").value
+    assert_selector footer, text: /\b1 unsaved change\b/i
+  end
+
+  # A mail field saved through the bar is a change of the delivery
+  # settings, so a working site is untested again, and the rail says so.
+  test "saving a mail field puts the rail's Mail row back to Saved, not tested" do
+    with_mail_state(:working) do
+      visit_screen admin_settings_path
+      assert_selector "#settings-glance-mail .admin-state-chip[data-state-tone=ok]", text: "Working"
+
+      fill_in "settings-mail_server", with: "smtp.other.test"
+      click_on "Save"
+
+      assert_selector "#toasts .admin-toast", text: "Settings saved"
+      assert_selector "#settings-glance-mail .admin-state-chip[data-state-tone=warn]", text: "Saved, not tested"
+    end
   end
 
   test "tabs switch without asking or counting, a sidebar link asks, and Save persists both languages" do
@@ -174,7 +321,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(900, 1000)
     visit admin_settings_path
     await_admin_controllers
-    width = page.evaluate_script("document.getElementById('ai').closest('.flex.min-w-0.flex-col').getBoundingClientRect().width")
+    width = page.evaluate_script("document.querySelector('.admin-settings-layout__cards').getBoundingClientRect().width")
     max = page.evaluate_script("parseFloat(getComputedStyle(document.body).getPropertyValue('--cs-form-max'))")
     assert_operator max, :>, 0
     assert_operator width, :<=, max + 0.5
@@ -259,7 +406,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "", page.evaluate_script("location.hash")
   end
 
-  # Ledger C-M6: Cancel on Settings leads to Settings. A reload is no new place.
+  # Cancel on Settings leads to Settings. A reload is no new place.
   test "the footer's Cancel reloads the screen without a second history entry" do
     visit admin_settings_path
     await_admin_controllers
@@ -326,7 +473,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
 
-    # D10: Default, Turn off and Add wait for Save or Cancel, and say so.
+    # Default, Turn off and Add wait for Save or Cancel, and say so.
     assert_selector "#settings-languages-card button[disabled]", text: "Make default…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Turn off…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Add language"

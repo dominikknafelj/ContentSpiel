@@ -37,7 +37,8 @@ module Admin
         states: %i[ok warn danger off],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/settings_test.rb", "the rail's states are words a keyboard passes over: each row is one link, and no chip takes the focus" ]
       )
 
       TONES = %i[ok warn danger off].freeze

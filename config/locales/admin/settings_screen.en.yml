@@ -19,6 +19,27 @@ en:
           images: "Images"
         nav:
           label: "Settings sections"
+        # The "At a glance" rail (`GlanceComponent`) and its rows
+        # (`GlanceRowComponent`, which reads these by full key). The AI and
+        # Mail rows say `ai_state.*` and `admin.mail.states.*.word`, as their
+        # cards do.
+        glance:
+          heading: "At a glance"
+          hint: "Settings save together, with the bar at the foot: they are configuration, not content."
+          languages:
+            count:
+              one: "%{count} language"
+              other: "%{count} languages"
+            default: "%{language} is the default"
+          images:
+            ready: "Ready"
+            waiting:
+              one: "%{count} waiting"
+              other: "%{count} waiting"
+            failed:
+              one: "%{count} failed"
+              other: "%{count} failed"
+            none: "No images yet"
         site_card:
           title_label: "Title · translatable"
           tagline_label: "Tagline · translatable"
