@@ -428,7 +428,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
 
   # A docked post's form is `display: contents`, so no pair container: the
   # Post tab's pairs stack in the rail, and the main column's sit side by
-  # side from 1212px of the editor (824px of the column). Typing saves, and
+  # side from 1244px of the editor (824px of the column's content box). Typing saves, and
   # the save's answer leaves both columns drawn.
   test "on a translation tab a post's pairs stack in the rail and sit side by side in the main column, and a save keeps both drawn" do
     with_locales(%w[en de], default: "en")
@@ -437,7 +437,7 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
     at_window(WIDE) do
       visit_editor(@post, locale: "de")
       assert_docked
-      assert_operator width_of("#editing"), :>=, 1212, "the premise: the main column is 824px or more"
+      assert_operator width_of("#editing"), :>=, 1244, "the premise: the main column's content box is 824px or more"
 
       excerpt_original = box("#{POST_PANEL} [data-original-for='excerpt']")
       excerpt_field = box("#{POST_PANEL} [data-field-name='excerpt'] .admin-translation-pair > div:first-child")
@@ -453,13 +453,13 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_operator box("#post-title")[3] - box("#post-title")[1], :>, 20, "the main column is still drawn after the save's answer"
       assert_operator box("#post-excerpt")[3] - box("#post-excerpt")[1], :>, 20, "the rail is still drawn after the save's answer"
     end
-    at_window(content_window(1211) - 44) do
+    at_window(content_window(1243) - 44) do
       visit_editor(@post, locale: "de")
       assert_docked
-      assert_in_delta 1211, width_of("#editing"), 1
+      assert_in_delta 1243, width_of("#editing"), 1
       title_original = box("#{POST_MAIN} [data-original-for='title']")
       title_field = box("#{POST_MAIN} [data-field-name='title'] .admin-translation-pair > div:first-child")
-      assert_operator title_original[3], :<=, title_field[1] + 1, "below 1212px of the editor the main column's pair stacks"
+      assert_operator title_original[3], :<=, title_field[1] + 1, "below 1244px of the editor the main column's pair stacks"
     end
   end
 

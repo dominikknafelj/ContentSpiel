@@ -573,3 +573,5 @@ en:
         section_choice:
           empty: "Choose a section"
           help: "Press a section's settings, such as “3 columns ▾”, to change them here."
+          # The same line on a translation tab, where a section's settings are read only.
+          help_translation: "Press a section's settings, such as “3 columns ▾”, to see them here. They are the same in every language."

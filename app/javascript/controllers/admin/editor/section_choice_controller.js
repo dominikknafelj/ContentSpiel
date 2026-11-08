@@ -24,8 +24,9 @@ const SECTION = ":is(.admin-section-card, .admin-section-group)"
 // server hands over only for one of the page's sections on the default
 // tab): once the page's controllers have connected it is chosen as a press
 // of its layout word would choose it, so docked its region is taken into
-// the Section tab and below the threshold it opens in place and the section
-// is scrolled into view. The address is never written here.
+// the Section tab and below the threshold it opens in place, scrolled into
+// view with the control that has the focus. The address is never written
+// here.
 //
 // THE WORDS ARE THE ONLY TARGET THAT SELECTS. This hears one event,
 // `admin--editor--section:open-settings`, which the card dispatches when a
@@ -113,7 +114,7 @@ export default class extends Controller {
     const card = document.querySelector(`${SECTION}[data-block-id="${CSS.escape(this.chosenValue)}"]`)
     const section = card && this.application.getControllerForElementAndIdentifier(card, "admin--editor--section")
     if (!section?.showSettings("layout")) return
-    if (!this.docked) card.scrollIntoView({ block: "center" })
+    if (!this.docked) section.region?.scrollIntoView({ block: "nearest" })
   }
 
   slotTargetConnected(slot) {

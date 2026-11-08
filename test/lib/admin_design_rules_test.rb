@@ -1026,19 +1026,76 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\.(?:admin-block-card|admin-section-card|admin-section-lanes)[^{]*\{[^}]*max-width/, css, "a wide block takes the column")
   end
 
+  # THE POST FORM HOLDS NO SIZE CONTAINER. Docked, `form#post-form` is
+  # `display: contents`, and Chrome drops the layout of a size container's
+  # content under such an ancestor once a stream replaces a node inside it
+  # (the autosave's error slots): the post's title, address and body
+  # collapse to nothing. So no stylesheet rule and no `@container` utility
+  # may make a container of anything the post form or the components inside
+  # it draw. The classes are read from those sources (`POST_FORM_SOURCES`),
+  # and a rule is matched by the classes of its selector's subject, the last
+  # compound. The form's own `.admin-translation-form` is the one exception:
+  # it is the contents element, no box and no container while docked.
+  POST_FORM_SOURCES = [
+    "app/components/admin/editor_screen/post_form_component.html.erb",
+    "app/components/admin/columns/*", "app/components/admin/fields/*",
+    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input}_component.*",
+    "app/components/admin/editor_screen/{related_posts,shared_fields,reference_card}_component.*",
+    "app/components/admin/translation_screen/{suggestion,translate_button}_component.*",
+    "app/views/admin/shared/{_translation_box,_field_errors,_base_updated_at_field,_override_field}.html.erb",
+    "app/javascript/rich_text/*.js", "app/javascript/controllers/admin/rich_text/*.js"
+  ].freeze
+  POST_FORM_CONTAINER_ALLOWED = {
+    "admin-translation-form" => "the post form itself: display: contents while docked, so no box and no container there"
+  }.freeze
+  CONTAINER_DECLARATION = /(?:\A|[;{\s])container(?:-type)?\s*:(?!\s*(?:none|normal)\b)\s*[^;}]+/
+
+  def self.post_form_classes
+    Dir[*POST_FORM_SOURCES.map { |glob| Rails.root.join(glob).to_s }].flat_map { |path| File.read(path).scan(/(?<![\w-])(?:admin-[a-z0-9_-]*[a-z0-9]|ProseMirror|tiptap)(?![\w-])/) }.uniq
+  end
+
+  # Each `[selector, classes of its subject]` of a rule that makes a size container.
+  def self.container_subjects(css)
+    css.gsub(%r{/\*.*?\*/}m, "").scan(/([^{}]+)\{([^{}]*)\}/).select { |_, body| body.match?(CONTAINER_DECLARATION) }.flat_map do |selectors, _|
+      selectors.split(",").map(&:strip).map { |selector| [ selector, selector.split(/\s+|>|~|\+/).reject(&:empty?).last.to_s.scan(/\.([\w-]+)/).flatten ] }
+    end
+  end
+
+  test "nothing the post form draws is a size container" do
+    classes = self.class.post_form_classes
+    %w[admin-post-main admin-field admin-column admin-translation-pair admin-rich-text-content ProseMirror admin-rail__panel].each { |name| assert_includes classes, name, "the sources hold #{name}" }
+    sheets = Dir[Rails.root.join("app/assets/tailwind/*.css"), Rails.root.join("app/assets/stylesheets/*.css")]
+    offences = sheets.flat_map do |path|
+      self.class.container_subjects(File.read(path)).filter_map do |selector, subject|
+        hit = (subject & classes) - POST_FORM_CONTAINER_ALLOWED.keys
+        "#{Pathname(path).relative_path_from(Rails.root)}: #{selector}" if hit.any?
+      end
+    end
+    assert_empty offences, "a size container inside the post form collapses its fields in Chrome after an autosave"
+    utilities = Dir[*POST_FORM_SOURCES.map { |glob| Rails.root.join(glob).to_s }].select { |path| File.read(path).match?(/(?<![\w-])@container(?:\/[\w-]+)?(?![\w-])/) }
+    assert_empty utilities, "no Tailwind @container utility in the post form's sources"
+    POST_FORM_CONTAINER_ALLOWED.each_key { |name| assert_includes classes, name, "a stale allowance: #{name}" }
+  end
+
+  test "the container pattern finds a container of a class's subject, and not a none or a descendant" do
+    found = self.class.container_subjects(".admin-rail-grid .admin-post-main { padding: 0; container-type: inline-size; } .x > .admin-field { container: pair / inline-size } .admin-column { container-type: normal } .admin-post-main .y { container-type: size }")
+    assert_equal [ [ ".admin-rail-grid .admin-post-main", [ "admin-post-main" ] ], [ ".x > .admin-field", [ "admin-field" ] ], [ ".admin-post-main .y", [ "y" ] ] ], found
+  end
+
   # A container query cannot read a custom property, so the threshold is a
   # number written in three places; this holds them to one.
   test "the editors' rail, the dashboard's and the lists' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    # The editor area asks one other width: 1212px, where a docked post's
-    # main column (the area less the rail and its gap) is 824px, its pairs'
-    # threshold, since the post form is no container while docked.
+    # The editor area asks one other width: 1244px, where a docked post's
+    # main column's content box (the area less the rail, its gap and the
+    # column's 32px of padding) is 824px, its pairs' threshold, since the
+    # post form is no container while docked.
     widths = css.scan(/@container admin-editor \(min-width: ([^)]+)\)/).flatten
-    assert_equal [ "1200px", "1212px" ], widths.sort, "the editor's container widths"
-    post_main = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1212px\)\s*\{/).first
+    assert_equal [ "1200px", "1244px" ], widths.sort, "the editor's container widths"
+    post_main = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-editor \(min-width: 1244px\)\s*\{/).first
     selectors = post_main.scan(/([^{}]+)\{/).flatten.map(&:strip)
     assert_equal 6, selectors.size, "the side-by-side rules, for the main column"
-    selectors.each { |selector| assert selector.start_with?(".admin-rail-grid .admin-post-main .admin-translation-pair"), "1212px lays out a docked post's main-column pairs alone: #{selector}" }
+    selectors.each { |selector| assert selector.start_with?(".admin-rail-grid .admin-post-main .admin-translation-pair"), "1244px lays out a docked post's main-column pairs alone: #{selector}" }
     editor = [ "1200px" ]
     # Every width the dashboard's container asks: the rail's two columns
     # below the threshold, and the threshold itself; a block at any other

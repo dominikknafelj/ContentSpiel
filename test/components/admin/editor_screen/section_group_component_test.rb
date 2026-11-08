@@ -62,6 +62,10 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     render_group
 
     assert_selector "#{group}[data-controller='admin--editor--section'][data-admin--editor--section-settings-id-value='section-#{@section.id}-settings']"
+    # Escape is the heading row's: on the group it would reach a block card's
+    # Escape and hide a gone card holding unsaved text.
+    assert_selector "#{head}[data-action='keydown.esc->admin--editor--section#escape']"
+    assert_not_includes page.find(group)["data-action"].to_s, "keydown"
     words = page.all("#{head} #section-#{@section.id}-words[data-admin--editor--section-target='words'] button", visible: :all)
     assert_equal [ "3 columns ▾", "No background ▾", "Content width ▾", "#about ▾" ], words.map { |word| word.text(:all).squish }
     assert_equal %w[layout background width anchor], words.map { |word| word["data-admin--editor--section-field-param"] }
@@ -74,6 +78,8 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
 
     region = "#{group} > [data-section-settings-home] + #section-#{@section.id}-settings[hidden][data-controller='admin--editor--section-settings'][data-section-id='#{@section.id}']"
     assert_selector region, visible: :all
+    assert_selector "#{region}[role=region][aria-labelledby='section-#{@section.id}-heading']", visible: :all
+    assert_selector "#{head} > h3#section-#{@section.id}-heading", text: "Section"
     rows = page.all("#{region} dl > div[tabindex='-1'][data-section-setting]", visible: :all)
     assert_equal %w[layout background width anchor], rows.map { |row| row["data-section-setting"] }
     assert_equal [ [ "Layout", "3 columns" ], [ "Background", "No background" ], [ "Width", "Content width" ], [ "Anchor", "#about" ] ],

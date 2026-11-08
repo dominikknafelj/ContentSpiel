@@ -1162,11 +1162,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    A container inside the form is no way out: Chrome drops the layout of a
    size container's content under a `display: contents` ancestor once a
    stream replaces a node inside it (the autosave's error slots), and the
-   title, address and body vanish. So the main column's pairs ask the editor
-   area: the column is the area less the rail and its gap (360px and 28px),
-   so 824px of it is 1212px of the area. The rules are the side-by-side
+   title, address and body vanish (no container in it: `admin_design_rules_test`).
+   So the main column's pairs ask the editor area: the column's content box
+   is the area less the rail and its gap (360px and 28px) and the column's
+   own padding (16px either side), so 824px of it, the pair's threshold
+   everywhere else, is 1244px of the area. The rules are the side-by-side
    block's above, for this column alone. */
-@container admin-editor (min-width: 1212px) {
+@container admin-editor (min-width: 1244px) {
   .admin-rail-grid .admin-post-main .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card { order: 0; }
   .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
@@ -1183,7 +1185,11 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    so the docked state is read from the mark `admin--ui--rail` writes on
    the grid (`data-rail-docked`), which follows the container query: the
    page's header is the area's sibling, the post's stands inside it. Below
-   the cap the auto margins are 0. */
+   the cap the auto margins are 0. The grid centres from the first paint, by
+   the query, and the header row only once the controller has connected and
+   written the mark: past the cap the row moves once, on load, from the
+   window's width to the grid's. No query reaches the page's header, which
+   stands outside the container, so the mark is the one shared answer. */
 .admin-editor-header:has(~ .admin-editor-area [data-rail-docked]) > *,
 .admin-editor-area:has([data-rail-docked]) .admin-editor-header > * { max-width: var(--cs-content-max); margin-inline: auto; }
 /* THE NOTES PANEL (`Admin::NotesScreen::RailPanelComponent`, `#notes-drawer`,

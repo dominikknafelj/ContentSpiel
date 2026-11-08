@@ -89,8 +89,16 @@ module Admin
         return data if unavailable?
 
         data.merge(controller: "admin--editor--section", "admin--editor--section-settings-id-value": settings_id,
-          action: "keydown.esc->admin--editor--section#escape admin--editor--section-settings:closed@window->admin--editor--section#settingsClosed")
+          action: "admin--editor--section-settings:closed@window->admin--editor--section#settingsClosed")
       end
+
+      # Escape is heard on the heading row alone, where the words close the
+      # open region (the region hears its own). Never on the group: a block's
+      # card inside it is no panel of the section, and the section's Escape
+      # would take a gone card holding unsaved text for one and hide it.
+      def head_data = unavailable? ? {} : { action: "keydown.esc->admin--editor--section#escape" }
+
+      def heading_id = "section-#{section.id}-heading"
 
       def default_language = ::Locales.name(::Locales.default, native: true)
 

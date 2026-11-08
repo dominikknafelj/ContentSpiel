@@ -85,7 +85,7 @@
        data-action="focusin->admin--editor--section-choice#keepFocus focusout->admin--editor--section-choice#keepBlur"></div>
   <div class="admin-section-choice__empty" data-admin--editor--section-choice-target="empty">
     <p class="text-sm font-medium text-ink"><%= t("admin.components.editor_screen.section_choice.empty") %></p>
-    <p class="mt-1 text-sm text-meta"><%= t("admin.components.editor_screen.section_choice.help") %></p>
+    <p class="mt-1 text-sm text-meta"><%= t(admin_locale.to_s == Locales.default.to_s ? "admin.components.editor_screen.section_choice.help" : "admin.components.editor_screen.section_choice.help_translation") %></p>
   </div>
 <% end %>
 <%= render rail_slot %>

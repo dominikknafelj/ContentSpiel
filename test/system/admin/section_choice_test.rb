@@ -694,6 +694,8 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
   # heading row carries the head's words; its region shows the settings
   # read only, moved as the card's is.
 
+  def focus_on?(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
+
   def group_of(section = @section) = "##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group"
 
   test "on a translation tab a section group's head words choose it and outline it" do
@@ -703,6 +705,9 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
         assert_docked
         assert_equal [ "2 columns", "No background", "Content width" ], all("#{group_of} #section-#{@section.id}-words button").map { |button| button.text.delete("▾").strip }
         assert_empty_line
+        # A translation tab's help line says what the tab shows: the settings to see, not to change.
+        assert_selector "#editor-grid-panel-section [data-admin--editor--section-choice-target=empty] p",
+          text: "Press a section's settings, such as “3 columns ▾”, to see them here. They are the same in every language.", visible: :all
 
         find(word("width")).click
         assert_selector in_rail, visible: :visible
@@ -722,11 +727,13 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
         assert_one_region
         assert_one_region(@second)
 
-        # Escape closes it and puts it home; the rail goes back to the tab left.
+        # Escape closes it and puts it home; the rail goes back to the tab
+        # left, and the word that opened it has the focus again.
         find("#{settings_region(@second)} [data-section-setting='layout']").send_keys(:escape)
         assert_selector "#{group_of(@second)} > #{settings_region(@second)}[hidden]", visible: :all
         assert_no_selector "#{group_of(@second)}[data-chosen]"
         assert_selector "#editor-grid-tab-page[aria-selected=true]"
+        assert_eventually(message: "the focus is back on the word that opened the region") { focus_on?(word("layout", @second)) }
       end
     end
   end
@@ -750,6 +757,36 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
         find(word("background")).click
         assert_selector "#{settings_region}[hidden]", visible: :all
         assert_equal "false", find(word("background"))["aria-expanded"]
+        assert focus_on?(word("background")), "a second press leaves the focus on its word"
+
+        # Escape in the region closes it, the focus back on the word that opened it.
+        find(word("width")).click
+        assert_selector settings_region, visible: :visible
+        assert focus_on?("#{settings_region} [data-section-setting='width']")
+        find("#{settings_region} [data-section-setting='width']").send_keys(:escape)
+        assert_selector "#{settings_region}[hidden]", visible: :all
+        assert_eventually(message: "Escape gives the focus back to the word") { focus_on?(word("width")) }
+      end
+    end
+  end
+
+  # A block's card in a group is no panel of the section: Escape in a card
+  # whose block was deleted under unsaved text (`data-editing-gone`, which
+  # live editing's merge writes) leaves it shown, with its text.
+  test "on a translation tab Escape in a gone card of a section's group leaves the card and its text" do
+    with_locales(%w[en de], default: "en") do
+      at_window(NARROW) do
+        visit_editor(@page, locale: "de")
+        card = "#{group_of} > ##{ActionView::RecordIdentifier.dom_id(@left)}"
+        field = "#{card} #block-#{@left.id}-caption"
+        assert_selector field
+        page.execute_script("document.querySelector(#{card.to_json}).dataset.editingGone = 'true'")
+        find(field).send_keys("Links")
+        find(field).send_keys(:escape)
+
+        assert_selector card, visible: :visible
+        assert_no_selector "#{card}[hidden]", visible: :all
+        assert_equal "Links", find(field).value
       end
     end
   end
@@ -774,8 +811,8 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
       assert_docked(false)
       assert_selector "#{card_of(@second)} > #{settings_region(@second)}", visible: :visible
       assert_selector "#{card_of(@section)} > #{settings_region(@section)}[hidden]", visible: :all
-      assert_eventually(message: "the section was not scrolled into view") do
-        page.evaluate_script("(() => { const box = document.querySelector(#{card_of(@second).to_json}).getBoundingClientRect(); return box.top < window.innerHeight && box.bottom > 0 })()")
+      assert_eventually(message: "the region and its focused control were not scrolled into view") do
+        page.evaluate_script("(() => { const box = document.activeElement.getBoundingClientRect(); return document.querySelector(#{settings_region(@second).to_json}).contains(document.activeElement) && box.top >= 0 && box.bottom <= window.innerHeight })()")
       end
     end
   end

@@ -53,10 +53,8 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
   # Where the rail does not dock (at 1600px the post editor docks it, on a
   # translation tab too: `editor_rail_test`).
   test "at 1400px a translation tab is wider than 760px and at most 1144px, and its pairs sit side by side" do
-    page.driver.resize(1400, 1000)
-    begin
-      visit "/cs-studio/posts/#{@post.id}?locale=de"
-      await_admin_controllers
+    at_window(1400, height: 1000) do
+      visit_editor(@post, locale: "de")
       await_js("window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editor-grid'), 'admin--ui--rail') !== null")
       assert_equal false, page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')"), "the rail docked at 1400px"
 
@@ -67,8 +65,6 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
       original = box("[data-original-for='title']")
       assert_in_delta field[1], original[1], 4, "the field and its original share a row"
       assert_operator original[2] - original[0], :<=, 561
-    ensure
-      page.driver.resize(1400, 1400)
     end
   end
 
