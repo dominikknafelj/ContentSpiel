@@ -310,7 +310,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
 
     with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 3) }) do
       with_reduced_motion do
-        visit admin_mind_graph_path
+        visit_screen admin_mind_graph_path
         await_graph
 
         around_home.call
@@ -343,7 +343,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
         assert_equal "/cs-studio/mind_graph/data", graph["data-url"], "nothing of the page says everything: the choice is in no address"
 
         # Not remembered after a reload.
-        visit admin_mind_graph_path
+        visit_screen admin_mind_graph_path
         await_graph
         around_home.call
 

@@ -331,4 +331,40 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"].to_s
   end
+
+  # The open set the server handed the page is a seed the list uses up: a
+  # page Turbo restores from its snapshot draws the folds from the cookie as
+  # it is now, whether the fold was made in the list or in Pages meanwhile.
+  test "Back to the graph draws the folds as the open set has them now" do
+    docs = create_page(title: "Docs")
+    create_page(title: "Guide", parent: docs)
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    home = "#{LIST} [role=treeitem][data-node-id='#{nid(root_page)}']"
+
+    # Folded in the list, then away and Back.
+    visit_screen admin_mind_graph_path
+    await_graph
+    assert_selector "#{home}[aria-expanded='true']"
+    find("#{home} > .admin-tree-row > .admin-tree-row__disclosure").click
+    assert_selector "#{home}[aria-expanded='false']"
+    click_node(a)
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Open post" } }
+    assert_current_path admin_post_path(a)
+    page.go_back
+    await_graph
+    assert_selector "#{home}[aria-expanded='false']"
+
+    # A fresh visit is handed the fold; opened again in Pages after leaving
+    # the graph, then Back.
+    visit_screen admin_mind_graph_path
+    await_graph
+    assert_selector "#{home}[aria-expanded='false']"
+    within("nav[aria-label='Modules']") { click_link "Pages" }
+    find("#tree [data-tree-row][data-tree-id='#{root_page.id}'] > .admin-tree-row__disclosure[aria-expanded='false']").click
+    assert_selector "#tree [data-tree-row][data-tree-id='#{root_page.id}'] > .admin-tree-row__disclosure[aria-expanded='true']"
+    page.go_back
+    await_graph
+    assert_selector "#{home}[aria-expanded='true']"
+  end
 end

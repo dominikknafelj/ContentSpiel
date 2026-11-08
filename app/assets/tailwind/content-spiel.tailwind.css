@@ -406,14 +406,15 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 /* A tree a find narrows (`data-filtered`, `admin--pages--tree`) does not
    move, so it draws no handle: none is in the page or the Tab order. */
 .admin-tree[data-filtered] .admin-tree-node__handle { display: none; }
-/* Focus is one ring, on the focused element and never on the row: in
-   Pages the control inside the row that holds it (the title's link, the
-   disclosure, the handle, "+"), in the graph's list the treeitem, the
-   row's one control. The ring is drawn inside the element's own box (-2px), so
-   neither the 28px row nor the column clips it; the selected bar may stand
-   beside it. */
+/* Focus is one ring: in Pages on the control inside the row that holds
+   it (the title's link, the disclosure, the handle, "+"), never on the row;
+   in the graph's list on the focused treeitem's OWN ROW, since the item
+   holds its children's group too and a ring round it would round the whole
+   branch. The ring is drawn inside its box (-2px), so neither the 28px row
+   nor the column clips it; the selected bar may stand beside it. */
 .admin-tree-row :focus-visible,
-.admin-tree [role="treeitem"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible > .admin-tree-row { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible { outline: none; }
 /* The selected row: `--cs-sunken` and a 3px accent bar on its left edge,
    3:1 on the sunken ground and the chrome in both schemes
    (`admin_contrast_test.rb`). An inset shadow and not a border, so the

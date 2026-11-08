@@ -30,7 +30,10 @@
 // open set (`tree/open_set.js`, the cookie both trees read): the first
 // drawing takes it from the tree's `data-tree-open`, which the server parsed
 // from the cookie for the pages this viewer reads, and every later one from
-// the cookie; a person's fold or open is written through `setOpen`, relative
+// the cookie: the first drawing takes the attribute off the graph's element
+// (and `destroy` does, if none was drawn), so a page Turbo restores from its
+// snapshot draws the folds as the cookie has them now, not as they were. A
+// person's fold or open is written through `setOpen`, relative
 // to the node's default (Home, `data-tree-root`, and the selected node's
 // path, `data-tree-on-path`, are open by default). Selecting a node opens
 // the path to it (`openPathIn`, which forgets that path's folds). A group
@@ -162,7 +165,10 @@
 // replace the rows' own region and never the checkbox, the tab stop stays
 // on the item of the same node, else on the first, and when the focus was
 // in that region it is put there, else on the checkbox. A redraw is told
-// to the tree's other scripts as `tree:changed` on the tree.
+// to the tree's other scripts as `tree:changed` on the tree. A find that
+// hides the stop's item (`tree-find:filtered`) moves the stop to the
+// nearest item that shows. There is no type-ahead: the find is the way to
+// a row by its name.
 //
 // Text goes in with `textContent`; no path is written here but the one the
 // app hands in (`link`). `createList(container, { text, number, dotClasses,
@@ -175,7 +181,8 @@
 // empties the rows while another graph is loaded, `mark` moves the mark to
 // the item of `id` (null for none), and `row` answers the treeitem of `id`.
 // `treeData` is the graph's element, whose `data-tree-open-path`,
-// `data-tree-locale` and `data-tree-open` the tree carries. `back` is
+// `data-tree-locale` and `data-tree-open` the tree carries (the last a seed
+// the list uses up). `back` is
 // `{ label, onBack }`. `onSelect(id)`, `onMore(id)` and `onHover(id | null)`
 // get a node's id as the data has it; `number` groups a figure as the
 // messages' language does. A pill's node carries `of`, the name of what it
@@ -226,9 +233,6 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // The way back from what is shown, while there is one (a pill's rows, or
   // the error line of a pill's read): what Escape in the rows' region does.
   let goBack = null
-  // The first drawing reads the open set the server handed the page
-  // (`data-tree-open`); every later one the cookie, which this list writes.
-  let seeded = false
   // The group headings and hubs the person folded: a view state, never
   // stored, kept through every redraw while the list is on the screen.
   const viewFolded = new Set()
@@ -510,6 +514,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     }
     return top
   }
+  const useSeed = () => treeData?.removeAttribute("data-tree-open")
   const forget = () => {
     rows = new Map()
     absent = new Map()
@@ -632,7 +637,9 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // region goes back where there is a way back, and is nobody's otherwise
   // (it is not taken, so whatever else listens hears it).
   const keydown = (event) => {
-    if (event.ctrlKey || event.metaKey || event.altKey) return
+    // A key a find took first (Up on its first match goes back to the
+    // field: `admin--tree--find#treeKey`, heard in the capture phase).
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
     if (event.key === "Escape") {
       if (!goBack || event.shiftKey) return
       event.preventDefault()
@@ -678,7 +685,17 @@ export function createList(container, { text, number = String, dotClasses, typeL
     if (event.target.matches?.(ITEM) && body.contains(event.target)) rove(event.target)
     over(event)
   }
-  const listeners = { click, keydown, pointerover: over, pointerout: out, focusin, focusout: out }
+  // A find narrowed the tree, or gave it back: the stop moves off an item
+  // the find hid to the nearest that shows (the parent that holds it), else
+  // to the first, so Tab still enters the tree.
+  const restop = (event) => {
+    const tree = event.target.closest?.('[role="tree"]')
+    if (!tree || !body.contains(tree)) return
+    const stop = tree.querySelector(`${ITEM}[tabindex="0"]`)
+    const next = (stop && showing(stop)) || shown(tree)[0]
+    if (next && next !== stop) rove(next)
+  }
+  const listeners = { click, keydown, pointerover: over, pointerout: out, focusin, focusout: out, "tree-find:filtered": restop, "tree-find:cleared": restop }
   Object.entries(listeners).forEach(([ name, handler ]) => body.addEventListener(name, handler))
 
   function mark(id) {
@@ -744,8 +761,12 @@ export function createList(container, { text, number = String, dotClasses, typeL
       if (posts) childrenOf(posts).append(...loose.map((pill) => pillRow(pill, 2)))
       else drawn.push(...loose.map((pill) => pillRow(pill, 1)))
       tree.append(...drawn)
-      drawFolds(tree, seeded ? readOpenSet() : readOpenSet(tree.dataset.treeOpen ?? null))
-      seeded = true
+      // The open set the server handed the page (`data-tree-open`) is a seed,
+      // used up by the first drawing: every later one, and a page Turbo
+      // restores from its snapshot, reads the cookie, which this list and
+      // the Pages tree write.
+      drawFolds(tree, readOpenSet(tree.dataset.treeOpen ?? null))
+      useSeed()
       put(tree)
     },
     // `addable: false`: there is no graph to add a post to, and a row that
@@ -805,6 +826,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     mark,
     row: (id) => rows.get(id) || null,
     destroy() {
+      useSeed()
       unlisted.removeEventListener("change", changed)
       Object.entries(listeners).forEach(([ name, handler ]) => body.removeEventListener(name, handler))
       container.replaceChildren()

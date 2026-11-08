@@ -443,7 +443,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     row = "[data-mind-graph-card] > [data-chip-row][aria-hidden='true']"
 
     with_reduced_motion do
-      visit admin_mind_graph_path
+      visit_screen admin_mind_graph_path
       await_graph
 
       click_node(nid(blog))

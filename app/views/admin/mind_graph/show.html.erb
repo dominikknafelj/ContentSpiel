@@ -81,7 +81,7 @@
       (its open notes as JSON, and where the card posts a new one; built for
       id 0 like the post's).
 
-      THE GRAPH THAT OPENS AROUND HOME (pages spec, decision 6). A site with
+      THE GRAPH THAT OPENS AROUND HOME. A site with
       too many lines for one picture is answered by `data-url` with where to
       open instead, and the script then reads `data-open-url` (the data of a
       page's local view, `__ID__` the page's id) and shows the bar below
@@ -182,8 +182,7 @@
           <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
         </p>
       <% else %>
-        <%# The bar of the view the 3,000-line rule opened (pages spec,
-            decision 6): hidden, and empty of any figure, until the script
+        <%# The bar of the view the 3,000-line rule opened: hidden, and empty of any figure, until the script
             has been told where to open. Then it says why the whole graph is
             not what is drawn (its sentence, written with `textContent`) and
             offers "Show everything", whose name the script completes with

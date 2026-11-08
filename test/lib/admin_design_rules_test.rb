@@ -1708,11 +1708,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     rules = self.class.css_rules("content-spiel.tailwind.css")
     from_inside = rules.select { |selectors, body| body.match?(/(?<![\w-])outline(?:-[\w-]+)?:/) && selectors.any? { |selector| selector.match?(/:has\([^)]*:focus/) && selector.include?("admin-tree") } }
     assert_empty from_inside.map(&:first), "a tree row draws no outline for a focus inside it"
-    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible' ])
+    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible > .admin-tree-row' ])
     assert_match(/outline:\s*2px solid var\(--cs-accent\);/, ring)
     assert_match(/outline-offset:\s*-2px;/, ring)
-    assert_empty rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
-      "no tree rule takes a focused element's ring away"
+    # The one exception: a focused treeitem draws its ring on its own row,
+    # which the rule above draws, and not round its whole branch.
+    assert_equal [ [ '.admin-tree [role="treeitem"]:focus-visible' ] ],
+                 rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
+      "no tree rule takes a focused element's ring away, but the treeitem's, whose ring is on its row"
   end
 
   # The selected row is a place, not a row being worked on: at rest it shows

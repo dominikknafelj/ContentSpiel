@@ -239,6 +239,43 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       "Enter selects, Space on a pill asks for its rows, a click on a row's title selects, and a click on the item selects"
   end
 
+  # A find hides rows (`tree/find.js`): the stop never stays on a hidden
+  # item, and a key the find took in its capture phase is the find's alone.
+  test "a find that hides the stop's item moves the stop to the nearest that shows, and a key a find took is left alone" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS.merge(f: "tree/find"))
+      (() => {
+        const { tree, item, key, focused, stops, list, done } = #{tree_script}
+        const seen = []
+        list.mark("page-4")
+        seen.push(stops())
+        f.filterTree(tree, "Docs")                    // About is hidden, Home holds the match
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        f.clearFilter(tree)
+        tree.dispatchEvent(new CustomEvent("tree-find:cleared", { bubbles: true }))
+        seen.push(stops())                            // it shows again: the stop stays
+        item("page-1").hidden = true                  // the stop's item hidden: its group's heading
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        item("pages").hidden = true                   // nothing above it shows: the first item that does
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        item("pages").hidden = false
+        item("page-1").hidden = false
+        // Up taken in the capture phase is not the tree's too.
+        item("page-2").focus()
+        const taken = (event) => event.preventDefault()
+        document.addEventListener("keydown", taken, { capture: true, once: true })
+        key("ArrowUp")
+        seen.push(focused())
+        return done(seen)
+      })()
+    JS
+
+    assert_equal [ [ "page-4" ], [ "page-1" ], [ "page-1" ], [ "pages" ], [ "posts" ], "page-2" ], result
+  end
+
   test "a group heading's Enter and Space fold and open it, and select nothing" do
     clear_open_set
     result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
@@ -296,12 +333,20 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       (() => {
         const { expanded, list, nodes, graph, done } = #{tree_script(open: "2")}
         const first = [ "page-1", "page-2" ].map(expanded)
+        const used = graph.hasAttribute("data-tree-open")
         list.render(nodes)
-        return done({ first, later: [ "page-1", "page-2" ].map(expanded) })
+        const later = [ "page-1", "page-2" ].map(expanded)
+        // A list that never drew uses the seed up when it goes.
+        const other = document.createElement("div")
+        other.dataset.treeOpen = "2"
+        m.createList(document.createElement("div"), { text: { t: (key) => key, locale: () => "en" }, treeClasses: #{TREE_CLASSES}, dotClasses: [], parts: p.readParts(document.body), treeData: other, unlisted: false,
+                                                      onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} }).destroy()
+        return done({ first, used, later, gone: other.hasAttribute("data-tree-open") })
       })()
     JS
 
     assert_equal %w[true true], result["first"], "the first drawing follows data-tree-open, not the cookie"
+    assert_equal [ false, false ], result.values_at("used", "gone"), "the seed is used up by the first drawing, or by destroy, so a page Turbo restores reads the cookie"
     assert_equal %w[false false], result["later"], "a later drawing reads the cookie the list writes"
   ensure
     clear_open_set

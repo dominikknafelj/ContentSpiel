@@ -8,7 +8,7 @@
 <div role="search" class="mb-2" data-controller="admin--tree--find"
      data-admin--tree--find-noun-value="<%= noun %>" data-admin--tree--find-moving-value="<%= moving %>"
      data-admin--tree--find-figure-class="font-medium text-dim" data-admin--tree--find-line-class="block"
-     data-action="keydown@document->admin--tree--find#slash keydown@document->admin--tree--find#treeKey tree:changed@document->admin--tree--find#changed turbo:before-cache@document->admin--tree--find#reset"
+     data-action="keydown@document->admin--tree--find#slash keydown@document->admin--tree--find#treeKey:capture tree:changed@document->admin--tree--find#changed turbo:before-cache@document->admin--tree--find#reset"
      data-messages="<%= script_messages %>">
   <label for="<%= field_id %>" class="sr-only"><%= t(".label.#{noun}") %></label>
   <div class="relative">

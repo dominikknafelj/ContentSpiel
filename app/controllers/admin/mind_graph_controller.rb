@@ -61,7 +61,7 @@ module Admin
           PostGraph::Local.call(actor: Current.actor, focus: focus, depth: params[:depth], locale: admin_locale, url_for: editor_url)
         else
           # A site with too many lines to read as one picture is answered
-          # with where to open instead (`open`, pages spec decision 6), and
+          # with where to open instead (`open`), and
           # "Show everything" asks again with `everything=1`.
           PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url, everything: everything?)
         end
@@ -80,7 +80,7 @@ module Admin
     end
 
     # The rows behind one of a page's "+N more" pills (`target=`: a pill per
-    # target, design answer H1), and where the Posts screen shows the same
+    # target), and where the Posts screen shows the same
     # posts as far as its filters go: by the type and the tag of the block
     # that points at the target. The page is found as a focus is, so one
     # outside the scope, in the trash, unknown or not named at all is a 404.
@@ -94,20 +94,22 @@ module Admin
 
     private
 
-    # The pages whose fold the list may be handed: the ones this viewer
-    # reads, in one pluck, and none for a viewer who reads no page.
+    # The pages whose fold the list may be handed: of the few the cookie
+    # names, the ones this viewer reads, in one pluck; none for a viewer who
+    # reads no page.
     def tree_open_ids
-      return [] unless @pages
+      candidates = TreeOpenSet.candidate_ids(cookies[TreeOpenSet::COOKIE])
+      return [] unless @pages && candidates.any?
 
-      AccessControl.scope(Current.actor, "pages.read", Page.kept).pluck(:id)
+      AccessControl.scope(Current.actor, "pages.read", Page.kept).where(id: candidates).pluck(:id)
     end
 
     def focus = PostGraph::Focus.find(actor: Current.actor, page: params[:page], post: params[:post], tag: params[:tag], locale: admin_locale)
 
-    # "Show everything" (pages spec, decision 6): exactly `everything=1`, and
+    # "Show everything": exactly `everything=1`, and
     # a parameter of the DATA alone. The page itself takes no such parameter,
     # so no address a person can keep or reload asks for everything: the
-    # choice is not remembered (the third design answers).
+    # choice is not remembered.
     def everything? = params[:everything] == "1"
 
     def list_rows = PostGraph::Rows.new(actor: Current.actor, locale: admin_locale, url_for: editor_url)

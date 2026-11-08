@@ -9,7 +9,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     drawn = create_post(title: "Entry drawn", content_type: "resume_entry")
     PostRelation.create!(post: drawn, related_post: listed)
     alone = create_post(title: "Entry alone", content_type: "resume_entry")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     assert_nil screen_position(alone), "a post with no connection is not drawn"
     assert_selector "#{GRAPH} [role=status] p", text: "1 other post has no connections yet and isn't shown."
@@ -85,7 +85,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a failed read of the unlisted posts says so in the list, Try again loads them, and Back shows the groups again" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     # The first request for the unlisted posts is held until the test lets
     # it go, the second fails, and the third and every other request go to
@@ -180,7 +180,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a read of the list that gets no answer is given up after fifteen seconds and says so in the list, and the list is busy while a read is out" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     page.execute_script(<<~JS)
       const original = window.fetch
@@ -235,7 +235,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     # A post type a page lists: its hub's row has a canvas for its mark.
     ContentBlock.create!(owner: docs, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     open_branches(docs)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
     within(LIST) do
@@ -298,7 +298,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert Publishing::State.of(soon).changes?, "the post carries both chips"
 
     open_branches(deep.parent.parent, deep.parent)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     rows = [ nid(soon), nid(deep) ].map { |id| "#{LIST} [role=treeitem][data-node-id='#{id}']" }
     assert_selector "#{rows[0]} .admin-status-chip[data-status='scheduled']"
@@ -328,7 +328,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
     posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
     posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
-    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    visit_screen admin_mind_graph_path(page: blog.id, depth: 2)
     await_graph
     assert_selector "[data-mind-graph-focus]", text: "Around the page “Blog”"
     lines = graph["data-edges"].to_i
@@ -535,7 +535,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     entry = ContentTypes.fetch("resume_entry").label
 
     with_reduced_motion do
-      visit admin_mind_graph_path(page: blog.id, depth: 2)
+      visit_screen admin_mind_graph_path(page: blog.id, depth: 2)
       await_graph
 
       # The twenty newest are ten of each; five of each are left out.
@@ -618,7 +618,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     create_post(title: "Beta", tags: [ "shared" ])
     c = create_post(title: "Gamma")
     PostRelation.create!(post: a, related_post: c)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
     assert_no_selector "#{GRAPH} details"
@@ -665,7 +665,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a row selects its node, centres the canvas on it and marks itself; it does not navigate" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     box = canvas_box
     centre = [ (box[0] + box[2]) / 2, (box[1] + box[3]) / 2 ]
@@ -729,7 +729,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "hovering a row of the list highlights its node on the canvas" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     point = screen_position(a)
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
@@ -764,6 +764,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     find("#{LIST} [role=treeitem][tabindex='0']").execute_script("this.focus()")
     keyboard.type(:Down)
     assert_match(/\AAlpha: /, focused.call)
+    assert_equal %w[none solid], page.evaluate_script("[ getComputedStyle(document.activeElement).outlineStyle, getComputedStyle(document.activeElement.firstElementChild).outlineStyle ]"),
+      "one ring, on the focused item's own row and not round the item"
     keyboard.type(:Down)
     assert_match(/\ABeta: /, focused.call)
     keyboard.type(:Up)
@@ -833,7 +835,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "the Tab key meets the search first and the list last" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path(post: a.id)
+    visit_screen admin_mind_graph_path(post: a.id)
     await_graph
     click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
@@ -892,7 +894,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     nasty = %(<img src=x onerror="window.pwned=1"> & co)
     a = create_post(title: nasty)
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
     within(LIST) { assert_selector "[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title", exact_text: nasty }

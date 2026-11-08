@@ -174,7 +174,9 @@ export default class extends Controller {
     }
   }
 
-  // Up Arrow on the first match goes back to the field.
+  // Up Arrow on the first match goes back to the field. Heard on the
+  // document in the capture phase, before the tree's own keys: a tree that
+  // moves its focus on Up (the graph's list) never hears this one.
   treeKey(event) {
     if (event.key !== "ArrowUp" || !this.filtering) return
     const first = this.firstMatch()

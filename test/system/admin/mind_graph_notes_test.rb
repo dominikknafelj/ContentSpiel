@@ -143,7 +143,7 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     a = create_post(title: "Alpha")
     b = create_post(title: "Beta")
     PostRelation.create!(post: a, related_post: b)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
 
