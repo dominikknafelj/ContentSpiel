@@ -14,11 +14,14 @@ module Admin
     # (`sections.<id>`), and the intro is the card's, handed in already read.
     #
     # Slots: `head_end`, at the end of the heading's row (the Site card's
-    # language tabs); `head_note`, under the intro (the Mail state, the
+    # language tabs, the Mail state); `head_note`, under the intro (the
     # Languages card's pending hint).
     class CardComponent < Admin::AdminComponent
       renders_one :head_end
       renders_one :head_note
+
+      # The key of a section's name, which the nav says too.
+      def self.word_key(section) = "admin.components.settings_screen.sections.#{section.id}"
 
       def initialize(section:, intro: nil, **html)
         @section = section
@@ -30,7 +33,7 @@ module Admin
 
       attr_reader :section, :intro
 
-      def word = t("admin.components.settings_screen.sections.#{section.id}")
+      def word = t(self.class.word_key(section))
 
       def section_attributes
         @html.merge(

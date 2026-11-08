@@ -1,7 +1,6 @@
 # The Settings screen's components (docs/reference/mail.md for the Mail
 # card): `admin.components.settings_screen.*` are their keys
-# (docs/reference/i18n.md: one file per component folder). A card still
-# drawn with literals is one `test/lib/admin_i18n_test.rb` does not list.
+# (docs/reference/i18n.md: one file per component folder).
 # The screen's view and the controllers' answers are `admin.settings.*`, in
 # `settings.en.yml`.
 en:
@@ -20,6 +19,69 @@ en:
           images: "Images"
         nav:
           label: "Settings sections"
+        site_card:
+          title_label: "Title · translatable"
+          tagline_label: "Tagline · translatable"
+          logo: "Logo"
+          current_logo: "Current logo"
+          logo_file: "Logo file"
+          logo_hint: "PNG, JPEG, GIF or WebP. Without a logo the site title is shown."
+          remove_logo: "Remove logo"
+          time_zone: "Time zone"
+          time_zone_help: "Used for scheduled publishing."
+          social_links: "Social links"
+          add_link: "+ Add link"
+        languages_card:
+          intro: "The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default."
+          drag_help: "Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back."
+          move: "Move %{language}"
+          default: "Default"
+          make_default: "Make default…"
+          make_default_label: "Make %{language} the default language"
+          falls_back_to: "Falls back to"
+          # Said after "Falls back to" to a screen reader only.
+          falls_back_for: "for %{language}"
+          no_fallback: "None (default)"
+          turn_off: "Turn off…"
+          turn_off_label: "Turn off %{language}"
+          add_label: "Add a language"
+          add: "Add language"
+          all_on: "Every available language is already on."
+        language_dialogs:
+          items:
+            one: "%{count} item"
+            other: "%{count} items"
+          default_dialog:
+            title: "Make %{language} the default?"
+            body: "%{language} moves to / and %{default_language} to /%{default_code}. Existing links to %{default_language} pages without /%{default_code} will open the %{language} version, or show “not found” where there is none."
+            details: "%{language} becomes the source language, so every translation is marked outdated (%{items})."
+            confirm: "Change default language"
+          off_dialog:
+            title: "Turn off %{language}?"
+            body: "%{language} disappears from the language switcher and /%{code} pages show “not found”. Translations are kept, so turning it back on restores them."
+            confirm: "Turn off %{language}"
+        publishing_card:
+          keep_label: "Keep trashed items for"
+          days: "days after an item is trashed."
+          help: "Set to 0 to keep trashed items until someone empties the trash."
+        ai_card:
+          intro: "Editors can ask for a suggested translation of a field. Nothing is saved until they use it."
+          provider: "Provider"
+          no_provider: "None (AI translation off)"
+          model: "Model"
+          test: "Test connection"
+          testing: "Testing…"
+        ai_key:
+          label: "API key"
+          replace: "Replace"
+          remove: "Remove…"
+          add: "Add key"
+          replace_placeholder: "Paste a new key to replace it"
+          placeholder: "Paste the provider's API key"
+          save: "Save key"
+          cancel: "Cancel"
+          # After "Key saved", the day the key was saved: `date.formats.admin`.
+          added: "added %{date}"
         mail_card:
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
           server: "Server"

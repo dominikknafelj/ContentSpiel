@@ -20,12 +20,12 @@
         <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: code, editable: true) %>
 
         <%= render Admin::Columns::PlainColumnComponent.new(
-              name: "title", label: "Title · translatable", id: field_id(code, "title"), html_name: html_name(code, "title"),
+              name: "title", label: t(".title_label"), id: field_id(code, "title"), html_name: html_name(code, "title"),
               value: values.text(code, :title), original: original(code, :title), locale: code,
               errors: (default?(code) ? errors_for(:title) : []), **translation(code, :title)
             ) %>
         <%= render Admin::Columns::PlainColumnComponent.new(
-              name: "tagline", label: "Tagline · translatable", id: field_id(code, "tagline"), html_name: html_name(code, "tagline"),
+              name: "tagline", label: t(".tagline_label"), id: field_id(code, "tagline"), html_name: html_name(code, "tagline"),
               value: values.text(code, :tagline), original: original(code, :tagline), locale: code,
               errors: (default?(code) ? errors_for(:tagline) : []), **translation(code, :tagline)
             ) %>
@@ -35,19 +35,19 @@
     <%# Logo: the stored one, if any, the shared drop zone, and an
         explicit remove box -- a blank file input never detaches it. %>
     <div class="admin-column" data-field-name="logo">
-      <p class="<%= setup_label_class %> mb-1" id="settings-logo-label">Logo</p>
+      <p class="<%= setup_label_class %> mb-1" id="settings-logo-label"><%= t(".logo") %></p>
       <div class="flex flex-wrap items-start gap-3.5">
         <% logo = values.logo %>
         <% if logo.attached? %>
-          <%= image_tag logo, alt: "Current logo", class: "size-11 shrink-0 rounded-cs border border-line bg-sunken object-contain" %>
+          <%= image_tag logo, alt: t(".current_logo"), class: "size-11 shrink-0 rounded-cs border border-line bg-sunken object-contain" %>
         <% end %>
         <div class="min-w-0 flex-1">
-          <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: "Logo file",
-                hint: "PNG, JPEG, GIF or WebP. Without a logo the site title is shown.") %>
+          <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: t(".logo_file"),
+                hint: t(".logo_hint")) %>
           <% if logo.attached? %>
             <label class="mt-2 inline-flex items-center gap-2 text-sm text-meta">
               <%= render Admin::Ui::CheckboxComponent.new(name: "site_setting[remove_logo]", value: "1", id: "settings-remove_logo", checked: values.remove_logo?) %>
-              Remove logo
+              <%= t(".remove_logo") %>
             </label>
           <% end %>
         </div>
@@ -56,18 +56,18 @@
     </div>
 
     <div class="admin-column max-w-sm" data-field-name="time_zone">
-      <%= label_tag "settings-time_zone", "Time zone", class: setup_label_class %>
+      <%= label_tag "settings-time_zone", t(".time_zone"), class: setup_label_class %>
       <%= select_tag "site_setting[time_zone]", options_for_select(time_zone_options, values.time_zone), id: "settings-time_zone",
             class: setup_select_class, aria: { describedby: "settings-time_zone-help" } %>
-      <p id="settings-time_zone-help" class="mt-1 text-xs text-meta">Used for scheduled publishing.</p>
+      <p id="settings-time_zone-help" class="mt-1 text-xs text-meta"><%= t(".time_zone_help") %></p>
       <%= helpers.render "admin/shared/field_errors", id: "settings-time_zone-errors", messages: errors_for(:time_zone) %>
     </div>
 
     <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--settings--repeat-rows"
               data-admin--settings--repeat-rows-next-value="<%= values.social_rows.size %>">
-      <legend class="<%= setup_label_class %> mb-1">Social links</legend>
-      <%# The form says it carries the links, so no rows means none (Decision 6);
-          a client that posts nothing leaves them. %>
+      <legend class="<%= setup_label_class %> mb-1"><%= t(".social_links") %></legend>
+      <%# The form says it carries the links, so no rows means none; a client
+          that posts nothing leaves them. %>
       <%= hidden_field_tag "site_setting[social_links_present]", "1", id: nil %>
       <div class="flex flex-col gap-2" data-admin--settings--repeat-rows-target="list">
         <% values.social_rows.each_with_index do |(name, url), index| %>
@@ -77,7 +77,7 @@
       <template id="settings-social-link-template" data-admin--settings--repeat-rows-target="template">
         <%= render "admin/settings/social_link_row", index: TEMPLATE_INDEX, name: "", url: "" %>
       </template>
-      <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--settings--repeat-rows#add">+ Add link</button>
+      <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--settings--repeat-rows#add"><%= t(".add_link") %></button>
       <%= helpers.render "admin/shared/field_errors", id: "settings-social_links-errors", messages: errors_for(:social_links) %>
     </fieldset>
   </div>

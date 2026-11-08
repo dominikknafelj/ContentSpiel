@@ -1,17 +1,17 @@
 <%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("ai"), id: "settings-ai-card",
-      intro: "Editors can ask for a suggested translation of a field. Nothing is saved until they use it.",
+      intro: t(".intro"),
       data: { controller: "admin--settings--ai admin--saving--pending-lock" }) do %>
   <div class="flex flex-col gap-4 p-4">
     <div class="grid gap-3.5 sm:grid-cols-2">
       <div class="admin-column" data-field-name="ai_provider">
-        <%= label_tag "settings-ai_provider", "Provider", class: setup_label_class %>
+        <%= label_tag "settings-ai_provider", t(".provider"), class: setup_label_class %>
         <%= select_tag "site_setting[ai_provider]", options_for_select(provider_names, values.ai_provider),
-              include_blank: "None (AI translation off)", id: "settings-ai_provider", class: setup_select_class,
+              include_blank: t(".no_provider"), id: "settings-ai_provider", class: setup_select_class,
               data: { "admin--settings--ai-target": "provider", "saved-value": saved_provider, action: "change->admin--settings--ai#refresh" } %>
         <%= helpers.render "admin/shared/field_errors", id: "settings-ai_provider-errors", messages: provider_errors %>
       </div>
       <div class="admin-column" data-field-name="ai_model">
-        <%= label_tag "settings-ai_model", "Model", class: setup_label_class %>
+        <%= label_tag "settings-ai_model", t(".model"), class: setup_label_class %>
         <%= text_field_tag "site_setting[ai_model]", values.ai_model, placeholder: ::AI::DEFAULT_MODEL, id: "settings-ai_model",
               autocomplete: "off", spellcheck: false, class: setup_input_class,
               data: { "admin--settings--ai-target": "model", "saved-value": saved_model, action: "input->admin--settings--ai#refresh" } %>
@@ -24,8 +24,8 @@
     <div>
       <div class="flex flex-wrap items-center gap-3">
         <%# Its own form (a sibling after the main one). Not a pending-lock control: see the class comment. %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "Test connection", variant: :secondary, type: "submit", form: TEST_FORM,
-              data: { "admin--settings--ai-target": "test", busy_label: "Testing…" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".test"), variant: :secondary, type: "submit", form: TEST_FORM,
+              data: { "admin--settings--ai-target": "test", busy_label: t(".testing") }) %>
         <span class="text-sm text-meta" data-admin--settings--ai-target="testHint" hidden></span>
       </div>
       <%= render Admin::SettingsScreen::AiTestResultComponent.new %>

@@ -47,8 +47,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
     settings = groups.find { |g| g[:label] == "Settings" }
     assert_includes settings[:rows].map { |r| r[:title] }, "Settings › Languages"
     assert_not_includes settings[:rows].map { |r| r[:title] }, "Dashboard"
-    assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Publishing", "Settings › Forms", "Settings › AI translation" ],
-      settings[:rows].map { |r| r[:title] }, "the nav's order, cut to the group's five"
+    assert_equal Jump::Search::SETTINGS_TITLES.values, settings[:rows].map { |r| r[:title] }, "every section, in the nav's order"
     sections = groups.find { |g| g[:label] == "Sections" }
     assert_includes sections[:rows].map { |r| r[:title] }, "Dashboard"
   end
@@ -82,6 +81,18 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_not AccessControl.holds?(languages_only, "settings.manage", channel: :admin), "the premise: the viewer holds languages.manage alone"
     settings = search("", actor: languages_only, modules: []).find { |g| g[:label] == "Settings" }
     assert_equal [ "Settings › Languages" ], settings[:rows].map { |r| r[:title] }
+  end
+
+  test "a blank query by a viewer who holds every permission lists all seven Settings rows, past the group limit" do
+    assert SettingsSections::ALL.all? { |section| AccessControl.holds?(@owner, section.permission, channel: :admin) }, "the premise: the owner holds every section's right"
+    assert_operator SettingsSections.ids.size, :>, Jump::Search::LIMIT, "the premise: there are more sections than the limit"
+
+    settings = search("").find { |g| g[:label] == "Settings" }
+    assert_equal SettingsSections.ids, settings[:rows].map { |r| r[:route].last[:anchor] }
+    assert_equal SettingsSections.ids.map { |id| Jump::Search::SETTINGS_TITLES.fetch(id) }, settings[:rows].map { |r| r[:title] }
+
+    7.times { |i| create_post(title: "Limited #{i}") }
+    assert_equal Jump::Search::LIMIT, search("limited").find { |g| g[:label] == "Posts" }[:rows].size, "the open-ended groups keep the limit"
   end
 
   test "a two-letter query does not match a record through a locale key" do

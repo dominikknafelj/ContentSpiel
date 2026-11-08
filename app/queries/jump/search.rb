@@ -40,7 +40,8 @@ module Jump
     # The Settings group: the sections of the Settings screen
     # (`SettingsSections`), in its nav's order, each a link to its card's
     # heading (`anchor: "mail"`) under the right that owns the card, so a
-    # viewer is never offered a link that would 403. The titles are what a
+    # viewer is never offered a link that would 403. The group is not cut to
+    # LIMIT: a blank query lists every section the viewer may manage. The titles are what a
     # person types against, so they stay here, English, keyed by the
     # sections' ids.
     SETTINGS_TITLES = {
@@ -62,7 +63,7 @@ module Jump
     def groups
       [
         group("Pages", page_rows), group("Posts", post_rows), group("Media", media_rows),
-        group("Sections", module_rows), group("Settings", settings_rows), group("Actions", action_rows)
+        group("Sections", module_rows), group("Settings", settings_rows, limit: nil), group("Actions", action_rows)
       ].compact
     end
 
@@ -70,7 +71,9 @@ module Jump
 
     attr_reader :actor, :query, :modules
 
-    def group(label, rows) = rows.empty? ? nil : { label: label, rows: rows.first(LIMIT) }
+    # `limit: nil` for a group whose rows are a short fixed list, every one of
+    # which a blank query offers (the Settings sections).
+    def group(label, rows, limit: LIMIT) = rows.empty? ? nil : { label: label, rows: limit ? rows.first(limit) : rows }
     def blank? = query.empty?
     def matches?(text) = text.to_s.downcase.include?(query.downcase)
 

@@ -112,6 +112,29 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal %w[languages], css_select("section.admin-settings-card").map { |card| card["aria-labelledby"] }
   end
 
+  # Every element drawn with each of the primary's classes, outside a dialog
+  # (whose confirm is its own area's primary).
+  def primaries(html)
+    wanted = Admin::Ui::ButtonComponent.classes(:primary).split
+    Nokogiri::HTML5.fragment(html).css("[class]").select do |node|
+      (wanted - node["class"].split).empty? && node.ancestors.none? { |up| up.name == "dialog" || up["role"] == "dialog" }
+    end
+  end
+
+  test "the Settings screen draws one primary button, the save bar's" do
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+    sample = %(<div><button class="#{primary}">One</button><a class="extra #{primary}">Two</a>) +
+      %(<dialog><button class="#{primary}">In a dialog</button></dialog><div role="dialog"><button class="#{primary}">In another</button></div>) +
+      %(<button class="#{Admin::Ui::ButtonComponent.classes(:secondary)}">Secondary</button></div>)
+    assert_equal 2, primaries(sample).size, "the matcher finds a primary however it is written, and none inside a dialog"
+
+    get "/cs-studio/settings"
+
+    found = primaries(response.body)
+    assert_equal 1, found.size, "primaries outside a dialog: #{found.map { |node| node.text.squish }.inspect}"
+    assert found.first.ancestors.any? { |up| up["class"].to_s.split.include?("admin-save-bar") }, "the one primary is the save bar's"
+  end
+
   # -- saving -------------------------------------------------------------------
 
   test "saving two languages' titles at once writes both and records one settings.updated" do

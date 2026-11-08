@@ -9,6 +9,8 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
     Current.session = nil
   end
 
+  def drawn_as?(button, variant, size: :regular) = (Admin::Ui::ButtonComponent.classes(variant, size: size).split - button[:class].split).empty?
+
   test "each state is a state chip, its tone and its word, and its sentence" do
     { not_set_up: [ "Not set up", "Not set up. Password resets and invites are off.", :off ],
       untested: [ "Saved, not tested", "Saved, not tested. Send a test mail to turn on resets and invites.", :warn ],
@@ -79,5 +81,19 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
     render_card(site: site, errors: site.errors)
 
     assert_selector "#settings-mail_sender_name-errors", text: "Sender name can't contain a line break."
+  end
+
+  test "the state stands at the head's end, as the Site card's tabs do, and the head's note holds nothing of Mail's" do
+    with_mail_state(:working) { render_card }
+
+    assert_selector ".admin-settings-card__head > .admin-settings-card__end #settings-mail-state[data-mail-state=working]"
+    assert_no_selector ".admin-settings-card__note"
+  end
+
+  test "Save login is a secondary: the save bar is the screen's one primary" do
+    with_mail_state(:not_set_up) { render_card }
+
+    assert drawn_as?(page.find("#settings-mail-login button[form=settings-mail-login-form]", text: "Save login"), :secondary)
+    assert_no_selector "button.bg-accent", visible: :all
   end
 end

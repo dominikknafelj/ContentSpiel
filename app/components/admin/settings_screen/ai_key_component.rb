@@ -5,7 +5,9 @@ module Admin
     # "added 2 Oct" when the key has a date; "No key" with a provider and no
     # key; and "Off" without a provider, whether a key is stored or not.
     # Replace/Add key swaps the chip for a password input with Save key and
-    # Cancel -- client side, `admin--settings--ai`.
+    # Cancel -- client side, `admin--settings--ai`. Replace, Add key and Save
+    # key are secondary, Remove… the danger text and Cancel the tertiary: an
+    # instant action is never the primary, which is the save bar's Save.
     #
     # NO PART OF THE KEY IS EVER RENDERED, and nothing here decrypts it: only
     # `SiteSetting#ai_api_key_set?` (the raw column) and the saved-on date are
@@ -44,7 +46,7 @@ module Admin
         date = site_setting.ai_api_key_saved_on
         return nil unless date
 
-        "added #{date.strftime(date.year == Time.zone.today.year ? "%-d %b" : "%-d %b %Y")}"
+        t(".added", date: I18n.l(date, format: date.year == Time.zone.today.year ? :"admin.short" : :"admin.short_with_year"))
       end
 
       # The date follows Key saved only: under Off, a key kept while no

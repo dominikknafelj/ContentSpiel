@@ -33,6 +33,8 @@ class Admin::SettingsScreen::CardComponentTest < ViewComponent::TestCase
     positions = [ "bg-ic-media-bg", "<h2", "How mail is sent.", "data-end", "data-note" ].map { |mark| html.index(mark) }
     assert positions.all?, "every part is in the head: #{positions.inspect}"
     assert_equal positions.sort, positions, "the chip, the word, the intro, then head_end and head_note"
+    assert_selector ".admin-settings-card__head > .admin-settings-card__end [data-end]"
+    assert_selector ".admin-settings-card__head > .admin-settings-card__note [data-note]"
   end
 
   test "without an intro or slots the head is the chip and the word alone" do
@@ -57,6 +59,7 @@ class Admin::SettingsScreen::CardComponentTest < ViewComponent::TestCase
   end
 
   test "the section's word is its key" do
+    assert_equal "Mail", I18n.t("admin.components.settings_screen.sections.mail"), "read first, so the backend has loaded its files"
     I18n.backend.store_translations(:en, admin: { components: { settings_screen: { sections: { mail: "Post" } } } })
     render_inline(Admin::SettingsScreen::CardComponent.new(section: mail)) { "Body" }
 

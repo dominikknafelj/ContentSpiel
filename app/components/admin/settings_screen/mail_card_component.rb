@@ -1,14 +1,14 @@
 module Admin
   module SettingsScreen
-    # The Mail card (spec "Settings → Mail", design answers M2 and M3; docs/
-    # reference/mail.md), after AI translation, for `settings.manage`.
+    # The Mail card (docs/reference/mail.md), after AI translation, for
+    # `settings.manage`.
     #
     # - Server, Port, Security (STARTTLS / TLS, a segmented control), Sender
     #   name and Sender address are fields of the one Settings form, saved
     #   with its save bar. Choosing a security puts its port (587 / 465) into
     #   Port unless a port was typed (`admin--settings--mail`).
     # - The login is `MailLoginComponent`: instant forms, written once.
-    # - The state (`MailStateComponent`) sits under the title.
+    # - The state (`MailStateComponent`) stands at the head's end.
     # - "Send test mail" is the foot (`MailTestResultComponent`).
     #
     # A field the host's environment sets (`MailSettings#from_host?`) is no
@@ -28,7 +28,7 @@ module Admin
         mail_sender_name: :sender_name, mail_sender_address: :sender_address
       }.freeze
       SECURITIES = %w[starttls tls].freeze
-      # The port each security is normally served on (spec, M1).
+      # The port each security is normally served on.
       PORTS = { "starttls" => 587, "tls" => 465 }.freeze
 
       def initialize(site_setting:, mail_settings:, values:, errors: nil)

@@ -1,9 +1,9 @@
 module Admin
   module SettingsScreen
-    # The Languages card's instant actions (round 3, Task 6): the forms and
-    # dialogs that can't live inside the Settings form (forms can't nest, and a
-    # dialog's own form can't be inside one either) and that the card reaches
-    # by `form=` or a dialog trigger. Rendered after the Settings form.
+    # The Languages card's instant actions: the forms and dialogs that can't
+    # live inside the Settings form (forms can't nest, and a dialog's own form
+    # can't be inside one either) and that the card reaches by `form=` or a
+    # dialog trigger. Rendered after the Settings form.
     #
     #   - `#language-add-form` -- Add language: `POST settings/languages`, no
     #     dialog (nothing is lost by it);
@@ -11,7 +11,7 @@ module Admin
     #     settings/languages/<code>/default`) and "Turn off <Name>?"
     #     (`DELETE settings/languages/<code>`).
     #
-    # Both dialogs are NEUTRAL (primary confirm, never red): the default change
+    # Both dialogs are NEUTRAL (their confirm is the dialog's primary, never red): the default change
     # re-marks translations but deletes nothing, and turning a language off keeps
     # its translations (`Locales::Disable`). The "(N items)" in the default
     # dialog is `Translations::StateIndex.translated_record_count` -- how many
@@ -34,7 +34,7 @@ module Admin
       def off_dialog_id(code) = LanguagesCardComponent.off_dialog_id(code)
 
       def items_phrase
-        @items_phrase ||= helpers.pluralize(::Translations::StateIndex.translated_record_count, "item")
+        @items_phrase ||= t(".items", count: ::Translations::StateIndex.translated_record_count)
       end
 
       private

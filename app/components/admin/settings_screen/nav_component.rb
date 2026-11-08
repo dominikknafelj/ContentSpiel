@@ -26,7 +26,7 @@ module Admin
 
       attr_reader :sections
 
-      def word(section) = t("admin.components.settings_screen.sections.#{section.id}")
+      def word(section) = t(CardComponent.word_key(section))
     end
   end
 end
