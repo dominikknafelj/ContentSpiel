@@ -1,6 +1,7 @@
 // Draws one frame of the mind graph.
-// Order: edges, marks (each with its pin), labels, notes badges, rings. Everything is in SCREEN pixels: the
-// camera moves a node's centre, and a node is the same size at every zoom.
+// Order: edges, marks (each with its pin), labels, notes badges, rings.
+// Everything is in SCREEN pixels: the camera moves a node's centre, and a
+// node is the same size at every zoom.
 //
 // The marks and the five looks of a record's state are `marks.js`'s
 // (`drawMark`); the lines are the five styles of `LINE_STYLES` below, each
