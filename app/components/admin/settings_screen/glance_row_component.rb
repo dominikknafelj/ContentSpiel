@@ -1,8 +1,9 @@
 module Admin
   module SettingsScreen
     # One row of the "At a glance" rail (`GlanceComponent`): a same-page
-    # link to its card's heading (`#mail`), with the section's chip, its
-    # name and its state. Only the four sections with a state have a row.
+    # link to its card's heading (`#mail`), with the section's name and its
+    # state. The section chips stay the nav's, beside the rail. Only the
+    # four sections with a state have a row.
     #
     # - Languages: how many the site has, and which is the default (named
     #   in its own language, as the Languages card names it); no state chip,
@@ -24,8 +25,17 @@ module Admin
     # page leaves nothing, so the leave guard never asks about it. The state
     # chips are text and take no focus, so the keyboard passes over a row in
     # one step.
+    #
+    # The row's hover is the dashboard rail rows': the paper fill on the
+    # tile radius, on the row's own padding (`-mx-2 px-2`), so the words
+    # stay on the rail's padding line; Tailwind's `hover:` stands only
+    # under `@media (hover: hover)`, so a touch screen keeps no fill after a
+    # tap. It fades in 120ms on `--cs-ease`, at once under reduced motion,
+    # and the focus ring is the global one.
     class GlanceRowComponent < Admin::AdminComponent
       SECTIONS = %w[languages ai mail images].freeze
+      ROW_CLASS = "-mx-2 flex items-center gap-2 rounded-tile px-2 py-1.5 text-sm text-ink transition-colors duration-120 ease-(--cs-ease) " \
+                  "motion-reduce:transition-none hover:bg-paper".freeze
 
       def self.id_for(section_id) = "settings-glance-#{section_id}"
 

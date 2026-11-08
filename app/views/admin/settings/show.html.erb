@@ -35,9 +35,14 @@
 <% manage_languages = can?("languages.manage") %>
 <% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
-<% images_fingerprint = (ImageSettings.current(SiteSetting.find(@site_setting.id)).fingerprint if manage_settings) %>
+<%# What is saved, for every word that says a state (the AI key, mail, the
+    images, the rail): after a refused save `Settings::Save` leaves what was
+    typed on `@site_setting`, which the fields show, but nothing of it was
+    saved. Read again only then, so the screen's ordinary draw costs nothing. %>
+<% stored = (@errors.present? || @stale_form) ? SiteSetting.find(@site_setting.id) : @site_setting %>
+<% images_fingerprint = (ImageSettings.current(stored).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
-<% mail_settings = (MailSettings.current(@site_setting) if manage_settings) %>
+<% mail_settings = (MailSettings.current(stored) if manage_settings) %>
 <% sections = SettingsSections.for { |permission| can?(permission) } %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "form_keep_days" => "settings-form_keep_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
@@ -54,7 +59,7 @@
       <%= render Admin::SettingsScreen::NavComponent.new(sections: sections) %>
     </div>
 
-    <%= render Admin::SettingsScreen::GlanceComponent.new(sections: sections, site_setting: @site_setting, mail_settings: mail_settings,
+    <%= render Admin::SettingsScreen::GlanceComponent.new(sections: sections, site_setting: stored, mail_settings: mail_settings,
           images_progress: images_progress, locales: Locales.enabled, default: Locales.default) %>
 
     <div class="admin-settings-layout__cards flex flex-col gap-5">
@@ -83,9 +88,9 @@
                   errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
             <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
             <%= render Admin::SettingsScreen::FormsCardComponent.new(values: values, errors: field_errors.call(:form_keep_days)) %>
-            <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: @site_setting, values: values,
+            <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: stored, values: values,
                   provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
-            <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: mail_settings, values: values,
+            <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: stored, mail_settings: mail_settings, values: values,
                   errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
             <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
                   errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>

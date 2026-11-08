@@ -84,10 +84,19 @@ class Admin::SettingsScreen::GlanceRowComponentTest < ViewComponent::TestCase
       assert_selector "a[href='##{id}']#settings-glance-#{id}"
       assert_no_selector "a[data-turbo-frame], a[data-turbo-action]"
       assert_no_selector "button, input, [tabindex]"
-      section = SettingsSections.find(id)
-      chip = page.find("a").native.element_children.first
-      assert_equal [ "span", "true" ], [ chip.name, chip["aria-hidden"] ], id
-      assert_includes chip[:class].split, Admin::Ui::IconChipComponent::FAMILIES.fetch(section.family).split.first, id
+      assert_no_selector "a svg", visible: :all # the section chips are the nav's, not the rail's
+      assert_empty Admin::Ui::IconChipComponent::FAMILIES.values.map { |classes| classes.split.first } & page.find("a")[:class].split
+    end
+  end
+
+  # The dashboard rail rows' hover: the paper fill on the row's own padding,
+  # on the tile radius, 120ms on the ease, none under reduced motion.
+  test "a row's hover is the paper fill on its own padding, and it fades unless motion is reduced" do
+    render_row("mail")
+
+    classes = page.find("a")[:class].split
+    %w[-mx-2 px-2 py-1.5 rounded-tile hover:bg-paper transition-colors duration-120 ease-(--cs-ease) motion-reduce:transition-none].each do |name|
+      assert_includes classes, name
     end
   end
 

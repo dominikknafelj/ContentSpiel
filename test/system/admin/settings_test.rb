@@ -74,6 +74,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       assert docked?(boxes), boxes.inspect
       assert_in_delta boxes["cards"]["right"] + 28, boxes["rail"]["left"], 1, "the rail stands --cs-rail-gap right of the cards"
       assert_in_delta 360, boxes["rail"]["width"], 1, "the rail is --cs-rail-width"
+      assert_in_delta boxes["container"]["width"] - 586, boxes["cards"]["width"], 1, "the cards' column takes what the nav, the gaps and the rail leave"
       assert_in_delta boxes["nav"]["right"] + 28, boxes["cards"]["left"], 1, "the cards stand --cs-rail-gap right of the nav"
       assert_in_delta boxes["container"]["left"], boxes["nav"]["left"], 1, "below the content max the composition stands at the left"
       assert_equal boxes["rail_token"], boxes["rail_background"]

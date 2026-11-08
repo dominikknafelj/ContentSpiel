@@ -478,4 +478,18 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "turbo-stream[target=settings-glance-ai]", 0
   end
+
+  # A refused save leaves the typed provider on the row in memory; the key's
+  # chip and the rail's row say the stored state, while the select shows
+  # what was typed.
+  test "a refused save after choosing a provider keeps the key's chip and the rail's row on the stored state" do
+    @site.update!(ai_provider: nil)
+
+    patch "/cs-studio/settings", params: { site_setting: { ai_provider: "test/stub", translations: { en: { title: "" } } }, base_updated_at: @site.reload.updated_at.iso8601(6) }
+
+    assert_response :unprocessable_entity
+    assert_select "select[name='site_setting[ai_provider]'] option[selected][value='test/stub']"
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=off]", text: "Off"
+    assert_select "#settings-glance-ai .admin-state-chip[data-state-tone=off]", text: "Off"
+  end
 end

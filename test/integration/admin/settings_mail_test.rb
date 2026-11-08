@@ -311,4 +311,18 @@ class Admin::SettingsMailTest < ActionDispatch::IntegrationTest
       assert_select "turbo-stream[target=settings-glance-ai]", 0
     end
   end
+
+  # A refused save leaves what was typed on the row in memory. The fields
+  # show it; the state words are the stored row's, since nothing was saved.
+  test "a refused save after changing the mail server keeps the Mail row and the card chip on the stored state" do
+    with_mail_state(:working) do
+      save(mail_server: "smtp.other.test", mail_port: "99999")
+
+      assert_response :unprocessable_entity
+      assert_select "#settings-mail_server[value=?]", "smtp.other.test"
+      assert_select "#settings-mail-state[data-mail-state=working] .admin-state-chip[data-state-tone=ok]", text: "Working"
+      assert_select "#settings-glance-mail .admin-state-chip[data-state-tone=ok]", text: "Working"
+      assert_no_match(/Saved, not tested/, response.body)
+    end
+  end
 end
