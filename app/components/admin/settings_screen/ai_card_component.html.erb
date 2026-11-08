@@ -1,9 +1,6 @@
-<section id="settings-ai-card" class="admin-settings-card rounded-card bg-surface shadow-1" aria-labelledby="ai"
-         data-controller="admin--settings--ai admin--saving--pending-lock">
-  <div class="border-b border-line px-4 py-3.5">
-    <h2 id="ai" class="text-h2 text-ink">AI translation</h2>
-    <p class="mt-1 text-sm text-dim">Editors can ask for a suggested translation of a field. Nothing is saved until they use it.</p>
-  </div>
+<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("ai"), id: "settings-ai-card",
+      intro: "Editors can ask for a suggested translation of a field. Nothing is saved until they use it.",
+      data: { controller: "admin--settings--ai admin--saving--pending-lock" }) do %>
   <div class="flex flex-col gap-4 p-4">
     <div class="grid gap-3.5 sm:grid-cols-2">
       <div class="admin-column" data-field-name="ai_provider">
@@ -34,4 +31,4 @@
       <%= render Admin::SettingsScreen::AiTestResultComponent.new %>
     </div>
   </div>
-</section>
+<% end %>

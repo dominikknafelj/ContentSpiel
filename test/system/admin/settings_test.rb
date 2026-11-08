@@ -133,18 +133,21 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "Typed, then jump", find_field("settings-en-title").value
   end
 
-  test "the section in view is the nav's current one, in ink with the bar, and follows the scroll" do
+  test "the section in view is the nav's current one, on the accent tint, and follows the scroll" do
     # Short enough that Publishing's heading can be scrolled to the top without the page's end stopping it.
     page.current_window.resize_to(1400, 400)
-    visit admin_settings_path
-    await_admin_controllers
+    visit_screen admin_settings_path
     nav = "nav[aria-label='Settings sections']"
 
     assert_selector "#{nav} a[aria-current=true]", text: "Site", count: 1
-    look = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{"#{nav} a[aria-current=true]".to_json})); return [ s.color, s.boxShadow ] })()")
-    ink = page.evaluate_script("getComputedStyle(document.body).getPropertyValue('--cs-ink')")
-    assert_match(/inset/, look[1])
-    assert_equal look[0], page.evaluate_script("(() => { const p = document.createElement('p'); p.style.color = #{ink.strip.to_json}; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c })()")
+    look = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector(#{"#{nav} a[aria-current=true]".to_json})); return [ s.color, s.backgroundColor, s.fontWeight, s.boxShadow ] })()")
+    resolved = ->(token, property) { page.evaluate_script("(() => { const p = document.createElement('p'); p.style.#{property} = getComputedStyle(document.body).getPropertyValue(#{token.to_json}).trim(); document.body.append(p); const c = getComputedStyle(p).#{property}; p.remove(); return c })()") }
+    assert_equal resolved.("--cs-ink", "color"), look[0]
+    assert_equal resolved.("--cs-accent-tint", "backgroundColor"), look[1]
+    assert_equal "600", look[2]
+    assert_equal "none", look[3], "no bar: the tint alone marks the current link"
+    other = page.evaluate_script("getComputedStyle(document.querySelector(#{"#{nav} a:not([aria-current])".to_json})).backgroundColor")
+    assert_not_equal look[1], other
 
     page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
     assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
@@ -233,8 +236,8 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   # ⌘K "Settings › AI translation" used ON Settings is a `_top` link to a
-  # section of the screen that is showing. As a visit it asked "Leave without
-  # saving?" about a jump that leaves nothing (final wave B).
+  # section of the screen that is showing. It is no visit: a visit would ask
+  # "Leave without saving?" about a jump that leaves nothing.
   test "a ⌘K row for a section of this screen jumps there without asking, changes kept" do
     visit admin_settings_path
     await_admin_controllers

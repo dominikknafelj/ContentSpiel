@@ -93,6 +93,25 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller~='admin--saving--autosave']", count: 0
   end
 
+  test "every card is drawn by the card frame, in the nav's order, for the rights the viewer holds" do
+    get "/cs-studio/settings"
+
+    cards = css_select("form#settings-form section.admin-settings-card")
+    assert_equal SettingsSections.ids, cards.map { |card| card["aria-labelledby"] }
+    assert_equal SettingsSections.ids.map { |id| "settings-#{id}-card" }, cards.map { |card| card["id"] }
+    assert_equal SettingsSections.ids.map { |id| "##{id}" }, css_select("nav[aria-label='Settings sections'] a").map { |a| a["href"] }
+    cards.each do |card|
+      head = card.at_css("> .admin-settings-card__head")
+      assert head, "#{card['id']} has the frame's head"
+      assert head.at_css("span[aria-hidden=true] svg"), "#{card['id']} carries its chip"
+      assert head.at_css("h2##{card['aria-labelledby']}.text-h2"), "#{card['id']} is named by its heading"
+    end
+
+    sign_in_as(user_holding("languages.manage"))
+    get "/cs-studio/settings"
+    assert_equal %w[languages], css_select("section.admin-settings-card").map { |card| card["aria-labelledby"] }
+  end
+
   # -- saving -------------------------------------------------------------------
 
   test "saving two languages' titles at once writes both and records one settings.updated" do
@@ -335,7 +354,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   end
 
   # The form resends every field, so what the select shows as selected is
-  # what a save writes back: a stored zone no option names used to fall to
+  # what a save writes back: a stored zone no option names must not fall to
   # the first option ("International Date Line West").
   test "a stored zone no option names stays selected, and a save that doesn't touch it keeps it" do
     @site.update_column(:time_zone, "America/Argentina/Cordoba")
@@ -364,7 +383,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "Europe/Berlin", @site.reload.effective_time_zone.tzinfo.name
   end
 
-  # -- stale saves (D4) ---------------------------------------------------------
+  # -- stale saves --------------------------------------------------------------
 
   test "a save on a stale base is refused with the banner, the typed values kept and nothing written" do
     stale = base
@@ -467,7 +486,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "Junk base", @site.reload.title
   end
 
-  # -- who sees what (D9) -------------------------------------------------------
+  # -- who sees what ------------------------------------------------------------
 
   def user_holding(*keys)
     user = users(:editor_branch)

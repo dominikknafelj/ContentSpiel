@@ -1,0 +1,18 @@
+<%= tag.section(**section_attributes) do %>
+  <%# A grid, so the chip centres on the heading's line and the intro and the
+      note stand under the heading, not under the chip. %>
+  <div class="admin-settings-card__head grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-t-card bg-rail px-4 py-3">
+    <%= render Admin::Ui::IconChipComponent.new(icon: section.icon, family: section.family, size: :small, class: "col-start-1 row-start-1") %>
+    <h2 id="<%= section.id %>" class="col-start-2 row-start-1 text-h2 font-semibold text-ink"><%= word %></h2>
+    <% if intro.present? %>
+      <p class="col-start-2 row-start-2 mt-0.5 text-small text-dim"><%= intro %></p>
+    <% end %>
+    <% if head_end? %>
+      <div class="col-start-3 row-start-1 row-span-2 self-start"><%= head_end %></div>
+    <% end %>
+    <% if head_note? %>
+      <div class="col-span-2 col-start-2"><%= head_note %></div>
+    <% end %>
+  </div>
+  <%= content %>
+<% end %>

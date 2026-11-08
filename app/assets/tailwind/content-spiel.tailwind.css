@@ -447,9 +447,9 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 
 /* Settings' in-page nav (Admin::SettingsScreen::NavComponent): the link of the
    section in view is current. The look is read from `aria-current`, so it
-   cannot drift from what a screen reader hears; ink text and a 2px ink bar at
-   the left, as the selected tree row has. */
-.admin-settings-nav a[aria-current="true"] { color: var(--cs-ink); box-shadow: inset 2px 0 0 var(--cs-ink); }
+   cannot drift from what a screen reader hears: the accent's tint, a
+   selection, with the name in ink at 600. */
+.admin-settings-nav a[aria-current="true"] { background: var(--cs-accent-tint); color: var(--cs-ink); font-weight: 600; }
 
 /* Admin::Ui::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::Ui::DialogComponent::WIDTHS). */

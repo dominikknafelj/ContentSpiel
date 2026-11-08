@@ -1,11 +1,11 @@
 module Jump
-  # What ⌘K finds (design pass spec §5.6): titles only -- pages, posts and
-  # library images the viewer may read, CS Studio's own modules, and a few
-  # actions. Full-text search is a separate roadmap item; this is a way to
+  # What ⌘K finds: titles only -- pages, posts and library images the viewer
+  # may read, CS Studio's own modules, the Settings screen's sections and a
+  # few actions. Full-text search is a separate roadmap item; this is a way to
   # *go* somewhere, not to find a phrase.
   #
   # Read-scoped the same way every list is (`AccessControl.scope`, which
-  # also hides trashed records -- trash spec §5.4; `Media::Asset.kept` does
+  # also hides trashed records, `docs/reference/trash.md`; `Media::Asset.kept` does
   # the same for images, which have no read scope of their own), so a title
   # the viewer couldn't open is never suggested.
   #
@@ -37,19 +37,21 @@ module Jump
       { title: "Your account", path: :admin_account_path, permission: nil }
     ].freeze
 
-    # The Settings group (spec §7, round 1 second review): destinations
-    # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
-    # id of the section on `admin_settings_path` (`site`, `languages`, `publishing`, `ai`; see
-    # `Admin::SettingsScreen::NavComponent`). Each needs the right that owns its card on that one screen,
-    # so a viewer is never offered a link that would 403. Sections (CS Studio's
-    # modules) used to share this group's label -- "Settings" listing
-    # Dashboard and Pages -- and are a group of their own now.
-    SETTINGS_DESTINATIONS = [
-      { title: "Settings › Site", path: :admin_settings_path, anchor: "site", permission: "settings.manage" },
-      { title: "Settings › Publishing", path: :admin_settings_path, anchor: "publishing", permission: "settings.manage" },
-      { title: "Settings › Languages", path: :admin_settings_path, anchor: "languages", permission: "languages.manage" },
-      { title: "Settings › AI translation", path: :admin_settings_path, anchor: "ai", permission: "settings.manage" }
-    ].freeze
+    # The Settings group: the sections of the Settings screen
+    # (`SettingsSections`), in its nav's order, each a link to its card's
+    # heading (`anchor: "mail"`) under the right that owns the card, so a
+    # viewer is never offered a link that would 403. The titles are what a
+    # person types against, so they stay here, English, keyed by the
+    # sections' ids.
+    SETTINGS_TITLES = {
+      "site" => "Settings › Site",
+      "languages" => "Settings › Languages",
+      "publishing" => "Settings › Publishing",
+      "forms" => "Settings › Forms",
+      "ai" => "Settings › AI translation",
+      "mail" => "Settings › Mail",
+      "images" => "Settings › Images"
+    }.freeze
 
     def initialize(actor:, query:, modules:)
       @actor = actor
@@ -109,9 +111,9 @@ module Jump
     end
 
     def settings_rows
-      SETTINGS_DESTINATIONS.select { |dest| AccessControl.holds?(actor, dest[:permission], channel: :admin) }
-        .select { |dest| blank? || matches?(dest[:title]) }
-        .map { |dest| { title: dest[:title], route: [ dest[:path], [], { anchor: dest[:anchor] } ] } }
+      SettingsSections.for { |permission| AccessControl.holds?(actor, permission, channel: :admin) }
+        .map { |section| { title: SETTINGS_TITLES.fetch(section.id), route: [ :admin_settings_path, [], { anchor: section.id } ] } }
+        .select { |row| blank? || matches?(row[:title]) }
     end
 
     def action_rows

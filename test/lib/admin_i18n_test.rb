@@ -120,6 +120,11 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/forms/new.html.erb
     app/views/admin/forms/show.html.erb
     app/javascript/controllers/admin/forms/builder_controller.js
+    app/components/admin/settings_screen/card_component.rb
+    app/components/admin/settings_screen/card_component.html.erb
+    app/components/admin/settings_screen/nav_component.rb
+    app/components/admin/settings_screen/nav_component.html.erb
+    app/views/admin/settings/show.html.erb
     app/components/admin/settings_screen/forms_card_component.rb
     app/components/admin/settings_screen/forms_card_component.html.erb
     app/components/admin/settings_screen/images_card_component.rb

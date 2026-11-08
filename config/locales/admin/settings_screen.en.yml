@@ -2,16 +2,25 @@
 # card): `admin.components.settings_screen.*` are their keys
 # (docs/reference/i18n.md: one file per component folder). A card still
 # drawn with literals is one `test/lib/admin_i18n_test.rb` does not list.
-#
-# `admin.settings.*` are what the controllers and `Settings::Save` answer:
-# toasts, the login's refusal, the sentence a site without encryption keys
-# gets for the mail login and the AI key alike, and a host-set field's.
+# The screen's view and the controllers' answers are `admin.settings.*`, in
+# `settings.en.yml`.
 en:
   admin:
     components:
       settings_screen:
+        # Each section's name, in the nav, on its card's heading and wherever
+        # a section is named (`SettingsSections`).
+        sections:
+          site: "Site"
+          languages: "Languages"
+          publishing: "Publishing"
+          forms: "Forms"
+          ai: "AI translation"
+          mail: "Mail"
+          images: "Images"
+        nav:
+          label: "Settings sections"
         mail_card:
-          title: "Mail"
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
           server: "Server"
           server_placeholder: "smtp.example.com"
@@ -62,12 +71,10 @@ en:
         ai_test_result:
           time: "%{milliseconds} ms"
         forms_card:
-          title: "Forms"
           keep_label: "Keep submissions for"
           days: "days."
           help: "Forms that keep submissions and don't set their own time keep them this long. A change applies to submissions already kept."
         images_card:
-          title: "Images"
           intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."
           format: "Format"
           webp: "WebP"
@@ -98,19 +105,3 @@ en:
             one: "Remake %{count} image? This runs in the background and can take a few minutes."
             other: "Remake %{count} images? This runs in the background and can take a few minutes."
           confirm: "Regenerate images"
-    settings:
-      mail_login:
-        saved: "Mail login saved"
-        removed: "Mail login removed"
-        blank: "Enter a username or a password first."
-      mail_test:
-        too_many: "Too many test mails. Try again in a few minutes."
-      regenerate_images:
-        queued:
-          zero: "No image needed regenerating."
-          one: "Regenerating %{count} image."
-          other: "Regenerating %{count} images."
-      save:
-        avif_unavailable: "AVIF can't be chosen: this server cannot write it."
-        no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
-        set_by_host: "%{field} is set by the host and can't be changed here."

@@ -1,0 +1,26 @@
+# The Settings screen's own view (`admin/settings/show`, `admin.settings.show.*`)
+# and what the controllers and `Settings::Save` answer: toasts, the login's
+# refusal, the sentence a site without encryption keys gets for the mail
+# login and the AI key alike, and a host-set field's. The cards' words are
+# `admin.components.settings_screen.*`, in `settings_screen.en.yml`.
+en:
+  admin:
+    settings:
+      show:
+        title: "Settings"
+        heading: "Settings"
+      mail_login:
+        saved: "Mail login saved"
+        removed: "Mail login removed"
+        blank: "Enter a username or a password first."
+      mail_test:
+        too_many: "Too many test mails. Try again in a few minutes."
+      regenerate_images:
+        queued:
+          zero: "No image needed regenerating."
+          one: "Regenerating %{count} image."
+          other: "Regenerating %{count} images."
+      save:
+        avif_unavailable: "AVIF can't be chosen: this server cannot write it."
+        no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
+        set_by_host: "%{field} is set by the host and can't be changed here."
