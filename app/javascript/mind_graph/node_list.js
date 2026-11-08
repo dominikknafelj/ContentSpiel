@@ -291,7 +291,11 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // it says where it is: its ancestors' titles from Home (the data's
   // `ancestors`), joined, on a line under its title cut at the end; the
   // tooltip and the name carry the whole path.
-  const pathOf = (node) => (node.ancestors?.length ? node.ancestors.join(PATH_JOIN) : null)
+  // A blank title is left out, so the line never holds a bare mark.
+  const pathOf = (node) => {
+    const titles = (node.ancestors ?? []).filter((title) => String(title ?? "").trim())
+    return titles.length ? titles.join(PATH_JOIN) : null
+  }
   const placed = (title, path) => (path ? text.t("mind_graph.script.list.under", { title, path }) : title)
   // A row's title, and on a line of their own under it its chips when it
   // has any: the title keeps the row's whole width and is cut only by the
@@ -373,7 +377,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
   const row = (node, { notInView = false, addable = true, opens = false, path = null } = {}) => {
     const item = document.createElement("li")
     const button = rowButton(node.id, { opens, flat: node.kind === "post" && !opens })
-    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node) }))
+    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node), figure: number(figure(node)) }))
     // At the row's end: the figure, or the words of a row that is not in view.
     const notShown = () => element("span", "text-label text-meta", text.t("mind_graph.script.list.not_in_view"))
     const trailing = element("span", classes.trailing)
@@ -524,6 +528,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
       forget()
       goBack = back?.onBack ?? null
       const shown = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id), addable }))), { back }) ]
+      // "Not listed on any page" with nothing to show says so under its heading.
+      if (!given.length && !back) shown.push(line(text.t("mind_graph.script.list.unlisted_none")))
       if (link) {
         const anchor = element("a", "mx-1 mt-2 inline-block text-sm text-accent underline", link.label)
         anchor.href = link.href

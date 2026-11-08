@@ -231,22 +231,23 @@ en:
             one: "%{words}: %{figure} more post %{target} lists, not in view. Activate to show it."
             other: "%{words}: %{figure} more posts %{target} lists, not in view. Activate to show them."
           select_page:
-            one: "%{title}: page, %{count} connection. Shows it in the graph."
-            other: "%{title}: page, %{count} connections. Shows it in the graph."
+            one: "%{title}: page, %{figure} connection. Shows it in the graph."
+            other: "%{title}: page, %{figure} connections. Shows it in the graph."
           select_post:
-            one: "%{title}: post, %{count} connection. Shows it in the graph."
-            other: "%{title}: post, %{count} connections. Shows it in the graph."
+            one: "%{title}: post, %{figure} connection. Shows it in the graph."
+            other: "%{title}: post, %{figure} connections. Shows it in the graph."
           select_tag:
-            one: "%{title}: tag, %{count} connection. Shows it in the graph."
-            other: "%{title}: tag, %{count} connections. Shows it in the graph."
+            one: "%{title}: tag, %{figure} connection. Shows it in the graph."
+            other: "%{title}: tag, %{figure} connections. Shows it in the graph."
           select_type:
-            one: "%{title}: post type, %{count} post. Shows it in the graph."
-            other: "%{title}: post type, %{count} posts. Shows it in the graph."
+            one: "%{title}: post type, %{figure} post. Shows it in the graph."
+            other: "%{title}: post type, %{figure} posts. Shows it in the graph."
           add_post: "%{title}, %{type} post, not in view. Activate to add it to the graph."
           add_retired_post: "%{title}, %{type}, retired type, not in view. Activate to add it to the graph."
           absent_post: "%{title}, %{type} post, not in view."
           absent_retired_post: "%{title}, %{type}, retired type, not in view."
           stated: "%{title}, %{state}"
+          unlisted_none: "Everything in view is listed on a page."
           ancestors: "%{path}"
           under: "%{title}, under %{path}"
         search:

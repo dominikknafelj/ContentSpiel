@@ -154,7 +154,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "%{figure} post has no connections yet.", "other" => "%{figure} posts have no connections yet." }, messages["mind_graph.script.isolated_only"])
     assert_equal({ "one" => "%{figure} tag", "other" => "%{figure} tags" }, messages["mind_graph.script.card.tags"])
     assert_equal({ "one" => "Release %{count} pinned", "other" => "Release %{count} pinned" }, messages["mind_graph.script.release_pinned"])
-    assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
+    assert_equal "%{title}: post, %{figure} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
     # The design answer's words, verbatim (F4, G5, H7).
     assert_equal [ "Not listed on any page", "not in view", "Open in Posts →", "The list couldn't be loaded.", "Try again" ],
@@ -162,7 +162,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "%{title}, %{type} post, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_post"]
     assert_equal "%{title}, %{type}, retired type, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_retired_post"]
     assert_equal [ "Pages · %{count}", "Tags · %{count}", "Post types · %{count}" ], messages.values_at("mind_graph.script.list.pages", "mind_graph.script.list.tags", "mind_graph.script.list.types")
-    assert_equal({ "one" => "%{title}: post type, %{count} post. Shows it in the graph.", "other" => "%{title}: post type, %{count} posts. Shows it in the graph." }, messages["mind_graph.script.list.select_type"])
+    assert_equal({ "one" => "%{title}: post type, %{figure} post. Shows it in the graph.", "other" => "%{title}: post type, %{figure} posts. Shows it in the graph." }, messages["mind_graph.script.list.select_type"])
     assert_equal [ "Pages", "Posts", "Tags", "No page, post or tag matches." ], messages.values_at(*%w[groups.page groups.post groups.tag none].map { |key| "mind_graph.script.search.#{key}" })
     # Every string of the list and of the search the locale file holds is served.
     %w[list search].each do |part|
@@ -201,7 +201,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
                     list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.ancestors list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
                     list.select_page list.select_post list.select_tag list.select_type list.stated
-                    list.tags list.try_again list.types list.under list.unlisted load_failed loading more no_connections opened.everything_name opened.line
+                    list.tags list.try_again list.types list.under list.unlisted list.unlisted_none load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
                     summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing

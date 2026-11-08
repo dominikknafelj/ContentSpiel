@@ -281,11 +281,11 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       })()
     JS
 
-    assert_equal [ "list.pages(4)", [ "Home", "1", 0, "list.select_page(Home,1)" ], [ "Docs", "2", 1, "list.select_page(Docs,2)" ],
-                   [ "Child", "9", 2, "list.select_page(Child,9)" ], [ "Stray", "0", 0, "list.select_page(Stray,0)" ],
-                   "list.posts(1)", [ "Post", "1", 0, "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", 0, "list.select_tag(tag,2)" ],
-                   "list.types(4)", [ "Blog", "112", 0, "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", 1, "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", 0, "list.select_type(Talk,1)" ],
-                   [ "gone (retired)", "0", 0, "list.select_type(gone (retired),0)" ], [ "All posts", "2040", 0, "list.select_type(All posts,2040)" ] ], rows["rows"],
+    assert_equal [ "list.pages(4)", [ "Home", "1", 0, "list.select_page(Home,1,1)" ], [ "Docs", "2", 1, "list.select_page(Docs,2,2)" ],
+                   [ "Child", "9", 2, "list.select_page(Child,9,9)" ], [ "Stray", "0", 0, "list.select_page(Stray,0,0)" ],
+                   "list.posts(1)", [ "Post", "1", 0, "list.select_post(Post,1,1)" ], "list.tags(1)", [ "tag", "2", 0, "list.select_tag(tag,2,2)" ],
+                   "list.types(4)", [ "Blog", "112", 0, "list.select_type(Blog,112,112)" ], [ "+3 more", "+3 more", 1, "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", 0, "list.select_type(Talk,1,1)" ],
+                   [ "gone (retired)", "0", 0, "list.select_type(gone (retired),0,0)" ], [ "All posts", "2040", 0, "list.select_type(All posts,2040,2040)" ] ], rows["rows"],
       "a page steps once per level under its parent, and one whose parent is not in the data stands after the tree at the top; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row is the child of what it hangs off and is no post type: the group still counts four"
     assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's row is in a list inside its parent's item, and one with no parent here at the top"
     assert_equal [ [ "glyph", "tree-home-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
@@ -312,6 +312,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => `#${value}`, unlisted: false,
                                                onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         list.render([ { id: "page-5", kind: "page", title: "Print design", degree: 1204, depth: 2, order: 5, parent: "page-4", ancestors: [ "Home", "Services" ] },
+                      { id: "page-8", kind: "page", title: "Flyers", degree: 1, depth: 3, order: 8, parent: "page-7", ancestors: [ "Home", " ", "Services" ] },
                       { id: "page-6", kind: "page", title: "Posters", degree: 2, depth: 3, order: 6, parent: "page-5", ancestors: [] },
                       { id: "type-blog", kind: "type", title: "Blog", degree: 1, count: 2040, colour_index: 1 } ])
         const read = (id) => {
@@ -321,15 +322,23 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
           const line = title.parentElement === button ? null : title.nextElementSibling
           return [ button.closest("[data-tree-children]") ? "nested" : "top", title.textContent, title.title, line ? [ line.className, line.textContent ] : "-", button.getAttribute("aria-label"), button.querySelector(".admin-tree-row__count").textContent ]
         }
-        return { stray: read("page-5"), child: read("page-6"), hub: read("type-blog"), headings: Array.from(container.querySelectorAll("h2"), (heading) => heading.textContent) }
+        const groups = { stray: read("page-5"), child: read("page-6"), blank: read("page-8"), hub: read("type-blog"), headings: Array.from(container.querySelectorAll("h2"), (heading) => heading.textContent) }
+        // "Not listed on any page" with nothing in it, and a pill's rows with none.
+        const lines = () => Array.from(container.querySelectorAll("[data-mind-graph-rows] p"), (line) => [ line.className, line.textContent ])
+        list.showRows({ heading: "Posts · 0", rows: [], inView: () => false })
+        const unlisted = lines()
+        list.showRows({ heading: "More from Blog · 0", rows: [], inView: () => false, back: { label: "Back", onBack() {} } })
+        return { ...groups, unlisted, pill: lines() }
       })()
     JS
 
     assert_equal [ "top", "Print design", "list.under(Print design,Home › Services)", [ "min-w-0 truncate text-small text-meta", "list.ancestors(Home › Services)" ],
-                   "list.select_page(list.under(Print design,Home › Services),1204)", "#1204" ], result["stray"]
-    assert_equal [ "nested", "Posters", "Posters", "-", "list.select_page(Posters,2)", "#2" ], result["child"], "a page whose parent is drawn nests under it and names no path"
-    assert_equal "#2040", result["hub"].last
-    assert_equal [ "list.pages(#2)", "list.types(#1)" ], result["headings"], "a heading's figure is the messages' format too"
+                   "list.select_page(list.under(Print design,Home › Services),1204,#1204)", "#1204" ], result["stray"]
+    assert_equal [ "nested", "Posters", "Posters", "-", "list.select_page(Posters,2,#2)", "#2" ], result["child"], "a page whose parent is drawn nests under it and names no path"
+    assert_equal [ "list.ancestors(Home › Services)", "list.under(Flyers,Home › Services)" ], [ result["blank"][3].last, result["blank"][2] ], "a blank ancestor is left out, never a bare mark"
+    assert_equal [ "#2040", "list.select_type(Blog,2040,#2040)" ], result["hub"].values_at(5, 4), "a figure in a row's name is the messages' format too"
+    assert_equal [ [ [ "m-0 px-1 py-1 text-small text-dim", "list.unlisted_none()" ] ], [] ], result.values_at("unlisted", "pill"), "an empty unlisted view says so in one dim line; a pill's rows have their way back"
+    assert_equal [ "list.pages(#3)", "list.types(#1)" ], result["headings"], "a heading's figure is the messages' format too"
   end
 
   # The list shows a record's state by the posts list's own rule: the status
@@ -377,15 +386,15 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_equal [ "admin-tree-row", "tree-disclosure", "list.pages(", "3", [ "not-first:mt-(--cs-sp-3)" ] * 4 ], result["look"],
       "a heading is the tree's row with the disclosure part, its figure cut out of its words into the count style, and each group but the first stands --cs-sp-3 below the one before"
     hidden = [ "true", true ]
-    assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1)" ],
-                   [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1)" ],
-                   [ "page-3", %w[unpublished], hidden, "list.select_page(list.stated(Changed,unpublished_chip.label()),1)" ],
-                   [ "post-1", %w[status-scheduled], hidden, "list.select_post(list.stated(Soon,labels.scheduled()),6)" ],
-                   [ "post-2", %w[status-scheduled unpublished], hidden, "list.select_post(list.stated(list.stated(Soon changed,labels.scheduled()),unpublished_chip.label()),5)" ],
-                   [ "post-3", [], "-", "list.select_post(Live,4)" ],
-                   [ "post-4", [], "-", "list.select_post(Later,3)" ],
-                   [ "post-5", %w[unpublished], hidden, "list.select_post(list.stated(Later changed,unpublished_chip.label()),2)" ],
-                   [ "tag-1", [], "-", "list.select_tag(tag,2)" ], [ "type-blog", [], "-", "list.select_type(Blog,3)" ],
+    assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1,1)" ],
+                   [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1,1)" ],
+                   [ "page-3", %w[unpublished], hidden, "list.select_page(list.stated(Changed,unpublished_chip.label()),1,1)" ],
+                   [ "post-1", %w[status-scheduled], hidden, "list.select_post(list.stated(Soon,labels.scheduled()),6,6)" ],
+                   [ "post-2", %w[status-scheduled unpublished], hidden, "list.select_post(list.stated(list.stated(Soon changed,labels.scheduled()),unpublished_chip.label()),5,5)" ],
+                   [ "post-3", [], "-", "list.select_post(Live,4,4)" ],
+                   [ "post-4", [], "-", "list.select_post(Later,3,3)" ],
+                   [ "post-5", %w[unpublished], hidden, "list.select_post(list.stated(Later changed,unpublished_chip.label()),2,2)" ],
+                   [ "tag-1", [], "-", "list.select_tag(tag,2,2)" ], [ "type-blog", [], "-", "list.select_type(Blog,3,3)" ],
                    [ "more-type-blog", [], "-", "list.more_row(3,3,Blog,+3 more)" ] ], result["rows"],
       "the posts list's chips after the title, hidden, each word said after the title in the name; a live row, a scheduled change without the mark, a tag, a type and a pill have none"
   end
@@ -434,7 +443,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       })()
     JS
 
-    assert_equal [ "Posts · 3", [ "Drawn", "3", 0, "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", 0, "list.add_post(<b>Absent</b>,blog)" ],
+    assert_equal [ "Posts · 3", [ "Drawn", "3", 0, "list.select_post(Drawn,3,3)" ], [ "<b>Absent</b>", "list.not_in_view()", 0, "list.add_post(<b>Absent</b>,blog)" ],
                    [ "Old", "list.not_in_view()", 0, "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
       "the type's label in lower case, and for a retired type its stored name in lower case in its own sentence: never a bare 'post'"
     assert_equal %w[post-2 post-3], result["absent"]
