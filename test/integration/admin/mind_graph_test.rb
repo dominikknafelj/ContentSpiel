@@ -129,7 +129,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph--graph'] template[data-mind-graph-parts]", count: 1
   end
 
-  # A type that is no longer registered has no label to send: the card shows
+  # A retired type, one the registry does not hold, has no label to send: the card shows
   # the stored name.
   test "a retired type has no entry among the type labels" do
     sign_in_as(users(:one))
@@ -333,6 +333,37 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph--graph'] canvas"
     assert_select "[data-mind-graph-empty]", count: 0
     assert_not_includes response.body, "Hidden from them"
+  end
+
+  # The list's first folds are the open set Pages reads, as `TreeOpenSet`
+  # reads it for this viewer: an entry for a page they do not read, or one in
+  # the trash, is left out, and so is junk; the tree's path is the admin path.
+  test "the graph's open set is the cookie's, without the pages the viewer does not read" do
+    branch = create_page(title: "Branch")
+    inside = create_page(title: "Inside", parent: branch)
+    outside = create_page(title: "Outside")
+    gone = create_page(title: "Gone")
+    gone.update_columns(trashed_at: Time.current) # version: none (a test puts a page in the trash) # changes: none (a test puts a page in the trash)
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ branch.id ] })
+    cookies[TreeOpenSet::COOKIE] = "#{inside.id}.-#{branch.id}.#{outside.id}.junk.#{gone.id}"
+
+    sign_in_as(users(:author))
+    get "/cs-studio/mind_graph"
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
+    assert_equal "#{inside.id}.-#{branch.id}", element["data-tree-open"], "the pages the viewer reads, in the cookie's order"
+    assert_equal "/cs-studio", element["data-tree-open-path"]
+    assert_equal Locales.default, element["data-tree-locale"]
+
+    sign_in_as(users(:one))
+    get "/cs-studio/mind_graph"
+    assert_equal "#{inside.id}.-#{branch.id}.#{outside.id}", css_select("[data-controller='admin--mind-graph--graph']").first["data-tree-open"], "the trash and the junk are left out for everyone"
+
+    # A viewer who reads no page (and a post) is handed no page's fold.
+    create_post(title: "Theirs to read")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
+    sign_in_as(users(:author))
+    get "/cs-studio/mind_graph"
+    assert_equal "", css_select("[data-controller='admin--mind-graph--graph']").first["data-tree-open"]
   end
 
   test "with no page and no post at all, 'No pages or posts yet.' instead of an empty canvas" do

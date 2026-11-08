@@ -54,11 +54,13 @@ class Admin::TreeItemParitySystemTest < Admin::MindGraphSystemTestCase
 
       visit_screen admin_mind_graph_path
       await_graph
-      row = "#{LIST} button[data-node-id='#{nid(deep)}']"
-      find(row).click
+      # Section is folded in the list until its page is selected, which
+      # opens the path to it.
+      row = "#{LIST} [role=treeitem][data-node-id='#{nid(deep)}'] > .admin-tree-row"
+      click_node(deep)
       assert_selector "#{row}.admin-tree-row--selected"
-      graph = measure(row, "#{LIST} button[data-node-id='#{nid(section)}']")
-      assert_operator count_width("#{LIST} button[data-node-id='#{nid(section)}']"), :>=, 14, "the graph's count at rest has no figure's width: a cut title's ellipsis would move on hover"
+      graph = measure(row, "#{LIST} [role=treeitem][data-node-id='#{nid(section)}'] > .admin-tree-row")
+      assert_operator count_width("#{LIST} [role=treeitem][data-node-id='#{nid(section)}'] > .admin-tree-row"), :>=, 14, "the graph's count at rest has no figure's width: a cut title's ellipsis would move on hover"
 
       assert_empty parted(pages, graph), "the trees' rows differ: Pages #{pages.inspect}, the graph's list #{graph.inspect}"
     end

@@ -64,10 +64,10 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
     end
 
     within(LIST) do
-      assert_selector "li", count: 3
+      assert_selector "[role=treeitem][data-node-id]", count: 3
       assert_row "Alpha: post, 1 connection. Shows it in the graph."
       assert_row "Beta: post, 1 connection. Shows it in the graph."
-      find("button", text: "shared").click
+      press_list_item("shared")
     end
     assert_equal "tag-#{tag.id}", graph["data-selected"]
     within("[data-mind-graph-card]") do
@@ -95,17 +95,17 @@ class Admin::MindGraphWorkerAndBackSystemTest < Admin::MindGraphSystemTestCase
       assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='4'][data-edges='3']"
       expect_js_error(/layout worker.*no workers here/)
     end
-    assert_selector "#{LIST} li", count: 4
+    assert_selector "#{LIST} [role=treeitem][data-node-id]", count: 4
 
     toggle "Tags"
 
     assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='3'][data-edges='1']"
     within(LIST) do
-      assert_selector "li", count: 3
-      assert_selector "button", text: "Alpha"
-      assert_selector "button", text: "Beta"
-      assert_selector "button", text: "Gamma"
-      assert_no_selector "button", text: "shared"
+      assert_selector "[role=treeitem][data-node-id]", count: 3
+      list_item("Alpha")
+      list_item("Beta")
+      list_item("Gamma")
+      assert_no_selector "[role=treeitem][aria-label^='shared']"
     end
     assert_no_selector "#{GRAPH}[data-settled]"
     assert_text "The graph can't be drawn in this browser."

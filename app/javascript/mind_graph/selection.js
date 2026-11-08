@@ -102,10 +102,16 @@ export function createSelection({ element, canvas, state, card, cardElement, lis
   }
 
   function closeCard() {
+    // The row is the list's treeitem: it takes the tree's one tab stop
+    // before the focus, so Tab out and back finds it again.
     const row = openedFromRow == null ? null : list.row(openedFromRow)
     select(-1)
-    if (row) row.focus()
-    else canvas.focus()
+    if (row) {
+      row.setAttribute("tabindex", "0")
+      row.focus()
+    } else {
+      canvas.focus()
+    }
   }
 
   function pinsChanged() {

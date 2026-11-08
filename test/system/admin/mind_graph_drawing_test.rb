@@ -345,7 +345,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     JS
     mouse.click(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
     within(LIST) do
-      assert_equal [ "MORE FROM BLOG POST · 1,980" ], all("h2").map { |heading| heading.text.upcase }, "named by what the pill hangs off, with the read's whole total, grouped, though it answered one row"
+      assert_equal [ "MORE FROM BLOG POST · 1,980" ], list_headings, "named by what the pill hangs off, with the read's whole total, grouped, though it answered one row"
       assert_row "Ninety-nine, #{ContentTypes.fetch("blog").label.downcase} post, not in view. Activate to add it to the graph."
     end
     assert_equal [ "/cs-studio/mind_graph/listed?page=12&target=type-blog" ], page.evaluate_script("window.listedAsked")
@@ -570,7 +570,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
         within("nav[aria-label='Modules']") { click_link "Mind graph" }
         await_graph
         find("#{LIST} label", text: "Not listed on any page").click
-        find("#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]").click
+        find("#{LIST} [role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]").click
         assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
         assert_equal({ "known" => 2, "placed" => true }, page.evaluate_script("window.afterShortTick"), "the worker's answer knew two nodes, the page holds three: the third must keep its place")
         await_graph

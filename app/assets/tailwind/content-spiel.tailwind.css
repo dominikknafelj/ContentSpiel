@@ -337,9 +337,9 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    open, and turned back while its treeitem is folded. */
 span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 [role="treeitem"][aria-expanded="false"] > .admin-tree-row > span.admin-tree-row__disclosure svg { transform: none; }
-/* A row that is itself a button (the graph's list) fills its line and
-   starts its words at the row's start, as a row that is a box does. */
-button.admin-tree-row { width: 100%; text-align: start; cursor: pointer; }
+/* A treeitem's row (the graph's list) is pressed as a whole: a click on it
+   selects, or on its disclosure folds. */
+[role="treeitem"] > .admin-tree-row { cursor: pointer; }
 .admin-tree-row__mark { flex: none; display: grid; place-items: center; width: var(--cs-tree-mark); height: var(--cs-tree-mark); margin-inline-end: 8px; color: var(--cs-meta); }
 .admin-tree-row__title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--cs-t-small); line-height: 1.25rem; font-weight: 400; color: var(--cs-ink); }
 .admin-tree-row--context-only .admin-tree-row__title { color: var(--cs-meta); }
@@ -408,13 +408,12 @@ button.admin-tree-row { width: 100%; text-align: start; cursor: pointer; }
 .admin-tree[data-filtered] .admin-tree-node__handle { display: none; }
 /* Focus is one ring, on the focused element and never on the row: in
    Pages the control inside the row that holds it (the title's link, the
-   disclosure, the handle, "+"), in the graph's list the row's one control,
-   the row's button (or its treeitem). The ring is drawn inside the element's own box (-2px), so
+   disclosure, the handle, "+"), in the graph's list the treeitem, the
+   row's one control. The ring is drawn inside the element's own box (-2px), so
    neither the 28px row nor the column clips it; the selected bar may stand
    beside it. */
 .admin-tree-row :focus-visible,
-.admin-tree [role="treeitem"]:focus-visible,
-.admin-tree button.admin-tree-row:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 /* The selected row: `--cs-sunken` and a 3px accent bar on its left edge,
    3:1 on the sunken ground and the chrome in both schemes
    (`admin_contrast_test.rb`). An inset shadow and not a border, so the

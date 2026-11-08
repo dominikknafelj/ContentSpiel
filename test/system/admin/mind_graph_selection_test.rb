@@ -465,7 +465,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
         assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
       end
       assert_marks_drawn "[data-mind-graph-card]"
-      assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(blog)}']"
+      assert_selector "#{LIST} [role=treeitem][aria-selected='true'][data-node-id='#{nid(blog)}']"
       assert_equal [ [ "Page", blog.id ] ] * 2, Notes::Thread.order(:id).last(2).map { |thread| [ thread.container_type, thread.container_id ] }
 
       # A live page with a change scheduled: the Live chip, then "Change scheduled 14 Oct".

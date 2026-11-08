@@ -2,22 +2,47 @@
 // screen reader, since nothing on a canvas can take focus, and a way to find
 // a node by name for everyone.
 //
-// A ROW IS A BUTTON, and it does to the graph what a click on the node does:
-// it selects the node, and the app brings it to the middle of the canvas and
-// opens its card -- whose "Open post" is what leads to the editor. A row
-// never navigates. Its accessible name says all of that in one sentence
-// ("Alpha: post, 2 connections. Shows it in the graph."), because the mark is
-// decoration and the count alone is a bare number. Hovering or focusing a row
-// lights its node up on the canvas (`onHover`), and the row of the selected
-// node is marked (`aria-current`) and scrolled into view INSIDE the panel --
-// never with `scrollIntoView`, which would scroll the page as well where the
-// panel stands under the canvas.
+// THE LIST IS ONE TREE, an ARIA tree (`ul#mind-graph-tree[role=tree]`,
+// named by the region's own name) with ONE TAB STOP: one item holds
+// `tabindex="0"`, the marked one or else the first, every other `-1`, and
+// the stop follows the focus. On the tree, Up and Down move to the previous
+// or next item that shows, Right opens a folded parent or goes to its first
+// child, Left folds an open parent or goes to its parent, Home and End go to
+// the first and the last item that shows, `*` opens the item's whole branch,
+// and Enter or Space does what a click on the row does. The focus never
+// rests inside a branch that folds: it goes to the parent that folded.
+//
+// A ROW IS A TREEITEM, and it does to the graph what a click on the node
+// does: it selects the node, and the app brings it to the middle of the
+// canvas and opens its card -- whose "Open post" is what leads to the
+// editor. A row never navigates. Its accessible name (`aria-label` on the
+// treeitem) says all of that in one sentence ("Alpha: post, 2 connections.
+// Shows it in the graph."), because the mark is decoration and the count
+// alone is a bare number. A click on its disclosure folds or opens it, and
+// a click anywhere else on the row selects; a find's Enter is a `.click()`
+// on the treeitem itself, and selects. Hovering or focusing a row lights
+// its node up on the canvas (`onHover`), and the item of the selected node
+// is `aria-selected`, takes the tree's selected look and is scrolled into
+// view INSIDE the panel -- never with `scrollIntoView`, which would scroll
+// the page as well where the panel stands under the canvas.
+//
+// THE FOLDS. A page's branch folds as it does in Pages and with the same
+// open set (`tree/open_set.js`, the cookie both trees read): the first
+// drawing takes it from the tree's `data-tree-open`, which the server parsed
+// from the cookie for the pages this viewer reads, and every later one from
+// the cookie; a person's fold or open is written through `setOpen`, relative
+// to the node's default (Home, `data-tree-root`, and the selected node's
+// path, `data-tree-on-path`, are open by default). Selecting a node opens
+// the path to it (`openPathIn`, which forgets that path's folds). A group
+// heading's fold and a hub's (the row a pill hangs off) are a view state,
+// open at first and never stored (`data-tree-view-fold`): kept while the
+// list is on the screen, through every redraw.
 //
 // FOUR GROUPS: "Pages · N" first, in TREE order (not by connections: a
 // tree is read by its order), then "Posts · N" and "Tags · N",
 // best-connected first as on the canvas, then "Post types · N": a row for
 // each post-type node and for "All posts", so each has a keyboard path to
-// its card. Each group is a list named by its heading. A POST TYPE'S ROW has
+// its card. Each group is a branch of the tree under its heading. A POST TYPE'S ROW has
 // a small copy of the hub as its mark, and as its number the POSTS of that
 // type the viewer can read (a tag's row has its connections there), in the
 // order the data has them -- colour-slot order, then retired types, then
@@ -34,12 +59,14 @@
 // have rows here, empty otherwise so the marks line up; so does a tag's and
 // a post type's, holding the disclosure where a pill hangs off it, so a
 // group's marks line up; a post's row is flat (no disclosure box). The
-// disclosure is drawn open and folds nothing: the row is the one control,
-// a button, so the disclosure is a silent part and never a button inside
-// it. The row of the selected node takes the tree's selected look.
+// disclosure is a part hidden from a screen reader and never a button: the
+// treeitem is the one control, and says whether it is open
+// (`aria-expanded`). The row of the selected node takes the tree's selected
+// look.
 //
-// A GROUP'S HEADING is a row of the tree's too, 28px like any, and never
-// selected: the disclosure part, its kind's icon chip (`Admin::Ui::
+// A GROUP'S HEADING is an item of the tree's too, at the first level, 28px
+// like any and never selected: Enter, Space and a click fold or open it. Its
+// row holds the disclosure part, its kind's icon chip (`Admin::Ui::
 // IconChipComponent`, the sidebar's: a page the structure's, a post, a tag
 // and a post type the lists') in the mark box, then the group's words in
 // the label style with the figure after the middle dot in the count style.
@@ -61,18 +88,18 @@
 // the focus goes to the first of them (the rule under "THE FOCUS IS NOT
 // LOST").
 //
-// A PILL'S ROWS (`showRows` with `back`) stand under a heading that names
-// them ("More from Blog · 92") with "Back to the list" beside it, a button,
-// before the rows in the document; ESCAPE pressed anywhere in the rows is
+// A PILL'S ROWS (`showRows` with `back`) are a second tree, of one level,
+// under a heading that names them ("More from Blog · 92") with "Back to the
+// list" beside it, a button, before the rows in the document; ESCAPE pressed anywhere in the rows is
 // the same way back (`back.onBack`), and so it is on the error line of a
 // pill's read that failed, which offers the button beside "Try again". The
 // rows of "Not listed on any page" have neither: their checkbox is the way
 // back, and Escape there is nobody's.
 //
-// THE PAGES' TREE IS A TREE FOR A SCREEN READER TOO, not an indent alone: a
-// page's row stands in a list INSIDE its parent's item (by the data's
-// `parent`), so the nesting is the document's and is announced as a level,
-// and the step is the children list's (`CLASSES.children`). A page whose
+// THE PAGES ARE A TREE FOR A SCREEN READER TOO, not an indent alone: a
+// page's item stands in a group INSIDE its parent's item (by the data's
+// `parent`), so the nesting is the document's and is announced as a level
+// (`aria-level`), and the step is the children list's (`CLASSES.children`). A page whose
 // parent has no row here (not readable, or not in this view) stands at the
 // top level of the group, with no step and no guide: nothing it could hang
 // from is drawn. Under its title it says where it stands, its ancestors'
@@ -103,8 +130,8 @@
 // page, a post or a tag, of which there can be thousands.
 //
 // ABOVE THE GROUPS, "Not listed on any page", a checkbox:
-// while it is on, the list shows the rows the app hands `showRows` IN PLACE
-// OF the groups, and the canvas is left as it is. The same form serves the
+// while it is on, the list shows the rows the app hands `showRows`, a tree
+// of one level, IN PLACE OF the groups, and the canvas is left as it is. The same form serves the
 // posts behind a page's "+N more", with "Open in Posts →" under them. The
 // checkbox is there only when the app says so (`unlisted`): for a viewer who
 // reads no page every post is one no page lists, and the filter says nothing.
@@ -132,27 +159,34 @@
 //
 // THE FOCUS IS NOT LOST when the rows are drawn again (a post was added, a
 // kind was switched, "Try again" brought the rows): `render` and `showRows`
-// replace the rows' own region and never the checkbox, and when the focus
-// was in that region it is put on the row of the same node, else on the
-// first row, else on the checkbox.
+// replace the rows' own region and never the checkbox, the tab stop stays
+// on the item of the same node, else on the first, and when the focus was
+// in that region it is put there, else on the checkbox. A redraw is told
+// to the tree's other scripts as `tree:changed` on the tree.
 //
 // Text goes in with `textContent`; no path is written here but the one the
 // app hands in (`link`). `createList(container, { text, number, dotClasses,
-// typeLabels, treeClasses, retryClass, parts, unlisted, onSelect, onHover,
-// onAdd, onMore, onUnlisted })` answers `{ render(nodes), showRows({
-// heading, rows, inView, link, back }), fail(line, { label, onRetry, focus,
-// back }), clear(), setUnlisted(on), setBusy(on), mark(id), row(id),
-// destroy() }`: `render` replaces the
-// rows with the four groups (the app calls it once per load and once per
-// filter change), `clear` empties the rows while another graph is loaded,
-// `mark` moves the mark to the row of `id` (null for none). `back` is
+// typeLabels, treeClasses, retryClass, parts, unlisted, treeData, onSelect,
+// onHover, onAdd, onMore, onUnlisted })` answers `{ render(nodes),
+// showRows({ heading, rows, inView, link, back }), fail(line, { label,
+// onRetry, focus, back }), clear(), setUnlisted(on), setBusy(on), mark(id),
+// row(id), destroy() }`: `render` replaces the rows with the four groups
+// (the app calls it once per load and once per filter change), `clear`
+// empties the rows while another graph is loaded, `mark` moves the mark to
+// the item of `id` (null for none), and `row` answers the treeitem of `id`.
+// `treeData` is the graph's element, whose `data-tree-open-path`,
+// `data-tree-locale` and `data-tree-open` the tree carries. `back` is
 // `{ label, onBack }`. `onSelect(id)`, `onMore(id)` and `onHover(id | null)`
 // get a node's id as the data has it; `number` groups a figure as the
 // messages' language does. A pill's node carries `of`, the name of what it
 // hangs off. The listeners are on the rows' region, one of each, however
-// many rows there are.
+// many rows there are. A row's node id is its treeitem's `data-node-id`; its
+// row's `data-tree-id` is the open set's bare page id for a page and the
+// node's id for any other, so the two never meet.
 import { dotClass, TAG_MARK } from "mind_graph/card"
+import { recordId } from "mind_graph/ids"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
+import { expanderOf, idOf, openByRule, openPathIn, readOpenSet, setFolded, setOpen } from "tree/open_set"
 
 const byDegree = (a, b) => b.degree - a.degree || String(a.title).localeCompare(String(b.title))
 const byTree = (a, b) => a.order - b.order
@@ -160,6 +194,9 @@ const byTree = (a, b) => a.order - b.order
 // then "All posts" last.
 const asGiven = () => 0
 const LIST = "m-0 list-none p-0"
+// The tree's id, which a find names (`aria-controls`).
+const TREE_ID = "mind-graph-tree"
+const ITEM = '[role="treeitem"]'
 // A state's part and the key of its chip's own word (`ui.en.yml`), which the
 // row's name says: the same words as the chip, from the same keys.
 const STATE_WORDS = {
@@ -178,8 +215,10 @@ const FIGURE = "\u0000"
 // Between two ancestors' titles in the line under a page whose parent is
 // not drawn: the breadcrumb's mark, no word.
 const PATH_JOIN = " › "
+// The open set's id of a node's row: a page's bare id, any other node's own.
+const treeIdOf = (node) => (node.kind === "page" ? recordId(node.id) : node.id)
 
-export function createList(container, { text, number = String, dotClasses, typeLabels = {}, treeClasses: classes, retryClass = "", parts, unlisted: filterable = true, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
+export function createList(container, { text, number = String, dotClasses, typeLabels = {}, treeClasses: classes, retryClass = "", parts, unlisted: filterable = true, treeData = null, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
   let rows = new Map()
   let absent = new Map()
   let marked = null
@@ -187,20 +226,18 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // The way back from what is shown, while there is one (a pill's rows, or
   // the error line of a pill's read): what Escape in the rows' region does.
   let goBack = null
+  // The first drawing reads the open set the server handed the page
+  // (`data-tree-open`); every later one the cookie, which this list writes.
+  let seeded = false
+  // The group headings and hubs the person folded: a view state, never
+  // stored, kept through every redraw while the list is on the screen.
+  const viewFolded = new Set()
 
   const element = (tag, className, content) => {
     const created = document.createElement(tag)
     if (className) created.className = className
     if (content != null) created.textContent = content
     return created
-  }
-  // `role="list"`: a list styled without markers is not announced as one by
-  // every screen reader, and here the nesting is what says a page's level.
-  const listOf = (items = []) => {
-    const list = element("ul", LIST)
-    list.setAttribute("role", "list")
-    list.append(...items)
-    return list
   }
 
   // The filter and the rows' own region: `render` and `showRows` replace the
@@ -211,12 +248,50 @@ export function createList(container, { text, number = String, dotClasses, typeL
   unlisted.className = "cs-checkbox"
   unlisted.dataset.mindGraphUnlisted = ""
   filter.append(unlisted, element("span", "", text.t("mind_graph.script.list.unlisted")))
-  // The rows' region is the tree (`CLASSES.tree`), inside the column's gutter.
-  const body = element("div", `${classes.tree} px-2 pt-2`)
+  // The rows' region, inside the column's gutter; the trees in it are the
+  // tree's block (`CLASSES.tree`).
+  const body = element("div", "px-2 pt-2")
   body.dataset.mindGraphRows = ""
   container.replaceChildren(...(filterable ? [ filter ] : []), body)
   const changed = () => onUnlisted(unlisted.checked)
   unlisted.addEventListener("change", changed)
+
+  // A tree: the tree's block, a list with no markers. The four groups' tree
+  // carries what the open set reads from it, copied from the graph.
+  const treeOf = ({ main = false } = {}) => {
+    const tree = element("ul", `${classes.tree} ${LIST}`)
+    tree.setAttribute("role", "tree")
+    if (!main) return tree
+    tree.id = TREE_ID
+    const label = container.getAttribute("aria-label")
+    if (label) tree.setAttribute("aria-label", label)
+    const given = treeData?.dataset ?? {}
+    for (const name of [ "treeOpenPath", "treeLocale", "treeOpen" ]) {
+      if (given[name] != null) tree.dataset[name] = given[name]
+    }
+    return tree
+  }
+  // A group inside an item: its children, a step in (`CLASSES.children`)
+  // under a row, none under a group's heading.
+  const groupOf = (className) => {
+    const group = element("ul", className)
+    group.setAttribute("role", "group")
+    group.dataset.treeChildren = ""
+    return group
+  }
+  // An item of the tree at `level`, out of the Tab order until it is the
+  // stop. It is its own focus (`data-tree-focus`), which a find moves to.
+  const itemAt = (level) => {
+    const item = element("li")
+    item.setAttribute("role", "treeitem")
+    item.setAttribute("aria-level", String(level))
+    item.tabIndex = -1
+    item.dataset.treeNode = ""
+    item.dataset.treeFocus = ""
+    return item
+  }
+  // The item's own row: its first child, before its group.
+  const rowIn = (item) => item.firstElementChild
 
   // "Back to the list": a button that reads as a link, as the legend's
   // "Status" does. It changes what the list shows and leads nowhere.
@@ -227,37 +302,56 @@ export function createList(container, { text, number = String, dotClasses, typeL
     button.addEventListener("click", onBack)
     return button
   }
-  // A list named by `heading`, in a section that holds `head` (the heading,
-  // or the heading with its way back) and the list.
-  const named = (heading, list, { head = heading, wrapperClass = "" } = {}) => {
-    const wrapper = element("section", wrapperClass)
+  // The rows a filter or a pill brings, a tree named by a heading of their
+  // own. With `back`, the way back stands beside the heading, before the
+  // rows.
+  const section = (title, tree, { back = null } = {}) => {
+    const wrapper = element("section")
+    const heading = element("h2", "m-0 flex min-w-0 items-center gap-2 px-1 pb-1 pt-1 text-label text-meta", title)
     heading.id = `mind-graph-list-${(headings += 1)}`
-    list.setAttribute("aria-labelledby", heading.id)
-    wrapper.append(head, list)
+    tree.setAttribute("aria-labelledby", heading.id)
+    if (!back) {
+      wrapper.append(heading, tree)
+      return wrapper
+    }
+    const head = element("div", "flex items-baseline justify-between gap-2 pr-1")
+    head.append(heading, backButton(back))
+    wrapper.append(head, tree)
     return wrapper
   }
-  // A group of the four: its heading is a row of the tree, and its rows
-  // the list it names, starting at the heading's left edge. `key` is the
-  // group's words with `%{count}` where the figure stands.
-  const group = (key, count, list, icon) => {
-    const heading = element("h2", classes.row)
+  // The mark box, holding `mark` (a pill's is empty, so its words stand
+  // under its hub's title).
+  const markBox = (mark = null) => {
+    const box = element("span", classes.mark)
+    if (mark) box.append(mark)
+    return box
+  }
+  // A group of the four: its heading is an item at the first level, its
+  // row the tree's row, and its nodes the group under it, starting at the
+  // heading's left edge. `key` is the group's words with `%{count}` where
+  // the figure stands.
+  const group = (name, key, count, items, icon) => {
+    const item = itemAt(1)
+    item.className = "not-first:mt-(--cs-sp-3)"
+    item.dataset.treeGroup = name
+    item.setAttribute("aria-label", text.t(key, { count: number(count) }))
+    const heading = element("div", classes.row)
     const [ before, ...rest ] = text.t(key, { count: FIGURE }).split(FIGURE)
     const words = element("span", "text-label text-meta", before)
     rest.forEach((after) => words.append(element("span", "text-count", number(count)), after))
     const title = element("span", classes.title)
     title.append(words)
     heading.append(parts.part("tree-disclosure"), markBox(parts.part(icon)), title)
-    return named(heading, list, { wrapperClass: "not-first:mt-(--cs-sp-3)" })
+    const children = groupOf(LIST)
+    children.append(...items)
+    item.append(heading, children)
+    return viewFold(item, `group:${name}`)
   }
-  // The rows a filter or a pill brings, under a heading of their own. With
-  // `back`, the way back stands beside the heading, before the rows.
-  const section = (title, list, { back = null } = {}) => {
-    const heading = element("h2", "m-0 flex min-w-0 items-center gap-2 px-1 pb-1 pt-1 text-label text-meta", title)
-    if (!back) return named(heading, list)
-
-    const head = element("div", "flex items-baseline justify-between gap-2 pr-1")
-    head.append(heading, backButton(back))
-    return named(heading, list, { head })
+  // A fold that is a view state: drawn as the person left it.
+  const viewFold = (item, key) => {
+    item.dataset.viewKey = key
+    item.dataset.treeViewFold = viewFolded.has(key) ? "folded" : "open"
+    return item
   }
   // The parts a page's or a post's row carries under its title, by the
   // posts list's own rule (`posts_screen/table_component.html.erb`): the
@@ -311,35 +405,30 @@ export function createList(container, { text, number = String, dotClasses, typeL
     stack.append(title, ...where, ...chips)
     return stack
   }
-  // The mark box, holding `mark` (a pill's is empty, so its words stand
-  // under its hub's title).
-  const markBox = (mark = null) => {
-    const box = element("span", classes.mark)
-    if (mark) box.append(mark)
-    return box
-  }
-  // A row: the tree's row as a button, with its disclosure box. `opens`: a
+  // A node's item and its row, with the row's disclosure box. `opens`: a
   // row whose children have rows here, which draws the disclosure part;
   // `flat`: a row with no disclosure box. Any other row keeps the box
-  // empty, so its mark lines up with its siblings'.
-  const rowButton = (id, { opens = false, flat = false } = {}) => {
-    const button = element("button", flat ? `${classes.row} ${classes.row_flat}` : classes.row)
-    button.type = "button"
-    button.dataset.nodeId = id
-    if (opens) button.append(parts.part("tree-disclosure"))
-    else if (!flat) button.append(element("span", classes.disclosure))
-    return button
+  // empty, so its mark lines up with its siblings'. The row carries what a
+  // find and the open set read: its id, its whole title and a page's
+  // address.
+  const nodeItem = (node, level, { opens = false, flat = false } = {}) => {
+    const item = itemAt(level)
+    item.dataset.nodeId = node.id
+    const row = element("div", flat ? `${classes.row} ${classes.row_flat}` : classes.row)
+    row.dataset.treeRow = ""
+    row.dataset.treeId = treeIdOf(node)
+    row.dataset.treeTitle = node.title ?? ""
+    if (node.kind === "page" && node.path) row.dataset.treePath = node.path
+    if (opens) row.append(parts.part("tree-disclosure"))
+    else if (!flat) row.append(element("span", classes.disclosure))
+    item.append(row)
+    rows.set(node.id, item)
+    return item
   }
-  // The list a page's or a hub's children stand in, inside its item: the
+  // The group a page's or a hub's children stand in, inside its item: the
   // tree's step.
-  const childrenOf = (item) => {
-    const held = item.querySelector(":scope > ul")
-    if (held) return held
-    const list = element("ul", classes.children)
-    list.setAttribute("role", "list")
-    list.dataset.treeChildren = ""
-    return item.appendChild(list)
-  }
+  const childrenOf = (item) => item.querySelector(":scope > [data-tree-children]") ?? item.appendChild(groupOf(`${classes.children} ${LIST}`))
+  const levelOf = (item) => Number(item.getAttribute("aria-level"))
   // The title as a row's name says it: followed by each chip's own word
   // ("Soon, Scheduled, Unpublished changes"), so what is seen is heard and
   // the name begins with what the row shows.
@@ -374,54 +463,49 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // titles it stands under. A post's row is flat; a tag's and a post type's
   // keep the disclosure box, so their marks line up with a hub's that a
   // pill hangs off.
-  const row = (node, { notInView = false, addable = true, opens = false, path = null } = {}) => {
-    const item = document.createElement("li")
-    const button = rowButton(node.id, { opens, flat: node.kind === "post" && !opens })
-    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node), figure: number(figure(node)) }))
+  const row = (node, { level, notInView = false, addable = true, opens = false, path = null } = {}) => {
+    const item = nodeItem(node, level, { opens, flat: node.kind === "post" && !opens })
+    item.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node), figure: number(figure(node)) }))
+    if (node.kind === "page" && node.home) item.dataset.treeRoot = ""
     // At the row's end: the figure, or the words of a row that is not in view.
     const notShown = () => element("span", "text-label text-meta", text.t("mind_graph.script.list.not_in_view"))
     const trailing = element("span", classes.trailing)
     trailing.append(notInView ? notShown() : element("span", classes.count, number(figure(node))))
-    button.append(markBox(markFor(node)), titled(node, path), trailing)
-    item.append(button)
-    rows.set(node.id, button)
+    rowIn(item).append(markBox(markFor(node)), titled(node, path), trailing)
     if (notInView) {
-      button.dataset.notInView = ""
+      item.dataset.notInView = ""
       // Without a graph the row adds nothing and says so: it is there to be
       // read, and is drawn again as one that adds once the graph has come.
       if (addable) absent.set(node.id, node)
-      else button.setAttribute("aria-disabled", "true")
+      else item.setAttribute("aria-disabled", "true")
     }
     return item
   }
   // A pill's row: flat, the pill's own words in the accent, and its whole
   // name. No mark: the row it hangs off is its parent.
-  const pillRow = (pill) => {
-    const item = document.createElement("li")
-    const button = rowButton(pill.id, { flat: true })
-    button.dataset.more = ""
+  const pillRow = (pill, level) => {
+    const item = nodeItem(pill, level, { flat: true })
+    item.dataset.more = ""
     // The name begins with the words the row shows, so someone who says
     // what they see names it (WCAG 2.5.3, label in name).
-    button.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "", words: pill.title }))
+    item.setAttribute("aria-label", text.t("mind_graph.script.list.more_row", { count: pill.count, figure: number(pill.count), target: pill.of ?? "", words: pill.title }))
     const title = element("span", classes.title)
     title.append(element("span", "text-accent", pill.title))
-    button.append(markBox(), title)
-    item.append(button)
-    rows.set(pill.id, button)
+    rowIn(item).append(markBox(), title)
     return item
   }
-  // The pages as the tree they are: a page's item holds the list of its
+  // The pages as the tree they are: a page's item holds the group of its
   // children. The pages come in tree order, so a parent is met before its
-  // children; one whose parent has no row here stands at the top level.
-  // `opens`: the ids whose rows draw the disclosure.
-  const tree = (pages, opens) => {
-    const top = listOf()
+  // children; one whose parent has no row here stands at the top level of
+  // the group. `opens`: the ids whose rows draw the disclosure.
+  const pageItems = (pages, opens) => {
+    const top = []
     const items = new Map()
     for (const page of pages) {
       const parent = items.get(page.parent)
-      const item = row(page, { opens: opens.has(page.id), path: parent ? null : pathOf(page) })
+      const item = row(page, { level: parent ? levelOf(parent) + 1 : 2, opens: opens.has(page.id), path: parent ? null : pathOf(page) })
       if (parent) childrenOf(parent).append(item)
-      else top.append(item)
+      else top.push(item)
       items.set(page.id, item)
     }
     return top
@@ -432,56 +516,192 @@ export function createList(container, { text, number = String, dotClasses, typeL
     marked = null
     goBack = null
   }
-  // Replaces the rows, and keeps the focus where it was: on the row of the
-  // same node, else on the first row, else on the checkbox. Only when the
-  // focus WAS in the rows: a list drawn while the person is elsewhere takes
-  // nothing from them. The marks are drawn once the rows are in the page.
-  const put = (...pieces) => {
-    const held = body.contains(document.activeElement) ? document.activeElement.dataset.nodeId ?? "" : null
-    body.replaceChildren(...pieces)
-    paintMarks(body)
-    if (held == null) return
-    const next = rows.get(held) || body.querySelector("button[data-node-id]") || (filterable ? unlisted : null)
-    next?.focus()
+
+  // THE TREE'S WALK. An item shows when nothing between it and its tree is
+  // `hidden` (a folded branch, or a find's narrowing).
+  const treeAround = (item) => item.closest('[role="tree"]')
+  const shows = (item) => {
+    const tree = treeAround(item)
+    for (let at = item; at && at !== tree; at = at.parentElement) if (at.hidden) return false
+    return true
+  }
+  const shown = (tree) => Array.from(tree.querySelectorAll(ITEM)).filter(shows)
+  const parentItem = (item) => item.parentElement?.closest(ITEM) ?? null
+  // The nearest item that shows: `item`, or the parent that folded over it.
+  const showing = (item) => {
+    let at = item
+    while (at && !shows(at)) at = parentItem(at)
+    return at
+  }
+  // The tab stop: `item` alone in its tree holds `tabindex="0"`.
+  const rove = (item) => {
+    treeAround(item)?.querySelectorAll(`${ITEM}[tabindex="0"]`).forEach((other) => { if (other !== item) other.tabIndex = -1 })
+    item.tabIndex = 0
+  }
+  const keyOf = (item) => item?.dataset.nodeId ?? item?.dataset.viewKey ?? null
+  const byKey = (key) => (key == null ? null : rows.get(key) ?? body.querySelector(`[data-view-key="${CSS.escape(key)}"]`))
+  const told = (tree) => tree.dispatchEvent(new CustomEvent("tree:changed", { bubbles: true }))
+
+  // A fold or an open of `item`'s branch by the person: drawn, and kept,
+  // a page's in the open set and a heading's or a hub's in this list alone.
+  // The stop and the focus never stay inside a branch that folds.
+  const store = (item, open) => {
+    if (item.dataset.viewKey) {
+      item.dataset.treeViewFold = open ? "open" : "folded"
+      if (open) viewFolded.delete(item.dataset.viewKey)
+      else viewFolded.add(item.dataset.viewKey)
+      return
+    }
+    const id = idOf(item)
+    if (id) setOpen(treeAround(item), id, open, { openByDefault: item.hasAttribute("data-tree-root") || item.hasAttribute("data-tree-on-path") })
+  }
+  const fold = (item, open) => {
+    if (!expanderOf(item) || !item.hasAttribute("aria-expanded")) return
+    setFolded(item, !open)
+    store(item, open)
+    if (!open) {
+      const inside = item.querySelector(`[data-tree-children] ${ITEM}[tabindex="0"]`)
+      if (inside) rove(item)
+      if (item.querySelector("[data-tree-children]")?.contains(document.activeElement)) item.focus()
+    }
+    told(treeAround(item))
+  }
+  // `item` and every branch under it, opened.
+  const openBranch = (item) => {
+    [ item, ...item.querySelectorAll(ITEM) ].filter((each) => each.hasAttribute("aria-expanded")).forEach((each) => {
+      setFolded(each, false)
+      store(each, true)
+    })
+    told(treeAround(item))
+  }
+  // Draws every branch of `tree` by the rule: the open set as it stands,
+  // a view fold as the person left it.
+  const drawFolds = (tree, set) => {
+    tree.querySelectorAll(`${ITEM}[data-tree-node]`).forEach((item) => {
+      if (item.querySelector(":scope > [data-tree-children]")) setFolded(item, !openByRule(item, set))
+    })
   }
 
-  const rowOf = (event) => event.target.closest?.("button[data-node-id]")
-  const click = (event) => {
-    const button = rowOf(event)
-    if (!button || button.getAttribute("aria-disabled") === "true") return
-    if (button.dataset.more != null) onMore(button.dataset.nodeId)
-    else if (absent.has(button.dataset.nodeId)) onAdd(absent.get(button.dataset.nodeId))
-    else onSelect(button.dataset.nodeId)
+  // Replaces the rows. The stop stays on the item of the same node, else
+  // goes to the first; when the focus WAS in the rows it is put there, else
+  // on the checkbox. A list drawn while the person is elsewhere takes
+  // nothing from them. The marks are drawn once the rows are in the page.
+  const put = (...pieces) => {
+    const focused = body.contains(document.activeElement)
+    const key = keyOf((focused ? document.activeElement : body.querySelector(`${ITEM}[tabindex="0"]`))?.closest?.(ITEM))
+    body.replaceChildren(...pieces)
+    paintMarks(body)
+    const kept = byKey(key)
+    const next = kept ? showing(kept) : null
+    body.querySelectorAll('[role="tree"]').forEach((tree) => {
+      const stop = next && tree.contains(next) ? next : tree.querySelector(ITEM)
+      if (stop) rove(stop)
+      told(tree)
+    })
+    if (!focused) return
+    const target = next ?? body.querySelector(`${ITEM}[tabindex="0"]`) ?? (filterable ? unlisted : null)
+    target?.focus()
   }
-  // Escape in the rows' region goes back where there is a way back, and is
-  // nobody's otherwise (it is not taken, so whatever else listens hears it).
+
+  // The item an event is about: the treeitem itself (a find's `.click()`),
+  // or the item whose own row holds the target; never a parent for its
+  // children's group.
+  const itemOf = (event) => {
+    const item = event.target.closest?.(ITEM)
+    if (!item || !body.contains(item)) return null
+    return event.target === item || rowIn(item).contains(event.target) ? item : null
+  }
+  // What a press on an item does: a heading folds or opens, a pill asks for
+  // its rows, a row that is not in view adds its post, any other selects.
+  const activate = (item) => {
+    if (item.dataset.viewKey?.startsWith("group:")) return fold(item, item.getAttribute("aria-expanded") === "false")
+    if (item.getAttribute("aria-disabled") === "true") return
+    const id = item.dataset.nodeId
+    if (item.dataset.more != null) onMore(id)
+    else if (absent.has(id)) onAdd(absent.get(id))
+    else onSelect(id)
+  }
+  const click = (event) => {
+    const item = itemOf(event)
+    if (!item) return
+    const disclosure = rowIn(item).querySelector(`:scope > .${classes.disclosure}`)
+    if (disclosure?.contains(event.target) && item.hasAttribute("aria-expanded")) fold(item, item.getAttribute("aria-expanded") === "false")
+    else activate(item)
+  }
+  // The tree's keys, on an item that has the focus. Escape in the rows'
+  // region goes back where there is a way back, and is nobody's otherwise
+  // (it is not taken, so whatever else listens hears it).
   const keydown = (event) => {
-    if (event.key !== "Escape" || !goBack || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.key === "Escape") {
+      if (!goBack || event.shiftKey) return
+      event.preventDefault()
+      event.stopPropagation()
+      goBack()
+      return
+    }
+    const item = event.target.matches?.(ITEM) ? event.target : null
+    if (!item || !body.contains(item) || (event.shiftKey && event.key !== "*")) return
+    const items = shown(treeAround(item))
+    const at = items.indexOf(item)
+    const expanded = item.getAttribute("aria-expanded")
+    const go = (to) => { if (to) { rove(to); to.focus() } }
+    switch (event.key) {
+      case "ArrowDown": go(items[at + 1]); break
+      case "ArrowUp": go(items[at - 1]); break
+      case "Home": go(items[0]); break
+      case "End": go(items[items.length - 1]); break
+      case "ArrowRight":
+        if (expanded === "false") fold(item, true)
+        else if (expanded === "true") go(shown(treeAround(item)).find((each) => parentItem(each) === item))
+        break
+      case "ArrowLeft":
+        if (expanded === "true") fold(item, false)
+        else go(parentItem(item))
+        break
+      case "*": openBranch(item); break
+      case "Enter": case " ": activate(item); break
+      default: return
+    }
     event.preventDefault()
-    event.stopPropagation()
-    goBack()
   }
   const over = (event) => {
-    const button = rowOf(event)
-    if (button && !absent.has(button.dataset.nodeId)) onHover(button.dataset.nodeId)
+    const item = itemOf(event)
+    if (item?.dataset.nodeId && !absent.has(item.dataset.nodeId)) onHover(item.dataset.nodeId)
   }
   const out = (event) => {
-    if (rowOf(event)) onHover(null)
+    if (itemOf(event)?.dataset.nodeId) onHover(null)
   }
-  const listeners = { click, keydown, pointerover: over, pointerout: out, focusin: over, focusout: out }
+  // The stop follows the focus, however it came (a click, a find's Down,
+  // the card giving it back).
+  const focusin = (event) => {
+    if (event.target.matches?.(ITEM) && body.contains(event.target)) rove(event.target)
+    over(event)
+  }
+  const listeners = { click, keydown, pointerover: over, pointerout: out, focusin, focusout: out }
   Object.entries(listeners).forEach(([ name, handler ]) => body.addEventListener(name, handler))
 
   function mark(id) {
-    marked?.removeAttribute("aria-current")
-    marked?.classList.remove(classes.row_selected)
+    marked?.removeAttribute("aria-selected")
+    if (marked) rowIn(marked).classList.remove(classes.row_selected)
     marked = id == null ? null : rows.get(id) || null
+    body.querySelectorAll('[role="tree"]').forEach((tree) => { if (!marked || !tree.contains(marked)) openPathIn(tree, null) })
     if (!marked) return
 
-    marked.setAttribute("aria-current", "true")
-    marked.classList.add(classes.row_selected)
-    // Into view within the panel only, and only as far as needed.
+    // The path to it opens, and a heading or a hub on it forgets its fold
+    // as a page on it does (`openPathIn`).
+    const tree = treeAround(marked)
+    openPathIn(tree, rowIn(marked).dataset.treeId)
+    for (let above = parentItem(marked); above; above = parentItem(above)) {
+      if (above.dataset.viewKey) store(above, true)
+    }
+    marked.setAttribute("aria-selected", "true")
+    rowIn(marked).classList.add(classes.row_selected)
+    // The stop goes to it, unless the person is on another item of the tree.
+    if (!tree.contains(document.activeElement)) rove(marked)
+    // Its row into view within the panel only, and only as far as needed.
     const box = container.getBoundingClientRect()
-    const rowBox = marked.getBoundingClientRect()
+    const rowBox = rowIn(marked).getBoundingClientRect()
     if (rowBox.top < box.top) container.scrollTop -= box.top - rowBox.top
     else if (rowBox.bottom > box.bottom) container.scrollTop += rowBox.bottom - box.bottom
   }
@@ -501,42 +721,53 @@ export function createList(container, { text, number = String, dotClasses, typeL
       // and a hub a pill hangs off.
       const pageIds = new Set(nodes.filter((node) => node.kind === "page").map((node) => node.id))
       const opens = new Set([ ...nodes.filter((node) => node.kind === "page" && pageIds.has(node.parent)).map((node) => node.parent), ...pills.map((pill) => pill.target) ])
-      const lists = new Map()
+      const tree = treeOf({ main: true })
+      const groupItems = new Map()
       const drawn = groups.map(([ name, found, icon ]) => {
-        const list = name === "pages" ? tree(found, opens) : listOf(found.map((node) => row(node, { opens: opens.has(node.id) })))
-        lists.set(name, list)
-        return group(`mind_graph.script.list.${name}`, found.length, list, icon)
+        const items = name === "pages" ? pageItems(found, opens) : found.map((node) => row(node, { level: 2, opens: opens.has(node.id) }))
+        const item = group(name, `mind_graph.script.list.${name}`, found.length, items, icon)
+        groupItems.set(name, item)
+        return item
       })
       // Each pill the child of the row it hangs off; one with no such row
       // at the end of the posts, or after the groups when no post is drawn.
       const loose = []
       for (const pill of pills) {
-        const hub = rows.get(pill.target)?.closest("li")
-        if (hub) childrenOf(hub).append(pillRow(pill))
-        else loose.push(pillRow(pill))
+        const hub = rows.get(pill.target)
+        if (hub) {
+          childrenOf(viewFold(hub, hub.dataset.nodeId)).append(pillRow(pill, levelOf(hub) + 1))
+        } else {
+          loose.push(pill)
+        }
       }
-      if (loose.length && lists.has("posts")) lists.get("posts").append(...loose)
-      else if (loose.length) drawn.push(listOf(loose))
-      put(...drawn)
+      const posts = groupItems.get("posts")
+      if (posts) childrenOf(posts).append(...loose.map((pill) => pillRow(pill, 2)))
+      else drawn.push(...loose.map((pill) => pillRow(pill, 1)))
+      tree.append(...drawn)
+      drawFolds(tree, seeded ? readOpenSet() : readOpenSet(tree.dataset.treeOpen ?? null))
+      seeded = true
+      put(tree)
     },
     // `addable: false`: there is no graph to add a post to, and a row that
     // is not in view only says so.
-    // A filter's rows in place of the groups. `inView(id)`: whether the
+    // A filter's rows in place of the groups, a tree of one level. `inView(id)`: whether the
     // canvas draws that post now. `back`: the rows are a pill's, and this
     // is the way back to the groups.
     showRows({ heading, rows: given, inView, link = null, back = null, addable = true }) {
       forget()
       goBack = back?.onBack ?? null
-      const shown = [ section(heading, listOf(given.map((node) => row({ ...node, kind: "post" }, { notInView: !inView(node.id), addable }))), { back }) ]
+      const tree = treeOf()
+      tree.append(...given.map((node) => row({ ...node, kind: "post" }, { level: 1, notInView: !inView(node.id), addable })))
+      const shownRows = [ section(heading, tree, { back }) ]
       // "Not listed on any page" with nothing to show says so under its heading.
-      if (!given.length && !back) shown.push(line(text.t("mind_graph.script.list.unlisted_none")))
+      if (!given.length && !back) shownRows.push(line(text.t("mind_graph.script.list.unlisted_none")))
       if (link) {
         const anchor = element("a", "mx-1 mt-2 inline-block text-sm text-accent underline", link.label)
         anchor.href = link.href
         anchor.dataset.mindGraphPostsLink = ""
-        shown.push(anchor)
+        shownRows.push(anchor)
       }
-      put(...shown)
+      put(...shownRows)
     },
     // A read that failed: the line and a small button
     // that asks again, in the list. `focus`: the press that asked was the

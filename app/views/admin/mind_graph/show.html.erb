@@ -50,7 +50,12 @@
       buttons) and of `Admin::Ui::ContentTypeDotComponent` (a type's dot in
       the card and the list, slots 1-12 in order), and `data-tree-classes`
       the tree row's (`Admin::Ui::TreeItemComponent::CLASSES`, the list's rows
-      are the Pages tree's row), so none is copied into JavaScript. What the script needs whole -- the status, unpublished and
+      are the Pages tree's row), so none is copied into JavaScript. The
+      list's tree folds a page's branch with the Pages tree's open set:
+      `data-tree-open` is the cookie as `TreeOpenSet` read it for the pages
+      this viewer reads, the list's first folds, and `data-tree-open-path`
+      (the admin path, where the cookie is written) and `data-tree-locale`
+      are copied onto the tree as the Pages tree carries them. What the script needs whole -- the status, unpublished and
       icon chips, the card's Close and the tree row's glyphs -- it clones from the parts template
       (`Admin::MindGraphScreen::PartsComponent`) at the element's end.
       `data-post-notes-url` is a fourth template: a post's open notes as JSON
@@ -133,6 +138,9 @@
        data-button-classes="<%= %i[primary secondary tertiary].to_h { |variant| [ variant, Admin::Ui::ButtonComponent.classes(variant, size: :small) ] }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
        data-tree-classes="<%= Admin::Ui::TreeItemComponent::CLASSES.to_json %>"
+       data-tree-open="<%= @tree_open %>"
+       data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>"
+       data-tree-locale="<%= admin_locale %>"
        data-state="loading"
        class="grid min-h-0 flex-1 overflow-hidden rounded-card bg-surface shadow-1 min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
     <%# The search field: how a page, post or tag the graph doesn't draw is reached.
@@ -244,8 +252,9 @@
         types), filled by `mind_graph/node_list.js` from the same data and
         following the filter; or, while "Not listed on any page" is on or
         after a press on "+N more", the rows of that read in their place. A canvas's nodes can't take focus, so this is
-        the keyboard and screen-reader path to them: a row is a button that
-        selects its node, and the card it opens holds the links. It comes last
+        the keyboard and screen-reader path to them: one tree with one Tab
+        stop (`ul#mind-graph-tree[role=tree]`), whose row selects its node,
+        and the card it opens holds the links. It comes last
         in the document and scrolls on its own beside the canvas. Under the
         canvas it keeps a least height, so the search's results (which hang
         over it, inside the box) are not cut off by a list of two rows. %>

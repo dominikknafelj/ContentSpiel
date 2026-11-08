@@ -131,9 +131,30 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
   end
 
-  # A row of the list by its accessible name (Capybara's button locator does
-  # not read `aria-label`).
-  def assert_row(name) = assert_selector("button[aria-label=#{name.to_json}]")
+  # A row of the list by its accessible name: the list is a tree, each row
+  # a `[role=treeitem]` named by its `aria-label` (which Capybara's locators
+  # do not read), and a parent's item holds its children's, so it is found
+  # by its own name and never by the text inside it.
+  def assert_row(name) = assert_selector("[role=treeitem][aria-label=#{name.to_json}]")
+
+  # The item of the row whose name begins with `name` ("Alpha" finds
+  # "Alpha: post, 1 connection. Shows it in the graph.").
+  def list_item(name, **options) = find("[role=treeitem][aria-label^=#{name.to_json}]", **options)
+
+  # The headings of what the list shows, in its order: each group's (its
+  # item's row) and a section's (the rows a filter or a pill brings).
+  def list_headings = all("#{LIST} :is([data-tree-group] > .admin-tree-row, section h2)").map { |heading| heading.text.squish.upcase }
+
+  # Opens the branches of `pages` in the open set both trees read, as a
+  # person who opened them in Pages left it: a page below Home is folded
+  # until it is opened. On a CS Studio page, before the graph is visited.
+  def open_branches(*pages)
+    page.execute_script("document.cookie = arguments[0]", "cs_tree_open=#{pages.map(&:id).join(".")}; path=/#{ContentSpiel::ADMIN_PATH}")
+  end
+
+  # A press on that row: on its own row, so an open parent's press never
+  # lands on one of its children, which its item's middle may hold.
+  def press_list_item(name, **options) = list_item(name, **options).find(:xpath, "./*[1]").click
 
   # Every mark of a row inside `selector` that is a canvas has been drawn:
   # something is on each one (a canvas that was never painted is all zeros).

@@ -24,7 +24,8 @@ import { messages } from "i18n/messages"
 // `data-tree-open-path`; a node is `[data-tree-node]`, its row
 // `[data-tree-row][data-tree-id]` and its children `[data-tree-children]`; a
 // node's parent is the closest `[data-tree-node]` above it; the root carries
-// `data-tree-root` and the selected page's ancestors `data-tree-on-path`; the
+// `data-tree-root` and the selected page's ancestors `data-tree-on-path` (in
+// the graph's list the selected node's, its group heading among them); the
 // element holding `aria-expanded` is the node itself when it is a
 // `[role="treeitem"]`, else its row's disclosure button.
 
@@ -66,8 +67,9 @@ function write(tree, entries) {
 }
 
 // `{ opened, folded }`, two Sets of bare page ids (strings), read from `seed`
-// (a value in the cookie's format, for the mind graph's list, which does not
-// read it yet) when one is given, else from the cookie.
+// (a value in the cookie's format: the mind graph's list draws its first
+// folds from the server's `data-tree-open`) when one is given, else from the
+// cookie.
 export function readOpenSet(seed = null) {
   const opened = new Set()
   const folded = new Set()
@@ -98,10 +100,13 @@ export function forgetFolds(tree, ids) {
 }
 
 // Is the branch of `node` open by the rule, the open set's `{ opened, folded }`
-// read against it?
+// read against it? A node whose fold is a view state and never stored (the
+// graph's group headings and the hubs a pill hangs off) says its own in
+// `data-tree-view-fold`, "open" or "folded", and the open set has no say.
 export function openByRule(node, { opened, folded }) {
   const id = idOf(node)
   if (node.hasAttribute("data-tree-on-path")) return true
+  if (node.dataset.treeViewFold) return node.dataset.treeViewFold === "open"
   if (folded.has(id)) return false
   return node.hasAttribute("data-tree-root") || opened.has(id)
 }

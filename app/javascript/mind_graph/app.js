@@ -69,7 +69,7 @@
 // announced as a toggle's is. AFTER A ROW IS ADDED EVERY FIGURE IS TRUE: the
 // pill stands for one post fewer (its words, its width, and at none the pill
 // itself and its rows go), the canvas's name counts the pills as they now
-// are, and the notice no longer counts the post among those that aren't
+// are, and the notice leaves the post out of those that aren't
 // shown -- all three read what the page holds (`graph_data.js`,
 // `countAdded`). WITHOUT A GRAPH THERE IS NOTHING TO ADD TO (it is still
 // being read, its read failed, or "Show everything" is on its way): the
@@ -218,9 +218,10 @@ export function mount(element) {
     }
   })
   // "Not listed on any page" is there only for a viewer the server gave its
-  // address (one who reads a page).
+  // address (one who reads a page). The list's tree carries the element's
+  // open set and its admin path (`treeData`), as the Pages tree does.
   const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, number, dotClasses, typeLabels, treeClasses, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl),
+    text, number, dotClasses, typeLabels, treeClasses, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl), treeData: element,
     onSelect: (id) => {
       const index = state.indexOf.get(id)
       if (index != null) selection.reveal(index)
@@ -297,7 +298,7 @@ export function mount(element) {
     const { index, node, lines, at } = addNode(state, row, { context })
     // What the page holds now says the post is drawn: its pill stands for
     // one fewer (and is written and measured again), and at none its rows
-    // go with it; an unconnected post is no longer one that isn't shown.
+    // go with it; an unconnected post drops out of those that aren't shown.
     const pill = countAdded(state.nodes, state.data, row)
     if (pill >= 0) {
       resizePill(state, pill, { context, words })
