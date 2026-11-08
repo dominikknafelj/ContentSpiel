@@ -110,6 +110,7 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
       path = PublicPath.current.where(record: docs).pick(:path)
       assert_selector "[data-search-group=page] a.admin-tree-row", text: "Ruby docs"
       assert_selector "[data-search-group=page] a span.text-small.text-meta", exact_text: path
+      assert_no_match(/mono/i, find("[data-search-group=page] a span.text-small", exact_text: path).evaluate_script("getComputedStyle(this).fontFamily"), "a page's path is not drawn in mono")
       assert_selector "[data-search-group=post] a.admin-tree-row", text: "Ruby notes"
       assert_selector "[data-search-group=tag] a.admin-tree-row", exact_text: "ruby"
       # Each row's mark is decoration: the page glyph, the type's dot, the square.
@@ -151,6 +152,14 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
       assert_selector "p", exact_text: "No page, post or tag matches.", count: 1
       assert_no_selector "[data-search-group]"
     end
+
+    # A page's result opens the page's local view, the page labelled first.
+    search_whole_site("ruby")
+    click_frame_link { find("#{RESULTS} [data-search-group=page] a").click }
+    assert_current_path admin_mind_graph_path(page: docs.id)
+    assert_selector "[data-mind-graph-focus]", text: "Around the page “Ruby docs”"
+    await_graph
+    assert_equal nid(docs), graph["data-labelled"].split(",").first, "the focus is labelled first"
   end
 
   test "a failed whole-site search says so and the graph keeps working" do

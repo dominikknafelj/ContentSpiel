@@ -72,9 +72,9 @@ export const LINE_STYLES = {
   lists: { colour: "lineLists", width: 1.5, dash: [ 0.1, 3.5 ], cap: "round" },
   tree: { colour: "lineTree", width: 1, dash: [], cap: "butt" }
 }
-// Below this zoom the lines of shared tags are not drawn: zoomed out they are most of the ink and say the least. A
-// DRAWING rule only: the filter, its counts and a selection's neighbours do
-// not change with it.
+// Below this zoom the lines of shared tags are not drawn: zoomed out they
+// are most of the ink and say the least. A DRAWING rule only: the filter,
+// its counts and a selection's neighbours do not change with it.
 const HIDE_TAG_LINES_BELOW = 0.4
 // The font a node's label is drawn in, and so the font its width is measured
 // in (`state.js`): the sans, the selected node's semibold.

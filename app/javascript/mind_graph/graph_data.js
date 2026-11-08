@@ -1,5 +1,5 @@
-// The graph's data as the page holds it: plain functions over the payload, with no canvas and no element, so
-// each can be asked directly by a test.
+// The graph's data as the page holds it: plain functions over the payload,
+// with no canvas and no element, so each can be asked directly by a test.
 //
 // A node is `{ …what the server sent, kind, title }`; `kind` is "page",
 // "post", "tag", "type" (a post type a page lists, and the one "All posts"

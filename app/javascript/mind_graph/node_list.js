@@ -185,8 +185,9 @@
 // onHover, onAdd, onMore, onUnlisted })` answers `{ render(nodes),
 // showRows({ heading, rows, inView, link, back }), fail(line, { label,
 // onRetry, focus, back }), showResults(…), closeResults(), clear(),
-// setUnlisted(on), setBusy(on), mark(id), row(id), destroy() }`: `render` replaces the rows with the four groups
-// (the app calls it once per load and once per filter change), `clear`
+// setUnlisted(on), setBusy(on), mark(id), row(id), destroy() }`: `render`
+// replaces the rows with the four groups (the app calls it once per load
+// and once per filter change), `clear`
 // empties the rows while another graph is loaded, `mark` moves the mark to
 // the item of `id` (null for none), and `row` answers the treeitem of `id`.
 // `treeData` is the graph's element, whose `data-tree-open-path`,
@@ -741,7 +742,10 @@ export function createList(container, { text, number = String, dotClasses, typeL
     rowIn(marked).classList.add(classes.row_selected)
     // The stop goes to it, unless the person is on another item of the tree.
     if (!tree.contains(document.activeElement)) rove(marked)
-    // Its row into view within the column only, and only as far as needed.
+    // Its row into view within the column only, and only as far as needed;
+    // not while the whole site's results stand in the rows' place, where
+    // the row has no box to measure.
+    if (body.hidden) return
     const box = scroller.getBoundingClientRect()
     const rowBox = rowIn(marked).getBoundingClientRect()
     if (rowBox.top < box.top) scroller.scrollTop -= box.top - rowBox.top
@@ -880,17 +884,17 @@ export function createList(container, { text, number = String, dotClasses, typeL
       backButton.dataset.mindGraphBack = ""
       backButton.addEventListener("click", leaveResults)
       const heading = element("h2", "m-0 mt-2 px-1 text-sm font-semibold text-ink", text.t("mind_graph.script.list.search_site_heading", { query }))
-      const backLine = element("div", "px-1")
+      const backLine = element("div", "flex px-1")
       backLine.append(backButton)
-      const shown = [ backLine, heading ]
+      const pieces = [ backLine, heading ]
       if (failed) {
         const said = element("p", "m-0 mt-2 px-1 text-small text-danger-ink", text.t("mind_graph.script.search.failed"))
         said.setAttribute("role", "alert")
-        shown.push(said)
+        pieces.push(said)
       } else if (!found.length) {
-        shown.push(line(text.t("mind_graph.script.search.none")))
+        pieces.push(line(text.t("mind_graph.script.search.none")))
       }
-      results.replaceChildren(...shown)
+      results.replaceChildren(...pieces)
       if (!failed && found.length) {
         const groups = element("div", `mt-2 ${classes.tree}`)
         renderResults(groups, found, { text, dotClasses, classes, parts })

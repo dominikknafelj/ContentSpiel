@@ -844,6 +844,37 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
     assert_equal [ 0, 1 ], result
   end
 
+  # While the whole site's results stand in the rows' place, a node
+  # selected on the canvas is marked in the hidden rows, and the column is
+  # not scrolled for a row that has no box.
+  test "list: a mark while the whole site's results show changes no scroll, and Back shows the marked row" do
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const scroller = document.createElement("div")
+        scroller.style.cssText = "height: 40px; overflow-y: auto"
+        const container = document.createElement("div")
+        scroller.append(container)
+        document.body.append(scroller)
+        const text = { t: (key) => key, locale: () => "en" }
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), unlisted: false, scroller,
+                                               onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        list.render(Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index}`, kind: "tag", title: `tag ${index}`, degree: 30 - index })))
+        list.showResults({ query: "x", rows: [], back: { label: "Back", onBack() {} } })
+        scroller.scrollTop = 0
+        list.mark("tag-29")
+        const during = scroller.scrollTop
+        const marked = list.row("tag-29").getAttribute("aria-selected")
+        list.closeResults()
+        list.mark("tag-29")
+        const after = scroller.scrollTop
+        scroller.remove()
+        return [ during, marked, after > 0 ]
+      })()
+    JS
+
+    assert_equal [ 0, "true", true ], result
+  end
+
   # A keyboard or screen-reader user reaches a
   # pill's rows. Each pill has a row in the list, in the pill's own words,
   # under the row of what it hangs off; activating it asks the app for the

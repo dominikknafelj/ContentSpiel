@@ -321,7 +321,7 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     "mx-1 mt-2 inline-block text-sm text-accent underline" => "\"Open in Posts\", under a pill's rows",
     "m-0 mt-2 px-1 text-sm font-semibold text-ink" => "the heading of the whole site's results, which is no row of the tree",
     "m-0 mt-2 px-1 text-small text-danger-ink" => "the line of a whole-site search that failed",
-    "px-1" => "the line of the whole site's Back, which stands where a row's disclosure column starts"
+    "flex px-1" => "the line of the whole site's Back, which stands where a row's disclosure column starts"
   }.freeze
   # The scripts that draw the list's rows.
   ROW_SCRIPTS = %w[node_list.js search_box.js].freeze

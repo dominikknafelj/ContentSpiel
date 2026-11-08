@@ -6,7 +6,8 @@
 // with its contract in its header: the state and its operations
 // (`state.js`), the frame (`frame.js`), the canvas's gestures and the hover
 // (`gestures.js`), the selection, its card and the pins (`selection.js`), the
-// list's reads (`list_reads.js`) and the notice (`notice.js`).
+// list's reads (`list_reads.js`), the list's last line and the whole site's
+// search (`site_search.js`) and the notice (`notice.js`).
 //
 // What the screen shows is said on the element, for tests and for anything
 // that wants to know without reading a canvas: `data-state` (loading, ready,
@@ -75,14 +76,15 @@
 // being read, its read failed, or "Show everything" is on its way): the
 // press does nothing.
 //
-// A SITE WITH TOO MANY LINES FOR ONE PICTURE opens around Home. The data's answer says where (`open`, and how many lines the
-// site has); this page then reads that page's local view (`data-open-url`),
-// writes the figure on the element (`data-opened-lines`, which the canvas's
-// name reads: "Showing the area around Home. The site has ...") and
-// shows the bar that says why, with "Show everything". That is a BUTTON: it
-// reads the whole graph (`data-everything-url`) into this page and navigates
-// nowhere, so the choice is in no address and a reload, and Back to this
-// page, open around Home again.
+// A SITE WITH TOO MANY LINES FOR ONE PICTURE opens around Home. The data's
+// answer says where (`open`, and how many lines the site has); this page
+// then reads that page's local view (`data-open-url`), writes the figure on
+// the element (`data-opened-lines`, which the canvas's name reads: "Showing
+// the area around Home. The site has ...") and shows the bar that says why,
+// with "Show everything". That is a BUTTON: it reads the whole graph
+// (`data-everything-url`) into this page and navigates nowhere, so the
+// choice is in no address and a reload, and Back to this page, open around
+// Home again.
 //
 // THE FIRST VIEW FITS EVERYTHING: while the layout takes shape the camera
 // follows it, and when it has cooled down the fit is final (`state.fitted`).
@@ -97,19 +99,8 @@
 // (`[data-mind-graph-search-site]`) are found in the document, and a screen
 // without them throws as a missing part does. The column's find field
 // (`admin--tree--find`) narrows the list's tree and owns every key of the
-// field. The last line follows the field's TEXT, heard as its `input` (which
-// the find also dispatches when it empties the field itself): while the
-// field holds text the line shows, "Search the whole site for “…”", and
-// when it is empty the line goes -- whether or not there is a tree to
-// narrow, so a graph that draws nothing, or whose read failed, still offers
-// the whole site. Pressing it asks the whole site (`search/suggestions.js`,
-// the field's text at the press: an answer to text the field has since
-// changed from is dropped), and the list draws the answer in the tree's place
-// (`showResults`); while the request is out the list is busy. Back and
-// Escape give the tree back with the query kept and the focus on the last
-// line. Typing in the field while the results show gives the tree back too,
-// so no results stand under other text. Whatever this writes into the
-// column, the controller's `reset` takes back.
+// field. The last line and the whole site's search are `site_search.js`'s.
+// Whatever this writes into the column, the controller's `reset` takes back.
 //
 // MOTION. How fast the layout is shown is the worker's business
 // (`layout_worker.js`, PACING): this page draws every `tick` it is sent. All
@@ -126,8 +117,8 @@ import { summaryOf } from "mind_graph/summary"
 import { createCard, fill } from "mind_graph/card"
 import { recordId } from "mind_graph/ids"
 import { paintMarks } from "mind_graph/swatches"
-import { createSuggestions } from "search/suggestions"
 import { createList } from "mind_graph/node_list"
+import { attachSiteSearch } from "mind_graph/site_search"
 import { createState, takeData, addNode, resizePill, showOnly, clearData } from "mind_graph/state"
 import { createFrame } from "mind_graph/frame"
 import { attachGestures } from "mind_graph/gestures"
@@ -175,7 +166,6 @@ export function mount(element) {
   // The column's parts, outside the element.
   const listContainer = part("#tree-column [data-mind-graph-list]")
   const searchSite = part("#tree-column [data-mind-graph-search-site]")
-  const searchSiteButton = searchSite.querySelector("button")
   const findField = () => document.querySelector('#tree-column input[aria-controls="mind-graph-tree"]')
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const typeLabels = JSON.parse(element.dataset.typeLabels)
@@ -279,59 +269,7 @@ export function mount(element) {
   })
   // The last line and the whole site's results: not part of the data
   // request, so they work whatever the graph is doing.
-  let resultsShown = false
-  const fieldQuery = () => findField()?.value.trim() ?? ""
-  const showLastLine = (query) => {
-    if (!query) return hideLastLine()
-    searchSiteButton.textContent = text.t("mind_graph.script.list.search_site", { query })
-    searchSite.hidden = false
-  }
-  function hideLastLine() {
-    searchSite.hidden = true
-    searchSiteButton.replaceChildren()
-  }
-  const backToList = () => {
-    resultsShown = false
-    const query = fieldQuery()
-    showLastLine(query)
-    if (query) searchSiteButton.focus()
-    else findField()?.focus()
-  }
-  const showResults = (query, answer) => {
-    list.setBusy(false)
-    resultsShown = true
-    hideLastLine()
-    list.showResults({ query, ...answer, back: { label: text.t("mind_graph.script.list.back"), onBack: backToList } })
-  }
-  const siteSearch = createSuggestions({
-    url: searchSite.dataset.url,
-    getQuery: fieldQuery,
-    onRows: (query, rows) => showResults(query, { rows }),
-    onError: () => showResults(fieldQuery(), { failed: true })
-  })
-  const searchWholeSite = () => {
-    if (!fieldQuery()) return
-    list.setBusy(true)
-    siteSearch.fetchNow()
-  }
-  // The field's text changed: a search still out is for other text, and
-  // results that show give the tree back under the new text.
-  const typed = (event) => {
-    if (event.target !== findField()) return
-    if (siteSearch.inFlight) {
-      siteSearch.cancel()
-      list.setBusy(false)
-    }
-    if (resultsShown) {
-      resultsShown = false
-      list.closeResults()
-    }
-    showLastLine(fieldQuery())
-  }
-  searchSiteButton.addEventListener("click", searchWholeSite)
-  document.addEventListener("input", typed)
-  // A field that already holds text (the column a frame navigation kept).
-  showLastLine(fieldQuery())
+  const stopSiteSearch = attachSiteSearch(searchSite, { list, text, findField })
 
   // The legend's toggles: the state is the checkboxes' own, so Back restores
   // what the person had chosen. `switched(name, true)` is the kinds that are
@@ -743,10 +681,7 @@ export function mount(element) {
       gestures.stop()
       stopTheme()
       selection.stop()
-      siteSearch.cancel()
-      searchSiteButton.removeEventListener("click", searchWholeSite)
-      document.removeEventListener("input", typed)
-      hideLastLine()
+      stopSiteSearch()
       list.destroy()
       card.hide()
       release.hidden = true

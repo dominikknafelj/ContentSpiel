@@ -16,11 +16,11 @@ import { Controller } from "@hotwired/stimulus"
 // the counts, the canvas's name with its summary of them, the notice's lines,
 // an open selection card and where it stood, the list's rows in the tree
 // column (a post added from the list among them, a pill's rows in the
-// groups' place, the whole site's results) and its last line, the zoom's figure, the number of pinned nodes and
-// the button that releases them, and on a large site the bar of the view it
-// opened in with its figure, or the whole graph after "Show everything" --
-// and Back restores exactly that, before
-// anything has been fetched or laid out. All of it says what the screen
+// groups' place, the whole site's results) and its last line, the zoom's
+// figure, the number of pinned nodes and the button that releases them,
+// and on a large site the bar of the view it opened in with its figure, or
+// the whole graph after "Show everything" -- and Back restores exactly that,
+// before anything has been fetched or laid out. All of it says what the screen
 // SHOWS, so it is reset here, synchronously, and the app writes it again as it
 // becomes true. Pins are among it on purpose: they live in the page that made
 // them, and a visit that comes back starts with none. (The legend's
@@ -93,7 +93,8 @@ export default class extends Controller {
     // snapshot keeps the column as it was: its rows, a pill's rows or the
     // whole site's results are the visit that was left, and come back with
     // the data. All but the last line is the list's, and goes; the last line
-    // is the server's, hidden and empty until the find narrows the tree.
+    // is the server's, hidden and empty while the find field is empty (it
+    // shows while the field holds text, tree or no tree).
     const list = document.querySelector("#tree-column [data-mind-graph-list]")
     if (list) {
       for (const child of Array.from(list.children)) if (!child.matches("[data-mind-graph-search-site]")) child.remove()

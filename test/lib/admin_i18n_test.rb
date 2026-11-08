@@ -287,6 +287,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/input.js
     app/javascript/mind_graph/renderer.js
     app/javascript/mind_graph/search_box.js
+    app/javascript/mind_graph/site_search.js
     app/javascript/mind_graph/theme.js
     app/javascript/mind_graph/ids.js
     app/javascript/mind_graph/marks.js

@@ -39,8 +39,8 @@
 # would. `script.list.pages`, `posts`, `tags` and `types` are a group's
 # heading with how many it holds; `posts` is also the heading of the rows a
 # filter shows ("Not listed on any page", a "+N more" pill), where the
-# figure is the read's whole total. `failed` and `try_again` are the design
-# answer's too (G5): a read of the list's that failed, said in the list.
+# figure is the read's whole total. `failed` and `try_again` are a read of
+# the list's that failed, said in the list.
 #
 # `script.list.search_site` is the list's last line while the find field
 # holds text, `%{query}` what it holds; pressing it asks the whole site, and
