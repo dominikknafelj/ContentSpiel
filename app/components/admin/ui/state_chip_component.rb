@@ -11,9 +11,14 @@ module Admin
     # height in a row. On the rail's ground a tint is no shape, so the dot
     # and the word carry the state there, and the word alone says it.
     #
-    # `label:` and `detail:` are the caller's words; the detail follows the
-    # word after a middle dot. Anything else the caller needs on the tag
-    # (`data`, `id`) passes through.
+    # `label:` and `detail:` are the caller's words. The detail is not part
+    # of the chip: it follows it on the same line as small meta text after a
+    # middle dot ("· added 2 Oct"), and the two stand in one plain inline
+    # wrapper, so the state and its detail read as one phrase ("Key saved ·
+    # added 2 Oct"), to a screen reader and in the page's text alike. A flex
+    # wrapper would read them as separate lines. Anything else the caller
+    # hands it (`data`, `id`, a class) goes on the root: the wrapper with a
+    # detail, the chip without.
     class StateChipComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -25,7 +30,9 @@ module Admin
         interface: %i[tone label detail],
         limits: [
           "It cannot be pressed and takes no focus.",
-          "It draws four tones; the word, never the colour, says the state."
+          "It draws four tones; the word, never the colour, says the state.",
+          "A detail is small meta text after the chip, never inside it.",
+          "Anything else the caller hands it (data, id, a class) goes on its root: the wrapper with a detail, the chip without."
         ],
         states: %i[ok warn danger off],
         keys: [],
@@ -43,6 +50,8 @@ module Admin
         off: "border-field-line text-dim"
       }.freeze
       DOT = "size-1.5 shrink-0 rounded-full".freeze
+      WRAPPER = "inline".freeze
+      DETAIL = "text-small text-meta".freeze
       DOTS = { ok: "bg-ok", warn: "bg-warn", danger: "bg-danger", off: "border border-field-line" }.freeze
 
       def initialize(tone:, label:, detail: nil, **html)
@@ -55,8 +64,18 @@ module Admin
       end
 
       def call
-        tag.span(**@html, class: [ CLASS, GROUNDS.fetch(@tone), @html[:class] ].compact.join(" "), data: { **@html.fetch(:data, {}), state_tone: @tone }) do
-          safe_join([ tag.span(class: "#{DOT} #{DOTS.fetch(@tone)}", aria: { hidden: true }), @label, (" · #{@detail}" if @detail.present?) ].compact)
+        return chip(**@html) if @detail.blank?
+
+        tag.span(**@html, class: [ WRAPPER, @html[:class] ].compact.join(" ")) do
+          safe_join([ chip, " ", tag.span("· #{@detail}", class: DETAIL) ])
+        end
+      end
+
+      private
+
+      def chip(**html)
+        tag.span(**html, class: [ CLASS, GROUNDS.fetch(@tone), html[:class] ].compact.join(" "), data: { **html.fetch(:data, {}), state_tone: @tone }) do
+          safe_join([ tag.span(class: "#{DOT} #{DOTS.fetch(@tone)}", aria: { hidden: true }), @label ])
         end
       end
     end

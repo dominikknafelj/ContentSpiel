@@ -1,8 +1,8 @@
 module Admin
   module SettingsScreen
-    # The one place that names AI translation's state, read by the key's
-    # chip, Test connection's result and the rail's AI row, so the three say
-    # the same word in the same tone.
+    # The one place that names AI translation's state and maps a test's
+    # result to one, read by the key's chip and Test connection's result, so
+    # both say the same word in the same tone.
     #
     # Without a provider AI translation is off, whatever key is stored. With
     # one, the state is whether a key is stored, until Test connection has
@@ -14,14 +14,17 @@ module Admin
       RESULTS = { connected: :connected, failed: :not_connected }.freeze
 
       def self.of(site_setting, result: nil)
-        if result
-          raise ArgumentError, "unknown AI test result #{result.inspect}" unless RESULTS.key?(result)
-
-          return RESULTS.fetch(result)
-        end
+        return of_result(result) if result
         return :off if site_setting.ai_provider.blank?
 
         site_setting.ai_api_key_set? ? :key_saved : :no_key
+      end
+
+      # A Test connection's result (`:connected` or `:failed`) as its state.
+      def self.of_result(result)
+        raise ArgumentError, "unknown AI test result #{result.inspect}" unless RESULTS.key?(result)
+
+        RESULTS.fetch(result)
       end
 
       def self.tone(state) = TONES.fetch(state)

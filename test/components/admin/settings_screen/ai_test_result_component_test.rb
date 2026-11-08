@@ -11,7 +11,9 @@ class Admin::SettingsScreen::AiTestResultComponentTest < ViewComponent::TestCase
   test "connected: the ok state chip, Connected and the time, in the sans" do
     render_inline Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: 412)
 
-    assert_selector "#settings-ai-test-result .admin-state-chip[data-state-tone=ok]", text: "Connected · 412 ms"
+    assert_selector "#settings-ai-test-result .admin-state-chip[data-state-tone=ok]", text: "Connected"
+    assert_selector "#settings-ai-test-result .admin-state-chip + .text-small.text-meta", text: "· 412 ms"
+    assert_equal "Connected · 412 ms", page.find("#settings-ai-test-result").text.squish
     assert_no_selector ".font-cs-mono"
   end
 
@@ -30,7 +32,7 @@ class Admin::SettingsScreen::AiTestResultComponentTest < ViewComponent::TestCase
     } } })
     render_inline Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: 7)
 
-    assert_selector ".admin-state-chip", text: "Linked up · 7 msec"
+    assert_equal "Linked up · 7 msec", page.find("#settings-ai-test-result").text.squish
   ensure
     I18n.backend.store_translations(:en, admin: { components: { settings_screen: {
       ai_state: { connected: "Connected" }, ai_test_result: { time: "%{milliseconds} ms" }

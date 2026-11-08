@@ -34,12 +34,16 @@ class Admin::Ui::StateChipComponentTest < ViewComponent::TestCase
     assert_empty dot_classes.grep(/\Abg-/)
   end
 
-  test "a detail follows the word after a middle dot" do
-    render_inline Admin::Ui::StateChipComponent.new(tone: :ok, label: "Key saved", detail: "added 2 Oct")
-    assert_equal "Key saved · added 2 Oct", page.find("span.admin-state-chip").text.squish
+  test "a detail is small meta text after the chip, and the two read as one phrase" do
+    render_inline Admin::Ui::StateChipComponent.new(tone: :ok, label: "Key saved", detail: "added 2 Oct", data: { ai_key_state: "set" })
+
+    assert_equal "Key saved", page.find("span.admin-state-chip").text.squish
+    assert_selector "span[data-ai-key-state=set] > span.admin-state-chip + span.text-small.text-meta", text: "· added 2 Oct"
+    assert_equal "Key saved · added 2 Oct", page.find("span[data-ai-key-state=set]").text.squish
 
     render_inline Admin::Ui::StateChipComponent.new(tone: :ok, label: "Key saved")
     assert_equal "Key saved", page.find("span.admin-state-chip").text.squish
+    assert_no_selector ".text-meta"
   end
 
   test "an unknown tone is refused" do

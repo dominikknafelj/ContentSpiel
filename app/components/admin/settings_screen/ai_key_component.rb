@@ -1,12 +1,11 @@
 module Admin
   module SettingsScreen
-    # The API key's part of the AI card: AiState's chip ("Key saved · added
-    # 2 Oct", "Key saved" alone for a key stored before the date column
-    # existed, "No key" with a provider and no key, "Off" without a provider,
-    # stored key or not)
-    # with Replace and Remove… (Add key when there is none). Replace/Add key
-    # swaps the chip for a password input with Save key and Cancel -- client
-    # side, `admin--settings--ai`.
+    # The API key's part of the AI card: AiState's chip with Replace and
+    # Remove… (Add key when there is none). The chip reads "Key saved", then
+    # "added 2 Oct" when the key has a date; "No key" with a provider and no
+    # key; and "Off" without a provider, whether a key is stored or not.
+    # Replace/Add key swaps the chip for a password input with Save key and
+    # Cancel -- client side, `admin--settings--ai`.
     #
     # NO PART OF THE KEY IS EVER RENDERED, and nothing here decrypts it: only
     # `SiteSetting#ai_api_key_set?` (the raw column) and the saved-on date are

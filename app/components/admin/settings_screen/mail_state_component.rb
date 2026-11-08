@@ -6,10 +6,10 @@ module Admin
     # (the card is `settings.manage`'s, who may read the line; System status
     # shows the sentence alone).
     #
-    # `TONES` is the one map from a mail state to its chip's tone, read here
-    # and by the Settings rail's Mail row: not set up is off, saved but not
-    # tested is warn, working is ok, and a failed send is danger, because a
-    # real mail was lost.
+    # `TONES` is the one map from a mail state to its chip's tone, public so
+    # that every component drawing a mail state reads it: not set up is off,
+    # saved but not tested is warn, working is ok, and a failed send is
+    # danger, because a real mail was lost.
     #
     # Its own element (`ID`), because "Send test mail" changes the state and
     # its answer replaces this part of the card alone. Every word is

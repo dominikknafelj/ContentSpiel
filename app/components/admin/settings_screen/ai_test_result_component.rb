@@ -1,13 +1,13 @@
 module Admin
   module SettingsScreen
     # Where Test connection reports back, inline under the button: AiState's
-    # Connected chip with the provider call's time, or Not connected with the
-    # provider's own message under it in danger ink. Always renders its slot
-    # (`#settings-ai-test-result`) -- empty until a test ran -- because the
-    # Turbo Stream answer of `Admin::SettingsController#test_ai_connection`
-    # replaces exactly that element. Neither form ever carries the API key:
-    # the message is the provider's `AI::Error` text, written to be shown to
-    # an editor.
+    # chip for the result, Connected with the provider call's time after it,
+    # or Not connected with the provider's own message under it in danger
+    # ink. Always renders its slot (`#settings-ai-test-result`) -- empty until
+    # a test ran -- because the Turbo Stream answer of
+    # `Admin::SettingsController#test_ai_connection` replaces exactly that
+    # element. Neither form ever carries the API key: the message is the
+    # provider's `AI::Error` text, written to be shown to an editor.
     class AiTestResultComponent < Admin::AdminComponent
       ID = "settings-ai-test-result".freeze
 
@@ -25,9 +25,9 @@ module Admin
       def call
         tag.div(id: ID, role: "status", class: "mt-2 text-sm") do
           if connected?
-            chip(:connected, detail: t(".time", milliseconds: milliseconds))
+            chip(AiState.of_result(:connected), detail: t(".time", milliseconds: milliseconds))
           elsif failed?
-            safe_join([ chip(:not_connected), tag.p(message, class: "mt-1 text-danger-ink") ])
+            safe_join([ chip(AiState.of_result(:failed)), tag.p(message, class: "mt-1 text-danger-ink") ])
           end
         end
       end

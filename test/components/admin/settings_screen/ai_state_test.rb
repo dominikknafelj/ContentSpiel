@@ -23,6 +23,9 @@ class Admin::SettingsScreen::AiStateTest < ActiveSupport::TestCase
     assert_equal :connected, AiState.of(site, result: :connected)
     assert_equal :not_connected, AiState.of(site, result: :failed)
     assert_raises(ArgumentError) { AiState.of(site, result: :maybe) }
+    assert_equal :connected, AiState.of_result(:connected)
+    assert_equal :not_connected, AiState.of_result(:failed)
+    assert_raises(ArgumentError) { AiState.of_result(:maybe) }
 
     assert_equal %i[off no_key key_saved connected not_connected], AiState::STATES
     assert_equal({ off: :off, no_key: :warn, key_saved: :ok, connected: :ok, not_connected: :danger }, AiState::TONES)
