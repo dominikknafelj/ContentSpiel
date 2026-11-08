@@ -1,19 +1,32 @@
 require "test_helper"
 
-# The page tree's divider as the server draws it (Claude Design, 2026-10-13,
-# T1): a focusable separator that says its width, with the shared tooltip and
-# the numbers its script works with. What it does is a browser's to show
-# (`test/system/admin/tree_column_test.rb`).
+# The tree column's divider as the server draws it: a focusable separator
+# that says its width, in the words of what the column holds, with the shared
+# tooltip and the numbers its script works with. What it does is a browser's
+# to show (`test/system/admin/tree_column_test.rb`).
 class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   Divider = Admin::Shell::TreeDividerComponent
 
   test "a vertical separator in the Tab order that says the default width between the minimum and the maximum, by name" do
-    render_inline(Divider.new)
+    render_inline(Divider.new(subject: "pages"))
 
     assert_selector "div.admin-tree-divider[role=separator][aria-orientation=vertical][tabindex='0'][aria-controls=tree-column]", count: 1
     assert_selector "[role=separator][aria-valuenow='272'][aria-valuemin='220'][aria-valuemax='480']"
-    assert_selector "[role=separator][aria-label='#{I18n.t("admin.components.shell.tree_divider.label")}']"
-    assert_equal "Page tree width", I18n.t("admin.components.shell.tree_divider.label")
+    assert_selector "[role=separator][aria-label='#{I18n.t("admin.components.shell.tree_subject.pages.divider")}']"
+    assert_equal "Page tree width", I18n.t("admin.components.shell.tree_subject.pages.divider")
+  end
+
+  test "the fold buttons, the divider and the top bar's tree button say what the column holds" do
+    render_inline(Divider.new(subject: "mind_graph"))
+    divider = page.find("[role=separator]")
+
+    assert_equal "List width", divider["aria-label"]
+    assert_selector "[role=separator] [data-tooltip]", visible: :all, text: "List width 272px. Arrow keys to resize."
+    key = "components.shell.tree_subject.mind_graph.divider_tooltip"
+    assert_equal({ "@locale" => "en", key => "List width %{width}px. Arrow keys to resize." }, JSON.parse(divider["data-messages"]))
+    assert_equal key, Divider.column_data(subject: "mind_graph")[:"admin--shell--tree-width-tooltip-key-value"]
+    assert_raises(KeyError) { Divider.new(subject: "posts") }
+    assert_raises(KeyError) { Divider.column_data(subject: "posts") }
   end
 
   test "the numbers are the design's, and the default is the 17rem the column always was" do
@@ -41,10 +54,11 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   end
 
   test "the column carries the controller, every number and both storage keys as its values, and the actions that keep it current" do
-    data = Divider.column_data
+    data = Divider.column_data(subject: "pages")
 
     assert_equal "admin--shell--tree-width", data[:controller]
-    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, key: "cs-tree-width", "fold-key": "cs-tree-folded" }.each do |name, value|
+    { min: 220, default: 272, max: 480, editor: 640, sidebar: 240, key: "cs-tree-width", "fold-key": "cs-tree-folded",
+      "tooltip-key": "components.shell.tree_subject.pages.divider_tooltip" }.each do |name, value|
       assert_equal value, data[:"admin--shell--tree-width-#{name}-value"], name.to_s
     end
     assert_empty data.keys.grep(/notes|strip/), "the script counts neither the notes nor the strip"
@@ -53,18 +67,18 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   end
 
   test "the divider is the controller's divider target, the tooltip's host, and hands over the tooltip's sentence as a message" do
-    render_inline(Divider.new)
+    render_inline(Divider.new(subject: "pages"))
     divider = page.find("[role=separator]")
 
     assert_equal %w[admin--ui--tooltip], divider["data-controller"].split
     assert_equal "divider", divider["data-admin--shell--tree-width-target"]
     assert_empty divider.native.attributes.keys.grep(/-value\z/), "the values are the column's"
     messages = JSON.parse(divider["data-messages"])
-    assert_equal "Tree width %{width}px. Arrow keys to resize.", messages.fetch("components.shell.tree_divider.tooltip")
+    assert_equal "Tree width %{width}px. Arrow keys to resize.", messages.fetch("components.shell.tree_subject.pages.divider_tooltip")
   end
 
   test "every gesture has its action on the divider: the press that begins a drag, a double click, the keys and the focus" do
-    render_inline(Divider.new)
+    render_inline(Divider.new(subject: "pages"))
     actions = page.find("[role=separator]")["data-action"].split
 
     %w[pointerdown->admin--shell--tree-width#press lostpointercapture->admin--shell--tree-width#release blur@window->admin--shell--tree-width#release
@@ -77,7 +91,7 @@ class Admin::Shell::TreeDividerComponentTest < ViewComponent::TestCase
   end
 
   test "the shared tooltip is inside, hidden until asked for, and names the default width" do
-    render_inline(Divider.new)
+    render_inline(Divider.new(subject: "pages"))
 
     assert_selector "[role=separator] .admin-tree-divider__tip [data-tooltip][data-admin--ui--tooltip-target=bubble]", visible: :all, count: 1,
       text: "Tree width 272px. Arrow keys to resize."

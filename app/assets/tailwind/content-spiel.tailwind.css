@@ -87,8 +87,8 @@
   --text-small: var(--cs-t-small);
   --text-label: var(--cs-t-label);
   --text-count: var(--cs-t-count);
-  /* Every mono label is 11px at weight 500 (design answer C1: 10px thin
-     read faint); an explicit `font-*` class beside it still wins. */
+  /* Every mono label is 11px at weight 500 (10px thin reads faint); an
+     explicit `font-*` class beside it still wins. */
   --text-label--font-weight: 500;
   --text-count--font-weight: 500;
   /* A panel's heading and a tile's title. */
@@ -212,6 +212,21 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1024px) {
   .admin-shell__tree { position: sticky; top: var(--admin-top-offset); align-self: start; height: calc(100dvh - var(--admin-top-offset)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 }
+/* A COLUMN WHOSE CONTENT FILLS IT (`Admin::Shell::TreeSubjects`, `fill:`;
+   the mind graph's list): the window-high column above is a flex column, in
+   which the screen's region (`.admin-shell__tree-region`, a child of the
+   column) takes the height its head and find field leave, so a short list,
+   its loading line or its empty line stand in a region as tall as the
+   column. A longer one grows the region past it and the column scrolls, as
+   every column does: this rule adds no geometry of its own (no position, no
+   height, no scroll), which is the rule above's for every screen. Only while
+   unfolded: folded, the column is the strip's row (THE TREE FOLDS TO A
+   STRIP, below). Below 1024px the column is the drawer, and the region is as
+   tall as its rows. */
+@media (min-width: 1024px) {
+  :root:not([data-tree-folded]) .admin-shell__tree--fill { display: flex; flex-direction: column; }
+  :root:not([data-tree-folded]) .admin-shell__tree--fill > .admin-shell__tree-region { flex: 1; }
+}
 /* The Translations row's action word sits under the row's stretched link, so it
    is shown by opacity, never visibility. */
 .admin-translation-row__action { opacity: 0; }
@@ -255,10 +270,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-tree-divider { left: calc(var(--admin-tree-column) - 4.5px); }
 }
 :root[data-tree-resizing], :root[data-tree-resizing] * { cursor: col-resize; user-select: none; }
-/* THE TREE FOLDS TO A STRIP. "Hide page tree" in the tree's head
-   (`.admin-tree-hide`) sets `data-tree-folded` on <html>, and "Show page
-   tree", the strip's one button (`.admin-tree-fold`,
-   `Admin::Shell::TreeFoldComponent`), takes it away; the layout's head
+/* THE TREE FOLDS TO A STRIP. The hide button in the column's head
+   (`.admin-tree-hide`, `Admin::Ui::TreeHideComponent`: "Hide page tree",
+   "Hide list") sets `data-tree-folded` on <html>, and the strip's one button
+   (`.admin-tree-fold`, `Admin::Shell::TreeFoldComponent`) takes it away; the layout's head
    script sets it before the first paint where this browser remembers the
    fold (`admin/shared/_tree_head`), and `admin--shell--tree-width` from then
    on. Folded, the grid's track is the strip (`--admin-tree-strip`, 2.75rem,
@@ -308,15 +323,26 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    the trailing slots, 8px. A parent is told by its disclosure and, folded,
    its count, never by a heavier title. On a leaf the disclosure is an empty
    box of the same width, so the marks line up across siblings; a flat row
-   (the graph's posts, tags and post types) has none. `position: relative`
+   (the graph's posts and pills) has none. `position: relative`
    holds the drag handle, which stands in the gutter left of the row. */
 .admin-tree-row { position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
 .admin-tree-row:hover { background: var(--cs-sunken); }
+/* A heading drawn on the row's geometry (a group of the whole site's
+   results, `mind_graph/search_results.js`) is pressed by nobody: no hover. */
+h3.admin-tree-row:hover { background: none; }
 .admin-tree-row__disclosure { flex: none; display: grid; place-items: center; width: var(--cs-tree-disclosure); height: var(--cs-tree-row); color: var(--cs-meta); }
 .admin-tree-row:hover .admin-tree-row__disclosure { color: var(--cs-ink); }
 .admin-tree-row__disclosure svg { transition: transform 120ms var(--cs-ease); }
 .admin-tree-row__disclosure[aria-expanded="true"] svg { transform: rotate(90deg); }
 .admin-tree-row--flat .admin-tree-row__disclosure { display: none; }
+/* A disclosure that is a part and not a button (the graph's list, whose
+   row is its one control: `Admin::MindGraphScreen::PartsComponent`) is drawn
+   open, and turned back while its treeitem is folded. */
+span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
+[role="treeitem"][aria-expanded="false"] > .admin-tree-row > span.admin-tree-row__disclosure svg { transform: none; }
+/* A treeitem's row (the graph's list) is pressed as a whole: a click on it
+   selects, or on its disclosure folds. */
+[role="treeitem"] > .admin-tree-row { cursor: pointer; }
 .admin-tree-row__mark { flex: none; display: grid; place-items: center; width: var(--cs-tree-mark); height: var(--cs-tree-mark); margin-inline-end: 8px; color: var(--cs-meta); }
 .admin-tree-row__title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--cs-t-small); line-height: 1.25rem; font-weight: 400; color: var(--cs-ink); }
 .admin-tree-row--context-only .admin-tree-row__title { color: var(--cs-meta); }
@@ -338,6 +364,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-row__add { flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-inline-start: 6px; border-radius: var(--cs-radius); color: var(--cs-meta); }
 .admin-tree-row__add:hover { color: var(--cs-ink); }
 .admin-tree-row__count { text-align: end; font-size: var(--cs-t-count); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--cs-meta); }
+/* A count shown at rest (the graph's list, where every row's figure shows)
+   keeps a figure's width from the start, so a cut title's ellipsis does not
+   move when the row is hovered; one that rests clipped is 1px until shown. */
+.admin-tree-row__count:not(.admin-tree-row__reveal) { min-width: 14px; }
 /* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
    clipped at rest, never `hidden` and never removed, so a screen reader
    still hears "3 subpages" and they take no room; they show on the row's
@@ -379,14 +409,15 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 /* A tree a find narrows (`data-filtered`, `admin--pages--tree`) does not
    move, so it draws no handle: none is in the page or the Tab order. */
 .admin-tree[data-filtered] .admin-tree-node__handle { display: none; }
-/* Focus is one ring, on the focused element and never on the row: in
-   Pages the control inside the row that holds it (the title's link, the
-   disclosure, the handle, "+"), in the graph's list the treeitem, its row's
-   one control. The ring is drawn inside the element's own box (-2px), so
-   neither the 28px row nor the column clips it; the selected bar may stand
-   beside it. */
+/* Focus is one ring: in Pages on the control inside the row that holds
+   it (the title's link, the disclosure, the handle, "+"), never on the row;
+   in the graph's list on the focused treeitem's OWN ROW, since the item
+   holds its children's group too and a ring round it would round the whole
+   branch. The ring is drawn inside its box (-2px), so neither the 28px row
+   nor the column clips it; the selected bar may stand beside it. */
 .admin-tree-row :focus-visible,
-.admin-tree [role="treeitem"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible > .admin-tree-row { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-tree [role="treeitem"]:focus-visible { outline: none; }
 /* The selected row: `--cs-sunken` and a 3px accent bar on its left edge,
    3:1 on the sunken ground and the chrome in both schemes
    (`admin_contrast_test.rb`). An inset shadow and not a border, so the

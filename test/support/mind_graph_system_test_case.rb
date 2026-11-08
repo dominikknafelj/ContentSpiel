@@ -17,7 +17,12 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   GRAPH = "[data-controller~='admin--mind-graph--graph']".freeze
   # The graph's own canvas: the legend's swatches are canvases too.
   CANVAS = "#{GRAPH} canvas[data-admin--mind-graph--graph-target='canvas']".freeze
-  LIST = "#{GRAPH} [data-mind-graph-list]".freeze
+  # The list, its find field, its last line and the whole site's results
+  # stand in the shell's tree column, outside the graph's element.
+  LIST = "#tree-column [data-mind-graph-list]".freeze
+  FIND = "#tree-column input[aria-controls='mind-graph-tree']".freeze
+  SEARCH_SITE = "#{LIST} [data-mind-graph-search-site]".freeze
+  RESULTS = "#{LIST} [data-mind-graph-results]".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -131,9 +136,30 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
   end
 
-  # A row of the list by its accessible name (Capybara's button locator does
-  # not read `aria-label`).
-  def assert_row(name) = assert_selector("button[aria-label=#{name.to_json}]")
+  # A row of the list by its accessible name: the list is a tree, each row
+  # a `[role=treeitem]` named by its `aria-label` (which Capybara's locators
+  # do not read), and a parent's item holds its children's, so it is found
+  # by its own name and never by the text inside it.
+  def assert_row(name) = assert_selector("[role=treeitem][aria-label=#{name.to_json}]")
+
+  # The item of the row whose name begins with `name` ("Alpha" finds
+  # "Alpha: post, 1 connection. Shows it in the graph.").
+  def list_item(name, **options) = find("[role=treeitem][aria-label^=#{name.to_json}]", **options)
+
+  # The headings of what the list shows, in its order: each group's (its
+  # item's row) and a section's (the rows a filter or a pill brings).
+  def list_headings = all("#{LIST} :is([data-tree-group] > .admin-tree-row, section h2)").map { |heading| heading.text.squish.upcase }
+
+  # Opens the branches of `pages` in the open set both trees read, as a
+  # person who opened them in Pages left it: a page below Home is folded
+  # until it is opened. On a CS Studio page, before the graph is visited.
+  def open_branches(*pages)
+    page.execute_script("document.cookie = arguments[0]", "cs_tree_open=#{pages.map(&:id).join(".")}; path=/#{ContentSpiel::ADMIN_PATH}")
+  end
+
+  # A press on that row: on its own row, so an open parent's press never
+  # lands on one of its children, which its item's middle may hold.
+  def press_list_item(name, **options) = list_item(name, **options).find(:xpath, "./*[1]").click
 
   # Every mark of a row inside `selector` that is a canvas has been drawn:
   # something is on each one (a canvas that was never painted is all zeros).
@@ -216,7 +242,7 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
       (() => {
         const box = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
         return {
-          box: box(#{GRAPH.to_json}), canvas: box(#{CANVAS.to_json}), list: box(#{LIST.to_json}), search: box("#mind-graph-search"),
+          box: box(#{GRAPH.to_json}), canvas: box(#{CANVAS.to_json}), list: box(#{LIST.to_json}), find: box(#{FIND.to_json}), column: box("#tree-column"),
           main: document.querySelector("main").getBoundingClientRect().width, viewport: window.innerHeight, page: document.documentElement.scrollHeight
         }
       })()
@@ -275,6 +301,14 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   def worker_messages = page.evaluate_script("window.workerMessages")
 
   def graph = find(GRAPH)
+
+  # Types `query` into the column's find field and presses the last line,
+  # "Search the whole site for …", which shows the whole site's results in
+  # the list's place.
+  def search_whole_site(query)
+    find(FIND).fill_in(with: query)
+    find("#{SEARCH_SITE} button", text: "Search the whole site for “#{query}”").click
+  end
 
   # A toggle of the legend, by the name on it. No `await_graph` is needed to
   # read what it shows: `data-nodes`, `data-edges`, the list and the canvas's

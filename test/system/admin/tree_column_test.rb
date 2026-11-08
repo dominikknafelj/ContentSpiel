@@ -588,4 +588,52 @@ class Admin::TreeColumnSystemTest < ApplicationSystemTestCase
   ensure
     page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
   end
+
+  # The mind graph's list stands in the same column: the width chosen on
+  # Pages is the graph's, its divider is the list's ("List width") and drags
+  # the same way, and the list's region fills the column from its find field
+  # to the window's bottom, however short the list.
+  test "the mind graph's column takes the tree's width, divider and drag, and its width is the one Pages left" do
+    open_editor
+    focus_divider
+    keys(:right, :right)
+    assert_tree 304
+
+    visit_screen admin_mind_graph_path
+    assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+    assert_tree 304
+    assert_equal "List width", divider["aria-label"]
+
+    mouse = drag_divider(to: 364)
+    assert_tree 364
+    mouse.up
+    assert_eventually(message: "the release did not remember the width") { stored == "364" }
+
+    column = box("#tree-column")
+    region = box("#tree-column [data-mind-graph-list]")
+    assert_in_delta column[3] - 16, region[3], 1, "the list's region does not reach the column's bottom (less its padding)"
+    assert_operator box("#tree-column [role=search]")[3], :<=, region[1], "the find field is not above the list"
+    assert_equal "auto", page.evaluate_script("getComputedStyle(document.getElementById('tree-column')).overflowY"), "the column scrolls on its own"
+    assert_equal "visible", page.evaluate_script("getComputedStyle(document.querySelector('#tree-column [data-mind-graph-list]')).overflowY"), "the region has no scroll of its own"
+
+    open_editor
+    assert_tree 364
+  end
+
+  # Below 1024px the column is the tree drawer, and on the mind graph the top
+  # bar's button for it is the list's.
+  test "below 1024px the list is the tree drawer, opened by the top bar's List button" do
+    at_width(900) do
+      visit_screen admin_mind_graph_path
+      assert_no_selector ".admin-tree-divider"
+      assert_no_selector "#tree-column [data-mind-graph-list] [role=tree]"
+
+      find("button[aria-controls='tree-column'][aria-label='Open list']", text: "List ▾").click
+      assert_selector "#tree-column[data-open]"
+      assert_eventually(message: -> { "the drawer is #{tree_width}px wide" }) { (tree_width - 272).abs <= 1 }
+      assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+      assert_no_selector ".admin-tree-hide"
+      assert_operator box("#tree-column")[2], :<=, box(".admin-shell__main")[2]
+    end
+  end
 end

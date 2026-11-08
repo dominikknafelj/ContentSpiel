@@ -2,7 +2,8 @@ module Admin
   module MindGraphScreen
     # The pieces of CS Studio the graph's scripts put into the list and the
     # card: the status chips, the unpublished chip, an icon chip per kind of
-    # node and the card's Close. Each is the shared component's own markup,
+    # node, the card's Close, and the tree row's own glyphs (`TREE_GLYPHS`).
+    # Each is the shared component's own markup, or the tree's glyph partial,
     # rendered here once into a `<template data-mind-graph-parts>` inside the
     # graph's element, and cloned by `mind_graph/parts.js`, so no chip and no
     # button is drawn by hand in JavaScript and a change to a component
@@ -14,7 +15,14 @@ module Admin
     # put into. A template's content is no part of the document: the page's
     # text, its Tab order and the controller's `reset` never meet it.
     class PartsComponent < AdminComponent
-      NAMES = %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close].freeze
+      NAMES = %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark].freeze
+
+      # The tree row's glyphs (`admin/shared/_tree_glyph`), which the list's
+      # rows put in their disclosure and mark boxes, as Pages' rows draw them.
+      # The disclosure is a span hidden from a screen reader in the tree's
+      # disclosure class, never a button: the graph's row is one control, the
+      # row itself, and a control inside it would be nested in another.
+      TREE_GLYPHS = { "tree-disclosure" => :chevron, "tree-page-mark" => :page, "tree-home-mark" => :home }.freeze
 
       # A kind's icon and its chip family: a page is the structure's, and a
       # post, a tag and a post type are the lists' (the sidebar's Pages,
@@ -37,7 +45,20 @@ module Admin
         end
       end
 
-      def part(name) = self.class.component(name, close_label: t(".close"))
+      # The markup of one part: the tree's glyph, or its component rendered.
+      def self.markup(name, view_context, close_label:)
+        glyph = TREE_GLYPHS[name]
+        return view_context.render(component(name, close_label: close_label)) unless glyph
+
+        # Stripped, as the icon chip strips its icon: the partial's own lines
+        # around the glyph would be text in the row's heading.
+        svg = view_context.render("admin/shared/tree_glyph", name: glyph).strip.html_safe
+        return svg unless name == "tree-disclosure"
+
+        view_context.tag.span(svg, class: Admin::Ui::TreeItemComponent::CLASSES[:disclosure], aria: { hidden: true })
+      end
+
+      def part(name) = self.class.markup(name, self, close_label: t(".close"))
     end
   end
 end

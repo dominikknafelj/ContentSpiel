@@ -10,22 +10,22 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794075172-4ce9".freeze
+  VERSION = "1794108449-0fdc".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
-    Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields Cover Dialog FieldFrame FormControls
+    ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields Cover Dialog FieldFrame FormControls
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
     GroupFields IconChip ImageField ImageLoading ListState Mails Menu PasswordField
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
-    PatternNotifications PatternSaving RichTextEditor SaveBar
+    PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
-    SitePostList SitePreviewBar SiteRichText SiteSection SiteTable
+    SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot
     StudioBlockCard StudioCalmColour StudioCalmColourE4E5 StudioCalmDashboard StudioCalmE4More StudioCalmE4Setup
     StudioCalmE4Together StudioCalmEditor StudioCalmEditorE StudioCommandPalette StudioDashboardCards
     StudioEditorHeader StudioEmptyState StudioFilterBar StudioHeldStrip StudioListTable StudioMediaGrid
     StudioMindGraph StudioNewRecordDialog StudioNotesThread StudioPageTree StudioRail StudioSectionTile
-    StudioShell StudioTagDetail StudioTranslationPair StudioTree TableGrid TextFields Toast Tooltip
+    StudioShell StudioTagDetail StudioTranslationPair StudioTree TableGrid TextFields Toast Tooltip UserName
   ].freeze
 
   # A component whose card has another name: the card whose "Code" section
@@ -59,18 +59,14 @@ module DesignSystemEntries
     "Admin::Ui::ToastRegionComponent" => "Toast",
     "Admin::Ui::TranslationChipComponent" => "Badge",
     "Admin::Ui::TreeFindComponent" => "StudioTree",
+    "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",
     "Admin::Ui::UnpublishedChipComponent" => "Badge",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"
   }.freeze
 
   # A component no card's "Code" section names yet, with the reason.
-  NOT_YET = {
-    "Admin::Ui::ActorAvatarComponent" => "The Avatar card designs the actor's mark in its Gaps (Designed, not built); its Code names only AvatarComponent.",
-    "Admin::Ui::PrefixInputComponent" => "The FieldFrame card's Code names SlugColumnComponent, which draws it; no card names the input itself.",
-    "Admin::Ui::SlotComponent" => "The StudioBlockCard card names the slot it fills in its Interface; no card describes the slot itself.",
-    "Admin::Ui::UserNameComponent" => "The Avatar card names it only as the source of an audit row's name; no card describes how a person's name reads."
-  }.freeze
+  NOT_YET = {}.freeze
 
   # The card of a component (a class or its name): its `COVERED_BY` card,
   # else its own name less `Component` when that is a card, else nil.

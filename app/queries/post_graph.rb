@@ -33,9 +33,11 @@
 #              change_at, unpublished, listed, url, degree, related_count,
 #              tag_count, open_notes }
 #   tags[]:  { id: "tag-<id>", name, count, degree }
-#   pages[]: { id: "page-<id>", title, path, depth, home, parent, order,
-#              status, changes, change_at, unpublished, url, degree,
-#              child_count, listed_count, open_notes }       in tree order
+#   pages[]: { id: "page-<id>", title, path, depth, home, parent, ancestors,
+#              order, status, changes, change_at, unpublished, url, degree,
+#              child_count, listed_count, open_notes }       in tree order.
+#              `ancestors` are the titles from Home to the parent of a page
+#              whose parent is not drawn, readable pages only; else empty
 #   types[]: { id: "type-<name>" | "all-posts", name, label, colour_index,
 #              count, degree }     by colour slot, then the retired types by
 #                                  name, then "all-posts" last. `count` is

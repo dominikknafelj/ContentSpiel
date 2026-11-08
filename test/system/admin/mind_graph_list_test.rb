@@ -9,7 +9,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     drawn = create_post(title: "Entry drawn", content_type: "resume_entry")
     PostRelation.create!(post: drawn, related_post: listed)
     alone = create_post(title: "Entry alone", content_type: "resume_entry")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     assert_nil screen_position(alone), "a post with no connection is not drawn"
     assert_selector "#{GRAPH} [role=status] p", text: "1 other post has no connections yet and isn't shown."
@@ -19,16 +19,16 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     find("#{LIST} label", text: "Not listed on any page").click
 
     within(LIST) do
-      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
-      assert_selector "button[data-node-id='#{nid(drawn)}']:not([data-not-in-view])", text: "Entry drawn"
+      assert_equal [ "POSTS · 2" ], list_headings
+      assert_selector "[role=treeitem][data-node-id='#{nid(drawn)}']:not([data-not-in-view])", text: "Entry drawn"
       assert_row "Entry drawn: post, 1 connection. Shows it in the graph."
-      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: /Entry alone\s*not in view/
+      assert_selector "[role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]", text: /Entry alone\s*not in view/
       assert_row "Entry alone, #{ContentTypes.fetch("resume_entry").label.downcase} post, not in view. Activate to add it to the graph."
-      assert_no_selector "button", text: "Listed"
+      assert_no_selector "[role=treeitem]", text: "Listed"
     end
     assert_equal before, [ graph["data-nodes"], graph["data-edges"] ], "the canvas is left as it is"
 
-    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(alone)}']").click
     assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7'][data-edges='4']"
     assert_selector "[data-mind-graph-card] h2", text: "Entry alone"
     # It is shown now: the notice does not count it among those that aren't.
@@ -37,7 +37,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     # with none counted), so its card says nothing of them.
     assert_no_selector "[data-mind-graph-card]", text: /related/i
     assert_selector "[data-mind-graph-card]:focus", wait: 2
-    assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-selected='true']"
     await_graph
     assert_kind_of Numeric, screen_position(alone)["x"], "the layout has no place for the added post"
     # Its label is measured like every other node's (selected, so it is
@@ -50,31 +50,31 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     find("[data-mind-graph-card-close]").click
     await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
 
-    find("#{LIST} button[data-node-id='#{nid(alone)}']").click
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(alone)}']").click
     assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='7']"
     assert_equal "Posts 4", legend_counts[1], "the count of posts follows what the graph holds"
 
     # The rows follow the legend: with the posts switched off none is in view.
     toggle "Posts"
-    assert_selector "#{LIST} button[data-not-in-view]", count: 2
+    assert_selector "#{LIST} [role=treeitem][data-not-in-view]", count: 2
     # A row that says "Activate to add it to the graph" does: with "Posts"
     # off, a press switches them back on, and selects the post.
-    find("#{LIST} button[data-node-id='#{nid(drawn)}']").click
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(drawn)}']").click
     assert_selector "#{GRAPH} input#mind-graph-nodes-post:checked", visible: :all
     assert_selector "#{GRAPH}[data-selected='#{nid(drawn)}'][data-nodes='7']"
-    assert_no_selector "#{LIST} button[data-not-in-view]"
+    assert_no_selector "#{LIST} [role=treeitem][data-not-in-view]"
     assert_selector "#{GRAPH} [role=status] p[data-mind-graph-announced]", text: /\AMind graph: 2 pages, 1 post type and 4 posts, 4 connections\. Showing everything\.\z/, visible: :all
 
     find("#{LIST} label", text: "Not listed on any page").click
     within(LIST) do
-      assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "PAGES · 2", "POSTS · 4", "POST TYPES · 1" ], list_headings
       assert_row "#{ContentTypes.fetch("blog").label}: post type, 2 posts. Shows it in the graph."
-      assert_selector "button[data-node-id='type-blog'] > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
-      assert_equal "2", find("button[data-node-id='type-blog']").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
+      assert_selector "[role=treeitem][data-node-id='type-blog'] > .admin-tree-row > .admin-tree-row__mark > canvas[data-mark=type][data-mark-of='#{ContentTypes.fetch("blog").colour_index}'][aria-hidden='true']"
+      assert_equal "2", find("[role=treeitem][data-node-id='type-blog'] > .admin-tree-row").all("span").last.text, "the number of posts of the type, where a tag's row has its connections"
     end
     # The fourth group is the keyboard's way to a post type's node: its row
     # selects it, as any row does.
-    find("#{LIST} button[data-node-id='type-blog']").click
+    find("#{LIST} [role=treeitem][data-node-id='type-blog']").click
     assert_selector "#{GRAPH}[data-selected='type-blog']"
     assert_selector "[data-mind-graph-card] h2", text: ContentTypes.fetch("blog").label
   end
@@ -85,7 +85,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a failed read of the unlisted posts says so in the list, Try again loads them, and Back shows the groups again" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     # The first request for the unlisted posts is held until the test lets
     # it go, the second fails, and the third and every other request go to
@@ -128,7 +128,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     await_js("window.unlistedRead === 1", wait: 10)
     await_frames
     within(LIST) do
-      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }, "the late answer replaced the groups"
+      assert_equal [ "PAGES · 2" ], list_headings, "the late answer replaced the groups"
       assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
     end
 
@@ -136,7 +136,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
 
     within(LIST) do
       assert_selector "[role=alert] p", text: "The list couldn't be loaded."
-      assert_no_selector "button[data-node-id]"
+      assert_no_selector "[role=treeitem][data-node-id]"
       assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
       assert_no_selector "button", text: "Back to the list", wait: 0
     end
@@ -148,10 +148,10 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "#{GRAPH}[data-nodes='2']"
     within(LIST) do
       assert_selector "[role=alert] p", text: "The list couldn't be loaded."
-      assert_no_selector "button[data-node-id]"
+      assert_no_selector "[role=treeitem][data-node-id]"
       assert_selector "input[data-mind-graph-unlisted]:checked", visible: :all
       press "Try again"
-      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_selector "[role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
       assert_no_selector "[role=alert]"
     end
     await_js("document.activeElement?.dataset.nodeId === #{nid(alone).to_json}")
@@ -164,7 +164,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     page.go_back
     await_graph
     within(LIST) do
-      assert_equal [ "PAGES · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "PAGES · 2" ], list_headings
       assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
       assert_selector "input[data-mind-graph-unlisted]", count: 1, visible: :all
     end
@@ -180,7 +180,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a read of the list that gets no answer is given up after fifteen seconds and says so in the list, and the list is busy while a read is out" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     page.execute_script(<<~JS)
       const original = window.fetch
@@ -213,7 +213,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "#{LIST} [aria-busy='true']"
     page.execute_script("window.listMode = 'real'; window.releaseList()")
     within(LIST) do
-      assert_selector "button[data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
+      assert_selector "[role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]", text: "Alone"
       assert_no_selector "[aria-busy='true']", wait: 0
     end
 
@@ -221,42 +221,48 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     page.execute_script("window.listMode = 'hold'")
     filter = find("#{LIST} label", text: "Not listed on any page")
     filter.click
-    assert_no_selector "#{LIST} button[data-node-id='#{nid(alone)}']"
+    assert_no_selector "#{LIST} [role=treeitem][data-node-id='#{nid(alone)}']"
     filter.click
     assert_selector "#{LIST} [aria-busy='true']"
     filter.click
     assert_no_selector "#{LIST} [aria-busy='true']"
-    assert_equal [ "PAGES · 2" ], within(LIST) { all("h2").map { |heading| heading.text.upcase } }
+    assert_equal [ "PAGES · 2" ], list_headings
   end
 
   test "the list's Pages group is the tree, a page's title and path with markup in them are text in the list, the search and the card" do
     docs = create_page(title: "<b>Docs</b>")
     create_page(title: "Guide", parent: docs)
-    visit admin_mind_graph_path
+    # A post type a page lists: its hub's row has a canvas for its mark.
+    ContentBlock.create!(owner: docs, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    open_branches(docs)
+    visit_screen admin_mind_graph_path
     await_graph
 
     within(LIST) do
-      assert_equal [ "PAGES · 3" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], all("li button span.truncate").map(&:text)
+      assert_equal [ "PAGES · 3", "POST TYPES · 1" ], list_headings
+      assert_equal [ "Home", "<b>Docs</b>", "Guide" ], find("[data-tree-group='pages']").all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
       assert_no_selector "b"
-      # A tree for a screen reader too: a page's row is in a list inside its
-      # parent's item, three levels deep here.
-      assert_selector "ul[role=list] > li > ul[role=list] > li > ul[role=list] > li > button[data-node-id='#{nid(Page.find_by!(parent: docs))}']"
-      assert_selector "li > button > canvas[data-mark=page][aria-hidden='true']", count: 3
+      # A tree for a screen reader too: a page's item is in a group inside
+      # its parent's item, three levels deep here under the group's heading.
+      guide = "[role=tree] > [role=treeitem][data-tree-group='pages'] > [role=group] > [role=treeitem][aria-level='2'] > [role=group] > [role=treeitem][aria-level='3'] > [role=group] > " \
+              "[role=treeitem][aria-level='4'][data-node-id='#{nid(Page.find_by!(parent: docs))}']"
+      assert_selector guide
+      assert_selector "[role=treeitem][data-node-id] > .admin-tree-row > .admin-tree-row__mark > svg[aria-hidden='true']", count: 3
+      assert_selector "[role=treeitem][data-node-id] > .admin-tree-row > .admin-tree-row__mark > canvas[data-mark=type][aria-hidden='true']", count: 1
     end
     assert_marks_drawn LIST
-    # In the Tab order the filter's checkbox is the list's first stop, after
-    # the canvas, and the rows follow it.
+    # In the Tab order the filter's checkbox is the list's first stop, and
+    # the rows follow it.
     stops = page.evaluate_script(<<~JS)
-      Array.from(document.querySelector(#{GRAPH.to_json}).querySelectorAll("input, button, a[href], canvas[tabindex='0']"))
-        .filter((element) => element.checkVisibility() && !element.closest("[hidden]") && (element.tagName === "CANVAS" || element.closest("[data-mind-graph-list]")))
-        .map((element) => element.tagName === "CANVAS" ? "canvas" : element.type === "checkbox" ? "checkbox" : "row")
+      Array.from(document.querySelector(#{LIST.to_json}).querySelectorAll("input, button, a[href], [tabindex='0']"))
+        .filter((element) => element.checkVisibility() && !element.closest("[hidden]"))
+        .map((element) => element.type === "checkbox" ? "checkbox" : element.getAttribute("role"))
     JS
-    assert_equal %w[canvas checkbox row row row], stops
+    assert_equal %w[checkbox treeitem], stops, "the tree is one stop"
 
-    # A canvas holds colours, not tokens: a row's mark is drawn again when
-    # the theme changes, like the graph.
-    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=page]".to_json}).toDataURL()"
+    # A canvas holds colours, not tokens: a hub row's mark is drawn again
+    # when the theme changes, like the graph.
+    mark = "document.querySelector(#{"#{LIST} canvas[data-mark=type]".to_json}).toDataURL()"
     before = page.evaluate_script(mark)
     theme = page.evaluate_script("document.documentElement.getAttribute('data-theme')")
     begin
@@ -270,45 +276,46 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     click_node(nid(docs))
     assert_selector "[data-mind-graph-card] h2", text: "<b>Docs</b>"
     assert_no_selector "[data-mind-graph-card] b"
-    fill_in "Find a page, post or tag", with: "docs"
-    assert_selector "#{GRAPH} [data-search-group=page] a", text: "<b>Docs</b>"
-    assert_no_selector "#{GRAPH} [data-mind-graph-results] b"
+    search_whole_site("docs")
+    assert_selector "#{RESULTS} [data-search-group=page] a", text: "<b>Docs</b>"
+    assert_no_selector "#{RESULTS} b"
   end
 
-  # A row's chips stand under its title, so a title is cut only by the row's
-  # own edge: neither a row with both chips nor a page's row three levels
-  # down leaves its title too narrow to tell one record from another. Each
-  # title must have room for its first twenty characters, measured against
-  # the text itself, not a width in pixels.
-  test "in the list's column a row with two chips and a page three levels down each keep room for twenty characters of the title" do
+  # At the column's default width a page three levels down still says
+  # which page it is: room for the first twelve characters of its title,
+  # measured against the text itself; the rest is cut with an ellipsis, and
+  # the whole title is the title box's tooltip and begins the item's name.
+  test "at the default column width a page three levels down shows at least 12 characters of its title, and its whole title is its tooltip and its name" do
+    title = "Deep page with a long title to read"
     level = create_page(title: "Section of the site")
     level = create_page(title: "Subsection of the site", parent: level)
-    deep = create_page(title: "Deep page with a long title to read", parent: level)
+    deep = create_page(title: title, parent: level)
     deep.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
-    soon = create_post(title: "Scheduled post with a long title to read")
-    PostRelation.create!(post: soon, related_post: create_post(title: "Beta"))
-    soon.update_columns(published_at: 3.days.from_now, unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
-    assert_equal :scheduled, Publishing::State.of(soon.reload).state
-    assert Publishing::State.of(soon).changes?, "the post carries both chips"
 
-    visit admin_mind_graph_path
+    open_branches(deep.parent.parent, deep.parent)
+    visit_screen admin_mind_graph_path
     await_graph
-    rows = [ nid(soon), nid(deep) ].map { |id| "#{LIST} button[data-node-id='#{id}']" }
-    assert_selector "#{rows[0]} .admin-status-chip[data-status='scheduled']"
-    assert_selector "#{rows[0]} [data-unpublished-changes]"
-    assert_selector "#{rows[1]} [data-unpublished-changes]"
-    rows.each do |row|
-      room = page.evaluate_script(<<~JS)
-        (() => {
-          const title = document.querySelector(#{row.to_json}).querySelector("span.truncate")
-          const range = document.createRange()
-          range.setStart(title.firstChild, 0)
-          range.setEnd(title.firstChild, 20)
-          return { room: title.getBoundingClientRect().width, needed: range.getBoundingClientRect().width }
-        })()
-      JS
-      assert_operator room["room"], :>=, room["needed"], "#{row}: the title has no room for its first twenty characters"
-    end
+    # The column at its default width, 17rem at a 16px root: nobody chose another.
+    assert_in_delta 272, element_box("#tree-column")["width"], 0.5
+    item = "#{LIST} [role=treeitem][data-node-id='#{nid(deep)}'][aria-level='5']"
+    assert_selector "#{item} [data-unpublished-changes]"
+    shown = page.evaluate_script(<<~JS)
+      (() => {
+        const title = document.querySelector(#{item.to_json}).querySelector(":scope > .admin-tree-row .admin-tree-row__title")
+        const range = document.createRange()
+        range.setStart(title.firstChild, 0)
+        range.setEnd(title.firstChild, 12)
+        const style = getComputedStyle(title)
+        return { room: title.getBoundingClientRect().width, needed: range.getBoundingClientRect().width, cut: title.scrollWidth > title.clientWidth,
+                 overflow: style.textOverflow, tooltip: title.getAttribute("title"), text: title.textContent }
+      })()
+    JS
+    assert_operator shown["room"], :>=, shown["needed"], "the title has no room for its first twelve characters: #{shown}"
+    assert shown["cut"], "the title is not cut at this width, so this test shows nothing of the ellipsis: #{shown}"
+    assert_equal "ellipsis", shown["overflow"]
+    assert_equal title, shown["text"], "the title box holds the whole title, cut only by its box"
+    assert_equal title, shown["tooltip"]
+    assert find(item)["aria-label"].start_with?("#{title}, Unpublished changes: page"), "the item's name does not begin with the whole title: #{find(item)["aria-label"]}"
   end
 
   # Around a page
@@ -321,7 +328,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
     posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
     posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
-    visit admin_mind_graph_path(page: blog.id, depth: 2)
+    visit_screen admin_mind_graph_path(page: blog.id, depth: 2)
     await_graph
     assert_selector "[data-mind-graph-focus]", text: "Around the page “Blog”"
     lines = graph["data-edges"].to_i
@@ -335,10 +342,10 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     click_node("more-type-resume_entry")
 
     within(LIST) do
-      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }, "the rows are named by what the pill hangs off"
+      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], list_headings, "the rows are named by what the pill hangs off"
       assert_selector "section button[data-mind-graph-back]", text: "Back to the list"
-      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
-      assert_selector "button[data-not-in-view]", count: 2
+      assert_equal [ "Entry 20", "Entry 21" ], all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
+      assert_selector "[role=treeitem][data-not-in-view]", count: 2
       assert_row "Entry 21, #{entry.downcase} post, not in view. Activate to add it to the graph."
       assert_selector "a[data-mind-graph-posts-link]", text: "Open in Posts →"
       assert_no_selector "input[data-mind-graph-unlisted]:checked", visible: :all
@@ -346,7 +353,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_equal "", graph["data-selected"], "more is not selected"
     assert_no_selector "[data-mind-graph-card]", visible: :visible
 
-    find("#{LIST} button[data-node-id='#{nid(posts.last)}']").click
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(posts.last)}']").click
     assert_selector "#{GRAPH}[data-selected='#{nid(posts.last)}'][data-edges='#{lines + 1}']"
     assert_equal [ "type-resume_entry" ], graph["data-neighbours"].split(","), "the added post is joined to the hub that brings it in, and not to the page"
     within(LIST) { assert_row "Entry 21: post, 1 connection. Shows it in the graph." }
@@ -355,8 +362,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     # The heading over the rows counts what the pill counts: one figure for "more" on the screen.
     within(LIST) do
       assert_selector "h2", text: /· 1\z/
-      assert_equal [ "MORE FROM #{entry.upcase} · 1" ], all("h2").map { |heading| heading.text.upcase }
-      assert_selector "li button[data-node-id^='post-']", count: 2
+      assert_equal [ "MORE FROM #{entry.upcase} · 1" ], list_headings
+      assert_selector "[role=treeitem][data-node-id^='post-']", count: 2
     end
     await_graph
     assert_kind_of Numeric, screen_position(posts.last)["x"], "the layout has no place for the added post"
@@ -373,10 +380,10 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     within(LIST) { assert_selector "a[data-mind-graph-posts-link]" }
     escape_on_canvas
     within(LIST) do
-      assert_equal [ "PAGES · 2", "POSTS · 21", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "PAGES · 2", "POSTS · 21", "POST TYPES · 1" ], list_headings
       assert_no_selector "a[data-mind-graph-posts-link]"
       # The pill's row says what the pill says: one post is still behind it.
-      assert_selector "button[data-node-id='more-type-resume_entry'][data-more]", exact_text: "+1 more"
+      assert_selector "[role=treeitem][data-node-id='more-type-resume_entry'][data-more]", exact_text: "+1 more"
       assert_row "+1 more: 1 more post #{entry} lists, not in view. Activate to show it."
     end
 
@@ -404,7 +411,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     posts = 22.times.map { |index| create_post(title: "Entry #{index}", content_type: "resume_entry") }
     posts.each_with_index { |post, index| post.update_columns(published_at: (index + 1).hours.ago) } # version: none (a test sets a time) # changes: none (a test sets a time)
     entry = ContentTypes.fetch("resume_entry").label
-    pill = "#{LIST} button[data-node-id='more-type-resume_entry']"
+    pill = "#{LIST} [role=treeitem][data-node-id='more-type-resume_entry']"
     focused = ->(id) { await_js("document.activeElement?.dataset.nodeId === #{id.to_json}") }
     keyboard = page.driver.browser.keyboard
     visit admin_mind_graph_path(page: blog.id, depth: 2)
@@ -413,8 +420,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector pill, exact_text: "+2 more"
     within(LIST) do
       assert_row "+2 more: 2 more posts #{entry} lists, not in view. Activate to show them."
-      assert_equal %w[type-resume_entry more-type-resume_entry], all("section:last-of-type button").map { |button| button["data-node-id"] }, "the pill's row stands under its hub's"
-      assert_equal [ "PAGES · 2", "POSTS · 20", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "and is counted in no heading"
+      assert_equal %w[type-resume_entry more-type-resume_entry], all("[data-tree-group='types'] [role=treeitem]").map { |item| item["data-node-id"] }, "the pill's row stands under its hub's"
+      assert_equal [ "PAGES · 2", "POSTS · 20", "POST TYPES · 1" ], list_headings, "and is counted in no heading"
     end
 
     # The first read fails (the stub answers it and puts the real fetch back).
@@ -443,8 +450,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     keyboard.type(:Enter)
     focused.call(nid(posts[20]))
     within(LIST) do
-      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Entry 20", "Entry 21" ], all("li button span.truncate").map(&:text)
+      assert_equal [ "MORE FROM #{entry.upcase} · 2" ], list_headings
+      assert_equal [ "Entry 20", "Entry 21" ], all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
     end
     assert_equal "", graph["data-selected"], "the pill is not selected by its row either"
 
@@ -462,13 +469,13 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     # that is activated switches the posts back on and adds its post.
     toggle "Posts"
     assert_selector "#{GRAPH} input#mind-graph-nodes-post:not(:checked)", visible: :all
-    assert_selector "#{LIST} button[data-not-in-view]", count: 2
-    find("#{LIST} button[data-node-id='#{nid(posts[20])}']").click
+    assert_selector "#{LIST} [role=treeitem][data-not-in-view]", count: 2
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(posts[20])}']").click
     assert_selector "#{GRAPH} input#mind-graph-nodes-post:checked", visible: :all
     assert_selector "#{GRAPH}[data-selected='#{nid(posts[20])}']"
     assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 21 of 22 posts. 1 more is in the list.']"
     assert_selector "#{GRAPH} [role=status] p[data-mind-graph-announced]", text: "21 of 22 posts. 1 more is in the list.", visible: :all
-    assert_selector "#{LIST} button[data-not-in-view]", count: 1
+    assert_selector "#{LIST} [role=treeitem][data-not-in-view]", count: 1
 
     # The pill is dragged, which pins it where it is dropped, and hovered.
     escape_on_canvas
@@ -482,16 +489,16 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     # rows go, and the list is the groups again. A SPENT PILL IS NOTHING: no
     # pin (nothing is left to release), and where it stood no hover, no
     # press, no label and no row; no count holds it.
-    find("#{LIST} button[data-node-id='#{nid(posts[21])}']").click
+    find("#{LIST} [role=treeitem][data-node-id='#{nid(posts[21])}']").click
     assert_selector "#{GRAPH}[data-selected='#{nid(posts[21])}'][data-edges='24'][data-pinned='0']"
     assert_no_selector "#{GRAPH} [data-mind-graph-release]", wait: 0
     assert_equal "25", graph["data-nodes"], "two pages, the hub and twenty-two posts: the pill is not among what is drawn"
     assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type and 22 posts.']"
     within(LIST) do
-      assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }
-      assert_no_selector "button[data-more]"
+      assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], list_headings
+      assert_no_selector "[role=treeitem][data-more]"
       assert_no_selector "button[data-mind-graph-back]"
-      assert_selector "button[data-node-id='#{nid(posts[21])}'][aria-current='true']"
+      assert_selector "[role=treeitem][data-node-id='#{nid(posts[21])}'][aria-selected='true']"
     end
     await_graph
     assert_nil screen_position("more-type-resume_entry"), "a pill that stands for nothing is not drawn"
@@ -505,7 +512,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     mouse.click(x: dropped["x"], y: dropped["y"])
     await_frames
     assert_not_equal "more-type-resume_entry", graph["data-selected"]
-    within(LIST) { assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], all("h2").map { |heading| heading.text.upcase }, "a press where it stood opens no rows" }
+    within(LIST) { assert_equal [ "PAGES · 2", "POSTS · 22", "POST TYPES · 1" ], list_headings, "a press where it stood opens no rows" }
     assert_equal lines, graph["data-edges"]
     assert_equal "Posts 22", legend_counts[1]
     places = page.evaluate_script("#{posts.last(2).map { |post| nid(post) }.to_json}.map((id) => document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(id)).flatMap((at) => [ at.x, at.y ])")
@@ -528,14 +535,14 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     entry = ContentTypes.fetch("resume_entry").label
 
     with_reduced_motion do
-      visit admin_mind_graph_path(page: blog.id, depth: 2)
+      visit_screen admin_mind_graph_path(page: blog.id, depth: 2)
       await_graph
 
       # The twenty newest are ten of each; five of each are left out.
       [ "more-#{tag}", "more-type-resume_entry" ].each { |id| assert screen_position(id), "#{id} is not drawn" }
       assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 20 of 30 posts and 1 tag. 10 more are in the list.']"
       within(LIST) do
-        assert_equal [ [ "more-#{tag}", "+5 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
+        assert_equal [ [ "more-#{tag}", "+5 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("[role=treeitem][data-more]").map { |button| [ button["data-node-id"], button.text ] }
         assert_row "+5 more: 5 more posts pill lists, not in view. Activate to show them."
         assert_row "+5 more: 5 more posts #{entry} lists, not in view. Activate to show them."
       end
@@ -559,42 +566,42 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
       assert_selector "#{LIST} [role=alert] p", text: "The list couldn't be loaded."
       escape_on_canvas
       assert_no_selector "#{LIST} [role=alert]"
-      assert_selector "#{LIST} button[data-more]", count: 2
+      assert_selector "#{LIST} [role=treeitem][data-more]", count: 2
 
       click_node("more-type-resume_entry")
       within(LIST) do
         assert_selector "button[data-mind-graph-back]"
-        assert_equal [ "MORE FROM #{entry.upcase} · 5" ], all("h2").map { |heading| heading.text.upcase }
-        assert_equal entries.last(5).map(&:title), all("li button span.truncate").map(&:text)
+        assert_equal [ "MORE FROM #{entry.upcase} · 5" ], list_headings
+        assert_equal entries.last(5).map(&:title), all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
         assert_equal({ "type" => "resume_entry" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
       end
 
       click_node("more-#{tag}")
       within(LIST) do
         assert_selector "h2", text: /more from pill/i
-        assert_equal [ "MORE FROM PILL · 5" ], all("h2").map { |heading| heading.text.upcase }
-        assert_equal pills.last(5).map(&:title), all("li button span.truncate").map(&:text), "the other pill's posts, and none of the first's"
+        assert_equal [ "MORE FROM PILL · 5" ], list_headings
+        assert_equal pills.last(5).map(&:title), all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text), "the other pill's posts, and none of the first's"
         assert_equal({ "tag" => "pill" }, Rack::Utils.parse_query(URI(find("a[data-mind-graph-posts-link]")[:href]).query).slice("type", "tag"))
       end
       lines = graph["data-edges"].to_i
-      find("#{LIST} button[data-node-id='#{nid(pills.last)}']").click
+      find("#{LIST} [role=treeitem][data-node-id='#{nid(pills.last)}']").click
       assert_selector "#{GRAPH}[data-selected='#{nid(pills.last)}'][data-edges='#{lines + 1}']"
       assert_equal [ tag ], graph["data-neighbours"].split(","), "a post a tag brings in gets its own line to that tag"
       # Each pill counts its own: the tag's stands for one fewer, the type's for as many as before.
       assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts and 1 tag. 9 more are in the list.']"
       within(LIST) do
         assert_selector "h2", text: /· 4\z/
-        assert_equal [ "MORE FROM PILL · 4" ], all("h2").map { |heading| heading.text.upcase }, "the heading follows its own pill, and the other pill's count is untouched"
+        assert_equal [ "MORE FROM PILL · 4" ], list_headings, "the heading follows its own pill, and the other pill's count is untouched"
       end
       within(LIST) { press "Back to the list" }
       within(LIST) do
-        assert_equal [ [ "more-#{tag}", "+4 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("button[data-more]").map { |button| [ button["data-node-id"], button.text ] }
+        assert_equal [ [ "more-#{tag}", "+4 more" ], [ "more-type-resume_entry", "+5 more" ] ], all("[role=treeitem][data-more]").map { |button| [ button["data-node-id"], button.text ] }
       end
       # A post the person adds from "Not listed on any page" is in view and is
       # not one the page lists: it is counted beside them, so 21 and 9 still
       # make the page's 30.
       find("#{LIST} label", text: "Not listed on any page").click
-      find("#{LIST} button[data-node-id='#{nid(stray)}'][data-not-in-view]").click
+      find("#{LIST} [role=treeitem][data-node-id='#{nid(stray)}'][data-not-in-view]").click
       assert_selector "#{GRAPH}[data-selected='#{nid(stray)}']"
       assert_selector "#{CANVAS}[aria-label='Mind graph around Blog, depth 2: 2 pages, 1 post type, 21 of 30 posts, 1 post and 1 tag. 9 more are in the list.']"
       await_graph
@@ -611,20 +618,20 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     create_post(title: "Beta", tags: [ "shared" ])
     c = create_post(title: "Gamma")
     PostRelation.create!(post: a, related_post: c)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
     assert_no_selector "#{GRAPH} details"
     assert_no_text "List of posts and tags in this graph"
     within(LIST) do
       # (The headings are in the upper-case label style.)
-      assert_equal [ "POSTS · 3", "TAGS · 1" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal [ "Alpha", "Beta", "Gamma", "shared" ], all("li button span.truncate").map(&:text), "posts then tags, best-connected first, equals by title"
-      assert_equal %w[2 1 1 2], all("li button span:last-child").map(&:text), "each row's number of connections"
+      assert_equal [ "POSTS · 3", "TAGS · 1" ], list_headings
+      assert_equal [ "Alpha", "Beta", "Gamma", "shared" ], all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text), "posts then tags, best-connected first, equals by title"
+      assert_equal %w[2 1 1 2], all("[role=treeitem][data-node-id] > .admin-tree-row > .admin-tree-row__trailing").map(&:text), "each row's number of connections"
       assert_row "Alpha: post, 2 connections. Shows it in the graph."
       assert_row "Gamma: post, 1 connection. Shows it in the graph."
       assert_row "shared: tag, 2 connections. Shows it in the graph."
-      assert_selector "li button > span[aria-hidden='true']", count: 4
+      assert_selector "[role=treeitem][data-node-id] > .admin-tree-row > .admin-tree-row__mark > span[aria-hidden='true']", count: 4
       assert_no_selector "a", visible: :all
       # Nobody reads a page here (there is none), so "Not listed on any
       # page" would say nothing: the filter is not offered.
@@ -634,8 +641,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     toggle "Tags"
     await_graph
     within(LIST) do
-      assert_equal [ "POSTS · 3" ], all("h2").map { |heading| heading.text.upcase }
-      assert_equal %w[Alpha Beta Gamma], all("li button span.truncate").map(&:text)
+      assert_equal [ "POSTS · 3" ], list_headings
+      assert_equal %w[Alpha Beta Gamma], all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
     end
   end
 
@@ -648,8 +655,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     await_graph
 
     within(LIST) do
-      assert_selector "li", count: 2
-      assert_equal %w[One Two], all("li button span.truncate").map(&:text)
+      assert_selector "[role=treeitem][data-node-id]", count: 2
+      assert_equal %w[One Two], all("[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title").map(&:text)
     end
   end
 
@@ -658,7 +665,7 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
   test "a row selects its node, centres the canvas on it and marks itself; it does not navigate" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     box = canvas_box
     centre = [ (box[0] + box[2]) / 2, (box[1] + box[3]) / 2 ]
@@ -666,54 +673,69 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_operator Math.hypot(from["x"] - centre[0], from["y"] - centre[1]), :>, 20, "the node is in the middle already: nothing to see"
     zoom = graph["data-zoom"]
 
-    within(LIST) { find("button", text: "Alpha").click }
+    within(LIST) { press_list_item("Alpha") }
 
     assert_equal nid(a), graph["data-selected"]
     await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{nid(a).to_json}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
     assert_equal zoom, graph["data-zoom"], "centring changed the zoom"
-    assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
+    assert_selector "#{LIST} [role=treeitem][aria-selected='true'] > .admin-tree-row--selected", text: "Alpha", count: 1
+    assert_selector "#{LIST} .admin-tree-row--selected", count: 1
     assert_selector "[data-mind-graph-card] h2", text: "Alpha"
     await_frames
     assert_card_beside(a, side: "right")
     assert_current_path admin_mind_graph_path
 
     # Another row moves the mark; clearing the selection takes it away.
-    within(LIST) { find("button", text: "Beta").click }
-    assert_selector "#{LIST} button[aria-current='true']", text: "Beta", count: 1
+    within(LIST) { press_list_item("Beta") }
+    assert_selector "#{LIST} [role=treeitem][aria-selected='true']", text: "Beta", count: 1
     escape_on_canvas
-    assert_no_selector "#{LIST} button[aria-current]"
+    assert_no_selector "#{LIST} [role=treeitem][aria-selected]"
+    assert_no_selector "#{LIST} .admin-tree-row--selected"
   end
 
-  # The other direction: a node selected on the canvas has its row marked, and
-  # the list scrolls -- by itself, not the page -- until the row is in view.
-  test "selecting a node on the canvas marks its row and scrolls the list to it" do
+  # The other direction: a node selected on the canvas has its row marked,
+  # the path to it in the list opened, and the column scrolls -- by itself,
+  # not the page -- until the row is in view.
+  test "selecting a node on the canvas opens its path in the list, marks its row and scrolls the list to it" do
+    section = create_page(title: "Section")
+    deep = create_page(title: "Deep", parent: create_page(title: "Sub", parent: section))
     posts = 70.times.map { |i| create_post(title: format("Post %02d", i)) }
     posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
+
+    # A page below Home stands in a folded branch until it is selected.
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(section)}'][aria-expanded='false']"
+    assert_no_selector "#{LIST} [role=treeitem][data-node-id='#{nid(deep)}']"
+    click_node(deep)
+    assert_selector "#{LIST} [role=treeitem][aria-selected='true'][data-node-id='#{nid(deep)}'][tabindex='0']"
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(section)}'][aria-expanded='true'][data-tree-on-path]"
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(deep.parent)}'][aria-expanded='true'][data-tree-on-path]"
+    escape_on_canvas
     # The last row: one of the chain's two ends, which have one connection.
     last = posts.last
-    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{nid(last)}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
+    row_in_view = "(() => { const list = document.querySelector('#tree-column').getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' [role=treeitem][data-node-id=\"#{nid(last)}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
     assert_not page.evaluate_script(row_in_view), "the row is in view before anything is selected: the list is not long enough for this test"
     scrolled = page.evaluate_script("window.scrollY")
 
     click_node(last)
 
-    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(last)}']"
+    assert_selector "#{LIST} [role=treeitem][aria-selected='true'][data-node-id='#{nid(last)}']"
     await_js(row_in_view)
-    assert_equal scrolled, page.evaluate_script("window.scrollY"), "the page scrolled, not the list"
+    assert_equal scrolled, page.evaluate_script("window.scrollY"), "the page scrolled, not the column"
+    assert_operator page.evaluate_script("document.getElementById('tree-column').scrollTop"), :>, 0, "the column did not scroll"
   end
 
   # Hovering a row lights its node up as the pointer on the node would.
   test "hovering a row of the list highlights its node on the canvas" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     point = screen_position(a)
     ring_before = pixel_at(point["x"] - 9.5, point["y"])
 
-    find("#{LIST} button", text: "Alpha").hover
+    within(LIST) { list_item("Alpha").hover }
 
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{nid(a)}'")
     assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the node whose row is hovered"
@@ -723,21 +745,37 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === ''")
   end
 
-  # The keyboard's whole way: a row is reached by Tab (it is a button), Enter
-  # selects its node and hands the focus to the card; Tab then walks the card
-  # as it reads -- the note's field before "Open post" -- Enter on the card opens the post, and Escape gives the
-  # focus back to the row.
-  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it, and Enter there opens the post" do
+  # The keyboard's whole way: the tree is one Tab stop, Down walks it,
+  # Enter or Space selects a row's node and hands the focus to the card;
+  # Tab then walks the card as it reads -- the note's field before "Open
+  # post" -- Escape gives the focus back to the row, which holds the stop,
+  # and Enter on the card opens the post.
+  test "Enter or Space on a row opens the node's card and moves the focus to it, and Escape gives it back to the row" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
+    keyboard = page.driver.browser.keyboard
+    focused = -> { page.evaluate_script("document.activeElement.getAttribute('aria-label') ?? document.activeElement.tagName") }
 
     # Real keys, on an element focused by script: Cuprite's `send_keys` CLICKS
     # an element that is not focused, and the click would do what Enter is
-    # here to show.
-    find("#{LIST} button", text: "Alpha").execute_script("this.focus()")
-    page.driver.browser.keyboard.type(:Enter)
+    # here to show. The tree's stop is its first item, the group's heading.
+    assert_equal [ "Posts · 2" ], all("#{LIST} [role=treeitem][tabindex='0']").map { |item| item["aria-label"] }
+    find("#{LIST} [role=treeitem][tabindex='0']").execute_script("this.focus()")
+    keyboard.type(:Down)
+    assert_match(/\AAlpha: /, focused.call)
+    assert_equal %w[none solid], page.evaluate_script("[ getComputedStyle(document.activeElement).outlineStyle, getComputedStyle(document.activeElement.firstElementChild).outlineStyle ]"),
+      "one ring, on the focused item's own row and not round the item"
+    keyboard.type(:Down)
+    assert_match(/\ABeta: /, focused.call)
+    keyboard.type(:Up)
+    keyboard.type(:Space)
+    assert_equal nid(a), graph["data-selected"]
+    assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "Space did not move the focus to the card"
+    keyboard.type(:Escape)
+    assert_match(/\AAlpha: /, focused.call)
+    keyboard.type(:Enter)
 
     assert_equal nid(a), graph["data-selected"]
     assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
@@ -752,7 +790,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
-    assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('span.truncate')?.textContent"), "the focus did not go back to the row"
+    assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('.admin-tree-row__title')?.textContent"), "the focus did not go back to the row"
+    assert_equal [ nid(a) ], all("#{LIST} [role=treeitem][tabindex='0']").map { |item| item["data-node-id"] }, "the row it went back to holds the tree's one stop"
 
     # Enter on the row again, then Enter on the card: the post.
     page.driver.browser.keyboard.type(:Enter)
@@ -790,52 +829,158 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_current_path admin_post_path(a)
   end
 
-  # The Tab key meets the
-  # search first, then a local view's bar, the filter, the zoom buttons, the
-  # canvas, the card and, last, the list -- though on screen the search and
-  # the list are one column on the right.
-  test "the Tab key meets the search first and the list last" do
+  # The Tab key follows the document: the tree column comes before <main>,
+  # so it meets the column's hide button, the find field, the list's
+  # checkbox and its tree (one stop), while the field holds text the last
+  # line, and the column's divider; then a local view's bar, the legend, the zoom buttons, the
+  # canvas and the card.
+  test "the Tab order is the find field, the list, then the legend, the zoom and the canvas" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
-    visit admin_mind_graph_path(post: a.id)
+    visit_screen admin_mind_graph_path(post: a.id)
     await_graph
     click_node(a)
     assert_selector "[data-mind-graph-card] a", text: "Open post"
+    stops = lambda do
+      page.evaluate_script(<<~JS)
+        Array.from(document.querySelectorAll("#tree-column input, #tree-column button, #tree-column a[href], #tree-column [role=treeitem][tabindex='0'], #tree-column [role=separator][tabindex='0'], " +
+                                             "main input, main button, main a[href], main canvas[tabindex='0']"))
+          .filter((element) => element.checkVisibility() && !element.closest("[hidden]"))
+          .map((element) => {
+            if (element.closest("#tree-column [role=search]")) return element.type === "search" ? "find" : "clear"
+            if (element.matches(".admin-tree-divider")) return "divider"
+            if (element.matches(".admin-tree-hide")) return "hide"
+            if (element.closest("[data-mind-graph-search-site]")) return "last line"
+            if (element.closest("[data-mind-graph-list]")) return "list"
+            if (element.closest("[data-mind-graph-focus]")) return "focus bar"
+            if (element.closest("[data-mind-graph-legend]")) return "legend"
+            if (element.dataset.action?.includes("admin--mind-graph--graph#")) return "zoom"
+            if (element.tagName === "CANVAS") return "canvas"
+            if (element.closest("[data-mind-graph-card]")) return "card"
+            return element.outerHTML
+          })
+      JS
+    end
 
-    stops = page.evaluate_script(<<~JS)
-      Array.from(document.querySelector(#{GRAPH.to_json}).querySelectorAll("input, button, a[href], canvas[tabindex='0']"))
-        .filter((element) => element.checkVisibility() && !element.closest("[hidden]"))
-        .map((element) => {
-          if (element.id === "mind-graph-search") return "search"
-          if (element.closest("[data-mind-graph-focus]")) return "focus bar"
-          if (element.closest("[data-mind-graph-legend]")) return "legend"
-          if (element.dataset.action?.includes("admin--mind-graph--graph#")) return "zoom"
-          if (element.tagName === "CANVAS") return "canvas"
-          if (element.closest("[data-mind-graph-card]")) return "card"
-          if (element.closest("[data-mind-graph-list]")) return "list"
-          return element.outerHTML
-        })
-    JS
+    assert_equal [ "hide", "find", "list", "divider", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
+    assert_equal 1, stops.call.count("list"), "the tree is one stop (a post's local view has no unlisted filter)"
 
-    assert_equal [ "search", "focus bar", "legend", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
+    find(FIND).fill_in(with: "alp")
+    assert_selector "#{SEARCH_SITE} button", text: "Search the whole site for “alp”"
+    assert_equal [ "hide", "find", "clear", "list", "last line", "divider", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
     # The toggles alone, and every one of them a stop the Tab key makes: none
     # is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
     assert_equal [ [ "Posts", 0 ], [ "Tags", 0 ], [ "Related", 0 ], [ "Shares a tag", 0 ] ], legend
   end
 
+  # The find's keys are the find's: Down Arrow in the field goes to the
+  # first match's item, which takes the tree's one stop, and Enter in the
+  # field presses it, which selects the node and opens its card.
+  test "Down Arrow in the find field reaches the first match, and Enter selects it and opens its card" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit_screen admin_mind_graph_path
+    await_graph
+
+    find(FIND).fill_in(with: "alph")
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(a)}'][data-filter-match]"
+    find(FIND).send_keys(:down)
+
+    item = "#{LIST} [role=treeitem][data-node-id='#{nid(a)}']"
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{item.to_json})"), "Down did not reach the first match"
+    assert_equal "0", find(item)["tabindex"]
+    assert_equal "", graph["data-selected"].to_s, "Down only moves the focus"
+
+    find(FIND).send_keys(:enter)
+
+    assert_selector "#{GRAPH}[data-selected='#{nid(a)}']"
+    assert_selector "[data-mind-graph-card]", visible: :visible
+    assert_selector "#{item}[aria-selected=true]"
+  end
+
+  # One open set for both trees: a branch folded in Pages is folded in the
+  # graph's list, and a branch opened in the list is open in Pages.
+  test "a branch folded in the Pages tree is folded in the mind graph's list" do
+    docs = create_page(title: "Docs")
+    guide = create_page(title: "Guide", parent: docs)
+    create_page(title: "Step", parent: guide)
+    visit_editor(docs)
+    find("#tree [data-tree-row][data-tree-id='#{root_page.id}'] > .admin-tree-row__disclosure[aria-label='Fold #{root_page.title}']").click
+    assert_selector "#tree [data-tree-row][data-tree-id='#{root_page.id}'] > .admin-tree-row__disclosure[aria-expanded='false']"
+
+    visit_screen admin_mind_graph_path
+    await_graph
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(root_page)}'][aria-expanded='false']"
+    assert_no_selector "#{LIST} [role=treeitem][data-node-id='#{nid(docs)}']"
+
+    # Opened in the list, Home and Guide are open in Pages.
+    within(LIST) do
+      list_item(root_page.title).find(".admin-tree-row__disclosure", match: :first).click
+      assert_selector "[role=treeitem][data-node-id='#{nid(root_page)}'][aria-expanded='true']"
+      list_item("Docs").find(".admin-tree-row__disclosure", match: :first).click
+      list_item("Guide").find(".admin-tree-row__disclosure", match: :first).click
+      assert_selector "[role=treeitem][data-node-id='#{nid(guide)}'][aria-expanded='true']"
+    end
+    visit_editor(root_page)
+    assert_selector "#tree [data-tree-row][data-tree-id='#{root_page.id}'] > .admin-tree-row__disclosure[aria-expanded='true']"
+    assert_selector "#tree [data-tree-row][data-tree-id='#{guide.id}'] > .admin-tree-row__disclosure[aria-expanded='true']"
+  end
+
   test "a title with markup in it is text in the list and in the search results" do
     nasty = %(<img src=x onerror="window.pwned=1"> & co)
     a = create_post(title: nasty)
     PostRelation.create!(post: a, related_post: create_post(title: "B"))
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
-    within(LIST) { assert_selector "button span.truncate", exact_text: nasty }
-    fill_in "Find a page, post or tag", with: "onerror"
-    within("[data-mind-graph-results]") { assert_link nasty }
+    within(LIST) { assert_selector "[role=treeitem][data-node-id] > .admin-tree-row .admin-tree-row__title", exact_text: nasty }
+    search_whole_site("onerror")
+    within(RESULTS) { assert_link nasty }
 
-    assert_no_selector "#{LIST} img, [data-mind-graph-results] img", visible: :all
+    assert_no_selector "#{LIST} img", visible: :all
     assert_nil page.evaluate_script("window.pwned")
+  end
+
+  # Below 1024px the list is the tree drawer over the screen. A row that
+  # selects closes the drawer and its scrim first, then its card takes the
+  # focus over the canvas; a fold or a group's heading keeps the drawer open;
+  # Escape on the card gives the focus to the canvas, not to the closed
+  # drawer.
+  test "below 1024px a row that selects closes the tree drawer and its card takes the focus, a fold keeps the drawer open, and Escape on the card goes to the canvas" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    create_page(title: "Docs")
+    at_window(900) do
+      visit_screen admin_mind_graph_path
+      await_graph
+      find("button[aria-controls='tree-column'][aria-label='Open list']", text: "List ▾").click
+      assert_selector "#tree-column[data-open]"
+
+      home = "#{LIST} [role=treeitem][data-node-id='#{nid(root_page)}']"
+      find("#{home} > .admin-tree-row > .admin-tree-row__disclosure").click
+      assert_selector "#{home}[aria-expanded='false']"
+      posts = "#{LIST} [role=treeitem][data-tree-group='posts']"
+      find("#{posts} > .admin-tree-row").click
+      assert_selector "#{posts}[aria-expanded='false']"
+      assert_selector "#tree-column[data-open]"
+      assert_selector ".admin-shell__scrim"
+      find("#{posts} > .admin-tree-row").click
+      assert_selector "#{posts}[aria-expanded='true']"
+
+      list_item("Alpha").execute_script("this.focus()")
+      page.driver.browser.keyboard.type(:Enter)
+
+      assert_no_selector "#tree-column[data-open]"
+      assert_no_selector ".admin-shell__scrim"
+      assert_selector "#{GRAPH}[data-selected='#{nid(a)}']"
+      assert_selector "[data-mind-graph-card]", visible: :visible
+      assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the card does not have the focus"
+
+      page.driver.browser.keyboard.type(:Escape)
+      assert_no_selector "[data-mind-graph-card]", visible: :visible
+      assert page.evaluate_script("document.activeElement === document.querySelector(#{CANVAS.to_json})"), "Escape on the card did not give the focus to the canvas"
+      assert_no_selector "#tree-column[data-open]"
+    end
   end
 end

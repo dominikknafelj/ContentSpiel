@@ -1,9 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
-// The page tree's column (`aside#tree-column`, with its data from
-// `Admin::Shell::TreeDividerComponent.column_data`; Claude Design,
-// 2026-10-13, T1): the column is as wide as the person made it with
+// The tree column (`aside#tree-column`, with its data from
+// `Admin::Shell::TreeDividerComponent.column_data`), whatever the screen
+// puts in it (the Pages tree, the mind graph's list): the column is as wide
+// as the person made it with
 // its divider (the `divider` target), between a minimum and a maximum, it
 // folds to a strip and back (the `fold` and `unfold` targets), and both
 // choices are remembered in this browser.
@@ -55,9 +56,9 @@ import { messages } from "i18n/messages"
 // agree at any font size and with a classic scrollbar (to the rounding of a
 // whole pixel where a rem figure is not one).
 //
-// THE FOLD, a third state of the width. "Hide page tree" (`fold`, in the
-// tree's head) and "Show page tree" (`unfold`, the strip's one button,
-// `Admin::Shell::TreeFoldComponent`) set and take away `data-tree-folded` on
+// THE FOLD, a third state of the width. The column head's hide button
+// (`fold`, `Admin::Ui::TreeHideComponent`) and the strip's one button
+// (`unfold`, `Admin::Shell::TreeFoldComponent`) set and take away `data-tree-folded` on
 // <html>, and "1" under `foldKey` in `localStorage`. The attribute has two
 // writers, as the width has: the layout's head script, before the first
 // paint, and this controller. The stylesheet makes the grid's track the
@@ -129,7 +130,10 @@ const STRIDE = 64
 
 export default class extends Controller {
   static targets = ["divider", "fold", "unfold"]
-  static values = { min: Number, default: Number, max: Number, editor: Number, sidebar: Number, key: String, foldKey: String }
+  // `tooltipKey` is the message key of the divider's tooltip, in the words of
+  // what the column holds (`Admin::Shell::TreeSubjects`); the divider's
+  // `data-messages` carries that key's sentence.
+  static values = { min: Number, default: Number, max: Number, editor: Number, sidebar: Number, key: String, foldKey: String, tooltipKey: String }
 
   connect() {
     this.pointer = null
@@ -320,7 +324,7 @@ export default class extends Controller {
     divider.setAttribute("aria-valuemax", String(Math.round(this.ceiling)))
     divider.setAttribute("aria-valuenow", String(width))
     const bubble = divider.querySelector("[data-tooltip]")
-    if (bubble) bubble.textContent = messages(divider).t("components.shell.tree_divider.tooltip", { width })
+    if (bubble) bubble.textContent = messages(divider).t(this.tooltipKeyValue, { width })
   }
 
   // `turbo:before-cache`, and on disconnect: no pointer is at work in a page

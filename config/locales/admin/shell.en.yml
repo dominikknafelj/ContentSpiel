@@ -1,8 +1,8 @@
 # CS Studio's shell, the components in `app/components/admin/shell/`
 # (docs/reference/i18n.md). A component's keys are
 # `admin.components.shell.<its class name without Admin::Shell:: and Component, underscored>`.
-# The sidebar, the page tree's divider and its fold are converted; the top bar and the
-# palette still hold their English as literals and move here with the rest of
+# The sidebar, the top bar and the tree column's parts are converted; the
+# palette still holds its English as literals and moves here with the rest of
 # the shell (`CONVERTED` in test/lib/admin_i18n_test.rb).
 #
 # `admin.modules` and `admin.module_groups` are the names of the modules
@@ -42,13 +42,38 @@ en:
           jump: "Jump to…"
           shortcut: "⌘K"
           sign_out: "Sign out"
-        tree_divider:
-          # The separator's accessible name; its value (the width in pixels) is read after it.
-          label: "Page tree width"
-          # The shared tooltip, on keyboard focus and on hover. The script writes
-          # it again with the current width (`admin--shell--tree-width`).
-          tooltip: "Tree width %{width}px. Arrow keys to resize."
-        tree_fold:
-          # The folded tree's strip: its one button, which unfolds the column
-          # (its name, and the shared tooltip's text).
-          show: "Show page tree"
+        top_bar:
+          # The button that opens the modules drawer (its name).
+          navigation: "Open navigation"
+          # The product's wordmark, drawn in capitals as the brand draws it.
+          wordmark: "CONTENT·SPIEL"
+          # The button that opens ⌘K (its name), and the key it shows.
+          jump: "Jump to…"
+          shortcut: "⌘K"
+        # The words of what the tree column holds, one family per subject
+        # (`Admin::Shell::TreeSubjects`), read by every part the shell draws
+        # for the column:
+        # - `hide`: the column head's button that folds it to its strip, and
+        #   `show`: the strip's one button, which unfolds it (each the
+        #   button's name and the shared tooltip's text);
+        # - `open`: the top bar's button that opens the column as a drawer
+        #   (its name), and `button`: the words it shows;
+        # - `divider`: the separator's accessible name, whose value (the
+        #   width in pixels) is read after it, and `divider_tooltip`: the
+        #   shared tooltip on keyboard focus and hover, which the script
+        #   writes again with the current width (`admin--shell--tree-width`).
+        tree_subject:
+          pages:
+            hide: "Hide page tree"
+            show: "Show page tree"
+            open: "Open page tree"
+            button: "Pages ▾"
+            divider: "Page tree width"
+            divider_tooltip: "Tree width %{width}px. Arrow keys to resize."
+          mind_graph:
+            hide: "Hide list"
+            show: "Show list"
+            open: "Open list"
+            button: "List ▾"
+            divider: "List width"
+            divider_tooltip: "List width %{width}px. Arrow keys to resize."

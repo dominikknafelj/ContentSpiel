@@ -16,11 +16,11 @@ class Admin::MindGraphScreen::PartsComponentTest < ViewComponent::TestCase
     "close" => -> { Admin::Ui::ButtonComponent.new(label: "Close", icon: :x, variant: :tertiary, size: :small, data: { mind_graph_card_close: "" }) }
   }.freeze
 
-  test "the parts are one template holding the three status chips, the unpublished chip, an icon chip per kind and Close as the shared icon button" do
+  test "the parts are one template holding the three status chips, the unpublished chip, an icon chip per kind, Close as the shared icon button and the tree row's glyphs" do
     templates = parts_templates
     assert_equal 1, templates.size
     names = templates.first.css("> span[data-part]").map { |part| part["data-part"] }
-    assert_equal %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close], names
+    assert_equal %w[status-live status-draft status-scheduled unpublished icon-page icon-post icon-tag icon-type close tree-disclosure tree-page-mark tree-home-mark], names
     assert_equal names, Admin::MindGraphScreen::PartsComponent::NAMES
     part = ->(name) { templates.first.css("> span[data-part='#{name}'] > *").tap { |found| assert_equal 1, found.size, "#{name} holds one element" }.first }
     assert_classes part.("status-live"), %w[admin-status-chip bg-live], status: "live"
@@ -32,6 +32,23 @@ class Admin::MindGraphScreen::PartsComponentTest < ViewComponent::TestCase
     %w[icon-page icon-post icon-tag icon-type].each { |name| assert_equal "true", part.(name)["aria-hidden"], name }
     close = part.("close")
     assert_equal [ "button", "button", "Close", "" ], [ close.name, close["type"], close["aria-label"], close["data-mind-graph-card-close"] ]
+  end
+
+  # The graph's row is one control, so its disclosure is no button: a span
+  # in the tree's disclosure class, silent to a screen reader, around the
+  # chevron Pages' disclosure draws. The marks are the tree's glyphs as they are.
+  test "the tree's parts are the tree row's own glyphs, and the disclosure is a silent span, never a control" do
+    template = parts_templates.first
+    part = ->(name) { template.css("> span[data-part='#{name}'] > *").tap { |found| assert_equal 1, found.size, "#{name} holds one element" }.first }
+    glyph = ->(name) { Nokogiri::HTML5.fragment(ApplicationController.render(partial: "admin/shared/tree_glyph", locals: { name: name })).at_css("svg").to_html }
+
+    disclosure = part.("tree-disclosure")
+    assert_equal [ "span", Admin::Ui::TreeItemComponent::CLASSES[:disclosure], "true" ], [ disclosure.name, disclosure["class"], disclosure["aria-hidden"] ]
+    assert_empty disclosure.css("button, a, [tabindex]"), "nothing in the disclosure can take the focus"
+    assert_equal glyph.(:chevron), disclosure.at_css("svg").to_html
+    assert_equal glyph.(:page), part.("tree-page-mark").to_html
+    assert_equal glyph.(:home), part.("tree-home-mark").to_html
+    %w[tree-page-mark tree-home-mark].each { |name| assert_equal "true", part.(name)["aria-hidden"], name }
   end
 
   test "a part is the shared component's own markup" do

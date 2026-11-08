@@ -8,34 +8,86 @@
     it has an HTML path beside it. Read-only: relations are edited in the post
     editor's related-posts picker. %>
 <% content_for :title, t(".title") %>
-<%# THE SCREEN FILLS THE WINDOW (the round of 2026-10-08): from 1,100px of
-    width the heading and the box together are exactly as tall as the window
-    less <main>'s padding and the top bar where there is one
-    (`--admin-top-offset`), so the page does not scroll and the canvas and the
-    list each take what is left. Below that width the list stands under the
-    canvas, the box is as tall as its content and the page scrolls. %>
-<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? || @pages %>">
+<% graph = @content_types.any? || @pages %>
+<%# THE COLUMN: the tree column of the shell (`content_for :tree`), whose
+    words are the list's (`content_for :tree_label`, `mind_graph`: "Hide
+    list", the strip's, the divider's and the top bar's "List ▾"). It holds,
+    in this order, the head (the heading and the column's hide button), the
+    find field over the list's tree (`Admin::Ui::TreeFindComponent`, which
+    names `ul#mind-graph-tree`), and the list's region
+    (`data-mind-graph-list`), which `mind_graph/node_list.js` fills with
+    "Not listed on any page" and the tree, and which ends with the last line
+    (`data-mind-graph-search-site`): "Search the whole site for …", shown
+    while the find field holds text, whose results the list draws in the
+    tree's place. The region is the column's `admin-shell__tree-region`, a
+    child of the column, so from 1024px it takes the height the head and the
+    find field leave (`.admin-shell__tree--fill`).
+
+    The column stands outside the graph's element and outside `#content`, so
+    a frame navigation keeps it: the graph's own links that stay on this
+    screen (Focus, the depths, Whole graph) are frame navigations, whose
+    graph fills the same column again, and every link that leads to another
+    screen is a visit of the whole page (`data-turbo-frame="_top"`, the
+    card's), which draws that screen's own column. Like the Pages tree it is
+    drawn for a full answer only: a frame answer keeps only `#content`. With
+    nothing to draw, there is no graph and no column.
+
+    THE TAB ORDER follows the document: the sidebar, the column (its hide
+    button, the find field, the checkbox, the tree, one stop, the last line
+    and, last, the column's divider), then `<main>`: a view's bar, the legend's toggles, the zoom
+    buttons, the canvas and the card. Below 1024px the column is the tree
+    drawer, opened by the top bar's "List ▾". %>
+<% if graph && !turbo_frame_request? %>
+  <% content_for :tree_label, "mind_graph" %>
+  <% content_for :tree do %>
+    <div class="mb-2 flex items-center gap-2 px-1">
+      <h2 class="flex-1 text-sm font-semibold text-ink"><%= t(".column_heading") %></h2>
+      <%= render Admin::Ui::TreeHideComponent.new(subject: "mind_graph") %>
+    </div>
+    <%= render Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes, keep_across_frames: true) %>
+    <%# The list: every node the graph draws, as a row, in four groups
+        (Pages, Posts, Tags, Post types), filled by `mind_graph/node_list.js`
+        from the same data and following the filter; or, while "Not listed
+        on any page" is on or after a press on "+N more", the rows of that
+        read in their place; or the whole site's results. A canvas's nodes
+        can't take focus, so this is the keyboard and screen-reader path to
+        them: one tree with one Tab stop, whose row selects its node, and
+        the card it opens holds the links.
+
+        THE LAST LINE stands in the region after what the list draws, and
+        outside the tree: hidden, and its button empty, while the find field
+        is empty; while the field holds text, tree or no tree, it shows and
+        the script writes the query into its words.
+        Pressing it asks `data-url` (`PostGraph::Search`: the pages, posts
+        and tags this viewer reads, the graph's drawing or not), and its
+        rows are links to each one's local view. The graph controller's
+        `reset` hides it and empties it again. %>
+    <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="admin-shell__tree-region">
+      <div data-mind-graph-search-site data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>" hidden class="mt-2 px-1">
+        <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :tertiary, size: :small) %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+<%# THE SCREEN FILLS THE WINDOW from 1024px: the heading and the box
+    together are exactly as tall as the window less <main>'s padding and the
+    top bar where there is one (`--admin-top-offset`), so the page does not
+    scroll and the canvas takes what is left. Below that width the box has
+    a height of its own and the page scrolls. %>
+<div class="<%= "flex min-h-[560px] flex-col lg:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if graph %>">
 <div class="mb-4">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <p class="mt-1 text-meta"><%= t(".intro") %></p>
 </div>
 
-<% if @content_types.empty? && !@pages %>
+<% if !graph %>
   <%# For THIS viewer: a viewer who can read no post and no page sees this, whatever the site holds. %>
   <div class="rounded-card bg-surface shadow-1 p-6 text-meta" data-mind-graph-empty="no-content"><%= t(".no_content") %></div>
 <% else %>
-  <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
-      the legend's row, the canvas) and the LIST. In the document
-      they come in that order, because the Tab key follows the document
-      (search, focus bar, the legend's toggles, zoom buttons, canvas, card,
-      list -- the list last, since it can hold
-      two thousand rows). On screen, from
-      1,100px, the graph is the left column over the box's whole height and
-      the search and the list are a 300px column on its right, the search on
-      top: a grid places each part, so the order of the document is free.
-      Below that width they stack with the graph FIRST (`order-first`), the
-      search and the list under it. The filter is the legend:
-      checkboxes, each a Tab stop that Space switches, applied client-side.
+  <%# One box, one column at every width: a local view's focus bar (or the
+      bar of the view a large site opened in), the legend's row, and the
+      canvas. The filter is the legend: checkboxes, each a Tab stop that
+      Space switches, applied client-side. The list is in the column (above).
 
       `data-state="loading"` is what the server says; the script takes it from
       there (`mind_graph/app.js` lists the attributes it writes). The notice is
@@ -47,10 +99,16 @@
       is each shown type's human name. `data-button-classes` and
       `data-dot-classes` hand the script the classes of
       `Admin::Ui::ButtonComponent` (the card's actions, the two Retry
-      buttons) and of `Admin::Ui::ContentTypeDotComponent` (a type's dot in
-      the card and the list, slots 1-12 in order), so neither is copied into
-      JavaScript. What the script needs whole -- the status, unpublished and
-      icon chips and the card's Close -- it clones from the parts template
+      buttons, the whole site's Back) and of `Admin::Ui::ContentTypeDotComponent` (a type's dot in
+      the card and the list, slots 1-12 in order), and `data-tree-classes`
+      the tree row's (`Admin::Ui::TreeItemComponent::CLASSES`, the list's rows
+      are the Pages tree's row), so none is copied into JavaScript. The
+      list's tree folds a page's branch with the Pages tree's open set:
+      `data-tree-open` is the cookie as `TreeOpenSet` read it for the pages
+      this viewer reads, the list's first folds, and `data-tree-open-path`
+      (the admin path, where the cookie is written) and `data-tree-locale`
+      are copied onto the tree as the Pages tree carries them. What the script needs whole -- the status, unpublished and
+      icon chips, the card's Close and the tree row's glyphs -- it clones from the parts template
       (`Admin::MindGraphScreen::PartsComponent`) at the element's end.
       `data-post-notes-url` is a fourth template: a post's open notes as JSON
       for its card, and where the card posts a new one. The
@@ -75,7 +133,7 @@
       (its open notes as JSON, and where the card posts a new one; built for
       id 0 like the post's).
 
-      THE GRAPH THAT OPENS AROUND HOME (pages spec, decision 6). A site with
+      THE GRAPH THAT OPENS AROUND HOME. A site with
       too many lines for one picture is answered by `data-url` with where to
       open instead, and the script then reads `data-open-url` (the data of a
       page's local view, `__ID__` the page's id) and shows the bar below
@@ -101,15 +159,16 @@
                                      "mind_graph.script.card.open_page", "mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts", "mind_graph.script.card.post_type",
                                      "mind_graph.script.opened.line", "mind_graph.script.opened.everything_name",
                                      "mind_graph.script.list.more_heading", "mind_graph.script.list.more_row", "mind_graph.script.list.back",
+                                     "mind_graph.script.list.search_site", "mind_graph.script.list.search_site_heading",
                                      "mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.label_page", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.sending", "mind_graph.script.card.notes.replies",
                                      "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.unread", "mind_graph.script.card.notes.failed",
-                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed",
+                                     "mind_graph.script.search.none", "mind_graph.script.search.failed",
                                      "mind_graph.script.search.groups.page", "mind_graph.script.search.groups.post", "mind_graph.script.search.groups.tag",
                                      "mind_graph.script.list.pages", "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.types", "mind_graph.script.list.empty",
-                                     "mind_graph.script.list.unlisted", "mind_graph.script.list.not_in_view", "mind_graph.script.list.open_in_posts", "mind_graph.script.list.failed", "mind_graph.script.list.try_again",
+                                     "mind_graph.script.list.unlisted", "mind_graph.script.list.unlisted_none", "mind_graph.script.list.not_in_view", "mind_graph.script.list.open_in_posts", "mind_graph.script.list.failed", "mind_graph.script.list.try_again",
                                      "mind_graph.script.list.select_page", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag", "mind_graph.script.list.select_type",
                                      "mind_graph.script.list.add_post", "mind_graph.script.list.add_retired_post", "mind_graph.script.list.absent_post", "mind_graph.script.list.absent_retired_post",
-                                     "mind_graph.script.list.stated", "components.ui.status_chip.labels.draft", "components.ui.status_chip.labels.scheduled", "components.ui.unpublished_chip.label",
+                                     "mind_graph.script.list.stated", "mind_graph.script.list.ancestors", "mind_graph.script.list.under", "components.ui.status_chip.labels.draft", "components.ui.status_chip.labels.scheduled", "components.ui.unpublished_chip.label",
                                      "mind_graph.script.legend.toggle",
                                      "mind_graph.script.summary.whole", "mind_graph.script.summary.local", "mind_graph.script.summary.everything", "mind_graph.script.summary.nothing",
                                      "mind_graph.script.summary.all_hidden", "mind_graph.script.summary.none_yet", "mind_graph.script.summary.around_home", "mind_graph.script.summary.site",
@@ -131,123 +190,97 @@
        data-type-labels="<%= @type_labels.to_json %>"
        data-button-classes="<%= %i[primary secondary tertiary].to_h { |variant| [ variant, Admin::Ui::ButtonComponent.classes(variant, size: :small) ] }.to_json %>"
        data-dot-classes="<%= (Admin::Ui::ContentTypeDotComponent::FILLED + Admin::Ui::ContentTypeDotComponent::RINGS).to_json %>"
+       data-tree-classes="<%= Admin::Ui::TreeItemComponent::CLASSES.to_json %>"
+       data-tree-open="<%= @tree_open %>"
+       data-tree-open-path="/<%= ContentSpiel::ADMIN_PATH %>"
+       data-tree-locale="<%= admin_locale %>"
        data-state="loading"
-       class="grid min-h-0 flex-1 overflow-hidden rounded-card bg-surface shadow-1 min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
-    <%# The search field: how a page, post or tag the graph doesn't draw is reached.
-        Its rows are links to that row's local view, filled in by
-        `mind_graph/search_box.js` with text and `href` only. The results are
-        ordinary links after the field in the document, so Tab reaches them.
-        The status line is the live region the results' wording goes through
-        (a count, "No page, post or tag matches.", the failure): it stays in the DOM,
-        so the list itself can stay a plain list of links. %>
-    <div class="border-t border-line p-2.5 min-[1100px]:col-start-2 min-[1100px]:row-start-1 min-[1100px]:border-l min-[1100px]:border-t-0">
-      <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
-        <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
-        <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
-              class: "admin-well block w-full px-3 py-1.5 text-sm text-ink" %>
-        <p data-mind-graph-status role="status" class="sr-only"></p>
-        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-(--cs-z-popover) m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-card bg-popover p-1 shadow-3"></ul>
-      </div>
-    </div>
-    <div class="order-first flex h-[70vh] min-h-[480px] min-w-0 flex-col min-[1100px]:order-none min-[1100px]:col-start-1 min-[1100px]:row-span-2 min-[1100px]:row-start-1 min-[1100px]:h-auto min-[1100px]:min-h-0">
-      <% if @focus %>
-        <%# The local view's bar: what the graph is drawn around, both
-            depths and the way back to the whole graph. The current depth is
-            plain text marked `aria-current`, not a disabled link: it leads
-            nowhere, so it is nothing to press. Read out of the row it would be
-            a bare "1", so it carries the word "Depth" for a screen reader, as
-            the other depth's link does in its name. All ordinary links, so Back works. The depth
-            link of 1 carries no `depth`, as the screen's own URLs do. %>
-        <p data-mind-graph-focus class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
-          <span class="font-semibold text-ink"><%= t(".focus.around_#{@focus.kind}", title: @focus.title) %></span>
-          <span class="inline-flex items-center gap-1.5"><%= t(".focus.depth") %>
-            <% [ 1, 2 ].each do |depth| %>
-              <% if depth == @depth %>
-                <span aria-current="true" class="font-semibold text-ink"><span class="sr-only"><%= t(".focus.depth") %></span> <%= depth %></span>
-              <% else %>
-                <%= link_to depth, admin_mind_graph_path(**admin_url_options, @focus.kind => @focus.id, depth: (depth if depth == 2)), "aria-label": t(".focus.depth_n", depth: depth), class: "text-accent underline" %>
-              <% end %>
+       class="flex h-[70vh] min-h-[480px] flex-1 flex-col overflow-hidden rounded-card bg-surface shadow-1 lg:h-auto lg:min-h-0">
+    <% if @focus %>
+      <%# The local view's bar: what the graph is drawn around, both
+          depths and the way back to the whole graph. The current depth is
+          plain text marked `aria-current`, not a disabled link: it leads
+          nowhere, so it is nothing to press. Read out of the row it would be
+          a bare "1", so it carries the word "Depth" for a screen reader, as
+          the other depth's link does in its name. All ordinary links, so Back works. The depth
+          link of 1 carries no `depth`, as the screen's own URLs do. %>
+      <p data-mind-graph-focus class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
+        <span class="font-semibold text-ink"><%= t(".focus.around_#{@focus.kind}", title: @focus.title) %></span>
+        <span class="inline-flex items-center gap-1.5"><%= t(".focus.depth") %>
+          <% [ 1, 2 ].each do |depth| %>
+            <% if depth == @depth %>
+              <span aria-current="true" class="font-semibold text-ink"><span class="sr-only"><%= t(".focus.depth") %></span> <%= depth %></span>
+            <% else %>
+              <%= link_to depth, admin_mind_graph_path(**admin_url_options, @focus.kind => @focus.id, depth: (depth if depth == 2)), "aria-label": t(".focus.depth_n", depth: depth), class: "text-accent underline" %>
             <% end %>
-          </span>
-          <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
-        </p>
-      <% else %>
-        <%# The bar of the view the 3,000-line rule opened (pages spec,
-            decision 6): hidden, and empty of any figure, until the script
-            has been told where to open. Then it says why the whole graph is
-            not what is drawn (its sentence, written with `textContent`) and
-            offers "Show everything", whose name the script completes with
-            how many lines that is. %>
-        <p data-mind-graph-opened hidden class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
-          <span data-mind-graph-opened-line id="mind-graph-opened-line"></span>
-          <%= render Admin::Ui::ButtonComponent.new(label: t(".opened.everything"), variant: :tertiary, size: :small, aria: { describedby: "mind-graph-opened-line" },
-                data: { mind_graph_everything: true, action: "admin--mind-graph--graph#showEverything" }) %>
-        </p>
-      <% end %>
-      <%# The legend, which is the filter. Its counts and each
-          toggle's name with its count are the script's, and the controller's
-          `reset` takes them back; the checkboxes' own state is kept. %>
-      <div class="border-b border-line px-3.5 py-2.5">
-        <%= render Admin::MindGraphScreen::LegendComponent.new(content_types: @content_types, pages: @pages) %>
-      </div>
-      <%# In the document the zoom buttons come BEFORE the canvas, because the
-          Tab key follows the document (legend, zoom buttons, canvas);
-          on screen they sit in the canvas's bottom-right corner, positioned, so
-          they are painted over it whatever the order. "Release N pinned" is
-          beside them only while a node is pinned: the script writes its label
-          (a plural) and shows it, and the controller's `reset` hides it again.
-          The zoom's figure between the two buttons is the script's too, a
-          count with digits of one width, so it does not shift as it changes. Each
-          zoom button is a glyph or a short word with its whole name as
-          `aria-label` and `title`. The notice is a polite live region:
-          loading, a failure and the cap's sentences are announced. %>
-      <div class="relative min-h-0 flex-1">
-        <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
-          <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
-          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-button border border-field-line bg-surface text-small text-ink">
-            <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
-            <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
-            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 text-count tabular-nums text-meta"></span>
-            <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>
-            <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph--graph#fit" } %>
-          </div>
-        </div>
-        <canvas data-admin--mind-graph--graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
-        <div data-admin--mind-graph--graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
-        <%# (The canvas's `data-label` is its name as the server wrote it: the
-            script puts its summary of what is in view into `aria-label`
-            (`mind_graph/summary.js`), and the controller's `reset` puts this
-            back on a page Turbo restored. After a toggle of the legend the
-            same summary is put into the notice, for a screen reader only:
-            that is how the change is announced.) %>
-        <%# The selection card and the hover tooltip: HTML over the
-            canvas, filled by `mind_graph/card.js` and `gestures.js` with `textContent`
-            and `href` only. Both are empty and `hidden` until the script shows
-            them, and the controller's `reset` hides them again on a page Turbo
-            restored from its cache. The card stands beside its node: the
-            script writes its `left` and `top` (`mind_graph/card_placement.js`).
-            It can take the focus (`tabindex="-1"`), which a row of the list
-            hands it, and is named by its title once it has one. The card's
-            links are the only way a selection leads anywhere: a click on the
-            canvas never navigates. Close, the card's last child, is the
-            shared icon button cloned as it is: the card stands it in its
-            top-right corner (the `[&>[data-mind-graph-card-close]]` classes),
-            over the tooltip host's own `relative`. %>
-        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-(--cs-z-raised) flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-card bg-popover p-3 shadow-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&>[data-mind-graph-card-close]]:absolute [&>[data-mind-graph-card-close]]:right-1.5 [&>[data-mind-graph-card-close]]:top-1.5"></aside>
-        <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-(--cs-z-raised) max-w-xs break-words rounded-cs bg-popover px-2 py-1 text-sm text-ink shadow-3"></div>
-      </div>
+          <% end %>
+        </span>
+        <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
+      </p>
+    <% else %>
+      <%# The bar of the view the 3,000-line rule opened: hidden, and empty of any figure, until the script
+          has been told where to open. Then it says why the whole graph is
+          not what is drawn (its sentence, written with `textContent`) and
+          offers "Show everything", whose name the script completes with
+          how many lines that is. %>
+      <p data-mind-graph-opened hidden class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
+        <span data-mind-graph-opened-line id="mind-graph-opened-line"></span>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".opened.everything"), variant: :tertiary, size: :small, aria: { describedby: "mind-graph-opened-line" },
+              data: { mind_graph_everything: true, action: "admin--mind-graph--graph#showEverything" }) %>
+      </p>
+    <% end %>
+    <%# The legend, which is the filter. Its counts and each
+        toggle's name with its count are the script's, and the controller's
+        `reset` takes them back; the checkboxes' own state is kept. %>
+    <div class="border-b border-line px-3.5 py-2.5">
+      <%= render Admin::MindGraphScreen::LegendComponent.new(content_types: @content_types, pages: @pages) %>
     </div>
-    <%# The list: every node the
-        graph draws, as a row, in four groups (Pages, Posts, Tags, Post
-        types), filled by `mind_graph/node_list.js` from the same data and
-        following the filter; or, while "Not listed on any page" is on or
-        after a press on "+N more", the rows of that read in their place. A canvas's nodes can't take focus, so this is
-        the keyboard and screen-reader path to them: a row is a button that
-        selects its node, and the card it opens holds the links. It comes last
-        in the document and scrolls on its own beside the canvas. Under the
-        canvas it keeps a least height, so the search's results (which hang
-        over it, inside the box) are not cut off by a list of two rows. %>
-    <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="min-h-80 border-t border-line pb-3 min-[1100px]:col-start-2 min-[1100px]:row-start-2 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l"></div>
+    <%# In the document the zoom buttons come BEFORE the canvas, because the
+        Tab key follows the document (legend, zoom buttons, canvas);
+        on screen they sit in the canvas's bottom-right corner, positioned, so
+        they are painted over it whatever the order. "Release N pinned" is
+        beside them only while a node is pinned: the script writes its label
+        (a plural) and shows it, and the controller's `reset` hides it again.
+        The zoom's figure between the two buttons is the script's too, a
+        count with digits of one width, so it does not shift as it changes. Each
+        zoom button is a glyph or a short word with its whole name as
+        `aria-label` and `title`. The notice is a polite live region:
+        loading, a failure and the cap's sentences are announced. %>
+    <div class="relative min-h-0 flex-1">
+      <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
+        <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph--graph#releasePinned" }) %>
+        <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-button border border-field-line bg-surface text-small text-ink">
+          <% zoom_button = "inline-flex h-7 cursor-pointer items-center px-2.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
+          <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph--graph#zoomOut" } %>
+          <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 text-count tabular-nums text-meta"></span>
+          <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph--graph#zoomIn" } %>
+          <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph--graph#fit" } %>
+        </div>
+      </div>
+      <canvas data-admin--mind-graph--graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
+      <div data-admin--mind-graph--graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
+      <%# (The canvas's `data-label` is its name as the server wrote it: the
+          script puts its summary of what is in view into `aria-label`
+          (`mind_graph/summary.js`), and the controller's `reset` puts this
+          back on a page Turbo restored. After a toggle of the legend the
+          same summary is put into the notice, for a screen reader only:
+          that is how the change is announced.) %>
+      <%# The selection card and the hover tooltip: HTML over the
+          canvas, filled by `mind_graph/card.js` and `gestures.js` with `textContent`
+          and `href` only. Both are empty and `hidden` until the script shows
+          them, and the controller's `reset` hides them again on a page Turbo
+          restored from its cache. The card stands beside its node: the
+          script writes its `left` and `top` (`mind_graph/card_placement.js`).
+          It can take the focus (`tabindex="-1"`), which a row of the list
+          hands it, and is named by its title once it has one. The card's
+          links are the only way a selection leads anywhere: a click on the
+          canvas never navigates. Close, the card's last child, is the
+          shared icon button cloned as it is: the card stands it in its
+          top-right corner (the `[&>[data-mind-graph-card-close]]` classes),
+          over the tooltip host's own `relative`. %>
+      <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-(--cs-z-raised) flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-card bg-popover p-3 shadow-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&>[data-mind-graph-card-close]]:absolute [&>[data-mind-graph-card-close]]:right-1.5 [&>[data-mind-graph-card-close]]:top-1.5"></aside>
+      <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-(--cs-z-raised) max-w-xs break-words rounded-cs bg-popover px-2 py-1 text-sm text-ink shadow-3"></div>
+    </div>
     <%= render Admin::MindGraphScreen::PartsComponent.new %>
   </div>
 <% end %>

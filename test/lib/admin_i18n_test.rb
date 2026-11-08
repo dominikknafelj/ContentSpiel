@@ -82,6 +82,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/shell/sidebar_component.rb
     app/components/admin/shell/sidebar_component.html.erb
     app/components/admin/shell/tree_fold_component.rb
+    app/components/admin/shell/tree_divider_component.rb
+    app/components/admin/shell/tree_subjects.rb
+    app/components/admin/shell/top_bar_component.rb
+    app/components/admin/shell/top_bar_component.html.erb
+    app/components/admin/ui/tree_hide_component.rb
+    app/helpers/admin/shell_helper.rb
     app/components/admin/ui/icon_chip_component.rb
     app/components/admin/forms_screen/list_component.rb
     app/components/admin/forms_screen/list_component.html.erb
@@ -280,7 +286,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/node_list.js
     app/javascript/mind_graph/input.js
     app/javascript/mind_graph/renderer.js
-    app/javascript/mind_graph/search_box.js
+    app/javascript/mind_graph/search_results.js
+    app/javascript/mind_graph/site_search.js
     app/javascript/mind_graph/theme.js
     app/javascript/mind_graph/ids.js
     app/javascript/mind_graph/marks.js

@@ -1,22 +1,20 @@
 module Admin
-  # The mind graph (mind graph canvas spec §3): the page is a FRAME -- heading,
+  # The mind graph: the page is a FRAME -- heading,
   # the legend that is its filter, an empty canvas -- and holds no graph data. `admin--mind-graph--graph`
   # fetches the graph from `data` and draws it on the canvas, laid out by
   # d3-force in a worker. Read-only -- relations are edited in the post editor's
   # related-posts picker, not here. Each node's editor URL is built through the
   # route helper with the editing language kept (`admin_url_options`).
   #
-  # Opens for someone who may read a page or a post somewhere (pages in the
-  # mind graph, spec §2): a graph of pages alone is a graph. Each kind is
-  # then narrowed by its own scope in the queries (every `PostGraph` query's
-  # `actor:`, access-control design spec §3.3), so only the pages and posts
-  # the actor may read are shown, with no line to one they can't. A node's
+  # Opens for someone who may read a page or a post somewhere: a graph of
+  # pages alone is a graph. Each kind is then narrowed by its own scope in
+  # the queries (every `PostGraph` query's `actor:`), so only the pages and
+  # posts the actor may read are shown, with no line to one they can't. A node's
   # editor URL is built here (`editor_url`, called with a `Post` or a
   # `Page`): a query knows no routes.
   #
   # `data`, `search`, `unlisted` and `listed` are the screen's JSON reads
-  # (mind graph canvas spec §3.1; pages spec §3) with the screen's own
-  # permission and scope: `data` answers the global graph (or, for a site of
+  # with the screen's own permission and scope: `data` answers the global graph (or, for a site of
   # more than `PostGraph::OPEN_AROUND_HOME_ABOVE` lines, where to open
   # instead, unless `everything=1` asks for all of it), or the
   # neighbourhood of `page=` / `post=` / `tag=` (a page wins over a post, a
@@ -31,8 +29,8 @@ module Admin
   # `Admin::BaseController` answers with the 404 page, or a bare 404 for a
   # non-HTML request.
   class MindGraphController < BaseController
-    # The screen opens for someone who may read a page or a post anywhere
-    # (pages spec §2): a graph of pages alone is a graph. Each kind is then
+    # The screen opens for someone who may read a page or a post anywhere:
+    # a graph of pages alone is a graph. Each kind is then
     # narrowed by its own scope in the queries.
     before_action :require_graph_access
 
@@ -44,13 +42,16 @@ module Admin
     # focus, which is not found when it is outside their scope. `@type_labels`
     # is the human name of each of those types that is still registered, for
     # the selection card (a retired type has none; the card shows its stored
-    # name, as `Admin::Ui::ContentTypeDotComponent` does).
+    # name, as `Admin::Ui::ContentTypeDotComponent` does). `@tree_open` is
+    # the open set the Pages tree shares (`TreeOpenSet`), read for the pages
+    # this viewer reads: the list's first folds.
     def show
       @focus = focus
       @depth = params[:depth].to_s == "2" ? 2 : 1
       @content_types = AccessControl.scope(Current.actor, "posts.read", Post.all).distinct.pluck(:content_type)
       @type_labels = @content_types.filter_map { |name| (definition = ContentTypes.find(name)) && [ name, definition.label ] }.to_h
       @pages = AccessControl.scope(Current.actor, "pages.read", Page.all).exists?
+      @tree_open = TreeOpenSet.parse(cookies[TreeOpenSet::COOKIE], readable_ids: tree_open_ids).to_s
     end
 
     def data
@@ -60,7 +61,7 @@ module Admin
           PostGraph::Local.call(actor: Current.actor, focus: focus, depth: params[:depth], locale: admin_locale, url_for: editor_url)
         else
           # A site with too many lines to read as one picture is answered
-          # with where to open instead (`open`, pages spec decision 6), and
+          # with where to open instead (`open`), and
           # "Show everything" asks again with `everything=1`.
           PostGraph::Global.call(actor: Current.actor, locale: admin_locale, url_for: editor_url, everything: everything?)
         end
@@ -72,14 +73,14 @@ module Admin
       render json: rows.map { |row| row.merge(url: admin_mind_graph_path(row[:kind] => row[:record_id], **admin_url_options)) }
     end
 
-    # The posts no page lists (pages spec §3, decision 10): true for the
+    # The posts no page lists: true for the
     # viewer, by the pages THEY read.
     def unlisted
       render json: with_dates(list_rows.unlisted)
     end
 
     # The rows behind one of a page's "+N more" pills (`target=`: a pill per
-    # target, design answer H1), and where the Posts screen shows the same
+    # target), and where the Posts screen shows the same
     # posts as far as its filters go: by the type and the tag of the block
     # that points at the target. The page is found as a focus is, so one
     # outside the scope, in the trash, unknown or not named at all is a 404.
@@ -93,12 +94,22 @@ module Admin
 
     private
 
+    # The pages whose fold the list may be handed: of the few the cookie
+    # names, the ones this viewer reads, in one pluck; none for a viewer who
+    # reads no page.
+    def tree_open_ids
+      candidates = TreeOpenSet.candidate_ids(cookies[TreeOpenSet::COOKIE])
+      return [] unless @pages && candidates.any?
+
+      AccessControl.scope(Current.actor, "pages.read", Page.kept).where(id: candidates).pluck(:id)
+    end
+
     def focus = PostGraph::Focus.find(actor: Current.actor, page: params[:page], post: params[:post], tag: params[:tag], locale: admin_locale)
 
-    # "Show everything" (pages spec, decision 6): exactly `everything=1`, and
+    # "Show everything": exactly `everything=1`, and
     # a parameter of the DATA alone. The page itself takes no such parameter,
     # so no address a person can keep or reload asks for everything: the
-    # choice is not remembered (the third design answers).
+    # choice is not remembered.
     def everything? = params[:everything] == "1"
 
     def list_rows = PostGraph::Rows.new(actor: Current.actor, locale: admin_locale, url_for: editor_url)
@@ -108,7 +119,7 @@ module Admin
     end
 
     # A scheduled change's day as CS Studio writes a short date ("14 Oct"),
-    # for the card's chip (pages spec §7, design answer G4). Wording, so it
+    # for the card's chip. Wording, so it
     # is put on HERE: the queries hand up the time (`change_at`) and no words.
     # `nodes` and `pages` are the graph's, `rows` the list's two reads'; an
     # answer that holds none of them (`open`) is left as it is.

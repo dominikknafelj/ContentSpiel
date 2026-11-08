@@ -1,5 +1,5 @@
 <%= tag.template data: { mind_graph_parts: "" } do %>
   <% NAMES.each do |name| %>
-    <%= tag.span render(part(name)), data: { part: name } %>
+    <%= tag.span part(name), data: { part: name } %>
   <% end %>
 <% end %>

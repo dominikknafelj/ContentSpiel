@@ -102,8 +102,11 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
       assert_link "Focus", href: /mind_graph\?tag=#{tag.id}\z/
       assert_button "Pin"
     end
+    # A visit of the whole page (the posts list draws its own column); the
+    # address's spaces are the script's `%20`, which reads as the form's `+`.
     click_frame_link { within("[data-mind-graph-card]") { click_link "Show posts with this tag" } }
-    assert_current_path admin_posts_path(tag: "c++ & more")
+    assert_current_path admin_posts_path, ignore_query: true
+    assert_equal({ "tag" => "c++ & more" }, Rack::Utils.parse_query(URI(page.current_url).query))
     # The posts list read the name back as it is: the two tagged posts, only.
     assert_text "P0"
     assert_text "P1"
@@ -443,7 +446,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
     row = "[data-mind-graph-card] > [data-chip-row][aria-hidden='true']"
 
     with_reduced_motion do
-      visit admin_mind_graph_path
+      visit_screen admin_mind_graph_path
       await_graph
 
       click_node(nid(blog))
@@ -465,7 +468,7 @@ class Admin::MindGraphSelectionSystemTest < Admin::MindGraphSystemTestCase
         assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
       end
       assert_marks_drawn "[data-mind-graph-card]"
-      assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{nid(blog)}']"
+      assert_selector "#{LIST} [role=treeitem][aria-selected='true'][data-node-id='#{nid(blog)}']"
       assert_equal [ [ "Page", blog.id ] ] * 2, Notes::Thread.order(:id).last(2).map { |thread| [ thread.container_type, thread.container_id ] }
 
       # A live page with a change scheduled: the Live chip, then "Change scheduled 14 Oct".

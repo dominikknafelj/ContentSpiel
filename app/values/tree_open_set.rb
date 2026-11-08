@@ -1,8 +1,9 @@
 # WHICH BRANCHES OF A PAGE TREE A PERSON HAS OPENED OR FOLDED, read from the
 # cookie `cs_tree_open` (`COOKIE`). The Pages tree draws its folds from it on the
 # server from the first paint (`Admin::PagesScreen::TreeComponent`,
-# `TreeRowComponent.for_page`); `to_s` is the hook for the mind graph's list,
-# which does not read it yet. The browser writes it, through `tree/open_set.js` alone; no Ruby
+# `TreeRowComponent.for_page`), and the mind graph's list draws its first
+# folds from `to_s`, handed over as `data-tree-open`. The browser writes it,
+# through `tree/open_set.js` alone; no Ruby
 # writes it (`admin_design_rules_test.rb`, "the open set has one writer").
 #
 # THE FORMAT. Page ids joined by `.`, the newest first: a bare id is a branch
@@ -34,24 +35,29 @@ class TreeOpenSet
   # The set `raw` (the cookie's value, or nil) holds for the pages among
   # `readable_ids`.
   def self.parse(raw, readable_ids:)
-    # A cookie is whatever the browser sends: bytes that are not text are
-    # read as nothing before anything else looks at them.
-    return EMPTY unless raw.is_a?(String) && raw.valid_encoding?
-    return EMPTY if raw.blank? || raw.bytesize > MAX_BYTES
-
     readable = readable_ids.to_set
     seen = Set.new
-    entries = raw.split(".").first(LIMIT).filter_map do |token|
-      sign, digits = ENTRY.match(token)&.captures
-      next unless digits
-
-      id = digits.to_i
-      next if !readable.include?(id) || !seen.add?(id)
-
-      [ id, sign.empty? ? :opened : :folded ]
-    end
-    new(entries)
+    new(tokens(raw).filter_map { |sign, id| [ id, sign.empty? ? :opened : :folded ] if readable.include?(id) && seen.add?(id) })
   end
+
+  # The page ids `raw` names, read as `parse` reads them but against no
+  # viewer: what a caller narrows to the readable ones before `parse`, so
+  # it asks the database about these few and not about every page.
+  def self.candidate_ids(raw) = tokens(raw).map(&:last).uniq
+
+  # `[sign, id]` of each well-formed entry among the first `LIMIT`. A cookie
+  # is whatever the browser sends: bytes that are not text are read as
+  # nothing before anything else looks at them.
+  def self.tokens(raw)
+    return [] unless raw.is_a?(String) && raw.valid_encoding?
+    return [] if raw.blank? || raw.bytesize > MAX_BYTES
+
+    raw.split(".").first(LIMIT).filter_map do |token|
+      sign, digits = ENTRY.match(token)&.captures
+      [ sign, digits.to_i ] if digits
+    end
+  end
+  private_class_method :tokens
 
   # `entries`: `[id, :opened | :folded]`, the newest first, one per id.
   def initialize(entries)
@@ -71,7 +77,7 @@ class TreeOpenSet
   end
 
   # The value as it was kept, in the cookie's format and order: what the
-  # graph's list is to be handed (`data-tree-open`); nothing hands it yet.
+  # graph's list is handed (`data-tree-open`).
   def to_s = @entries.map { |id, kind| kind == :folded ? "-#{id}" : id.to_s }.join(".")
 
   EMPTY = new([])

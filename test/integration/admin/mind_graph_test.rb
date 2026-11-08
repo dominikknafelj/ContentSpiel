@@ -129,7 +129,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph--graph'] template[data-mind-graph-parts]", count: 1
   end
 
-  # A type that is no longer registered has no label to send: the card shows
+  # A retired type, one the registry does not hold, has no label to send: the card shows
   # the stored name.
   test "a retired type has no entry among the type labels" do
     sign_in_as(users(:one))
@@ -154,15 +154,15 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "%{figure} post has no connections yet.", "other" => "%{figure} posts have no connections yet." }, messages["mind_graph.script.isolated_only"])
     assert_equal({ "one" => "%{figure} tag", "other" => "%{figure} tags" }, messages["mind_graph.script.card.tags"])
     assert_equal({ "one" => "Release %{count} pinned", "other" => "Release %{count} pinned" }, messages["mind_graph.script.release_pinned"])
-    assert_equal "%{title}: post, %{count} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
+    assert_equal "%{title}: post, %{figure} connections. Shows it in the graph.", messages["mind_graph.script.list.select_post"]["other"]
     assert_equal "Posts · %{count}", messages["mind_graph.script.list.posts"]
-    # The design answer's words, verbatim (F4, G5, H7).
+    # The list's own words, verbatim.
     assert_equal [ "Not listed on any page", "not in view", "Open in Posts →", "The list couldn't be loaded.", "Try again" ],
                  messages.values_at(*%w[unlisted not_in_view open_in_posts failed try_again].map { |key| "mind_graph.script.list.#{key}" })
     assert_equal "%{title}, %{type} post, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_post"]
     assert_equal "%{title}, %{type}, retired type, not in view. Activate to add it to the graph.", messages["mind_graph.script.list.add_retired_post"]
     assert_equal [ "Pages · %{count}", "Tags · %{count}", "Post types · %{count}" ], messages.values_at("mind_graph.script.list.pages", "mind_graph.script.list.tags", "mind_graph.script.list.types")
-    assert_equal({ "one" => "%{title}: post type, %{count} post. Shows it in the graph.", "other" => "%{title}: post type, %{count} posts. Shows it in the graph." }, messages["mind_graph.script.list.select_type"])
+    assert_equal({ "one" => "%{title}: post type, %{figure} post. Shows it in the graph.", "other" => "%{title}: post type, %{figure} posts. Shows it in the graph." }, messages["mind_graph.script.list.select_type"])
     assert_equal [ "Pages", "Posts", "Tags", "No page, post or tag matches." ], messages.values_at(*%w[groups.page groups.post groups.tag none].map { |key| "mind_graph.script.search.#{key}" })
     # Every string of the list and of the search the locale file holds is served.
     %w[list search].each do |part|
@@ -179,8 +179,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     # added there and forgotten in the view would throw in the script.
     held = I18n.t("admin.mind_graph.script.summary").flat_map { |key, value| value.is_a?(Hash) && !value.key?(:other) ? value.keys.map { |inner| "#{key}.#{inner}" } : [ key.to_s ] }
     assert_empty held.map { |key| "mind_graph.script.summary.#{key}" } - messages.keys
-    # The design answer's words, verbatim: a page's card (part one §5), the
-    # chip's second part (G4) and the whole chip for a screen reader.
+    # The words verbatim: a page's card, the chip's second part and the
+    # whole chip for a screen reader.
     assert_equal [ "Open page", "Change scheduled %{date}", "Live, unpublished changes", "Live, change scheduled %{date}" ],
                  messages.values_at(*%w[open_page status.change_scheduled status.live_with_changes status.live_change_scheduled].map { |key| "mind_graph.script.card.#{key}" })
     # A list row's name says its chips' own words, from the chips' own keys.
@@ -188,6 +188,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal [ "Draft", "Scheduled", "Unpublished changes" ], messages.values_at(*chip_words)
     assert_equal chip_words.map { |key| I18n.t("admin.#{key}") }, messages.values_at(*chip_words)
     assert_equal "%{title}, %{state}", messages["mind_graph.script.list.stated"]
+    # A page whose parent is not drawn says the path it stands under.
+    assert_equal [ "%{path}", "%{title}, under %{path}" ], messages.values_at("mind_graph.script.list.ancestors", "mind_graph.script.list.under")
     assert_equal [ { "one" => "%{figure} child page", "other" => "%{figure} child pages" }, { "one" => "lists %{figure} post", "other" => "lists %{figure} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
     # A pill's row is named with its visible words first ("+92 more: …"), so
@@ -197,32 +199,45 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.live_change_scheduled card.status.live_with_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
-                    list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
-                    list.select_page list.select_post list.select_tag list.select_type list.stated
-                    list.tags list.try_again list.types list.unlisted load_failed loading more no_connections opened.everything_name opened.line
-                    release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
+                    list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.ancestors list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
+                    list.search_site list.search_site_heading list.select_page list.select_post list.select_tag list.select_type list.stated
+                    list.tags list.try_again list.types list.under list.unlisted list.unlisted_none load_failed loading more no_connections opened.everything_name opened.line
+                    release_pinned retired_type retry search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
                     summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing
                     summary.pages summary.pair summary.posts summary.posts_of summary.series summary.site summary.tags summary.types summary.whole worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
-  # The frame of the round of 2026-10-08: the search, the graph and the list
-  # in that order in the document (the Tab key's order), the list as an empty
-  # region the script fills, "Release N pinned" hidden until something is
-  # pinned, and no collapsed list of links under the canvas.
-  test "the frame holds the search first, then the canvas with its controls, then the list; nothing is pinned" do
+  # The tree column holds the list's head, the find field over the list's
+  # tree, and the list's region, empty but for its hidden last line; the
+  # graph's box holds the legend's row and the canvas, then the template of
+  # what the scripts clone. "Release N pinned" is hidden until something is
+  # pinned, and there is no collapsed list of links under the canvas.
+  test "the column holds the list's head, its find field and its region; the box holds the legend and the canvas; nothing is pinned" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    # Three parts, and the template of what the scripts clone, which is no part of the document.
+    assert_select "aside#tree-column.admin-shell__tree--fill" do
+      assert_select "> div:nth-of-type(1) > h2", text: "Pages, posts and tags"
+      assert_select "> div:nth-of-type(1) > button.admin-tree-hide[aria-controls='tree-column']", text: "Hide list"
+      assert_select "> div[role=search] input[type=search][aria-controls='mind-graph-tree'][placeholder='Find a page, post or tag']"
+      assert_select "> [data-mind-graph-list].admin-shell__tree-region[role='region'][aria-label='Pages, posts, tags and post types in this graph']" do
+        assert_select "> *", count: 1
+        assert_select "> [data-mind-graph-search-site][hidden][data-url^='/cs-studio/mind_graph/search'] > button:empty", count: 1
+      end
+    end
+    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-list], [data-controller='admin--mind-graph--graph'] input[type=search]", count: 0
+    # One column of three parts (the bar of the view a large site opens in,
+    # the legend's row, the canvas), and the template of what the scripts
+    # clone, which is no part of the document.
     assert_select "[data-controller='admin--mind-graph--graph'] > :not(template)", count: 3
     assert_select "[data-controller='admin--mind-graph--graph'] > template:last-child[data-mind-graph-parts]", count: 1
-    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(1) #mind-graph-search"
-    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(2) canvas"
-    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3)[data-mind-graph-list][role='region'][aria-label='Pages, posts, tags and post types in this graph']:empty"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(1)[data-mind-graph-opened][hidden]"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(2) [data-mind-graph-legend]"
+    assert_select "[data-controller='admin--mind-graph--graph'] > :nth-child(3) canvas"
     assert_select "details", count: 0
     assert_select "button[data-mind-graph-release][hidden][data-action='admin--mind-graph--graph#releasePinned']:empty"
     assert_select "[role='group'][aria-label='Zoom'] button", count: 3
@@ -333,6 +348,37 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Hidden from them"
   end
 
+  # The list's first folds are the open set Pages reads, as `TreeOpenSet`
+  # reads it for this viewer: an entry for a page they do not read, or one in
+  # the trash, is left out, and so is junk; the tree's path is the admin path.
+  test "the graph's open set is the cookie's, without the pages the viewer does not read" do
+    branch = create_page(title: "Branch")
+    inside = create_page(title: "Inside", parent: branch)
+    outside = create_page(title: "Outside")
+    gone = create_page(title: "Gone")
+    gone.update_columns(trashed_at: Time.current) # version: none (a test puts a page in the trash) # changes: none (a test puts a page in the trash)
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ branch.id ] })
+    cookies[TreeOpenSet::COOKIE] = "#{inside.id}.-#{branch.id}.#{outside.id}.junk.#{gone.id}"
+
+    sign_in_as(users(:author))
+    get "/cs-studio/mind_graph"
+    element = css_select("[data-controller='admin--mind-graph--graph']").first
+    assert_equal "#{inside.id}.-#{branch.id}", element["data-tree-open"], "the pages the viewer reads, in the cookie's order"
+    assert_equal "/cs-studio", element["data-tree-open-path"]
+    assert_equal Locales.default, element["data-tree-locale"]
+
+    sign_in_as(users(:one))
+    get "/cs-studio/mind_graph"
+    assert_equal "#{inside.id}.-#{branch.id}.#{outside.id}", css_select("[data-controller='admin--mind-graph--graph']").first["data-tree-open"], "the trash and the junk are left out for everyone"
+
+    # A viewer who reads no page (and a post) is handed no page's fold.
+    create_post(title: "Theirs to read")
+    access_control_grants(:author_pages_read).update!(scope: { "page_ids" => [ 0 ] })
+    sign_in_as(users(:author))
+    get "/cs-studio/mind_graph"
+    assert_equal "", css_select("[data-controller='admin--mind-graph--graph']").first["data-tree-open"]
+  end
+
   test "with no page and no post at all, 'No pages or posts yet.' instead of an empty canvas" do
     sign_in_as(users(:one))
 
@@ -341,6 +387,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "[data-mind-graph-empty=no-content]", text: "No pages or posts yet."
     assert_select "[data-controller~='admin--mind-graph--graph']", count: 0
+    # Nothing to list either: no tree column, and no top bar button for one.
+    assert_select "#tree-column", count: 0
   end
 
   test "the legend names only the content types of the viewer's posts, plus the keys" do
@@ -464,30 +512,30 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Status key"
   end
 
-  # The tab order is the search, the filter (the
-  # legend's toggles: its keys and status looks are marks, and no stop),
-  # the zoom buttons, then the canvas. (A swatch is a canvas too, and no stop:
-  # only the graph's own canvas has a `tabindex`.) The buttons sit in the canvas's corner on
-  # screen, but they come BEFORE it in the document, which is what the Tab key
-  # follows -- as the search does, though on screen it stands on the right.
+  # The tab order is the column's find field (the column comes before
+  # <main>), the filter (the legend's toggles: its keys and status looks are
+  # marks, and no stop), the zoom buttons, then the canvas. (A swatch is a
+  # canvas too, and no stop: only the graph's own canvas has a `tabindex`.)
+  # The buttons sit in the canvas's corner on screen, but they come BEFORE it
+  # in the document, which is what the Tab key follows.
   # ("Release N pinned" is first among the buttons, hidden until a node is
   # pinned; a button is named here by its `aria-label`, as a screen reader
   # names it.)
-  test "the tab order is the search, the filter, the zoom buttons, then the canvas" do
+  test "the tab order is the find field, the filter, the zoom buttons, then the canvas" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
     # A template's content is not in the document a browser tabs through.
-    order = css_select("[data-controller='admin--mind-graph--graph'] input[type=search], [data-controller='admin--mind-graph--graph'] input[type=checkbox], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas[tabindex]")
+    order = css_select("#tree-column input[type=search], [data-controller='admin--mind-graph--graph'] input[type=checkbox], [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas[tabindex]")
       .reject { |node| node.ancestors("template").any? }
       .map { |node| node.name == "button" ? (node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip)) : node.name == "input" ? (node["type"] == "search" ? "search" : node["data-name"]) : node.name }
     # "Show everything" stands in a bar that is hidden until a large site has
     # opened around Home, where a focused view has its bar's links.
     assert_equal [ "search", "Show everything", "Posts", "Tags", "Related", "Shares a tag", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
     assert_select "[data-mind-graph-opened][hidden] button", text: "Show everything"
-    assert_equal "search", css_select("[data-controller='admin--mind-graph--graph'] input, [data-controller='admin--mind-graph--graph'] button, [data-controller='admin--mind-graph--graph'] canvas").first["type"]
+    assert_select "[data-controller='admin--mind-graph--graph'] input[type=search]", count: 0
     assert_select "[data-controller='admin--mind-graph--graph'] canvas[data-swatch][tabindex]", count: 0
     # Nothing is taken out of the Tab order or moved within it; only the card
     # can be handed the focus by the script (`tabindex="-1"`).
@@ -590,45 +638,49 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-mind-graph-focus] b", count: 0
   end
 
-  test "the global view has no focus bar, and every view has the search field inside the controller's element" do
+  # The column is the screen's for a full answer only, as the Pages tree
+  # is: a frame answer keeps only `#content`, and the column a frame
+  # navigation leaves stands.
+  test "the global view has no focus bar, and a frame answer draws no column" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
-
     assert_select "[data-mind-graph-focus]", count: 0
-    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
-    assert_select "label.sr-only[for=mind-graph-search]", text: "Find a page, post or tag"
-    assert_select "[data-mind-graph-search] [data-mind-graph-results][hidden]:empty"
+    assert_select "#tree-column [data-mind-graph-list]", count: 1
+
+    get "/cs-studio/mind_graph", headers: { "Turbo-Frame" => "content" }
+    assert_select "[data-controller='admin--mind-graph--graph']", count: 1
+    assert_select "#tree-column, [data-mind-graph-list]", count: 0
   end
 
-  # Spec §5.7: the search comes first, then (in a local view) the focus bar's
-  # links, then the filter, the zoom buttons and the canvas. The bar is the
-  # first row of the graph's own column, above the legend.
-  test "in a local view the tab order is the search, the bar's links, the filter, the zoom buttons, the canvas" do
+  # The column comes before <main> in the document, so the Tab key meets
+  # the find field first; then (in a local view) the focus bar's links, the
+  # filter, the zoom buttons and the canvas. The bar is the first row of the
+  # box, above the legend.
+  test "in a local view the tab order is the find field, the bar's links, the filter, the zoom buttons, the canvas" do
     sign_in_as(users(:one))
     post = create_post(title: "A")
 
     get "/cs-studio/mind_graph", params: { post: post.id }
 
-    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }.join(", "))
+    order = css_select(([ "#tree-column input[type=search]" ] + %w[[data-mind-graph-focus]\ a input[type=checkbox] button canvas[tabindex]].map { |part| "[data-controller='admin--mind-graph--graph'] #{part}" }).join(", "))
       .reject { |node| node.ancestors("template").any? }
       .map { |node| { "button" => node["aria-label"] || (node["hidden"] ? "hidden" : node.text.strip), "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
     assert_equal [ "search", "link:2", "link:Whole graph", "checkbox", "checkbox", "checkbox", "checkbox", "hidden", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
   end
 
-  # Spec §5.7: the list comes after the canvas (and the card), so it is the
-  # last stop -- it can hold two thousand rows; it starts empty, the script
-  # fills it.
-  test "the list comes last and empty" do
+  # The list's region is in the column, before the box in the document; it
+  # starts empty but for its last line, and the script fills it.
+  test "the list stands in the column, before the canvas, and starts empty" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    assert_select "[data-controller='admin--mind-graph--graph'] [data-mind-graph-list]:empty"
-    order = css_select("[data-controller='admin--mind-graph--graph'] canvas[tabindex], [data-controller='admin--mind-graph--graph'] [data-mind-graph-card], [data-controller='admin--mind-graph--graph'] [data-mind-graph-list]").map(&:name)
-    assert_equal %w[canvas aside div], order
+    assert_select "#tree-column [data-mind-graph-list] > :not([data-mind-graph-search-site])", count: 0
+    order = css_select("#tree-column [data-mind-graph-list], [data-controller='admin--mind-graph--graph'] canvas[tabindex], [data-controller='admin--mind-graph--graph'] [data-mind-graph-card]").map(&:name)
+    assert_equal %w[div canvas aside], order
   end
 
   # The current depth is text, not a link that can't be followed: no link
@@ -658,17 +710,6 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "canvas[role=img][aria-label='Mind graph'][data-label='Mind graph']"
-  end
-
-  test "the search has a live region that stays in the page, apart from the list of links" do
-    sign_in_as(users(:one))
-    create_post(title: "A")
-
-    get "/cs-studio/mind_graph"
-
-    assert_select "[data-mind-graph-search] p[data-mind-graph-status][role=status]:not([hidden]):empty"
-    assert_select "[data-mind-graph-results][role]", count: 0
-    assert_select "[data-mind-graph-results] [data-mind-graph-status]", count: 0
   end
 
   # Loading, a failure and the cap's sentences are written by the script into

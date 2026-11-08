@@ -24,9 +24,6 @@ en:
             opened: "Opened %{title}. %{position}"
             position: "Position %{position} of %{count}."
             cancelled: "Cancelled. %{title} is back where it was."
-          # The head's button that folds the column to a strip (its name, and
-          # the shared tooltip's text); "Show page tree" is its mirror.
-          hide: "Hide page tree"
         tree_row:
           untitled: "(untitled)"
           context_only: "You can’t open this page"

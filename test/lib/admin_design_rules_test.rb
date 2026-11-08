@@ -1629,10 +1629,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/tree_find_component.*", "app/javascript/mind_graph/node_list.js"
   ].freeze
   TREE_LENGTHS = %w[--cs-tree-row --cs-tree-disclosure --cs-tree-mark --cs-tree-step].freeze
-  # A tree file let through both tree rules, with the reason.
-  TREE_RULES_NOT_YET = {
-    "app/javascript/mind_graph/node_list.js" => "the graph's list is not on the shared row yet"
-  }.freeze
   TREE_INDENT = /(?<![\w-])(?:[\w\[\]-]+:)*-?(?:ml|pl|ms|ps)-|(?<![\w-])(?:margin|padding)-(?:left|inline-start)(?![\w-])|\b(?:margin|padding)(?:Left|InlineStart)\b/
   TREE_TINT = /(?<![\w-])(?:[\w\[\]-]+:)*bg-accent-tint(?![\w-])/
 
@@ -1677,7 +1673,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert [ margin, guide, padding ].all?, "the children list's margin, guide and padding are pixels: #{rule.squish}"
     assert_equal step, "#{margin.to_i + guide.to_i + padding.to_i}px", "one level's step is the children list's margin, guide and padding"
 
-    offences = self.class.tree_offences(TREE_INDENT) - TREE_RULES_NOT_YET.keys
+    offences = self.class.tree_offences(TREE_INDENT)
     assert_empty offences, "a tree file sets no indent of its own (ml-, pl-, padding-inline-start): the step is the .admin-tree block's"
   end
 
@@ -1685,14 +1681,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     rule = single_rule(".admin-tree mark")
     assert_match(/background:\s*var\(--cs-accent-tint\);/, rule)
     assert_match(/(?<![\w-])color:\s*inherit;/, rule)
-    offences = self.class.tree_offences(TREE_TINT) - TREE_RULES_NOT_YET.keys
+    offences = self.class.tree_offences(TREE_TINT)
     assert_empty offences, "a tree file draws no accent tint of its own: a match's is the .admin-tree block's"
-  end
-
-  test "a tree-rules exception that no longer breaks a rule fails" do
-    files = self.class.tree_files
-    stale = TREE_RULES_NOT_YET.keys.reject { |path| files.include?(path) && self.class.tree_offences(Regexp.union(TREE_INDENT, TREE_TINT), [ path ]).any? }
-    assert_empty stale, "these exceptions break neither tree rule any more: drop them from TREE_RULES_NOT_YET"
   end
 
   test "the tree patterns match an indent and a tint, and not a token, a margin of another side or a comment" do
@@ -1718,11 +1708,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     rules = self.class.css_rules("content-spiel.tailwind.css")
     from_inside = rules.select { |selectors, body| body.match?(/(?<![\w-])outline(?:-[\w-]+)?:/) && selectors.any? { |selector| selector.match?(/:has\([^)]*:focus/) && selector.include?("admin-tree") } }
     assert_empty from_inside.map(&:first), "a tree row draws no outline for a focus inside it"
-    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible' ])
+    ring = rule_for([ ".admin-tree-row :focus-visible", '.admin-tree [role="treeitem"]:focus-visible > .admin-tree-row' ])
     assert_match(/outline:\s*2px solid var\(--cs-accent\);/, ring)
     assert_match(/outline-offset:\s*-2px;/, ring)
-    assert_empty rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
-      "no tree rule takes a focused element's ring away"
+    # The one exception: a focused treeitem draws its ring on its own row,
+    # which the rule above draws, and not round its whole branch.
+    assert_equal [ [ '.admin-tree [role="treeitem"]:focus-visible' ] ],
+                 rules.select { |selectors, body| selectors.any? { |selector| selector.include?("admin-tree") && selector.include?("focus") } && body.match?(/outline:\s*none/) }.map(&:first),
+      "no tree rule takes a focused element's ring away, but the treeitem's, whose ring is on its row"
   end
 
   # The selected row is a place, not a row being worked on: at rest it shows

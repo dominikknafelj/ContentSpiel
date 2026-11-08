@@ -6,7 +6,8 @@
 // with its contract in its header: the state and its operations
 // (`state.js`), the frame (`frame.js`), the canvas's gestures and the hover
 // (`gestures.js`), the selection, its card and the pins (`selection.js`), the
-// list's reads (`list_reads.js`) and the notice (`notice.js`).
+// list's reads (`list_reads.js`), the list's last line and the whole site's
+// search (`site_search.js`) and the notice (`notice.js`).
 //
 // What the screen shows is said on the element, for tests and for anything
 // that wants to know without reading a canvas: `data-state` (loading, ready,
@@ -69,21 +70,21 @@
 // announced as a toggle's is. AFTER A ROW IS ADDED EVERY FIGURE IS TRUE: the
 // pill stands for one post fewer (its words, its width, and at none the pill
 // itself and its rows go), the canvas's name counts the pills as they now
-// are, and the notice no longer counts the post among those that aren't
+// are, and the notice leaves the post out of those that aren't
 // shown -- all three read what the page holds (`graph_data.js`,
 // `countAdded`). WITHOUT A GRAPH THERE IS NOTHING TO ADD TO (it is still
 // being read, its read failed, or "Show everything" is on its way): the
 // press does nothing.
 //
-// A SITE WITH TOO MANY LINES FOR ONE PICTURE (pages spec, decision 6) opens
-// around Home. The data's answer says where (`open`, and how many lines the
-// site has); this page then reads that page's local view (`data-open-url`),
-// writes the figure on the element (`data-opened-lines`, which the canvas's
-// name reads: "Showing the area around Home. The site has ...", H5) and
-// shows the bar that says why, with "Show everything". That is a BUTTON: it
-// reads the whole graph (`data-everything-url`) into this page and navigates
-// nowhere, so the choice is in no address and a reload, and Back to this
-// page, open around Home again.
+// A SITE WITH TOO MANY LINES FOR ONE PICTURE opens around Home. The data's
+// answer says where (`open`, and how many lines the site has); this page
+// then reads that page's local view (`data-open-url`), writes the figure on
+// the element (`data-opened-lines`, which the canvas's name reads: "Showing
+// the area around Home. The site has ...") and shows the bar that says why,
+// with "Show everything". That is a BUTTON: it reads the whole graph
+// (`data-everything-url`) into this page and navigates nowhere, so the
+// choice is in no address and a reload, and Back to this page, open around
+// Home again.
 //
 // THE FIRST VIEW FITS EVERYTHING: while the layout takes shape the camera
 // follows it, and when it has cooled down the fit is final (`state.fitted`).
@@ -92,6 +93,14 @@
 // "Fit all": a filter, a resize and a later reheat of the layout leave it
 // where it is. Nodes are not clamped to the box; the box is a window onto
 // the graph.
+//
+// THE LIST STANDS IN THE TREE COLUMN, outside the element: its region
+// (`#tree-column [data-mind-graph-list]`) and the last line in it
+// (`[data-mind-graph-search-site]`) are found in the document, and a screen
+// without them throws as a missing part does. The column's find field
+// (`admin--tree--find`) narrows the list's tree and owns every key of the
+// field. The last line and the whole site's search are `site_search.js`'s.
+// Whatever this writes into the column, the controller's `reset` takes back.
 //
 // MOTION. How fast the layout is shown is the worker's business
 // (`layout_worker.js`, PACING): this page draws every `tick` it is sent. All
@@ -108,8 +117,8 @@ import { summaryOf } from "mind_graph/summary"
 import { createCard, fill } from "mind_graph/card"
 import { recordId } from "mind_graph/ids"
 import { paintMarks } from "mind_graph/swatches"
-import { attachSearch } from "mind_graph/search_box"
 import { createList } from "mind_graph/node_list"
+import { attachSiteSearch } from "mind_graph/site_search"
 import { createState, takeData, addNode, resizePill, showOnly, clearData } from "mind_graph/state"
 import { createFrame } from "mind_graph/frame"
 import { attachGestures } from "mind_graph/gestures"
@@ -119,6 +128,13 @@ import { say, announce } from "mind_graph/notice"
 import { readParts } from "mind_graph/parts"
 
 const BUTTON_ZOOM = 1.4
+
+// A part of the screen the script cannot work without.
+function part(selector) {
+  const found = document.querySelector(selector)
+  if (!found) throw new Error(`the mind graph's ${selector} is not on the page`)
+  return found
+}
 
 export function mount(element) {
   // The graph's own canvas, by its target: the legend's swatches are
@@ -147,10 +163,17 @@ export function mount(element) {
   // The bar of the view a large site opens in, its sentence and its button
   // (absent from a focused view's page: such a view is never opened by rule).
   const openedBar = element.querySelector("[data-mind-graph-opened]")
-  const search = element.querySelector("[data-mind-graph-search]")
+  // The column's parts, outside the element.
+  const listContainer = part("#tree-column [data-mind-graph-list]")
+  const column = listContainer.closest("#tree-column")
+  const searchSite = part("#tree-column [data-mind-graph-search-site]")
+  const findField = () => document.querySelector('#tree-column input[aria-controls="mind-graph-tree"]')
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const typeLabels = JSON.parse(element.dataset.typeLabels)
   const buttonClasses = JSON.parse(element.dataset.buttonClasses)
+  // The tree row's classes (`Admin::Ui::TreeItemComponent::CLASSES`): the
+  // list's rows are the Pages tree's row.
+  const treeClasses = JSON.parse(element.dataset.treeClasses)
   // The chips and the card's Close, cloned from the server's own markup.
   const parts = readParts(element)
 
@@ -215,12 +238,14 @@ export function mount(element) {
     }
   })
   // "Not listed on any page" is there only for a viewer the server gave its
-  // address (one who reads a page).
-  const list = createList(element.querySelector("[data-mind-graph-list]"), {
-    text, number, dotClasses, typeLabels, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl),
+  // address (one who reads a page). The list's tree carries the element's
+  // open set and its admin path (`treeData`), as the Pages tree does.
+  const list = createList(listContainer, {
+    text, number, dotClasses, typeLabels, treeClasses, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl), treeData: element,
+    scroller: column,
     onSelect: (id) => {
       const index = state.indexOf.get(id)
-      if (index != null) selection.reveal(index)
+      if (index != null) revealFromList(index)
     },
     onHover: (id) => gestures.hoverRow(id == null ? -1 : state.indexOf.get(id) ?? -1),
     onAdd: addPost,
@@ -243,9 +268,9 @@ export function mount(element) {
   const selection = createSelection({
     element, canvas, state, card, cardElement, list, layout: () => layout, release, text, request: frame.request, moveCamera: gestures.moveCamera, onMore: (node) => reads.openMore(node)
   })
-  // The search field is HTML beside the canvas, not part of the data request:
-  // it works whatever the graph is doing, a failed load included.
-  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]"), dotClasses })
+  // The last line and the whole site's results: not part of the data
+  // request, so they work whatever the graph is doing.
+  const stopSiteSearch = attachSiteSearch(searchSite, { list, text, findField })
 
   // The legend's toggles: the state is the checkboxes' own, so Back restores
   // what the person had chosen. `switched(name, true)` is the kinds that are
@@ -288,13 +313,13 @@ export function mount(element) {
     const known = state.indexOf.get(row.id)
     if (known != null) {
       if (switchedOn) refilter()
-      return state.visibleNodes.includes(known) ? selection.reveal(known) : undefined
+      return state.visibleNodes.includes(known) ? revealFromList(known) : undefined
     }
 
     const { index, node, lines, at } = addNode(state, row, { context })
     // What the page holds now says the post is drawn: its pill stands for
     // one fewer (and is written and measured again), and at none its rows
-    // go with it; an unconnected post is no longer one that isn't shown.
+    // go with it; an unconnected post drops out of those that aren't shown.
     const pill = countAdded(state.nodes, state.data, row)
     if (pill >= 0) {
       resizePill(state, pill, { context, words })
@@ -323,7 +348,19 @@ export function mount(element) {
       element.removeAttribute("data-settled")
       startLayout()
     }
-    if (state.visibleNodes.includes(index)) selection.reveal(index)
+    if (state.visibleNodes.includes(index)) revealFromList(index)
+  }
+
+  // A row that selects (a press, Enter, a row that adds its post). In the
+  // tree drawer (below 1024px, `data-open` on the column) the drawer and its
+  // scrim close first (`tree:chosen`, heard by `admin--shell--drawer`, which
+  // alone opens and closes it), then the node is centred and its card takes
+  // the focus; the row is then off screen, so closing the card gives the
+  // focus to the canvas. Whatever does not select keeps the drawer open.
+  function revealFromList(index) {
+    const inDrawer = column.hasAttribute("data-open")
+    if (inDrawer) listContainer.dispatchEvent(new CustomEvent("tree:chosen", { bubbles: true }))
+    selection.reveal(index, { fromRow: !inDrawer })
   }
 
   // The "Posts" toggle, switched on if it was off: whether it was. A viewer
@@ -345,7 +382,7 @@ export function mount(element) {
   }
 
   // The canvas is one image to a screen reader, and its name says what is on
-  // it NOW (`summary.js`; design answers G6 and H5). After a toggle
+  // it NOW (`summary.js`). After a toggle
   // (`announce`) the same words are announced (`notice.js`).
   function summarise({ announce: aloud = false } = {}) {
     const summary = summaryOf({
@@ -573,10 +610,11 @@ export function mount(element) {
   }
 
   // A canvas holds colours, not tokens: the graph's and the rows' marks
-  // (the list's, the open search results') are drawn again.
+  // (the legend's, the list's) are drawn again.
   const stopTheme = watchTheme(() => {
     state.theme = readTheme(canvas)
     paintMarks(element)
+    paintMarks(listContainer)
     frame.request()
   })
   // The first real size fits the view, once the layout has settled.
@@ -656,7 +694,7 @@ export function mount(element) {
       gestures.stop()
       stopTheme()
       selection.stop()
-      stopSearch()
+      stopSiteSearch()
       list.destroy()
       card.hide()
       release.hidden = true

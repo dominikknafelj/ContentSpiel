@@ -143,7 +143,7 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     a = create_post(title: "Alpha")
     b = create_post(title: "Beta")
     PostRelation.create!(post: a, related_post: b)
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
     key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
 
@@ -154,11 +154,11 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     assert_no_selector "[data-mind-graph-card]"
 
     # By the list: a card may stand over the other node on the canvas.
-    find("#{LIST} button", text: "Beta").click
+    within(LIST) { press_list_item("Beta") }
     assert_selector "[data-mind-graph-card-notes][data-notes-id='#{b.id}']"
     assert_equal "", find("[data-mind-graph-card-notes] textarea").value
 
-    find("#{LIST} button", text: "Alpha").click
+    within(LIST) { press_list_item("Alpha") }
     assert_selector "[data-mind-graph-card-notes][data-notes-id='#{a.id}']"
     assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
 

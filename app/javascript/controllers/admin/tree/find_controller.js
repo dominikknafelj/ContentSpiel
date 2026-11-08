@@ -32,10 +32,28 @@ const SAY_AFTER_MS = 300
 // IT IS THE ONE WRITER THAT CLEANS THE FIELD: on `turbo:before-cache` the
 // field, its hint, its Clear, its status line and the tree's narrowing are
 // all taken back, so Turbo's snapshot, and a page restored from it, holds
-// the whole tree and an empty field.
+// the whole tree and an empty field -- before a visit of the whole page.
+// With `keep` (the mind graph's), a navigation of the content frame keeps
+// the query: the column outlives it, and the new view's tree is narrowed by
+// it again when its owner draws it (`tree:changed`). Turbo tells the two
+// apart by its order of events: a frame that advances the history renders
+// and dispatches `turbo:frame-load` FIRST, and only then proposes the visit
+// whose `turbo:before-cache` follows (its snapshot was taken before the
+// frame rendered); a visit of the whole page dispatches `turbo:before-cache`
+// before anything is rendered. So a `turbo:frame-load` of a frame that
+// advances (`data-turbo-action`) marks the next `turbo:before-cache` as the
+// frame's own. The mark covers ONE snapshot: `reset()` takes it off as it
+// uses it, so a frame load that proposes no visit (a `src` set or a
+// `reload()` by script, a frame's visit cancelled by a whole-page one) can
+// leave it standing for at most the next `turbo:before-cache` it was meant
+// for; and `turbo:load`, which ends either kind of visit, takes it off too,
+// so a mark no snapshot used never outlives the visit that set it. A kept
+// query keeps no count of the view that was left: the status line is
+// emptied with the snapshot, and the count is said again for the tree on
+// screen.
 export default class extends Controller {
   static targets = ["field", "hint", "clear", "status"]
-  static values = { noun: String, moving: Boolean }
+  static values = { noun: String, moving: Boolean, keep: Boolean }
   static classes = ["figure", "line"]
 
   connect() {
@@ -68,7 +86,14 @@ export default class extends Controller {
 
   apply() {
     const tree = this.tree
-    if (!tree) return
+    if (!tree) {
+      // No tree to narrow (not drawn yet, or another view in its place): no
+      // count stands under the field.
+      clearTimeout(this.sayTimer)
+      this.said = null
+      this.statusTarget.replaceChildren()
+      return
+    }
 
     const query = this.query
     if (!query) {
@@ -98,9 +123,13 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
+  // The field emptied by the find itself (Clear, Escape, the snapshot) is
+  // told as typing is, an `input` on the field, so whatever follows the
+  // field's text hears it (the mind graph's last line); the find's own
+  // `filter` is that input's action.
   empty() {
     this.fieldTarget.value = ""
-    this.filter()
+    this.fieldTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   // The tree's rows were drawn again: the query runs over them, once a frame.
@@ -174,7 +203,9 @@ export default class extends Controller {
     }
   }
 
-  // Up Arrow on the first match goes back to the field.
+  // Up Arrow on the first match goes back to the field. Heard on the
+  // document in the capture phase, before the tree's own keys: a tree that
+  // moves its focus on Up (the graph's list) never hears this one.
   treeKey(event) {
     if (event.key !== "ArrowUp" || !this.filtering) return
     const first = this.firstMatch()
@@ -185,9 +216,11 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
+  // The first match of a tree that can be seen: a tree another view stands
+  // in place of (the mind graph's whole-site results) is not acted on.
   firstMatch() {
     const tree = this.tree
-    if (!this.filtering || !tree) return null
+    if (!this.filtering || !tree || !tree.checkVisibility()) return null
     return matchFocuses(tree)[0] ?? null
   }
 
@@ -206,8 +239,31 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
-  // Before Turbo's snapshot: an empty field and the whole tree.
+  // A frame that advances the history has rendered: the snapshot that
+  // follows is its visit's (see the header).
+  frameLoaded(event) {
+    if (event.target.hasAttribute?.("data-turbo-action")) this.inFrameVisit = true
+  }
+
+  loaded() {
+    this.inFrameVisit = false
+  }
+
+  // Before Turbo's snapshot: an empty field and the whole tree, unless the
+  // query is kept across the content frame's navigation.
   reset() {
+    const kept = this.keepValue && this.inFrameVisit
+    this.inFrameVisit = false
+    if (kept) {
+      // The count goes, and the query runs again over whatever tree is on
+      // screen now: none yet (the line stays empty until the new tree is
+      // drawn and `tree:changed` runs it), or the new view's, if its owner
+      // drew it before this snapshot.
+      this.said = null
+      this.statusTarget.replaceChildren()
+      this.apply()
+      return
+    }
     cancelAnimationFrame(this.frame)
     this.empty()
   }

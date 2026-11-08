@@ -14,8 +14,9 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
   FOLD_KEY = "cs-tree-folded".freeze
   WIDTH_KEY = "cs-tree-width".freeze
   STRIP = 44
-  HIDE = "button[aria-label='Hide page tree']".freeze
-  SHOW = "button[aria-label='Show page tree']".freeze
+  WORDS = "admin.components.shell.tree_subject.pages".freeze
+  HIDE = "button[aria-label='#{I18n.t("#{WORDS}.hide")}']".freeze
+  SHOW = "button[aria-label='#{I18n.t("#{WORDS}.show")}']".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -163,6 +164,7 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
   end
 
   test "the fold buttons say what they control" do
+    assert_equal [ "Hide page tree", "Show page tree" ], [ I18n.t("#{WORDS}.hide"), I18n.t("#{WORDS}.show") ]
     at_window(1600) do
       open_editor
       assert_selector "#{HIDE}[aria-controls='tree-column'][aria-expanded='true']"
@@ -176,6 +178,25 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
       find(SHOW).click
       assert_selector "#{HIDE}[aria-expanded='true']"
       assert_selector "#{SHOW}[aria-expanded='true']", visible: :all
+    end
+  end
+
+  # The hide button's keyboard (`Admin::Ui::TreeHideComponent`'s contract):
+  # each is a button, so Enter and Space press it, and a press gives the
+  # focus to the other one, which is the one shown afterwards.
+  test "Enter on the hide button folds the column and gives the focus to the strip, and Space on the strip unfolds it" do
+    at_window(1600) do
+      open_editor
+      find(HIDE).execute_script("this.focus()")
+      page.driver.browser.keyboard.type(:enter)
+      assert_tree STRIP
+      assert folded?
+      assert_eventually(message: -> { "the focus is on #{focused_label.inspect}" }) { focused_label == "Show page tree" }
+
+      page.driver.browser.keyboard.type(:space)
+      assert_tree 272
+      assert_not folded?
+      assert_eventually(message: -> { "the focus is on #{focused_label.inspect}" }) { focused_label == "Hide page tree" }
     end
   end
 
@@ -201,5 +222,34 @@ class Admin::TreeFoldSystemTest < ApplicationSystemTestCase
     end
   ensure
     page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
+  end
+
+  # The graph's list folds as the Pages tree does, in its own words ("Hide
+  # list", "Show list"), and the box beside it takes the room it gives up:
+  # the canvas widens, and the graph draws into the wider canvas.
+  test "the mind graph's column folds to its strip with its own words, and the canvas widens" do
+    words = "admin.components.shell.tree_subject.mind_graph"
+    canvas = "[data-controller~='admin--mind-graph--graph'] canvas[data-admin--mind-graph--graph-target='canvas']"
+    at_window(1600) do
+      visit_screen admin_mind_graph_path
+      assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+      before = width_of(canvas)
+      column = tree_width
+
+      find("button[aria-label='#{I18n.t("#{words}.hide")}']").click
+      assert_tree STRIP
+      assert folded?
+      assert_no_selector "#tree-column [data-mind-graph-list]"
+      assert_eventually(message: -> { "the focus is on #{focused_label.inspect}" }) { focused_label == I18n.t("#{words}.show") }
+      assert_eventually(message: -> { "the canvas is #{width_of(canvas)}px wide" }) { (width_of(canvas) - (before + column - STRIP)).abs <= 1 }
+      assert_eventually(message: "the canvas's bitmap did not follow its box") do
+        page.evaluate_script("(() => { const c = document.querySelector(#{canvas.to_json}); return c.width === Math.round(c.getBoundingClientRect().width * window.devicePixelRatio) })()")
+      end
+
+      find("button[aria-label='#{I18n.t("#{words}.show")}']").click
+      assert_tree column
+      assert_selector "#tree-column [data-mind-graph-list] [role=tree]"
+      assert_eventually(message: -> { "the canvas is #{width_of(canvas)}px wide" }) { (width_of(canvas) - before).abs <= 1 }
+    end
   end
 end

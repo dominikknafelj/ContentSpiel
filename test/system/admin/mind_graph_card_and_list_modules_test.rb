@@ -5,6 +5,8 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
   # The parts the card and the list clone, imported beside the module under
   # test as `p`, and their template in the page as the view renders it.
   PARTS = { p: "mind_graph/parts" }.freeze
+  # The tree row's classes, as the view hands them to the list.
+  TREE_CLASSES = Admin::Ui::TreeItemComponent::CLASSES.to_json
 
   setup do
     page.execute_script("document.body.insertAdjacentHTML('beforeend', arguments[0])", ApplicationController.render(Admin::MindGraphScreen::PartsComponent.new, layout: false))
@@ -56,12 +58,299 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       const calls = []
       const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
       const parts = p.readParts(document.body)
-      const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts, onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
+      const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts, onSelect: (id) => calls.push([ "select", id ]), onHover: () => {},
                                              onAdd: (row) => calls.push([ "add", row.id ]), onUnlisted: (on) => calls.push([ "unlisted", on ]) })
-      const read = () => Array.from(container.querySelectorAll("h2, button")).map((item) => item.tagName === "H2" ? item.textContent : [ item.querySelector(".truncate").textContent, item.lastChild.textContent, item.style.paddingInlineStart, item.getAttribute("aria-label") ])
+      // Each item in the document's order: a group's heading by its name, a
+      // section's heading by its words, any other item as its row's title,
+      // what ends its row, its level and its name.
+      const read = () => Array.from(container.querySelectorAll("section h2, [role=treeitem]")).map((item) => item.tagName === "H2" ? item.textContent : item.dataset.treeGroup ? item.getAttribute("aria-label")
+        : [ item.firstElementChild.querySelector(".admin-tree-row__title").textContent, item.firstElementChild.lastChild.textContent, Number(item.getAttribute("aria-level")), item.getAttribute("aria-label") ])
       return { container, calls, list, read, parts }
     })()
   JS
+
+  # A tree of every kind, drawn by a list whose tree carries the open set as
+  # the graph's element hands it (`treeData`): Home > Docs > Guide, Home >
+  # About, a post, a tag and a hub with a pill. `open` is `data-tree-open`.
+  def tree_script(open: "")
+    <<~JS
+      (() => {
+        const container = document.createElement("div")
+        container.setAttribute("aria-label", "Pages, posts and tags")
+        document.body.append(container)
+        const graph = document.createElement("div")
+        graph.dataset.treeOpenPath = #{"/#{ContentSpiel::ADMIN_PATH}".to_json}
+        graph.dataset.treeLocale = "de"
+        graph.dataset.treeOpen = #{open.to_json}
+        const calls = []
+        const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), treeData: graph, unlisted: false,
+                                               onSelect: (id) => calls.push([ "select", id ]), onHover() {}, onAdd() {}, onUnlisted() {}, onMore: (id) => calls.push([ "more", id ]) })
+        const nodes = [ { id: "page-1", kind: "page", title: "Home", path: "/", degree: 2, depth: 0, order: 0, parent: null, home: true },
+                        { id: "page-2", kind: "page", title: "Docs", path: "/docs", degree: 2, depth: 1, order: 1, parent: "page-1" },
+                        { id: "page-3", kind: "page", title: "Guide", path: "/docs/guide", degree: 1, depth: 2, order: 2, parent: "page-2" },
+                        { id: "page-4", kind: "page", title: "About", path: "/about", degree: 1, depth: 1, order: 3, parent: "page-1" },
+                        { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
+                        { id: "type-blog", kind: "type", title: "Blog", degree: 2, count: 3, colour_index: 1 },
+                        { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ]
+        list.render(nodes)
+        const tree = container.querySelector("[role=tree]")
+        // An item by its node's id, or a group's heading by its name.
+        const item = (id) => list.row(id) ?? tree.querySelector(`[data-tree-group="${id}"]`)
+        const name = (element) => element?.dataset.nodeId ?? element?.dataset.treeGroup ?? "-"
+        const key = (key, more = {}) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...more }))
+        const focused = () => name(document.activeElement)
+        const stops = () => Array.from(tree.querySelectorAll('[role=treeitem][tabindex="0"]'), name)
+        const expanded = (id) => item(id).getAttribute("aria-expanded") ?? "-"
+        const done = (result) => { container.remove(); return result }
+        return { container, graph, list, nodes, tree, item, name, key, focused, stops, expanded, calls, done }
+      })()
+    JS
+  end
+
+  def clear_open_set
+    page.execute_script("document.cookie = #{"cs_tree_open=; path=/#{ContentSpiel::ADMIN_PATH}; max-age=0".to_json}")
+  end
+
+  def open_cookie = page.evaluate_script("document.cookie.split('; ').find((pair) => pair.startsWith('cs_tree_open='))?.slice(13) ?? null")
+
+  test "the list is one tree: groups at level 1, pages by their depth, posts, tags and types flat at level 2, and the marked node aria-selected" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { tree, item, name, list, stops, expanded, done } = #{tree_script}
+        const items = Array.from(tree.querySelectorAll("[role=treeitem]"), (each) => [ name(each), each.getAttribute("aria-level"), expanded(name(each)), each.getAttribute("tabindex") ])
+        const own = [ tree.id, tree.getAttribute("role"), tree.getAttribute("aria-label"), tree.dataset.treeOpenPath, tree.dataset.treeLocale, tree.dataset.treeOpen, tree.classList.contains("admin-tree") ]
+        // What a find and the open set read: each node's row, its own focus.
+        const hooks = [ "page-1", "page-3", "post-1", "type-blog", "pages" ].map((id) => { const row = item(id).firstElementChild; return [ item(id).hasAttribute("data-tree-node"), item(id).hasAttribute("data-tree-focus"), row.dataset.treeId ?? "-", row.dataset.treeTitle ?? "-", row.dataset.treePath ?? "-" ] })
+        const root = [ item("page-1").hasAttribute("data-tree-root"), tree.querySelectorAll("[data-tree-root]").length ]
+        list.mark("page-3")
+        const marked = [ Array.from(tree.querySelectorAll("[aria-selected]"), (each) => [ name(each), each.getAttribute("aria-selected") ]), Array.from(tree.querySelectorAll("[data-tree-on-path]"), name), stops() ]
+        list.mark("post-1")
+        const moved = [ Array.from(tree.querySelectorAll("[aria-selected]"), name), Array.from(tree.querySelectorAll("[data-tree-on-path]"), name), stops() ]
+        const named = [ item("pages").getAttribute("aria-label"), item("page-2").getAttribute("aria-label"), item("more-type-blog").getAttribute("aria-label") ]
+        return done({ items, own, hooks, root, marked, moved, named, buttons: tree.querySelectorAll("button").length })
+      })()
+    JS
+
+    assert_equal [ [ "pages", "1", "true", "0" ], [ "page-1", "2", "true", "-1" ], [ "page-2", "3", "false", "-1" ], [ "page-3", "4", "-", "-1" ], [ "page-4", "3", "-", "-1" ],
+                   [ "posts", "1", "true", "-1" ], [ "post-1", "2", "-", "-1" ], [ "tags", "1", "true", "-1" ], [ "tag-1", "2", "-", "-1" ],
+                   [ "types", "1", "true", "-1" ], [ "type-blog", "2", "true", "-1" ], [ "more-type-blog", "3", "-", "-1" ] ], result["items"],
+      "a group heading is an item at level 1 and open; Home is open by default and Docs folded; a leaf, a post and a tag say no aria-expanded; a hub with a pill is open; one Tab stop, the first item"
+    assert_equal [ "mind-graph-tree", "tree", "Pages, posts and tags", "/#{ContentSpiel::ADMIN_PATH}", "de", "", true ], result["own"],
+      "the tree is named by the region and carries the graph's open set, its path and its language"
+    assert_equal [ [ true, true, "1", "Home", "/" ], [ true, true, "3", "Guide", "/docs/guide" ], [ true, true, "post-1", "Post", "-" ], [ true, true, "type-blog", "Blog", "-" ], [ true, true, "-", "-", "-" ] ], result["hooks"],
+      "a page's row says its bare id, its title and its address; any other node's its own id; a heading's row is no row a find reads"
+    assert_equal [ true, 1 ], result["root"], "Home is the tree's root"
+    assert_equal [ [ [ "page-3", "true" ] ], %w[pages page-1 page-2], [ "page-3" ] ], result["marked"],
+      "the marked page is aria-selected alone, the path to it is opened and marked, and it holds the Tab stop"
+    assert_equal [ [ "post-1" ], [ "posts" ], [ "post-1" ] ], result["moved"], "the mark, the path and the stop move together"
+    assert_equal [ "list.pages(4)", "list.select_page(Docs,2,2)", "list.more_row(3,3,Blog,+3 more)" ], result["named"]
+    assert_equal 0, result["buttons"], "no item is a button"
+  end
+
+  test "one Tab stop: the arrows, Home and End move the focus, which skips what is folded or hidden" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { item, key, focused, stops, list, nodes, done } = #{tree_script}
+        const seen = []
+        item("pages").focus()
+        const walk = (keyName, times = 1) => { for (let at = 0; at < times; at++) key(keyName); seen.push([ keyName, focused(), stops() ]) }
+        walk("ArrowDown")            // Home
+        walk("ArrowDown")            // Docs: folded, so Guide is skipped
+        walk("ArrowDown")            // About
+        walk("ArrowUp")
+        walk("End")
+        walk("Home")
+        walk("ArrowUp")              // nothing above the first
+        // A find's narrowing hides an item: the walk skips it.
+        item("page-1").focus()
+        item("page-2").hidden = true
+        walk("ArrowDown")
+        item("page-2").hidden = false
+        // A folded group is skipped whole.
+        item("posts").focus()
+        key("ArrowLeft")
+        walk("ArrowDown")
+        // A modifier leaves the key alone.
+        const untouched = key("ArrowDown", { ctrlKey: true })
+        // A redraw keeps the stop on the same node.
+        list.render(nodes)
+        const redrawn = [ stops(), focused() ]
+        return done({ seen, untouched, redrawn })
+      })()
+    JS
+
+    assert_equal [ [ "ArrowDown", "page-1", [ "page-1" ] ], [ "ArrowDown", "page-2", [ "page-2" ] ], [ "ArrowDown", "page-4", [ "page-4" ] ], [ "ArrowUp", "page-2", [ "page-2" ] ],
+                   [ "End", "more-type-blog", [ "more-type-blog" ] ], [ "Home", "pages", [ "pages" ] ], [ "ArrowUp", "pages", [ "pages" ] ],
+                   [ "ArrowDown", "page-4", [ "page-4" ] ], [ "ArrowDown", "tags", [ "tags" ] ] ], result["seen"],
+      "the focus and the one stop move together, over what shows only"
+    assert_equal true, result["untouched"], "a key with a modifier is not taken"
+    assert_equal [ [ "tags" ], "tags" ], result["redrawn"], "a redraw keeps the stop and the focus on the same item, and a group the person folded stays folded"
+  end
+
+  test "→ opens a folded page or goes to its first child, ← folds it or goes to its parent, and * opens the whole branch" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { item, key, focused, expanded, calls, done } = #{tree_script}
+        const seen = []
+        const step = (keyName) => { key(keyName); seen.push([ keyName, focused(), expanded("page-1"), expanded("page-2") ]) }
+        item("page-2").focus()
+        step("ArrowRight")      // opens Docs
+        step("ArrowRight")      // to Guide
+        step("ArrowRight")      // a leaf: nothing
+        step("ArrowLeft")       // a leaf: to its parent
+        step("ArrowLeft")       // folds Docs
+        step("ArrowLeft")       // to Home
+        step("ArrowLeft")       // folds Home
+        step("*")               // Home and every branch under it
+        item("page-3").focus()
+        step("ArrowLeft")
+        step("ArrowLeft")
+        step("ArrowLeft")       // Docs is folded: to Home
+        // A group heading: Left folds it, Right opens it and then goes into it.
+        item("posts").focus()
+        const group = []
+        for (const keyName of [ "ArrowLeft", "ArrowRight", "ArrowRight" ]) { key(keyName); group.push([ keyName, focused(), expanded("posts") ]) }
+        item("post-1").focus()
+        key("Enter")
+        item("more-type-blog").focus()
+        key(" ")
+        // A click on a disclosure folds, a click elsewhere on its row selects.
+        const disclosure = item("type-blog").firstElementChild.firstElementChild
+        disclosure.click()
+        const folded = expanded("type-blog")
+        item("type-blog").firstElementChild.querySelector(".admin-tree-row__title").click()
+        // A find's Enter clicks the item itself.
+        item("page-4").click()
+        return done({ seen, group, folded, calls })
+      })()
+    JS
+
+    assert_equal [ [ "ArrowRight", "page-2", "true", "true" ], [ "ArrowRight", "page-3", "true", "true" ], [ "ArrowRight", "page-3", "true", "true" ],
+                   [ "ArrowLeft", "page-2", "true", "true" ], [ "ArrowLeft", "page-2", "true", "false" ], [ "ArrowLeft", "page-1", "true", "false" ],
+                   [ "ArrowLeft", "page-1", "false", "false" ], [ "*", "page-1", "true", "true" ],
+                   [ "ArrowLeft", "page-2", "true", "true" ], [ "ArrowLeft", "page-2", "true", "false" ], [ "ArrowLeft", "page-1", "true", "false" ] ], result["seen"]
+    assert_equal [ [ "ArrowLeft", "posts", "false" ], [ "ArrowRight", "posts", "true" ], [ "ArrowRight", "post-1", "true" ] ], result["group"], "Left folds a group, Right opens it and then goes into it"
+    assert_equal "false", result["folded"], "a click on the disclosure folds the hub"
+    assert_equal [ [ "select", "post-1" ], [ "more", "more-type-blog" ], [ "select", "type-blog" ], [ "select", "page-4" ] ], result["calls"],
+      "Enter selects, Space on a pill asks for its rows, a click on a row's title selects, and a click on the item selects"
+  end
+
+  # A find hides rows (`tree/find.js`): the stop never stays on a hidden
+  # item, and a key the find took in its capture phase is the find's alone.
+  test "a find that hides the stop's item moves the stop to the nearest that shows, and a key a find took is left alone" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS.merge(f: "tree/find"))
+      (() => {
+        const { tree, item, key, focused, stops, list, done } = #{tree_script}
+        const seen = []
+        list.mark("page-4")
+        seen.push(stops())
+        f.filterTree(tree, "Docs")                    // About is hidden, Home holds the match
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        f.clearFilter(tree)
+        tree.dispatchEvent(new CustomEvent("tree-find:cleared", { bubbles: true }))
+        seen.push(stops())                            // it shows again: the stop stays
+        item("page-1").hidden = true                  // the stop's item hidden: its group's heading
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        item("pages").hidden = true                   // nothing above it shows: the first item that does
+        tree.dispatchEvent(new CustomEvent("tree-find:filtered", { bubbles: true }))
+        seen.push(stops())
+        item("pages").hidden = false
+        item("page-1").hidden = false
+        // Up taken in the capture phase is not the tree's too.
+        item("page-2").focus()
+        const taken = (event) => event.preventDefault()
+        document.addEventListener("keydown", taken, { capture: true, once: true })
+        key("ArrowUp")
+        seen.push(focused())
+        return done(seen)
+      })()
+    JS
+
+    assert_equal [ [ "page-4" ], [ "page-1" ], [ "page-1" ], [ "pages" ], [ "posts" ], "page-2" ], result
+  end
+
+  test "a group heading's Enter and Space fold and open it, and select nothing" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { item, key, expanded, calls, done } = #{tree_script}
+        item("tags").focus()
+        const seen = []
+        for (const keyName of [ "Enter", " ", "Enter" ]) { key(keyName); seen.push(expanded("tags")) }
+        item("tags").firstElementChild.querySelector(".admin-tree-row__title").click()
+        seen.push(expanded("tags"))
+        return done({ seen, calls, selected: item("tags").hasAttribute("aria-selected") })
+      })()
+    JS
+
+    assert_equal [ %w[false true false true], [], false ], result.values_at("seen", "calls", "selected")
+  end
+
+  test "a page's fold in the list is kept in the cookie the Pages tree reads, and a group's fold is not" do
+    clear_open_set
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { item, key, list, nodes, expanded, done } = #{tree_script}
+        const cookie = () => document.cookie.split("; ").find((pair) => pair.startsWith("cs_tree_open="))?.slice(13) ?? "-"
+        const seen = []
+        item("page-2").focus()
+        key("ArrowRight")                 // Docs opened: folded by default, so stored
+        seen.push(cookie())
+        item("page-1").focus()
+        key("ArrowLeft")                  // Home folded: open by default, so stored as a fold
+        seen.push(cookie())
+        item("posts").focus()
+        key("ArrowLeft")                  // a group: a view state
+        item("type-blog").focus()
+        key("ArrowLeft")                  // a hub: a view state
+        seen.push(cookie())
+        // A redraw reads the cookie, and keeps the view folds.
+        list.render(nodes)
+        const redrawn = [ "page-1", "page-2", "posts", "type-blog" ].map(expanded)
+        // Selecting Guide opens its path and forgets Home's fold.
+        list.mark("page-3")
+        seen.push(cookie())
+        return done({ seen, redrawn, path: expanded("page-1") })
+      })()
+    JS
+
+    assert_equal [ "2", "-1.2", "-1.2", "2" ], result["seen"], "only pages are written, against their default; a path opened by a selection forgets its folds"
+    assert_equal %w[false true false false], result["redrawn"]
+    assert_equal "true", result["path"]
+  end
+
+  test "the list starts from the open set the server handed it" do
+    clear_open_set
+    page.execute_script("document.cookie = #{"cs_tree_open=-1; path=/#{ContentSpiel::ADMIN_PATH}".to_json}")
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const { expanded, list, nodes, graph, done } = #{tree_script(open: "2")}
+        const first = [ "page-1", "page-2" ].map(expanded)
+        const used = graph.hasAttribute("data-tree-open")
+        list.render(nodes)
+        const later = [ "page-1", "page-2" ].map(expanded)
+        // A list that never drew uses the seed up when it goes.
+        const other = document.createElement("div")
+        other.dataset.treeOpen = "2"
+        m.createList(document.createElement("div"), { text: { t: (key) => key, locale: () => "en" }, treeClasses: #{TREE_CLASSES}, dotClasses: [], parts: p.readParts(document.body), treeData: other, unlisted: false,
+                                                      onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} }).destroy()
+        return done({ first, used, later, gone: other.hasAttribute("data-tree-open") })
+      })()
+    JS
+
+    assert_equal %w[true true], result["first"], "the first drawing follows data-tree-open, not the cookie"
+    assert_equal [ false, false ], result.values_at("used", "gone"), "the seed is used up by the first drawing, or by destroy, so a page Turbo restores reads the cookie"
+    assert_equal %w[false false], result["later"], "a later drawing reads the cookie the list writes"
+  ensure
+    clear_open_set
+  end
 
   # A page's card: "path, status pill, '4 child
   # pages · lists 112 posts', Open page / Focus / Pin; the notes list under
@@ -237,38 +526,111 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                    [ "actions", [ "A", "card.show_tagged()", "/posts?tag=a%20b%26c", "primary" ], [ "A", "card.focus()", "/g?tag=3", "secondary" ], [ "BUTTON", "card.pin()", "-", "secondary" ] ], [ "close" ] ], tag
   end
 
-  test "list: four groups: Pages first, in tree order and indented by depth, then posts and tags by their connections, then the post types as the data has them" do
+  test "list: four groups: Pages first, in tree order a step per level, then posts and tags by their connections, then the post types as the data has them" do
     rows = js_module("mind_graph/node_list", <<~JS, also: PARTS)
       (() => {
-        const { container, list, read } = #{LIST_SCRIPT}
+        const { container, list, read, parts } = #{LIST_SCRIPT}
         list.render([ { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 }, { id: "tag-1", kind: "tag", title: "tag", degree: 2 },
-                      { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2, parent: "page-2" }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null },
+                      { id: "page-3", kind: "page", title: "Child", degree: 9, depth: 2, order: 2, parent: "page-2" }, { id: "page-1", kind: "page", title: "Home", degree: 1, depth: 0, order: 0, parent: null, home: true },
                       { id: "page-2", kind: "page", title: "Docs", degree: 2, depth: 1, order: 1, parent: "page-1" }, { id: "page-9", kind: "page", title: "Stray", degree: 0, depth: 1, order: 3, parent: null },
                       { id: "type-blog", kind: "type", title: "Blog", degree: 4, count: 112, colour_index: 1 }, { id: "type-talk", kind: "type", title: "Talk", degree: 9, count: 1, colour_index: 8 },
                       { id: "type-gone", kind: "type", title: "gone (retired)", degree: 1, count: 0, colour_index: null }, { id: "all-posts", kind: "type", title: "All posts", degree: 1, count: 2040, colour_index: null },
                       { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
-        const markOf = (button) => { const mark = button.firstElementChild; return [ mark.tagName, mark.dataset.mark ?? (mark.classList.contains("truncate") ? "truncate" : mark.className.split(" ").pop()), mark.dataset.markOf ?? "-", mark.getAttribute("aria-hidden") ?? "-" ] }
-        // Where a page's row stands in the document: the row of the item its list is in, or "top". (No null: the driver drops one from an array.)
-        const under = (id) => list.row(id).closest("ul").parentElement.closest("li")?.querySelector("button").dataset.nodeId ?? "top"
-        return { rows: read(), marks: Array.from(container.querySelectorAll("button"), markOf),
+        const same = (element, names) => names.find((name) => element.isEqualNode(parts.part(name))) ?? "not a part"
+        // The mark box's content: a glyph by the part it is a clone of, else the element.
+        const markOf = (item) => {
+          const mark = item.firstElementChild.querySelector(":scope > .admin-tree-row__mark").firstElementChild
+          if (!mark) return [ "empty" ]
+          if (mark.tagName.toLowerCase() === "svg") return [ "glyph", same(mark, [ "tree-home-mark", "tree-page-mark" ]) ]
+          return [ mark.tagName, mark.dataset.mark ?? mark.className.split(" ").pop(), mark.dataset.markOf ?? "-", mark.getAttribute("aria-hidden") ?? "-" ]
+        }
+        // The disclosure box: the part (drawn open), empty, or none on a flat row.
+        const boxOf = (row) => {
+          const box = row.querySelector(":scope > .admin-tree-row__disclosure")
+          if (!box) return row.classList.contains("admin-tree-row--flat") ? "flat" : "none"
+          return box.childElementCount ? same(box, [ "tree-disclosure" ]) : "empty"
+        }
+        const items = () => Array.from(container.querySelectorAll("[role=treeitem]"))
+        list.mark("page-2")
+        const marked = items().map((item) => [ item.firstElementChild.classList.contains("admin-tree-row--selected"), item.getAttribute("aria-selected") ?? "-" ]).filter(([ selected, current ]) => selected || current !== "-")
+        list.mark("post-1")
+        const moved = [ list.row("page-2").firstElementChild.className, list.row("post-1").firstElementChild.className ]
+        list.mark(null)
+        // Where a page's item stands in the document: inside the item of its parent, or "top" (its group's). (No null: the driver drops one from an array.)
+        const under = (id) => { const above = list.row(id).parentElement.closest("[role=treeitem]"); return above.dataset.treeGroup ? "top" : above.dataset.nodeId }
+        const tree = container.querySelector("[role=tree]")
+        return { rows: read(), marks: items().filter((item) => !item.dataset.treeGroup).map(markOf), boxes: items().map((item) => boxOf(item.firstElementChild)),
+                 marked, moved, cleared: container.querySelectorAll(".admin-tree-row--selected, [aria-selected]").length,
+                 classes: [ [ tree.id, tree.className, tree.parentElement.matches("[data-mind-graph-rows]") ], Array.from(container.querySelectorAll("[data-tree-children]"), (list) => [ list.getAttribute("role"), list.className ]) ],
                  under: [ "page-1", "page-2", "page-3", "page-9" ].map(under),
-                 lists: Array.from(container.querySelectorAll("section"), (section) => [ section.querySelector("h2").textContent, section.querySelector("ul").getAttribute("aria-labelledby") === section.querySelector("h2").id, section.querySelector("ul").getAttribute("role") ]),
+                 lists: Array.from(container.querySelectorAll("[data-tree-group]"), (item) => [ item.getAttribute("aria-label"), item.getAttribute("aria-level"), item.getAttribute("aria-expanded"), item.hasAttribute("aria-selected"), item.parentElement === tree ]),
                  checkbox: [ container.firstElementChild.tagName, container.querySelector("label input").type, container.querySelector("label").textContent ] }
       })()
     JS
 
-    assert_equal [ "list.pages(4)", [ "Home", "1", "12px", "list.select_page(Home,1)" ], [ "Docs", "2", "24px", "list.select_page(Docs,2)" ],
-                   [ "Child", "9", "36px", "list.select_page(Child,9)" ], [ "Stray", "0", "24px", "list.select_page(Stray,0)" ],
-                   "list.posts(1)", [ "Post", "1", "", "list.select_post(Post,1)" ], "list.tags(1)", [ "tag", "2", "", "list.select_tag(tag,2)" ],
-                   "list.types(4)", [ "Blog", "112", "", "list.select_type(Blog,112)" ], [ "+3 more", "+3 more", "28px", "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", "", "list.select_type(Talk,1)" ],
-                   [ "gone (retired)", "0", "", "list.select_type(gone (retired),0)" ], [ "All posts", "2040", "", "list.select_type(All posts,2040)" ] ], rows["rows"],
-      "a page whose parent is not in the data is listed after the tree, indented once; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row stands under the row of what it hangs off and is no post type: the group still counts four"
-    assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's row is in a list inside its parent's item, and one with no parent here at the top"
-    assert_equal [ [ "CANVAS", "page", "-", "true" ] ] * 4 + [ [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
-                 [ [ "CANVAS", "type", "1", "true" ], [ "SPAN", "truncate", "-", "-" ], [ "CANVAS", "type", "8", "true" ], [ "CANVAS", "type", "retired", "true" ], [ "CANVAS", "type", "all-posts", "true" ] ], rows["marks"],
-      "a page's and a post type's mark are the renderer's canvases, each hub saying which it is; a post's dot and a tag's square are CS Studio's own"
-    assert_equal [ [ "list.pages(4)", true, "list" ], [ "list.posts(1)", true, "list" ], [ "list.tags(1)", true, "list" ], [ "list.types(4)", true, "list" ] ], rows["lists"], "each group is a list named by its heading"
+    assert_equal [ "list.pages(4)", [ "Home", "1", 2, "list.select_page(Home,1,1)" ], [ "Docs", "2", 3, "list.select_page(Docs,2,2)" ],
+                   [ "Child", "9", 4, "list.select_page(Child,9,9)" ], [ "Stray", "0", 2, "list.select_page(Stray,0,0)" ],
+                   "list.posts(1)", [ "Post", "1", 2, "list.select_post(Post,1,1)" ], "list.tags(1)", [ "tag", "2", 2, "list.select_tag(tag,2,2)" ],
+                   "list.types(4)", [ "Blog", "112", 2, "list.select_type(Blog,112,112)" ], [ "+3 more", "+3 more", 3, "list.more_row(3,3,Blog,+3 more)" ], [ "Talk", "1", 2, "list.select_type(Talk,1,1)" ],
+                   [ "gone (retired)", "0", 2, "list.select_type(gone (retired),0,0)" ], [ "All posts", "2040", 2, "list.select_type(All posts,2040,2040)" ] ], rows["rows"],
+      "the groups are the tree's first level and their nodes the second; a page steps once per level under its parent, and one whose parent is not in the data stands after the tree at the top; a post type's number is its POSTS, not its connections, and the rows keep the data's order; a pill's row is the child of what it hangs off and is no post type: the group still counts four"
+    assert_equal [ "top", "page-1", "page-2", "top" ], rows["under"], "the tree is the document's: a page's item is in a group inside its parent's item, and one with no parent here at the group's top"
+    assert_equal [ [ "glyph", "tree-home-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "glyph", "tree-page-mark" ], [ "SPAN", "dot", "-", "true" ], [ "SPAN", "bg-surface", "-", "true" ] ] +
+                 [ [ "CANVAS", "type", "1", "true" ], [ "empty" ], [ "CANVAS", "type", "8", "true" ], [ "CANVAS", "type", "retired", "true" ], [ "CANVAS", "type", "all-posts", "true" ] ], rows["marks"],
+      "a page's mark is the tree's glyph, Home's the house; a post type's is the renderer's canvas, each hub saying which it is; a post's dot and a tag's square are CS Studio's own; a pill's box is empty"
+    assert_equal %w[tree-disclosure tree-disclosure tree-disclosure empty empty tree-disclosure flat tree-disclosure empty tree-disclosure tree-disclosure flat empty empty empty], rows["boxes"],
+      "each heading, a page with children here and a hub a pill hangs off draw the disclosure part; a leaf page, a tag and a type keep the box empty, so a group's marks line up; a post and a pill are flat"
+    assert_equal [ [ [ true, "true" ] ], [ "admin-tree-row", "admin-tree-row admin-tree-row--flat admin-tree-row--selected" ], 0 ], rows.values_at("marked", "moved", "cleared"),
+      "the marked item is aria-selected and its row takes the tree's selected class, one at a time, and none is left with the mark cleared"
+    group = [ "group", "m-0 list-none p-0" ]
+    step = [ "group", "admin-tree__children m-0 list-none p-0" ]
+    assert_equal [ [ "mind-graph-tree", "admin-tree m-0 list-none p-0", true ], [ group, step, step, group, group, group, step ] ], rows["classes"],
+      "the tree is one `ul#mind-graph-tree` of the tree's block in the rows' region; a group's nodes stand in a group with no step, and a parent's children in the tree's children list"
+    assert_equal [ [ "list.pages(4)", "1", "true", false, true ], [ "list.posts(1)", "1", "true", false, true ], [ "list.tags(1)", "1", "true", false, true ], [ "list.types(4)", "1", "true", false, true ] ], rows["lists"],
+      "each group is an item at the first level, named by its heading's words, open, and never selected"
     assert_equal [ "LABEL", "checkbox", "list.unlisted()" ], rows["checkbox"]
+  end
+
+  # In a local view a page whose parent is not drawn stands at the top with
+  # no step, and says where it is: its ancestors' titles from Home on a line
+  # under its title, in its tooltip and in its name. A page whose parent is
+  # drawn nests and says nothing more. Every figure is the messages' format.
+  test "list: a page whose parent has no row says its ancestors under its title, in its tooltip and in its name, and every figure is formatted" do
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const container = document.createElement("div")
+        const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => `#${value}`, unlisted: false,
+                                               onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        list.render([ { id: "page-5", kind: "page", title: "Print design", degree: 1204, depth: 2, order: 5, parent: "page-4", ancestors: [ "Home", "Services" ] },
+                      { id: "page-8", kind: "page", title: "Flyers", degree: 1, depth: 3, order: 8, parent: "page-7", ancestors: [ "Home", " ", "Services" ] },
+                      { id: "page-6", kind: "page", title: "Posters", degree: 2, depth: 3, order: 6, parent: "page-5", ancestors: [] },
+                      { id: "type-blog", kind: "type", title: "Blog", degree: 1, count: 2040, colour_index: 1 } ])
+        const read = (id) => {
+          const item = list.row(id)
+          const row = item.firstElementChild
+          const title = row.querySelector(".admin-tree-row__title")
+          // The line under the title, in the title's stack; a plain row has no stack.
+          const line = title.parentElement === row ? null : title.nextElementSibling
+          return [ item.parentElement.closest("[role=treeitem]").dataset.treeGroup ? "top" : "nested", title.textContent, title.title, line ? [ line.className, line.textContent ] : "-", item.getAttribute("aria-label"), row.querySelector(".admin-tree-row__count").textContent ]
+        }
+        const groups = { stray: read("page-5"), child: read("page-6"), blank: read("page-8"), hub: read("type-blog"), headings: Array.from(container.querySelectorAll("[data-tree-group]"), (heading) => heading.getAttribute("aria-label")) }
+        // "Not listed on any page" with nothing in it, and a pill's rows with none.
+        const lines = () => Array.from(container.querySelectorAll("[data-mind-graph-rows] p"), (line) => [ line.className, line.textContent ])
+        list.showRows({ heading: "Posts · 0", rows: [], inView: () => false })
+        const unlisted = lines()
+        list.showRows({ heading: "More from Blog · 0", rows: [], inView: () => false, back: { label: "Back", onBack() {} } })
+        return { ...groups, unlisted, pill: lines() }
+      })()
+    JS
+
+    assert_equal [ "top", "Print design", "list.under(Print design,Home › Services)", [ "min-w-0 truncate text-small text-meta", "list.ancestors(Home › Services)" ],
+                   "list.select_page(list.under(Print design,Home › Services),1204,#1204)", "#1204" ], result["stray"]
+    assert_equal [ "nested", "Posters", "Posters", "-", "list.select_page(Posters,2,#2)", "#2" ], result["child"], "a page whose parent is drawn nests under it and names no path"
+    assert_equal [ "list.ancestors(Home › Services)", "list.under(Flyers,Home › Services)" ], [ result["blank"][3].last, result["blank"][2] ], "a blank ancestor is left out, never a bare mark"
+    assert_equal [ "#2040", "list.select_type(Blog,2040,#2040)" ], result["hub"].values_at(5, 4), "a figure in a row's name is the messages' format too"
+    assert_equal [ [ [ "m-0 px-1 py-1 text-small text-dim", "list.unlisted_none()" ] ], [] ], result.values_at("unlisted", "pill"), "an empty unlisted view says so in one dim line; a pill's rows have their way back"
+    assert_equal [ "list.pages(#3)", "list.types(#1)" ], result["headings"], "a heading's figure is the messages' format too"
   end
 
   # The list shows a record's state by the posts list's own rule: the status
@@ -295,29 +657,37 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                       { id: "more-type-blog", kind: "more", title: "+3 more", degree: 1, count: 3, target: "type-blog", of: "Blog" } ])
         const same = (element, name) => element.isEqualNode(parts.part(name)) ? name : `not ${name}`
         const icons = [ "icon-page", "icon-post", "icon-tag", "icon-type" ]
-        const headings = Array.from(container.querySelectorAll("section > h2"), (heading, index) => [ heading.textContent, same(heading.firstElementChild, icons[index]), heading.firstElementChild.getAttribute("aria-hidden") ])
-        const rows = Array.from(container.querySelectorAll("button[data-node-id]"), (button) => {
-          const chips = Array.from(button.querySelectorAll(".admin-status-chip, [data-unpublished-changes]"))
+        const chipOf = (heading) => heading.querySelector(":scope > .admin-tree-row__mark").firstElementChild
+        const groups = Array.from(container.querySelectorAll("[data-tree-group]"))
+        const headings = groups.map((item, index) => [ item.firstElementChild.textContent, same(chipOf(item.firstElementChild), icons[index]), chipOf(item.firstElementChild).getAttribute("aria-hidden") ])
+        // A heading is a row of the tree: the disclosure part, the chip in the mark box, the words with the figure in the count style.
+        const row = groups[0].firstElementChild
+        const look = [ row.className, same(row.firstElementChild, "tree-disclosure"), row.querySelector(".admin-tree-row__title > .text-label").firstChild.textContent,
+                       row.querySelector(".admin-tree-row__title > .text-label > .text-count").textContent, groups.map((item) => item.className) ]
+        const rows = Array.from(container.querySelectorAll("[role=treeitem][data-node-id]"), (item) => {
+          const chips = Array.from(item.firstElementChild.querySelectorAll(".admin-status-chip, [data-unpublished-changes]"))
           const held = chips[0]?.parentElement
-          return [ button.dataset.nodeId, chips.map((chip) => same(chip, chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`)),
-                   held ? [ held.getAttribute("aria-hidden"), held.previousElementSibling.classList.contains("truncate") ] : "-", button.getAttribute("aria-label") ]
+          return [ item.dataset.nodeId, chips.map((chip) => same(chip, chip.matches("[data-unpublished-changes]") ? "unpublished" : `status-${chip.dataset.status}`)),
+                   held ? [ held.getAttribute("aria-hidden"), held.previousElementSibling.classList.contains("admin-tree-row__title") ] : "-", item.getAttribute("aria-label") ]
         })
-        return { headings, rows }
+        return { headings, look, rows }
       })()
     JS
 
     assert_equal [ [ "list.pages(3)", "icon-page", "true" ], [ "list.posts(5)", "icon-post", "true" ], [ "list.tags(1)", "icon-tag", "true" ], [ "list.types(1)", "icon-type", "true" ] ], result["headings"],
-      "each group's heading starts with its kind's icon chip, and its words are the heading's whole text"
+      "each group's heading has its kind's icon chip in the mark box, and its words are the heading's whole text"
+    assert_equal [ "admin-tree-row", "tree-disclosure", "list.pages(", "3", [ "not-first:mt-(--cs-sp-3)" ] * 4 ], result["look"],
+      "a heading is the tree's row with the disclosure part, its figure cut out of its words into the count style, and each group but the first stands --cs-sp-3 below the one before"
     hidden = [ "true", true ]
-    assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1)" ],
-                   [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1)" ],
-                   [ "page-3", %w[unpublished], hidden, "list.select_page(list.stated(Changed,unpublished_chip.label()),1)" ],
-                   [ "post-1", %w[status-scheduled], hidden, "list.select_post(list.stated(Soon,labels.scheduled()),6)" ],
-                   [ "post-2", %w[status-scheduled unpublished], hidden, "list.select_post(list.stated(list.stated(Soon changed,labels.scheduled()),unpublished_chip.label()),5)" ],
-                   [ "post-3", [], "-", "list.select_post(Live,4)" ],
-                   [ "post-4", [], "-", "list.select_post(Later,3)" ],
-                   [ "post-5", %w[unpublished], hidden, "list.select_post(list.stated(Later changed,unpublished_chip.label()),2)" ],
-                   [ "tag-1", [], "-", "list.select_tag(tag,2)" ], [ "type-blog", [], "-", "list.select_type(Blog,3)" ],
+    assert_equal [ [ "page-1", [], "-", "list.select_page(Home,1,1)" ],
+                   [ "page-2", %w[status-draft], hidden, "list.select_page(list.stated(Draft,labels.draft()),1,1)" ],
+                   [ "page-3", %w[unpublished], hidden, "list.select_page(list.stated(Changed,unpublished_chip.label()),1,1)" ],
+                   [ "post-1", %w[status-scheduled], hidden, "list.select_post(list.stated(Soon,labels.scheduled()),6,6)" ],
+                   [ "post-2", %w[status-scheduled unpublished], hidden, "list.select_post(list.stated(list.stated(Soon changed,labels.scheduled()),unpublished_chip.label()),5,5)" ],
+                   [ "post-3", [], "-", "list.select_post(Live,4,4)" ],
+                   [ "post-4", [], "-", "list.select_post(Later,3,3)" ],
+                   [ "post-5", %w[unpublished], hidden, "list.select_post(list.stated(Later changed,unpublished_chip.label()),2,2)" ],
+                   [ "tag-1", [], "-", "list.select_tag(tag,2,2)" ], [ "type-blog", [], "-", "list.select_type(Blog,3,3)" ],
                    [ "more-type-blog", [], "-", "list.more_row(3,3,Blog,+3 more)" ] ], result["rows"],
       "the posts list's chips after the title, hidden, each word said after the title in the name; a live row, a scheduled change without the mark, a tag, a type and a pill have none"
   end
@@ -334,11 +704,11 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const words = #{words.to_json}
         const text = { t: (key, values = {}) => Object.entries(values).reduce((said, [ name, value ]) => said.split(`%{${name}}`).join(value), words[key] ?? `missing ${key}`), locale: () => "en" }
         const container = document.createElement("div")
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         const post = { kind: "post", degree: 2, colour_index: 1, type: "blog", changes: null }
         list.showRows({ heading: "Posts", rows: [ { ...post, id: "post-1", title: "Alpha", status: "draft", unpublished: false }, { ...post, id: "post-2", title: "Beta", status: "scheduled", unpublished: true },
                                                   { ...post, id: "post-3", title: "Gamma", status: "live", changes: "unpublished", unpublished: true } ], inView: (id) => id !== "post-3" })
-        return Array.from(container.querySelectorAll("button[data-node-id]"), (button) => button.getAttribute("aria-label"))
+        return Array.from(container.querySelectorAll("[role=treeitem][data-node-id]"), (item) => item.getAttribute("aria-label"))
       })()
     JS
 
@@ -355,8 +725,8 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
                                                       { id: "post-3", title: "Old", degree: 0, colour_index: null, type: "<i>Gone</i>" } ],
                         inView: (id) => id === "post-1", link: { href: "/posts?type=blog", label: "Open in Posts" } })
         const rows = read()
-        const absent = Array.from(container.querySelectorAll("button[data-not-in-view]"), (button) => button.dataset.nodeId)
-        container.querySelectorAll("button").forEach((button) => button.click())
+        const absent = Array.from(container.querySelectorAll("[role=treeitem][data-not-in-view]"), (item) => item.dataset.nodeId)
+        container.querySelectorAll("[role=treeitem]").forEach((item) => item.click())
         const box = container.querySelector("input[type=checkbox]")
         box.click()
         const link = container.querySelector("a[data-mind-graph-posts-link]")
@@ -366,8 +736,8 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       })()
     JS
 
-    assert_equal [ "Posts · 3", [ "Drawn", "3", "", "list.select_post(Drawn,3)" ], [ "<b>Absent</b>", "list.not_in_view()", "", "list.add_post(<b>Absent</b>,blog)" ],
-                   [ "Old", "list.not_in_view()", "", "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
+    assert_equal [ "Posts · 3", [ "Drawn", "3", 1, "list.select_post(Drawn,3,3)" ], [ "<b>Absent</b>", "list.not_in_view()", 1, "list.add_post(<b>Absent</b>,blog)" ],
+                   [ "Old", "list.not_in_view()", 1, "list.add_retired_post(Old,<i>gone</i>)" ] ], result["rows"],
       "the type's label in lower case, and for a retired type its stored name in lower case in its own sentence: never a bare 'post'"
     assert_equal %w[post-2 post-3], result["absent"]
     assert_equal [ [ "select", "post-1" ], [ "add", "post-2" ], [ "add", "post-3" ], [ "unlisted", true ] ], result["calls"]
@@ -383,14 +753,14 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const { container, calls, list } = #{LIST_SCRIPT}
         document.body.append(container)
         const rows = [ { id: "post-2", title: "Absent", degree: 0, colour_index: 1, type: "blog" }, { id: "post-3", title: "Old", degree: 0, colour_index: null, type: "Gone" } ]
-        const read = () => Array.from(container.querySelectorAll("button[data-node-id]"), (button) => [ button.getAttribute("aria-label"), button.hasAttribute("data-not-in-view"), button.getAttribute("aria-disabled") ?? "-", button.lastChild.textContent ])
+        const read = () => Array.from(container.querySelectorAll("[role=treeitem][data-node-id]"), (item) => [ item.getAttribute("aria-label"), item.hasAttribute("data-not-in-view"), item.getAttribute("aria-disabled") ?? "-", item.firstElementChild.lastChild.textContent ])
         list.showRows({ heading: "Posts · 2", rows, inView: () => false, addable: false })
         const without = read()
-        container.querySelectorAll("button[data-node-id]").forEach((button) => button.click())
+        container.querySelectorAll("[role=treeitem][data-node-id]").forEach((item) => item.click())
         const pressed = calls.slice()
         list.showRows({ heading: "Posts · 2", rows, inView: () => false })
         const withGraph = read()
-        container.querySelectorAll("button[data-node-id]").forEach((button) => button.click())
+        container.querySelectorAll("[role=treeitem][data-node-id]").forEach((item) => item.click())
         container.remove()
         return { without, pressed, withGraph, calls }
       })()
@@ -411,7 +781,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         let asked = 0
         list.fail("The list couldn't be loaded.", { label: "Try again", onRetry: () => { asked += 1 }, focus: true })
         const button = container.querySelector("[role=alert] button[data-mind-graph-retry]")
-        const said = [ container.querySelector("[role=alert] p").textContent, button.textContent, button.type, button.className, document.activeElement === button, container.querySelectorAll("button[data-node-id]").length ]
+        const said = [ container.querySelector("[role=alert] p").textContent, button.textContent, button.type, button.className, document.activeElement === button, container.querySelectorAll("[role=treeitem]").length ]
         button.click()
         button.click()
         const checkbox = Boolean(container.querySelector("input[type=checkbox]"))
@@ -464,14 +834,45 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       (() => {
         const container = document.createElement("div")
         const text = { t: (key) => key, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: [], parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: [], parts: p.readParts(document.body), unlisted: false, onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
         list.render([ { id: "tag-1", kind: "tag", title: "tag", degree: 2 } ])
         list.setUnlisted(true)
-        return [ container.querySelectorAll("input, label").length, container.querySelectorAll("button[data-node-id]").length ]
+        return [ container.querySelectorAll("input, label").length, container.querySelectorAll("[role=treeitem][data-node-id]").length ]
       })()
     JS
 
     assert_equal [ 0, 1 ], result
+  end
+
+  # While the whole site's results stand in the rows' place, a node
+  # selected on the canvas is marked in the hidden rows, and the column is
+  # not scrolled for a row that has no box.
+  test "list: a mark while the whole site's results show changes no scroll, and Back shows the marked row" do
+    result = js_module("mind_graph/node_list", <<~JS, also: PARTS)
+      (() => {
+        const scroller = document.createElement("div")
+        scroller.style.cssText = "height: 40px; overflow-y: auto"
+        const container = document.createElement("div")
+        scroller.append(container)
+        document.body.append(scroller)
+        const text = { t: (key) => key, locale: () => "en" }
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), unlisted: false, scroller,
+                                               onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {} })
+        list.render(Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index}`, kind: "tag", title: `tag ${index}`, degree: 30 - index })))
+        list.showResults({ query: "x", rows: [], back: { label: "Back", onBack() {} } })
+        scroller.scrollTop = 0
+        list.mark("tag-29")
+        const during = scroller.scrollTop
+        const marked = list.row("tag-29").getAttribute("aria-selected")
+        list.closeResults()
+        list.mark("tag-29")
+        const after = scroller.scrollTop
+        scroller.remove()
+        return [ during, marked, after > 0 ]
+      })()
+    JS
+
+    assert_equal [ 0, "true", true ], result
   end
 
   # A keyboard or screen-reader user reaches a
@@ -484,10 +885,10 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key, values = {}) => `${key.split(".").slice(-2).join(".")}(${Object.values(values).join(",")})`, locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), parts: p.readParts(document.body), number: (value) => "n" + value, onSelect: (id) => calls.push([ "select", id ]), onHover: (id) => calls.push([ "hover", id ]),
                                                onAdd() {}, onUnlisted() {}, onMore: (id) => calls.push([ "more", id ]), onBack() {} })
         document.body.append(container)
-        const order = () => Array.from(container.querySelectorAll("h2, button[data-node-id]"), (item) => item.tagName === "H2" ? item.textContent : item.dataset.nodeId)
+        const order = () => Array.from(container.querySelectorAll("[role=treeitem]"), (item) => item.dataset.treeGroup ? item.getAttribute("aria-label") : item.dataset.nodeId)
         const nodes = [ { id: "page-1", kind: "page", title: "Blog", degree: 1, depth: 0, order: 0, parent: null }, { id: "post-1", kind: "post", title: "Post", degree: 1, colour_index: 1 },
                         { id: "tag-5", kind: "tag", title: "<b>pill</b>", degree: 6 }, { id: "tag-6", kind: "tag", title: "other", degree: 9 },
                         { id: "type-blog", kind: "type", title: "Blog post", degree: 2, count: 30, colour_index: 1 }, { id: "all-posts", kind: "type", title: "All posts", degree: 1, count: 40, colour_index: null },
@@ -496,7 +897,7 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         list.render(nodes)
         const all = order()
         const pill = list.row("more-type-blog")
-        const row = [ pill.tagName, pill.type, pill.textContent, pill.getAttribute("aria-label"), pill.hasAttribute("data-more"), pill.hasAttribute("data-not-in-view"), pill.querySelectorAll("b").length,
+        const row = [ pill.tagName, pill.getAttribute("role"), pill.textContent, pill.getAttribute("aria-label"), pill.hasAttribute("data-more"), pill.hasAttribute("data-not-in-view"), pill.querySelectorAll("b").length,
                       list.row("more-tag-5").getAttribute("aria-label"), container.querySelectorAll("b").length ]
         pill.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }))
         pill.click()
@@ -511,13 +912,13 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
       })()
     JS
 
-    assert_equal [ "list.pages(1)", "page-1", "list.posts(1)", "post-1", "list.tags(2)", "tag-6", "tag-5", "more-tag-5", "list.types(2)", "type-blog", "more-type-blog", "all-posts" ], result["all"],
+    assert_equal [ "list.pages(n1)", "page-1", "list.posts(n1)", "post-1", "list.tags(n2)", "tag-6", "tag-5", "more-tag-5", "list.types(n2)", "type-blog", "more-type-blog", "all-posts" ], result["all"],
       "a pill's row follows the row of the hub or the tag it hangs off, and is counted in no heading"
-    assert_equal [ "BUTTON", "button", "+1,980 more", "list.more_row(1980,n1980,Blog post,+1,980 more)", true, false, 0, "list.more_row(1,n1,<b>pill</b>,+1 more)", 0 ], result["row"],
+    assert_equal [ "LI", "treeitem", "+1,980 more", "list.more_row(1980,n1980,Blog post,+1,980 more)", true, false, 0, "list.more_row(1,n1,<b>pill</b>,+1 more)", 0 ], result["row"],
       "its visible words are the pill's own, its name says how many posts of what, and a tag's name in it is text"
     assert_equal [ [ "hover", "more-type-blog" ], [ "more", "more-type-blog" ], [ "select", "type-blog" ] ], result["calls"], "hovering it lights the pill, pressing it asks for its rows and selects nothing"
-    assert_equal [ "list.pages(1)", "page-1", "list.posts(1)", "post-1", "more-type-blog", "list.tags(2)", "tag-6", "tag-5", "more-tag-5" ], result["hubless"], "a pill whose hub has no row stands at the end of the posts"
-    assert_equal [ "list.pages(1)", "page-1", "more-tag-5", "more-type-blog" ], result["postless"], "and with no post drawn either, after the groups: never without a row"
+    assert_equal [ "list.pages(n1)", "page-1", "list.posts(n1)", "post-1", "more-type-blog", "list.tags(n2)", "tag-6", "tag-5", "more-tag-5" ], result["hubless"], "a pill whose hub has no row stands at the end of the posts"
+    assert_equal [ "list.pages(n1)", "page-1", "more-tag-5", "more-type-blog" ], result["postless"], "and with no post drawn either, after the groups: never without a row"
   end
 
   # A pill's rows stand under a heading that
@@ -531,12 +932,12 @@ class Admin::MindGraphCardAndListModulesSystemTest < Admin::MindGraphModulesSyst
         const container = document.createElement("div")
         const calls = []
         const text = { t: (key) => key.split(".").slice(-2).join("."), locale: () => "en" }
-        const list = m.createList(container, { text, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts: p.readParts(document.body), onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
+        const list = m.createList(container, { text, treeClasses: #{TREE_CLASSES}, dotClasses: Array(12).fill("dot"), typeLabels: { blog: "Blog" }, retryClass: "retry", parts: p.readParts(document.body), onSelect() {}, onHover() {}, onAdd() {}, onUnlisted() {}, onMore() {} })
         document.body.append(container)
         const back = { label: "Back to the list", onBack: () => calls.push("back") }
         const rows = [ { id: "post-1", title: "One", degree: 0, type: "blog" }, { id: "post-2", title: "Two", degree: 0, type: "blog" } ]
         const key = (target, more = {}) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, ...more }))
-        const stops = () => Array.from(container.querySelectorAll("h2, button, a"), (item) => item.tagName === "H2" ? item.textContent : item.dataset.nodeId ?? item.textContent)
+        const stops = () => Array.from(container.querySelectorAll("h2, button, a, [role=treeitem]"), (item) => item.tagName === "H2" ? item.textContent : item.dataset.nodeId ?? item.textContent)
 
         list.showRows({ heading: "More from Blog · 2", rows, inView: () => false, link: { href: "/posts", label: "Open in Posts" }, back })
         const pill = stops()

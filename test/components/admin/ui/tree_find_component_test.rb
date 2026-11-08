@@ -45,4 +45,13 @@ class Admin::Ui::TreeFindComponentTest < ViewComponent::TestCase
     assert_not messages.key?("components.ui.tree_find.no_moving")
     assert_equal "false", page.find("[role=search]")["data-admin--tree--find-moving-value"]
   end
+
+  test "a field that keeps its query across the content frame's navigation says so to its script" do
+    render_inline(Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes, keep_across_frames: true))
+    assert_equal "true", page.find("[role=search]")["data-admin--tree--find-keep-value"]
+    assert_includes page.find("[role=search]")["data-action"], "turbo:frame-load@document->admin--tree--find#frameLoaded"
+
+    render_inline(Admin::Ui::TreeFindComponent.new(controls: "tree-list", noun: :pages))
+    assert_equal "false", page.find("[role=search]")["data-admin--tree--find-keep-value"]
+  end
 end

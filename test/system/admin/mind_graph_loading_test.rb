@@ -155,11 +155,11 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
       await_graph
       assert_equal [ "Showing the 2,000 best-connected of 6,000 posts.", "1,214 other posts have no connections yet and aren't shown." ], lines.call.map(&:first)
       find("#{LIST} label", text: "Not listed on any page").click
-      assert_selector "#{LIST} button[data-not-in-view]", count: 2
+      assert_selector "#{LIST} [role=treeitem][data-not-in-view]", count: 2
       page.execute_script(watch)
 
       heard.call
-      find("#{LIST} button[data-node-id='post-50']").click
+      find("#{LIST} [role=treeitem][data-node-id='post-50']").click
       assert_selector "#{GRAPH}[data-selected='post-50'][data-nodes='3']"
       assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", nil ], [ "1,214 other posts have no connections yet and aren't shown.", "before" ] ], lines.call,
         "one more is shown; the other sentence is the element it was"
@@ -167,7 +167,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
       assert_includes find(CANVAS)["aria-label"], "Showing the 2,001 best-connected of 6,000 posts."
 
       heard.call
-      find("#{LIST} button[data-node-id='post-51']").click
+      find("#{LIST} [role=treeitem][data-node-id='post-51']").click
       assert_selector "#{GRAPH}[data-selected='post-51'][data-nodes='4']"
       assert_equal [ [ "Showing the 2,001 best-connected of 6,000 posts.", "before" ], [ "1,213 other posts have no connections yet and aren't shown.", nil ] ], lines.call,
         "one fewer isn't shown; the cap's sentence is the element it was"
@@ -185,7 +185,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
   test "a row of Not listed on any page pressed while the graph is being read, and after that read failed, does nothing and raises nothing, and adds its post once the graph is there" do
     create_page(title: "Blog")
     alone = create_post(title: "Alone")
-    row = "#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]"
+    row = "#{LIST} [role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]"
     blog = ContentTypes.fetch("blog").label.downcase
     visit_screen admin_tags_path
     page.execute_script(<<~JS)
@@ -226,7 +226,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
       within(LIST) { assert_row "Alone, #{blog} post, not in view. Activate to add it to the graph." }
       find(row).click
       assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
-      assert_selector "#{LIST} button[data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-current='true']"
+      assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(alone)}']:not([data-not-in-view])[aria-selected='true']"
     end
   end
 
@@ -310,7 +310,7 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
 
     with_singleton_override(PostGraph::Global, :call, ->(**options) { whole.call(**options, open_above: 3) }) do
       with_reduced_motion do
-        visit admin_mind_graph_path
+        visit_screen admin_mind_graph_path
         await_graph
 
         around_home.call
@@ -337,13 +337,13 @@ class Admin::MindGraphLoadingSystemTest < Admin::MindGraphSystemTestCase
         assert_selector "#{CANVAS}[aria-label='Mind graph: 5 pages, 4 connections. Showing everything.']"
         # The press is answered for a screen reader too: the whole graph's summary, in the notice's live region.
         assert_selector "#{GRAPH} [role=status] p.sr-only[data-mind-graph-announced]", text: /\AMind graph: 5 pages, 4 connections\. Showing everything\.\z/, visible: :all
-        within(LIST) { assert_equal [ "PAGES · 5" ], all("h2").map { |heading| heading.text.upcase } }
+        within(LIST) { assert_equal [ "PAGES · 5" ], list_headings }
         assert screen_position("page-#{Page.find_by!(parent: first).id}")
         assert_current_path admin_mind_graph_path, ignore_query: false
         assert_equal "/cs-studio/mind_graph/data", graph["data-url"], "nothing of the page says everything: the choice is in no address"
 
         # Not remembered after a reload.
-        visit admin_mind_graph_path
+        visit_screen admin_mind_graph_path
         await_graph
         around_home.call
 

@@ -21,14 +21,14 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     assert_no_text "Loading the graph…"
   end
 
-  # The screen fills the window: the box is (almost)
-  # the content column wide -- main's width less its padding -- and ends
-  # exactly where the window does less that padding, so the page itself does
-  # not scroll. Inside it the canvas is on the left and the search and the
-  # list are a 300px column on its right, the search on top.
-  test "the screen fills the window: the page does not scroll, and the list stands beside the canvas" do
+  # The screen fills the window: the box is (almost) the content column
+  # wide -- main's width less its padding -- and ends exactly where the
+  # window does less that padding, so the page itself does not scroll. The
+  # box is one column, the canvas as wide as it; the list stands in the tree
+  # column on its left, its find field above it.
+  test "the screen fills the window: the page does not scroll, and the list stands in the tree column beside the box" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
 
     sizes = layout_boxes
@@ -38,34 +38,27 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     assert_operator sizes["box"]["width"], :<=, sizes["main"]
     assert_in_delta sizes["viewport"] - 24, sizes["box"]["bottom"], 2, "the box does not reach the bottom of the window: #{sizes}"
     assert_operator sizes["canvas"]["height"], :>, 600
-    assert_in_delta 300, sizes["list"]["width"], 2
-    assert_in_delta sizes["canvas"]["right"], sizes["list"]["left"], 2, "the list is not beside the canvas: #{sizes}"
-    assert_in_delta sizes["list"]["left"], sizes["search"]["left"], 16
-    assert_operator sizes["search"]["bottom"], :<=, sizes["list"]["top"] + 1, "the search field is not above the list"
-    assert_in_delta sizes["box"]["bottom"], sizes["list"]["bottom"], 2, "the list does not reach the bottom of the box"
+    assert_in_delta sizes["box"]["width"], sizes["canvas"]["width"], 1, "the canvas is not as wide as the box: #{sizes}"
     assert_in_delta sizes["box"]["bottom"], sizes["canvas"]["bottom"], 2
+    assert_operator sizes["column"]["right"], :<=, sizes["box"]["left"], "the list's column is not left of the box: #{sizes}"
+    assert_operator sizes["find"]["bottom"], :<=, sizes["list"]["top"] + 1, "the find field is not above the list"
+    assert_in_delta sizes["viewport"], sizes["column"]["bottom"], 1, "the column is not window-high: #{sizes}"
   end
 
-  # Below about 1,100 px the list has no room beside the canvas: it stands
-  # under it, with the search field between them, and the page may scroll.
-  test "in a window narrower than 1,100 pixels the search and the list stand under the canvas" do
+  # Below 1024px the list's column is a drawer: the box has the content
+  # column to itself, the canvas as wide as it, and a height of its own.
+  test "in a window narrower than 1,024 pixels the box is the canvas alone and the list is in the drawer" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
-    visit admin_mind_graph_path
+    visit_screen admin_mind_graph_path
     await_graph
-    original = page.current_window.size
 
-    begin
-      page.current_window.resize_to(1000, 900)
+    at_window(1000, height: 900) do
       await_js("document.querySelector(#{CANVAS.to_json}).getBoundingClientRect().width > 800")
       sizes = layout_boxes
 
       assert_in_delta sizes["box"]["width"], sizes["canvas"]["width"], 4, "the canvas is not as wide as the box: #{sizes}"
-      assert_in_delta sizes["box"]["width"], sizes["list"]["width"], 4
-      assert_operator sizes["search"]["top"], :>=, sizes["canvas"]["bottom"], "the search field is not under the canvas: #{sizes}"
-      assert_operator sizes["list"]["top"], :>=, sizes["search"]["bottom"] - 1, "the list is not under the search field: #{sizes}"
       assert_operator sizes["canvas"]["height"], :>=, 480
-    ensure
-      page.current_window.resize_to(*original)
+      assert_no_selector LIST, visible: :visible
     end
   end
 
@@ -345,7 +338,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
     JS
     mouse.click(x: pill["x"] + (width / 2) - 2, y: pill["y"] + 5)
     within(LIST) do
-      assert_equal [ "MORE FROM BLOG POST · 1,980" ], all("h2").map { |heading| heading.text.upcase }, "named by what the pill hangs off, with the read's whole total, grouped, though it answered one row"
+      assert_equal [ "MORE FROM BLOG POST · 1,980" ], list_headings, "named by what the pill hangs off, with the read's whole total, grouped, though it answered one row"
       assert_row "Ninety-nine, #{ContentTypes.fetch("blog").label.downcase} post, not in view. Activate to add it to the graph."
     end
     assert_equal [ "/cs-studio/mind_graph/listed?page=12&target=type-blog" ], page.evaluate_script("window.listedAsked")
@@ -570,7 +563,7 @@ class Admin::MindGraphDrawingSystemTest < Admin::MindGraphSystemTestCase
         within("nav[aria-label='Modules']") { click_link "Mind graph" }
         await_graph
         find("#{LIST} label", text: "Not listed on any page").click
-        find("#{LIST} button[data-node-id='#{nid(alone)}'][data-not-in-view]").click
+        find("#{LIST} [role=treeitem][data-node-id='#{nid(alone)}'][data-not-in-view]").click
         assert_selector "#{GRAPH}[data-selected='#{nid(alone)}'][data-nodes='3']"
         assert_equal({ "known" => 2, "placed" => true }, page.evaluate_script("window.afterShortTick"), "the worker's answer knew two nodes, the page holds three: the third must keep its place")
         await_graph

@@ -43,4 +43,13 @@ class TreeOpenSetTest < ActiveSupport::TestCase
 
     assert_equal "40.-7.12", set.to_s, "junk, an unreadable id and a repeated id are dropped, the first word on an id kept"
   end
+
+  # What a caller asks the database about: the ids the cookie names, read
+  # as `parse` reads them, once each.
+  test "candidate_ids are the well-formed ids of the first entries, against no viewer" do
+    assert_equal [ 40, 7, 999, 12 ], TreeOpenSet.candidate_ids("40.junk.-7.999.12.40.-12")
+    assert_equal [], TreeOpenSet.candidate_ids(nil)
+    assert_equal [], TreeOpenSet.candidate_ids("\xFF.12".dup.force_encoding("UTF-8"))
+    assert_equal TreeOpenSet::LIMIT, TreeOpenSet.candidate_ids((1..TreeOpenSet::LIMIT + 5).map(&:to_s).join(".")).size
+  end
 end
