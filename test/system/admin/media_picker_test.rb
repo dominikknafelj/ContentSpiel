@@ -407,7 +407,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # driver's click first scrolls the page to reach it -- a scroll of the test's
   # own making, not the picker's.
   test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
-    page.driver.resize(1400, 900)
+    page.current_window.resize_to(1400, 900)
     visit_editor(@landing)
     # Make sure there is 600px to scroll whatever the editor's own height is.
     page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 0)")
@@ -432,7 +432,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_operator box["right"], :<=, box["width"]
     assert_equal scrolled_to, box["scrollY"]
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # Select-then-use (D14): a click selects the tile, Use image confirms.

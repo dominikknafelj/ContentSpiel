@@ -132,6 +132,12 @@ class Dashboard::WaitingForYouTest < ActiveSupport::TestCase
     page = create_page(title: "Same id")
     post = create_post(title: "Same id")
     Post.where(id: post.id).update_all(id: page.id) if post.id != page.id
+    # A sequence is not rolled back with the test's transaction, so the posts
+    # sequence can stand just below the id the post was moved to, and the next
+    # `create_post` would draw that id again (a `posts_pkey` violation that
+    # depends on what the worker ran before). Resetting it to the highest post
+    # id makes every later post draw an id above the moved one.
+    Post.connection.reset_pk_sequence!(Post.table_name)
     post = Post.find(page.id)
     [ page, post ].each { |record| mark(record, @base) }
     newer = Array.new(3) { |n| create_post(title: "Newer #{n}") }

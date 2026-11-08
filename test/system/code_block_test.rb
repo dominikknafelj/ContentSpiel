@@ -484,11 +484,11 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
     size = page.evaluate_script("[window.innerWidth, window.innerHeight]")
     begin
-      page.driver.resize(360, 800)
+      page.current_window.resize_to(360, 800)
       await_js("window.innerWidth === 360")
       inside.call("360")
     ensure
-      page.driver.resize(*size)
+      page.current_window.resize_to(*size)
     end
   end
 

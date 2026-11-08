@@ -489,7 +489,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "below 1280px the top bar stays over the row titles when the page scrolls" do
     posts = Array.new(25) { |i| create_post(title: "Only in English #{i}") }
     begin
-      page.driver.resize(1000, 700)
+      page.current_window.resize_to(1000, 700)
       visit "/cs-studio/translations"
       assert_selector "#translation-item-post-#{posts.last.id}"
       page.execute_script("window.scrollTo(0, 400)")
@@ -501,7 +501,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
         return bar.contains(el) && !el.closest("th[scope=row]") })()
       JS
     ensure
-      page.driver.resize(1400, 1400)
+      page.current_window.resize_to(1400, 1400)
     end
   end
 

@@ -19,7 +19,7 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
   # At 1600px the post editor, which has no tree beside it, has the room for
   # the rail (`editor_rail_test`); the form column is measured below it.
   test "at 1400px the post form is 760px wide, starts at the content's left edge, and the header keeps its width" do
-    page.driver.resize(1400, 1000)
+    page.current_window.resize_to(1400, 1000)
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
 
@@ -34,7 +34,7 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
     assert_in_delta box(".admin-shell__main")[2], box(".admin-editor-header")[2], 1, "the header does not keep its full width"
     assert_operator box(".admin-editor-header")[2], :>, 1300
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "at 1600px the page settings and the block list are 760px wide, one above the other" do
@@ -71,10 +71,10 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
   private
 
   def at_1600
-    page.driver.resize(1600, 1000)
+    page.current_window.resize_to(1600, 1000)
     yield
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   def box(selector)

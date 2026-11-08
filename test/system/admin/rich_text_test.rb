@@ -577,7 +577,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   # original is above it, not beside it -- and the Insert menu still opens.
   # (Round 1's `flex-wrap` remains the fallback for a column narrower still.)
   test "in a narrow translation column (page editor beside the tree) the original stacks above the toolbar, which stays inside its box, and the Insert menu stays reachable" do
-    page.driver.resize(1100, 1000)
+    page.current_window.resize_to(1100, 1000)
     page_record = create_page(title: "About")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
       translations: { "en" => { body: rich_doc("Hello **there**") } }).record
@@ -602,7 +602,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     find("[role=toolbar] button[aria-haspopup=menu]").click
     assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # Design pass round 1, bug 5: with the primary-language original shown
@@ -611,7 +611,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   # the toolbar -- is neither clipped by it nor out of reach: its items are
   # visible, inside the viewport, and still run their command.
   test "in a translation the toolbar is one row and the Insert menu opens and runs YouTube" do
-    page.driver.resize(1400, 1000)
+    page.current_window.resize_to(1400, 1000)
     @post.assign_body(rich_doc("Hello **there**"), locale: :en)
     @post.save!
     visit "/cs-studio/posts/#{@post.id}?locale=de"
@@ -647,7 +647,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     end
     assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "the YouTube dialog rejects text that is not a video, shows the id live, and Enter inserts" do

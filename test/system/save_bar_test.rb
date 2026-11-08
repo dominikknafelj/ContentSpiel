@@ -650,7 +650,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   test "a footer stuck over the fields draws a stronger top edge and an elevation, and at the end of the form neither" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(@owner)
-    page.driver.resize(1400, 600)
+    page.current_window.resize_to(1400, 600)
     visit admin_settings_path
     await_admin_controllers
     bar = ".admin-save-bar"
@@ -666,6 +666,6 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_equal "none", at_rest[1]
     assert_not_equal stuck[0], at_rest[0], "the top edge is the strong line only while stuck"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 end

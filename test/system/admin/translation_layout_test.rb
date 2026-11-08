@@ -16,7 +16,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
   end
 
   test "wide, the title field and its original sit side by side" do
-    page.driver.resize(1400, 1000)
+    page.current_window.resize_to(1400, 1000)
     visit "/cs-studio/posts/#{@post.id}?locale=de"
     await_admin_controllers
 
@@ -24,13 +24,13 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     assert_in_delta tops[0], tops[1], 4, "the field and its original should share a row at 1400px (#{tops})"
     assert_operator widths_of("[data-original-for='title']").first, :>, 200
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # The page editor sits beside the page tree, so at 1100px a block card's form
   # is under 824px wide although the window is not.
   test "narrow, the original stacks above the field and the toolbar is one row" do
-    page.driver.resize(1100, 1000)
+    page.current_window.resize_to(1100, 1000)
     page_record = create_page(title: "About")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
       translations: { "en" => { body: rich_doc("Hello **there**") } }).record
@@ -47,11 +47,11 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     rows = page.evaluate_script(%[(() => { const t = document.querySelector("[data-block-id='#{block.id}'] [role=toolbar]"); return new Set(Array.from(t.children).map(c => Math.round(c.getBoundingClientRect().top))).size })()])
     assert_equal 1, rows, "the rich-text toolbar should be one row once the original is stacked above it"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "the stacked original folds away" do
-    page.driver.resize(1100, 1000)
+    page.current_window.resize_to(1100, 1000)
     page_record = create_page(title: "About")
     visit "/cs-studio/pages/#{page_record.id}?locale=de"
     await_admin_controllers
@@ -61,13 +61,13 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     find("[data-original-for='title'] summary").click
     assert_no_selector "[data-original-for='title'] details[open]"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # A card folded while stacked must not stay folded (and unreachable, its
   # summary inert) once the column is wide enough for the pair.
   test "a card folded while stacked shows its original again when the window widens" do
-    page.driver.resize(1100, 1000)
+    page.current_window.resize_to(1100, 1000)
     page_record = create_page(title: "About")
     visit "/cs-studio/pages/#{page_record.id}?locale=de"
     await_admin_controllers
@@ -76,7 +76,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-original-for='title'] details[open]"
     assert_no_selector "[data-original-for='title'] p", text: "About"
 
-    page.driver.resize(1700, 1000)
+    page.current_window.resize_to(1700, 1000)
     # Geometry, not Capybara visibility: Cuprite treats anything inside a
     # closed `<details>` as hidden, which is the state under test.
     height = page.evaluate_script("document.querySelector(\"[data-original-for='title'] p\").getBoundingClientRect().height")
@@ -84,7 +84,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     tops = tops_of("[data-field-name='title'] .admin-translation-pair > div:first-child", "[data-original-for='title']")
     assert_in_delta tops[0], tops[1], 4
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # Docked (the tree folded, so the editor area is the content's width), the

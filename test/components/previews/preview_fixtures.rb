@@ -12,6 +12,16 @@
 # preview inside one uncommitted test transaction, see
 # `test/components/previews_test.rb`) from colliding with each other's rows
 # in the meantime.
+#
+# That savepoint is always rolled back, in Lookbook and in the test alike,
+# and an attachment given as an io is uploaded only from an `after_commit`
+# (Active Storage's `has_one_attached`), which never fires inside it: the
+# file would never be written and anything that reads it raises
+# `ActiveStorage::FileNotFoundError`. So a library image's blob is made with
+# `ActiveStorage::Blob.create_and_upload!`, which writes the file at once,
+# and the blob is attached. The cost: a blob uploaded this way stays on disk
+# after a Lookbook visit, while its database rows are rolled back with the
+# rest.
 module PreviewFixtures
   module_function
 
@@ -52,7 +62,7 @@ module PreviewFixtures
   # byte-sniffing validation.
   def media_asset
     asset = Media::Asset.new
-    asset.file.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+    asset.file.attach(uploaded_blob(Rails.root.join("public/icon.png")))
     asset.save!
     asset
   end
@@ -62,11 +72,12 @@ module PreviewFixtures
   # 3000x2000 PNG, so every configured width is smaller than the original
   # and is in the `srcset`.
   def processed_media_asset
+    blob = uploaded_blob(Rails.root.join("test/fixtures/files/wide.png"))
+    blob.analyze
     asset = Media::Asset.new
-    asset.file.attach(io: File.open(Rails.root.join("test/fixtures/files/wide.png")), filename: "wide.png")
+    asset.file.attach(blob)
     asset.save!
-    asset.file.analyze
-    metadata = asset.file.blob.metadata || {}
+    metadata = blob.metadata || {}
     asset.update_columns(width: metadata["width"], height: metadata["height"])
     settings = ImageSettings.current
     files = Media::Renditions.widths_for(original_width: asset.width, configured: settings.widths).map do |width|
@@ -77,5 +88,11 @@ module PreviewFixtures
     end
     asset.update_columns(renditions: { "current" => { "fingerprint" => settings.fingerprint, "files" => files } }) # version: none (a preview's recorded generation)
     asset
+  end
+
+  # A blob whose file is on the storage service before any transaction ends
+  # (see the module's comment).
+  def uploaded_blob(path)
+    File.open(path) { |io| ActiveStorage::Blob.create_and_upload!(io: io, filename: path.basename.to_s) }
   end
 end

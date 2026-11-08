@@ -16,7 +16,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   def footer = ".admin-save-bar"
 
   test "at 1600px every card is 760px wide, a text field fills it and Time zone keeps its own width" do
-    page.driver.resize(1600, 1000)
+    page.current_window.resize_to(1600, 1000)
     visit admin_settings_path
     await_admin_controllers
 
@@ -27,7 +27,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_operator width.("#settings-en-title"), :>, 700
     assert_operator width.("#settings-time_zone"), :<=, 384
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "tabs switch without asking or counting, a sidebar link asks, and Save persists both languages" do
@@ -135,7 +135,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
   test "the section in view is the nav's current one, in ink with the bar, and follows the scroll" do
     # Short enough that Publishing's heading can be scrolled to the top without the page's end stopping it.
-    page.driver.resize(1400, 400)
+    page.current_window.resize_to(1400, 400)
     visit admin_settings_path
     await_admin_controllers
     nav = "nav[aria-label='Settings sections']"
@@ -149,13 +149,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     page.execute_script("document.getElementById('publishing').scrollIntoView({ block: 'start' })")
     assert_selector "#{nav} a[aria-current=true]", text: "Publishing", count: 1
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "at the end of a page that scrolls the last section is current, though its heading is not above the 40% line" do
     # A window tall enough that the last card's (Images') heading is still below the 40% line at the page's end:
     # only the nav's at-end rule can make it current.
-    page.driver.resize(1400, 2400)
+    page.current_window.resize_to(1400, 2400)
     visit admin_settings_path
     await_admin_controllers
     page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
@@ -164,11 +164,11 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert page.evaluate_script("document.documentElement.scrollHeight > window.innerHeight"), "the premise: the page scrolls"
     assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Images", count: 1
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "below 1024px the cards are no wider than the form maximum" do
-    page.driver.resize(900, 1000)
+    page.current_window.resize_to(900, 1000)
     visit admin_settings_path
     await_admin_controllers
     width = page.evaluate_script("document.getElementById('ai').closest('.flex.min-w-0.flex-col').getBoundingClientRect().width")
@@ -176,17 +176,17 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_operator max, :>, 0
     assert_operator width, :<=, max + 0.5
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "on a window where nothing scrolls the first section is current" do
-    page.driver.resize(1400, 4000)
+    page.current_window.resize_to(1400, 4000)
     visit admin_settings_path
     await_admin_controllers
 
     assert_selector "nav[aria-label='Settings sections'] a[aria-current=true]", text: "Site", count: 1
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "a blank social row counts nothing, a typed label counts one" do

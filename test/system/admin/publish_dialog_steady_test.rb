@@ -88,14 +88,14 @@ class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase
   end
 
   test "at a phone's width the button does not move, one row or long" do
-    page.driver.resize(390, 800)
+    page.current_window.resize_to(390, 800)
     retitle
     assert_button_stays(long: false)
     page.execute_script("document.querySelector('dialog[open]').close()")
     add_blocks(30)
     assert_button_stays(long: true)
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "the scheduled-time row the answer shows does not move the button either" do

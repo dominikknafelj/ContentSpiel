@@ -74,13 +74,13 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
     assert_eventually(message: "the lanes are not side by side at the full width") { page.evaluate_script(boxes)["beside"] }
     assert_not page.evaluate_script(label_shown), "a column's label is shown although the lanes are side by side"
 
-    page.driver.resize(520, 900)
+    page.current_window.resize_to(520, 900)
 
     assert_eventually(message: "the lanes did not stack at 520px") { page.evaluate_script(boxes)["stacked"] }
     assert page.evaluate_script(label_shown), "a stacked lane does not show its column's label"
     assert_selector ".admin-section-lane__label", text: "Column 2", visible: :all
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # ---- Unavailable types (sections spec §6) ---------------------------------

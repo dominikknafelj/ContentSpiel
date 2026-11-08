@@ -1,11 +1,14 @@
 require "application_system_test_case"
 
-# The driver rule `ApplicationSystemTestCase` adds to Cuprite (read its
-# comment first): a node whose page has been replaced is reported as stale at
-# once, not after Ferrum's half-second of retries -- per node. Without it one
-# Capybara poll that straddles a Turbo page swap goes blind for about
-# 0.5 s x the number of elements it holds, which on an editor (seven
-# `[role=status]` elements) is longer than a success toast stays up.
+# A node whose page has been replaced is reported as stale at once, not after
+# Ferrum's half-second of retries (`Ferrum::Frame::Runtime#call`,
+# `INTERMITTENT_ATTEMPTS`/`_SLEEP`) per node. Without it one Capybara poll
+# that straddles a Turbo page swap goes blind for about 0.5 s x the number of
+# elements it holds, which on an editor (seven `[role=status]` elements) is
+# longer than a success toast stays up. Cuprite 0.20 gives this itself: it
+# checks `this.isConnected` before every command, and every command runs
+# bound to the node (`Node#js`, `node.evaluate`), a call Ferrum does not
+# retry when the node is gone. This test pins that against a driver upgrade.
 class StaleNodeSystemTest < ApplicationSystemTestCase
   NODES = 7
 

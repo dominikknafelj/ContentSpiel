@@ -41,10 +41,10 @@ class TableBlockSystemTest < ApplicationSystemTestCase
   def box(expression) = page.evaluate_script("(() => { const box = document.querySelector('#{BOX}'); return #{expression} })()")
 
   def with_window(width, height = 800)
-    page.driver.resize(width, height)
+    page.current_window.resize_to(width, height)
     yield
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # The mask's opaque span, as the two lengths the box computes for its ends.
