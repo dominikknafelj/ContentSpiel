@@ -100,7 +100,7 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
     search_whole_site("ruby")
 
     within(RESULTS) do
-      assert_equal [ "button", "h2" ], page.evaluate_script("Array.from(document.querySelector(#{RESULTS.to_json}).children).slice(0, 2).map((child) => child.tagName.toLowerCase())")
+      assert_equal [ "div>button", "h2" ], page.evaluate_script("Array.from(document.querySelector(#{RESULTS.to_json}).children).slice(0, 2).map((child) => child.tagName === 'DIV' ? `div>${child.firstElementChild?.tagName.toLowerCase()}` : child.tagName.toLowerCase())")
       assert_selector "button[data-mind-graph-back]", exact_text: "Back to the list"
       assert_selector "h2", exact_text: "Whole site: “ruby”"
       assert_equal %w[PAGES POSTS TAGS], all("[data-search-group] > h3").map { |heading| heading.text.upcase }

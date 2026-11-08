@@ -261,20 +261,23 @@ export function createList(container, { text, number = String, dotClasses, typeL
 
   // The filter and the rows' own region: `render` and `showRows` replace the
   // region and never the checkbox, so the focus stays on it while it is used.
-  const filter = element("label", "flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-ink")
+  const filter = element("label", "flex cursor-pointer items-center gap-2 px-1 py-2 text-sm text-ink")
   const unlisted = document.createElement("input")
   unlisted.type = "checkbox"
   unlisted.className = "cs-checkbox"
   unlisted.dataset.mindGraphUnlisted = ""
   filter.append(unlisted, element("span", "", text.t("mind_graph.script.list.unlisted")))
-  // The rows' region, inside the column's gutter; the trees in it are the
-  // tree's block (`CLASSES.tree`).
-  const body = element("div", "px-2 pt-2")
+  // The rows' region. It has no gutter of its own: a row stands where a
+  // Pages row stands, inside the column's padding, and the region's other
+  // lines (the filter, a heading, the last line) stand `px-1` in, where a
+  // row's disclosure column starts. The trees in it are the tree's block
+  // (`CLASSES.tree`).
+  const body = element("div", "pt-2")
   body.dataset.mindGraphRows = ""
   container.prepend(...(filterable ? [ filter ] : []), body)
   // The whole site's results, in the place of the filter and the rows while
   // they show.
-  const results = element("div", "px-2 pt-2")
+  const results = element("div", "pt-2")
   results.dataset.mindGraphResults = ""
   results.hidden = true
   body.after(results)
@@ -877,7 +880,9 @@ export function createList(container, { text, number = String, dotClasses, typeL
       backButton.dataset.mindGraphBack = ""
       backButton.addEventListener("click", leaveResults)
       const heading = element("h2", "m-0 mt-2 px-1 text-sm font-semibold text-ink", text.t("mind_graph.script.list.search_site_heading", { query }))
-      const shown = [ backButton, heading ]
+      const backLine = element("div", "px-1")
+      backLine.append(backButton)
+      const shown = [ backLine, heading ]
       if (failed) {
         const said = element("p", "m-0 mt-2 px-1 text-small text-danger-ink", text.t("mind_graph.script.search.failed"))
         said.setAttribute("role", "alert")

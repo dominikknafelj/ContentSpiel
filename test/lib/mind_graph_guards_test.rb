@@ -312,16 +312,16 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
   # (`LIST_LAYOUT_LITERALS`, each with its reason).
   ROW_LOOK = /(?<![\w-])(?:[\w\[\]-]+:)*(?:px-|py-|text-sm(?![\w-])|bg-accent-tint|font-semibold)/
   LIST_LAYOUT_LITERALS = {
-    "flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-ink" => "the label of the \"Not listed on any page\" filter, above the tree",
+    "flex cursor-pointer items-center gap-2 px-1 py-2 text-sm text-ink" => "the label of the \"Not listed on any page\" filter, above the tree",
     "cursor-pointer rounded-cs text-sm text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" =>
       "\"Back to the list\", a button that reads as a link",
-    "px-2 pt-2" => "the rows' region, which holds the tree inside the column's gutter",
     "m-0 flex min-w-0 items-center gap-2 px-1 pb-1 pt-1 text-label text-meta" => "the heading of a filter's or a pill's rows, which is no row of the tree",
     "m-0 px-1 py-1 text-small text-dim" => "the line of a list with nothing drawn",
     "flex flex-col items-start gap-2 px-1 py-1" => "the box of a failed read's line and its buttons",
     "mx-1 mt-2 inline-block text-sm text-accent underline" => "\"Open in Posts\", under a pill's rows",
     "m-0 mt-2 px-1 text-sm font-semibold text-ink" => "the heading of the whole site's results, which is no row of the tree",
-    "m-0 mt-2 px-1 text-small text-danger-ink" => "the line of a whole-site search that failed"
+    "m-0 mt-2 px-1 text-small text-danger-ink" => "the line of a whole-site search that failed",
+    "px-1" => "the line of the whole site's Back, which stands where a row's disclosure column starts"
   }.freeze
   # The scripts that draw the list's rows.
   ROW_SCRIPTS = %w[node_list.js search_box.js].freeze

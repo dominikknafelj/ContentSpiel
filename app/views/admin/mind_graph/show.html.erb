@@ -62,7 +62,7 @@
         rows are links to each one's local view. The graph controller's
         `reset` hides it and empties it again. %>
     <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="admin-shell__tree-region">
-      <div data-mind-graph-search-site data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>" hidden class="mt-2 px-2">
+      <div data-mind-graph-search-site data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>" hidden class="mt-2 px-1">
         <%= render Admin::Ui::ButtonComponent.new(label: "", variant: :tertiary, size: :small) %>
       </div>
     </div>

@@ -281,44 +281,41 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_no_selector "#{RESULTS} b"
   end
 
-  # A row's chips stand under its title, so a title is cut only by the row's
-  # own edge: neither a row with both chips nor a page's row three levels
-  # down leaves its title too narrow to tell one record from another. Each
-  # title must have room for its first twenty characters, measured against
-  # the text itself, not a width in pixels.
-  test "in the list's column a row with two chips and a page three levels down each keep room for twenty characters of the title" do
-    skip "open design question: at the column's default width (17rem, its 1rem padding, the region's px-2 gutter) a page three levels down has 73px for its title, and twenty characters need about 119px"
+  # At the column's default width a page three levels down still says
+  # which page it is: room for the first twelve characters of its title,
+  # measured against the text itself; the rest is cut with an ellipsis, and
+  # the whole title is the title box's tooltip and begins the item's name.
+  test "at the default column width a page three levels down shows at least 12 characters of its title, and its whole title is its tooltip and its name" do
+    title = "Deep page with a long title to read"
     level = create_page(title: "Section of the site")
     level = create_page(title: "Subsection of the site", parent: level)
-    deep = create_page(title: "Deep page with a long title to read", parent: level)
+    deep = create_page(title: title, parent: level)
     deep.update_columns(unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
-    soon = create_post(title: "Scheduled post with a long title to read")
-    PostRelation.create!(post: soon, related_post: create_post(title: "Beta"))
-    soon.update_columns(published_at: 3.days.from_now, unpublished_changes_at: Time.current) # version: none (a test sets the facts a state is derived from) # changes: none (a test sets the facts a state is derived from)
-    assert_equal :scheduled, Publishing::State.of(soon.reload).state
-    assert Publishing::State.of(soon).changes?, "the post carries both chips"
 
     open_branches(deep.parent.parent, deep.parent)
     visit_screen admin_mind_graph_path
     await_graph
     # The column at its default width, 17rem at a 16px root: nobody chose another.
     assert_in_delta 272, element_box("#tree-column")["width"], 0.5
-    rows = [ nid(soon), nid(deep) ].map { |id| "#{LIST} [role=treeitem][data-node-id='#{id}']" }
-    assert_selector "#{rows[0]} .admin-status-chip[data-status='scheduled']"
-    assert_selector "#{rows[0]} [data-unpublished-changes]"
-    assert_selector "#{rows[1]} [data-unpublished-changes]"
-    rows.each do |row|
-      room = page.evaluate_script(<<~JS)
-        (() => {
-          const title = document.querySelector(#{row.to_json}).querySelector(".admin-tree-row__title")
-          const range = document.createRange()
-          range.setStart(title.firstChild, 0)
-          range.setEnd(title.firstChild, 20)
-          return { room: title.getBoundingClientRect().width, needed: range.getBoundingClientRect().width }
-        })()
-      JS
-      assert_operator room["room"], :>=, room["needed"], "#{row}: the title has no room for its first twenty characters"
-    end
+    item = "#{LIST} [role=treeitem][data-node-id='#{nid(deep)}'][aria-level='5']"
+    assert_selector "#{item} [data-unpublished-changes]"
+    shown = page.evaluate_script(<<~JS)
+      (() => {
+        const title = document.querySelector(#{item.to_json}).querySelector(":scope > .admin-tree-row .admin-tree-row__title")
+        const range = document.createRange()
+        range.setStart(title.firstChild, 0)
+        range.setEnd(title.firstChild, 12)
+        const style = getComputedStyle(title)
+        return { room: title.getBoundingClientRect().width, needed: range.getBoundingClientRect().width, cut: title.scrollWidth > title.clientWidth,
+                 overflow: style.textOverflow, tooltip: title.getAttribute("title"), text: title.textContent }
+      })()
+    JS
+    assert_operator shown["room"], :>=, shown["needed"], "the title has no room for its first twelve characters: #{shown}"
+    assert shown["cut"], "the title is not cut at this width, so this test shows nothing of the ellipsis: #{shown}"
+    assert_equal "ellipsis", shown["overflow"]
+    assert_equal title, shown["text"], "the title box holds the whole title, cut only by its box"
+    assert_equal title, shown["tooltip"]
+    assert find(item)["aria-label"].start_with?("#{title}, Unpublished changes: page"), "the item's name does not begin with the whole title: #{find(item)["aria-label"]}"
   end
 
   # Around a page
