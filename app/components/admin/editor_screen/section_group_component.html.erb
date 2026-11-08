@@ -13,9 +13,9 @@
     <span hidden data-section-settings-home></span>
     <%# The section's settings, read only (see the component): no form and no control.
         Hidden until a word of the heading row opens it. %>
-    <%# A region named by the group's heading, so it says whose settings it shows when it
-        stands in the rail. %>
-    <%= tag.div id: settings_id, hidden: true, role: "region", aria: { labelledby: heading_id }, class: "admin-section-group__settings flex flex-col rounded-card bg-rail p-3",
+    <%# A region named by the group's heading and its own words ("Section 3 columns…"), so
+        it says which section's settings it shows when it stands in the rail. %>
+    <%= tag.div id: settings_id, hidden: true, role: "region", aria: { labelledby: "#{heading_id} #{words_id}" }, class: "admin-section-group__settings flex flex-col rounded-card bg-rail p-3",
           data: { controller: "admin--editor--section-settings", section_id: section.id, action: "keydown.esc->admin--editor--section-settings#escape" } do %>
       <dl class="flex flex-col gap-2">
         <% rows.each do |field, label, word| %>

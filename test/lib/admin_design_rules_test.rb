@@ -1034,8 +1034,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # may make a container of anything the post form or the components inside
   # it draw. The classes are read from those sources (`POST_FORM_SOURCES`),
   # and a rule is matched by the classes of its selector's subject, the last
-  # compound. The form's own `.admin-translation-form` is the one exception:
-  # it is the contents element, no box and no container while docked.
+  # compound, or, when the subject names no class (`> *`, a tag, an
+  # attribute), by the classes of the compounds before it: whatever stands
+  # under a post-form class is inside the form. The form's own
+  # `.admin-translation-form` is the one exception, and only as the subject:
+  # it is the contents element, no box and no container while docked. The
+  # sources hold no `@container` utility and no arbitrary `[container…]` one.
   POST_FORM_SOURCES = [
     "app/components/admin/editor_screen/post_form_component.html.erb",
     "app/components/admin/columns/*", "app/components/admin/fields/*",
@@ -1048,17 +1052,28 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   POST_FORM_CONTAINER_ALLOWED = {
     "admin-translation-form" => "the post form itself: display: contents while docked, so no box and no container there"
   }.freeze
+  CONTAINER_UTILITY = /(?<![\w-])@container(?:\/[\w-]+)?(?![\w-])|\[container(?:-type)?:/
   CONTAINER_DECLARATION = /(?:\A|[;{\s])container(?:-type)?\s*:(?!\s*(?:none|normal)\b)\s*[^;}]+/
 
   def self.post_form_classes
     Dir[*POST_FORM_SOURCES.map { |glob| Rails.root.join(glob).to_s }].flat_map { |path| File.read(path).scan(/(?<![\w-])(?:admin-[a-z0-9_-]*[a-z0-9]|ProseMirror|tiptap)(?![\w-])/) }.uniq
   end
 
-  # Each `[selector, classes of its subject]` of a rule that makes a size container.
+  # Each `[selector, classes of its subject, classes of the compounds before
+  # it]` of a rule that makes a size container.
   def self.container_subjects(css)
     css.gsub(%r{/\*.*?\*/}m, "").scan(/([^{}]+)\{([^{}]*)\}/).select { |_, body| body.match?(CONTAINER_DECLARATION) }.flat_map do |selectors, _|
-      selectors.split(",").map(&:strip).map { |selector| [ selector, selector.split(/\s+|>|~|\+/).reject(&:empty?).last.to_s.scan(/\.([\w-]+)/).flatten ] }
+      selectors.split(",").map(&:strip).map do |selector|
+        compounds = selector.split(/\s+|>|~|\+/).reject(&:empty?)
+        classes = ->(parts) { parts.flat_map { |part| part.scan(/\.([\w-]+)/).flatten } }
+        [ selector, classes.([ compounds.last.to_s ]), classes.(compounds[0...-1]) ]
+      end
     end
+  end
+
+  # Whether a container rule's subject is something the post form draws.
+  def self.post_form_container?(subject, earlier, classes)
+    ((subject & classes) - POST_FORM_CONTAINER_ALLOWED.keys).any? || (subject.empty? && (earlier & classes).any?)
   end
 
   test "nothing the post form draws is a size container" do
@@ -1066,20 +1081,31 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[admin-post-main admin-field admin-column admin-translation-pair admin-rich-text-content ProseMirror admin-rail__panel].each { |name| assert_includes classes, name, "the sources hold #{name}" }
     sheets = Dir[Rails.root.join("app/assets/tailwind/*.css"), Rails.root.join("app/assets/stylesheets/*.css")]
     offences = sheets.flat_map do |path|
-      self.class.container_subjects(File.read(path)).filter_map do |selector, subject|
-        hit = (subject & classes) - POST_FORM_CONTAINER_ALLOWED.keys
-        "#{Pathname(path).relative_path_from(Rails.root)}: #{selector}" if hit.any?
+      self.class.container_subjects(File.read(path)).filter_map do |selector, subject, earlier|
+        "#{Pathname(path).relative_path_from(Rails.root)}: #{selector}" if self.class.post_form_container?(subject, earlier, classes)
       end
     end
     assert_empty offences, "a size container inside the post form collapses its fields in Chrome after an autosave"
-    utilities = Dir[*POST_FORM_SOURCES.map { |glob| Rails.root.join(glob).to_s }].select { |path| File.read(path).match?(/(?<![\w-])@container(?:\/[\w-]+)?(?![\w-])/) }
-    assert_empty utilities, "no Tailwind @container utility in the post form's sources"
+    utilities = Dir[*POST_FORM_SOURCES.map { |glob| Rails.root.join(glob).to_s }].select { |path| File.read(path).match?(CONTAINER_UTILITY) }
+    assert_empty utilities, "no Tailwind @container or [container…] utility in the post form's sources"
     POST_FORM_CONTAINER_ALLOWED.each_key { |name| assert_includes classes, name, "a stale allowance: #{name}" }
   end
 
-  test "the container pattern finds a container of a class's subject, and not a none or a descendant" do
-    found = self.class.container_subjects(".admin-rail-grid .admin-post-main { padding: 0; container-type: inline-size; } .x > .admin-field { container: pair / inline-size } .admin-column { container-type: normal } .admin-post-main .y { container-type: size }")
-    assert_equal [ [ ".admin-rail-grid .admin-post-main", [ "admin-post-main" ] ], [ ".x > .admin-field", [ "admin-field" ] ], [ ".admin-post-main .y", [ "y" ] ] ], found
+  test "the container pattern finds a container of a post-form class, or of a classless subject under one, and not a none" do
+    css = ".admin-rail-grid .admin-post-main { padding: 0; container-type: inline-size; } .x > .admin-field { container: pair / inline-size } " \
+          ".admin-column { container-type: normal } .admin-post-main .y { container-type: size } .admin-post-main > * { container-type: inline-size } " \
+          ".admin-post-main div { container-type: inline-size } .admin-post-main [data-field-name] { container-type: inline-size } " \
+          ".admin-translation-form { container: admin-pair / inline-size } .admin-translation-form > div { container-type: inline-size } .admin-dashboard > * { container-type: size }"
+    found = self.class.container_subjects(css)
+    assert_equal [ ".admin-rail-grid .admin-post-main", ".x > .admin-field", ".admin-post-main .y", ".admin-post-main > *", ".admin-post-main div",
+                   ".admin-post-main [data-field-name]", ".admin-translation-form", ".admin-translation-form > div", ".admin-dashboard > *" ], found.map(&:first), "a none or normal is no container"
+    classes = %w[admin-post-main admin-field admin-translation-form]
+    offences = found.select { |_, subject, earlier| self.class.post_form_container?(subject, earlier, classes) }.map(&:first)
+    assert_equal [ ".admin-rail-grid .admin-post-main", ".x > .admin-field", ".admin-post-main > *", ".admin-post-main div", ".admin-post-main [data-field-name]", ".admin-translation-form > div" ], offences,
+      "the form's own class is allowed only as the subject; a classed subject outside the form and a rule outside it are not offences"
+    assert_match CONTAINER_UTILITY, %(class="[container-type:inline-size] p-4")
+    assert_match CONTAINER_UTILITY, %(class="@container/main")
+    assert_no_match CONTAINER_UTILITY, %(class="admin-container-ish container-fluid")
   end
 
   # A container query cannot read a custom property, so the threshold is a

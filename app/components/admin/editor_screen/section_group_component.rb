@@ -100,6 +100,8 @@ module Admin
 
       def heading_id = "section-#{section.id}-heading"
 
+      def words_id = Admin::EditorScreen::SectionCardComponent.words_id(section)
+
       def default_language = ::Locales.name(::Locales.default, native: true)
 
       # The default language's editor with this section chosen. No `locale`:

@@ -78,7 +78,9 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
 
     region = "#{group} > [data-section-settings-home] + #section-#{@section.id}-settings[hidden][data-controller='admin--editor--section-settings'][data-section-id='#{@section.id}']"
     assert_selector region, visible: :all
-    assert_selector "#{region}[role=region][aria-labelledby='section-#{@section.id}-heading']", visible: :all
+    # Named by the heading and the section's own words, so two sections' regions differ.
+    assert_selector "#{region}[role=region][aria-labelledby='section-#{@section.id}-heading section-#{@section.id}-words']", visible: :all
+    assert_selector "#{head} > #section-#{@section.id}-words", visible: :all
     assert_selector "#{head} > h3#section-#{@section.id}-heading", text: "Section"
     rows = page.all("#{region} dl > div[tabindex='-1'][data-section-setting]", visible: :all)
     assert_equal %w[layout background width anchor], rows.map { |row| row["data-section-setting"] }

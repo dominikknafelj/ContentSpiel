@@ -461,6 +461,14 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       title_field = box("#{POST_MAIN} [data-field-name='title'] .admin-translation-pair > div:first-child")
       assert_operator title_original[3], :<=, title_field[1] + 1, "below 1244px of the editor the main column's pair stacks"
     end
+    at_window(content_window(1244) - 44) do
+      visit_editor(@post, locale: "de")
+      assert_docked
+      assert_in_delta 1244, width_of("#editing"), 1
+      title_original = box("#{POST_MAIN} [data-original-for='title']")
+      title_field = box("#{POST_MAIN} [data-field-name='title'] .admin-translation-pair > div:first-child")
+      assert_in_delta title_field[1], title_original[1], 4, "at 1244px of the editor the main column's field and its original share a row"
+    end
   end
 
   test "the page settings are one form at every width" do
