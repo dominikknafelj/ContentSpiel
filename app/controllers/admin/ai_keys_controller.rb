@@ -1,7 +1,6 @@
 module Admin
   # The AI API key's own save (`PATCH /<admin>/settings/ai_key`) and remove
-  # (`DELETE`), the instant actions of the Settings screen's AI card (round 3,
-  # Task 7; translation helpers spec §6.2). The key is deliberately not a field
+  # (`DELETE`), the instant actions of the Settings screen's AI card. The key is deliberately not a field
   # of the Settings form -- it is never rendered, so it can't be a pending
   # change -- so each action is its own form beside it and answers with Turbo
   # Streams that replace ONLY the key component and its forms (plus the main
@@ -18,8 +17,6 @@ module Admin
   class AiKeysController < BaseController
     include CarriedBase
 
-    BLANK_KEY_MESSAGE = "Enter the API key first.".freeze
-
     before_action -> { require_permission("settings.manage") }
 
     # `site_setting` is read only when it is the hash the form posts: a forged
@@ -28,9 +25,9 @@ module Admin
     def update
       posted = params[:site_setting]
       key = (posted.is_a?(ActionController::Parameters) ? posted[:ai_api_key] : nil).to_s.strip
-      return answer(nil, error: BLANK_KEY_MESSAGE, status: :unprocessable_entity) if key.blank?
+      return answer(nil, error: t("admin.settings.ai_key.blank"), status: :unprocessable_entity) if key.blank?
 
-      write({ "ai_api_key" => key }, notice: "API key saved")
+      write({ "ai_api_key" => key }, notice: t("admin.settings.ai_key.saved"))
     end
 
     # With no key stored there is nothing to remove: nothing is written and
@@ -38,7 +35,7 @@ module Admin
     def destroy
       return answer(nil) unless Current.site.ai_api_key_set?
 
-      write({ "ai_api_key" => nil }, notice: "API key removed")
+      write({ "ai_api_key" => nil }, notice: t("admin.settings.ai_key.removed"))
     end
 
     private

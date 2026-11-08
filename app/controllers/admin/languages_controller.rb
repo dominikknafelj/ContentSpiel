@@ -1,10 +1,8 @@
 module Admin
-  # The Languages card's INSTANT actions (cs-studio spec §6.1; round 3, Task 6).
-  # The Languages screen is gone: its card lives in Settings, and what the
-  # screen's bulk form did -- the order and each language's fallback -- is a
-  # pair of fields of the Settings form, saved by its footer (`Settings::Save`'s
-  # `languages:`). What stays here are the three actions that happen at once,
-  # each a form of its own behind (for the two that need it) a dialog:
+  # The Settings Languages card's INSTANT actions. The order and each
+  # language's fallback are fields of the Settings form, saved by its save bar
+  # (`Settings::Save`'s `languages:`); here are the three actions that happen
+  # at once, each a form of its own behind (for the two that need it) a dialog:
   #
   #   - `create`       -- Add language, `Locales::Enable`, no dialog;
   #   - `destroy`      -- Turn off, `Locales::Disable` (refused for the default);
@@ -14,7 +12,7 @@ module Admin
   # is a full reload of Settings, which renders a fresh `base_updated_at` for
   # the main form, so no base needs moving; and it would throw away anything
   # typed there, which is why the card's controls are disabled while that form
-  # has unsaved changes (`admin--saving--pending-lock`, decision D10). A request made
+  # has unsaved changes (`admin--saving--pending-lock`). A request made
   # anyway (a script, a second tab) still just reloads the screen.
   #
   # `languages.manage`, checked again by each service.
@@ -27,14 +25,14 @@ module Admin
     # tiers: the default language, then every other enabled one.
     def create
       code = params[:code].to_s
-      redirect_after("#{Locales.name(code, native: true)} added") { Locales::Enable.call(code) }
+      redirect_after(t("admin.settings.languages.added", language: Locales.name(code, native: true))) { Locales::Enable.call(code) }
     end
 
     # Turn off. The service refuses the default (and is the one place that rule
     # lives); the card just never shows the button for it.
     def destroy
       code = params[:id].to_s
-      redirect_after("#{Locales.name(code, native: true)} turned off") { Locales::Disable.call(code) }
+      redirect_after(t("admin.settings.languages.turned_off", language: Locales.name(code, native: true))) { Locales::Disable.call(code) }
     end
 
     # Make the language the default. A code that isn't an enabled language is a
@@ -44,7 +42,7 @@ module Admin
       code = params[:id].to_s
       return head(:unprocessable_entity) unless Locales.enabled?(code)
 
-      redirect_after("#{Locales.name(code, native: true)} is now the default language") { Locales::MakeDefault.call(code) }
+      redirect_after(t("admin.settings.languages.made_default", language: Locales.name(code, native: true))) { Locales::MakeDefault.call(code) }
     end
 
     private
@@ -61,7 +59,7 @@ module Admin
       if result.ok?
         redirect_to card_path, status: :see_other, notice: (notice unless language_state == before)
       else
-        forbidden_or(result) { redirect_to card_path, status: :see_other, alert: result.errors.to_sentence }
+        forbidden_or(result) { redirect_to card_path, status: :see_other, alert: result.errors.to_sentence } # i18n-ok: to_sentence joins with the locale's support.array words
       end
     end
 

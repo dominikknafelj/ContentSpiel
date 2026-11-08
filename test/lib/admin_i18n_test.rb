@@ -125,6 +125,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/nav_component.rb
     app/components/admin/settings_screen/nav_component.html.erb
     app/views/admin/settings/show.html.erb
+    app/views/admin/settings/_ai_key_forms.html.erb
+    app/views/admin/settings/_social_link_row.html.erb
+    app/javascript/controllers/admin/settings/ai_controller.js
+    app/controllers/admin/ai_keys_controller.rb
+    app/controllers/admin/settings_controller.rb
+    app/controllers/admin/languages_controller.rb
     app/components/admin/settings_screen/site_card_component.rb
     app/components/admin/settings_screen/site_card_component.html.erb
     app/components/admin/settings_screen/languages_card_component.rb

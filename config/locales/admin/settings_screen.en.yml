@@ -71,6 +71,8 @@ en:
           model: "Model"
           test: "Test connection"
           testing: "Testing…"
+          # Beside Test connection while Provider or Model differ from the saved ones (`admin--settings--ai`).
+          save_first: "Save provider and model first. Tests the saved settings."
         ai_key:
           label: "API key"
           replace: "Replace"
@@ -82,6 +84,9 @@ en:
           cancel: "Cancel"
           # After "Key saved", the day the key was saved: `date.formats.admin`.
           added: "added %{date}"
+          # Written into the key's entry while it holds text, and shown by the
+          # save bar in place of its Save (`admin--settings--ai`).
+          hold: "Save or cancel the API key first."
         mail_card:
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
           server: "Server"

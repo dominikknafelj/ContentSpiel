@@ -1,6 +1,7 @@
 <%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("ai"), id: "settings-ai-card",
       intro: t(".intro"),
-      data: { controller: "admin--settings--ai admin--saving--pending-lock" }) do %>
+      data: { controller: "admin--settings--ai admin--saving--pending-lock",
+              messages: messages_data("components.settings_screen.ai_card.save_first", "components.settings_screen.ai_key.hold") }) do %>
   <div class="flex flex-col gap-4 p-4">
     <div class="grid gap-3.5 sm:grid-cols-2">
       <div class="admin-column" data-field-name="ai_provider">

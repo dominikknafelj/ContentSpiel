@@ -32,4 +32,12 @@ class Admin::SettingsScreen::AiCardComponentTest < ViewComponent::TestCase
     assert_selector "#settings-ai_provider-errors", text: "isn't an available provider"
     assert_selector "#settings-ai_model-errors", text: "Model is bad"
   end
+
+  test "its script's hints are the card's messages, read from keys" do
+    render_card
+
+    payload = JSON.parse(page.find("section#settings-ai-card")["data-messages"])
+    assert_equal I18n.t("admin.components.settings_screen.ai_card.save_first"), payload.fetch("components.settings_screen.ai_card.save_first")
+    assert_equal "Save or cancel the API key first.", payload.fetch("components.settings_screen.ai_key.hold")
+  end
 end

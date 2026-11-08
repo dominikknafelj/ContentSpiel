@@ -280,7 +280,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
 
     patch admin_settings_ai_key_path, params: { site_setting: { ai_api_key: " " } }
     assert_redirected_to admin_settings_path(anchor: "ai")
-    assert_equal Admin::AiKeysController::BLANK_KEY_MESSAGE, flash[:alert]
+    assert_equal I18n.t("admin.settings.ai_key.blank"), flash[:alert]
 
     delete admin_settings_ai_key_path
     assert_redirected_to admin_settings_path(anchor: "ai")
@@ -298,7 +298,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
   test "a forged scalar site_setting is a blank key and an empty Settings form, never a 500" do
     patch admin_settings_ai_key_path, params: { site_setting: "x" }, as: :turbo_stream
     assert_response :unprocessable_entity
-    assert_includes response.body, Admin::AiKeysController::BLANK_KEY_MESSAGE
+    assert_includes response.body, I18n.t("admin.settings.ai_key.blank")
 
     title = @site.title
     patch admin_settings_path, params: { site_setting: "x" }
