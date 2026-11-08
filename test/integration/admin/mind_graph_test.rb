@@ -188,6 +188,8 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal [ "Draft", "Scheduled", "Unpublished changes" ], messages.values_at(*chip_words)
     assert_equal chip_words.map { |key| I18n.t("admin.#{key}") }, messages.values_at(*chip_words)
     assert_equal "%{title}, %{state}", messages["mind_graph.script.list.stated"]
+    # A page whose parent is not drawn says the path it stands under.
+    assert_equal [ "%{path}", "%{title}, under %{path}" ], messages.values_at("mind_graph.script.list.ancestors", "mind_graph.script.list.under")
     assert_equal [ { "one" => "%{figure} child page", "other" => "%{figure} child pages" }, { "one" => "lists %{figure} post", "other" => "lists %{figure} posts" } ],
                  messages.values_at("mind_graph.script.card.child_pages", "mind_graph.script.card.lists_posts")
     # A pill's row is named with its visible words first ("+92 more: …"), so
@@ -197,9 +199,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
                     card.notes.replies card.notes.sending card.notes.title card.notes.unread card.open_page card.open_post card.pin card.post_type card.related card.show_tagged
                     card.status.change_scheduled card.status.live_change_scheduled card.status.live_with_changes
                     card.tag card.tag_posts card.tags card.unpin isolated isolated_only legend.toggle
-                    list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
+                    list.absent_post list.absent_retired_post list.add_post list.add_retired_post list.ancestors list.back list.empty list.failed list.more_heading list.more_row list.not_in_view list.open_in_posts list.pages list.posts
                     list.select_page list.select_post list.select_tag list.select_type list.stated
-                    list.tags list.try_again list.types list.unlisted load_failed loading more no_connections opened.everything_name opened.line
+                    list.tags list.try_again list.types list.under list.unlisted load_failed loading more no_connections opened.everything_name opened.line
                     release_pinned retired_type retry search.count search.failed search.groups.page search.groups.post search.groups.tag search.none
                     summary.all_hidden summary.around_home summary.connections summary.everything summary.hidden.page summary.hidden.post summary.hidden.tag summary.hidden.type
                     summary.hidden_lines.lists summary.hidden_lines.related summary.hidden_lines.tag summary.hidden_lines.tree summary.local summary.more summary.none_yet summary.nothing

@@ -261,7 +261,7 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     pages = graph[:pages]
 
     assert_equal [ page_id(home), page_id(blog), page_id(child) ], pages.map { |page| page[:id] }
-    assert_equal({ id: page_id(blog), title: "Blog", path: "/blog", depth: 1, home: false, parent: page_id(home), order: 1, status: "live", unpublished: false,
+    assert_equal({ id: page_id(blog), title: "Blog", path: "/blog", depth: 1, home: false, parent: page_id(home), ancestors: [], order: 1, status: "live", unpublished: false,
                    url: "/cs-studio/pages/#{blog.id}", degree: 3, child_count: 1, listed_count: 1, open_notes: 1 }, pages[1].except(:changes, :change_at))
     assert_equal [ true, nil, 0, 1 ], pages[0].values_at(:home, :parent, :depth, :child_count)
   end

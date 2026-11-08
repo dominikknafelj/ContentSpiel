@@ -247,6 +247,8 @@ en:
           absent_post: "%{title}, %{type} post, not in view."
           absent_retired_post: "%{title}, %{type}, retired type, not in view."
           stated: "%{title}, %{state}"
+          ancestors: "%{path}"
+          under: "%{title}, under %{path}"
         search:
           count:
             one: "%{count} result"

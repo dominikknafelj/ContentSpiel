@@ -6,7 +6,7 @@ module Admin
     # in `mind_graph/node_list.js`, with the parts' glyphs
     # (`Admin::MindGraphScreen::PartsComponent`); `test/system/admin/
     # tree_item_parity_test.rb` measures the two. `flat:` is the graph's
-    # (its posts, tags and post types). The nesting around it (`<ul>`/`<li>`
+    # (its posts and its pills). The nesting around it (`<ul>`/`<li>`
     # in both, the children lists in `CLASSES[:children]`) is the screen's,
     # and so are the title's link and every extra in the slots.
     #
@@ -19,8 +19,8 @@ module Admin
     # `parent:` draws the disclosure, a button saying whether the branch is
     # open (`aria-expanded`) and naming the list it folds (`controls:`, the
     # children list's id); a leaf keeps the disclosure's empty box so the
-    # marks line up, and `flat:` draws neither (the graph's posts, tags and
-    # post types). The button's press is `admin--tree--disclosure#toggle`, the
+    # marks line up, and `flat:` draws neither (the graph's posts and
+    # pills). The button's press is `admin--tree--disclosure#toggle`, the
     # controller the tree it stands in carries, which folds the branch and
     # writes the open set. `folded:` is what the server drew; the script
     # toggles it after.

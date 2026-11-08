@@ -323,7 +323,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    the trailing slots, 8px. A parent is told by its disclosure and, folded,
    its count, never by a heavier title. On a leaf the disclosure is an empty
    box of the same width, so the marks line up across siblings; a flat row
-   (the graph's posts, tags and post types) has none. `position: relative`
+   (the graph's posts and pills) has none. `position: relative`
    holds the drag handle, which stands in the gutter left of the row. */
 .admin-tree-row { position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
 .admin-tree-row:hover { background: var(--cs-sunken); }
@@ -361,6 +361,10 @@ button.admin-tree-row { width: 100%; text-align: start; cursor: pointer; }
 .admin-tree-row__add { flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-inline-start: 6px; border-radius: var(--cs-radius); color: var(--cs-meta); }
 .admin-tree-row__add:hover { color: var(--cs-ink); }
 .admin-tree-row__count { text-align: end; font-size: var(--cs-t-count); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--cs-meta); }
+/* A count shown at rest (the graph's list, where every row's figure shows)
+   keeps a figure's width from the start, so a cut title's ellipsis does not
+   move when the row is hovered; one that rests clipped is 1px until shown. */
+.admin-tree-row__count:not(.admin-tree-row__reveal) { min-width: 14px; }
 /* WHAT RESTS OUT OF SIGHT. A marker, a count and presence (`__reveal`) are
    clipped at rest, never `hidden` and never removed, so a screen reader
    still hears "3 subpages" and they take no room; they show on the row's

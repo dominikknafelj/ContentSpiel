@@ -31,18 +31,19 @@
 // to right: the disclosure box, the mark box, the title, the chips under
 // the title, and the figure at the row's end, shown at rest on every row. A
 // page has a disclosure box, holding the disclosure part when its children
-// have rows here, empty otherwise so the marks line up; a post's, a tag's
-// and a post type's row is flat (no disclosure box), unless a pill hangs off
-// it. The disclosure is drawn open and folds nothing: the row is the one
-// control, a button, so the disclosure is a silent part and never a button
-// inside it. The row of the selected node takes the tree's selected look.
+// have rows here, empty otherwise so the marks line up; so does a tag's and
+// a post type's, holding the disclosure where a pill hangs off it, so a
+// group's marks line up; a post's row is flat (no disclosure box). The
+// disclosure is drawn open and folds nothing: the row is the one control,
+// a button, so the disclosure is a silent part and never a button inside
+// it. The row of the selected node takes the tree's selected look.
 //
 // A GROUP'S HEADING is a row of the tree's too, 28px like any, and never
 // selected: the disclosure part, its kind's icon chip (`Admin::Ui::
 // IconChipComponent`, the sidebar's: a page the structure's, a post, a tag
 // and a post type the lists') in the mark box, then the group's words in
 // the label style with the figure after the middle dot in the count style.
-// 12px stand above every heading but the first. A heading adds no step: the
+// `--cs-sp-3` stands above every heading but the first. A heading adds no step: the
 // rows under it start at its left edge, and a page steps `--cs-tree-step`
 // per level below Home, as in Pages.
 //
@@ -73,7 +74,13 @@
 // `parent`), so the nesting is the document's and is announced as a level,
 // and the step is the children list's (`CLASSES.children`). A page whose
 // parent has no row here (not readable, or not in this view) stands at the
-// top level of the group, with no step: nothing it could hang from is drawn.
+// top level of the group, with no step and no guide: nothing it could hang
+// from is drawn. Under its title it says where it stands, its ancestors'
+// titles from Home (the data's `ancestors`, which name only pages the viewer
+// reads), and its tooltip and its name say the same.
+//
+// EVERY FIGURE in the list, a row's and a heading's, is written by `number`,
+// as the messages' language groups it ("Pages · 1,204").
 //
 // A ROW'S STATE is shown as the posts list shows it, by its rule: an
 // exception stands out and a plain live row has nothing. Under the title, on
@@ -112,7 +119,8 @@
 // retired type". One that is drawn selects, like any row.
 //
 // A READ THAT FAILED is said IN THE LIST, not in a toast, beside what it
-// was for: the line and a small "Try again" button under it (`fail`), in a
+// was for: the line in the danger ink and a small "Try again" button under
+// it (`fail`, the tertiary button's classes the app hands in), in a
 // `role="alert"` so it is announced. The checkbox above stays, so the
 // filter can be let go. When the focus was in the rows it is put on "Try
 // again": the row or the button that was pressed is gone, and the keyboard
@@ -164,7 +172,12 @@ const LINK = "cursor-pointer rounded-cs text-sm text-accent underline focus-visi
 // Where a heading's figure stands in its words: the key is asked with this
 // in place of the count and cut there, so the language keeps its own order
 // and the figure alone takes the count style. No word holds the character.
+// A heading's key is therefore never a plural: a plural is chosen by the
+// count, and the key is asked with this character in the count's place.
 const FIGURE = "\u0000"
+// Between two ancestors' titles in the line under a page whose parent is
+// not drawn: the breadcrumb's mark, no word.
+const PATH_JOIN = " › "
 
 export function createList(container, { text, number = String, dotClasses, typeLabels = {}, treeClasses: classes, retryClass = "", parts, unlisted: filterable = true, onSelect, onHover, onAdd, onMore = () => {}, onUnlisted }) {
   let rows = new Map()
@@ -228,13 +241,13 @@ export function createList(container, { text, number = String, dotClasses, typeL
   // group's words with `%{count}` where the figure stands.
   const group = (key, count, list, icon) => {
     const heading = element("h2", classes.row)
-    const [ before, after = "" ] = text.t(key, { count: FIGURE }).split(FIGURE)
+    const [ before, ...rest ] = text.t(key, { count: FIGURE }).split(FIGURE)
     const words = element("span", "text-label text-meta", before)
-    words.append(element("span", "text-count", count), after)
+    rest.forEach((after) => words.append(element("span", "text-count", number(count)), after))
     const title = element("span", classes.title)
     title.append(words)
     heading.append(parts.part("tree-disclosure"), markBox(parts.part(icon)), title)
-    return named(heading, list, { wrapperClass: "not-first:mt-3" })
+    return named(heading, list, { wrapperClass: "not-first:mt-(--cs-sp-3)" })
   }
   // The rows a filter or a pill brings, under a heading of their own. With
   // `back`, the way back stands beside the heading, before the rows.
@@ -267,22 +280,31 @@ export function createList(container, { text, number = String, dotClasses, typeL
     held.append(...names.map((name) => parts.part(name)))
     return [ held ]
   }
-  // The tree's title box, the whole title in its tooltip as in Pages.
-  const titleBox = (words) => {
+  // The tree's title box, the whole title in its tooltip as in Pages
+  // (`tooltip`, where the row says more than its title).
+  const titleBox = (words, tooltip = words) => {
     const title = element("span", classes.title, words)
-    title.title = words
+    title.title = tooltip
     return title
   }
+  // A page whose parent has no row here stands at the top with no step, so
+  // it says where it is: its ancestors' titles from Home (the data's
+  // `ancestors`), joined, on a line under its title cut at the end; the
+  // tooltip and the name carry the whole path.
+  const pathOf = (node) => (node.ancestors?.length ? node.ancestors.join(PATH_JOIN) : null)
+  const placed = (title, path) => (path ? text.t("mind_graph.script.list.under", { title, path }) : title)
   // A row's title, and on a line of their own under it its chips when it
   // has any: the title keeps the row's whole width and is cut only by the
   // row's edge, so in the list's narrow column a row with two chips, or a
   // page deep in the tree, still says which record it is. The chips wrap
   // rather than run past the row's figure.
-  const titled = (node) => {
+  const titled = (node, path = null) => {
     const chips = stateChips(node)
-    if (!chips.length) return titleBox(node.title)
+    const title = titleBox(node.title, placed(node.title, path))
+    if (!chips.length && !path) return title
     const stack = element("span", "flex min-w-0 flex-1 flex-col gap-0.5")
-    stack.append(titleBox(node.title), ...chips)
+    const where = path ? [ element("span", "min-w-0 truncate text-small text-meta", text.t("mind_graph.script.list.ancestors", { path })) ] : []
+    stack.append(title, ...where, ...chips)
     return stack
   }
   // The mark box, holding `mark` (a pill's is empty, so its words stand
@@ -344,16 +366,19 @@ export function createList(container, { text, number = String, dotClasses, typeL
     ? text.t("mind_graph.script.list.absent_post", { title: stated(node), type: lower(typeLabels[node.type]) })
     : text.t("mind_graph.script.list.absent_retired_post", { title: stated(node), type: lower(node.type) })
   // `opens`: the row's children have rows here (a page's, or a pill that
-  // hangs off it).
-  const row = (node, { notInView = false, addable = true, opens = false } = {}) => {
+  // hangs off it). `path`: a page whose parent has no row here, and the
+  // titles it stands under. A post's row is flat; a tag's and a post type's
+  // keep the disclosure box, so their marks line up with a hub's that a
+  // pill hangs off.
+  const row = (node, { notInView = false, addable = true, opens = false, path = null } = {}) => {
     const item = document.createElement("li")
-    const button = rowButton(node.id, { opens, flat: node.kind !== "page" && !opens })
-    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: stated(node), count: figure(node) }))
+    const button = rowButton(node.id, { opens, flat: node.kind === "post" && !opens })
+    button.setAttribute("aria-label", notInView ? (addable ? addName(node) : absentName(node)) : text.t(NAMES[node.kind], { title: placed(stated(node), path), count: figure(node) }))
     // At the row's end: the figure, or the words of a row that is not in view.
     const notShown = () => element("span", "text-label text-meta", text.t("mind_graph.script.list.not_in_view"))
     const trailing = element("span", classes.trailing)
-    trailing.append(notInView ? notShown() : element("span", classes.count, figure(node)))
-    button.append(markBox(markFor(node)), titled(node), trailing)
+    trailing.append(notInView ? notShown() : element("span", classes.count, number(figure(node))))
+    button.append(markBox(markFor(node)), titled(node, path), trailing)
     item.append(button)
     rows.set(node.id, button)
     if (notInView) {
@@ -389,8 +414,8 @@ export function createList(container, { text, number = String, dotClasses, typeL
     const top = listOf()
     const items = new Map()
     for (const page of pages) {
-      const item = row(page, { opens: opens.has(page.id) })
       const parent = items.get(page.parent)
+      const item = row(page, { opens: opens.has(page.id), path: parent ? null : pathOf(page) })
       if (parent) childrenOf(parent).append(item)
       else top.append(item)
       items.set(page.id, item)
@@ -457,7 +482,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
     else if (rowBox.bottom > box.bottom) container.scrollTop += rowBox.bottom - box.bottom
   }
 
-  const line = (content) => element("p", "m-0 px-1 py-1 text-sm text-meta", content)
+  const line = (content) => element("p", "m-0 px-1 py-1 text-small text-dim", content)
 
   return {
     render(nodes) {
@@ -525,7 +550,7 @@ export function createList(container, { text, number = String, dotClasses, typeL
       again.addEventListener("click", onRetry)
       const controls = element("div", "flex flex-wrap items-center gap-3")
       controls.append(again, ...(back ? [ backButton(back) ] : []))
-      said.append(element("p", "m-0 text-sm text-meta", content), controls)
+      said.append(element("p", "m-0 text-small text-danger-ink", content), controls)
       body.replaceChildren(said)
       if (focus || held) again.focus()
     },

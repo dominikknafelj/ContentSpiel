@@ -323,6 +323,8 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert_equal [ @guide, @intro ].map { |page| "page-#{page.id}" }, page_ids(result)
     assert_empty result[:nodes]
     assert_no_match(/page-#{@docs.id}\b/, result.to_json)
+    assert_equal [ [], [] ], result[:pages].map { |page| page[:ancestors] }, "the walk to Home stops under a page the viewer cannot read, and names none"
+    assert_no_match(/"Docs"/, result.to_json)
   end
 
   test "from a tag the walk steps along a lists line: the pages that list it are depth 1" do
@@ -333,6 +335,18 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
 
     assert_equal [ "page-#{@blog.id}" ], page_ids(result)
     assert_includes result[:edges], { source: "page-#{@blog.id}", target: "tag-#{Tag.find_by!(name: "shared").id}", kind: "lists" }
+  end
+
+  # A page whose parent is not drawn says where it stands by its
+  # ancestors' titles from Home; one whose parent is drawn needs none.
+  test "a page whose parent is not in the view carries its ancestors' titles from Home, and one whose parent is drawn none" do
+    tree
+    list_block(@intro, tag: "shared")
+    list_block(@guide, tag: "shared")
+
+    pages = local(tag_focus("shared"))[:pages].to_h { |page| [ page[:id], page[:ancestors] ] }
+
+    assert_equal({ "page-#{@guide.id}" => [ root_page.title, "Docs" ], "page-#{@intro.id}" => [] }, pages)
   end
 
   test "from a post, depth 2 reaches the pages that list one of its tags, and depth 1 does not" do

@@ -191,6 +191,21 @@ module PostGraph
 
     private
 
+    # The titles of a page's ancestors from Home down to its parent, for a
+    # page whose parent is not drawn (a local view): its row in the list says
+    # where it stands, as the tree line would. The tree holds only what the
+    # viewer reads, so the walk stops under an ancestor they cannot read and
+    # never names it. No statement: the titles are the site's loaded rows.
+    def ancestor_titles(page_id, tree)
+      titles = []
+      at = tree.parent(page_id)
+      while at
+        titles.unshift(Locales.read(@site.page(at), :title, locale: @locale))
+        at = tree.parent(at)
+      end
+      titles
+    end
+
     # `lost`: how many of the tag's drawn posts went between the two reads;
     # they are no longer posts that carry it.
     def tag_node(tag_id, name, plan, degree, lost = 0)
@@ -205,6 +220,7 @@ module PostGraph
       notes = Notes::Counts.by_container("Page", page_ids)
       pending = pending_copies("Page", page_ids)
       tree = @site.tree
+      in_view = page_ids.to_set
       page_ids.sort_by { |page_id| tree.rank(page_id) }.map do |page_id|
         record = @site.page(page_id)
         id = PostGraph.node_id(:page, page_id)
@@ -217,6 +233,7 @@ module PostGraph
           depth: tree.depth(page_id),
           home: page_id == tree.home_id,
           parent: parent && PostGraph.node_id(:page, parent),
+          ancestors: (parent && !in_view.include?(parent) ? ancestor_titles(page_id, tree) : []),
           order: tree.rank(page_id),
           status: state.status,
           changes: CHANGES[state.state],

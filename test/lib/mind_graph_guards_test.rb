@@ -316,9 +316,8 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
       "\"Back to the list\", a button that reads as a link",
     "${classes.tree} px-2 pt-2" => "the rows' region: the tree's own class, inside the column's gutter",
     "m-0 flex min-w-0 items-center gap-2 px-1 pb-1 pt-1 text-label text-meta" => "the heading of a filter's or a pill's rows, which is no row of the tree",
-    "m-0 px-1 py-1 text-sm text-meta" => "the line of a list with nothing drawn",
+    "m-0 px-1 py-1 text-small text-dim" => "the line of a list with nothing drawn",
     "flex flex-col items-start gap-2 px-1 py-1" => "the box of a failed read's line and its buttons",
-    "m-0 text-sm text-meta" => "a failed read's line",
     "mx-1 mt-2 inline-block text-sm text-accent underline" => "\"Open in Posts\", under a pill's rows"
   }.freeze
 
