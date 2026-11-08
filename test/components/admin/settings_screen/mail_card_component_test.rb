@@ -9,15 +9,16 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
     Current.session = nil
   end
 
-  test "each state is a dot and a word, and its sentence" do
-    { not_set_up: [ "Not set up", "Not set up. Password resets and invites are off.", ".border-meta" ],
-      untested: [ "Saved, not tested", "Saved, not tested. Send a test mail to turn on resets and invites.", ".bg-warn" ],
-      working: [ "Working", "Working. Last mail sent", ".bg-ok" ],
-      failed: [ "Last send failed", "Last send failed", ".bg-danger" ] }.each do |state, (word, sentence, dot)|
+  test "each state is a state chip, its tone and its word, and its sentence" do
+    { not_set_up: [ "Not set up", "Not set up. Password resets and invites are off.", :off ],
+      untested: [ "Saved, not tested", "Saved, not tested. Send a test mail to turn on resets and invites.", :warn ],
+      working: [ "Working", "Working. Last mail sent", :ok ],
+      failed: [ "Last send failed", "Last send failed", :danger ] }.each do |state, (word, sentence, tone)|
       with_mail_state(state) { render_card }
 
-      assert_selector "#settings-mail-state[data-mail-state=#{state}] .font-semibold", text: word
-      assert_selector "#settings-mail-state #{dot}[aria-hidden=true]"
+      assert_equal tone, Admin::SettingsScreen::MailStateComponent::TONES.fetch(state)
+      assert_selector "#settings-mail-state[data-mail-state=#{state}] .admin-state-chip[data-state-tone=#{tone}]", text: word
+      assert_selector "#settings-mail-state .admin-state-chip > span[aria-hidden=true]", visible: :all
       assert_selector "#settings-mail-state p", text: sentence
     end
   end

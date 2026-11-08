@@ -624,6 +624,22 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # `Admin::Ui::StateChipComponent`: ok, warn and danger are a word and a
+  # dot on the role's tint; off is a field-line edge and ring with dim words,
+  # standing on a card or on the rail.
+  test "a state chip's word is 4.5:1 and its dot 3:1 on its tint, and off's edge 3:1 on the surface and the rail, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[ok warn danger].each do |role|
+        assert_ratio(4.5, colour.("--cs-#{role}-ink"), colour.("--cs-#{role}-tint"), "the #{role} chip's word (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-#{role}"), colour.("--cs-#{role}-tint"), "the #{role} chip's dot (#{scheme})")
+      end
+      %w[--cs-surface --cs-rail].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the off chip's edge and ring on #{ground} (#{scheme})")
+        assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "the off chip's word on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   # The Notes tab stands on the rail's ground docked and on the popover's in
   # the slide-over; the thread's reply dock paints the ground the drawer
   # names (`--cs-notes-ground`), so a message, a time, a mention, Reply and

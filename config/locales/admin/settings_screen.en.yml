@@ -1,8 +1,7 @@
-# The Settings screen's Mail card (spec "Settings → Mail", design answer M2;
-# docs/reference/mail.md): `admin.components.settings_screen.*` are its
-# components' keys (docs/reference/i18n.md: one file per component folder).
-# The screen's older cards still hold their words as literals; only the mail
-# card and the encryption-keys sentence are keys so far.
+# The Settings screen's components (docs/reference/mail.md for the Mail
+# card): `admin.components.settings_screen.*` are their keys
+# (docs/reference/i18n.md: one file per component folder). A card still
+# drawn with literals is one `test/lib/admin_i18n_test.rb` does not list.
 #
 # `admin.settings.*` are what the controllers and `Settings::Save` answer:
 # toasts, the login's refusal, the sentence a site without encryption keys
@@ -52,6 +51,16 @@ en:
           sent: "Test mail sent to %{address}. Check your inbox."
         mail_state:
           label: "Mail state"
+        # `Admin::SettingsScreen::AiState`'s words, one per state: the key's
+        # chip, Test connection's result and the rail say them alike.
+        ai_state:
+          "off": "Off"
+          no_key: "No key"
+          key_saved: "Key saved"
+          connected: "Connected"
+          not_connected: "Not connected"
+        ai_test_result:
+          time: "%{milliseconds} ms"
         forms_card:
           title: "Forms"
           keep_label: "Keep submissions for"

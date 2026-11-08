@@ -25,7 +25,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/settings"
     await_admin_controllers
 
-    assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key yet"
+    assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key"
     within("#settings-ai-key") { click_on "Add key" }
     fill_in "API key", with: KEY
     click_on "Save key"
@@ -44,7 +44,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # Test connection is on, and answers with the measured time.
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
     click_on "Test connection"
-    assert_selector "#settings-ai-test-result", text: /CONNECTED · \d+ MS/
+    assert_selector "#settings-ai-test-result", text: /Connected · \d+ ms/
 
     # Change the model: the test is off with the specific hint; the key's controls wait too.
     fill_in "Model", with: "claude-opus-5"
@@ -60,12 +60,12 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
     click_on "Test connection"
-    assert_selector "#settings-ai-test-result", text: /CONNECTED · \d+ MS/
+    assert_selector "#settings-ai-test-result", text: /Connected · \d+ ms/
 
     # Remove… asks first.
     click_on "Remove…"
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
-    assert_selector "#settings-ai-key", text: "No key yet"
+    assert_selector "#settings-ai-key", text: "No key"
     assert_nil site_settings(:default).reload.ai_api_key
   end
 
@@ -209,19 +209,19 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # Back in line with the saved values, but the request is still out: no second provider call.
     assert_selector "button[form='settings-ai-test-form'][disabled]"
     GatedProvider.release
-    assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
+    assert_selector "#settings-ai-test-result", text: /Connected/, wait: 10
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
 
     # Edited during a flight and left edited: it is still gated when the answer lands. The first test's
-    # "CONNECTED" is still in the slot and the button is disabled during any flight, so neither says the second
+    # "Connected" is still in the slot and the button is disabled during any flight, so neither says the second
     # answer has landed: the slot is emptied first, and the button is looked at only once it is no longer busy.
     page.execute_script("document.getElementById('settings-ai-test-result').replaceChildren()")
-    assert_no_selector "#settings-ai-test-result", text: /CONNECTED/
+    assert_no_selector "#settings-ai-test-result", text: /Connected/
     GatedProvider.hold!
     click_on "Test connection"
     fill_in "Model", with: "claude-opus-5"
     GatedProvider.release
-    assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
+    assert_selector "#settings-ai-test-result", text: /Connected/, wait: 10
     assert_no_selector "button", text: "Testing…"
     assert_selector "button[form='settings-ai-test-form'][disabled]"
     assert_text "Save provider and model first. Tests the saved settings."
@@ -273,7 +273,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_equal "sk-ant-second-key", site_settings(:default).reload.ai_api_key
     click_on "Remove…"
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
-    assert_selector "#settings-ai-key", text: "No key yet"
+    assert_selector "#settings-ai-key", text: "No key"
   end
 
   # Contrast and buttons spec, Ruling 11: a busy button is disabled but not

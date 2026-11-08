@@ -10,7 +10,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794108449-0fdc".freeze
+  VERSION = "1794162664-ed4a".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -20,12 +20,12 @@ module DesignSystemEntries
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
-    SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot
+    SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip
     StudioBlockCard StudioCalmColour StudioCalmColourE4E5 StudioCalmDashboard StudioCalmE4More StudioCalmE4Setup
     StudioCalmE4Together StudioCalmEditor StudioCalmEditorE StudioCommandPalette StudioDashboardCards
     StudioEditorHeader StudioEmptyState StudioFilterBar StudioHeldStrip StudioListTable StudioMediaGrid
     StudioMindGraph StudioNewRecordDialog StudioNotesThread StudioPageTree StudioRail StudioSectionTile
-    StudioShell StudioTagDetail StudioTranslationPair StudioTree TableGrid TextFields Toast Tooltip UserName
+    StudioSettings StudioShell StudioTagDetail StudioTranslationPair StudioTree StudioWizard TableGrid TextFields Toast Tooltip UserName
   ].freeze
 
   # A component whose card has another name: the card whose "Code" section

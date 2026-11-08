@@ -131,6 +131,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/mail_login_component.rb
     app/components/admin/settings_screen/mail_login_component.html.erb
     app/components/admin/settings_screen/mail_state_component.rb
+    app/components/admin/settings_screen/ai_state.rb
+    app/components/admin/settings_screen/ai_test_result_component.rb
     app/components/admin/settings_screen/mail_alert_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/settings_screen/mail_test_result_component.rb
@@ -176,6 +178,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/dashboard_screen/draft_tile_component.html.erb
     app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
+    app/components/admin/ui/state_chip_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb
     app/components/admin/editor_screen/live_region_component.rb

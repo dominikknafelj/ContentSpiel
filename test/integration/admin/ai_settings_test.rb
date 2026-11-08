@@ -84,38 +84,42 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
 
   # -- the chip (D11) -----------------------------------------------------------
 
-  test "no key reads No key yet, with Add key" do
+  test "no key reads Off without a provider and No key with one, with Add key" do
+    get "/cs-studio/settings"
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=off][data-ai-key-state=unset]", text: "Off"
+
+    @site.update!(ai_provider: "test/stub")
     get "/cs-studio/settings"
 
-    assert_select "#settings-ai-key [data-ai-key-state=unset]", /No key yet/
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=warn][data-ai-key-state=unset]", text: "No key"
     assert_select "#settings-ai-key button", text: "Add key"
   end
 
   test "a key saved before the date column existed reads Key saved alone" do
-    @site.update!(ai_api_key: KEY)
+    @site.update!(ai_provider: "test/stub", ai_api_key: KEY)
     @site.update_columns(ai_api_key_saved_at: nil)
 
     get "/cs-studio/settings"
 
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved", chip.text.squish
+      assert_equal "Key saved", chip.text.squish
     end
     assert_select "#settings-ai-key button", text: "Replace"
     assert_select "#settings-ai-key button", text: "Remove…"
   end
 
   test "a key saved this year reads the day and month, last year's also the year" do
-    @site.update!(ai_api_key: KEY)
+    @site.update!(ai_provider: "test/stub", ai_api_key: KEY)
     @site.update_columns(ai_api_key_saved_at: Time.zone.local(Time.zone.today.year, 10, 2, 12))
     get "/cs-studio/settings"
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved · added 2 Oct", chip.text.squish
+      assert_equal "Key saved · added 2 Oct", chip.text.squish
     end
 
     @site.update_columns(ai_api_key_saved_at: Time.zone.local(Time.zone.today.year - 1, 10, 2, 12))
     get "/cs-studio/settings"
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved · added 2 Oct #{Time.zone.today.year - 1}", chip.text.squish
+      assert_equal "Key saved · added 2 Oct #{Time.zone.today.year - 1}", chip.text.squish
     end
   end
 
@@ -145,6 +149,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
   end
 
   test "the key is stored encrypted and the page never shows it" do
+    @site.update!(ai_provider: "test/stub")
     save_key(KEY)
 
     assert_response :success
@@ -214,7 +219,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     save_key(KEY)
 
     assert_select "turbo-stream[target=settings-ai-test-result]"
-    assert_not_includes Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-ai-test-result]").text, "CONNECTED"
+    assert_not_includes Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-ai-test-result]").text, "Connected"
   end
 
   test "a key save from a user without settings.manage is refused" do
@@ -255,7 +260,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_nil @site.reload.ai_api_key
     assert_nil @site.ai_api_key_saved_at
-    assert_select_in_stream "settings-ai-key", /No key yet/
+    assert_select_in_stream "settings-ai-key", /Off/
     assert_select "turbo-stream[action=append][target=toasts]", /API key removed/
   end
 
@@ -330,7 +335,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     remove_key
     assert_response :success
     assert_nil stored_ciphertext
-    assert_select_in_stream "settings-ai-key", /No key yet/
+    assert_select_in_stream "settings-ai-key", /Off/
     event = Audit::Event.where(action: "settings.updated").order(:id).last
     assert_equal [ "set", "not set" ], event.field_changes["AI key"]
   end
@@ -390,7 +395,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
 
     assert_response :success
-    assert_select_in_stream "settings-ai-test-result", /● CONNECTED · \d+ MS/
+    assert_select_in_stream "settings-ai-test-result", /Connected · \d+ ms/
     assert_not_includes response.body, KEY
   end
 

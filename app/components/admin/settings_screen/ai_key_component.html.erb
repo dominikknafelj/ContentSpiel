@@ -2,11 +2,7 @@
   <label for="settings-ai_api_key" class="<%= setup_label_class %>">API key</label>
 
   <div class="mt-1 flex flex-wrap items-center gap-2" data-admin--settings--ai-target="chip" <%= "hidden" if editing? %>>
-    <span class="inline-flex items-center gap-1.5 rounded-cs border border-line bg-sunken px-2.5 py-1 text-sm text-ink"
-          data-ai-key-state="<%= key_set? ? "set" : "unset" %>">
-      <span aria-hidden="true" class="<%= key_set? ? "text-ok-ink" : "text-meta" %>">●</span>
-      <%= chip_text %>
-    </span>
+    <%= render chip %>
     <% if key_set? %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Replace", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--settings--ai#edit")) %>
       <%= render Admin::Ui::ButtonComponent.new(label: "Remove…", variant: :danger_text, size: :small, data: dialog_trigger(REMOVE_DIALOG).merge(LOCK)) %>

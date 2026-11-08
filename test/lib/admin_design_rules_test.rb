@@ -592,7 +592,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   MONO_CODE = /<code|<pre|tag\.code|tag\.pre/
   MONO_ALLOWED = {
     "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
-    "app/components/admin/settings_screen/ai_test_result_component.rb" => "the AI 'CONNECTED · n MS' result stays mono capitals",
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
     "app/views/setup/token.html.erb" => "the setup token's input holds a key value",
@@ -1500,8 +1499,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # Status colour belongs to the status components. The Live and Scheduled
   # fills are the solid chips', so a new use of them is a new state of the
   # chip; the ok, warn and danger fills are held to the files that draw one
-  # today, a list that may only shrink as screens move their fills into a
-  # status component.
+  # today. The list shrinks as screens move their fills into a status
+  # component, and a status component joins it only in place of the screens'
+  # fills it takes over.
   LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
   LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb
     app/components/admin/ui/scheduled_date_component.rb].freeze
@@ -1525,7 +1525,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_state_mark_component.rb
     app/components/admin/settings_screen/language_dialogs_component.html.erb
     app/components/admin/settings_screen/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_state_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/translation_screen/summary_card_component.html.erb
@@ -1536,7 +1535,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/insecure_notice_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/mail_failed_notice_component.rb
-    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb
     app/components/admin/ui/unpublished_chip_component.html.erb
     app/components/admin/ui/word_diff_component.rb

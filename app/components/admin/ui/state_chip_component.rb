@@ -1,0 +1,64 @@
+module Admin
+  module Ui
+    # A system's state, in a dot and a word: mail, the AI key, Test
+    # connection's result, a system check. Not a record's state: a page's or
+    # a post's is `StatusChipComponent`, whose Live and Scheduled fills belong
+    # to publishing.
+    #
+    # ok, warn and danger are the role's tint with its dot and its ink; off
+    # has no ground, a field-line edge, a hollow ring and dim words. Every
+    # tone keeps a 1px edge (transparent but off's) so the four stand at one
+    # height in a row. On the rail's ground a tint is no shape, so the dot
+    # and the word carry the state there, and the word alone says it.
+    #
+    # `label:` and `detail:` are the caller's words; the detail follows the
+    # word after a middle dot. Anything else the caller needs on the tag
+    # (`data`, `id`) passes through.
+    class StateChipComponent < AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Inline text: its word says the state; the dot is hidden. It has no role and takes no focus.",
+        motion: :none,
+        content_edges: %i[short long],
+        widths: :fluid,
+        interface: %i[tone label detail],
+        limits: [
+          "It cannot be pressed and takes no focus.",
+          "It draws four tones; the word, never the colour, says the state."
+        ],
+        states: %i[ok warn danger off],
+        keys: [],
+        slots: [],
+        controller: nil
+      )
+
+      TONES = %i[ok warn danger off].freeze
+
+      CLASS = "admin-state-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs border px-2 py-0.5 text-label".freeze
+      GROUNDS = {
+        ok: "border-transparent bg-ok-tint text-ok-ink",
+        warn: "border-transparent bg-warn-tint text-warn-ink",
+        danger: "border-transparent bg-danger-tint text-danger-ink",
+        off: "border-field-line text-dim"
+      }.freeze
+      DOT = "size-1.5 shrink-0 rounded-full".freeze
+      DOTS = { ok: "bg-ok", warn: "bg-warn", danger: "bg-danger", off: "border border-field-line" }.freeze
+
+      def initialize(tone:, label:, detail: nil, **html)
+        raise ArgumentError, "unknown state chip tone #{tone.inspect}" unless TONES.include?(tone)
+
+        @tone = tone
+        @label = label
+        @detail = detail
+        @html = html
+      end
+
+      def call
+        tag.span(**@html, class: [ CLASS, GROUNDS.fetch(@tone), @html[:class] ].compact.join(" "), data: { **@html.fetch(:data, {}), state_tone: @tone }) do
+          safe_join([ tag.span(class: "#{DOT} #{DOTS.fetch(@tone)}", aria: { hidden: true }), @label, (" · #{@detail}" if @detail.present?) ].compact)
+        end
+      end
+    end
+  end
+end

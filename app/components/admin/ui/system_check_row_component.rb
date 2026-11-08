@@ -2,10 +2,10 @@ module Admin
   module Ui
     # One `Setup::SystemCheck::Result` as a row, for CS Studio's System status
     # page and the setup wizard's system-check step, which shares its rows
-    # with System status: a status chip -- a dot and the
-    # word, so the state is never colour alone -- then the check's name, its
-    # message and, when the result has one, the console command in a code box
-    # with a Copy button.
+    # with System status: a state chip (ok or warn) -- a dot and the word, so
+    # the state is never colour alone -- then the check's name, its message
+    # and, when the result has one, the console command in a code box with a
+    # Copy button.
     #
     # `copyable:` is off in the setup wizard. The wizard loads the `application`
     # entry point only, and `admin--ui--clipboard` is an admin controller, so a Copy
@@ -33,13 +33,13 @@ module Admin
         interface: %i[result copyable mail_settings_href image_settings_href forms_href],
         limits: [
           "Without copyable (the setup wizard) the command is selectable text with no Copy button.",
-          "Its words (OK, Warning, Copy, Copy command for, Learn more, and the script's Copied) are English, not keys."
+          "Its words (Copy, Copy command for, Learn more, and the script's Copied) are English, not keys."
         ],
         states: %i[ok warning hover focus],
         script_states: {
           copied: [ "test/system/admin/system_status_and_preview_test.rb", "Copy writes the command, says Copied, and announces it politely" ]
         },
-        keys: %w[open_mail_settings open_image_settings open_forms],
+        keys: %w[ok warning open_mail_settings open_image_settings open_forms],
         slots: [],
         controller: "admin--ui--clipboard"
       )
@@ -64,16 +64,9 @@ module Admin
 
       def copyable? = @copyable && result.command.present?
 
-      def status_word = result.ok? ? "OK" : "Warning"
-
-      # The border is the second cue beside the dot and the word: a Warning
-      # chip has a warn dot *and* a warn border.
-      def chip_class
-        border = result.ok? ? "border-line-strong" : "border-warn"
-        "inline-flex items-center gap-1.5 rounded-cs border #{border} px-2 py-0.5 text-label text-ink"
+      def state_chip
+        Admin::Ui::StateChipComponent.new(tone: result.ok? ? :ok : :warn, label: result.ok? ? t(".ok") : t(".warning"))
       end
-
-      def dot_class = result.ok? ? "bg-ok" : "bg-warn"
     end
   end
 end
