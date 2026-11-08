@@ -1229,7 +1229,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `data-editing-away`, the one mark the choice writes on the region, which
    live editing's merge leaves alone (its RUNTIME set): a class written by
    the script would be taken away by the next list merge. */
-.admin-section-card__settings[data-editing-away] { margin: 0; padding: 0; background: transparent; }
+:is(.admin-section-card__settings, .admin-section-group__settings)[data-editing-away] { margin: 0; padding: 0; background: transparent; }
 /* A section's header controls. A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen
@@ -1300,9 +1300,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `admin_contrast_test`). Written after the state edges and as heavy, so it
    wins over a held edge: the chosen section is the one the person is
    acting on, and its hold says itself in words, in the strip and the
-   read-only form. A section whose type is gone draws no words and is never
+   read-only form. A translation tab's group is chosen the same way and
+   drawn the same. A section whose type is gone draws no words and is never
    chosen. */
-.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+:is(.admin-section-card, .admin-section-group)[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 /* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
    its states are elevations, with no border. At rest the first; under the
    pointer the second, raised, and never moved, so nothing shifts under a

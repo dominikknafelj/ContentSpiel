@@ -126,12 +126,14 @@ export default class extends Controller {
 
   // The named setting's control, or the layout menu's button for the layout
   // (its input is hidden). A reader's controls are disabled and take no
-  // focus: the region's Close button has it then.
+  // focus: the region's Close button has it then. A translation tab's
+  // region holds no control: the setting's row has it (`data-section-setting`).
   focus(field) {
     const control = field === "layout"
       ? this.element.querySelector("[data-admin--editor--section-settings-target~='layoutMenu'] [aria-haspopup=menu]")
       : this.element.querySelector(`[name='block[settings][${CSS.escape(field)}]']`)
-    const target = control && !control.matches(":disabled") ? control : this.element.querySelector("[data-action~='admin--editor--section-settings#close']")
+    const target = control && !control.matches(":disabled") ? control
+      : this.element.querySelector(`[data-section-setting="${CSS.escape(field)}"]`) || this.element.querySelector("[data-action~='admin--editor--section-settings#close']")
     target?.focus()
   }
 }

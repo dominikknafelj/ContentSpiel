@@ -1,9 +1,32 @@
 <%# In the block list where the section's card would be, with the section's id, and no
-    handle or menu: see the component. Its direct children are the heading and one card
-    per block. %>
-<%= tag.div id: dom_id, class: "admin-section-group flex flex-col gap-3 rounded-cs border border-line-strong bg-sunken p-3",
-      data: { block_id: section.id, container: "", "admin--editor--blocks-target": "card" } do %>
-  <h3 class="text-label <%= unavailable? ? "text-danger-ink" : "text-meta" %>"><%= heading %></h3>
+    handle or menu: see the component. Its direct children are the heading row, the
+    settings region's home and the region, then one card per block. %>
+<%= tag.div id: dom_id, class: "admin-section-group flex flex-col gap-3 rounded-cs border border-line-strong bg-sunken p-3", data: wrapper_data do %>
+  <%# It has an id, as every ancestor of a unit up to the block list does (`editing/merge`). %>
+  <div id="<%= header_id %>" class="admin-section-group__head flex flex-wrap items-center gap-2">
+    <h3 class="text-label <%= unavailable? ? "text-danger-ink" : "text-meta" %>"><%= heading %></h3>
+    <%= render words_component unless unavailable? %>
+  </div>
+  <% unless unavailable? %>
+    <%# Where the region belongs: the editor's rail puts it back after this marker
+        (`admin--editor--section-choice#release`). Empty, and drawn nothing. %>
+    <span hidden data-section-settings-home></span>
+    <%# The section's settings, read only (see the component): no form and no control.
+        Hidden until a word of the heading row opens it. %>
+    <%= tag.div id: settings_id, hidden: true, class: "admin-section-group__settings flex flex-col rounded-card bg-rail p-3",
+          data: { controller: "admin--editor--section-settings", section_id: section.id, action: "keydown.esc->admin--editor--section-settings#escape" } do %>
+      <dl class="flex flex-col gap-2">
+        <% rows.each do |field, label, word| %>
+          <div tabindex="-1" data-section-setting="<%= field %>" class="rounded-cs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+            <dt class="text-xs text-meta"><%= label %></dt>
+            <dd class="text-sm text-ink"><%= word %></dd>
+          </div>
+        <% end %>
+      </dl>
+      <p class="mt-3 text-xs text-meta"><%= t(".same_everywhere") %></p>
+      <%= link_to t(".edit_in", language: default_language), edit_path, class: edit_class %>
+    <% end %>
+  <% end %>
   <% blocks.each do |block| %>
     <%= render card(block) %>
   <% end %>

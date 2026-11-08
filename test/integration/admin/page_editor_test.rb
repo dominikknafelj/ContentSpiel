@@ -16,6 +16,35 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "form[data-controller~='admin--saving--autosave'] input[name='page[title]'][value='About']"
   end
 
+  # A translation tab's "Edit in <language>" (Design System v124): `section`
+  # names a section the default tab chooses on load; anything but one of the
+  # page's sections on the default tab is ignored, silently.
+  test "?section= hands the default tab one of the page's sections to choose, and nothing else" do
+    with_locales(%w[en de], default: "en") do
+      section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+      inside = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+      text = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+      foreign = create_page(title: "Elsewhere").content_blocks.create!(block_type: "section", position: 0)
+      chosen = "#editor-grid[data-admin--editor--section-choice-chosen-value]"
+
+      get "/cs-studio/pages/#{@page.id}", params: { section: section.id }
+      assert_select "#editor-grid[data-admin--editor--section-choice-chosen-value='#{section.id}']"
+
+      [ foreign.id, text.id, inside.id, "nope", 0 ].each do |id|
+        get "/cs-studio/pages/#{@page.id}", params: { section: id }
+        assert_response :success
+        assert_select chosen, count: 0, message: "section=#{id} chooses nothing"
+      end
+      get "/cs-studio/pages/#{@page.id}", params: { section: { id: section.id } }
+      assert_select chosen, count: 0
+      get "/cs-studio/pages/#{@page.id}", params: { section: section.id, locale: "de" }
+      assert_select chosen, count: 0, message: "a translation tab takes no section"
+      section.update_columns(block_type: "gone/section")
+      get "/cs-studio/pages/#{@page.id}", params: { section: section.id }
+      assert_select chosen, count: 0, message: "a section whose type is gone is never chosen"
+    end
+  end
+
   # A restored snapshot of an editor holds stale bases and unsent
   # text (see the view's own comment), so the editors opt out of Turbo's page
   # cache -- in a full page and in the frame answer a tree link gets alike.

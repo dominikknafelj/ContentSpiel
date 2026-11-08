@@ -278,6 +278,10 @@ en:
         section_group:
           heading: "Section"
           unavailable: "Unavailable type — %{type}"
+          # Under a section's settings on a translation tab, which shows them read only.
+          same_everywhere: "Same in every language"
+          # The link to the default language's editor with the section chosen.
+          edit_in: "Edit in %{language}"
         # The tile's avatar of whoever is changing the block: its
         # tooltip and its text for a screen reader.
         holder_avatar:

@@ -2,6 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { mergeMoved } from "editing/merge"
 
 const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
+// A section in the block list: the default tab's card, a translation tab's group.
+const SECTION = ":is(.admin-section-card, .admin-section-group)"
 
 // Choosing a section (`admin--editor--section-choice`), on the page editor's
 // rail grid beside `admin--ui--rail`. Where the rail docks, pressing a
@@ -11,6 +13,19 @@ const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 // section chosen the panel says "Choose a section" (`empty`). Below the
 // threshold nothing here acts, and the words open the region in place, under
 // its head, as the card does on its own.
+//
+// A TRANSLATION TAB'S SECTION is a group (`SectionGroupComponent`), not a
+// card: its heading row carries the same words, and its region holds the
+// settings read only, with no form. It is chosen, moved and put back by the
+// same rules; "the card" below is whichever of the two the section is
+// (`SECTION`).
+//
+// THE ADDRESS MAY NAME A SECTION (`chosen`, from `?section=<id>`, which the
+// server hands over only for one of the page's sections on the default
+// tab): once the page's controllers have connected it is chosen as a press
+// of its layout word would choose it, so docked its region is taken into
+// the Section tab and below the threshold it opens in place and the section
+// is scrolled into view. The address is never written here.
 //
 // THE WORDS ARE THE ONLY TARGET THAT SELECTS. This hears one event,
 // `admin--editor--section:open-settings`, which the card dispatches when a
@@ -87,6 +102,19 @@ const AUTOSAVE = "form[data-controller~='admin--saving--autosave']"
 // clean takes the region with it, and the panel says "Choose a section".
 export default class extends Controller {
   static targets = [ "slot", "empty" ]
+  static values = { chosen: String }
+
+  connect() {
+    if (this.chosenValue) requestAnimationFrame(() => this.chooseFromAddress())
+  }
+
+  // The section the address names, chosen as its layout word would choose it.
+  chooseFromAddress() {
+    const card = document.querySelector(`${SECTION}[data-block-id="${CSS.escape(this.chosenValue)}"]`)
+    const section = card && this.application.getControllerForElementAndIdentifier(card, "admin--editor--section")
+    if (!section?.showSettings("layout")) return
+    if (!this.docked) card.scrollIntoView({ block: "center" })
+  }
 
   slotTargetConnected(slot) {
     // The panel says "Choose a section" again whenever its region goes, by
@@ -111,7 +139,7 @@ export default class extends Controller {
 
   // The card of a region's section, wherever the list has it.
   cardOf(region) {
-    return region ? document.querySelector(`.admin-section-card[data-block-id="${CSS.escape(region.dataset.sectionId)}"]`) : null
+    return region ? document.querySelector(`${SECTION}[data-block-id="${CSS.escape(region.dataset.sectionId)}"]`) : null
   }
 
   // Whether the region's form holds text the server does not have, or its
@@ -132,7 +160,7 @@ export default class extends Controller {
 
     const current = this.chosen
     if (current && current !== region) this.closeChosen(current)
-    const card = event.target.closest(".admin-section-card")
+    const card = event.target.closest(SECTION)
 
     if (region.parentElement !== this.slotTarget) this.slotTarget.append(region)
     region.setAttribute("data-editing-away", "")

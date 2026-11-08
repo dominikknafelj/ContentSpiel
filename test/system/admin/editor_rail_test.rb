@@ -367,8 +367,40 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_in_delta 812, width_of(".admin-content-blocks"), 1
       assert_in_delta 360, width_of("#editor-grid-panel-page"), 1
       assert_in_delta box(".admin-content-blocks")[2] + 28, box("#editor-grid-panel-page")[0], 1
-      # A translation tab draws no section's settings, so it has no Section tab.
-      assert_equal %w[editor-grid-tab-page editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
+      assert_equal %w[editor-grid-tab-page editor-grid-tab-section editor-grid-tab-notes], all("#editor-grid [role=tablist] [role=tab]").map { |tab| tab[:id] }
+    end
+  end
+
+  # A section's settings are the same in every language and a translation
+  # tab never sends one: the Section tab holds them as rows, under the
+  # form's labels, with no control, and links to the default language's
+  # editor with the section chosen.
+  test "on a translation tab the Section tab shows the section's settings read only, with a link to the default language" do
+    with_locales(%w[en de], default: "en")
+    @section.update!(settings: { "layout" => "two", "anchor" => "pricing" })
+    at_window(WIDE) do
+      visit_editor(@page, locale: "de")
+      assert_docked
+      find("#section-#{@section.id}-words button[data-admin--editor--section-field-param='anchor']").click
+
+      region = "#editor-grid-panel-section #section-#{@section.id}-settings"
+      assert_selector region, visible: :visible
+      assert_selector "#editor-grid-tab-section[aria-selected=true]"
+      assert_equal [ [ "Layout", "2 columns" ], [ "Background", "No background" ], [ "Width", "Content width" ], [ "Anchor", "#pricing" ] ],
+        all("#{region} [data-section-setting]").map { |row| [ row.find("dt").text, row.find("dd").text ] }
+      assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{region} [data-section-setting='anchor']".to_json})"), "the word's row has the focus"
+      %w[form input select textarea button].each { |tag| assert_no_selector "#{region} #{tag}", visible: :all }
+      assert_selector "#{region} p", text: "Same in every language"
+      label, value = page.evaluate_script(<<~JS)
+        (() => { const row = document.querySelector(#{"#{region} [data-section-setting='layout']".to_json}); return [ getComputedStyle(row.querySelector("dt")).fontSize, getComputedStyle(row.querySelector("dd")).fontSize ] })()
+      JS
+      assert_equal [ "12px", "14px" ], [ label, value ]
+
+      click_frame_link "Edit in English"
+      assert_docked
+      assert_equal "/cs-studio/pages/#{@page.id}?section=#{@section.id}", page.evaluate_script("location.pathname + location.search")
+      assert_selector "#editor-grid-panel-section #section-#{@section.id}-form", visible: :visible
+      assert_selector "##{ActionView::RecordIdentifier.dom_id(@section)}.admin-section-card[data-chosen]"
     end
   end
 

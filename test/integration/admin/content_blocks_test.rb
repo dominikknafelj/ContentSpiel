@@ -556,10 +556,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_select "#content-blocks-list > *", count: 2
-      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--editor--blocks-target='card'] > h3", text: "Section"
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--editor--blocks-target='card'] > .admin-section-group__head > h3", text: "Section"
       assert_equal [ left.id, right.id ], css_select(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
       assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--saving--autosave'] .admin-translation-pair", text: /Right original/
-      assert_select ".admin-block-tile, [data-admin--editor--blocks-target='lane'], [data-admin--editor--section-target]", count: 0
+      assert_select ".admin-block-tile, [data-admin--editor--blocks-target='lane'], [data-admin--editor--section-target~='tile'], [data-admin--editor--section-target~='panel'], [data-admin--editor--section-target~='lanes']", count: 0
+      assert_select "#section-#{section.id}-settings form, #section-#{section.id}-settings input, #section-#{section.id}-form", count: 0
       assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--editor--blocks-target='card'] .admin-block-card__handle"
     end
   end
