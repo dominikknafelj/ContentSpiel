@@ -27,11 +27,12 @@ module Admin
         motion: :reduced,
         content_edges: %i[short long],
         widths: :fluid,
-        interface: %i[controls noun moving],
+        interface: %i[controls noun moving keep_across_frames],
         limits: [
           "It narrows only the rows the tree drew: a page the tree does not draw is not found.",
           "The narrowing is never stored: a branch it opens folds again when the field is cleared, and the open set is unchanged.",
-          "A tree that moves by drag does not move while narrowed, and its line says so."
+          "A tree that moves by drag does not move while narrowed, and its line says so.",
+          "With keep_across_frames the query outlives a navigation of the content frame (its tree is drawn again and narrowed by it); a visit of the whole page always empties the field."
         ],
         states: %i[rest focus],
         script_states: {
@@ -45,18 +46,19 @@ module Admin
         keyboard: [ "test/system/admin/tree_find_test.rb", "/ focuses the field, Down Arrow reaches the first match, Enter opens it" ]
       )
 
-      def initialize(controls:, noun: :pages, moving: false)
+      def initialize(controls:, noun: :pages, moving: false, keep_across_frames: false)
         raise ArgumentError, "a find field names the tree it narrows: give controls:" if controls.blank?
         raise ArgumentError, "unknown noun #{noun.inspect}: one of #{NOUNS.join(', ')}" unless NOUNS.include?(noun)
 
         @controls = controls
         @noun = noun
         @moving = moving
+        @keep_across_frames = keep_across_frames
       end
 
       private
 
-      attr_reader :controls, :noun, :moving
+      attr_reader :controls, :noun, :moving, :keep_across_frames
 
       def field_id = "#{controls}-find"
 

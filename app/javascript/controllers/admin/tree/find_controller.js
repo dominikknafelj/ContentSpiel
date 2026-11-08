@@ -32,10 +32,20 @@ const SAY_AFTER_MS = 300
 // IT IS THE ONE WRITER THAT CLEANS THE FIELD: on `turbo:before-cache` the
 // field, its hint, its Clear, its status line and the tree's narrowing are
 // all taken back, so Turbo's snapshot, and a page restored from it, holds
-// the whole tree and an empty field.
+// the whole tree and an empty field -- before a visit of the whole page.
+// With `keep` (the mind graph's), a navigation of the content frame keeps
+// the query: the column outlives it, and the new view's tree is narrowed by
+// it again when its owner draws it (`tree:changed`). Turbo tells the two
+// apart by its order of events: a frame that advances the history renders
+// and dispatches `turbo:frame-load` FIRST, and only then proposes the visit
+// whose `turbo:before-cache` follows (its snapshot was taken before the
+// frame rendered); a visit of the whole page dispatches `turbo:before-cache`
+// before anything is rendered. So a `turbo:frame-load` of a frame that
+// advances (`data-turbo-action`) marks the next `turbo:before-cache` as the
+// frame's own, and `turbo:load`, which ends either visit, unmarks it.
 export default class extends Controller {
   static targets = ["field", "hint", "clear", "status"]
-  static values = { noun: String, moving: Boolean }
+  static values = { noun: String, moving: Boolean, keep: Boolean }
   static classes = ["figure", "line"]
 
   connect() {
@@ -68,7 +78,14 @@ export default class extends Controller {
 
   apply() {
     const tree = this.tree
-    if (!tree) return
+    if (!tree) {
+      // No tree to narrow (not drawn yet, or another view in its place): no
+      // count stands under the field.
+      clearTimeout(this.sayTimer)
+      this.said = null
+      this.statusTarget.replaceChildren()
+      return
+    }
 
     const query = this.query
     if (!query) {
@@ -191,9 +208,11 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
+  // The first match of a tree that can be seen: a tree another view stands
+  // in place of (the mind graph's whole-site results) is not acted on.
   firstMatch() {
     const tree = this.tree
-    if (!this.filtering || !tree) return null
+    if (!this.filtering || !tree || !tree.checkVisibility()) return null
     return matchFocuses(tree)[0] ?? null
   }
 
@@ -212,8 +231,20 @@ export default class extends Controller {
     this.fieldTarget.focus()
   }
 
-  // Before Turbo's snapshot: an empty field and the whole tree.
+  // A frame that advances the history has rendered: the snapshot that
+  // follows is its visit's (see the header).
+  frameLoaded(event) {
+    if (event.target.hasAttribute?.("data-turbo-action")) this.inFrameVisit = true
+  }
+
+  loaded() {
+    this.inFrameVisit = false
+  }
+
+  // Before Turbo's snapshot: an empty field and the whole tree, unless the
+  // query is kept across the content frame's navigation.
   reset() {
+    if (this.keepValue && this.inFrameVisit) return
     cancelAnimationFrame(this.frame)
     this.empty()
   }

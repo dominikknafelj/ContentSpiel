@@ -217,4 +217,74 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
 
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
   end
+
+  # The query is the person's and outlives the graph's own navigations: a
+  # Focus, a depth and Whole graph are frame navigations, whose new tree the
+  # find narrows by it again, with its count and the last line. A visit of
+  # the whole page, and Back to the graph from there, starts empty.
+  test "the query is kept across Focus, a depth and Whole graph, and Back narrows the tree it restores; leaving the screen empties the field" do
+    a, b, c = %w[Alpha Beta Gamma].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: b, related_post: c)
+    match = "#{LIST} [role=treeitem][data-node-id='#{nid(a)}'][data-filter-match]"
+    narrowed = lambda do |message|
+      assert_equal "alp", find(FIND).value, "#{message}: the field lost its query"
+      assert_selector match
+      assert_no_selector "#{LIST} [role=treeitem][data-node-id='#{nid(b)}']"
+      assert_selector "#tree-column [role=status]", text: "1 match"
+      assert_selector "#{SEARCH_SITE} button", text: "Search the whole site for “alp”"
+    end
+    visit_screen admin_mind_graph_path
+    await_graph
+    find(FIND).fill_in(with: "alp")
+    assert_selector match
+
+    click_node(a)
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
+    assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
+    await_graph
+    narrowed.call("after Focus")
+
+    click_frame_link { within("[data-mind-graph-focus]") { click_link "2" } }
+    await_graph
+    assert_equal "3", graph["data-nodes"]
+    narrowed.call("after a depth")
+
+    click_frame_link { within("[data-mind-graph-focus]") { click_link "Whole graph" } }
+    assert_no_selector "[data-mind-graph-focus]"
+    await_graph
+    narrowed.call("after Whole graph")
+
+    page.go_back
+    assert_selector "[data-mind-graph-focus]"
+    await_graph
+    narrowed.call("after Back")
+
+    click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
+    page.go_back
+    await_graph
+    assert_equal "", find(FIND).value
+    assert_selector "#{LIST} [role=treeitem][data-node-id='#{nid(b)}']"
+    assert_no_selector "#{LIST} [data-filter-match]"
+    assert_selector SEARCH_SITE, visible: :hidden
+  end
+
+  # The find's Down and Enter act on a tree a person can see: while the
+  # whole site's results stand in its place they do nothing.
+  test "while the whole site's results show, Down and Enter in the find field leave the hidden tree alone" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit_screen admin_mind_graph_path
+    await_graph
+
+    search_whole_site("alpha")
+    assert_selector "#{RESULTS} [data-search-group=post]"
+    find(FIND).send_keys(:down)
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{FIND.to_json})"), "Down moved the focus into the hidden tree"
+    find(FIND).send_keys(:enter)
+
+    assert_equal "", graph["data-selected"].to_s, "Enter pressed a row of the hidden tree"
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_selector "#{RESULTS} [data-search-group=post]"
+  end
 end

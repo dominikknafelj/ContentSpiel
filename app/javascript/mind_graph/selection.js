@@ -15,7 +15,7 @@
 // the same way (`reveal`), brings the node to the middle of the canvas and
 // moves the focus to the card, so the keyboard reaches the actions; closing
 // that card gives the focus back to the row, and otherwise to the canvas.
-// "+N more" is not something to select (design answer F4): a press on it is
+// "+N more" is not something to select: a press on it is
 // `onMore`, and the selection stays as it was.
 //
 // Inside the card, Escape closes it too (`input.js` hears the canvas's keys
@@ -94,9 +94,12 @@ export function createSelection({ element, canvas, state, card, cardElement, lis
     moveCamera({ k, tx: state.width / 2 - state.positions[index * 2] * k, ty: state.height / 2 - state.positions[index * 2 + 1] * k })
   }
 
-  function reveal(index) {
+  // `fromRow: false`: the row it was chosen from is not on screen once the
+  // card opens (the tree drawer closed for it), so closing the card gives
+  // the focus to the canvas.
+  function reveal(index, { fromRow = true } = {}) {
     select(index)
-    openedFromRow = state.nodes[index].id
+    openedFromRow = fromRow ? state.nodes[index].id : null
     centre(index)
     cardElement.focus()
   }

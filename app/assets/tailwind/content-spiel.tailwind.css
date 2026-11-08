@@ -328,7 +328,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-tree-row { position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
 .admin-tree-row:hover { background: var(--cs-sunken); }
 /* A heading drawn on the row's geometry (a group of the whole site's
-   results, `mind_graph/search_box.js`) is pressed by nobody: no hover. */
+   results, `mind_graph/search_results.js`) is pressed by nobody: no hover. */
 h3.admin-tree-row:hover { background: none; }
 .admin-tree-row__disclosure { flex: none; display: grid; place-items: center; width: var(--cs-tree-disclosure); height: var(--cs-tree-row); color: var(--cs-meta); }
 .admin-tree-row:hover .admin-tree-row__disclosure { color: var(--cs-ink); }

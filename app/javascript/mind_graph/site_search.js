@@ -79,7 +79,8 @@ export function attachSiteSearch(lastLine, { list, text, findField }) {
   }
   button.addEventListener("click", press)
   document.addEventListener("input", typed)
-  // A field that already holds text (the column a frame navigation kept).
+  // A field that already holds text: a navigation of the content frame keeps
+  // the column, and the find keeps its query across it (`keep`).
   show(fieldQuery())
 
   return () => {

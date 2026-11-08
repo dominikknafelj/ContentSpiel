@@ -1,8 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The shell's two drawers (design pass spec §4, handoff §9 A7): below 1280px
-// the modules sidebar slides in over the content, below 1024px so does the
-// page tree. Lives on <body>, because its triggers (the top bar) and its
+// The shell's two drawers: below 1280px the modules sidebar slides in over
+// the content, below 1024px so does the tree column. Lives on <body>, because its triggers (the top bar) and its
 // panels (the grid's sidebar and tree columns) are siblings, not nested.
 //
 // A panel is any `[data-admin--shell--drawer-target=panel]` carrying
@@ -73,12 +72,21 @@ export default class extends Controller {
   // `turbo:before-visit`). Only `#content`: the layout hears every frame's
   // load on `document` -- the ⌘K results (on each keystroke), the New page /
   // New post dialogs' forms, the media picker's library -- and none of those
-  // is a page having been picked; ⌘K with the tree drawer open used to close
-  // the drawer behind the palette.
+  // is a page having been picked, so ⌘K with the tree drawer open does not
+  // close the drawer behind the palette.
   frameLoaded(event) {
     if (event.target.id !== "content") return
     const tree = this.panelNamed("tree")
     if (tree?.hasAttribute("data-open")) this.close(tree)
+  }
+
+  // Something in a drawer was chosen that is shown outside it (`tree:chosen`,
+  // the mind graph's list selecting a node, whose card is over the canvas):
+  // the drawer it stands in closes, its scrim with it, and the focus is the
+  // chooser's to place.
+  chosen(event) {
+    const panel = this.panelTargets.find((candidate) => candidate.contains(event.target))
+    if (panel?.hasAttribute("data-open")) this.close(panel)
   }
 
   // Navigation never keeps a drawer open and never steals focus into the

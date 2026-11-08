@@ -165,6 +165,7 @@ export function mount(element) {
   const openedBar = element.querySelector("[data-mind-graph-opened]")
   // The column's parts, outside the element.
   const listContainer = part("#tree-column [data-mind-graph-list]")
+  const column = listContainer.closest("#tree-column")
   const searchSite = part("#tree-column [data-mind-graph-search-site]")
   const findField = () => document.querySelector('#tree-column input[aria-controls="mind-graph-tree"]')
   const dotClasses = JSON.parse(element.dataset.dotClasses)
@@ -241,10 +242,10 @@ export function mount(element) {
   // open set and its admin path (`treeData`), as the Pages tree does.
   const list = createList(listContainer, {
     text, number, dotClasses, typeLabels, treeClasses, parts, retryClass: buttonClasses.tertiary, unlisted: Boolean(element.dataset.unlistedUrl), treeData: element,
-    scroller: listContainer.closest("#tree-column"),
+    scroller: column,
     onSelect: (id) => {
       const index = state.indexOf.get(id)
-      if (index != null) selection.reveal(index)
+      if (index != null) revealFromList(index)
     },
     onHover: (id) => gestures.hoverRow(id == null ? -1 : state.indexOf.get(id) ?? -1),
     onAdd: addPost,
@@ -312,7 +313,7 @@ export function mount(element) {
     const known = state.indexOf.get(row.id)
     if (known != null) {
       if (switchedOn) refilter()
-      return state.visibleNodes.includes(known) ? selection.reveal(known) : undefined
+      return state.visibleNodes.includes(known) ? revealFromList(known) : undefined
     }
 
     const { index, node, lines, at } = addNode(state, row, { context })
@@ -347,7 +348,19 @@ export function mount(element) {
       element.removeAttribute("data-settled")
       startLayout()
     }
-    if (state.visibleNodes.includes(index)) selection.reveal(index)
+    if (state.visibleNodes.includes(index)) revealFromList(index)
+  }
+
+  // A row that selects (a press, Enter, a row that adds its post). In the
+  // tree drawer (below 1024px, `data-open` on the column) the drawer and its
+  // scrim close first (`tree:chosen`, heard by `admin--shell--drawer`, which
+  // alone opens and closes it), then the node is centred and its card takes
+  // the focus; the row is then off screen, so closing the card gives the
+  // focus to the canvas. Whatever does not select keeps the drawer open.
+  function revealFromList(index) {
+    const inDrawer = column.hasAttribute("data-open")
+    if (inDrawer) listContainer.dispatchEvent(new CustomEvent("tree:chosen", { bubbles: true }))
+    selection.reveal(index, { fromRow: !inDrawer })
   }
 
   // The "Posts" toggle, switched on if it was off: whether it was. A viewer

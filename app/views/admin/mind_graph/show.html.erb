@@ -33,8 +33,8 @@
     nothing to draw, there is no graph and no column.
 
     THE TAB ORDER follows the document: the sidebar, the column (its hide
-    button, the find field, the checkbox, the tree, one stop, and the last
-    line), then `<main>`: a view's bar, the legend's toggles, the zoom
+    button, the find field, the checkbox, the tree, one stop, the last line
+    and, last, the column's divider), then `<main>`: a view's bar, the legend's toggles, the zoom
     buttons, the canvas and the card. Below 1024px the column is the tree
     drawer, opened by the top bar's "List ▾". %>
 <% if graph && !turbo_frame_request? %>
@@ -44,7 +44,7 @@
       <h2 class="flex-1 text-sm font-semibold text-ink"><%= t(".column_heading") %></h2>
       <%= render Admin::Ui::TreeHideComponent.new(subject: "mind_graph") %>
     </div>
-    <%= render Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes) %>
+    <%= render Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes, keep_across_frames: true) %>
     <%# The list: every node the graph draws, as a row, in four groups
         (Pages, Posts, Tags, Post types), filled by `mind_graph/node_list.js`
         from the same data and following the filter; or, while "Not listed

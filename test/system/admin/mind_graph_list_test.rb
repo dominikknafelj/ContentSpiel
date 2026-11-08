@@ -831,8 +831,8 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
 
   # The Tab key follows the document: the tree column comes before <main>,
   # so it meets the column's hide button, the find field, the list's
-  # checkbox and its tree (one stop), and, while the field holds text, the
-  # last line; then a local view's bar, the legend, the zoom buttons, the
+  # checkbox and its tree (one stop), while the field holds text the last
+  # line, and the column's divider; then a local view's bar, the legend, the zoom buttons, the
   # canvas and the card.
   test "the Tab order is the find field, the list, then the legend, the zoom and the canvas" do
     a = create_post(title: "Alpha")
@@ -843,11 +843,12 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
     assert_selector "[data-mind-graph-card] a", text: "Open post"
     stops = lambda do
       page.evaluate_script(<<~JS)
-        Array.from(document.querySelectorAll("#tree-column input, #tree-column button, #tree-column a[href], #tree-column [role=treeitem][tabindex='0'], " +
+        Array.from(document.querySelectorAll("#tree-column input, #tree-column button, #tree-column a[href], #tree-column [role=treeitem][tabindex='0'], #tree-column [role=separator][tabindex='0'], " +
                                              "main input, main button, main a[href], main canvas[tabindex='0']"))
           .filter((element) => element.checkVisibility() && !element.closest("[hidden]"))
           .map((element) => {
             if (element.closest("#tree-column [role=search]")) return element.type === "search" ? "find" : "clear"
+            if (element.matches(".admin-tree-divider")) return "divider"
             if (element.matches(".admin-tree-hide")) return "hide"
             if (element.closest("[data-mind-graph-search-site]")) return "last line"
             if (element.closest("[data-mind-graph-list]")) return "list"
@@ -861,12 +862,12 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
       JS
     end
 
-    assert_equal [ "hide", "find", "list", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
+    assert_equal [ "hide", "find", "list", "divider", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
     assert_equal 1, stops.call.count("list"), "the tree is one stop (a post's local view has no unlisted filter)"
 
     find(FIND).fill_in(with: "alp")
     assert_selector "#{SEARCH_SITE} button", text: "Search the whole site for “alp”"
-    assert_equal [ "hide", "find", "clear", "list", "last line", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
+    assert_equal [ "hide", "find", "clear", "list", "last line", "divider", "focus bar", "legend", "zoom", "canvas", "card" ], stops.call.chunk_while { |a, b| a == b }.map(&:first)
     # The toggles alone, and every one of them a stop the Tab key makes: none
     # is taken out of the order.
     legend = page.evaluate_script("Array.from(document.querySelectorAll(#{"#{GRAPH} [data-mind-graph-legend] input, #{GRAPH} [data-mind-graph-legend] button".to_json}), (element) => [ element.dataset.name || element.textContent.trim(), element.tabIndex ])")
@@ -939,5 +940,47 @@ class Admin::MindGraphListSystemTest < Admin::MindGraphSystemTestCase
 
     assert_no_selector "#{LIST} img", visible: :all
     assert_nil page.evaluate_script("window.pwned")
+  end
+
+  # Below 1024px the list is the tree drawer over the screen. A row that
+  # selects closes the drawer and its scrim first, then its card takes the
+  # focus over the canvas; a fold or a group's heading keeps the drawer open;
+  # Escape on the card gives the focus to the canvas, not to the closed
+  # drawer.
+  test "below 1024px a row that selects closes the tree drawer and its card takes the focus, a fold keeps the drawer open, and Escape on the card goes to the canvas" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    create_page(title: "Docs")
+    at_window(900) do
+      visit_screen admin_mind_graph_path
+      await_graph
+      find("button[aria-controls='tree-column'][aria-label='Open list']", text: "List ▾").click
+      assert_selector "#tree-column[data-open]"
+
+      home = "#{LIST} [role=treeitem][data-node-id='#{nid(root_page)}']"
+      find("#{home} > .admin-tree-row > .admin-tree-row__disclosure").click
+      assert_selector "#{home}[aria-expanded='false']"
+      posts = "#{LIST} [role=treeitem][data-tree-group='posts']"
+      find("#{posts} > .admin-tree-row").click
+      assert_selector "#{posts}[aria-expanded='false']"
+      assert_selector "#tree-column[data-open]"
+      assert_selector ".admin-shell__scrim"
+      find("#{posts} > .admin-tree-row").click
+      assert_selector "#{posts}[aria-expanded='true']"
+
+      list_item("Alpha").execute_script("this.focus()")
+      page.driver.browser.keyboard.type(:Enter)
+
+      assert_no_selector "#tree-column[data-open]"
+      assert_no_selector ".admin-shell__scrim"
+      assert_selector "#{GRAPH}[data-selected='#{nid(a)}']"
+      assert_selector "[data-mind-graph-card]", visible: :visible
+      assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the card does not have the focus"
+
+      page.driver.browser.keyboard.type(:Escape)
+      assert_no_selector "[data-mind-graph-card]", visible: :visible
+      assert page.evaluate_script("document.activeElement === document.querySelector(#{CANVAS.to_json})"), "Escape on the card did not give the focus to the canvas"
+      assert_no_selector "#tree-column[data-open]"
+    end
   end
 end

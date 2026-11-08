@@ -304,7 +304,7 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
 
   # THE LIST'S ROWS ARE THE TREE'S ROW (`Admin::Ui::TreeItemComponent`): a
   # row's classes are read from `data-tree-classes`, never written in
-  # `node_list.js` or in `search_box.js` (the whole site's results, on the
+  # `node_list.js` or in `search_results.js` (the whole site's results, on the
   # same row), so the graph's rows cannot part from the Pages tree's. A
   # row's own look would be written as padding, a text size, the old
   # selection tint or a weight, so every string of the script that holds one
@@ -324,7 +324,7 @@ class MindGraphGuardsTest < ActiveSupport::TestCase
     "flex px-1" => "the line of the whole site's Back, which stands where a row's disclosure column starts"
   }.freeze
   # The scripts that draw the list's rows.
-  ROW_SCRIPTS = %w[node_list.js search_box.js].freeze
+  ROW_SCRIPTS = %w[node_list.js search_results.js].freeze
 
   # The string literals of a script, its comments stripped: double-quoted,
   # single-quoted and template strings, as written.

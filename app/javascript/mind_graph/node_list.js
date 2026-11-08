@@ -175,7 +175,7 @@
 // hidden and kept as they are (a redraw while the results show goes on
 // under them): "Back to the list" first, a tertiary small button that
 // takes the focus, then the heading that names the query, then the groups
-// `search_box.js` draws, or one line that nothing matched, or the failure
+// `search_results.js` draws, or one line that nothing matched, or the failure
 // in the danger ink (`role="alert"`). Back, and Escape anywhere in the
 // results, take them away (`closeResults`) and call `back.onBack`.
 //
@@ -205,7 +205,7 @@
 // node's id for any other, so the two never meet.
 import { dotClass, TAG_MARK } from "mind_graph/card"
 import { recordId } from "mind_graph/ids"
-import { renderResults } from "mind_graph/search_box"
+import { renderResults } from "mind_graph/search_results"
 import { markCanvas, paintMarks } from "mind_graph/swatches"
 import { expanderOf, idOf, openByRule, openPathIn, readOpenSet, setFolded, setOpen } from "tree/open_set"
 
