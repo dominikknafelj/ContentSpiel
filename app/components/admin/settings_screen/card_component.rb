@@ -15,8 +15,9 @@ module Admin
     #
     # Slots: `head_end`, at the end of the heading's row (the Site card's
     # language tabs, the Mail state); `head_note`, under the intro (the
-    # Languages card's pending hint); `heading_mark`, inside the heading after
-    # its word (the Languages card's changed order).
+    # Languages card's pending hint); `heading_mark`, the heading's next
+    # sibling on its row (the Languages card's changed order), outside it so
+    # the section's name stays its word.
     class CardComponent < Admin::AdminComponent
       renders_one :head_end
       renders_one :head_note

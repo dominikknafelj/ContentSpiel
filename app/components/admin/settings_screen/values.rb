@@ -88,8 +88,9 @@ module Admin
       # database`), not the in-memory row: a refused `Locales::Configure` leaves
       # the typed entries assigned to it.
       #
-      # DECISION D7: a language stored with several fallbacks shows the FIRST;
-      # the others are dropped only when that row's select is changed and saved
+      # A language stored with several fallbacks shows the FIRST, since the
+      # select holds one; the others are dropped only when that row's select
+      # is changed and saved
       # (`Admin::SettingsController#language_arguments` compares the posted
       # value with this same first entry).
       def language_rows

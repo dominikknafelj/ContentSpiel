@@ -504,7 +504,8 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # The bar belongs to its form: it floats in the form's own column (not
   # across the whole content area, where its buttons ended up far from the
   # form), the words first and the buttons at its end, Save last; the count
-  # is sans 13px, not mono capitals; and the Save button reads "Save user".
+  # is sans 14px on a 20px line, its bold count too, not mono capitals; and
+  # the Save button reads "Save user".
   test "the footer sits in the form's column under the fields, Save at its end, in sans type" do
     sign_in_via_form(@owner)
     visit_screen edit_admin_user_path(@target)
@@ -520,9 +521,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
         const discard = bar.querySelector("a").getBoundingClientRect()
         const count = bar.querySelector("[data-admin--saving--save-bar-target=count]")
         const style = getComputedStyle(count)
+        const strong = count.querySelector("strong")
         return { barLeft: rect.left, barRight: rect.right, formLeft: form.left, formRight: form.right,
                  saveRight: save.right, discardRight: discard.right, countLeft: count.getBoundingClientRect().left,
-                 font: style.fontFamily, size: style.fontSize, transform: style.textTransform,
+                 font: style.fontFamily, size: style.fontSize, line: style.lineHeight, transform: style.textTransform,
+                 strong: strong && getComputedStyle(strong).fontSize,
                  paddingRight: parseFloat(getComputedStyle(bar).paddingRight) }
       })()
     JS
@@ -531,7 +534,9 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_in_delta geometry["barRight"] - geometry["paddingRight"], geometry["saveRight"], 1
     assert_operator geometry["discardRight"], :<, geometry["saveRight"]
     assert_operator geometry["countLeft"], :<, geometry["discardRight"]
-    assert_equal "13px", geometry["size"]
+    assert_equal "14px", geometry["size"]
+    assert_equal "20px", geometry["line"]
+    assert_equal "14px", geometry["strong"]
     assert_equal "none", geometry["transform"]
     assert_no_match(/mono/i, geometry["font"])
     assert_selector ".admin-save-bar button[type=submit]", text: /\ASave user\z/

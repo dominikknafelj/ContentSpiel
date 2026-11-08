@@ -1,36 +1,34 @@
-<%# "Your account" (the notes handoff's decision 25): the h1, then three
+<%# "Your account": the h1, then three
     cards -- Profile and Notes in one form with one footer, and Password, a
     form of its own with its own "Change password" footer and the promise
-    about sessions directly under the card's title. The screen began as
-    "Change my password" (access-control design spec §5; round 3, handoff
-    "Studio Change Password"): every signed-in user's own password, behind
-    their current one, plus the one profile field, their name (design pass
-    spec §5.1). A deliberate submit, never autosave, like the Users module's
-    own forms.
+    about sessions directly under the card's title. Every signed-in user
+    changes their own password here, behind their current one, and the one
+    profile field, their name. A deliberate submit, never autosave, like the
+    Users module's own forms.
 
     Two forms, so two footers: each `Admin::Ui::SaveBarComponent` is the footer of
     its own form and counts only that form's changes (one Leave prompt serves
     both). The first form is the person's preferences -- the name and the two
-    Notes switches (notes handoff, decision 13: preferences save the same
-    way; a password change is a separate, secure step). Neither Save may
+    Notes switches (preferences save the same way; a password change is a
+    separate, secure step). Neither Save may
     throw away what the other form holds:
-    - "Save" keeps the screen (a Turbo Stream answer, see the controller),
+    - "Save changes" keeps the screen (a Turbo Stream answer, see the controller),
       so the password fields stay as typed;
     - "Change password" re-renders the screen, so it waits for the first form:
       while the name or a Notes switch is unsaved it is locked, with "Save or
-      cancel your changes first." (`after:`, the D10 rule between two forms).
+      discard your changes first." (`after:`: an instant answer that reloads
+      the screen waits for the pending changes).
     The current password alone is nothing to save and is what a password
     manager fills in on load: it is not counted (`data-save-bar-ignore`), or
     every visit here would end in "Leave without saving?".
     The first form is two cards of one width (560px), Profile (the name) and
-    Notes, with the one footer under both (notes handoff, decisions 19 and
-    20); the Password card is 560px too, and its footer -- the footer of
-    that one card -- sits INSIDE it, under a line and within the card's
-    padding (decision 34: `contained: true`).
+    Notes, with the one footer under both; the Password card is 560px too,
+    and its footer -- the footer of that one card -- sits INSIDE it, under a
+    line and within the card's padding (`contained: true`).
     Every string of the first form is a key (`admin.accounts`); the password
     form's are still literals, which is why this file is not in the i18n
-    test's `CONVERTED` list. The password form is the 560px card of the mock, its footer carrying the "Forgot your
-    current password?" link at the far end. The subtitle's promise is the
+    test's `CONVERTED` list. The password card's footer carries the "Forgot
+    your current password?" link at the far end. The subtitle's promise is the
     service's own rule (`Users::OwnerProtection#end_sessions_after_password_
     change`: the acting session stays, the user's other sessions go). No
     typed password is ever rendered back: the inputs have no `value`. %>
@@ -44,8 +42,8 @@
   <h1 class="mb-4 text-h1 text-ink"><%= t("admin.accounts.title") %></h1>
 
   <%# The page's summary is the Profile and Notes form's. The password form's
-      answer, refused or saved, is said inside its own card (the notes
-      handoff's decision 43; see the card below). %>
+      answer, refused or saved, is said inside its own card, where the form
+      is (see the card below). %>
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
   <%# What the form shows: the account as stored, or, after a refusal, what
@@ -63,8 +61,7 @@
       </div>
     </section>
 
-    <%# Notes (notes spec §6.4, D18, D19; handoff "Account switches" and
-        decisions 13-16): two settings of the person's, saved with this
+    <%# Notes: two settings of the person's, saved with this
         form's footer like any configuration -- never autosaved, never
         through the write queue. A hidden "0" ahead of each box makes an
         unticked switch submit; `admin--saving--save-bar` does not count a hidden
@@ -118,11 +115,11 @@
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
-    <%# `#password` is the card's anchor (the handoff's decision 38): what a
+    <%# `#password` is the card's anchor: what a
         link to "change your password" names, and where the form's own
         answer comes back to. `scroll-mt`: clear of whatever is stuck to the top. %>
-    <%# Drawn as the password form's own answer, saved or refused (decision
-        42): `admin--account--password-answer` puts `#password` in the address, the
+    <%# Drawn as the password form's own answer, saved or refused:
+        `admin--account--password-answer` puts `#password` in the address, the
         card in view and the focus on the message. %>
     <section id="password" class="max-w-[560px] scroll-mt-6 rounded-card bg-surface shadow-1" aria-labelledby="account-password"
              <%= tag.attributes(data: { controller: "admin--account--password-answer" }) if password_answer %>>
@@ -132,7 +129,7 @@
       </div>
       <div class="px-[18px] pt-3.5">
         <%# The form's answer, at the top of the card: under the sentence
-            about sessions, above the fields (decision 43). A refusal is the
+            about sessions, above the fields, where the eye is. A refusal is the
             shared danger alert, the error summary, whose lines link to
             their fields (each field keeps its own line too); the service's
             own sentences stand when it left no per-field errors (a denial,
@@ -149,8 +146,8 @@
         </div>
 
         <div class="mb-4">
-          <%# Its id is `new_password`: `password` is the card's, the page's anchor
-              (decision 38), and an id names one element. The field's name is unchanged. %>
+          <%# Its id is `new_password`: `password` is the card's, the page's
+              anchor, and an id names one element. The field's name is unchanged. %>
           <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "new_password", label: "New password", meter: true, errors: field_errors[:password]) %>
         </div>
 
@@ -159,7 +156,7 @@
                 errors: field_errors[:password_confirmation]) %>
         </div>
       </div>
-      <%# The card's own footer, inside it (the notes handoff's decision 34). %>
+      <%# The card's own footer, inside it: the card is short and its footer is where it ends. %>
       <%= render Admin::Ui::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }, contained: true) do %>
       <%# The reset flow is public and signs nobody out by being visited. It
           mails a link, so the link is offered only while mail works

@@ -658,10 +658,12 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
 
   # -- what the save bar can say ------------------------------------------------
 
-  # Review Focus 2: the bar names what changed by the control's own words
-  # (`saving/form_snapshot.js`, `nameOf`): a `data-save-bar-name` on the
-  # control or its `[data-field-name]` wrapper, a legend, or a `label[for]`.
-  # A control with none of them would be counted and never named.
+  # The bar names what changed by the control's own words, and a control
+  # with none would be counted and never named. The test reads them as
+  # `saving/form_snapshot.js`'s `nameOf` does: a `data-save-bar-name` on the
+  # control or its `[data-field-name]` wrapper; for a radio or a checkbox its
+  # fieldset's legend; a `label[for]`'s words without screen-reader-only
+  # text; the legend it stands in.
   test "every control the Settings form submits has a name the bar can say" do
     with_locales(%w[en de], default: "en")
     @site.update!(social_links: { "Mastodon" => "https://social.example/@site" })
@@ -676,21 +678,37 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     end
     assert_operator controls.size, :>, 20, "the form moved: this guard is looking at too little"
 
+    seen = ->(node) { node && node.dup.tap { |copy| copy.css(".sr-only").each(&:remove) }.text.strip.presence }
     nameless = controls.reject do |control|
       wrapper = control.ancestors("[data-field-name]").first
-      named = control["data-save-bar-name"].present? || wrapper&.[]("data-save-bar-name").present?
-      named ||= control.ancestors("fieldset").any? { |fieldset| fieldset.at_css("> legend")&.text.present? }
-      named || (control["id"].present? && form.document.at_css("label[for='#{control["id"]}']")&.text.present?)
+      legend = seen.(control.ancestors("fieldset").first&.at_css("> legend"))
+      label = control["id"].present? && seen.(form.document.at_css("label[for='#{control["id"]}']"))
+      control["data-save-bar-name"].present? || wrapper&.[]("data-save-bar-name").present? ||
+        (control["type"].in?(%w[radio checkbox]) && legend) || label || legend
     end
     assert_empty nameless.map { |control| control["name"] }
     # Each language's pair is its own wrapper, named with its language.
     assert_select "[data-field-name='title.de'] input[data-save-bar-name='Deutsch: Title']"
     assert_select "[data-field-name='tagline.en'] input[data-save-bar-name='English: Tagline']"
     assert_select "[data-field-name='languages.de.fallback'][data-save-bar-name='Deutsch: Falls back to'] select"
-    assert_select "section#settings-languages-card[data-field-name=language_order][data-save-bar-name='Language order'][data-save-bar-mark=heading] h2#languages .admin-save-bar-heading-mark .sr-only", text: "Language order changed"
+    assert_select "section#settings-languages-card[data-field-name=language_order][data-save-bar-name='Language order'][data-save-bar-mark=heading] h2#languages + .admin-save-bar-heading-mark .sr-only", text: "Language order changed"
+    # Beside the heading, never in it: the section is named "Languages".
+    assert_select "h2#languages", text: /\ALanguages\z/
+    assert_select "[data-field-name='languages.de.fallback'] select[data-save-bar-key='languages.de.fallback']"
     assert_select "[data-field-name=social_links][data-save-bar-name='Social links'][data-save-bar-mark=dot]"
     assert_select "[data-field-name=logo][data-save-bar-name='Logo']"
     assert_select "[data-save-bar-changed]", count: 0
+  end
+
+  # With one language on there is nothing to tell apart: the label alone.
+  test "with one language on, a field kept per language is named without its language" do
+    with_locales(%w[en], default: "en")
+
+    get "/cs-studio/settings"
+
+    assert_select "[data-field-name='title.en'] input[data-save-bar-name='Title']"
+    assert_select "[data-field-name='tagline.en'] input[data-save-bar-name='Tagline']"
+    assert_select "[data-field-name='languages.en.fallback'][data-save-bar-name='Falls back to']"
   end
 
   # After a refusal the typed values are the browser's baseline, so the

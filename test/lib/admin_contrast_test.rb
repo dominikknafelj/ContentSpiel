@@ -641,8 +641,9 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # The changed-field mark: a well's 2px accent edge on the well's own fill,
-  # and the accent dot after a label on the card. The spec's figure for the
-  # edge on the card is 6.9 / 7.1:1.
+  # and the accent dot after a label on the card. On the card the edge is
+  # held at the figure it measures, 6.9 / 7.1:1, so a change of the accent
+  # cannot quietly take it back.
   test "the changed mark is 3:1 or better on the field's fill and on the card, in both schemes" do
     each_scheme do |scheme, colour|
       assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-field-fill"), "the changed edge on the field's fill (#{scheme})")

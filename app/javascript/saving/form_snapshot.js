@@ -29,7 +29,13 @@
 //   (`site_setting[languages][][fallback]`, one select per language row);
 //   keyed by name alone they collapsed into the last row's value, and an
 //   edit to an earlier row was not a change at all. A row added, removed or
-//   moved shows up as the positions whose value now differs.
+//   moved shows up as the positions whose value now differs;
+// - a control that carries `data-save-bar-key` is that key, wherever it
+//   stands: a row whose place is a field of its own (the Languages card's
+//   rows, whose order is the tracked `language_order`) keys its fallback by
+//   its language, so a move is one change, the order's, and no row's;
+// - a multiple select is the values it has chosen, sorted: choosing is a
+//   change, the order of the options is none.
 // A hidden input is skipped -- the CSRF token, a `_method`, a checkbox's
 // "0" twin are not the editor's doing -- unless it carries
 // `data-save-bar-track`: the real control behind a widget (a chip, the
@@ -39,9 +45,10 @@
 // (absent and "" are one value, see `changedKeys`); no screen has one.
 //
 // `controls` maps every key to the elements behind it -- an unticked box's
-// key too, which has no value -- and `byName` every field name to its
-// elements, so a changed key can be traced to the field it belongs to even
-// when its own control has left the page (a chip removed).
+// key too, which has no value -- `byName` every field name to its elements,
+// and `wrappers` every key to its control's `[data-field-name]` wrapper as it
+// stood, so a changed key can be traced to the field it belongs to even when
+// its own control has left the page (a chip or a link's row removed).
 
 // How many changed fields the bar names before it says how many more.
 export const NAMES_SHOWN = 3
@@ -50,8 +57,12 @@ export function snapshot(form) {
   const values = {}
   const controls = {}
   const byName = {}
+  const wrappers = {}
   const positions = {}
-  const note = (key, field) => { (controls[key] ??= []).push(field) }
+  const note = (key, field) => {
+    (controls[key] ??= []).push(field)
+    wrappers[key] ??= field.closest("[data-field-name]")
+  }
   for (const field of form.elements) {
     if (!field.name || field.disabled || field.type === "submit") continue
     // Nothing to save by itself, and filled in by a password manager on
@@ -74,12 +85,12 @@ export function snapshot(form) {
     } else {
       const position = positions[field.name] ?? 0
       positions[field.name] = position + 1
-      const key = `${field.name}#${position}`
-      values[key] = field.value
+      const key = field.dataset.saveBarKey || `${field.name}#${position}`
+      values[key] = field.type === "select-multiple" ? [...field.selectedOptions].map((option) => option.value).sort().join("\n") : field.value
       note(key, field)
     }
   }
-  return { values, controls, byName }
+  return { values, controls, byName, wrappers }
 }
 
 // The keys whose value differs between two snapshots. An absent key and an
@@ -122,4 +133,11 @@ export function nameOf(control) {
   const label = words(control.labels?.[0])
   if (label) return label
   return words(legend) || control.getAttribute("aria-label")?.trim() || ""
+}
+
+// The wrapper a changed key's field had, still on the page, for a key whose
+// controls have all gone (a stored link's row removed: its field is the
+// list's).
+export function wrapperOf(key, initial, now) {
+  return [ now.wrappers[key], initial.wrappers[key] ].find((wrapper) => wrapper?.isConnected) || null
 }

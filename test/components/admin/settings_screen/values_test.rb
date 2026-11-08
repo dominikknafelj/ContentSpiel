@@ -12,8 +12,8 @@ class Admin::SettingsScreen::ValuesTest < ActiveSupport::TestCase
     Admin::SettingsScreen::Values.new(site: @site, submitted: ActionController::Parameters.new(submitted).permit!, stored: @site)
   end
 
-  # Review Focus 1: after a refused or stale save the browser's baseline is
-  # what was typed, so only the server can say which fields are unsaved.
+  # After a refused or stale save the browser's baseline is what was typed,
+  # so only the server can say which fields are unsaved.
   test "Values#changed_fields lists the wrappers whose typed value differs from the stored settings, per language and per row, and nothing on a plain load" do
     assert_empty Admin::SettingsScreen::Values.new(site: @site, stored: @site).changed_fields
 

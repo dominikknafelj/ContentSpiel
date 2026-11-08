@@ -58,9 +58,13 @@ module Admin
       def translation(code, field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)
 
       # What the save bar calls a language's title or tagline: "Deutsch:
-      # Title", the language as the tabs name it.
+      # Title", the language as the tabs name it; with one language on, the
+      # label alone.
       def field_name_words(code, field)
-        t("admin.components.ui.save_bar.per_language", language: ::Locales.name(code, native: true), label: t(".names.#{field}"))
+        label = t(".names.#{field}")
+        return label if codes.size == 1
+
+        t("admin.components.ui.save_bar.per_language", language: ::Locales.name(code, native: true), label: label)
       end
 
       def tabs_data(code) = { "admin--settings--tabs-target": "tab", action: "admin--settings--tabs#select keydown->admin--settings--tabs#keydown", code: code }

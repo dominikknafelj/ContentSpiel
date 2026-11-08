@@ -105,7 +105,7 @@ en:
           again: "Choose the files again: %{names}"
         send_apple: "Send (⌘↵)"
         # What the submit reads while its note is being sent, once that has
-        # taken longer than a moment (the handoff's decision 41).
+        # taken longer than a moment, so a quick send never flickers.
         sending: "Sending…"
         # The toast a note addressed to the viewer raises (`admin--notes--inbox`):
         # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
@@ -115,7 +115,7 @@ en:
           open: "Open"
           # Quoted: a bare `on` is YAML's word for true.
           "on": "%{sentence} on %{title}"
-          # From the third note of a burst (the handoff's decision 18): one
+          # From the third note of a burst, so a burst is not a stack: one
           # toast for all of them, whose "Open" leads to the inbox. It
           # starts at 3; `one` is there because a count needs both forms.
           many:
@@ -131,18 +131,16 @@ en:
             one: "%{count} new message ↓"
             other: "%{count} new messages ↓"
           gone: "This thread was deleted"
-    # The account screen's "Notes" card (notes spec §6.4, handoff "Account
-    # switches"): two settings of the person's, and what this browser says
-    # about showing notifications. Read with full keys from
-    # `admin/accounts/edit.html.erb` and `Admin::AccountsController`. The
-    # card is one of two in the account screen's first form, "Your account"
-    # (the handoff's decisions 19 and 20): Profile, the name, and Notes, with
-    # one footer, whose button is the bar's own "Save changes" and whose
+    # The account screen's "Notes" card: two settings of the person's, and
+    # what this browser says about showing notifications. Read with full keys
+    # from `admin/accounts/edit.html.erb` and `Admin::AccountsController`.
+    # The card is one of two in the account screen's first form, "Your
+    # account": Profile, the name, and Notes, with one footer, whose button is the bar's own "Save changes" and whose
     # toast is the app's own "Settings saved" (no full stop, as on the
     # Settings screen).
     accounts:
       # The screen's heading, its title in the browser's tab and the
-      # sidebar's entry that leads to it (the handoff's decision 25).
+      # sidebar's entry that leads to it: one name for the one place.
       title: "Your account"
       saved: "Settings saved"
       profile:
@@ -153,7 +151,7 @@ en:
       password:
         title: "Password"
         sessions: "You'll stay signed in here. Other sessions are signed out."
-        # The form's answer, said in the card (the handoff's decision 43).
+        # The form's answer, said in the card, where the form is.
         changed: "Password changed. Your other sessions were signed out."
         limited: "Try again later."
       notes:
@@ -199,7 +197,7 @@ en:
             label: "Write a note on this post"
             label_page: "Write a note on this page"
             add: "Add note"
-            # The button while the note is being sent (decision 41).
+            # The button while the note is being sent, once that takes longer than a moment.
             sending: "Sending…"
             replies:
               one: "%{count} reply"
@@ -226,7 +224,7 @@ en:
           add_note: "Add note"
         block_tile:
           add_note: "Add note"
-      # A record's open notes where it is listed (notes spec §4.4): the media
+      # A record's open notes where it is listed: the media
       # tile's, and the posts table's column header. None of these components'
       # other strings live here (they are not converted): these merge into
       # their scopes. The tree's and the posts list's pill are `notes_screen.row_pill`.
@@ -318,8 +316,8 @@ en:
           dismiss: "Dismiss"
           # Row 1's way back to the editor in the sheet (below 1024px), where
           # the sheet's own header is hidden while a thread is open. These
-          # words for a page and a post alike, without the title (the
-          # handoff's decision 21).
+          # words for a page and a post alike, without the title, which the
+          # screen behind it already shows.
           leave: "Back to page"
           # Under what the thread is on: "2 messages · started on DE".
           messages:
@@ -356,10 +354,10 @@ en:
           react: "React"
           # In the meta line of a message whose edit was left without saving,
           # and nowhere else: also while its edit form is open again with the
-          # text put back (the handoff's decisions 27 and 29).
+          # text put back, so a person sees where text still waits.
           unsaved: "Unsaved edit"
-        # A message's files (handoff "Attachment row", "Inline image and
-        # still GIF tile"). `file` is the kind of a file whose stored type is
+        # A message's files: the attachment row and the inline image or
+        # still GIF tile. `file` is the kind of a file whose stored type is
         # none of the allowed ones; `open` names an image's link, `download`
         # a document's; `play` and `pause` are the control of a GIF with
         # reduced motion; `gif` its label.

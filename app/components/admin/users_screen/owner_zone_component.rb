@@ -1,8 +1,7 @@
 module Admin
   module UsersScreen
-    # The user editor's owner zone (round 3 Task 12, decision D18, handoff §4.9):
-    # a dashed card below the form -- for a viewer who is an owner, and only on an
-    # existing user -- saying what an owner is and offering the one action:
+    # The user editor's owner zone: a dashed card below the form -- for a
+    # viewer who is an owner, and only on an existing user -- saying what an owner is and offering the one action:
     #
     # - a non-owner: "Make owner…";
     # - an owner: "Remove owner rights…";

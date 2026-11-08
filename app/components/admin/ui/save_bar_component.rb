@@ -36,6 +36,9 @@ module Admin
           marked: [ "test/system/save_bar_test.rb", "a changed field carries the mark, and loses it when typed back" ],
           blocked: [ "test/system/save_bar_test.rb", "Change password is locked while the name is unsaved, and unlocks when it is saved" ]
         },
+        # `per_language` and `order_changed` are read by the Settings cards,
+        # not by this component, and are listed because the contract holds
+        # every leaf under `save_bar`.
         keys: %w[save_changes discard changes names more separator per_language order_changed unsaved no_changes blocked],
         slots: [],
         controller: nil
@@ -62,6 +65,11 @@ module Admin
       def save_label = @save_label || t(".save_changes")
 
       def contained? = @contained
+
+      # The words' size: the floating bar's line is 14px on a 20px line
+      # (`text-sm`; CS Studio's `text-small` is 13px); a card's footer keeps
+      # its 13px.
+      def line_class = contained? ? "text-[13px]" : "text-sm"
 
       # Sticky at `--cs-sp-3` above the window's edge, so the bar floats clear
       # of it over the fields and stands under them at the form's end.

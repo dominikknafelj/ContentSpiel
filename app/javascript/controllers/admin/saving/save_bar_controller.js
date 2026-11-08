@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { targetWithinThePage } from "controllers/admin/shell/fragment_links_controller"
 import { messages } from "i18n/messages"
-import { NAMES_SHOWN, changedKeys, controlOf, nameOf, snapshot } from "saving/form_snapshot"
+import { NAMES_SHOWN, changedKeys, controlOf, nameOf, snapshot, wrapperOf } from "saving/form_snapshot"
 
 // The explicit-save pattern for configuration screens: the form's bar
 // (Discard, Save) is always there, counts the changed fields and names them,
@@ -410,16 +410,17 @@ export default class extends Controller {
 
   refresh() {
     const { count, names } = this.tally(true)
+    const unsaved = this.dirtyValue || count > 0
     // A Save that the password field already governs (`data-password-submit`:
     // disabled until the password is long enough) is left to it -- two
     // controllers writing one button's `disabled` on the same keystroke would
     // undo each other, and such a form can't be saved with nothing typed
     // anyway.
     if (this.hasSaveTarget && !("passwordSubmit" in this.saveTarget.dataset)) {
-      this.saveTarget.disabled = this.blocked || !(this.unsaved || this.alwaysValue)
+      this.saveTarget.disabled = this.blocked || !(unsaved || this.alwaysValue)
     }
-    if (this.hasDotTarget) this.dotTarget.hidden = !this.unsaved
-    this.writeCount(count, names)
+    if (this.hasDotTarget) this.dotTarget.hidden = !unsaved
+    this.writeCount(count, names, unsaved)
     announce()
   }
 
@@ -427,14 +428,14 @@ export default class extends Controller {
   // unsaved changes" in meta. The names sentence is the key's, and the count
   // is cut out of it where the key put it, so a language may order the two
   // as it likes.
-  writeCount(count, names) {
+  writeCount(count, names, unsaved) {
     const text = messages(this.element)
     const target = this.countTarget
     target.replaceChildren()
-    target.classList.toggle("text-meta", !this.unsaved)
-    target.classList.toggle("text-dim", this.unsaved)
+    target.classList.toggle("text-meta", !unsaved)
+    target.classList.toggle("text-dim", unsaved)
     if (count === 0) {
-      target.textContent = this.unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes"))
+      target.textContent = unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes"))
       return
     }
     const changes = text.t("components.ui.save_bar.changes", { count })
@@ -531,7 +532,7 @@ export default class extends Controller {
     const loose = []
     for (const key of keys) {
       const control = controlOf(key, this.initial, now)
-      const wrapper = control?.closest("[data-field-name]")
+      const wrapper = control ? control.closest("[data-field-name]") : wrapperOf(key, this.initial, now)
       if (wrapper && this.element.contains(wrapper)) changed.add(wrapper)
       else if (control) loose.push(control)
     }

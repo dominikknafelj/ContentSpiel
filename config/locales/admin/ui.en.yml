@@ -113,9 +113,9 @@ en:
         unpublished_chip:
           label: "Unpublished changes"
 
-        # One translation vocabulary in CS Studio (Claude Design's O4):
-        # Missing, Outdated, Translated. Plan ruling 5: the outdated tooltip
-        # keeps its sentence, since it names the language to compare with.
+        # One translation vocabulary in CS Studio: Missing, Outdated,
+        # Translated. The outdated tooltip keeps its sentence, since it names
+        # the language to compare with.
         translation_chip:
           aria_label:
             complete: "%{language}: translated"

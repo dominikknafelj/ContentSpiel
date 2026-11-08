@@ -246,7 +246,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-admin--settings--repeat-rows-target=list] input[name$='[name]']", count: 2
   end
 
-  # Review Focus 1. A refused save brings back what was typed, which is then
+  # A refused save brings back what was typed, which is then
   # the browser's own baseline: the server says which fields differ from the
   # saved settings. A field both changed and invalid shows its invalid edge
   # alone (Port), and is named all the same.
@@ -278,8 +278,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   end
 
   test "Back with a typed change asks first, and Discard discards without asking" do
-    visit admin_root_path
-    await_admin_controllers
+    visit_screen admin_root_path
     within("nav[aria-label='Modules']") { click_link "Settings" }
     assert_current_path admin_settings_path
     assert_selector footer, text: /No unsaved changes/i
@@ -387,7 +386,10 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("button[aria-label='Remove link']").click
-    assert_selector footer, text: /unsaved change/i
+    # The row's two fields went, each a change, and both are the list's.
+    assert_selector footer, text: "2 unsaved changes · Social links"
+    dot = page.evaluate_script("getComputedStyle(document.querySelector('#settings-social-links > legend'), '::after').width")
+    assert_equal "8px", dot
     assert_no_selector "[data-admin--settings--repeat-rows-target=row]"
     assert_selector "button[data-action='admin--settings--repeat-rows#add']:focus"
     press "Save changes"
@@ -489,6 +491,28 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       seen = page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
       seen == codes
     end
+  end
+
+  # A row's fallback is keyed by its language, not its place: moving a row
+  # is the order's change alone, and no fallback is marked or named.
+  test "a keyboard move reads as the language order alone, with no edge on any fallback" do
+    site = site_settings(:default)
+    site.update!(locales: site.locales.map { |entry| entry["code"] == "es" ? entry.merge("fallbacks" => [ "de" ]) : entry })
+    visit_screen admin_settings_path
+    assert_language_order %w[en de es]
+
+    handle = find("button[aria-label='Move Deutsch']")
+    handle.send_keys(:space)
+    handle.send_keys(:down)
+    handle.send_keys(:space)
+    assert_language_order %w[en es de]
+
+    assert_selector footer, text: "1 unsaved change · Language order"
+    assert_selector "#settings-languages-card[data-save-bar-changed]"
+    assert_no_selector "#settings-languages-card [data-field-name][data-save-bar-changed]"
+    shadows = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card select')).map((s) => getComputedStyle(s).boxShadow)")
+    assert shadows.none? { |shadow| shadow.include?("inset") }, "a fallback carries the changed edge: #{shadows.inspect}"
+    assert_selector "#settings-languages-card h2#languages + .admin-save-bar-heading-mark", visible: :visible
   end
 
   test "a keyboard reorder is one pending change, locks the instant actions, and Save puts the tabs in the new order" do
