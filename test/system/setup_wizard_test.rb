@@ -5,8 +5,8 @@ class SetupWizardTest < ApplicationSystemTestCase
   include HeldTestMail
 
   setup do
-    # `delete_all`, not `destroy_all` -- see `SetupTestHelper#start_fresh_
-    # install`'s own comment (Task 8's `User#ensure_not_last_owner`).
+    # `delete_all`, not `destroy_all`: see `SetupTestHelper#start_fresh_
+    # install`'s own comment (`User#ensure_not_last_owner`).
     User.delete_all
     site_settings(:default).update!(setup_completed_at: nil)
     SetupController::RATE_LIMIT_STORE.clear
@@ -16,10 +16,17 @@ class SetupWizardTest < ApplicationSystemTestCase
     visit "/"
     assert_current_path "/setup/token"
 
-    assert_selector "h1", text: "Enter your setup token"
+    assert_text "Welcome to Content·Spiel"
+    assert_selector "h1", text: "Let's set up your site"
+    assert_text "Step 1 of 9"
+    within("nav[aria-label='Setup steps']") do
+      assert_selector "li", text: /System check\s*Optional\z/
+      assert_no_text "OPTIONAL"
+    end
     fill_in "Setup token", with: Setup::Token.value
     press "Continue"
 
+    assert_text "Step 2 of 9"
     assert_text "File storage"
     assert_selector "h1", text: "System check"
     press "Continue"
@@ -104,9 +111,28 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_selector "button[data-password-submit]:not([disabled])", text: "Continue"
   end
 
-  # `press` (a scripted click -- see its own comment) moved to
-  # `ApplicationSystemTestCase` in cs-studio Task 9, shared by every system
-  # test that needs it, this one included.
+  test "Where do I find the log? opens the commands under the field and keeps the focus" do
+    visit "/setup/token"
+    assert_selector "h1", text: "Let's set up your site"
+    assert_no_text "docker compose logs web"
+
+    find("summary", text: "Where do I find the log?").click
+
+    assert_selector "details[open]", text: "The setup token is printed in the server's log when CS Studio starts, unless you set it yourself with SETUP_TOKEN."
+    assert_selector "details[open] code", text: "docker compose logs web"
+    assert_selector "details[open] code", text: "kamal app logs"
+    assert_selector "details[open] code", text: "contentspiel dev"
+    assert_equal "Where do I find the log?", page.evaluate_script("document.activeElement.textContent").strip
+    assert page.evaluate_script(<<~JS), "the disclosure stands under the field, above Continue"
+      (() => {
+        const field = document.getElementById("token")
+        const details = document.querySelector("details")
+        const button = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Continue")
+        return Boolean(field.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+          Boolean(details.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+      })()
+    JS
+  end
 
   test "the Mail step's security switch sets the port unless another port was typed" do
     visit "/setup/token"
@@ -132,6 +158,34 @@ class SetupWizardTest < ApplicationSystemTestCase
     fill_in "Port", with: "2525"
     find("label", exact_text: "TLS").click
     assert_field "Port", with: "2525"
+  end
+
+  # The row puts Send test mail first and Continue last; the form's first
+  # submit button is a hidden Continue, so Enter in any field continues.
+  test "Enter in a Mail field continues and sends no mail, whatever the row's order" do
+    visit "/setup/token"
+    fill_in "Setup token", with: Setup::Token.value
+    press "Continue"
+    assert_selector "h1", text: "System check"
+    press "Continue"
+    fill_in "Email address", with: "owner@example.com"
+    fill_in "Password", with: "password12345"
+    fill_in "Confirm password", with: "password12345"
+    press "Continue"
+    assert_selector "h1", text: "Site identity"
+    fill_in "Site title", with: "Dana's Notes"
+    press "Continue"
+    assert_selector "h1", text: "Mail"
+    ActionMailer::Base.deliveries.clear
+
+    assert_equal "Send test mail", find("#setup-mail-actions").all("button, a").first.text.strip
+    fill_in "Server", with: "smtp.enter.test"
+    fill_in "Sender address", with: "hello@site.test"
+    find_field("Sender address").send_keys(:enter)
+
+    assert_selector "h1", text: "Languages"
+    assert_empty ActionMailer::Base.deliveries
+    assert_equal "smtp.enter.test", SiteSetting.instance.mail_server
   end
 
   test "Send test mail shows it is working and a second press while waiting sends nothing" do

@@ -63,10 +63,13 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
   # Attaches `mind_graph/input` to a canvas made for the test, runs `script`
   # (which has `fire(type, pointerId, x, y, pointerType = "touch")`) and answers the callbacks made,
   # in order, as [name, *arguments]. `target:` is what `onPress` answers: true
-  # makes a press the start of a drag, false of a pan.
+  # makes a press the start of a drag, false of a pan. The flag travels inside
+  # an object: Ferrum sends no positional arguments at all when none of them is
+  # truthy (it asks the list `any?`), so a lone `false` would leave the done
+  # callback in `target`'s place and the script would never answer.
   def input_calls(script, target: false)
-    page.evaluate_async_script(<<~JS, target)
-      const [target, done] = arguments
+    calls = page.evaluate_async_script(<<~JS, { "target" => target })
+      const [{ target }, done] = arguments
       import("mind_graph/input").then(({ attachInput }) => {
         const canvas = document.createElement("canvas")
         canvas.style.cssText = "position: fixed; left: 0; top: 0; width: 600px; height: 400px; z-index: 1000"
@@ -84,8 +87,10 @@ class Admin::MindGraphModulesSystemTestCase < ApplicationSystemTestCase
         detach()
         canvas.remove()
         done(calls)
-      })
+      }).catch((error) => done({ error: String(error) }))
     JS
+    flunk "input: #{calls["error"]}" if calls.is_a?(Hash)
+    calls
   end
 
   # Draws one frame through `mind_graph/renderer` onto a context that only

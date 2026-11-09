@@ -93,7 +93,7 @@ end
 # backend (config/initializers/mobility.rb).
 gem "mobility", "~> 1.3"
 
-# Parses/renders CommonMark for `RichText::Markdown` (design spec §3.4) --
+# Parses/renders CommonMark for `RichText::Markdown` --
 # MCP reads and writes rich-text bodies as Markdown, converted to and from
 # the Tiptap/ProseMirror JSON `RichText::Document` wraps
 # [https://github.com/gjtorikian/commonmarker]. Only its AST (`Commonmarker
@@ -128,11 +128,11 @@ gem "mcp", "~> 1.9"
 
 gem "rack-attack", "~> 6.8"
 
-gem "view_component", "~> 4.20"
+gem "view_component", "~> 4.23"
 
-# Colours the Code block's source on the server (code block spec §2). It was
-# in the bundle only through Lookbook, a development and test gem; a
-# visitor's request runs it now, so it is a dependency of its own.
+# Colours the Code block's source on the server. A visitor's request runs
+# it, so it is a dependency of its own and not only Lookbook's, a
+# development and test gem.
 # `require: false`: requiring Rouge loads every one of its lexers, so it is
 # required by the one file that names it (`app/values/code_highlight.rb`).
 gem "rouge", "~> 5.1", require: false
@@ -140,7 +140,7 @@ gem "rouge", "~> 5.1", require: false
 gem "lookbook", "~> 2.3", groups: [ :development, :test ]
 
 # The official Anthropic SDK -- the built-in AI translation provider
-# (`AI::Providers::Anthropic`, translation helpers spec §6). Only ever
+# (`AI::Providers::Anthropic`). Only ever
 # constructed when a site has an AI key configured; tests inject a fake
 # client and never reach the network.
 gem "anthropic"

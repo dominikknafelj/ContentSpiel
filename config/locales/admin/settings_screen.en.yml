@@ -1,31 +1,149 @@
-# The Settings screen's Mail card (spec "Settings → Mail", design answer M2;
-# docs/reference/mail.md): `admin.components.settings_screen.*` are its
-# components' keys (docs/reference/i18n.md: one file per component folder).
-# The screen's older cards still hold their words as literals; only the mail
-# card and the encryption-keys sentence are keys so far.
-#
-# `admin.settings.*` are what the controllers and `Settings::Save` answer:
-# toasts, the login's refusal, the sentence a site without encryption keys
-# gets for the mail login and the AI key alike, and a host-set field's.
+# The Settings screen's components (docs/reference/mail.md for the Mail
+# card): `admin.components.settings_screen.*` are their keys
+# (docs/reference/i18n.md: one file per component folder).
+# The screen's view and the controllers' answers are `admin.settings.*`, in
+# `settings.en.yml`.
 en:
   admin:
     components:
       settings_screen:
+        # Each section's name, in the nav, on its card's heading and wherever
+        # a section is named (`SettingsSections`).
+        sections:
+          site: "Site"
+          languages: "Languages"
+          publishing: "Publishing"
+          forms: "Forms"
+          ai: "AI translation"
+          mail: "Mail"
+          images: "Images"
+        nav:
+          label: "Settings sections"
+        # The "At a glance" rail (`GlanceComponent`) and its rows
+        # (`GlanceRowComponent`, which reads these by full key). The AI and
+        # Mail rows say `ai_state.*` and `admin.mail.states.*.word`, as their
+        # cards do.
+        glance:
+          heading: "At a glance"
+          hint: "Settings save together, with the bar at the foot: they are configuration, not content."
+          languages:
+            count:
+              one: "%{count} language"
+              other: "%{count} languages"
+            default: "%{language} is the default"
+          images:
+            ready: "Ready"
+            waiting:
+              one: "%{count} waiting"
+              other: "%{count} waiting"
+            failed:
+              one: "%{count} failed"
+              other: "%{count} failed"
+            none: "No images yet"
+        site_card:
+          title_label: "Title · translatable"
+          tagline_label: "Tagline · translatable"
+          logo: "Logo"
+          current_logo: "Current logo"
+          logo_file: "Logo file"
+          logo_hint: "PNG, JPEG, GIF or WebP. Without a logo the site title is shown."
+          remove_logo: "Remove logo"
+          time_zone: "Time zone"
+          time_zone_help: "Used for scheduled publishing."
+          social_links: "Social links"
+          add_link: "+ Add link"
+          # What the save bar calls a changed field whose label is not plain;
+          # a title or tagline is said with its language
+          # (`ui.save_bar.per_language`).
+          names:
+            title: "Title"
+            tagline: "Tagline"
+            social_links: "Social links"
+            logo: "Logo"
+        languages_card:
+          intro: "The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default."
+          drag_help: "Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back."
+          move: "Move %{language}"
+          default: "Default"
+          make_default: "Make default…"
+          make_default_label: "Make %{language} the default language"
+          falls_back_to: "Falls back to"
+          # Said after "Falls back to" to a screen reader only.
+          falls_back_for: "for %{language}"
+          no_fallback: "None (default)"
+          turn_off: "Turn off…"
+          turn_off_label: "Turn off %{language}"
+          add_label: "Add a language"
+          add: "Add language"
+          all_on: "Every available language is already on."
+          # What the save bar calls the order and a row's fallback, which is
+          # said with its language (`ui.save_bar.per_language`).
+          names:
+            language_order: "Language order"
+            fallback: "Falls back to"
+        language_dialogs:
+          items:
+            one: "%{count} item"
+            other: "%{count} items"
+          default_dialog:
+            title: "Make %{language} the default?"
+            body: "%{language} moves to / and %{default_language} to /%{default_code}. Existing links to %{default_language} pages without /%{default_code} will open the %{language} version, or show “not found” where there is none."
+            details: "%{language} becomes the source language, so every translation is marked outdated (%{items})."
+            confirm: "Change default language"
+          off_dialog:
+            title: "Turn off %{language}?"
+            body: "%{language} disappears from the language switcher and /%{code} pages show “not found”. Translations are kept, so turning it back on restores them."
+            confirm: "Turn off %{language}"
+        publishing_card:
+          keep_label: "Keep trashed items for"
+          days: "days after an item is trashed."
+          help: "Set to 0 to keep trashed items until someone empties the trash."
+        ai_card:
+          intro: "Editors can ask for a suggested translation of a field. Nothing is saved until they use it."
+          provider: "Provider"
+          no_provider: "None (AI translation off)"
+          model: "Model"
+          test: "Test connection"
+          testing: "Testing…"
+          # Beside Test connection while Provider or Model differ from the saved ones (`admin--settings--ai`).
+          save_first: "Save provider and model first. Tests the saved settings."
+        ai_key:
+          label: "API key"
+          replace: "Replace"
+          remove: "Remove…"
+          add: "Add key"
+          replace_placeholder: "Paste a new key to replace it"
+          placeholder: "Paste the provider's API key"
+          save: "Save key"
+          cancel: "Cancel"
+          # After "Key saved", the day the key was saved: `date.formats.admin`.
+          added: "added %{date}"
+          # Written into the key's entry while it holds text, and shown by the
+          # save bar in place of its Save (`admin--settings--ai`).
+          hold: "Save or cancel the API key first."
         mail_card:
-          title: "Mail"
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
+          all_from_host: "These settings come from the host's environment."
+        # The Mail form's fields, on Settings and in the wizard's Mail step:
+        # a label per `MailSettings` field.
+        mail_fields:
+          server_group: "Server"
+          sender_group: "Sender"
           server: "Server"
           server_placeholder: "smtp.example.com"
           port: "Port"
           security: "Security"
           starttls: "STARTTLS"
           tls: "TLS"
-          none: "None"
           sender_name: "Sender name"
           sender_address: "Sender address"
           sender_address_placeholder: "no-reply@yourdomain"
+        # A mail field the host sets, the security in its words.
+        host_value:
           set_by_host: "Set by the host"
-          all_from_host: "These settings come from the host's environment."
+          starttls: "STARTTLS"
+          tls: "TLS"
+          none: "None"
         mail_login:
           heading: "Login"
           username: "Username"
@@ -35,7 +153,6 @@ en:
           set_on: "Set on %{date}"
           replace: "Replace"
           remove: "Remove…"
-          set_by_host: "Set by the host"
           # Written into the login's entry while it holds text, and shown by
           # the footer in place of its Save (`admin--settings--mail`).
           hold: "Save or cancel the mail login first."
@@ -52,13 +169,21 @@ en:
           sent: "Test mail sent to %{address}. Check your inbox."
         mail_state:
           label: "Mail state"
+        # `Admin::SettingsScreen::AiState`'s words, one per state: the key's
+        # chip, Test connection's result and the rail say them alike.
+        ai_state:
+          "off": "Off"
+          no_key: "No key"
+          key_saved: "Key saved"
+          connected: "Connected"
+          not_connected: "Not connected"
+        ai_test_result:
+          time: "%{milliseconds} ms"
         forms_card:
-          title: "Forms"
           keep_label: "Keep submissions for"
           days: "days."
           help: "Forms that keep submissions and don't set their own time keep them this long. A change applies to submissions already kept."
         images_card:
-          title: "Images"
           intro: "How the images of the library are made for the public site. Saving these settings changes no image; Regenerate images does."
           format: "Format"
           webp: "WebP"
@@ -89,19 +214,3 @@ en:
             one: "Remake %{count} image? This runs in the background and can take a few minutes."
             other: "Remake %{count} images? This runs in the background and can take a few minutes."
           confirm: "Regenerate images"
-    settings:
-      mail_login:
-        saved: "Mail login saved"
-        removed: "Mail login removed"
-        blank: "Enter a username or a password first."
-      mail_test:
-        too_many: "Too many test mails. Try again in a few minutes."
-      regenerate_images:
-        queued:
-          zero: "No image needed regenerating."
-          one: "Regenerating %{count} image."
-          other: "Regenerating %{count} images."
-      save:
-        avif_unavailable: "AVIF can't be chosen: this server cannot write it."
-        no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
-        set_by_host: "%{field} is set by the host and can't be changed here."

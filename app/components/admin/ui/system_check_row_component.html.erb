@@ -1,8 +1,6 @@
 <li class="admin-system-check flex gap-4 py-4" data-status="<%= result.status %>">
   <div class="w-[110px] shrink-0">
-    <span class="<%= chip_class %>">
-      <span aria-hidden="true" class="size-2 rounded-full <%= dot_class %>"></span><%= status_word %>
-    </span>
+    <%= render state_chip %>
   </div>
   <div class="min-w-0 flex-1">
     <p class="font-semibold text-ink"><%= result.label %></p>

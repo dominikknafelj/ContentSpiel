@@ -131,7 +131,7 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
     visit admin_media_path
     await_admin_controllers
     assert_selector BAR
-    page.driver.resize(380, 900)
+    page.current_window.resize_to(380, 900)
     labels = "#{BAR} fieldset label"
     assert_selector labels, minimum: 4
     result = page.evaluate_script(<<~JS)
@@ -149,6 +149,6 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
       assert_operator label["height"], :>=, HEIGHT - 2 - 0.5, "#{label["text"]} is shorter than its row"
     end
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 end

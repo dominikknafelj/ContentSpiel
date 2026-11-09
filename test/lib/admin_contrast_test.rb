@@ -1,11 +1,10 @@
 require "test_helper"
 
-# Contrast and buttons spec, "C1": CS Studio's token pairs, measured as
-# `design_tokens_test.rb` measures the site's. Text is 4.5:1 (WCAG 1.4.3);
-# a boundary that identifies a control or a state is 3:1 (1.4.11); a
-# boundary that only groups is held above the floor it reached, so a later
-# change cannot quietly take it back, and below 3:1, where it would be an
-# outline.
+# CS Studio's token pairs, measured as `design_tokens_test.rb` measures the
+# site's. Text is 4.5:1 (WCAG 1.4.3); a boundary that identifies a control
+# or a state is 3:1 (1.4.11); a boundary that only groups is held above the
+# floor it reached, so a later change cannot quietly take it back, and below
+# 3:1, where it would be an outline.
 class AdminContrastTest < ActiveSupport::TestCase
   include ContrastMeasure
 
@@ -297,10 +296,9 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The owner's decision of 2026-11-07: a non-primary button's fill is no
-  # shape on any ground (1.00 to 1.26:1), so its edge carries it, measured on
-  # every ground a button stands on. The tokens are read from the classes
-  # the component draws.
+  # A non-primary button's fill is no shape on any ground (1.00 to 1.26:1),
+  # so its edge carries it, measured on every ground a button stands on. The
+  # tokens are read from the classes the component draws.
   BUTTON_GROUNDS = %w[--cs-rail --cs-surface --cs-paper --cs-popover].freeze
 
   def button_token(variant, size, prefix)
@@ -380,7 +378,7 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The canvas's figures (spec, stage 5a), each a floor to its rounding: a
+  # The canvas's figures, each a floor to its rounding: a
   # figure of 6.9 is met by 6.85. A post's hues mean post types, so each slot
   # keeps its own hue angle; only its lightness is tuned into the band.
   CANVAS = "--cs-surface"
@@ -621,6 +619,77 @@ class AdminContrastTest < ActiveSupport::TestCase
         assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "Draft's words on #{ground} (#{scheme})")
         assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "Draft's outline on #{ground} (#{scheme})")
       end
+    end
+  end
+
+  # `Admin::Ui::StateChipComponent`: ok, warn and danger are a word and a
+  # dot on the role's tint; off is a field-line edge and ring with dim words,
+  # standing on a card or on the rail.
+  test "a state chip's word is 4.5:1 and its dot 3:1 on its tint, and off's edge 3:1 on the surface and the rail, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[ok warn danger].each do |role|
+        assert_ratio(4.5, colour.("--cs-#{role}-ink"), colour.("--cs-#{role}-tint"), "the #{role} chip's word (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-#{role}"), colour.("--cs-#{role}-tint"), "the #{role} chip's dot (#{scheme})")
+      end
+      %w[--cs-surface --cs-rail].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the off chip's edge and ring on #{ground} (#{scheme})")
+        assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "the off chip's word on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # The changed-field mark: a well's 2px accent edge on the well's own fill,
+  # and the accent dot after a label on the card. On the card the edge is
+  # held at the figure it measures, 6.9 / 7.1:1, so a change of the accent
+  # cannot quietly take it back.
+  test "the changed mark is 3:1 or better on the field's fill and on the card, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-field-fill"), "the changed edge on the field's fill (#{scheme})")
+      assert_ratio(floor({ light: 6.9, dark: 7.1 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-surface"), "the changed mark on the card (#{scheme})")
+    end
+  end
+
+  # The floating save bar stands on the popover's ground: the count (ink,
+  # bold), the names (dim), "No unsaved changes" (meta) and the accent dot.
+  test "the floating bar's words and dot read on the popover ground" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-popover"), "#{ink} on the bar (#{scheme})") }
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-popover"), "the bar's dot (#{scheme})")
+    end
+  end
+
+  # The wizard's progress bar is a graphic, so its floor is 3:1: the accent
+  # fill against the card's sunken track it is drawn on, which measures
+  # 5.67:1 in light and 6.32:1 in dark.
+  test "the wizard's progress fill is 3:1 or better against its sunken track, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-sunken"), "the progress fill on its track (#{scheme})")
+    end
+  end
+
+  # The current step's row is the accent tint: its name in ink, and its
+  # marker an accent ring around the number in accent. The accent on the
+  # tint measures 5.675:1 in light and 6.246:1 in dark, held at 5.7 and 6.2:1
+  # (each a floor to its rounding).
+  test "the current step's words are 4.5:1 on the accent tint, and its number in the accent" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint"), "the current step's name (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's number (#{scheme})")
+      assert_ratio(floor({ light: 5.7, dark: 6.2 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's ring (#{scheme})")
+    end
+  end
+
+  test "a done step's check is 3:1 or better on the ok tint" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "a done step's check (#{scheme})")
+    end
+  end
+
+  # The step list stands on the page, so a step to come's ring is measured on
+  # paper: it is the marker's only edge.
+  test "a step to come's ring is 3:1 or better on the page" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-field-line"), colour.("--cs-paper"), "a step to come's ring on the page (#{scheme})")
     end
   end
 

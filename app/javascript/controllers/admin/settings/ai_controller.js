@@ -1,6 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
-// The AI translation card's client side (round 3, Task 7).
+// The AI translation card's client side. Its words come from the card's
+// `data-messages` (and the save bar's shared one from <body>).
 //
 // 1. Replace / Add key swaps the key chip for the key's input, Cancel (or
 //    Escape) swaps it back and empties the input. The input is never
@@ -10,16 +12,16 @@ import { Controller } from "@hotwired/stimulus"
 // 2. Test connection tests the SAVED settings, so it is gated here, in one
 //    place, on two independent rules:
 //      - Provider or Model differ from their `data-saved-value` -> disabled,
-//        "Save provider and model first. Tests the saved settings."
+//        `ai_card.save_first`: "Save provider and model first. Tests the saved settings."
 //      - the main form has unsaved changes (any `admin--saving--save-bar` on the page,
-//        heard as `admin--saving--save-bar:state`, decision D10) -> disabled,
-//        "Save or cancel your changes first."
+//        heard as `admin--saving--save-bar:state`) -> disabled,
+//        `save_bar.blocked`: "Save or discard your changes first."
 //    Both can apply at once (a changed field is itself a pending change);
 //    then only the more specific hint shows. The button is deliberately not an
 //    `admin--saving--pending-lock` control: that controller would re-enable it on its
 //    own schedule and undo the first rule.
 //
-// 3. A key typed and not saved holds the main Save back (ledger C-M8). The
+// 3. A key typed and not saved holds the main Save back (`ai_key.hold`). The
 //    entry is a field of the key's own form; the main Save re-renders the
 //    screen and dropped it without a word. While the entry is open and not
 //    empty it carries `data-save-bar-holds` with the sentence the footer
@@ -41,9 +43,9 @@ import { Controller } from "@hotwired/stimulus"
 // Like `admin--saving--pending-lock`, it asks the save bar for its state once on
 // connect (each controller arrives by its own dynamic import, and a form
 // re-rendered after a refusal is unsaved from the start).
-const SPECIFIC_HINT = "Save provider and model first. Tests the saved settings."
-const PENDING_HINT = "Save or cancel your changes first."
-const KEY_HINT = "Save or cancel the API key first."
+const SPECIFIC_HINT = "components.settings_screen.ai_card.save_first"
+const PENDING_HINT = "components.ui.save_bar.blocked"
+const KEY_HINT = "components.settings_screen.ai_key.hold"
 
 export default class extends Controller {
   static targets = ["provider", "model", "test", "testHint", "chip", "entry", "input"]
@@ -112,7 +114,7 @@ export default class extends Controller {
     if (this.hasEntryTarget && this.hasInputTarget) {
       const open = !this.entryTarget.hidden
       const holds = open && this.inputTarget.value.trim() !== ""
-      if (holds) this.entryTarget.setAttribute("data-save-bar-holds", KEY_HINT)
+      if (holds) this.entryTarget.setAttribute("data-save-bar-holds", messages(this.element).t(KEY_HINT))
       else this.entryTarget.removeAttribute("data-save-bar-holds")
       // The INPUT is never locked out while the entry is open, text or no
       // text: emptying it to type another key (select all, delete) would
@@ -150,7 +152,8 @@ export default class extends Controller {
   refresh() {
     if (!this.hasTestTarget) return
     const changed = this.changed
-    const hint = changed ? SPECIFIC_HINT : this.pending ? PENDING_HINT : ""
+    const key = changed ? SPECIFIC_HINT : this.pending ? PENDING_HINT : null
+    const hint = key ? messages(this.element).t(key) : ""
     this.testTarget.disabled = changed || this.pending || this.testing
     if (this.hasTestHintTarget) {
       this.testHintTarget.textContent = hint

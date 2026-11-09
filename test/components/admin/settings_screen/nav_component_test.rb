@@ -2,7 +2,7 @@ require "test_helper"
 
 class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
   test "one anchor per section, in the screen's order" do
-    render_inline Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent::SECTIONS)
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
     assert_selector "nav[aria-label='Settings sections'] a", count: 7
     assert_equal %w[#site #languages #publishing #forms #ai #mail #images], page.all("a").map { |a| a[:href] }
@@ -12,26 +12,42 @@ class Admin::SettingsScreen::NavComponentTest < ViewComponent::TestCase
   # Same-page links: a `_top` link would be a Turbo visit, which the save
   # footer's leave guard asks about.
   test "the links are plain fragment links, never visits" do
-    render_inline Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent::SECTIONS)
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
     assert_no_selector "a[data-turbo-frame]"
   end
 
   test "the nav is the current-section controller's, and the server marks no link current" do
-    render_inline Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent::SECTIONS)
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
     assert_selector "nav[aria-label='Settings sections'][data-controller='admin--settings--nav'][data-action~='turbo:before-cache@document->admin--settings--nav#reset']"
     assert_selector "a[data-admin--settings--nav-target=link]", count: 7
     assert_no_selector "a[aria-current]"
   end
 
-  test "sections_for keeps the sections whose right the viewer holds" do
-    only_settings = Admin::SettingsScreen::NavComponent.sections_for { |permission| permission == "settings.manage" }
-    only_languages = Admin::SettingsScreen::NavComponent.sections_for { |permission| permission == "languages.manage" }
+  test "each link carries its section's chip before its word" do
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
 
-    assert_equal %w[site publishing forms ai mail images], only_settings.map { |section| section[:id] }
-    assert_equal %w[languages], only_languages.map { |section| section[:id] }
-    assert_empty Admin::SettingsScreen::NavComponent.sections_for { false }
+    links = page.all("nav a")
+    assert_equal 7, links.size
+    SettingsSections::ALL.zip(links).each do |section, link|
+      chip = link.native.element_children.first
+      assert_equal [ "span", "true" ], [ chip.name, chip["aria-hidden"] ], section.id
+      assert_includes chip[:class].split, "size-5.5", section.id
+      assert_includes chip[:class].split, Admin::Ui::IconChipComponent::FAMILIES.fetch(section.family).split.first, section.id
+      assert chip.at_css("svg"), section.id
+    end
+    assert_equal "Languages", links[1].text
+  end
+
+  test "its words are keys" do
+    assert_equal "Settings sections", I18n.t("admin.components.settings_screen.nav.label")
+    I18n.backend.store_translations(:en, admin: { components: { settings_screen: { nav: { label: "Parts of Settings" }, sections: { ai: "Machine translation" } } } })
+    render_inline Admin::SettingsScreen::NavComponent.new(sections: SettingsSections::ALL)
+
+    assert_selector "nav[aria-label='Parts of Settings'] a[href='#ai']", text: "Machine translation"
+  ensure
+    I18n.backend.store_translations(:en, admin: { components: { settings_screen: { nav: { label: "Settings sections" }, sections: { ai: "AI translation" } } } })
   end
 
   test "renders nothing without sections" do

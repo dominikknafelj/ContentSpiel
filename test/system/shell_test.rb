@@ -3,7 +3,7 @@ require "application_system_test_case"
 class ShellTest < ApplicationSystemTestCase
   test "under 1280 the sidebar is a drawer behind the top bar" do
     sign_in_via_form users(:one)
-    page.driver.resize(1100, 900)
+    page.current_window.resize_to(1100, 900)
     assert_selector ".admin-top-bar"
     assert_no_selector "#sidebar[data-open]"
     find("button[aria-label='Open navigation']").click
@@ -25,7 +25,7 @@ class ShellTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Posts"
     assert_no_selector "#sidebar[data-open]"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # The scrim is un-hidden by `admin--shell--drawer`, which knows nothing about
@@ -33,33 +33,33 @@ class ShellTest < ApplicationSystemTestCase
   # into the ordinary sidebar, and the scrim must not stay over the page.
   test "a drawer left open across a resize to desktop width leaves no scrim over the page" do
     sign_in_via_form users(:one)
-    page.driver.resize(1100, 900)
+    page.current_window.resize_to(1100, 900)
     await_admin_controllers
     find("button[aria-label='Open navigation']").click
     assert_selector "#sidebar[data-open]"
     assert_selector ".admin-shell__scrim", visible: true
 
-    page.driver.resize(1400, 900)
+    page.current_window.resize_to(1400, 900)
     assert_no_selector ".admin-shell__scrim", visible: true
     within("#content") { assert_selector "h1" }
     # Nothing covers the content: a link in it takes a real click.
     assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('.admin-shell__scrim')).display")
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
-  # Review B, M4: the tree drawer closes when a page picked in it has loaded
-  # into `#content` -- not on any frame's load. ⌘K's results frame loads as
-  # the palette opens and on every keystroke; it used to close the drawer
-  # behind the palette (as did the New page / New post frames and the media
-  # picker's).
+  # The tree drawer closes when a page picked in it has loaded into
+  # `#content` -- not on any frame's load. ⌘K's results frame loads as the
+  # palette opens and on every keystroke, and must not close the drawer
+  # behind the palette (nor must the New page / New post frames and the
+  # media picker's).
   test "below 1024 the tree drawer stays open while another frame loads, and closes when a tree link has loaded" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     other = create_page(title: "Other")
     sign_in_via_form users(:one)
     visit "/cs-studio/pages/#{root_page.id}"
     await_admin_controllers
-    page.driver.resize(900, 900)
+    page.current_window.resize_to(900, 900)
     find("button[aria-controls='tree-column']").click
     assert_selector "#tree-column[data-open]"
 
@@ -78,7 +78,7 @@ class ShellTest < ApplicationSystemTestCase
     assert_field "Title", with: "Other"
     assert_no_selector "#tree-column[data-open]"
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "at desktop width there is no top bar and the sidebar stays put" do
@@ -87,8 +87,8 @@ class ShellTest < ApplicationSystemTestCase
     assert_selector "#sidebar nav[aria-label='Modules']"
   end
 
-  # Round 1 departure, dark and light: the sidebar's background ran only to the
-  # viewport's bottom. Its grid cell now stretches the whole page and paints the
+  # Dark and light: the sidebar's background reaches the page's bottom, not
+  # only the viewport's. Its grid cell stretches the whole page and paints the
   # chrome background; the nav inside stays pinned to the viewport.
   %w[light dark].each do |theme|
     test "the sidebar background fills the page and the nav stays pinned on a long page (#{theme})" do
@@ -113,7 +113,7 @@ class ShellTest < ApplicationSystemTestCase
     end
   end
 
-  # The notes handoff's decision 25: the sidebar's entry reads "Your account",
+  # The sidebar's entry reads "Your account",
   # and the person's name block above it is a link to the same screen, whose
   # cards are Profile, Notes and Password. A name saved there is drawn again
   # in the block (a stream), which is still the link.
@@ -134,7 +134,7 @@ class ShellTest < ApplicationSystemTestCase
     assert_current_path admin_account_path
 
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
     assert_selector "#sidebar a#account-identity[href='#{admin_account_path}'] span[title='Ada']"
   end
 end

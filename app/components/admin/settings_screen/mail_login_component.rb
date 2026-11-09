@@ -1,23 +1,26 @@
 module Admin
   module SettingsScreen
-    # The mail login's part of the Mail card (spec decision 2, design answer
-    # M2), on the AI key's pattern (`AiKeyComponent`): written once, never
-    # shown again. With no login stored, Username and Password are open with
-    # "Save login"; once one is, a meta line "Set on 14 Oct 2026" with Replace
-    # (which opens the two fields again, with Cancel) and Remove….
+    # The mail login's part of the Mail card, on the AI key's pattern
+    # (`AiKeyComponent`): written once, never shown again. With no login
+    # stored, Username and Password are open with "Save login"; once one is,
+    # a meta line "Set on 14 Oct 2026" with Replace (which opens the two
+    # fields again, with Cancel) and Remove…. Save login and Replace are
+    # secondary, Remove… the danger text: an instant action is never the
+    # primary, which is the save bar's Save.
     #
     # NOTHING OF THE LOGIN IS EVER RENDERED and nothing here decrypts it: only
     # `SiteSetting#mail_login_set?` (the raw columns) and the saved-on date are
     # read, so a login the current encryption keys can't read still shows as
     # set and can be replaced or removed. The inputs are never pre-filled.
     #
-    # A half the host's environment sets is a sunken box with "Set by the
-    # host" and no input (its value is not shown either: it is a credential);
-    # with both halves from the host there is nothing to save here at all.
+    # A half the host's environment sets is `HostValueComponent`, the mask
+    # with "Set by the host" and no input (its value is not shown either: it
+    # is a credential); with both halves from the host there is nothing to
+    # save here at all.
     #
     # Like the key's, its controls sit inside the Settings form but belong to
     # the login's own form (`LOGIN_FORM`, after the main form) through
-    # `form=`, so the footer never counts them; Replace, Remove…, the inputs
+    # `form=`, so the save bar never counts them; Replace, Remove…, the inputs
     # and Save login are `admin--saving--pending-lock` controls, the inputs
     # exempt while the entry is open (`admin--settings--mail`). `error:` is a
     # refusal shown in the slot, with the entry open.
@@ -27,8 +30,8 @@ module Admin
       REMOVE_DIALOG = "settings-mail-remove-login-dialog".freeze
       LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
       FIELDS = { username: "mail_username", password: "mail_password" }.freeze
-      # What a login half the host sets is drawn as, here and in the setup
-      # wizard's Mail step: never its value.
+      # What a login half the host sets is drawn as (`HostValueComponent`, on
+      # Settings and in the wizard's Mail step): never its value.
       MASK = "••••••••".freeze
 
       # Whether a mail field is a half of the login, whose value no screen shows.

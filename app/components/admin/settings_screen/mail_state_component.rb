@@ -1,15 +1,15 @@
 module Admin
   module SettingsScreen
-    # The Mail card's state (spec "The states", design answer M3): a dot and
-    # a word, never colour alone, and under them the state's sentence. While
-    # the last send failed, the stored failure follows: its sentence and the
-    # server's line in mono (the card is `settings.manage`'s, who may read the
-    # line; System status shows the sentence alone).
+    # The Mail card's state: a state chip (a dot and a word, never colour
+    # alone) and under it the state's sentence. While the last send failed,
+    # the stored failure follows: its sentence and the server's line in mono
+    # (the card is `settings.manage`'s, who may read the line; System status
+    # shows the sentence alone).
     #
-    #   Not set up         hollow circle in --cs-meta
-    #   Saved, not tested  filled warn dot
-    #   Working            filled ok dot
-    #   Last send failed   danger dot: a real mail was lost
+    # `TONES` is the one map from a mail state to its chip's tone, public so
+    # that every component drawing a mail state reads it: not set up is off,
+    # saved but not tested is warn, working is ok, and a failed send is
+    # danger, because a real mail was lost.
     #
     # Its own element (`ID`), because "Send test mail" changes the state and
     # its answer replaces this part of the card alone. Every word is
@@ -18,9 +18,7 @@ module Admin
     class MailStateComponent < Admin::AdminComponent
       ID = "settings-mail-state".freeze
 
-      DOTS = {
-        not_set_up: "border border-meta", untested: "bg-warn", working: "bg-ok", failed: "bg-danger"
-      }.freeze
+      TONES = { not_set_up: :off, untested: :warn, working: :ok, failed: :danger }.freeze
 
       def initialize(mail_settings:)
         @mail_settings = mail_settings
@@ -29,10 +27,7 @@ module Admin
       def call
         tag.div(id: ID, class: "mt-2", data: { mail_state: state }) do
           safe_join([
-            tag.p(class: "flex items-center gap-1.5 text-sm text-ink") do
-              safe_join([ tag.span(class: "size-2 shrink-0 rounded-full #{DOTS.fetch(state)}", aria: { hidden: true }),
-                tag.span(t("admin.mail.states.#{state}.word"), class: "font-semibold") ])
-            end,
+            tag.p(render(Admin::Ui::StateChipComponent.new(tone: TONES.fetch(state), label: t("admin.mail.states.#{state}.word")))),
             tag.p(sentence, class: "mt-1 text-sm text-dim"),
             failure_alert
           ].compact)

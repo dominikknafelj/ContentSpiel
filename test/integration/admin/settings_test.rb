@@ -1,8 +1,7 @@
 require "test_helper"
 
-# The Settings screen is one form with one save footer (decisions
-# D4/D6/D9): every enabled language's title and tagline are in the
-# page at once, a save is an ordinary PATCH that redirects (303) with a toast,
+# The Settings screen is one form with one save footer: every enabled
+# language's title and tagline are in the page at once, a save is an ordinary PATCH that redirects (303) with a toast,
 # a refusal re-renders at 422 with the error summary, and a save on a stale
 # base is refused at 409. Nothing here answers a Turbo Stream.
 class Admin::SettingsTest < ActionDispatch::IntegrationTest
@@ -91,6 +90,48 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select ".admin-save-bar", 1
     assert_select "form#settings-form .admin-save-bar"
     assert_select "[data-controller~='admin--saving--autosave']", count: 0
+  end
+
+  test "every card is drawn by the card frame, in the nav's order, for the rights the viewer holds" do
+    get "/cs-studio/settings"
+
+    cards = css_select("form#settings-form section.admin-settings-card")
+    assert_equal SettingsSections.ids, cards.map { |card| card["aria-labelledby"] }
+    assert_equal SettingsSections.ids.map { |id| "settings-#{id}-card" }, cards.map { |card| card["id"] }
+    assert_equal SettingsSections.ids.map { |id| "##{id}" }, css_select("nav[aria-label='Settings sections'] a").map { |a| a["href"] }
+    cards.each do |card|
+      head = card.at_css("> .admin-settings-card__head")
+      assert head, "#{card['id']} has the frame's head"
+      assert head.at_css("span[aria-hidden=true] svg"), "#{card['id']} carries its chip"
+      assert head.at_css("h2##{card['aria-labelledby']}.text-h2"), "#{card['id']} is named by its heading"
+    end
+
+    sign_in_as(user_holding("languages.manage"))
+    get "/cs-studio/settings"
+    assert_equal %w[languages], css_select("section.admin-settings-card").map { |card| card["aria-labelledby"] }
+  end
+
+  # Every element drawn with each of the primary's classes, outside a dialog
+  # (whose confirm is its own area's primary).
+  def primaries(html)
+    wanted = Admin::Ui::ButtonComponent.classes(:primary).split
+    Nokogiri::HTML5.fragment(html).css("[class]").select do |node|
+      (wanted - node["class"].split).empty? && node.ancestors.none? { |up| up.name == "dialog" || up["role"] == "dialog" }
+    end
+  end
+
+  test "the Settings screen draws one primary button, the save bar's" do
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+    sample = %(<div><button class="#{primary}">One</button><a class="extra #{primary}">Two</a>) +
+      %(<dialog><button class="#{primary}">In a dialog</button></dialog><div role="dialog"><button class="#{primary}">In another</button></div>) +
+      %(<button class="#{Admin::Ui::ButtonComponent.classes(:secondary)}">Secondary</button></div>)
+    assert_equal 2, primaries(sample).size, "the matcher finds a primary however it is written, and none inside a dialog"
+
+    get "/cs-studio/settings"
+
+    found = primaries(response.body)
+    assert_equal 1, found.size, "primaries outside a dialog: #{found.map { |node| node.text.squish }.inspect}"
+    assert found.first.ancestors.any? { |up| up["class"].to_s.split.include?("admin-save-bar") }, "the one primary is the save bar's"
   end
 
   # -- saving -------------------------------------------------------------------
@@ -335,7 +376,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   end
 
   # The form resends every field, so what the select shows as selected is
-  # what a save writes back: a stored zone no option names used to fall to
+  # what a save writes back: a stored zone no option names must not fall to
   # the first option ("International Date Line West").
   test "a stored zone no option names stays selected, and a save that doesn't touch it keeps it" do
     @site.update_column(:time_zone, "America/Argentina/Cordoba")
@@ -364,7 +405,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "Europe/Berlin", @site.reload.effective_time_zone.tzinfo.name
   end
 
-  # -- stale saves (D4) ---------------------------------------------------------
+  # -- stale saves --------------------------------------------------------------
 
   test "a save on a stale base is refused with the banner, the typed values kept and nothing written" do
     stale = base
@@ -467,7 +508,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "Junk base", @site.reload.title
   end
 
-  # -- who sees what (D9) -------------------------------------------------------
+  # -- who sees what ------------------------------------------------------------
 
   def user_holding(*keys)
     user = users(:editor_branch)
@@ -503,6 +544,41 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "#publishing, #ai", count: 0
     assert_select "form#settings-form input[name^='site_setting[translations]']", count: 0
     assert_select "nav[aria-label='Modules'] a", text: "Settings"
+  end
+
+  # The rail must not tell a languages-only viewer whether mail works,
+  # whether an AI key is saved or how many images failed.
+  test "a viewer with languages.manage alone sees the languages row and no other state" do
+    with_mail_state(:failed) do
+      @site.update_columns(ai_provider: "anthropic")
+      sign_in_as(user_holding("languages.manage"))
+
+      get "/cs-studio/settings"
+
+      assert_response :success
+      assert_select "aside.admin-settings-glance a", 1
+      assert_select "aside.admin-settings-glance a#settings-glance-languages[href='#languages']", text: /3 languages/
+      assert_select "#settings-glance-ai, #settings-glance-mail, #settings-glance-images", count: 0
+      assert_select ".admin-state-chip", count: 0
+      [ "Last send failed", "No key", "Not set up", "No images yet", "Ready" ].each { |word| assert_not_includes response.body, word }
+    end
+  end
+
+  # The rail is drawn from what the screen already read: the mail settings,
+  # the images' counts, the site's languages. Measured against the same
+  # screen with the rail not drawn, after a first request has warmed what
+  # is cached per process.
+  test "the rail costs no statement of its own" do
+    get "/cs-studio/settings"
+    with_rail = count_statements { get "/cs-studio/settings" }
+    assert_select "aside.admin-settings-glance a", 4
+
+    glance = Admin::SettingsScreen::GlanceComponent
+    drawn = glance.method(:new)
+    without_rail = with_singleton_override(glance, :new, ->(**options) { drawn.call(**options, sections: []) }) { count_statements { get "/cs-studio/settings" } }
+    assert_select "aside.admin-settings-glance", 0
+
+    assert_equal without_rail, with_rail
   end
 
   test "a user with neither right gets the 403 page" do
@@ -578,5 +654,74 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
       params: { record_type: "SiteSetting", record_id: @site.id + 1, field: "title", locale: "de" }, as: :turbo_stream
 
     assert_response :not_found
+  end
+
+  # -- what the save bar can say ------------------------------------------------
+
+  # The bar names what changed by the control's own words, and a control
+  # with none would be counted and never named. The test reads them as
+  # `saving/form_snapshot.js`'s `nameOf` does: a `data-save-bar-name` on the
+  # control or its `[data-field-name]` wrapper; for a radio or a checkbox its
+  # fieldset's legend; a `label[for]`'s words without screen-reader-only
+  # text; the legend it stands in.
+  test "every control the Settings form submits has a name the bar can say" do
+    with_locales(%w[en de], default: "en")
+    @site.update!(social_links: { "Mastodon" => "https://social.example/@site" })
+
+    get "/cs-studio/settings"
+
+    assert_response :success
+    form = Nokogiri::HTML(response.body).at_css("#settings-form")
+    controls = form.css("input[name], select[name], textarea[name]").reject do |control|
+      control["type"].in?(%w[submit button]) || control.key?("data-save-bar-ignore") ||
+        (control["type"] == "hidden" && !control.key?("data-save-bar-track")) || control.ancestors("template").any?
+    end
+    assert_operator controls.size, :>, 20, "the form moved: this guard is looking at too little"
+
+    seen = ->(node) { node && node.dup.tap { |copy| copy.css(".sr-only").each(&:remove) }.text.strip.presence }
+    nameless = controls.reject do |control|
+      wrapper = control.ancestors("[data-field-name]").first
+      legend = seen.(control.ancestors("fieldset").first&.at_css("> legend"))
+      label = control["id"].present? && seen.(form.document.at_css("label[for='#{control["id"]}']"))
+      control["data-save-bar-name"].present? || wrapper&.[]("data-save-bar-name").present? ||
+        (control["type"].in?(%w[radio checkbox]) && legend) || label || legend
+    end
+    assert_empty nameless.map { |control| control["name"] }
+    # Each language's pair is its own wrapper, named with its language.
+    assert_select "[data-field-name='title.de'] input[data-save-bar-name='Deutsch: Title']"
+    assert_select "[data-field-name='tagline.en'] input[data-save-bar-name='English: Tagline']"
+    assert_select "[data-field-name='languages.de.fallback'][data-save-bar-name='Deutsch: Falls back to'] select"
+    assert_select "section#settings-languages-card[data-field-name=language_order][data-save-bar-name='Language order'][data-save-bar-mark=heading] h2#languages + .admin-save-bar-heading-mark .sr-only", text: "Language order changed"
+    # Beside the heading, never in it: the section is named "Languages".
+    assert_select "h2#languages", text: /\ALanguages\z/
+    assert_select "[data-field-name='languages.de.fallback'] select[data-save-bar-key='languages.de.fallback']"
+    assert_select "[data-field-name=social_links][data-save-bar-name='Social links'][data-save-bar-mark=dot]"
+    assert_select "[data-field-name=logo][data-save-bar-name='Logo']"
+    assert_select "[data-save-bar-changed]", count: 0
+  end
+
+  # With one language on there is nothing to tell apart: the label alone.
+  test "with one language on, a field kept per language is named without its language" do
+    with_locales(%w[en], default: "en")
+
+    get "/cs-studio/settings"
+
+    assert_select "[data-field-name='title.en'] input[data-save-bar-name='Title']"
+    assert_select "[data-field-name='tagline.en'] input[data-save-bar-name='Tagline']"
+    assert_select "[data-field-name='languages.en.fallback'][data-save-bar-name='Falls back to']"
+  end
+
+  # After a refusal the typed values are the browser's baseline, so the
+  # server marks the wrappers that differ from what is stored.
+  test "a refused save marks the typed fields that differ from the saved settings, and no other" do
+    with_locales(%w[en de], default: "en")
+    @site.update!(mail_server: "smtp.saved.test")
+
+    save mail_server: "smtp.typed.test", trash_retention_days: -1
+
+    assert_response :unprocessable_entity
+    assert_select "[data-field-name=mail_server][data-save-bar-changed=saved]"
+    assert_select "[data-field-name=trash_retention_days][data-save-bar-changed=saved]"
+    assert_select "[data-save-bar-changed]", count: 2
   end
 end

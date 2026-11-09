@@ -1,9 +1,9 @@
 require "application_system_test_case"
 
 # The publish dialog's button stays where it is when the overview arrives: a
-# person aims at "Publish changes" as the dialog opens, and the answer used to
-# grow the dialog and move the button down 46px, under or past the pointer, and
-# with a long overview onto another control. Measured, with the answer held back
+# person aims at "Publish changes" as the dialog opens, and an answer that
+# grew the dialog would move the button down (46px), under or past the
+# pointer, and with a long overview onto another control. Measured, with the answer held back
 # so that "before" is really before; the dialog's height is what is fixed
 # (`Admin::Ui::DialogComponent`'s `steady:`), and what is longer scrolls inside.
 class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase
@@ -88,14 +88,14 @@ class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase
   end
 
   test "at a phone's width the button does not move, one row or long" do
-    page.driver.resize(390, 800)
+    page.current_window.resize_to(390, 800)
     retitle
     assert_button_stays(long: false)
     page.execute_script("document.querySelector('dialog[open]').close()")
     add_blocks(30)
     assert_button_stays(long: true)
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   test "the scheduled-time row the answer shows does not move the button either" do

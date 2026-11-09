@@ -1,10 +1,13 @@
 module Admin
   module SettingsScreen
-    # The API key's part of the AI card (handoff §4.5, decision D11): a chip,
-    # "● Key saved · added 2 Oct" ("Key saved" alone for a key stored before
-    # the date column existed, "No key yet" without one) with Replace and
-    # Remove… (Add key when there is none). Replace/Add key swaps the chip for
-    # a password input with Save key and Cancel -- client side, `admin--settings--ai`.
+    # The API key's part of the AI card: AiState's chip with Replace and
+    # Remove… (Add key when there is none). The chip reads "Key saved", then
+    # "added 2 Oct" when the key has a date; "No key" with a provider and no
+    # key; and "Off" without a provider, whether a key is stored or not.
+    # Replace/Add key swaps the chip for a password input with Save key and
+    # Cancel -- client side, `admin--settings--ai`. Replace, Add key and Save
+    # key are secondary, Remove… the danger text and Cancel the tertiary: an
+    # instant action is never the primary, which is the save bar's Save.
     #
     # NO PART OF THE KEY IS EVER RENDERED, and nothing here decrypts it: only
     # `SiteSetting#ai_api_key_set?` (the raw column) and the saved-on date are
@@ -17,7 +20,7 @@ module Admin
     # form) through `form=`, so the footer never counts them and Save never
     # sends them; Replace, Remove… and Cancel are unnamed buttons. Replace /
     # Add key, Remove…, the input and Save key are `admin--saving--pending-lock`
-    # controls (decision D10): they wait while the main form has unsaved changes.
+    # controls: they wait while the main form has unsaved changes.
     #
     # The root's id is what a Turbo Stream `replace` of a key save targets.
     # `error:` is a refusal (a blank key) shown in the slot, with the input open.
@@ -43,13 +46,16 @@ module Admin
         date = site_setting.ai_api_key_saved_on
         return nil unless date
 
-        "added #{date.strftime(date.year == Time.zone.today.year ? "%-d %b" : "%-d %b %Y")}"
+        t(".added", date: I18n.l(date, format: date.year == Time.zone.today.year ? :"admin.short" : :"admin.short_with_year"))
       end
 
-      def chip_text
-        return "No key yet" unless key_set?
-
-        [ "Key saved", added_label ].compact.join(" · ")
+      # The date follows Key saved only: under Off, a key kept while no
+      # provider is chosen, it would read as the day AI translation was
+      # turned off.
+      def chip
+        state = AiState.of(site_setting)
+        Admin::Ui::StateChipComponent.new(tone: AiState.tone(state), label: AiState.word(state), detail: (added_label if state == :key_saved),
+          data: { ai_key_state: key_set? ? "set" : "unset" })
       end
 
       private

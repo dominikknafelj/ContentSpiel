@@ -1,15 +1,14 @@
 module Admin
   module SettingsScreen
-    # The Languages card (round 3, Task 6; handoff §4.5, A8, A9): one row per
-    # enabled language -- a drag handle, the native name with its public path
-    # (`/` for the default, `/<code>` for the rest), a "Default" tag or a
-    # "Make default…" button, a "Falls back to" select and "Turn off…" -- and
-    # "Add language" below. Rendered
-    # only for `languages.manage` (decision D9).
+    # The Languages card: one row per enabled language -- a drag handle, the
+    # native name with its public path (`/` for the default, `/<code>` for
+    # the rest), a "Default" badge or a "Make default…" button, a "Falls back
+    # to" select and "Turn off…" -- and "Add language" below. Rendered only
+    # for `languages.manage`.
     #
     # TWO KINDS OF CONTROL, and which form each belongs to is the point:
     #
-    # PENDING -- fields of the one Settings form, saved by its footer: the
+    # PENDING -- fields of the one Settings form, saved by its save bar: the
     # ORDER (a hidden `site_setting[languages][][code]` per row, in row order,
     # plus the one tracked `site_setting[language_order]` that makes a
     # reorder a single counted change; see `admin--settings--sortable-rows`) and each
@@ -20,14 +19,16 @@ module Admin
     # forms can't nest) and is reached from here by the `form=` attribute or a
     # dialog trigger. They answer with a 303 to the screen, which reloads it, so
     # they are disabled while the main form has unsaved changes
-    # (`admin--saving--pending-lock`, decision D10): otherwise the reload would throw
-    # the typed changes away.
+    # (`admin--saving--pending-lock`): otherwise the reload would throw the
+    # typed changes away. Being instant, none is the primary: the save bar's
+    # Save is the screen's one. Make default… and Add language are secondary,
+    # Turn off… the danger text.
     #
-    # The default language is NOT a radio group (final wave B, ledger C-M9; the
-    # handoff drew radios): a radio moves on every arrow key, and each move
-    # opened the "Make <Name> the default?" dialog -- a keyboard user could not
-    # walk the group without being asked. The default row carries a "Default"
-    # tag; every other row a "Make default…" button that opens that dialog.
+    # The default language is NOT a radio group: a radio moves on every arrow
+    # key, and each move would open the "Make <Name> the default?" dialog, so a
+    # keyboard user could not walk the group without being asked. The default
+    # row carries the neutral "Default" badge; every other row a "Make
+    # default…" button that opens that dialog.
     #
     # `values:` -- `Values` (typed order and fallbacks beat stored).
     class LanguagesCardComponent < Admin::AdminComponent
@@ -53,11 +54,21 @@ module Admin
       # `PublicUrlsGuardTest` would take for a hand-built public URL.
       def path(code) = default?(code) ? "/" : [ "", code ].join("/")
 
+      # What the save bar calls a row's fallback: "Deutsch: Falls back to",
+      # and with one language on, which has nothing to tell apart, the label
+      # alone.
+      def fallback_name(code)
+        label = t(".names.fallback")
+        return label if rows.size == 1
+
+        t("admin.components.ui.save_bar.per_language", language: name(code), label: label)
+      end
+
       def order_value = rows.map { |row| row[:code] }.join(",")
 
       # "None (default)" first, then every OTHER enabled language.
       def fallback_options(code)
-        [ [ "None (default)", "" ] ] + (rows.map { |row| row[:code] } - [ code ]).map { |other| [ name(other), other ] }
+        [ [ t(".no_fallback"), "" ] ] + (rows.map { |row| row[:code] } - [ code ]).map { |other| [ name(other), other ] }
       end
 
       def addable_options

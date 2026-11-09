@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The Users list and the user editor in a real browser (round 3 Task 12): a row opens
+# The Users list and the user editor in a real browser: a row opens
 # the editor, a ticked group card is one unsaved change, Make owner… confirms and
 # the list shows the Owner tag, the owner and delete buttons wait for unsaved
 # changes, and the password disclosure counts nothing until something is typed and
@@ -64,8 +64,8 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     fill_in "Name", with: "Typed"
     assert_selector ".admin-owner-zone button[disabled]", text: "Make owner…"
     assert_selector ".admin-delete-zone button[disabled]", text: "Delete user…"
-    assert_selector ".admin-owner-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
-    assert_selector ".admin-delete-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or cancel your changes first.", visible: :visible
+    assert_selector ".admin-owner-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
+    assert_selector ".admin-delete-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
 
     fill_in "Name", with: ""
     assert_selector ".admin-owner-zone button:not([disabled])", text: "Make owner…"

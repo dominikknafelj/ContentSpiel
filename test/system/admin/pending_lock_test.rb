@@ -1,14 +1,14 @@
 require "application_system_test_case"
 
-# `admin--saving--pending-lock` (design pass round 3, Task 1; decision D10): while an
+# `admin--saving--pending-lock`: while an
 # explicit-save form on the screen has unsaved changes, the instant actions
-# beside it are disabled and a hint says why -- "Save or cancel your changes
+# beside it are disabled and a hint says why -- "Save or discard your changes
 # first." -- because an instant action re-renders the screen and would throw
 # the pending changes away.
 #
-# Its first real hosts arrive with Settings, Groups and Users later in the
-# round, so the wrapper is added to the edit-user screen here (ruling R2):
-# a button, a link and the hint, next to the real `admin--saving--save-bar` form.
+# The wrapper is added to the edit-user screen here, so the lock is held on
+# its own: a button, a link and the hint, next to the real
+# `admin--saving--save-bar` form.
 class Admin::PendingLockTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -43,7 +43,7 @@ class Admin::PendingLockTest < ApplicationSystemTestCase
     fill_in "Name", with: "#{original} changed"
     assert_selector "#lock-button[disabled]"
     assert_selector "#lock-link[aria-disabled=true]"
-    assert_selector "#lock-hint", text: "Save or cancel your changes first.", visible: :visible
+    assert_selector "#lock-hint", text: "Save or discard your changes first.", visible: :visible
 
     # A disabled link goes nowhere -- and doesn't ask to leave either.
     find("#lock-link").click
@@ -73,7 +73,7 @@ class Admin::PendingLockTest < ApplicationSystemTestCase
 
     add_lock("afterend")
     assert_selector "#lock-button[disabled]"
-    assert_selector "#lock-hint", text: "Save or cancel your changes first.", visible: :visible
+    assert_selector "#lock-hint", text: "Save or discard your changes first.", visible: :visible
   end
 
   # Disabling a field of the explicit-save form itself would take it out of

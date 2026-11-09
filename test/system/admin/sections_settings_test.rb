@@ -10,7 +10,9 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     find(word("background")).click
     assert_selector settings_region, visible: :visible
-    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "true", each["aria-expanded"] }
+    # Retrying selectors: a save's answer replaces the words, so a node read once may be gone.
+    assert_selector "#section-#{@section.id}-words button[aria-expanded='true']"
+    assert_no_selector "#section-#{@section.id}-words button:not([aria-expanded='true'])"
     assert_eventually(message: "the focus is not on the Background select") { focus_is_on("#block-#{@section.id}-background") }
 
     # Another word moves the focus to its own setting and leaves the settings open.
@@ -100,7 +102,9 @@ class Admin::SectionsSettingsSystemTest < Admin::SectionsSystemTestCase
 
     assert_selector "#section-#{@section.id}-body.hidden", visible: :all
     assert_selector settings_region, visible: :hidden
-    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "false", each["aria-expanded"] }
+    # Retrying selectors: a save's answer replaces the words, so a node read once may be gone.
+    assert_selector "#section-#{@section.id}-words button[aria-expanded='false']"
+    assert_no_selector "#section-#{@section.id}-words button:not([aria-expanded='false'])"
     assert_eventually(message: "the focus is not on the section's name") { focus_is_on(name_button) }
     assert_released
     assert_equal "about", @section.reload.settings["anchor"]

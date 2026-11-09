@@ -1,7 +1,12 @@
-<%# The Settings screen (cs-studio spec §6.1, handoff §4.5): a
-    nav of anchors at the left (`Admin::SettingsScreen::NavComponent`) and one
-    card per section in a card column of `--cs-form-max` altogether. ONE form
-    (`#settings-form`) wraps the whole column and carries the ONE save footer
+<%# The Settings screen: the nav of anchors (`Admin::SettingsScreen::NavComponent`),
+    the "At a glance" rail (`Admin::SettingsScreen::GlanceComponent`) and one
+    card per section (`SettingsSections`, each drawn in
+    `Admin::SettingsScreen::CardComponent`) in a column of `--cs-form-max` at
+    most. The three stand in that order in the document at every width, so
+    the focus goes nav, rail, cards; only the stylesheet places them
+    (`.admin-settings-layout`, docked by the Settings area's own width).
+
+    ONE form (`#settings-form`) wraps the cards and carries the ONE save bar
     (`Admin::Ui::SaveBarComponent`, at its bottom): the Site and Publishing cards,
     the Languages card's order and fallbacks and the AI card's provider and
     model are its fields, and so are the Mail card's server, port, security
@@ -13,21 +18,35 @@
     `#settings-mail-login-forms` and
     `#settings-language-forms` (forms can't nest, and the dialog forms can't be
     inside it either), through the `form=` attribute or a dialog trigger.
-    Each card shows only for the right that owns it (decision D9): a viewer with
-    only `languages.manage` gets this same form with just the Languages card
-    and the footer.
+    Each card, nav link and rail row shows only for the right that owns it
+    (`SettingsSections`' `permission`), in the nav's order: a viewer with only
+    `languages.manage` gets this same form with just the Languages card and the
+    bar, and a rail of the languages alone.
+
+    The rail is drawn from what this view has already read (the mail
+    settings, the images' counts, the languages), so it costs no statement.
 
     After a refused save the same screen comes back (422), or after a stale one
     (409): `@submitted` holds what was typed, so every field shows that and
     nothing is lost (`Admin::SettingsScreen::Values`). %>
-<% content_for :title, "Settings" %>
+<% content_for :title, t(".title") %>
 <% tab = @tab_locale || admin_locale %>
 <% manage_settings = can?("settings.manage") %>
 <% manage_languages = can?("languages.manage") %>
-<% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
 <% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
-<% images_fingerprint = (ImageSettings.current(SiteSetting.find(@site_setting.id)).fingerprint if manage_settings) %>
+<%# What is saved, for every word that says a state (the AI key, mail, the
+    images, the rail, the logo, the fields' unsaved marks): after a refused
+    save `Settings::Save` leaves what was typed on `@site_setting`, which the
+    fields show, but nothing of it was saved. Read again only then, so the
+    screen's ordinary draw costs nothing. %>
+<% stored = (@errors.present? || @stale_form) ? SiteSetting.find(@site_setting.id) : @site_setting %>
+<%# The fields show what was typed; the server's unsaved marks compare it
+    with `stored` (`Values#changed_fields`). %>
+<% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted, stored: stored) %>
+<% images_fingerprint = (ImageSettings.current(stored).fingerprint if manage_settings) %>
 <% images_progress = (Media::RenditionProgress.new(fingerprint: images_fingerprint).counts if manage_settings) %>
+<% mail_settings = (MailSettings.current(stored) if manage_settings) %>
+<% sections = SettingsSections.for { |permission| can?(permission) } %>
 <% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
      "trash_retention_days" => "settings-trash_retention_days", "form_keep_days" => "settings-form_keep_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
      "social_links" => "settings-social-0-name", "mail_server" => "settings-mail_server", "mail_port" => "settings-mail_port",
@@ -36,58 +55,65 @@
      "image_quality_webp" => "settings-image_quality_webp", "image_quality_avif" => "settings-image_quality_avif",
      "image_widths" => "settings-image_widths", "image_max_upload_mb" => "settings-image_max_upload_mb" } %>
 
-<div class="grid grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,var(--cs-form-max))]">
-  <div class="lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
-    <h1 class="mb-3.5 text-h1 text-ink">Settings</h1>
-    <%= render Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent.sections_for { |permission| can?(permission) }) %>
-  </div>
+<div class="admin-settings-layout">
+  <div class="admin-settings-layout__grid">
+    <div class="admin-settings-layout__nav lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
+      <h1 class="mb-3.5 text-h1 text-ink"><%= t(".heading") %></h1>
+      <%= render Admin::SettingsScreen::NavComponent.new(sections: sections) %>
+    </div>
 
-  <div class="flex min-w-0 max-w-[var(--cs-form-max)] flex-col gap-5">
-    <% if @stale_form %>
-      <%= render "admin/shared/stale_banner", message: Admin::SettingsController::STALE_MESSAGE, lead: Admin::SettingsController::STALE_LEAD, change: @stale_change, reload_path: admin_settings_path(**admin_url_options) %>
-    <% end %>
-    <%# Full messages, so "AI provider isn't an available provider" keeps the name
-    the model gives its attribute instead of the humanized key ("Ai provider"). %>
-    <% summary = @errors.respond_to?(:group_by_attribute) ? @errors.group_by_attribute.transform_values { |errors| errors.map(&:full_message) } : (@errors || []) %>
-    <%= render Admin::Ui::ErrorSummaryComponent.new(errors: summary, field_ids: error_ids.merge("logo" => "settings-logo")) %>
+    <%= render Admin::SettingsScreen::GlanceComponent.new(sections: sections, site_setting: stored, mail_settings: mail_settings,
+          images_progress: images_progress, locales: Locales.enabled, default: Locales.default) %>
 
-    <% if manage_settings || manage_languages %>
-      <%= form_with url: admin_settings_path, method: :patch, id: "settings-form", multipart: true, class: "flex flex-col gap-5",
-            data: save_bar_form_data(dirty: @stale_form || @errors.present?) do %>
-        <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "settings-base-updated-at", value: base } %>
+    <div class="admin-settings-layout__cards flex flex-col gap-5">
+      <% if @stale_form %>
+        <%# The lead goes on to name who changed the settings and when, where the
+            audit log says; the message is the whole banner where it doesn't. %>
+        <%= render "admin/shared/stale_banner", message: t(".stale.message"), lead: t(".stale.lead"), change: @stale_change, reload_path: admin_settings_path(**admin_url_options) %>
+      <% end %>
+      <%# Full messages, so "AI provider isn't an available provider" keeps the name
+      the model gives its attribute instead of the humanized key ("Ai provider"). %>
+      <% summary = @errors.respond_to?(:group_by_attribute) ? @errors.group_by_attribute.transform_values { |errors| errors.map(&:full_message) } : (@errors || []) %>
+      <%= render Admin::Ui::ErrorSummaryComponent.new(errors: summary, field_ids: error_ids.merge("logo" => "settings-logo")) %>
 
-        <% if manage_settings %>
-          <%= render Admin::SettingsScreen::SiteCardComponent.new(site_setting: @site_setting, values: values, locale: tab,
-                errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+      <% if manage_settings || manage_languages %>
+        <%= form_with url: admin_settings_path, method: :patch, id: "settings-form", multipart: true, class: "flex flex-col gap-5",
+              data: save_bar_form_data(dirty: @stale_form || @errors.present?) do %>
+          <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "settings-base-updated-at", value: base } %>
+
+          <% if manage_settings %>
+            <%= render Admin::SettingsScreen::SiteCardComponent.new(site_setting: @site_setting, values: values, locale: tab,
+                  errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+          <% end %>
+          <% if manage_languages %><%= render Admin::SettingsScreen::LanguagesCardComponent.new(site_setting: @site_setting, values: values) %><% end %>
+          <% if manage_settings %>
+            <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
+                  errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
+            <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
+            <%= render Admin::SettingsScreen::FormsCardComponent.new(values: values, errors: field_errors.call(:form_keep_days)) %>
+            <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: stored, values: values,
+                  provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
+            <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: stored, mail_settings: mail_settings, values: values,
+                  errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+            <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
+                  errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>
+          <% end %>
+
+          <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options)) %>
         <% end %>
-        <% if manage_languages %><%= render Admin::SettingsScreen::LanguagesCardComponent.new(site_setting: @site_setting, values: values) %><% end %>
+
+        <%# Forms of their own, outside the one above (see the comment at the top). %>
         <% if manage_settings %>
-          <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
-                errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
-          <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
-          <%= render Admin::SettingsScreen::FormsCardComponent.new(values: values, errors: field_errors.call(:form_keep_days)) %>
-          <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: @site_setting, values: values,
-                provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
-          <%= render Admin::SettingsScreen::MailCardComponent.new(site_setting: @site_setting, mail_settings: MailSettings.current(@site_setting), values: values,
-                errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
-          <%= render Admin::SettingsScreen::ImagesCardComponent.new(values: values, progress: images_progress, avif_available: ImageSettings.avif_available?,
-                errors: (@errors if @errors.respond_to?(:full_messages_for)), status_link: can?("system_status.view")) %>
+          <%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %>
+          <%= render "admin/settings/mail_login_forms", site_setting: @site_setting, main_base: base %>
         <% end %>
-
-        <%= render Admin::Ui::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
+        <% if manage_settings %>
+          <div id="settings-images-forms"><%= render Admin::SettingsScreen::ImagesDialogComponent.new(progress: images_progress) %></div>
+        <% end %>
+        <% if manage_languages %>
+          <div id="settings-language-forms"><%= render Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: @site_setting) %></div>
+        <% end %>
       <% end %>
-
-      <%# Forms of their own, outside the one above (see the comment at the top). %>
-      <% if manage_settings %>
-        <%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %>
-        <%= render "admin/settings/mail_login_forms", site_setting: @site_setting, main_base: base %>
-      <% end %>
-      <% if manage_settings %>
-        <div id="settings-images-forms"><%= render Admin::SettingsScreen::ImagesDialogComponent.new(progress: images_progress) %></div>
-      <% end %>
-      <% if manage_languages %>
-        <div id="settings-language-forms"><%= render Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: @site_setting) %></div>
-      <% end %>
-    <% end %>
+    </div>
   </div>
 </div>

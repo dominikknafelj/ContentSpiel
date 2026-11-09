@@ -491,7 +491,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   UPPER_TRACKED_ALLOWED = {
     "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
     "CONTENT·SPIEL" => "the product layout's wordmark",
-    "Content·Spiel</span>" => "the setup layout's wordmark"
+    %("Content·Spiel" %></span>) => "the setup layout's wordmark"
   }.freeze
   # CS Studio's sources, the setup pages and the three layouts around them.
   # The public site is the theme's and out of scope: its pages keep their look.
@@ -592,10 +592,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   MONO_CODE = /<code|<pre|tag\.code|tag\.pre/
   MONO_ALLOWED = {
     "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
-    "app/components/admin/settings_screen/ai_test_result_component.rb" => "the AI 'CONNECTED · n MS' result stays mono capitals",
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
-    "app/views/setup/token.html.erb" => "the setup token's input holds a key value",
+    "app/views/setup/token.html.erb" => "the setup token's input holds a key value, and the log's commands are code",
     "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
     "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
     "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
@@ -691,13 +690,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".
+  # 10px thin text looks faint, so the smallest is 11px at weight 500, everywhere.
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
     assert_empty design_offences(/text-\[10px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
-  # Design answer, first reply: "▾PAGE SETTINGS" had no space. A mono-label
+  # A triangle glued to its words reads "▾PAGE SETTINGS". A mono-label
   # summary draws its own triangle, 6px from the words, that a screen reader skips.
   test "a disclosure's triangle is the stylesheet's, apart from its words, turned when open" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
@@ -919,6 +918,56 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty medias.select { |body| body.include?("admin-list-rail") }, "no window media query lays out the lists' rail"
   end
 
+  # Settings' "At a glance" rail: laid out by the Settings area's own width,
+  # never a window media query, docked on the rail's tokens. Below the
+  # threshold the grid's areas put it above the cards, a compact card; the
+  # nav's window rule changes the grid's columns and areas and names no
+  # part of it.
+  test "Settings' rail is laid out by the Settings area's own container, from the rail's tokens" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-settings-layout\s*\{\s*container:\s*admin-settings\s*\/\s*inline-size;\s*\}/, css)
+    grid = css[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
+    assert grid, "the grid's own rule"
+    assert_match(/grid-template-columns:\s*minmax\(0, 1fr\);/, grid, "one column below the window's 1024px")
+    assert_match(/grid-template-areas:\s*"nav" "glance" "cards";/, grid, "the nav, the rail, then the cards")
+    assert_match(/column-gap:\s*var\(--cs-rail-gap\);/, grid)
+    assert_match(/\.admin-settings-glance\s*\{[^}]*grid-area:\s*glance;/, css)
+    card = css[/\.admin-settings-glance\s*\{([^}]*)\}/, 1]
+    %w[background:\s*var\(--cs-surface\) box-shadow:\s*var\(--cs-shadow-1\) border-radius:\s*var\(--cs-radius-card\)].each do |declaration|
+      assert_match(/#{declaration};/, card, "below the threshold the rail is a compact card")
+    end
+
+    window = self.class.css_blocks("content-spiel.tailwind.css", /@media \(min-width: 1024px\)\s*\{/).select { |body| body.include?("admin-settings") }
+    assert_equal 1, window.size, "one window rule places the nav beside the cards"
+    assert_match(/\A\s*\.admin-settings-layout__grid\s*\{[^}]*\}\s*\z/, window.first, "the window rule names the grid alone")
+    assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\);/, window.first)
+    assert_match(/grid-template-areas:\s*"nav glance" "nav cards";/, window.first, "the nav spans both rows; the rail stands above the cards")
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1200px\)\s*\{/)
+    assert_equal 1, docked.size, "one block docks Settings' rail"
+    docked_grid = docked.first[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
+    assert docked_grid, "the docked block lays out the grid"
+    assert_match(/grid-template-columns:\s*170px minmax\(0, var\(--cs-form-max\)\) var\(--cs-rail-width\);/, docked_grid, "the cards' column narrows as the area does; the rail keeps its width")
+    assert_match(/grid-template-areas:\s*"nav cards glance";/, docked_grid)
+    assert_no_match(/justify-content/, docked_grid, "spare width below the max falls right of the rail")
+    rail = docked.first[/\.admin-settings-glance\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds the rail"
+    [ 'background:\s*var\(--cs-rail\)', 'box-shadow:\s*var\(--cs-shadow-2\)', 'border-radius:\s*var\(--cs-radius-rail\)', 'position:\s*sticky',
+      'top:\s*calc\(var\(--admin-top-offset\) \+ var\(--cs-sp-4\)\)', 'max-height:\s*calc\(100dvh - var\(--admin-top-offset\) - 2 \* var\(--cs-sp-4\)\)',
+      'overflow-y:\s*auto' ].each do |declaration|
+      assert_match(/#{declaration};/, rail, "docked, the rail is on the rail's ground, sticks and scrolls inside itself")
+    end
+    outside = css.sub(docked.first, "")
+    assert_operator outside.index(/\.admin-settings-glance\s*\{/), :<, css.index(docked.first), "the card rule stands before the docked block, so the rail's ground wins"
+    assert_equal 1, outside.scan(/\.admin-settings-glance\b/).size, "outside the docked block only the rail's own rule names it"
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-settings-glance") }, "no window media query lays out Settings' rail"
+    view = Rails.root.join("app/views/admin/settings/show.html.erb").read
+    assert_no_match(/\b(?:lg|xl|2xl):(?:grid|col|row)/, view, "the view leaves the grid to the stylesheet")
+  end
+
   # The Tags list's usage bar takes the structure hue through a token of its
   # own, as a tag's square on the canvas does, so it can change without
   # moving the icons; the bar is drawn in one place.
@@ -962,7 +1011,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every docked composition and its head row centre past --cs-content-max" do
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
-      "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ] }.each do |container, selectors|
+      "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
+      "admin-settings" => [ ".admin-settings-layout__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
@@ -980,7 +1030,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     # Undocked nothing centres: no rule outside a docked block carries an
     # auto inline margin but the header's, which applies only while docked.
-    outside = %w[admin-editor admin-dashboard admin-list].reduce(css) do |rest, container|
+    outside = %w[admin-editor admin-dashboard admin-list admin-settings].reduce(css) do |rest, container|
       self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
     end
     assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
@@ -1109,8 +1159,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A container query cannot read a custom property, so the threshold is a
-  # number written in three places; this holds them to one.
-  test "the editors' rail, the dashboard's and the lists' dock at one threshold" do
+  # number written in four places; this holds them to one.
+  test "the editors' rail, the dashboard's, the lists' and Settings' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     # The editor area asks one other width: 1244px, where a docked post's
     # main column's content box (the area less the rail, its gap and the
@@ -1129,6 +1179,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     dashboard = css.scan(/@container admin-dashboard \(min-width: ([^)]+)\)/).flatten
     assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
     assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
+    assert_equal [ editor.first ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks the threshold alone"
 
     docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
     assert_equal 1, docked.size
@@ -1166,6 +1217,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-accent", "text-ink", "bg-white-ish", "text-on-accent", "bg-cat-1" ].each { |sample| assert_no_match PALETTE, sample }
   end
 
+  # The accent fill means "press me" or "this needs you": a button, a count
+  # pill, the unread bubble, a progress bar, and the unsaved marks -- the save
+  # bar's dot here, and a changed field's dot, which the stylesheet draws from
+  # `data-save-bar-changed` and no utility carries.
   ACCENT_FILL = /(?<![\w-])bg-accent(?![\w-])/
   ACCENT_FILL_ALLOWED = {
     "app/components/admin/ui/button_component.rb" => "the buttons",
@@ -1179,10 +1234,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
     "app/javascript/media/upload_tiles.js" => "a progress bar",
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
-    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser"
+    "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",
+    "app/components/admin/ui/save_bar_component.html.erb" => "the save bar's unsaved dot, beside its words",
+    "app/views/setup/_steps.html.erb" => "the wizard's progress bar"
   }.freeze
 
-  test "only a button, the checkbox, a count pill, the unread bubble and a progress bar carry the accent fill" do
+  test "only a button, the checkbox, a count pill, the unread bubble, a progress bar and the unsaved marks carry the accent fill" do
     assert_empty class_offences(ACCENT_FILL, allowed: ACCENT_FILL_ALLOWED)
   end
 
@@ -1499,9 +1556,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # Status colour belongs to the status components. The Live and Scheduled
   # fills are the solid chips', so a new use of them is a new state of the
-  # chip; the ok, warn and danger fills are held to the files that draw one
-  # today, a list that may only shrink as screens move their fills into a
-  # status component.
+  # chip; the ok, warn and danger fills are held to the files that draw one.
+  # The list shrinks as screens move their fills into a status
+  # component, and a status component joins it only in place of the screens'
+  # fills it takes over. The wizard's step list draws a done step's check in
+  # the ok tone, never the Live fill: a finished step is not a publication.
   LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
   LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb
     app/components/admin/ui/scheduled_date_component.rb].freeze
@@ -1525,7 +1584,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/pages_screen/tree_state_mark_component.rb
     app/components/admin/settings_screen/language_dialogs_component.html.erb
     app/components/admin/settings_screen/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_state_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/translation_screen/summary_card_component.html.erb
@@ -1536,7 +1594,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/insecure_notice_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/mail_failed_notice_component.rb
-    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb
     app/components/admin/ui/unpublished_chip_component.html.erb
     app/components/admin/ui/word_diff_component.rb
@@ -1550,6 +1608,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/shared/_stale_banner.html.erb
     app/views/invitations/show.html.erb
     app/views/setup/_flash.html.erb
+    app/views/setup/_steps.html.erb
   ].freeze
 
   test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do

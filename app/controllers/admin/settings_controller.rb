@@ -1,18 +1,16 @@
 module Admin
-  # The Settings module (cs-studio spec §6.1): one screen of
-  # cards -- Site, Languages, Publishing, AI translation -- and ONE form
-  # (`#settings-form`) with ONE save footer. Settings no longer autosaves
-  # (design pass spec §4, handoff B12): `PATCH /settings` is an ordinary form
-  # submission, answered by a 303 to the same screen with the toast "Settings
-  # saved" (decision D4), by the screen re-rendered at 422 with the error
-  # summary when the service refuses, or at 409 when the form's base is stale.
-  # It never answers a Turbo Stream.
+  # The Settings module: one screen of cards (`SettingsSections`) and ONE
+  # form (`#settings-form`) with ONE save bar. Settings saves explicitly:
+  # `PATCH /settings` is an ordinary form submission, answered by a 303 to
+  # the same screen with the toast "Settings saved", by the screen
+  # re-rendered at 422 with the error summary when the service refuses, or
+  # at 409 when the form's base is stale. It never answers a Turbo Stream.
   #
   # There's only ever one `SiteSetting` row (`SiteSetting#only_one_record_
   # exists`); every write goes through `Settings::Save`, which holds the
   # permission checks and the `settings.updated` event.
   #
-  # WHO OPENS IT (decision D9): either `settings.manage` or `languages.manage`
+  # WHO OPENS IT: either `settings.manage` or `languages.manage`
   # (`StudioModules`, and the gate below); each card and its nav link render only for
   # the right that owns them (`Admin::SettingsScreen::NavComponent`). Nothing
   # here is guarded per card by a `before_action`: the service enforces the
@@ -24,12 +22,7 @@ module Admin
     include StaleForm
     include MailTestLimit
     include MailTestSending
-
-    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
-    # changed it and when where the audit log says, and the message is the whole
-    # banner where it doesn't.
-    STALE_LEAD = "Settings were changed".freeze
-    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
+    include GlanceRows
 
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
@@ -73,7 +66,7 @@ module Admin
       posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
       permitted = posted.permit(
         :logo, :remove_logo, :social_links_present, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, :language_order,
-        *Admin::SettingsScreen::MailCardComponent::FIELDS, *Admin::SettingsScreen::ImagesCardComponent::FIELDS,
+        *Admin::SettingsScreen::MailFieldsComponent::FIELDS, *Admin::SettingsScreen::ImagesCardComponent::FIELDS,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],
         # `language_order` is the one tracked field that makes a reorder a
@@ -93,7 +86,7 @@ module Admin
       result = Settings::Save.call(site, attributes: attributes, translations: translated, languages: language_arguments(site, permitted))
 
       if result.ok?
-        redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: "Settings saved"
+        redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: t("admin.settings.saved")
       else
         forbidden_or(result) do
           @site_setting = site
@@ -105,7 +98,7 @@ module Admin
       end
     end
 
-    # Test connection (translation helpers spec §6.2): one tiny request
+    # Test connection: one tiny request
     # with the *saved* provider, model and key (`AI.provider`, then the
     # provider's own `#test_connection`), reported inline under the button:
     # "CONNECTED · 412 MS" with the provider call's elapsed time, measured here
@@ -121,7 +114,7 @@ module Admin
       render turbo_stream: ai_test_result_stream(message: error.message), status: :unprocessable_entity
     end
 
-    # Send test mail (spec "Settings → Mail", design answer M2): one mail to
+    # Send test mail: one mail to
     # the person pressing it, sent now and in this request with the SAVED
     # settings (`ApplicationMailer.deliver_now_and_record`, bounded by
     # `MailSettings`' timeouts), its outcome recorded as any send's is. Saves
@@ -143,7 +136,7 @@ module Admin
     # of the gate above.
     def regenerate_images
       result = Media::Regenerate.call
-      return forbidden_or(result) { redirect_to admin_settings_path(anchor: "images", **admin_url_options), status: :see_other, alert: result.errors.to_sentence } unless result.ok?
+      return forbidden_or(result) { redirect_to admin_settings_path(anchor: "images", **admin_url_options), status: :see_other, alert: result.errors.to_sentence } unless result.ok? # i18n-ok: to_sentence joins with the locale's support.array words
 
       redirect_to admin_settings_path(anchor: "images", **admin_url_options), status: :see_other,
         notice: t("admin.settings.regenerate_images.queued", count: result.record)
@@ -151,12 +144,13 @@ module Admin
 
     private
 
-    # The card's foot and its state, as they are after a test mail.
+    # The card's foot, its state and the rail's Mail row, as they are after a test mail.
     def mail_test_streams(**result)
       [
         turbo_stream.replace(Admin::SettingsScreen::MailTestResultComponent::ID,
           Admin::SettingsScreen::MailTestResultComponent.new(address: Current.user.email_address, **result)),
-        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current))
+        turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: MailSettings.current)),
+        glance_row_stream("mail")
       ]
     end
 
@@ -165,7 +159,7 @@ module Admin
     # unless a new file came with it), the social link rows in the order the
     # form numbered them, and only the languages/fields actually posted.
     def site_arguments(permitted)
-      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailCardComponent::FIELDS,
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :form_keep_days, :ai_provider, :ai_model, *Admin::SettingsScreen::MailFieldsComponent::FIELDS,
         *Admin::SettingsScreen::ImagesCardComponent::FIELDS).to_h
       attributes["image_widths"] = ImageSettings.parse_widths(attributes["image_widths"]) if attributes.key?("image_widths")
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
@@ -182,10 +176,10 @@ module Admin
     # nil when no rows were posted (the language part is then not in the call).
     # Rows arrive as `languages[][code]`/`languages[][fallback]` in row order.
     #
-    # DECISION D7: the card's select stores ONE fallback, but a language may be
-    # stored with several. A row's stored list is rewritten only when the
-    # posted value differs from the stored FIRST entry -- the one the select
-    # showed -- so an untouched row keeps all of its fallbacks, and a row whose
+    # The card's select stores ONE fallback, but a language may be stored
+    # with several. A row's stored list is rewritten only when the posted
+    # value differs from the stored FIRST entry -- the one the select showed
+    # -- so an untouched row keeps all of its fallbacks, and a row whose
     # select was changed (to another language, or to "None") keeps only the
     # new choice. A row posting no `fallback` at all (the default's select is
     # disabled) is untouched too.
@@ -230,8 +224,13 @@ module Admin
       errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
     end
 
+    # The result under the button and the rail's AI row, which says
+    # Connected or Not connected for the rest of this visit.
     def ai_test_result_stream(milliseconds: nil, message: nil)
-      turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message))
+      [
+        turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message)),
+        glance_row_stream("ai", ai_result: message ? :failed : :connected)
+      ]
     end
   end
 end

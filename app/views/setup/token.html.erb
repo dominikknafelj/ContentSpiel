@@ -1,15 +1,32 @@
-<% content_for :title, "Setup token" %>
-<h1 class="text-h1 font-semibold">Enter your setup token</h1>
+<% content_for :title, step_label("token") %>
+<p class="flex items-center gap-2 text-sm font-semibold text-ink">
+  <%= render Admin::Ui::IconChipComponent.new(icon: :pages, family: :structure, size: :small) %>
+  <%= t(".welcome") %>
+</p>
+<h1 class="mt-3 text-h1 font-semibold"><%= t(".heading") %></h1>
 <p class="mt-2 text-dim">
-  To make sure you're the person who deployed this site, copy the setup token from the server log.
-  Look for the line starting with <code class="font-cs-mono">[ContentSpiel] Setup is not complete</code>.
+  <%= t(".intro_html", line: tag.code("[ContentSpiel] Setup is not complete", class: "font-cs-mono")) %><%# i18n-ok: the server log's own line, quoted as it is printed %>
 </p>
 
 <%= form_with url: setup_step_path("token"), method: :patch, class: "mt-6 space-y-4" do |form| %>
   <div>
-    <%= form.label :token, "Setup token", class: setup_label_class %>
+    <%= form.label :token, t(".field"), class: setup_label_class %>
     <%= form.text_field :token, required: true, autofocus: true, autocomplete: "off", spellcheck: false,
       class: "#{setup_input_class} font-cs-mono" %>
   </div>
-  <%= render Admin::Ui::ButtonComponent.new(label: "Continue", type: "submit") %>
+  <%# A native disclosure under the field: its summary is a tertiary-looking
+      line, and opening it moves nothing, the focus included. %>
+  <details class="text-small text-dim">
+    <summary class="admin-disclosure inline-flex cursor-pointer rounded-button text-sm font-semibold text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><%= t(".log.summary") %></summary>
+    <div class="mt-2 space-y-1">
+      <p><%= t(".log.intro_html", variable: tag.code("SETUP_TOKEN", class: "font-cs-mono text-ink")) %></p>
+      <p><%= t(".log.development_html", command: tag.code("bin/dev", class: "font-cs-mono text-ink")) %></p>
+      <p><%= t(".log.compose_html", command: tag.code("docker compose logs web", class: "font-cs-mono text-ink")) %></p>
+      <p><%= t(".log.kamal_html", command: tag.code("kamal app logs", class: "font-cs-mono text-ink")) %></p>
+      <p><%= t(".log.contentspiel_html", command: tag.code("contentspiel dev", class: "font-cs-mono text-ink")) %></p>
+    </div>
+  </details>
+  <div class="flex items-center justify-end gap-3">
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".continue"), type: "submit") %>
+  </div>
 <% end %>

@@ -1,0 +1,53 @@
+# The Settings screen's own view (`admin/settings/show`, `admin.settings.show.*`)
+# and what the controllers and `Settings::Save` answer: toasts, the login's
+# refusal, the sentence a site without encryption keys gets for the mail
+# login and the AI key alike, and a host-set field's. The cards' words are
+# `admin.components.settings_screen.*`, in `settings_screen.en.yml`.
+en:
+  admin:
+    settings:
+      show:
+        title: "Settings"
+        heading: "Settings"
+        # The 409 banner (`admin/shared/_stale_banner`): `lead` is followed by
+        # who changed the settings and when; `message` is the whole banner
+        # when the audit log names nobody.
+        stale:
+          lead: "Settings were changed"
+          message: "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
+      saved: "Settings saved"
+      # The Remove dialog of the AI card's key (`_ai_key_forms`).
+      ai_key_forms:
+        remove_dialog:
+          title: "Remove the API key?"
+          body: "AI translation stops working until a new key is saved."
+          confirm: "Remove key"
+      # One row of the Site card's social links (`_social_link_row`).
+      social_link_row:
+        label: "Label"
+        label_placeholder: "Label, e.g. GitHub"
+        url: "URL"
+        remove: "Remove link"
+      ai_key:
+        saved: "API key saved"
+        removed: "API key removed"
+        blank: "Enter the API key first."
+      languages:
+        added: "%{language} added"
+        turned_off: "%{language} turned off"
+        made_default: "%{language} is now the default language"
+      mail_login:
+        saved: "Mail login saved"
+        removed: "Mail login removed"
+        blank: "Enter a username or a password first."
+      mail_test:
+        too_many: "Too many test mails. Try again in a few minutes."
+      regenerate_images:
+        queued:
+          zero: "No image needed regenerating."
+          one: "Regenerating %{count} image."
+          other: "Regenerating %{count} images."
+      save:
+        avif_unavailable: "AVIF can't be chosen: this server cannot write it."
+        no_encryption_keys: "This site has no encryption keys, so a password can't be stored. See Hosting: encryption keys."
+        set_by_host: "%{field} is set by the host and can't be changed here."

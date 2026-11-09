@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Translation helpers spec §6.2: the Settings module's "AI translation"
+# The Settings module's "AI translation"
 # section -- provider, model and an API key that is stored encrypted and
 # never rendered, logged or audited; a blank key keeps the stored one,
 # Remove key clears it, and Test connection reports OK or the provider's
@@ -82,40 +82,44 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "input[name='site_setting[ai_model]'][data-saved-value='']"
   end
 
-  # -- the chip (D11) -----------------------------------------------------------
+  # -- the chip ------------------------------------------------------------------
 
-  test "no key reads No key yet, with Add key" do
+  test "no key reads Off without a provider and No key with one, with Add key" do
+    get "/cs-studio/settings"
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=off][data-ai-key-state=unset]", text: "Off"
+
+    @site.update!(ai_provider: "test/stub")
     get "/cs-studio/settings"
 
-    assert_select "#settings-ai-key [data-ai-key-state=unset]", /No key yet/
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=warn][data-ai-key-state=unset]", text: "No key"
     assert_select "#settings-ai-key button", text: "Add key"
   end
 
   test "a key saved before the date column existed reads Key saved alone" do
-    @site.update!(ai_api_key: KEY)
+    @site.update!(ai_provider: "test/stub", ai_api_key: KEY)
     @site.update_columns(ai_api_key_saved_at: nil)
 
     get "/cs-studio/settings"
 
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved", chip.text.squish
+      assert_equal "Key saved", chip.text.squish
     end
     assert_select "#settings-ai-key button", text: "Replace"
     assert_select "#settings-ai-key button", text: "Remove…"
   end
 
   test "a key saved this year reads the day and month, last year's also the year" do
-    @site.update!(ai_api_key: KEY)
+    @site.update!(ai_provider: "test/stub", ai_api_key: KEY)
     @site.update_columns(ai_api_key_saved_at: Time.zone.local(Time.zone.today.year, 10, 2, 12))
     get "/cs-studio/settings"
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved · added 2 Oct", chip.text.squish
+      assert_equal "Key saved · added 2 Oct", chip.text.squish
     end
 
     @site.update_columns(ai_api_key_saved_at: Time.zone.local(Time.zone.today.year - 1, 10, 2, 12))
     get "/cs-studio/settings"
     assert_select "#settings-ai-key [data-ai-key-state=set]" do |chip|
-      assert_equal "● Key saved · added 2 Oct #{Time.zone.today.year - 1}", chip.text.squish
+      assert_equal "Key saved · added 2 Oct #{Time.zone.today.year - 1}", chip.text.squish
     end
   end
 
@@ -145,6 +149,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
   end
 
   test "the key is stored encrypted and the page never shows it" do
+    @site.update!(ai_provider: "test/stub")
     save_key(KEY)
 
     assert_response :success
@@ -156,9 +161,9 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select_in_stream "settings-ai-key", /Key saved · added/
     assert_not_nil @site.ai_api_key_saved_at
     assert_select "turbo-stream[action=append][target=toasts]", /API key saved/
-    # Only the key component and its forms are replaced: the main form's fields are left alone.
+    # Only the key component, its forms and the rail's AI row are replaced: the main form's fields are left alone.
     assert_select "turbo-stream[action=replace]" do |streams|
-      assert_equal %w[settings-ai-key settings-ai-key-forms settings-ai-test-result settings-base-updated-at], streams.map { |stream| stream["target"] }.sort
+      assert_equal %w[settings-ai-key settings-ai-key-forms settings-ai-test-result settings-base-updated-at settings-glance-ai], streams.map { |stream| stream["target"] }.sort
     end
     # The replaced forms keep their own wrapper id (or a second action would find no target)
     # and carry the moved base for the next press.
@@ -214,7 +219,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     save_key(KEY)
 
     assert_select "turbo-stream[target=settings-ai-test-result]"
-    assert_not_includes Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-ai-test-result]").text, "CONNECTED"
+    assert_not_includes Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-ai-test-result]").text, "Connected"
   end
 
   test "a key save from a user without settings.manage is refused" do
@@ -255,7 +260,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_nil @site.reload.ai_api_key
     assert_nil @site.ai_api_key_saved_at
-    assert_select_in_stream "settings-ai-key", /No key yet/
+    assert_select_in_stream "settings-ai-key", /Off/
     assert_select "turbo-stream[action=append][target=toasts]", /API key removed/
   end
 
@@ -275,7 +280,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
 
     patch admin_settings_ai_key_path, params: { site_setting: { ai_api_key: " " } }
     assert_redirected_to admin_settings_path(anchor: "ai")
-    assert_equal Admin::AiKeysController::BLANK_KEY_MESSAGE, flash[:alert]
+    assert_equal I18n.t("admin.settings.ai_key.blank"), flash[:alert]
 
     delete admin_settings_ai_key_path
     assert_redirected_to admin_settings_path(anchor: "ai")
@@ -293,7 +298,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
   test "a forged scalar site_setting is a blank key and an empty Settings form, never a 500" do
     patch admin_settings_ai_key_path, params: { site_setting: "x" }, as: :turbo_stream
     assert_response :unprocessable_entity
-    assert_includes response.body, Admin::AiKeysController::BLANK_KEY_MESSAGE
+    assert_includes response.body, I18n.t("admin.settings.ai_key.blank")
 
     title = @site.title
     patch admin_settings_path, params: { site_setting: "x" }
@@ -330,7 +335,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     remove_key
     assert_response :success
     assert_nil stored_ciphertext
-    assert_select_in_stream "settings-ai-key", /No key yet/
+    assert_select_in_stream "settings-ai-key", /Off/
     event = Audit::Event.where(action: "settings.updated").order(:id).last
     assert_equal [ "set", "not set" ], event.field_changes["AI key"]
   end
@@ -390,7 +395,7 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
 
     assert_response :success
-    assert_select_in_stream "settings-ai-test-result", /● CONNECTED · \d+ MS/
+    assert_select_in_stream "settings-ai-test-result", /Connected · \d+ ms/
     assert_not_includes response.body, KEY
   end
 
@@ -432,5 +437,71 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
 
     assert_response :forbidden
+  end
+
+  # The rail's AI row follows in the answer that changes the state: Test
+  # connection says Connected or Not connected for this visit, and a saved
+  # or removed key says the stored state again.
+  test "Test connection, Send test mail and a saved key update their rail row in the same answer" do
+    @site.update!(ai_provider: "test/stub")
+
+    save_key(KEY)
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai[href='#ai'] .admin-state-chip[data-state-tone=ok]", text: "Key saved"
+    end
+
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=ok]", text: "Connected"
+    end
+
+    save_key("sk-ant-wrong")
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=danger]", text: "Not connected"
+    end
+
+    remove_key
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=warn]", text: "No key"
+    end
+    assert_select "turbo-stream[target=settings-glance-mail]", 0
+  end
+
+  # A failed test on a site with no provider redraws the row as it stands:
+  # AI translation is off, never "Not connected".
+  test "a failed Test connection with no provider leaves the rail's row Off" do
+    @site.update!(ai_provider: nil)
+
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=off]", text: "Off"
+    end
+  end
+
+  # A refused key changes no state, so its answer leaves the row alone.
+  test "a blank key's refusal leaves the rail's row alone" do
+    save_key(" ")
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target=settings-glance-ai]", 0
+  end
+
+  # A refused save leaves the typed provider on the row in memory; the key's
+  # chip and the rail's row say the stored state, while the select shows
+  # what was typed.
+  test "a refused save after choosing a provider keeps the key's chip and the rail's row on the stored state" do
+    @site.update!(ai_provider: nil)
+
+    patch "/cs-studio/settings", params: { site_setting: { ai_provider: "test/stub", translations: { en: { title: "" } } }, base_updated_at: @site.reload.updated_at.iso8601(6) }
+
+    assert_response :unprocessable_entity
+    assert_select "select[name='site_setting[ai_provider]'] option[selected][value='test/stub']"
+    assert_select "#settings-ai-key .admin-state-chip[data-state-tone=off]", text: "Off"
+    assert_select "#settings-glance-ai .admin-state-chip[data-state-tone=off]", text: "Off"
   end
 end

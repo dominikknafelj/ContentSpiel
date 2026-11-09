@@ -1,8 +1,8 @@
 <%# The check rows, shared by the setup wizard's step and CS Studio's System
-    status (handoff §10 item 14): warnings first, then OK, each group in the
-    checks' own order. `copyable` is false in the wizard, which loads no admin
-    JavaScript, so a Copy button there would do nothing
-    (`Admin::Ui::SystemCheckRowComponent`). %>
+    status: warnings first, then OK, each group in the checks' own order.
+    `copyable` is false in the wizard, which loads no admin JavaScript, so a
+    Copy button there would do nothing (`Admin::Ui::SystemCheckRowComponent`).
+    The rows' sentences are `Setup::SystemCheck`'s and stay English. %>
 <% copyable = local_assigns.fetch(:copyable, false) %>
 <% mail_settings_href = local_assigns[:mail_settings_href] %>
 <% image_settings_href = local_assigns[:image_settings_href] %>

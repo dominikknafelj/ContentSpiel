@@ -1,0 +1,138 @@
+# The setup wizard's words (`SetupController`, `app/views/layouts/setup.html.erb`,
+# `app/views/setup/`). A view reads its own tree by lazy lookup (`setup.token.*`),
+# the layout and the step list read `setup.layout.*` by full key, and the step
+# names are `setup.steps.<step>`, one per `SetupController::STEPS` entry and
+# nothing else (`test/integration/setup_early_steps_test.rb`). The Mail step's
+# fields read the Mail form's own words (`admin.components.settings_screen.
+# mail_fields`). `Setup::SystemCheck`'s sentences stay English
+# (docs/reference/i18n.md).
+en:
+  setup:
+    layout:
+      title: "Set up Content·Spiel"
+      first_run: "First-run setup"
+      steps_label: "Setup steps"
+      progress: "Step %{number} of %{total}"
+      done: "Done: "
+      optional: "Optional"
+    steps:
+      token: "Setup token"
+      system_check: "System check"
+      admin: "Admin account"
+      site: "Site identity"
+      mail: "Mail"
+      languages: "Languages"
+      mcp_token: "MCP token"
+      starter_content: "Starter content"
+      review: "Review"
+    flash:
+      token_mismatch: "That setup token doesn't match. Copy it from the server log."
+      too_many_attempts: "Too many attempts. Try again in a few minutes."
+      admin_exists: "An admin account already exists. Sign in to continue setup."
+      starter_added: "Starter content added."
+      starter_already_there: "Starter content was already there."
+      starter_failed: "%{errors}."
+      complete: "Setup complete."
+      missing_admin_group: "This site has no \"%{group}\" group, which a token made here belongs to. Run bin/rails db:seed on the server to create the built-in groups, then try again, or skip this step and create a token in CS Studio later."
+    back:
+      label: "Back"
+    token:
+      welcome: "Welcome to Content·Spiel"
+      heading: "Let's set up your site"
+      intro_html: "First, show that you are the person who deployed it: copy the setup token from the server log. It is on the line that starts with %{line}."
+      field: "Setup token"
+      continue: "Continue"
+      log:
+        summary: "Where do I find the log?"
+        intro_html: "The setup token is printed in the server's log when CS Studio starts, unless you set it yourself with %{variable}."
+        development_html: "In development: the terminal running %{command}."
+        compose_html: "With Docker Compose: %{command}."
+        kamal_html: "With Kamal: %{command}."
+        contentspiel_html: "With the contentspiel command: the terminal running %{command}."
+    system_check:
+      heading: "System check"
+      intro: "These checks don't change anything. A warning tells you what won't work yet — you can continue now and fix it later."
+      rerun: "Re-run checks"
+      continue: "Continue"
+    admin:
+      heading: "Create the admin account"
+      intro: "You'll use this account to sign in to the admin."
+      email: "Email address"
+      password: "Password"
+      password_confirmation: "Confirm password"
+      continue: "Continue"
+    site:
+      heading: "Site identity"
+      intro: "How your site introduces itself. You can change all of this later in the admin under Site settings."
+      title: "Site title"
+      tagline: "Tagline"
+      logo: "Logo"
+      social_links: "Social links"
+      network: "Network"
+      network_placeholder: "e.g. GitHub"
+      url: "URL"
+      url_placeholder: "https://…"
+      continue: "Continue"
+    mail:
+      heading: "Mail"
+      intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
+      username: "Username"
+      password: "Password"
+      login_saved: "A login is saved. Leave both blank to keep it."
+      send_test: "Send test mail"
+      sending: "Sending…"
+      sends_to: "Sends to %{address} (your address)"
+      skip: "Skip for now"
+      continue: "Continue"
+    languages:
+      heading: "Languages"
+      intro_html: "Your site is available in the languages below. Pick the default: it's served without a language prefix in the URL (for example %{plain} instead of %{prefixed})."
+      default: "Default language"
+      additional: "Additional languages"
+      continue: "Continue"
+    mcp_token:
+      heading: "Connect an AI agent"
+      intro_html: "AI agents (for example Claude) can manage your posts through this site's MCP server at %{path}. They need a token to connect. This first token gets the Admin group; narrow it to a different group any time from CS Studio's \"AI assistant\" page, or create additional tokens there later."
+      name: "Token name"
+      hint: "Helps you recognise which assistant is using it. The token acts as you; revoke it any time in Studio › AI assistant."
+      generate: "Generate token"
+      skip: "Skip for now"
+    mcp_token_created:
+      heading: "Your token"
+      intro: "This is the only time the full token is shown. Copy it into your agent's config now. It carries the Admin group and acts as you; if you lose it, or want a narrower one, create a new one from CS Studio's \"AI assistant\" page and revoke this one there."
+      continue: "Continue"
+    starter_content:
+      heading: "Starter content"
+      intro_html: "Finishing setup always creates your Home page at %{path}. You can also add:"
+      pages_html: "%{blog}, %{resume} and %{now} pages, each listing posts of that type"
+      blog: "Blog"
+      resume: "Resume"
+      now: "Now"
+      posts: "one sample post for each, in your default language"
+      add: "Add starter content"
+      skip: "Skip for now"
+    review:
+      heading: "Review"
+      intro: "Check your choices. Everything here can also be changed later in the admin."
+      site_title: "Site title"
+      tagline: "Tagline"
+      social_links: "Social links"
+      mail: "Mail"
+      mail_not_set_up: "Not set up. Password resets and invites stay off until mail works. Set it up later in Settings → Mail."
+      default_language: "Default language"
+      home_page: "Home page"
+      home_page_always: "Always created"
+      mcp_token: "MCP token"
+      mcp_token_created: "%{name} (created)"
+      starter_content: "Starter content"
+      starter_added: "Blog, Resume and Now pages, one sample post each"
+      starter_skipped: "Skipped — Home page only"
+      skipped: "Skipped"
+      none: "None"
+      blank: "—"
+      edit: "Edit"
+      # The review link's accessible name. Keep the visible word, `edit`
+      # ("Edit"), at its start, as the same word, so saying what is seen
+      # activates the link (WCAG 2.5.3, label in name).
+      edit_row: "Edit %{item}"
+      finish: "Finish setup"

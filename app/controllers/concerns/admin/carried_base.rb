@@ -25,6 +25,7 @@ module Admin
   # `respond_with_streams`.
   module CarriedBase
     extend ActiveSupport::Concern
+    include GlanceRows
 
     private
 
@@ -53,13 +54,15 @@ module Admin
     # as keys): put side by side, never joined with an English "and".
     def refusal(result) = result.errors.join(" ")
 
-    # Ends an answer: the main form's new base when it moved, the toasts, and
+    # Ends an answer: the main form's new base when it moved, the rail's row
+    # of the section (`glance`) when something was written, the toasts, and
     # the streams; or, for a client that takes no stream (no JavaScript, a
     # scripted client), whose body would be shown as text, a redirect to the
     # card at `anchor` with a flash. Decided by "does the client take a
     # stream", not `respond_to`: the write has happened, and a client that
     # accepts neither must not be answered 406 for it.
-    def respond_with_streams(streams, anchor:, moved_to: nil, notice: nil, error: nil, toast: false, status: :ok)
+    def respond_with_streams(streams, anchor:, glance:, moved_to: nil, notice: nil, error: nil, toast: false, status: :ok)
+      streams += [ glance_row_stream(glance) ] if notice
       streams += [ turbo_stream.replace("settings-base-updated-at", partial: "admin/shared/base_updated_at_field",
         locals: { id: "settings-base-updated-at", value: moved_to }) ] if moved_to
       streams += [ turbo_stream.append("toasts", Admin::Ui::ToastComponent.new(message: notice, kind: :success)) ] if notice

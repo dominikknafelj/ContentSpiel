@@ -1,8 +1,8 @@
 require "test_helper"
 
-# The setup wizard's optional Mail step (spec "The setup wizard", design
-# answer M1): after Site identity, skippable, the same fields and service as
-# Settings → Mail, a test mail to the admin, and the one test-mail limit.
+# The setup wizard's optional Mail step: after Site identity, skippable, the
+# same fields and service as Settings → Mail, a test mail to the admin, and
+# the one test-mail limit.
 class SetupMailStepTest < ActionDispatch::IntegrationTest
   include LogCapture
 
@@ -30,7 +30,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     get setup_step_path("mail")
     assert_response :success
     assert_select "h1", text: /Mail/
-    assert_select "h1", text: /optional/
+    assert_select "h1", text: /Optional/
     assert_match(/Content Spiel sends two kinds of mail: password reset links and invites\. Use the SMTP details from your mail provider\./, response.body)
     assert_select "a[href=?]", setup_step_path("languages"), text: "Skip for now"
 
@@ -43,7 +43,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     save_mail
     get setup_step_path("review")
     assert_select "dd", text: "Saved, not tested"
-    assert_select "dd a[href=?]", setup_step_path("mail"), text: "Edit"
+    assert_select "dd a[href=?][aria-label='Edit Mail']", setup_step_path("mail"), text: "Edit"
   end
 
   test "its fields come in order: Server, Port 587, Security STARTTLS / TLS, Username, Password, Sender name from the site's title, Sender address" do
@@ -53,9 +53,9 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     labels = css_select("form label, form legend").map { |node| node.text.strip }.reject(&:blank?)
     assert_equal [ "Server", "Port", "Security", "STARTTLS", "TLS", "Username", "Password", "Sender name", "Sender address" ], labels
     assert_select "input[name='site_setting[mail_server]'][placeholder='smtp.example.com']"
-    assert_select "input[name='site_setting[mail_port]'][value='587'][data-setup-mail-target=port]"
+    assert_select "input[name='site_setting[mail_port]'][value='587'][data-mail-port-target=port]"
     assert_select "input[type=radio][name='site_setting[mail_security]']", 2
-    assert_select "input[type=radio][value=starttls][checked][data-port='587'][data-action='change->setup-mail#security']"
+    assert_select "input[type=radio][value=starttls][checked][data-port='587'][data-action='change->mail-port#security']"
     assert_select "input[type=radio][value=tls][data-port='465']"
     assert_select "input[type=password][name='site_setting[mail_password]']"
     assert_select "input[name='site_setting[mail_sender_name]'][value=?]", "Dana's Notes"
@@ -63,6 +63,52 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     assert_select "span", text: "Sends to owner@example.com (your address)"
     # Enter submits Continue, never the test mail.
     assert_equal "Continue", css_select("form button[type=submit]").first.text.strip
+  end
+
+  test "the step draws the shared Mail fields: the same groups and controls as Settings" do
+    get setup_step_path("mail")
+
+    assert_select "form[data-controller~=mail-port]"
+    assert_select "[role=group][aria-labelledby=setup-mail-server-group]" do
+      assert_select "[data-field-name=mail_server] input#setup-mail_server[name='site_setting[mail_server]']"
+      assert_select "[data-field-name=mail_port] input#setup-mail_port[data-mail-port-target=port]"
+      assert_select "fieldset#setup-mail_security legend", text: "Security"
+      assert_select "input#setup-mail_username[name='site_setting[mail_username]']"
+      assert_select "input#setup-mail_password[type=password]"
+    end
+    assert_select "[role=group][aria-labelledby=setup-mail-sender-group]" do
+      assert_select "[data-field-name=mail_sender_name] input#setup-mail_sender_name"
+      assert_select "[data-field-name=mail_sender_address] input#setup-mail_sender_address"
+    end
+    assert_select "#setup-mail-server-group", text: "Server"
+    assert_select "#setup-mail-sender-group", text: "Sender"
+  end
+
+  test "the action row is Send test mail with its address, then Back, Skip for now and Continue last; the outcome stands under it" do
+    get setup_step_path("mail")
+
+    row = css_select("#setup-mail-actions").first
+    assert row, "the action row"
+    words = row.css("a, button").map { |node| node.text.strip }
+    assert_equal [ "Send test mail", "Back", "Skip for now", "Continue" ], words
+    assert_select "#setup-mail-actions span.text-small.text-meta", text: "Sends to owner@example.com (your address)"
+  end
+
+  test "a refused field shows its sentence under it, besides the summary" do
+    save_mail(FIELDS.merge(mail_sender_name: "A\nB"))
+
+    assert_response :unprocessable_entity
+    assert_select "#setup-mail_sender_name-errors", text: /Sender name can't contain a line break\./
+  end
+
+  test "the error summary links each refused field to its input" do
+    save_mail(FIELDS.merge(mail_sender_name: "A\nB", mail_port: "70000"))
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert] a[href='#setup-mail_sender_name']"
+    assert_select "[role=alert] a[href='#setup-mail_port']"
+    assert_select "input#setup-mail_sender_name"
+    assert_select "input#setup-mail_port"
   end
 
   test "Continue saves through Settings::Save, goes on to Languages and stores the login encrypted and unseen" do
@@ -139,7 +185,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Spec decision 3 (final review 1): the host's login is a credential. Each
+  # The host's login is a credential. Each
   # half is checked alone, and the whole body is searched, not one element.
   { "MAIL_SMTP_USERNAME" => "host-login-user-4711", "MAIL_SMTP_PASSWORD" => "host-login-pass-0815" }.each do |variable, secret|
     test "the host's #{variable} is Set by the host and its value is nowhere in the step's page" do

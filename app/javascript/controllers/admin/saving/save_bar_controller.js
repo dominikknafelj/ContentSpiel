@@ -1,20 +1,34 @@
 import { Controller } from "@hotwired/stimulus"
 import { targetWithinThePage } from "controllers/admin/shell/fragment_links_controller"
 import { messages } from "i18n/messages"
+import { NAMES_SHOWN, changedKeys, controlOf, nameOf, snapshot, wrapperOf } from "saving/form_snapshot"
 
-// The explicit-save pattern for configuration screens (design pass spec §4,
-// handoff §9 B12): the form's footer (Save, Cancel) is always there, counts
-// the changed fields, and leaving with changes asks first. Save is disabled
-// while an existing record has nothing to save.
-// A change is counted per *control* (per group name for radios; see
-// `snapshot`), comparing against a snapshot taken on connect -- so changing a
-// field back removes it from the count.
+// The explicit-save pattern for configuration screens: the form's bar
+// (Discard, Save) is always there, counts the changed fields and names them,
+// marks each changed field, and leaving with changes asks first. Save is
+// disabled while an existing record has nothing to save.
+// A change is counted per *control* (per group name for radios; the keys are
+// `saving/form_snapshot.js`'s), comparing against a snapshot taken on
+// connect -- so changing a field back removes it from the count.
+//
+// THE MARK AND THE NAMES. `refresh` writes `data-save-bar-changed` on the
+// nearest `[data-field-name]` wrapper of each changed control, and takes it
+// off every wrapper it marked that holds no change any more; the stylesheet
+// draws the mark from it. It is the one writer in the browser. The server
+// writes `data-save-bar-changed="saved"` on a wrapper in a refused or stale
+// re-render (Settings' `Values#changed_fields`): what was typed differs from
+// what is stored, which the browser cannot know, so such a mark stays until a
+// save or Discard and is counted and named with the script's own: one change
+// for each changed key, plus one for each server-marked wrapper that holds no
+// changed key. The names are the distinct wrappers of both, each once, in the
+// page's order, by `nameOf`; a control in no wrapper is named on its own.
 //
 // Two server-driven states sit on top of the snapshot count:
 //   dirty  -- the server re-rendered the form with errors (a 422). The
 //             re-render reconnects this controller, whose snapshot is then the
-//             typed, invalid values (count 0); `dirty` keeps Save enabled and
-//             the leave guard up regardless, since nothing was saved.
+//             typed, invalid values; `dirty` keeps Save enabled and the leave
+//             guard up regardless, since nothing was saved. A screen whose
+//             server marks nothing says "Unsaved changes".
 //   always -- Save is enabled even with nothing changed (a new record: the
 //             form's whole point is to be submitted). The guard still waits
 //             for a real change.
@@ -24,7 +38,7 @@ import { messages } from "i18n/messages"
 // listeners (shared by every connected instance) asks "is any form unsaved and
 // not the one being submitted?" and opens the single Leave dialog.
 //
-// FOUR WAYS OUT are guarded (round 3, Task 1), each where Turbo -- or the
+// FOUR WAYS OUT are guarded, each where Turbo -- or the
 // browser -- first says it is about to happen. All were checked against
 // Turbo's own source (turbo-rails 2.0.23), not assumed:
 //
@@ -56,7 +70,7 @@ import { messages } from "i18n/messages"
 //    (`FrameController##findFrameElement`): its own `data-turbo-frame`, else
 //    the frame it sits in. Only `#content` holds these forms; the dialogs'
 //    and the palette's frames replace nothing.
-//    The footer's Cancel (`data-save-bar-cancel`) is such a link and the one
+//    The bar's Discard (`data-save-bar-cancel`) is such a link and the one
 //    that never asks: discarding is what it is for.
 //    Discard clicks the link again, so Turbo does exactly what it would have.
 //    A `#field` link to the page itself (the error summary's) is no way out
@@ -309,7 +323,7 @@ function clearPendingLeave() {
 // changes of all of them), whenever a form connects, changes or goes. It is
 // the one thing this controller tells the rest of the screen, and
 // `admin--saving--pending-lock` is its listener: instant actions beside the form are
-// disabled while changes are pending (decision D10).
+// disabled while changes are pending, since their answer reloads the screen.
 // A listener that connects later than the forms asks for the state again by
 // dispatching `admin--saving--save-bar:query` on `document`, which is answered with
 // the same event -- controllers are registered by one dynamic import each, so
@@ -333,12 +347,12 @@ function measureBars() {
   else document.documentElement.style.setProperty("--admin-save-bar-height", `${Math.max(...heights)}px`)
 }
 
-// ONE FORM AFTER ANOTHER (final wave B, ledger C-I1). A screen with two of
+// ONE FORM AFTER ANOTHER. A screen with two of
 // these forms (the account screen: name, password) must not let one Save throw
 // away what the other form holds. A form whose answer re-renders the screen
 // names the other in `after` (`save_bar_form_data(after:)`): while THAT form
 // is unsaved, this one's Save is disabled, its `blocked` target says "Save or
-// cancel your changes first." (decision D10's sentence), and a submit that
+// discard your changes first.", and a submit that
 // comes anyway -- Enter in a field -- is refused (`guardSubmit`). The other
 // form is then saved in a way that keeps the screen (a Turbo Stream answer).
 // The Save a password field governs (`data-password-submit`) is written by
@@ -346,7 +360,7 @@ function measureBars() {
 // button and keeps it disabled, and is asked to measure again when the block
 // lifts.
 // The same lock serves something typed BESIDE the form that its Save would
-// drop (ledger C-M8: Settings' API key entry, a field of the key's own form,
+// drop (Settings' API key entry, a field of the key's own form,
 // open and filled in while the main Save re-renders the screen): the element
 // holding it carries `data-save-bar-holds="<sentence>"` while it does, and
 // asks for a new look with `admin--saving--save-bar:query`.
@@ -354,11 +368,11 @@ function measureBars() {
 // page's messages (`i18n/messages.js`); `admin--saving--pending-lock` shows the same.
 
 export default class extends Controller {
-  static targets = ["bar", "count", "save", "blocked"]
+  static targets = ["bar", "count", "save", "blocked", "dot"]
   static values = { dirty: Boolean, always: Boolean, after: String }
 
   connect() {
-    this.initial = this.snapshot()
+    this.initial = snapshot(this.element)
     this.submitting = false
     if (instances.size === 0) {
       document.addEventListener("turbo:before-visit", onVisit)
@@ -374,24 +388,12 @@ export default class extends Controller {
     if (this.hasBarTarget) {
       this.barObserver = new ResizeObserver(measureBars)
       this.barObserver.observe(this.barTarget)
-      // Stuck over the content (O2): the bar sticks at -1px, so while it is
-      // stuck it is never wholly inside the window (ratio under 1) and its
-      // bottom is at the window's edge or past it; at rest, under the end of
-      // the form, it is whole. The first callback decides at connect, so a
-      // bar Turbo restored from a snapshot with `data-stuck` is decided again.
-      if (!this.barTarget.classList.contains("admin-save-bar--contained")) {
-        this.stuckObserver = new IntersectionObserver(([ entry ]) => {
-          this.barTarget.toggleAttribute("data-stuck", entry.intersectionRatio < 1 && entry.boundingClientRect.bottom > entry.rootBounds.bottom)
-        }, { threshold: [ 1 ] })
-        this.stuckObserver.observe(this.barTarget)
-      }
     }
     this.refresh()
   }
 
   disconnect() {
     this.barObserver?.disconnect()
-    this.stuckObserver?.disconnect()
     instances.delete(this)
     measureBars()
     if (instances.size === 0) {
@@ -407,20 +409,48 @@ export default class extends Controller {
   }
 
   refresh() {
-    const count = this.changes
+    const { count, names } = this.tally(true)
+    const unsaved = this.dirtyValue || count > 0
     // A Save that the password field already governs (`data-password-submit`:
     // disabled until the password is long enough) is left to it -- two
     // controllers writing one button's `disabled` on the same keystroke would
     // undo each other, and such a form can't be saved with nothing typed
     // anyway.
     if (this.hasSaveTarget && !("passwordSubmit" in this.saveTarget.dataset)) {
-      this.saveTarget.disabled = this.blocked || !(this.unsaved || this.alwaysValue)
+      this.saveTarget.disabled = this.blocked || !(unsaved || this.alwaysValue)
     }
-    const text = messages(this.element)
-    this.countTarget.textContent = count > 0
-      ? text.t("components.ui.save_bar.changes", { count })
-      : (this.unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes")))
+    if (this.hasDotTarget) this.dotTarget.hidden = !unsaved
+    this.writeCount(count, names, unsaved)
     announce()
+  }
+
+  // The count in bold, then the names in the count line's own colour; "No
+  // unsaved changes" in meta. The names sentence is the key's, and the count
+  // is cut out of it where the key put it, so a language may order the two
+  // as it likes.
+  writeCount(count, names, unsaved) {
+    const text = messages(this.element)
+    const target = this.countTarget
+    target.replaceChildren()
+    target.classList.toggle("text-meta", !unsaved)
+    target.classList.toggle("text-dim", unsaved)
+    if (count === 0) {
+      target.textContent = unsaved ? text.t("components.ui.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.ui.save_bar.no_changes"))
+      return
+    }
+    const changes = text.t("components.ui.save_bar.changes", { count })
+    const strong = document.createElement("strong")
+    strong.className = "font-semibold text-ink"
+    strong.textContent = changes
+    if (names.length === 0) return target.append(strong)
+
+    const separator = text.t("components.ui.save_bar.separator")
+    const shown = names.slice(0, NAMES_SHOWN).join(separator)
+    const list = names.length > NAMES_SHOWN ? text.t("components.ui.save_bar.more", { names: shown, count: names.length - NAMES_SHOWN }) : shown
+    const sentence = text.t("components.ui.save_bar.names", { changes, names: list })
+    const at = sentence.indexOf(changes)
+    if (at < 0) return target.append(sentence)
+    target.append(sentence.slice(0, at), strong, sentence.slice(at + changes.length))
   }
 
   // See "ONE FORM AFTER ANOTHER". The sentence to show, or "" when nothing
@@ -464,7 +494,7 @@ export default class extends Controller {
   // What is being sent is what a success will have saved (`submitEnded`).
   markSubmitting() {
     this.submitting = true
-    this.sent = this.snapshot()
+    this.sent = snapshot(this.element)
   }
 
   // A submit that didn't go through (a 422 re-renders and reconnects anyway;
@@ -481,80 +511,57 @@ export default class extends Controller {
   submitEnded(event) {
     this.submitting = false
     if (!event.detail.success) return
-    this.initial = this.sent || this.snapshot()
+    this.initial = this.sent || snapshot(this.element)
     this.dirtyValue = false
+    this.clearSavedMarks()
     this.refresh()
   }
 
   get unsaved() { return this.dirtyValue || this.changes > 0 }
 
-  // What the form would SUBMIT, not what its controls look like: a disabled
-  // control and an unticked checkbox are both simply absent. That matters
-  // because other controllers inside the form adjust controls on connect --
-  // `admin--groups--branch-picker` ticks and disables every box under a chosen
-  // branch -- and on a Turbo frame navigation this controller connects (and
-  // takes its baseline) *before* they run. Recording a checkbox's `checked`
-  // as such made an untouched group form count "1 unsaved change" and ask
-  // before leaving; a box that is ticked-and-disabled submits exactly what an
-  // unticked one does, so baseline and later snapshots now agree whatever the
-  // connect order.
-  //
-  // KEYS. One per control, so one changed control is one change:
-  // - a radio group is one key (its name): flipping a radio is one change,
-  //   not two;
-  // - a checkbox is `name=value`, present only while ticked;
-  // - a tracked hidden input whose name ends in `[]` is `name=value` too,
-  //   present only while it holds a value: the members of a SET (a chip
-  //   input's chips, the scope editor's carried types), where order means
-  //   nothing. Keyed by position, removing the first of ten chips shifted the
-  //   other nine and read "10 unsaved changes", and removing a chip and adding
-  //   it back counted as a change. One chip removed is one change; removed and
-  //   re-added is none. The blank sentinel ahead of the chips (so an emptied
-  //   list still submits) holds no value and is no member;
-  // - anything else is its name plus its POSITION among the controls of that
-  //   name (`name#0`, `name#1`, ...). Rows of a list share one name
-  //   (`site_setting[languages][][fallback]`, one select per language row);
-  //   keyed by name alone they collapsed into the last row's value, and an
-  //   edit to an earlier row was not a change at all. A row added, removed or
-  //   moved shows up as the positions whose value now differs.
-  // A hidden input is skipped -- the CSRF token, a `_method`, a checkbox's
-  // "0" twin are not the editor's doing -- unless it carries
-  // `data-save-bar-track`: the real control behind a widget (a chip, the
-  // order of sortable rows), whose script dispatches a bubbling `input` or
-  // `change` on it when it sets the value.
-  // A control that goes from disabled to enabled-and-empty counts nothing
-  // (absent and "" are one value, see `changes`); no screen has one.
-  snapshot() {
-    const values = {}
-    const positions = {}
-    for (const field of this.element.elements) {
-      if (!field.name || field.disabled || field.type === "submit") continue
-      // Nothing to save by itself, and filled in by a password manager on
-      // load (the account screen's current password).
-      if ("saveBarIgnore" in field.dataset) continue
-      if (field.type === "hidden" && !("saveBarTrack" in field.dataset)) continue
-      if (field.type === "radio") {
-        if (field.checked) values[field.name] = field.value
-        else values[field.name] ??= ""
-      } else if (field.type === "checkbox") {
-        if (field.checked) values[`${field.name}=${field.value}`] = "on"
-      } else if (field.type === "hidden" && field.name.endsWith("[]")) {
-        if (field.value !== "") values[`${field.name}=${field.value}`] = "on"
-      } else {
-        const position = positions[field.name] ?? 0
-        positions[field.name] = position + 1
-        values[`${field.name}#${position}`] = field.value
-      }
+  get changes() { return this.tally(false).count }
+
+  // How many changes there are and what they are called (the counting rule,
+  // "THE MARK AND THE NAMES" above). With `mark`, the wrappers' marks are
+  // written too: only `refresh` writes them, so a count asked for elsewhere
+  // (the leave dialog, another form's announcement) changes nothing.
+  tally(mark) {
+    const now = snapshot(this.element)
+    const keys = changedKeys(this.initial, now)
+    const changed = new Set()
+    const loose = []
+    for (const key of keys) {
+      const control = controlOf(key, this.initial, now)
+      const wrapper = control ? control.closest("[data-field-name]") : wrapperOf(key, this.initial, now)
+      if (wrapper && this.element.contains(wrapper)) changed.add(wrapper)
+      else if (control) loose.push(control)
     }
-    return values
+    const saved = [...this.element.querySelectorAll("[data-save-bar-changed='saved']")]
+    const count = keys.length + saved.filter((wrapper) => !changed.has(wrapper)).length
+
+    if (mark) {
+      this.element.querySelectorAll("[data-save-bar-changed='']").forEach((wrapper) => {
+        if (!changed.has(wrapper)) wrapper.removeAttribute("data-save-bar-changed")
+      })
+      changed.forEach((wrapper) => { if (!wrapper.hasAttribute("data-save-bar-changed")) wrapper.setAttribute("data-save-bar-changed", "") })
+    }
+
+    const named = [...new Set([ ...changed, ...saved, ...loose ])]
+      .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
+    const names = [...new Set(named.map((element) => nameOf(element.matches("[data-field-name]") ? this.firstControl(element) : element)).filter(Boolean))]
+    return { count, names }
   }
 
-  get changes() {
-    const now = this.snapshot()
-    // An absent key and an empty string are the same value: a blank row added
-    // to a list (`name#1` appears, empty) is nothing the editor changed yet.
-    // For a checkbox the absent key is "unticked" and any present one "on", so
-    // the two still differ.
-    return Object.keys({ ...this.initial, ...now }).filter((key) => (this.initial[key] ?? "") !== (now[key] ?? "")).length
+  // The control a wrapper is named by: its own name if it carries one, else
+  // its first field.
+  firstControl(wrapper) {
+    if (wrapper.dataset.saveBarName) return wrapper
+    return wrapper.querySelector("input:not([type=hidden]), select, textarea, input[data-save-bar-track]") || wrapper
+  }
+
+  // The server's marks hold until a save or Discard: a save that keeps the
+  // form has saved what they named.
+  clearSavedMarks() {
+    this.element.querySelectorAll("[data-save-bar-changed='saved']").forEach((wrapper) => wrapper.removeAttribute("data-save-bar-changed"))
   }
 }

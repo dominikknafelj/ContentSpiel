@@ -1,0 +1,7 @@
+<aside class="admin-settings-glance flex flex-col gap-2.5" aria-labelledby="<%= HEADING_ID %>">
+  <h2 id="<%= HEADING_ID %>" class="text-label text-meta"><%= t(".heading") %></h2>
+  <% sections.each do |section| %>
+    <%= render Admin::SettingsScreen::GlanceRowComponent.new(section: section, **row) %>
+  <% end %>
+  <p class="text-small text-meta"><%= t(".hint") %></p>
+</aside>

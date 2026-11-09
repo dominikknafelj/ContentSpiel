@@ -4,9 +4,7 @@
   <% FIELDS.each_key do |field| %>
     <% next unless mail_settings.from_host?(field) %>
     <div class="mt-1">
-      <span class="<%= setup_label_class %>"><%= t(".#{field}") %></span>
-      <div class="mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm text-dim" aria-hidden="true"><%= MASK %></div>
-      <p class="mt-1 text-sm text-meta"><%= t(".set_by_host") %></p>
+      <%= render Admin::SettingsScreen::HostValueComponent.new(field: field, label: t(".#{field}"), mail_settings: mail_settings) %>
     </div>
   <% end %>
 
@@ -39,7 +37,7 @@
         <% end %>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :primary, type: "submit", form: LOGIN_FORM, data: LOCK) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".save"), variant: :secondary, type: "submit", form: LOGIN_FORM, data: LOCK) %>
         <% if login_set? %>
           <%= render Admin::Ui::ButtonComponent.new(label: t(".cancel"), variant: :tertiary, data: { action: "admin--settings--mail#cancel" }) %>
         <% end %>

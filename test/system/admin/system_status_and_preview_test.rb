@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Browser-only behaviour of round 3's Task 16: the System status Copy button
+# What only a browser shows of System status and the preview bar: the Copy button
 # (with and without the Clipboard API) and the preview bar's geometry.
 class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
   setup do
@@ -78,7 +78,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
   test "at 360px wide Exit preview is inside the viewport and clickable, with a long title" do
     root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
     Page.create!(parent: root, title: "A very long title for a page that is only a draft and has to be truncated", slug: "long", published_at: nil)
-    page.driver.resize(360, 700)
+    page.current_window.resize_to(360, 700)
 
     visit "/preview/long"
 
@@ -90,7 +90,7 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
   ensure
     # The window outlives the test: every later test in this worker would
     # otherwise run at phone width.
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   private

@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The Code block on the public site, in a browser (code block spec §4): the
+# The Code block on the public site, in a browser: the
 # Copy button, and a long line.
 #
 # The clipboard is the browser's and a headless one may refuse it, so each
@@ -101,7 +101,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     assert_selector "#{FIGURE} [role=status]", exact_text: "Copied", visible: :all
     assert_equal CODE, page.evaluate_script("window.__copied"), "what is copied is the stored code: no markup, the indentation and the line breaks as typed"
 
-    # Design answer C2: the status line is emptied when the word goes back,
+    # The status line is emptied when the word goes back,
     # so the next press writes it again and is announced again.
     restore_after(50)
     find("#{FIGURE} button").click
@@ -248,9 +248,8 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   # Scroll anchoring is switched off for the test: Chrome keeps what is in
   # view where it is when something above it grows, so with it a strip
   # revealed AFTER the scroll leaves the page at the anchor all the same and
-  # this test could not fail (Task 5b's re-review, N3). Without it the order
-  # is seen: this was red, 292 pixels off, with the reveal put off by fifty
-  # milliseconds. It is switched off for EVERY element, by a stylesheet the
+  # this test could not fail. Without it the order is seen: with the reveal
+  # put off by fifty milliseconds the test is red, 292 pixels off. It is switched off for EVERY element, by a stylesheet the
   # document adopts (which a Turbo visit keeps): `overflow-anchor: none` on
   # the root alone left Chrome compensating. Safari has no scroll anchoring,
   # which is who the order is for.
@@ -277,7 +276,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     page.execute_script("document.adoptedStyleSheets = []")
   end
 
-  # Final review M7. A theme's mistyped key is "" outside development, and
+  # A theme's mistyped key is "" outside development, and
   # an attribute that is there and empty is still a value: the word the
   # template wrote on the button is what it goes back to, not nothing.
   test "an empty label keeps the word the template wrote on the button: after an answer the button says it again" do
@@ -352,7 +351,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     assert_equal "", status_text
   end
 
-  # Design answer C1. Three blocks: nothing to show, a language, a file name.
+  # The strip shows only what it has to say. Three blocks: nothing to show, a language, a file name.
   test "without a clipboard a block with nothing to show has no strip and no empty box, one with a name or a language has its strip without a button; with a clipboard each has its button" do
     add_code(CODE, settings: { "code" => CODE })
     add_code(CODE)
@@ -380,7 +379,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     assert page.evaluate_script("#{figure_js(0)}.querySelector('button').getBoundingClientRect().bottom <= #{figure_js(0)}.querySelector('pre').getBoundingClientRect().top")
   end
 
-  # Design answer C2: "Not copied" is no error the visitor caused, so it has
+  # "Not copied" is no error the visitor caused, so it has
   # no colour of its own: the three words look the same.
   test "a browser that refuses is told Not copied, in the same colour as Copy and Copied" do
     add_code(CODE)
@@ -484,16 +483,16 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
 
     size = page.evaluate_script("[window.innerWidth, window.innerHeight]")
     begin
-      page.driver.resize(360, 800)
+      page.current_window.resize_to(360, 800)
       await_js("window.innerWidth === 360")
       inside.call("360")
     ensure
-      page.driver.resize(*size)
+      page.current_window.resize_to(*size)
     end
   end
 
-  # Design answer C8, as the browser computes it: the scrollbar's scheme
-  # follows the theme and is dark in a strong band in both schemes (D2), selected
+  # The scrollbar and the selection, as the browser computes them: the scrollbar's scheme
+  # follows the theme and is dark in a strong band in both schemes, selected
   # code is the accent with its own ink for plain text and for a coloured
   # token alike, and the focus ring is the accent.
   test "the block's scheme follows the theme and a strong band, selected code is the accent pair, and the button's focus ring is the accent" do
@@ -539,8 +538,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
     assert_equal [ true, "solid", "2px", true ], ring
   end
 
-  # THE THEMING CONTRACT, in a browser (code block spec §5,
-  # docs/reference/theming.md, "The Code block"). The third theme's template
+  # THE THEMING CONTRACT, in a browser (docs/reference/theming.md, "The Code block"). The third theme's template
   # is written from the reference's tables alone: another element, other
   # classes, the documented markup. That the button works under it is what
   # makes the table a promise.
@@ -582,7 +580,7 @@ class CodeBlockSystemTest < ApplicationSystemTestCase
   # one, which is where the build puts a theme's (`ThemeCss.write_entry`:
   # the default's import first, then the theme's). In a strong band the
   # band's own values are nearer the code than a theme's on the root, and
-  # the code stays one colour (decision 8).
+  # the code stays one colour.
   test "a theme's stylesheet that declares the seven tokens again re-colours the code in both schemes, and in a strong band the code stays the band's one colour" do
     erb = "<%# note %>\n<p class=\"a\"><% if @x %><%= 1 %><% end %></p>"
     ruby = "# note\ndef a = \"b\""

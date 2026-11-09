@@ -1,6 +1,7 @@
-# The first-run setup wizard (design spec 2026-09-26 §3-§4). Every step
-# persists as soon as it's submitted, so an admin who closes the browser can
-# sign in again and resume. Access:
+# The first-run setup wizard. Every step persists as soon as it's submitted,
+# so an admin who closes the browser can sign in again and resume. Its words
+# are `setup.*` (`config/locales/setup.en.yml`): a step's name
+# `setup.steps.<step>`, what it answers `setup.flash.*`. Access:
 #   - no user yet: anyone who entered the setup token this session, and only
 #     the steps up to creating the admin;
 #   - admin exists: only a signed-in user;
@@ -9,11 +10,6 @@ class SetupController < ApplicationController
   STEPS = %w[token system_check admin site mail languages mcp_token starter_content review].freeze
   PRE_ADMIN_STEPS = %w[token system_check admin].freeze
   OPTIONAL_STEPS = %w[system_check mail mcp_token starter_content].freeze
-  LABELS = {
-    "token" => "Setup token", "system_check" => "System check", "admin" => "Admin account",
-    "site" => "Site identity", "mail" => "Mail", "languages" => "Languages", "mcp_token" => "MCP token",
-    "starter_content" => "Starter content", "review" => "Review"
-  }.freeze
 
   # The rate limit needs a real store, and Rails.cache is :null_store in test
   # (every write a no-op, so the limit would never trip there). Per-process
@@ -26,19 +22,19 @@ class SetupController < ApplicationController
   allow_unauthenticated_access
   layout "setup"
 
-  # Overrides ApplicationController's `:admin` default (spec §7.1) -- setup
-  # writes (the site, languages, MCP token, starter content) run before an
-  # admin session necessarily exists, so they're attributed to their own
-  # channel rather than misreported as `:admin`.
+  # Overrides ApplicationController's `:admin` default: setup writes (the
+  # site, languages, MCP token, starter content) run before an admin session
+  # necessarily exists, so they're attributed to their own channel rather
+  # than misreported as `:admin`.
   before_action { Current.channel = :setup }
 
   before_action :require_setup_pending
   before_action :load_step, only: %i[show update]
   before_action :require_step_access, only: %i[show update]
-  # Final fix wave (Important 3): once the owner exists every step runs
-  # signed in (`require_step_access`), and its writes are attributed to
-  # that owner -- `ApplicationController#set_current_actor` ran before the
-  # session was resumed, so `Current.actor` is still nil here. Before the
+  # Once the owner exists every step runs signed in (`require_step_access`),
+  # and its writes are attributed to that owner --
+  # `ApplicationController#set_current_actor` ran before the session was
+  # resumed, so `Current.actor` is still nil here. Before the
   # admin step there's nobody to attribute to: those writes stay the
   # trusted nil actor on `:setup`.
   before_action :act_as_signed_in_user, only: %i[show update]
@@ -52,10 +48,10 @@ class SetupController < ApplicationController
 
   rate_limit to: 10, within: 3.minutes, only: :update, store: RATE_LIMIT_STORE,
     if: -> { params[:step] == "token" },
-    with: -> { redirect_to setup_step_path("token"), alert: "Too many attempts. Try again in a few minutes." }
+    with: -> { redirect_to setup_step_path("token"), alert: I18n.t("setup.flash.too_many_attempts") }
 
   # The mail step's "Send test mail" is limited in the ONE bucket Settings →
-  # Mail counts in (`MailTestLimit`, plan Ruling P2): five per person per three
+  # Mail counts in (`MailTestLimit`): five per person per three
   # minutes, whichever screen they were pressed on. Only that button counts, not
   # "Continue" (which saves and sends nothing) and not the other steps.
   limit_test_mails only: :update, if: -> { @step == "mail" && params[:send_test].present? }, with: -> {
@@ -157,7 +153,7 @@ class SetupController < ApplicationController
       STEPS[index - 1]
     end
 
-    def step_label(step) = LABELS.fetch(step)
+    def step_label(step) = I18n.t(step, scope: "setup.steps")
 
     def optional_step?(step) = OPTIONAL_STEPS.include?(step)
 
@@ -166,7 +162,7 @@ class SetupController < ApplicationController
         session[:setup_token_verified] = true
         redirect_to setup_step_path("system_check")
       else
-        flash.now[:alert] = "That setup token doesn't match. Copy it from the server log."
+        flash.now[:alert] = I18n.t("setup.flash.token_mismatch")
         render :token, status: :unprocessable_entity
       end
     end
@@ -175,13 +171,12 @@ class SetupController < ApplicationController
     # the same moment: only the first sees `User.none?` and becomes the admin;
     # the second is sent to sign in.
     #
-    # The first account is the site's owner (access-control design spec
-    # §6): every later setup step writes through permission-checked services
-    # as this user, and a user in no group may do nothing. It's created
-    # through `Users::Save` like any other account (final fix wave,
-    # Important 3), so it gets its `user.created` event -- by the trusted
-    # nil actor on `:setup`, since nobody is signed in yet. `Users::Save`'s
-    # own transaction joins this one, inside the lock.
+    # The first account is the site's owner: every later setup step writes
+    # through permission-checked services as this user, and a user in no
+    # group may do nothing. It's created through `Users::Save` like any other
+    # account, so it gets its `user.created` event -- by the trusted nil actor
+    # on `:setup`, since nobody is signed in yet. `Users::Save`'s own
+    # transaction joins this one, inside the lock.
     def update_admin
       attributes = params.expect(user: [ :email_address, :password, :password_confirmation ]).to_h.merge(owner: true)
       result = nil
@@ -204,7 +199,7 @@ class SetupController < ApplicationController
         session.delete(:setup_token_verified)
         redirect_to setup_step_path("site")
       elsif result.nil?
-        redirect_to admin_sign_in_path, alert: "An admin account already exists. Sign in to continue setup."
+        redirect_to admin_sign_in_path, alert: I18n.t("setup.flash.admin_exists")
       else
         @user = result.record
         render :admin, status: :unprocessable_entity
@@ -217,8 +212,7 @@ class SetupController < ApplicationController
       site = site_params.to_h
       translated = site.extract!(*Settings::Save::TRANSLATED.map(&:to_s))
 
-      # The title and tagline are translated (translation helpers spec §5)
-      # and typed here in the site's default language -- which the next
+      # The title and tagline are translated and typed here in the site's default language -- which the next
       # step may still change, taking them along (`SiteSetting#carry_
       # translations_into_new_default_locale`).
       if Settings::Save.call(@site_setting, attributes: site, translations: { @site_setting.default_locale => translated }).ok?
@@ -228,12 +222,12 @@ class SetupController < ApplicationController
       end
     end
 
-    # The optional Mail step (spec "The setup wizard", design answer M1): the
-    # same fields, written by the same service, as Settings → Mail. "Continue"
-    # saves and goes on; "Send test mail" saves, sends to the admin who is
-    # setting the site up and stays on the step with the answer (the ok line,
-    # or the warn alert with the failure's sentence and the server's line).
-    # Skip is a plain link and writes nothing.
+    # The optional Mail step: the same fields, written by the same service,
+    # as Settings → Mail. "Continue" saves and goes on; "Send test mail"
+    # saves, sends to the admin who is setting the site up and stays on the
+    # step with the answer (the ok line, or the warn alert with the failure's
+    # sentence and the server's line). Skip is a plain link and writes
+    # nothing.
     #
     # A field the host's environment sets is not on the form (`Settings::Save`
     # would refuse it); a login half left blank is left as it is (a blank
@@ -287,7 +281,7 @@ class SetupController < ApplicationController
     # login half. The password is never put back into the form.
     def mail_attributes
       mail = MailSettings.current
-      attributes = @mail_values.reject { |name, _| mail.from_host?(Admin::SettingsScreen::MailCardComponent::SETTING.fetch(name)) }
+      attributes = @mail_values.reject { |name, _| mail.from_host?(Admin::SettingsScreen::MailFieldsComponent::SETTING.fetch(name)) }
       posted = params[:site_setting]
       if posted.is_a?(ActionController::Parameters)
         login = posted.permit(*MAIL_LOGIN).to_h.symbolize_keys.compact_blank
@@ -299,11 +293,10 @@ class SetupController < ApplicationController
 
     # The form always renders a few name/URL rows; a row missing either half
     # is dropped rather than saved as a broken link (`SiteSetting#social_
-    # link_rows=`, Task 8 -- moved out of here so `Admin::SettingsController`
-    # shares the exact same normalisation instead of hand-keeping its own
-    # copy). A request that omits the social_links key entirely (no rows
-    # submitted at all, e.g. a crafted or partial PATCH) leaves the
-    # previously saved links alone rather than wiping them out.
+    # link_rows=`, which `Admin::SettingsController` shares). A request that
+    # omits the social_links key entirely (no rows submitted at all, e.g. a
+    # crafted or partial PATCH) leaves the previously saved links alone
+    # rather than wiping them out.
     def site_params
       permitted = params.expect(site_setting: [ :title, :tagline, :logo, social_links: [ [ :name, :url ] ] ])
       return permitted unless permitted.key?(:social_links)
@@ -313,10 +306,10 @@ class SetupController < ApplicationController
     end
 
     # Writes the chosen default plus any additional languages as
-    # `site_settings.locales` (spec §4.4) -- unlike every other step, this one
-    # can change what `Locales.enabled` returns, so every page and post needs
-    # a URL recomputed in whichever languages just became enabled (or lost
-    # one that just left) before the next step renders. `extra_locales` has
+    # `site_settings.locales`. Unlike every other step, this one can change
+    # what `Locales.enabled` returns, so every page and post needs a URL
+    # recomputed in whichever languages just became enabled (or lost one that
+    # just left) before the next step renders. `extra_locales` has
     # no backing column -- it only exists as a form field -- so it's read
     # straight off `params` rather than assigned to `@site_setting` directly.
     def update_languages
@@ -340,10 +333,10 @@ class SetupController < ApplicationController
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
     #
-    # The token's *name* is required (round 3 decision D2): `name:` is always a
-    # String, so a missing or blank field is "Name can't be blank" (422, back on
-    # the form with what was typed) and not a default "Token 1". The name --
-    # never the token -- is kept in the session for the review step's row.
+    # The token's *name* is required: `name:` is always a String, so a
+    # missing or blank field is "Name can't be blank" (422, back on the form
+    # with what was typed) and not a default "Token 1". The name -- never the
+    # token -- is kept in the session for the review step's row.
     def update_mcp_token
       # The first account is an owner, so its token gets the Admin group
       # (it can be narrowed to another group in CS Studio later).
@@ -367,7 +360,7 @@ class SetupController < ApplicationController
 
       unless result.ok?
         @token_name = name
-        @token_error = result.errors.to_sentence
+        @token_error = result.errors.to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
         return render :mcp_token, status: :unprocessable_entity
       end
 
@@ -379,23 +372,21 @@ class SetupController < ApplicationController
 
     def missing_admin_group(name)
       @token_name = name
-      @token_error = "This site has no \"#{AccessControl::Seeds::ADMIN_NAME}\" group, which a token made here belongs to. " \
-        "Run bin/rails db:seed on the server to create the built-in groups, then try again, or skip this step and create a token in CS Studio later."
+      @token_error = I18n.t("setup.flash.missing_admin_group", group: AccessControl::Seeds::ADMIN_NAME)
       render :mcp_token, status: :unprocessable_entity
     end
 
-    # `StarterContents::Add` (locked and idempotent, final fix wave,
-    # P23): the same locked, re-checked path CS Studio's "Create starter
-    # pages" takes, so a double submit can't race itself into a
-    # duplicate-slug 500. A failure is shown on this step (422), like any
+    # `StarterContents::Add` (locked and idempotent): the same locked,
+    # re-checked path CS Studio's "Create starter pages" takes, so a double
+    # submit can't race itself into a duplicate-slug 500. A failure is shown on this step (422), like any
     # other step's form error.
     def update_starter_content
       result = StarterContents::Add.call
 
       if result.ok?
-        redirect_to setup_step_path("review"), notice: result.record ? "Starter content added." : "Starter content was already there."
+        redirect_to setup_step_path("review"), notice: I18n.t(result.record ? "setup.flash.starter_added" : "setup.flash.starter_already_there")
       else
-        flash.now[:alert] = "#{result.errors.to_sentence}."
+        flash.now[:alert] = I18n.t("setup.flash.starter_failed", errors: result.errors.to_sentence) # i18n-ok: to_sentence joins with the locale's support.array words
         render :starter_content, status: :unprocessable_entity
       end
     end
@@ -408,10 +399,9 @@ class SetupController < ApplicationController
         StarterContent.raise!(StarterContents::EnsureHome.call(locale: Current.site.default_locale))
         Setup.complete!
       end
-      # CS Studio is where every sign-in lands now (cs-studio spec §3) --
-      # finishing setup is no exception, even though the admin who just
-      # walked through this wizard is already signed in from `update_admin`
-      # above.
-      redirect_to admin_root_path, notice: "Setup complete."
+      # CS Studio is where every sign-in lands, and finishing setup is no
+      # exception, even though the admin who just walked through this wizard
+      # is already signed in from `update_admin` above.
+      redirect_to admin_root_path, notice: I18n.t("setup.flash.complete")
     end
 end

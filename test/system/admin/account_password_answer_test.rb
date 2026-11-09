@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# After the password form is saved or refused (the notes handoff's decision
-# 42): the page is at `/account#password`, the Password card is in view, and
+# After the password form is saved or refused the page is at `/account#password`, the Password card is in view, and
 # the focus is on the message, which a screen reader then announces.
 #
 # In a window short enough that the card is NOT in view from the top of the
@@ -34,7 +33,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     within("#password") { press "Change password" }
   end
 
-  # The handoff's decision 43: the answer is said INSIDE the Password card,
+  # The answer is said INSIDE the Password card, beside what it answers,
   # and that is what takes the focus.
   def in_view?(selector)
     page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return box.top >= 0 && box.bottom <= window.innerHeight })()")
@@ -80,7 +79,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     original = Users::UpdateProfile.method(:call)
     Users::UpdateProfile.define_singleton_method(:call) { |*, **| refusal }
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector ".admin-error-summary[role=alert]", text: "Name is too long."
     assert_no_selector "#password .admin-error-summary"
@@ -119,7 +118,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     visit admin_account_path
     await_admin_controllers
     fill_in "Your name", with: "Ada"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal "/cs-studio/account", address

@@ -41,7 +41,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
   end
 
   test "a string, a plural and an interpolated sentence read as the server wrote them" do
-    assert_equal "Save or cancel your changes first.", in_page(%(messages(document.body).t("components.ui.save_bar.blocked")))["value"]
+    assert_equal "Save or discard your changes first.", in_page(%(messages(document.body).t("components.ui.save_bar.blocked")))["value"]
     assert_equal "1 unsaved change", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 1 })))["value"]
     assert_equal "0 unsaved changes", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 0 })))["value"]
     assert_equal "3 unsaved changes", in_page(%(messages(document.body).t("components.ui.save_bar.changes", { count: 3 })))["value"]
@@ -53,7 +53,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     add_messages_element("near", { "@locale" => "en", "hello" => "Hi %{name}" }.to_json)
 
     assert_equal "Hi <Dom>", in_page(%(messages(document.querySelector("#near .inner")).t("hello", { name: "<Dom>" })))["value"]
-    assert_equal "Save or cancel your changes first.",
+    assert_equal "Save or discard your changes first.",
       in_page(%(messages(document.querySelector("#near .inner")).t("components.ui.save_bar.blocked")))["value"], "a key only <body> has"
   end
 
@@ -68,7 +68,7 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     JS
 
     assert_equal [ "inner a", "outer b" ], in_page(%([ "a", "b" ].map((key) => messages(document.querySelector("#inner-holder .leaf")).t(key))))["value"]
-    assert_equal "Save or cancel your changes first.",
+    assert_equal "Save or discard your changes first.",
       in_page(%(messages(document.querySelector("#inner-holder .leaf")).t("components.ui.save_bar.blocked")))["value"]
   end
 

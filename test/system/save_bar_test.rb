@@ -1,12 +1,12 @@
 require "application_system_test_case"
 
-# The explicit-save footer and the Leave dialog in a real browser (cs-studio
-# design pass, Task 11; round 3, Task 1): the footer is always there with Save
-# and Cancel, counts changed fields against what was loaded, keeps Save
-# disabled while an existing record has nothing to save, and leaving with
-# changes asks first -- by a sidebar link (a Turbo visit), by a link inside
-# the content frame (a frame navigation) and by the browser's Back. The
-# footer's own Cancel is the one way out that never asks.
+# The explicit-save bar and the Leave dialog in a real browser: the bar is
+# always there with Save and Discard, counts changed fields against what was
+# loaded, names and marks them, keeps Save disabled while an existing record
+# has nothing to save, and leaving with changes asks first -- by a sidebar
+# link (a Turbo visit), by a link inside the content frame (a frame
+# navigation) and by the browser's Back. The bar's own Discard is the one way
+# out that never asks.
 class SaveBarSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -33,10 +33,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     visit edit_admin_user_path(@target)
     await_admin_controllers
 
-    # An existing record with nothing changed: Save and Cancel are on screen,
+    # An existing record with nothing changed: Save and Discard are on screen,
     # Save can't be pressed, and the footer says why.
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
-    assert_selector ".admin-save-bar a", text: "Cancel"
+    assert_selector ".admin-save-bar a", text: "Discard"
     assert_selector ".admin-save-bar button[type=submit][disabled]", text: "Save"
 
     original = find_field("Name").value
@@ -387,14 +387,14 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog#leave-dialog[open]"
   end
 
-  test "the footer's Cancel leaves without asking" do
+  test "the footer's Discard leaves without asking" do
     sign_in_via_form(@owner)
     visit edit_admin_user_path(@target)
     await_admin_controllers
     fill_in "Name", with: "Thrown away"
     assert_selector ".admin-save-bar", text: /1 unsaved change/i
 
-    within(".admin-save-bar") { click_link "Cancel" }
+    within(".admin-save-bar") { click_link "Discard" }
     assert_current_path admin_users_path
     assert_no_selector "dialog#leave-dialog[open]"
     assert_not_equal "Thrown away", @target.reload.name
@@ -450,7 +450,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # (Create user itself waits for a long enough password: the password
     # field governs that button, not the footer.)
     assert_selector ".admin-save-bar button[type=submit]", text: "Create user"
-    assert_selector ".admin-save-bar a", text: "Cancel"
+    assert_selector ".admin-save-bar a", text: "Discard"
     assert_no_selector ".admin-save-bar", text: /unsaved/i
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_current_path admin_posts_path
@@ -501,14 +501,14 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog#leave-dialog[open]"
   end
 
-  # The footer belongs to its form: it sits in the form's own column, right
-  # under the fields (not across the whole content area, where its buttons
-  # ended up far from the form), Save first; the count is sans 13px, not mono
-  # capitals; and the Save button reads "Save user" (round 3 Task 12).
-  test "the footer sits in the form's column under the fields, Save first, in sans type" do
+  # The bar belongs to its form: it floats in the form's own column (not
+  # across the whole content area, where its buttons ended up far from the
+  # form), the words first and the buttons at its end, Save last; the count
+  # is sans 14px on a 20px line, its bold count too, not mono capitals; and
+  # the Save button reads "Save user".
+  test "the footer sits in the form's column under the fields, Save at its end, in sans type" do
     sign_in_via_form(@owner)
-    visit edit_admin_user_path(@target)
-    await_admin_controllers
+    visit_screen edit_admin_user_path(@target)
     fill_in "Name", with: "In the column"
     assert_selector ".admin-save-bar", text: /1 unsaved change/i
 
@@ -518,22 +518,27 @@ class SaveBarSystemTest < ApplicationSystemTestCase
         const rect = bar.getBoundingClientRect()
         const form = document.getElementById("user-form").getBoundingClientRect()
         const save = bar.querySelector("button[type=submit]").getBoundingClientRect()
-        const cancel = bar.querySelector("a").getBoundingClientRect()
-        const count = getComputedStyle(bar.querySelector("[data-admin--saving--save-bar-target=count]"))
+        const discard = bar.querySelector("a").getBoundingClientRect()
+        const count = bar.querySelector("[data-admin--saving--save-bar-target=count]")
+        const style = getComputedStyle(count)
+        const strong = count.querySelector("strong")
         return { barLeft: rect.left, barRight: rect.right, formLeft: form.left, formRight: form.right,
-                 saveLeft: save.left, cancelLeft: cancel.left,
-                 font: count.fontFamily, size: count.fontSize, transform: count.textTransform,
-                 borderTop: getComputedStyle(bar).borderTopWidth }
+                 saveRight: save.right, discardRight: discard.right, countLeft: count.getBoundingClientRect().left,
+                 font: style.fontFamily, size: style.fontSize, line: style.lineHeight, transform: style.textTransform,
+                 strong: strong && getComputedStyle(strong).fontSize,
+                 paddingRight: parseFloat(getComputedStyle(bar).paddingRight) }
       })()
     JS
     assert_in_delta geometry["formLeft"], geometry["barLeft"], 1
     assert_operator geometry["barRight"], :<=, geometry["formRight"] + 1
-    assert_in_delta geometry["barLeft"], geometry["saveLeft"], 1
-    assert_operator geometry["saveLeft"], :<, geometry["cancelLeft"]
-    assert_equal "13px", geometry["size"]
+    assert_in_delta geometry["barRight"] - geometry["paddingRight"], geometry["saveRight"], 1
+    assert_operator geometry["discardRight"], :<, geometry["saveRight"]
+    assert_operator geometry["countLeft"], :<, geometry["discardRight"]
+    assert_equal "14px", geometry["size"]
+    assert_equal "20px", geometry["line"]
+    assert_equal "14px", geometry["strong"]
     assert_equal "none", geometry["transform"]
     assert_no_match(/mono/i, geometry["font"])
-    assert_equal "1px", geometry["borderTop"]
     assert_selector ".admin-save-bar button[type=submit]", text: /\ASave user\z/
   end
 
@@ -543,10 +548,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     assert_selector ".admin-save-bar", count: 2
-    assert_selector ".admin-save-bar button[type=submit][disabled]", text: /\ASave\z/
+    assert_selector ".admin-save-bar button[type=submit][disabled]", text: /\ASave changes\z/
 
     fill_in "Your name", with: "Someone New"
-    assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: /\ASave\z/
+    assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: /\ASave changes\z/
     # The current password alone is not a change (a password manager fills it
     # in on load): only what would be saved counts.
     fill_in "Current password", with: "whatever"
@@ -575,10 +580,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     fill_in "Your name", with: "Saved Name"
-    press "Save"
+    press "Save changes"
     assert_no_selector "dialog#leave-dialog[open]"
-    # (The old subtitle, "Signed in as <name>.", used to show the saved name;
-    # the new one doesn't, so the toast is the visible proof.)
+    # The screen's subtitle does not show the name, so the toast is the
+    # visible proof.
     assert_text "Settings saved", wait: 10
     assert_equal "Saved Name", @owner.reload.name
     # The answer is a stream that keeps the screen and replaces the sidebar's
@@ -586,8 +591,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_equal "Saved Name", find_field("Your name").value
     assert_selector "span[title='Saved Name']", text: "Saved Name", wait: 5
   end
-  # Final wave B, ledger C-I1: neither Save may throw away what the other
-  # form holds.
+  # Neither Save may throw away what the other form holds.
   test "Save on the profile form keeps what the password form holds, and asks nothing" do
     sign_in_via_form(@owner)
     visit admin_account_path
@@ -596,7 +600,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     fill_in "Current password", with: "password"
     fill_in "New password", with: "a-new-long-password"
     fill_in "Your name", with: "Kept Both"
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
 
     assert_text "Settings saved", wait: 10
     assert_no_selector "dialog#leave-dialog[open]"
@@ -607,7 +611,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # The name form took what it saved as its baseline: clean, Save disabled,
     # and typing the old value back is a change again.
     assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes"
-    assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave\z/
+    assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave changes\z/
     assert_selector "#password-form .admin-save-bar", text: "1 unsaved change"
     fill_in "Your name", with: "Kept Both, again"
     assert_selector "#profile-form .admin-save-bar", text: "1 unsaved change"
@@ -625,7 +629,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     fill_in "Your name", with: "Typed Name"
     assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
-    assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel your changes first."
+    assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or discard your changes first."
     # Enter in a field submits past a disabled button: refused all the same.
     find_field("Confirm new password").send_keys(:enter)
     assert_no_selector "[role=status]", text: "Password changed", wait: 1
@@ -636,10 +640,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
     fill_in "New password", with: "a-new-long-password"
 
-    within("#profile-form") { press "Save" }
+    within("#profile-form") { press "Save changes" }
     assert_text "Settings saved", wait: 10
     assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
-    assert_no_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel"
+    assert_no_selector "#password-form .admin-save-bar [role=status]", text: "Save or discard"
 
     within("#password-form") { press "Change password" }
     assert_text "Password changed. Your other sessions were signed out.", wait: 10
@@ -647,25 +651,103 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_equal "Typed Name", find_field("Your name").value
   end
 
-  test "a footer stuck over the fields draws a stronger top edge and an elevation, and at the end of the form neither" do
-    site_settings(:default).update!(setup_completed_at: Time.current)
+  # One look at all times: the popover's ground and elevation 3, a
+  # card's radius, over the fields and at the end of the form alike.
+  test "the bar floats over the fields and at the end of the form alike" do
     sign_in_via_form(@owner)
-    page.driver.resize(1400, 600)
-    visit admin_settings_path
-    await_admin_controllers
-    bar = ".admin-save-bar"
-    look = -> { page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('.admin-save-bar')); return [ s.borderTopColor, s.boxShadow ] })()") }
+    page.current_window.resize_to(1400, 600)
+    visit_screen admin_settings_path
+    look = lambda do
+      page.evaluate_script(<<~JS)
+        (() => {
+          const bar = document.querySelector(".admin-save-bar")
+          const style = getComputedStyle(bar)
+          const probe = document.createElement("div")
+          probe.style.background = "var(--cs-popover)"
+          probe.style.boxShadow = "var(--cs-shadow-3)"
+          document.body.append(probe)
+          const token = getComputedStyle(probe)
+          const look = { ground: style.backgroundColor, shadow: style.boxShadow, radius: style.borderTopLeftRadius, top: style.borderTopWidth,
+                         popover: token.backgroundColor, elevation: token.boxShadow, stuck: bar.hasAttribute("data-stuck"),
+                         bottom: bar.getBoundingClientRect().bottom, window: window.innerHeight }
+          probe.remove()
+          return look
+        })()
+      JS
+    end
 
-    assert_selector "#{bar}[data-stuck]"
-    stuck = look.call
-    assert_not_equal "none", stuck[1]
+    over = look.call
+    assert_equal over["popover"], over["ground"]
+    # Tailwind's shadow utility writes its ring layers, transparent, first.
+    assert over["shadow"].end_with?(over["elevation"]), "the bar's shadow is #{over["shadow"]}, not elevation 3"
+    assert_not_equal "0px", over["radius"]
+    assert_equal "0px", over["top"]
+    assert_not over["stuck"]
+    # Clear of the window's edge by the bar's own gap, over the fields.
+    assert_operator over["bottom"], :<=, over["window"] - 13
 
     page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
-    assert_no_selector "#{bar}[data-stuck]"
-    at_rest = look.call
-    assert_equal "none", at_rest[1]
-    assert_not_equal stuck[0], at_rest[0], "the top edge is the strong line only while stuck"
+    at_end = look.call
+    %w[ground shadow radius top stuck].each { |key| assert_equal over[key], at_end[key], key }
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
+  end
+
+  # Settings' mail fields, five changes: the bar says how many and names
+  # the first three, in the page's order, and how many more.
+  test "the bar names up to three changed fields and how many more" do
+    sign_in_via_form(@owner)
+    visit_screen admin_settings_path
+    bar = ".admin-save-bar"
+
+    find("#settings-ai_provider").all("option").find { |option| option.value.present? && !option.selected? }.select_option
+    assert_selector bar, text: "1 unsaved change · Provider"
+    fill_in "settings-mail_server", with: "smtp.named.test"
+    fill_in "settings-mail_port", with: "2525"
+    assert_selector bar, text: "3 unsaved changes · Provider, Server, Port"
+    fill_in "settings-mail_sender_name", with: "Named Sender"
+    fill_in "settings-mail_sender_address", with: "named@example.org"
+
+    assert_selector bar, text: "5 unsaved changes · Provider, Server, Port and 2 more"
+    assert_selector "#{bar} strong", text: /\A5 unsaved changes\z/
+    assert_selector "#{bar} [data-admin--saving--save-bar-target=dot]:not([hidden])", visible: :all
+  end
+
+  # A segmented control is radios whose labels are the options' words: the
+  # bar names the control by its legend, never by the option chosen.
+  test "a segmented control is named by its legend" do
+    sign_in_via_form(@owner)
+    visit_screen admin_settings_path
+
+    find("label[for='settings-mail_security-tls']").click
+
+    assert_selector ".admin-save-bar", text: /unsaved changes? · .*Security/
+    assert_no_selector ".admin-save-bar", text: /TLS/
+  end
+
+  test "a changed field carries the mark, and loses it when typed back" do
+    sign_in_via_form(@owner)
+    visit_screen admin_settings_path
+    server = "[data-field-name=mail_server]"
+    original = find_field("settings-mail_server").value
+    shadow = -> { page.evaluate_script("getComputedStyle(document.getElementById('settings-mail_server')).boxShadow") }
+    assert_equal "none", shadow.call
+
+    fill_in "settings-mail_server", with: "smtp.marked.test"
+    assert_selector "#{server}[data-save-bar-changed]"
+    assert_match(/inset/, shadow.call)
+
+    # Not a well: the dot after the legend, and no edge on any well inside.
+    find("label[for='settings-mail_security-tls']").click
+    assert_selector "[data-field-name=mail_security][data-save-bar-changed]"
+    dot = page.evaluate_script("(() => { const s = getComputedStyle(document.querySelector('[data-field-name=mail_security] legend'), '::after'); return [ s.content, s.width, s.backgroundColor ] })()")
+    assert_not_equal "none", dot[0]
+    assert_equal "8px", dot[1]
+
+    fill_in "settings-mail_server", with: original
+    assert_no_selector "#{server}[data-save-bar-changed]"
+    assert_equal "none", shadow.call
+    assert_selector ".admin-save-bar", text: /Security/
+    assert_no_selector ".admin-save-bar", text: /Server/
   end
 end

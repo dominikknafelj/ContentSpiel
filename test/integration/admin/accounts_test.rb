@@ -1,8 +1,8 @@
 require "test_helper"
 
-# "Your account", the screen (the notes handoff's decision 25), whose third
-# card is "Change my password" (access-control design spec §3.3 "Any user may change
-# their own password", §5 "reachable by every user from the account menu").
+# "Your account", the screen, whose third card is "Change my password": any
+# user may change their own password, and the screen is reachable by every
+# user from the account menu.
 class Admin::AccountsTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -31,7 +31,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" }
 
     assert_response :unprocessable_entity
-    # In the Password card, not above the cards (the handoff's decision 43).
+    # In the Password card, where the form is, not above the cards.
     assert_select "#password .admin-error-summary[role=alert] li", text: "That's not your current password."
     assert_select ".admin-error-summary", count: 1
     assert_select "#current_password-errors", text: "That's not your current password."
@@ -55,7 +55,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/account"
 
-    # The handoff's decision 25: the page is "Your account"; its cards are
+    # The page is "Your account"; its cards are
     # Profile, Notes and Password, in that order; and the promise about
     # sessions stands directly under the Password card's title.
     assert_select "title", text: "Your account"
@@ -68,11 +68,10 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       assert_select "input[type=password]", count: 3
     end
     # The Password card's footer is the card's own and sits inside it, under
-    # a line (notes handoff, decision 34); the first form's stays under its
-    # two cards, as it was.
+    # a line; the first form's stays under its two cards.
     assert_select "form#password-form section[aria-labelledby=account-password] > .admin-save-bar.admin-save-bar--contained.border-t:last-child button[type=submit]", text: "Change password"
     assert_select "form#password-form section ~ .admin-save-bar", count: 0
-    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save"
+    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save changes"
     assert_select "form#profile-form section .admin-save-bar", count: 0
     assert_select "h1 + p", count: 0
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
@@ -136,7 +135,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "/cs-studio/account#password"
     follow_redirect!
-    # Said in the card, and by no toast (the handoff's decision 43).
+    # Said in the card, where the form is, and by no toast.
     assert_select "#password [data-password-saved][role=status][tabindex='-1']", text: "Password changed. Your other sessions were signed out."
     assert_select "#toasts .admin-toast", count: 0
     assert user.reload.authenticate("new-password-1")
@@ -203,21 +202,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/cs-studio/sign-in"
   end
 
-  # --- the Notes switches (notes spec §6.4, D18, D19; handoff decision 13) ----------
+  # --- the Notes switches --------------------------------------------------------
 
   test "the name and the two Notes switches are one form with one footer, and saving keeps the screen" do
     sign_in_as(users(:reader))
     get "/cs-studio/account"
 
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--saving--save-bar']" do
-      # Decisions 19 and 20: "Your account", then two cards of one width,
-      # Profile and Notes, and one footer under both, whose button is "Save".
+      # "Your account", then two cards of one width, Profile and Notes, and
+      # one footer under both, whose button is "Save changes".
       assert_select "section.max-w-\\[560px\\]", count: 2
       assert_select "section[aria-labelledby=account-profile] h3#account-profile", text: "Profile"
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
       assert_select "section[aria-labelledby=account-profile] input[name=name]"
       assert_select "section[aria-labelledby=account-notes] h3#account-notes", text: "Notes"
-      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save"
+      assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save changes"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"
@@ -292,7 +291,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert User.where(notes_sound: false).or(User.where(notes_desktop: true)).none?
   end
 
-  # The handoff's decision 38: the page is "Your account", and its address
+  # The page is "Your account", and its address
   # says so. The old one, which named the password alone, leads there.
   test "the account page is at /account; the old address moves there for good, with the language it was asked in" do
     sign_in_as(users(:reader))
@@ -342,7 +341,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "/cs-studio/account/password"
   end
 
-  # The handoff's decision 42: the page drawn as the password form's answer
+  # The page drawn as the password form's answer
   # says so on the Password card (the script then brings the page to it);
   # drawn for any other reason it does not.
   test "the Password card is marked as the form's answer after a save and after a refusal, and not otherwise" do

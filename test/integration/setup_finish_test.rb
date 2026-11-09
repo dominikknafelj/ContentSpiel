@@ -17,6 +17,10 @@ class SetupFinishTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Deutsch"
     assert_includes response.body, "Skipped"
     assert_select "a[href=?]", setup_step_path("site")
+    # Each Edit says which row it edits, so a list of links is not seven "Edit"s.
+    names = css_select("dd a").map { |link| link["aria-label"] }
+    assert_equal [ "Edit Site title", "Edit Tagline", "Edit Social links", "Edit Mail", "Edit Default language", "Edit MCP token", "Edit Starter content" ], names
+    assert_equal [ "Edit" ], css_select("dd a").map { |link| link.text.strip }.uniq
   end
 
   test "finishing creates the homepage, ends setup and opens the admin" do

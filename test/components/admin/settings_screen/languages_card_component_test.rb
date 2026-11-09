@@ -8,6 +8,8 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     render_inline Admin::SettingsScreen::LanguagesCardComponent.new(site_setting: @site, values: values)
   end
 
+  def drawn_as?(button, variant, size: :regular) = (Admin::Ui::ButtonComponent.classes(variant, size: size).split - button[:class].split).empty?
+
   test "rows in stored order with name, path, the Default tag or Make default, fallback select and Turn off" do
     @site.update!(locales: [ { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] }, { "code" => "es" } ], default_locale: "de")
     render_card
@@ -64,5 +66,29 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     assert_no_selector "#language-add-code"
     assert_no_selector "button", text: "Add language"
     assert_text "Every available language is already on."
+  end
+
+  test "Turn off… is the danger text button, Make default… and Add language the secondary, and Default the neutral badge" do
+    render_card
+
+    turn_offs = page.all("#language-de button, #language-es button", text: "Turn off…")
+    assert_equal 2, turn_offs.size
+    assert turn_offs.all? { |button| drawn_as?(button, :danger_text, size: :small) }, "Turn off… is the small danger text"
+    spacer = page.find("#language-en span.invisible[data-turn-off-spacer] button", visible: :all)
+    assert drawn_as?(spacer, :danger_text, size: :small), "the default's unseen spacer is drawn as the button it stands for"
+    page.all("button", text: "Make default…").each { |button| assert drawn_as?(button, :secondary, size: :small) }
+    assert drawn_as?(page.find("button", text: "Add language"), :secondary)
+    badge = page.find("#language-en [data-default-tag]", text: "Default")
+    assert_empty Admin::Ui::BadgeComponent::TONES.fetch(:neutral).split - badge[:class].split, "Default is the neutral badge"
+  end
+
+  test "its words are keys" do
+    assert_equal "Add language", I18n.t("admin.components.settings_screen.languages_card.add")
+    I18n.backend.store_translations(:en, admin: { components: { settings_screen: { languages_card: { add: "Switch on" } } } })
+    render_card
+
+    assert_selector "button[form=language-add-form]", text: "Switch on"
+  ensure
+    I18n.backend.store_translations(:en, admin: { components: { settings_screen: { languages_card: { add: "Add language" } } } })
   end
 end

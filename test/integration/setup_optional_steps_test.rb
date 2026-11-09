@@ -11,15 +11,74 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     get setup_step_path("mail")
 
     assert_response :success
-    assert_select "h1 span", text: "optional"
+    assert_select "h1 span.text-label.text-meta", text: "Optional"
     assert_select "a[href=?]", setup_step_path("languages"), text: "Skip for now"
+  end
+
+  PRIMARY = Admin::Ui::ButtonComponent.classes(:primary)
+  TERTIARY = Admin::Ui::ButtonComponent.classes(:tertiary)
+
+  def primaries(nodes = css_select("[class]")) = nodes.select { |node| node["class"].to_s.include?(PRIMARY) }
+
+  # The primary, or the `button_to` form it stands in, ends its row.
+  def last_in_row?(node)
+    node = node.parent if node.parent.name == "form" && node.parent["class"].to_s.split.include?("button_to")
+    node.next_element.nil?
+  end
+
+  def assert_one_primary_last(step)
+    found = primaries
+    assert_equal 1, found.size, "#{step}: #{found.map { |node| node.text.strip }.inspect}"
+    assert last_in_row?(found.first), "#{step}: the primary is not last in its row"
+    css_select("a").select { |link| link.text.strip.in?([ "Back", "Skip for now" ]) }.each do |link|
+      assert_includes link["class"], TERTIARY, "#{step}: #{link.text.strip}"
+    end
+  end
+
+  test "every step draws one primary, last in its row, its Back and Skip tertiary" do
+    sample = Nokogiri::HTML5.fragment(ApplicationController.render(Admin::Ui::ButtonComponent.new(label: "Go"), layout: false) +
+      ApplicationController.render(Admin::Ui::ButtonComponent.new(label: "Back", variant: :tertiary), layout: false))
+    assert_equal [ "Go" ], primaries(sample.css("[class]")).map(&:text), "the matcher finds the primary and nothing else"
+
+    %w[site mail languages mcp_token starter_content review].each do |step|
+      get setup_step_path(step)
+      assert_response :success
+      assert_one_primary_last(step)
+    end
+    assert_select "a", text: "Back", minimum: 1
+    assert_select "a", text: "Skip for now", count: 0
+
+    get setup_step_path("starter_content")
+    assert_equal "Add starter content", primaries.first.text.strip
+    get setup_step_path("mcp_token")
+    assert_equal "Generate token", primaries.first.text.strip
+    get setup_step_path("review")
+    assert_equal "Finish setup", primaries.first.text.strip
+
+    patch setup_step_path("mcp_token"), params: { token_name: "claude-desktop" }
+    assert_one_primary_last("mcp_token_created")
+
+    ApiToken.delete_all
+    Session.delete_all
+    User.delete_all
+    reset!
+    get setup_step_path("token")
+    assert_one_primary_last("token")
+    verify_setup_token
+    %w[system_check admin].each do |step|
+      get setup_step_path(step)
+      assert_one_primary_last(step)
+    end
+    get setup_step_path("system_check")
+    row = primaries.first.parent.element_children.map { |node| node.text.strip }
+    assert_equal [ "Re-run checks", "Back", "Continue" ], row, "the step's own secondary first, then Back, the primary last"
   end
 
   test "the MCP token step can be skipped" do
     get setup_step_path("mcp_token")
 
     assert_response :success
-    assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip"
+    assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip for now"
     assert_match(/Admin group/, response.body)
   end
 
@@ -54,7 +113,7 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_match(/This is the only time the full token is shown\. Copy it into your agent's config now\./, response.body)
+    assert_select "p", text: /This is the only time the full token is shown\. Copy it into your agent's config now\./
     raw = css_select("#mcp-token").first.text.strip
     token = ApiToken.authenticate(raw)
     assert_equal "claude-desktop", token.name
@@ -83,7 +142,7 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     get setup_step_path("starter_content")
 
     assert_response :success
-    assert_select "a[href=?]", setup_step_path("review"), text: "Skip"
+    assert_select "a[href=?]", setup_step_path("review"), text: "Skip for now"
   end
 
   test "adding starter content creates the pages in the default language" do
@@ -95,9 +154,9 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     assert StarterContent.added?(locale: "de")
   end
 
-  # Final fix wave (C, P23): the wizard takes the same locked, re-checked
-  # path as CS Studio (`StarterContents::Add`), and a failure is a form
-  # error on the step, never a 500.
+  # The wizard takes the same locked, re-checked path as CS Studio
+  # (`StarterContents::Add`), and a failure is a form error on the step,
+  # never a 500.
   test "adding starter content twice doesn't duplicate anything" do
     patch setup_step_path("starter_content")
 

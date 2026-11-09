@@ -23,7 +23,7 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
   # and refuses any other: every route the query can produce must be on it.
   test "every route a row can carry is on the helper's list" do
     names = Jump::Search::ACTIONS.map { |action| action[:path] } +
-      Jump::Search::SETTINGS_DESTINATIONS.map { |destination| destination[:path] } +
+      %i[admin_settings_path] +
       StudioModules.entries.map(&:path) +
       %i[admin_page_path admin_post_path admin_media_path]
 

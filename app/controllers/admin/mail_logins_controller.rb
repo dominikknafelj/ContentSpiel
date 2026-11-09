@@ -1,15 +1,15 @@
 module Admin
   # The mail login's own save (`PATCH /<admin>/settings/mail_login`) and
-  # remove (`DELETE`), the instant actions of the Settings screen's Mail card
-  # (spec "Settings → Mail", design answer M2). Built as
-  # `Admin::AiKeysController` is, which says at length why: the login is
-  # never a field of the Settings form (it is never rendered, so it can't be
-  # a pending change), each action is its own form beside it, and the answer
-  # is Turbo Streams that replace ONLY the login component and its forms
-  # (plus the main form's base, the card's state and a toast), so whatever
-  # the main form holds unsaved is left alone. The write, the carried base
-  # (`main_base_updated_at`) and the answer's tail are `Admin::CarriedBase`'s,
-  # shared with the AI key's controller.
+  # remove (`DELETE`), the instant actions of the Settings screen's Mail
+  # card. Built as `Admin::AiKeysController` is, which says at length why:
+  # the login is never a field of the Settings form (it is never rendered,
+  # so it can't be a pending change), each action is its own form beside
+  # it, and the answer is Turbo Streams that replace ONLY the login
+  # component and its forms (plus the main form's base, the card's state,
+  # the rail's Mail row and a toast), so whatever the main form holds
+  # unsaved is left alone. The write, the carried base
+  # (`main_base_updated_at`) and the answer's tail are
+  # `Admin::CarriedBase`'s, shared with the AI key's controller.
   #
   # `settings.manage` only. `Settings::Save` is the writer: the permission
   # check, the encryption, "Set on", the audit event that says THAT the login
@@ -60,7 +60,7 @@ module Admin
         # verified site is untested again (`MailSettings`' fingerprint).
         turbo_stream.replace(Admin::SettingsScreen::MailStateComponent::ID, Admin::SettingsScreen::MailStateComponent.new(mail_settings: settings))
       ]
-      respond_with_streams(streams, anchor: "mail", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
+      respond_with_streams(streams, anchor: "mail", glance: "mail", moved_to: moved_to, notice: notice, error: error, toast: toast, status: status)
     end
   end
 end

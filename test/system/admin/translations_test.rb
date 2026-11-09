@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# The translation helpers end to end, in a real browser (translation
-# helpers spec §4-§6): the editor's Translate / Use / "Translate empty
+# The translation helpers end to end, in a real browser: the editor's Translate / Use / "Translate empty
 # fields" / "Use all" (`admin--translation--translate`), which only a browser can run --
 # the request is a `fetch`, Use fills the input and lets the form's own
 # `admin--saving--autosave` save it, and a rich-text Use goes through the Tiptap
@@ -489,7 +488,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "below 1280px the top bar stays over the row titles when the page scrolls" do
     posts = Array.new(25) { |i| create_post(title: "Only in English #{i}") }
     begin
-      page.driver.resize(1000, 700)
+      page.current_window.resize_to(1000, 700)
       visit "/cs-studio/translations"
       assert_selector "#translation-item-post-#{posts.last.id}"
       page.execute_script("window.scrollTo(0, 400)")
@@ -501,7 +500,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
         return bar.contains(el) && !el.closest("th[scope=row]") })()
       JS
     ensure
-      page.driver.resize(1400, 1400)
+      page.current_window.resize_to(1400, 1400)
     end
   end
 
@@ -555,7 +554,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     click_on "Español"
     assert_equal "", find_field("settings-es-title").value
     assert_no_selector "#translation-suggestion-settings-es-title textarea", visible: :all
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
     assert_equal "[de] Test Site", site_settings(:default).reload.title(locale: "de")
     assert_nil site_settings(:default).title(locale: "es", fallback: false)
@@ -569,7 +568,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-original-for='tagline']", text: "Things I learned"
 
     fill_in "settings-de-tagline", with: "Was ich gelernt habe"
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
     assert_equal "Things I learned", site_settings(:default).reload.tagline(locale: "en")
 

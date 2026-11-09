@@ -33,7 +33,8 @@ module Admin
     SCRIPT_MESSAGES = %w[
       components.ui.save_status.saving components.ui.save_status.saving_live components.ui.save_status.retrying
       components.ui.save_status.offline components.ui.save_status.signed_out components.ui.save_status.retry
-      components.ui.save_bar.changes components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
+      components.ui.save_bar.changes components.ui.save_bar.names components.ui.save_bar.more components.ui.save_bar.separator
+      components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
       components.ui.toast.order_failed components.ui.toast.dropped
       layout.leave_dialog.body layout.leave_dialog.body_with_count
       notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning

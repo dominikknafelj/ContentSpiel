@@ -1,0 +1,10 @@
+<%= tag.a href: "##{section.id}", id: self.class.id_for(section.id), class: ROW_CLASS do %>
+  <% if languages? %>
+    <span class="min-w-0 flex-1"><span class="block"><%= language_count %></span><span class="block text-small text-dim"><%= default_line %></span></span>
+  <% else %>
+    <span class="min-w-0 flex-1"><%= word %></span>
+    <span class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+      <% chips.each do |tone, label| %><%= render Admin::Ui::StateChipComponent.new(tone: tone, label: label) %><% end %>
+    </span>
+  <% end %>
+<% end %>

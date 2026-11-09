@@ -95,7 +95,8 @@ class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTest
     # An answer that lands just as the 2 s run out can read as an Error
     # instead, "Unable to find visible xpath /html": the last poll has found
     # <html>, the visit resets Chrome's node ids before it is read
-    # (`StaleNodeAtOnce`), and Capybara reports a stale node as not found.
+    # (`test/system/stale_node_test.rb`), and Capybara reports a stale node as
+    # not found.
     assert_text "Starter pages created", wait: 10
     within("#tree") { assert_text "Blog" }
   end

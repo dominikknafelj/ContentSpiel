@@ -1,14 +1,19 @@
-<%# The card's ids sit on its heading, as the other cards' do (`#languages` is the
-    nav's and ⌘K's anchor). The whole section is the `admin--saving--pending-lock`
-    scope: every `control` below is an instant action. %>
-<section id="settings-languages-card" class="admin-settings-card rounded-card bg-surface shadow-1" aria-labelledby="languages"
-         data-controller="admin--saving--pending-lock admin--settings--sortable-rows">
-  <div class="border-b border-line px-4 py-3.5">
-    <h2 id="languages" class="text-h2 text-ink">Languages</h2>
-    <p class="mt-1 text-sm text-dim">The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default.</p>
-    <p id="language-drag-help" class="sr-only">Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back.</p>
+<%# The whole card is the `admin--saving--pending-lock` scope: every
+    `control` below is an instant action. It is also the order's field for
+    the save bar: the order has no label of its own, so its changed mark is
+    the dot after the card's heading (`data-save-bar-mark="heading"`), and
+    each row's fallback is a field of its own inside it, keyed by its
+    language (`data-save-bar-key`) so a move changes the order alone. %>
+<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("languages"), id: "settings-languages-card", intro: t(".intro"),
+      data: { controller: "admin--saving--pending-lock admin--settings--sortable-rows",
+              field_name: "language_order", save_bar_name: t(".names.language_order"), save_bar_mark: "heading", save_bar_changed: values.saved_change("language_order") }) do |card| %>
+  <% card.with_heading_mark do %>
+    <span class="admin-save-bar-heading-mark"><span class="sr-only"><%= t("admin.components.ui.save_bar.order_changed") %></span></span>
+  <% end %>
+  <% card.with_head_note do %>
+    <p id="language-drag-help" class="sr-only"><%= t(".drag_help") %></p>
     <p class="mt-1 text-sm text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
-  </div>
+  <% end %>
 
   <%# The order as ONE tracked value: see `admin--settings--sortable-rows`. %>
   <%= hidden_field_tag "site_setting[language_order]", order_value, id: "settings-language-order",
@@ -21,7 +26,7 @@
       <li id="language-<%= code %>" class="admin-language-row flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3"
           data-admin--settings--sortable-rows-target="row" data-code="<%= code %>" data-label="<%= name(code) %>">
         <button type="button" class="shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="Move <%= name(code) %>" aria-describedby="language-drag-help"
+                aria-label="<%= t(".move", language: name(code)) %>" aria-describedby="language-drag-help"
                 data-admin--settings--sortable-rows-target="handle"
                 data-action="keydown->admin--settings--sortable-rows#key focusout->admin--settings--sortable-rows#blur">⠿</button>
         <%# Row inputs, in row order: the code first, then the fallback (the
@@ -38,29 +43,31 @@
             column width so the rows line up. %>
         <div class="flex w-28 justify-start">
           <% if default?(code) %>
-            <%= render Admin::Ui::BadgeComponent.new(label: "Default", data: { default_tag: true }) %>
+            <%= render Admin::Ui::BadgeComponent.new(label: t(".default"), data: { default_tag: true }) %>
           <% else %>
-            <%= render Admin::Ui::ButtonComponent.new(label: "Make default…", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".make_default"), variant: :secondary, size: :small, aria: { label: t(".make_default_label", language: name(code)) },
                   data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
           <% end %>
         </div>
 
-        <div class="inline-flex items-center gap-2 text-sm text-ink">
-          <label for="language-<%= code %>-fallback">Falls back to<span class="sr-only"> for <%= name(code) %></span></label>
+        <%= tag.div class: "inline-flex items-center gap-2 text-sm text-ink",
+              data: { field_name: "languages.#{code}.fallback", save_bar_name: fallback_name(code), save_bar_changed: values.saved_change("languages.#{code}.fallback") } do %>
+          <label for="language-<%= code %>-fallback"><%= t(".falls_back_to") %><span class="sr-only"> <%= t(".falls_back_for", language: name(code)) %></span></label>
           <%= select_tag "site_setting[languages][][fallback]", options_for_select(fallback_options(code), (default?(code) ? "" : row[:fallback])),
-                id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto" %>
-        </div>
+                id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto",
+                data: { save_bar_key: "languages.#{code}.fallback" } %>
+        <% end %>
 
         <%# The default can't be turned off. Its row keeps the button's place
-            with the button itself, unseen and inert, rather than a guessed
-            width: a spacer that is a few pixels off shifts the default's
-            tag and select out of line with the rows below. %>
+            with the button itself, unseen and inert, in the same variant,
+            rather than a guessed width: a spacer that is a few pixels off
+            shifts the default's tag and select out of line with the rows below. %>
         <% if default?(code) %>
           <span class="invisible" aria-hidden="true" data-turn-off-spacer>
-            <%= render Admin::Ui::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, disabled: true, tabindex: -1) %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, disabled: true, tabindex: -1) %>
           </span>
         <% else %>
-          <%= render Admin::Ui::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".turn_off"), variant: :danger_text, size: :small, aria: { label: t(".turn_off_label", language: name(code)) },
                 data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--saving--pending-lock-target": "control")) %>
         <% end %>
       </li>
@@ -71,13 +78,13 @@
       sentence, not an empty select beside a button that can only fail. %>
   <% if addable_options.any? %>
     <div class="flex flex-wrap items-center gap-3 p-4">
-      <label for="language-add-code" class="text-sm text-ink">Add a language</label>
+      <label for="language-add-code" class="text-sm text-ink"><%= t(".add_label") %></label>
       <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
             class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--saving--pending-lock-target": "control" } %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".add"), variant: :secondary, type: "submit", form: ADD_FORM,
             data: { "admin--saving--pending-lock-target": "control" }) %>
     </div>
   <% else %>
-    <p class="p-4 text-sm text-meta">Every available language is already on.</p>
+    <p class="p-4 text-sm text-meta"><%= t(".all_on") %></p>
   <% end %>
-</section>
+<% end %>

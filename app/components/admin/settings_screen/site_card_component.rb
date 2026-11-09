@@ -1,13 +1,13 @@
 module Admin
   module SettingsScreen
-    # The Site card (round 3, Task 5; decision D6, handoff B32): the site's
-    # title and tagline in EVERY enabled language at once, then the logo, the
-    # time zone and the social links -- all fields of the one Settings form
-    # (`#settings-form`), none of them autosaving.
+    # The Site card: the site's title and tagline in EVERY enabled language
+    # at once, then the logo, the time zone and the social links -- all
+    # fields of the one Settings form (`#settings-form`), none of them
+    # autosaving.
     #
     # Every language's pair is in the page (`site_setting[translations][<code>]
     # [title|tagline]`, ids `settings-<code>-title`), one panel per language;
-    # the language tabs in the header (`Ui::LanguageTabsComponent`, `mode:
+    # the language tabs at the head's end (`Ui::LanguageTabsComponent`, `mode:
     # :buttons`) only switch which panel is visible (`admin--settings--tabs`,
     # `hidden` and `aria-selected`) and never navigate, so switching tabs is
     # not a change and cannot trigger the leave guard. `locale:` is the tab
@@ -57,12 +57,22 @@ module Admin
       # asks for a site field.
       def translation(code, field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)
 
+      # What the save bar calls a language's title or tagline: "Deutsch:
+      # Title", the language as the tabs name it; with one language on, the
+      # label alone.
+      def field_name_words(code, field)
+        label = t(".names.#{field}")
+        return label if codes.size == 1
+
+        t("admin.components.ui.save_bar.per_language", language: ::Locales.name(code, native: true), label: label)
+      end
+
       def tabs_data(code) = { "admin--settings--tabs-target": "tab", action: "admin--settings--tabs#select keydown->admin--settings--tabs#keydown", code: code }
 
       def errors_for(attribute) = errors ? errors.full_messages_for(attribute) : []
 
-      # Every zone `ActiveSupport::TimeZone` knows (dashboard spec §5), each
-      # labelled with its current UTC offset ("(GMT+01:00) Berlin").
+      # Every zone `ActiveSupport::TimeZone` knows, each labelled with its
+      # current UTC offset ("(GMT+01:00) Berlin").
       #
       # The stored value is always among the options: the form resends every
       # field, so a stored value no option matched would make the browser

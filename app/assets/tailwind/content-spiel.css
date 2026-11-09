@@ -1,5 +1,5 @@
-/* Content·Spiel product tokens (Claude Design project "Content Spiel design
-   system"). Theme switches on [data-theme] on <html>; see
+/* Content·Spiel product tokens, as the Design System names them. The
+   theme switches on [data-theme] on <html>; see
    app/views/shared/_theme_head.html.erb. Font URLs are bare filenames on
    purpose: Propshaft resolves them against app/assets/fonts and rewrites
    them to digested /assets/... paths. */
@@ -32,8 +32,8 @@
      below 3:1 on purpose. Everything pressed or typed into is outlined in
      `--cs-field-line`, 3:1 or better on paper, surface, a text field's fill,
      the rail and the popover in both schemes; no control edge stands on
-     sunken, where it would measure under 3:1 (contrast and buttons spec, C1 and Ruling 1;
-     `test/lib/admin_contrast_test.rb`). */
+     sunken, where it would measure under 3:1
+     (`test/lib/admin_contrast_test.rb`). */
   --cs-line: rgba(23,25,31,0.10);
   --cs-line-strong: rgba(23,25,31,0.22);
   --cs-field-line: #808797;
@@ -62,7 +62,7 @@
   --cs-ph-b: #c9c7bd;
   --cs-chrome: #ffffff;              /* sidebar / tree column */
   /* A post type's hue, each 5.9 to 7.1:1 on the surface in light and 8.1
-     to 9.1:1 in dark, on its own hue angle (design answer D2); only the
+     to 9.1:1 in dark, on its own hue angle so no two read alike; only the
      lightness is tuned. Types 7+ reuse 1-6 as rings. */
   --cs-cat-1: oklch(0.47 0.09 200);
   --cs-cat-2: oklch(0.49 0.11 300);
@@ -78,9 +78,9 @@
      written as `rgba()`: a canvas takes that, and not `color-mix()`. */
   --cs-graph-page: var(--cs-ink);
   --cs-graph-tag: var(--cs-ic-structure);
-  /* The Tags list's usage bar: the structure hue, which meets the spec's
-     figure for a tag (6.2 / 8.9:1) on the row's surface and on its paper
-     track, as it does for a tag's square on the canvas. */
+  /* The Tags list's usage bar: the structure hue, a tag's mark, at 6.2:1
+     or better (8.9:1 in dark) on the row's surface and on its paper track,
+     as a tag's square is on the canvas. */
   --cs-tag-usage: var(--cs-ic-structure);
   --cs-graph-line-tree: rgba(74,79,90,0.71);      /* dim */
   --cs-graph-line-related: rgba(23,25,31,0.55);   /* ink */
@@ -141,9 +141,6 @@
   --cs-shadow-2: 0 2px 4px rgba(23,25,31,0.07), 0 12px 28px rgba(23,25,31,0.09);
   --cs-shadow-3: 0 3px 8px rgba(23,25,31,0.09), 0 18px 40px rgba(23,25,31,0.12);
   --cs-shadow-4: 0 6px 12px rgba(23,25,31,0.12), 0 28px 56px rgba(23,25,31,0.20);
-  /* A save footer stuck over the content (Claude Design O2, plan ruling 7):
-     cast upward, faint in light and a little stronger in dark. */
-  --cs-shadow-stuck: 0 -6px 16px rgba(23,25,31,0.06);
 }
 
 [data-theme="dark"] {
@@ -179,12 +176,12 @@
   --cs-cat-2: oklch(0.80 0.10 300);
   --cs-cat-3: oklch(0.79 0.09 120);
   --cs-cat-4: oklch(0.81 0.09 0);
-  --cs-cat-5: oklch(0.80 0.07 260);   /* away from cat-1's teal (design answer D2) */
+  --cs-cat-5: oklch(0.80 0.07 260);   /* away from cat-1's teal */
   --cs-cat-6: oklch(0.80 0.08 95);
   /* A page's mark is the dim and not the ink, which glares in dark. */
   --cs-graph-page: var(--cs-dim);
   --cs-graph-tag: var(--cs-ic-structure);
-  /* The usage bar: the structure hue at the spec's figure (see light). */
+  /* The usage bar: the structure hue, measured as in light. */
   --cs-tag-usage: var(--cs-ic-structure);
   --cs-graph-line-tree: rgba(176,182,196,0.7);    /* dim */
   --cs-graph-line-related: rgba(227,229,236,0.51); /* ink */
@@ -231,7 +228,6 @@
   --cs-shadow-2: inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 24px rgba(0,0,0,0.35);
   --cs-shadow-3: inset 0 1px 0 rgba(255,255,255,0.07), 0 12px 32px rgba(0,0,0,0.45);
   --cs-shadow-4: inset 0 1px 0 rgba(255,255,255,0.08), 0 24px 56px rgba(0,0,0,0.6);
-  --cs-shadow-stuck: 0 -6px 16px rgba(0,0,0,0.35);
 }
 
 /* A visitor's page carries no CMS colour: the form-send pages share this
@@ -266,9 +262,9 @@
   --cs-theme-fade-easing: ease-out;
   /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
   --cs-control-compact: 2.375rem;
-  /* The editors' and Settings' form column (layout points spec, decision 1),
-     and on an editor's translation tab where the rail does not dock two
-     560px columns and their 24px gap (Claude Design's O3). Read by
+  /* The editors' and Settings' form column, one width so a field reads the
+     same on every form, and on an editor's translation tab where the rail
+     does not dock two 560px columns and their 24px gap. Read by
      `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;

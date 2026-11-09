@@ -1,0 +1,73 @@
+<div class="flex flex-col gap-4">
+  <%= tag.div role: "group", aria: { labelledby: group_id(:server) }, class: GROUP_CLASS do %>
+    <div class="flex items-center gap-2">
+      <%= render Admin::Ui::IconChipComponent.new(icon: :server, family: :media, size: :small) %>
+      <span id="<%= group_id(:server) %>" class="text-label text-meta"><%= t(".server_group") %></span>
+    </div>
+
+    <div class="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_8rem]">
+      <% %i[mail_server mail_port].each do |name| %>
+        <%= tag.div class: "admin-column", data: wrapper_data(name) do %>
+          <% if from_host?(name) %>
+            <%= render host_value(name) %>
+          <% else %>
+            <%= label_tag input_id(name), label(name), class: setup_label_class %>
+            <% if name == :mail_port %>
+              <%= number_field_tag input_name(name), shown(name), id: input_id(name), min: 1, max: 65_535, step: 1,
+                    placeholder: PORTS.fetch(MailSettings::DEFAULT_SECURITY), class: setup_input_class, data: { mail_port_target: "port" } %>
+            <% else %>
+              <%= text_field_tag input_name(name), shown(name), id: input_id(name), placeholder: t(".server_placeholder"),
+                    autocomplete: "off", spellcheck: false, class: setup_input_class %>
+            <% end %>
+          <% end %>
+          <%= helpers.render "admin/shared/field_errors", id: "#{input_id(name)}-errors", messages: field_errors(name) %>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%= tag.div class: "admin-column", data: wrapper_data(:mail_security) do %>
+      <% if from_host?(:mail_security) %>
+        <%= render host_value(:mail_security) %>
+      <% else %>
+        <%# The segmented control of a schema field's `control: :segmented` (`Admin::Fields::SelectField`). %>
+        <%= tag.fieldset id: input_id(:mail_security), class: "m-0 min-w-0 border-0 p-0" do %>
+          <legend class="<%= setup_label_class %> mb-1"><%= label(:mail_security) %></legend>
+          <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
+            <% SECURITIES.each do |option| %>
+              <label for="<%= input_id(:mail_security) %>-<%= option %>" class="<%= segment_class %>">
+                <%= radio_button_tag input_name(:mail_security), option, security == option, id: "#{input_id(:mail_security)}-#{option}", class: "sr-only",
+                      data: { action: "change->mail-port#security", port: PORTS.fetch(option) } %>
+                <span><%= t(".#{option}") %></span>
+              </label>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+      <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:mail_security)}-errors", messages: field_errors(:mail_security) %>
+    <% end %>
+
+    <%= login %>
+  <% end %>
+
+  <%= tag.div role: "group", aria: { labelledby: group_id(:sender) }, class: GROUP_CLASS do %>
+    <div class="flex items-center gap-2">
+      <%= render Admin::Ui::IconChipComponent.new(icon: :user, family: :text, size: :small) %>
+      <span id="<%= group_id(:sender) %>" class="text-label text-meta"><%= t(".sender_group") %></span>
+    </div>
+
+    <div class="grid gap-3.5 sm:grid-cols-2">
+      <% %i[mail_sender_name mail_sender_address].each do |name| %>
+        <%= tag.div class: "admin-column", data: wrapper_data(name) do %>
+          <% if from_host?(name) %>
+            <%= render host_value(name) %>
+          <% else %>
+            <%= label_tag input_id(name), label(name), class: setup_label_class %>
+            <%= text_field_tag input_name(name), shown(name), id: input_id(name), autocomplete: "off", spellcheck: false, class: setup_input_class,
+                  placeholder: (t(".sender_address_placeholder") if name == :mail_sender_address) %>
+          <% end %>
+          <%= helpers.render "admin/shared/field_errors", id: "#{input_id(name)}-errors", messages: field_errors(name) %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

@@ -18,7 +18,7 @@ class Admin::SettingsImagesSystemTest < ApplicationSystemTestCase
       # The press makes images from the SAVED settings: it waits for the save.
       assert_button "Regenerate images…", disabled: true
     end
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     await_admin_controllers
     assert_field "Widths", with: "400, 800"

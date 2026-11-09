@@ -120,6 +120,33 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/forms/new.html.erb
     app/views/admin/forms/show.html.erb
     app/javascript/controllers/admin/forms/builder_controller.js
+    app/components/admin/settings_screen/card_component.rb
+    app/components/admin/settings_screen/card_component.html.erb
+    app/components/admin/settings_screen/nav_component.rb
+    app/components/admin/settings_screen/nav_component.html.erb
+    app/components/admin/settings_screen/glance_component.rb
+    app/components/admin/settings_screen/glance_component.html.erb
+    app/components/admin/settings_screen/glance_row_component.rb
+    app/components/admin/settings_screen/glance_row_component.html.erb
+    app/views/admin/settings/show.html.erb
+    app/views/admin/settings/_ai_key_forms.html.erb
+    app/views/admin/settings/_social_link_row.html.erb
+    app/javascript/controllers/admin/settings/ai_controller.js
+    app/controllers/admin/ai_keys_controller.rb
+    app/controllers/admin/settings_controller.rb
+    app/controllers/admin/languages_controller.rb
+    app/components/admin/settings_screen/site_card_component.rb
+    app/components/admin/settings_screen/site_card_component.html.erb
+    app/components/admin/settings_screen/languages_card_component.rb
+    app/components/admin/settings_screen/languages_card_component.html.erb
+    app/components/admin/settings_screen/language_dialogs_component.rb
+    app/components/admin/settings_screen/language_dialogs_component.html.erb
+    app/components/admin/settings_screen/publishing_card_component.rb
+    app/components/admin/settings_screen/publishing_card_component.html.erb
+    app/components/admin/settings_screen/ai_card_component.rb
+    app/components/admin/settings_screen/ai_card_component.html.erb
+    app/components/admin/settings_screen/ai_key_component.rb
+    app/components/admin/settings_screen/ai_key_component.html.erb
     app/components/admin/settings_screen/forms_card_component.rb
     app/components/admin/settings_screen/forms_card_component.html.erb
     app/components/admin/settings_screen/images_card_component.rb
@@ -128,9 +155,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/images_dialog_component.html.erb
     app/components/admin/settings_screen/mail_card_component.rb
     app/components/admin/settings_screen/mail_card_component.html.erb
+    app/components/admin/settings_screen/mail_fields_component.rb
+    app/components/admin/settings_screen/mail_fields_component.html.erb
+    app/components/admin/settings_screen/host_value_component.rb
     app/components/admin/settings_screen/mail_login_component.rb
     app/components/admin/settings_screen/mail_login_component.html.erb
     app/components/admin/settings_screen/mail_state_component.rb
+    app/components/admin/settings_screen/ai_state.rb
+    app/components/admin/settings_screen/ai_test_result_component.rb
     app/components/admin/settings_screen/mail_alert_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/settings_screen/mail_test_result_component.rb
@@ -176,6 +208,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/dashboard_screen/draft_tile_component.html.erb
     app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
+    app/components/admin/ui/state_chip_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb
     app/components/admin/editor_screen/live_region_component.rb
@@ -386,6 +419,22 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/note_inbox/index.html.erb
     app/views/admin/note_inbox/_card.html.erb
     app/controllers/admin/note_inbox_controller.rb
+    app/views/layouts/setup.html.erb
+    app/views/setup/_steps.html.erb
+    app/views/setup/_back.html.erb
+    app/views/setup/_flash.html.erb
+    app/views/setup/_system_check_results.html.erb
+    app/views/setup/token.html.erb
+    app/views/setup/system_check.html.erb
+    app/views/setup/admin.html.erb
+    app/views/setup/site.html.erb
+    app/views/setup/languages.html.erb
+    app/views/setup/mcp_token.html.erb
+    app/views/setup/mcp_token_created.html.erb
+    app/views/setup/starter_content.html.erb
+    app/views/setup/review.html.erb
+    app/views/setup/mail.html.erb
+    app/controllers/setup_controller.rb
   ].freeze
 
   PLACEHOLDER = "".freeze
@@ -404,12 +453,12 @@ class AdminI18nTest < ActiveSupport::TestCase
   STOP_WORDS = %w[now ago not the is are to of your this that need needs changed since you and or in on for with from has have
     was were be can no yet just all any more less new].freeze
 
-  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL)\b|\) AS [a-z_]+|->>/
+  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL|LOCK TABLE)\b|\) AS [a-z_]+|->>/
   # An HTTP header name: any `X-` header, or one of the standard names listed.
   # NOT "any hyphenated Title-Case token": that shape is also a label
   # ("Read-Only", "Sign-In", "Up-To-Date"), which is copy -- on a JavaScript
   # sink line too. A header this list lacks fails the guard until it is added.
-  STANDARD_HEADERS = %w[Content-Type Turbo-Frame].freeze
+  STANDARD_HEADERS = %w[Content-Type Turbo-Frame Cache-Control].freeze
   HEADER = /\A(?:X(?:-[A-Z][A-Za-z]*)+|#{Regexp.union(STANDARD_HEADERS).source})\z/
   MARKER = /i18n-ok:\s*\S.{9,}/
 
@@ -675,7 +724,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--saving--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
       "Admin::Ui::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
-      "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
+      "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "Cache-Control", "LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
   end

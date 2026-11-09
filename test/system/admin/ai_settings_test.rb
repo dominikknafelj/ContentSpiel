@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
-# Translation helpers spec §6.2, in a real browser: the API key is saved by
-# its own button (not the settings form's autosave), comes back as "API
-# key: set" with an empty field, and Test connection answers inline. The
+# The AI translation card in a real browser: the API key is saved by its
+# own button (not the settings form's save bar), comes back as the "Key
+# saved" chip with an empty field, and Test connection answers inline. The
 # provider is `GatedProvider` (test/support/gated_provider.rb) registered
 # for this test -- the app server runs in this process, so it sees the same
 # registry -- and never reaches the network; a test that needs a request in
@@ -25,7 +25,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/settings"
     await_admin_controllers
 
-    assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key yet"
+    assert_selector "#settings-ai-key [data-ai-key-state=unset]", text: "No key"
     within("#settings-ai-key") { click_on "Add key" }
     fill_in "API key", with: KEY
     click_on "Save key"
@@ -44,7 +44,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # Test connection is on, and answers with the measured time.
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
     click_on "Test connection"
-    assert_selector "#settings-ai-test-result", text: /CONNECTED · \d+ MS/
+    assert_selector "#settings-ai-test-result", text: /Connected · \d+ ms/
 
     # Change the model: the test is off with the specific hint; the key's controls wait too.
     fill_in "Model", with: "claude-opus-5"
@@ -52,20 +52,20 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_text "Save provider and model first. Tests the saved settings."
     assert_selector "#settings-ai-key button[disabled]", text: "Replace"
     assert_selector "#settings-ai-key button[disabled]", text: "Remove…"
-    assert_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_selector "#settings-ai-key", text: "Save or discard your changes first."
 
     # Save the model: the test is available again, against the saved settings.
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     await_admin_controllers
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
     click_on "Test connection"
-    assert_selector "#settings-ai-test-result", text: /CONNECTED · \d+ MS/
+    assert_selector "#settings-ai-test-result", text: /Connected · \d+ ms/
 
     # Remove… asks first.
     click_on "Remove…"
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
-    assert_selector "#settings-ai-key", text: "No key yet"
+    assert_selector "#settings-ai-key", text: "No key"
     assert_nil site_settings(:default).reload.ai_api_key
   end
 
@@ -85,9 +85,9 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /No unsaved changes/i
   end
 
-  # Final wave B, ledger C-M8 and Task 7 minor 7: the main Save re-renders the
-  # screen and dropped a typed key without a word; and Cancel / Save key left
-  # the focus on <body>.
+  # The main Save re-renders the screen, which would drop a typed key without
+  # a word, so a typed key holds it back; and Cancel / Save key must not
+  # leave the focus on <body>.
   test "a typed, unsaved key holds the main Save back; Cancel and Save key hand the focus on" do
     visit "/cs-studio/settings"
     await_admin_controllers
@@ -118,9 +118,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_eventually { page.evaluate_script("document.activeElement.textContent.trim()") == "Replace" }
   end
 
-  # Round 2, N3: a typed key locked the footer's Save ("Save or cancel the API
-  # key first.") while the changed form locked the key's input and Save key
-  # ("Save or cancel your changes first."): neither could be saved.
+  # A typed key locks the bar's Save ("Save or cancel the API key first.")
+  # and a changed form locks the key's controls ("Save or discard your
+  # changes first."), so the key's input and Save key must stay usable, or
+  # neither could ever be saved.
   test "a typed key and a changed form don't lock each other: Save key stays pressable, and then the main Save is" do
     site_settings(:default).update!(ai_api_key: "sk-old-key-0000")
     visit "/cs-studio/settings"
@@ -134,20 +135,20 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
     assert_selector "#settings-ai_api_key:not([disabled])"
     assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
-    assert_no_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_no_selector "#settings-ai-key", text: "Save or discard your changes first."
     # Test connection has nothing to do with the entry: still locked.
     assert_selector "button[disabled]", text: "Test connection"
 
     # Emptied to type another key (select all, delete): the field under the
     # caret stays usable for as long as the entry is open; only Save key waits
-    # for there being something to save (round 3, Minor 2).
+    # for there being something to save.
     # (By script, with the `input` event a real deletion fires: the driver's
     # own way of clearing a field fires none.)
     page.execute_script("const key = document.getElementById('settings-ai_api_key'); key.focus(); key.value = ''; key.dispatchEvent(new Event('input', { bubbles: true }))")
     assert_selector "#settings-ai-key button[type=submit][disabled]", text: "Save key"
     assert_selector "#settings-ai_api_key:not([disabled])"
     assert_equal "settings-ai_api_key", page.evaluate_script("document.activeElement.id")
-    assert_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_selector "#settings-ai-key", text: "Save or discard your changes first."
     assert_selector "#{footer} button[type=submit]:not([disabled])", text: "Save"
     fill_in "API key", with: KEY
     assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
@@ -161,14 +162,14 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # The key's own actions are instant ones again: locked while the form is unsaved.
     assert_selector "#settings-ai-key button[disabled]", text: "Replace"
     assert_selector "#settings-ai-key button[disabled]", text: "Remove…"
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_equal "another-model", site_settings(:default).reload.ai_model
   end
 
-  # Task 7 minor 11: a key write that lands while a Test is in flight replaces
-  # the test's form; its end never reached the controller and the button
-  # stayed disabled, with its spinner, until a reload.
+  # A key write that lands while a Test is in flight replaces the test's
+  # form, so the test's end never reaches the controller: the button must
+  # not stay disabled, with its spinner, until a reload.
   test "a key saved while a test is in flight leaves Test connection usable afterwards" do
     site_settings(:default).update!(ai_api_key: KEY)
     visit "/cs-studio/settings"
@@ -209,19 +210,19 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # Back in line with the saved values, but the request is still out: no second provider call.
     assert_selector "button[form='settings-ai-test-form'][disabled]"
     GatedProvider.release
-    assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
+    assert_selector "#settings-ai-test-result", text: /Connected/, wait: 10
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
 
     # Edited during a flight and left edited: it is still gated when the answer lands. The first test's
-    # "CONNECTED" is still in the slot and the button is disabled during any flight, so neither says the second
+    # "Connected" is still in the slot and the button is disabled during any flight, so neither says the second
     # answer has landed: the slot is emptied first, and the button is looked at only once it is no longer busy.
     page.execute_script("document.getElementById('settings-ai-test-result').replaceChildren()")
-    assert_no_selector "#settings-ai-test-result", text: /CONNECTED/
+    assert_no_selector "#settings-ai-test-result", text: /Connected/
     GatedProvider.hold!
     click_on "Test connection"
     fill_in "Model", with: "claude-opus-5"
     GatedProvider.release
-    assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
+    assert_selector "#settings-ai-test-result", text: /Connected/, wait: 10
     assert_no_selector "button", text: "Testing…"
     assert_selector "button[form='settings-ai-test-form'][disabled]"
     assert_text "Save provider and model first. Tests the saved settings."
@@ -235,12 +236,12 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     original = find_field("settings-trash_retention_days").value
     fill_in "settings-trash_retention_days", with: "9"
     assert_selector "button[form='settings-ai-test-form'][disabled]"
-    assert_text "Save or cancel your changes first."
+    assert_text "Save or discard your changes first."
     assert_no_text "Save provider and model first."
 
     fill_in "settings-trash_retention_days", with: original
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
-    assert_no_text "Save or cancel your changes first."
+    assert_no_text "Save or discard your changes first."
   end
 
   test "Save key with an empty input shows the error with the input still open, and Cancel clears it" do
@@ -273,10 +274,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_equal "sk-ant-second-key", site_settings(:default).reload.ai_api_key
     click_on "Remove…"
     within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
-    assert_selector "#settings-ai-key", text: "No key yet"
+    assert_selector "#settings-ai-key", text: "No key"
   end
 
-  # Contrast and buttons spec, Ruling 11: a busy button is disabled but not
+  # A busy button is disabled but not
   # drawn as a disabled one; it keeps its variant's colours beside its spinner.
   test "Test connection keeps its look while it is busy" do
     site_settings(:default).update!(ai_api_key: KEY)

@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The one media picker (media library design spec §6):
+# The one media picker:
 # `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
 # search, segments, selectable tiles, a header Upload and a footer "N selected ·
 # Cancel · Use image" -- opened from the page hero field, an image block's image
@@ -397,9 +397,9 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   private
 
-  # Round 1 second review: Design's screenshot showed the picker at the bottom
-  # of the page, cut off, with the page behind shifted and a black band on top.
-  # This opens it in a real browser (1400x900) with the page scrolled down 600px
+  # A modal opened from far down a page must stand in the viewport, not at
+  # the bottom of the page cut off, with the page behind shifted and a band
+  # on top. This opens it in a real browser (1400x900) with the page scrolled down 600px
   # and checks the dialog lies inside the viewport and nothing behind it moved.
   # The page is scrolled to where the Choose image button sits 300px below the
   # viewport top (about 600px down), not to a fixed 600: the editor header is
@@ -407,7 +407,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # driver's click first scrolls the page to reach it -- a scroll of the test's
   # own making, not the picker's.
   test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
-    page.driver.resize(1400, 900)
+    page.current_window.resize_to(1400, 900)
     visit_editor(@landing)
     # Make sure there is 600px to scroll whatever the editor's own height is.
     page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 0)")
@@ -432,7 +432,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_operator box["right"], :<=, box["width"]
     assert_equal scrolled_to, box["scrollY"]
   ensure
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   # Select-then-use (D14): a click selects the tile, Use image confirms.

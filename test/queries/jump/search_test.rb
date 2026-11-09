@@ -47,7 +47,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
     settings = groups.find { |g| g[:label] == "Settings" }
     assert_includes settings[:rows].map { |r| r[:title] }, "Settings › Languages"
     assert_not_includes settings[:rows].map { |r| r[:title] }, "Dashboard"
-    assert_equal [ "Settings › Site", "Settings › Publishing", "Settings › Languages", "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
+    assert_equal Jump::Search::SETTINGS_TITLES.values, settings[:rows].map { |r| r[:title] }, "every section, in the nav's order"
     sections = groups.find { |g| g[:label] == "Sections" }
     assert_includes sections[:rows].map { |r| r[:title] }, "Dashboard"
   end
@@ -57,14 +57,42 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_equal [ "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
     assert_equal [ :admin_settings_path, [], { anchor: "ai" } ], settings[:rows].first[:route]
 
-    # Languages moved into Settings (round 3, Task 6): its destination is the
-    # `#languages` anchor like the others, not a screen of its own.
     languages = search("languages", actor: @owner).find { |g| g[:label] == "Settings" }
     assert_equal [ "Settings › Languages" ], languages[:rows].map { |r| r[:title] }
     assert_equal [ :admin_settings_path, [], { anchor: "languages" } ], languages[:rows].first[:route]
 
     nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")
     assert_nil search("", actor: nobody, modules: []).find { |g| g[:label] == "Settings" }
+  end
+
+  test "the Settings rows are SettingsSections', titled one each" do
+    assert_equal SettingsSections.ids, Jump::Search::SETTINGS_TITLES.keys
+    assert_equal [ "Settings › Site", "Settings › Languages", "Settings › Publishing", "Settings › Forms", "Settings › AI translation",
+      "Settings › Mail", "Settings › Images" ], Jump::Search::SETTINGS_TITLES.values
+
+    %w[forms mail images].each do |id|
+      rows = search(Jump::Search::SETTINGS_TITLES.fetch(id).delete_prefix("Settings › ")).find { |g| g[:label] == "Settings" }[:rows]
+      assert_includes rows, { title: Jump::Search::SETTINGS_TITLES.fetch(id), route: [ :admin_settings_path, [], { anchor: id } ] }
+    end
+
+    languages_only = users(:editor_branch)
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "languages.manage", scope: {})
+    AccessControl::Membership.create!(user: languages_only, group: access_control_groups(:branch_editors)) unless languages_only.groups.exists?(access_control_groups(:branch_editors).id)
+    assert_not AccessControl.holds?(languages_only, "settings.manage", channel: :admin), "the premise: the viewer holds languages.manage alone"
+    settings = search("", actor: languages_only, modules: []).find { |g| g[:label] == "Settings" }
+    assert_equal [ "Settings › Languages" ], settings[:rows].map { |r| r[:title] }
+  end
+
+  test "a blank query by a viewer who holds every permission lists all seven Settings rows, past the group limit" do
+    assert SettingsSections::ALL.all? { |section| AccessControl.holds?(@owner, section.permission, channel: :admin) }, "the premise: the owner holds every section's right"
+    assert_operator SettingsSections.ids.size, :>, Jump::Search::LIMIT, "the premise: there are more sections than the limit"
+
+    settings = search("").find { |g| g[:label] == "Settings" }
+    assert_equal SettingsSections.ids, settings[:rows].map { |r| r[:route].last[:anchor] }
+    assert_equal SettingsSections.ids.map { |id| Jump::Search::SETTINGS_TITLES.fetch(id) }, settings[:rows].map { |r| r[:title] }
+
+    7.times { |i| create_post(title: "Limited #{i}") }
+    assert_equal Jump::Search::LIMIT, search("limited").find { |g| g[:label] == "Posts" }[:rows].size, "the open-ended groups keep the limit"
   end
 
   test "a two-letter query does not match a record through a locale key" do

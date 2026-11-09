@@ -102,7 +102,7 @@ class SetupFreshDatabaseTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "#token-name-error", text: /no "Admin" group.*bin\/rails db:seed.*skip this step/m
     assert_select "input[name=token_name][value=?]", "claude-desktop"
-    assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip"
+    assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip for now"
     assert_select "#mcp-token", count: 0
     # The whole sentence a person reads, and the page it stands on.
     assert_equal 'This site has no "Admin" group, which a token made here belongs to. Run bin/rails db:seed on the server to create the built-in groups, ' \

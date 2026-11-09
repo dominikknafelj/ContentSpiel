@@ -16,8 +16,8 @@ module Admin
   # any typing. The leave guard still waits for a real change.
   #
   # `after:` -- the id of another explicit-save form on the screen that has to
-  # be saved (or cancelled) first: while THAT form is unsaved this one's Save
-  # is locked and its footer says "Save or cancel your changes first." (the
+  # be saved (or discarded) first: while THAT form is unsaved this one's Save
+  # is locked and its footer says "Save or discard your changes first." (the
   # account screen: changing the password re-renders the screen and would
   # drop a typed name).
   #
