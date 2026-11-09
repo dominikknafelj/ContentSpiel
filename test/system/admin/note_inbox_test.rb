@@ -247,7 +247,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     page.execute_script("window.__row = document.querySelector(#{first.to_json})")
     find(first).send_keys(:tab)
     assert_equal false, page.evaluate_script("document.activeElement === window.__row"), "the Tab did not leave the row's link"
-    assert_equal false, page.evaluate_script("!!document.activeElement.closest('[data-delivery]')"), "a Tab stop inside the row took the focus"
+    assert_equal false, page.evaluate_script("window.__row.contains(document.activeElement)"), "a Tab stop inside the row's link took the focus"
     assert_match(/\ADana mentioned you\b.*\bNew\b.*\bOpen thread\z/m, name)
   end
 

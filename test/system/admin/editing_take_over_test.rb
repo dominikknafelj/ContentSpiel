@@ -994,15 +994,15 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_eventually(wait: LIVE, message: "the take-over was never announced") { said.any? }
       assert_equal [ "Olga Braun took over this block" ], said
       # Another fetch of the same card says nothing more. The fetch is a plain
-      # GET outside the write queue, so it is the merge of its answer that is
-      # waited for, and then that no announcement is still
-      # waiting out its 150 ms: the strip that came with the card is a new
-      # element, and a second announcement would have been armed when it connected.
-      listen_merged
+      # GET outside the write queue, and a merge from the take-over may still be
+      # in flight, so no merge event says which merge is the refresh's: what is
+      # waited for is the strip in the document being a new element (the card
+      # was drawn again), and then that no announcement is still waiting out
+      # its 150 ms, which a second announcement would have armed when the new
+      # strip connected.
       page.execute_script("window.__strip = document.querySelector(#{strip.to_json})")
       page.execute_script("document.getElementById('editing').dispatchEvent(new CustomEvent('admin--editing--hold:refresh', { detail: { subject: 'block-#{@block.id}' } }))")
-      await_merged
-      assert_equal false, page.evaluate_script("window.__strip === document.querySelector(#{strip.to_json})"), "the second fetch did not draw the card again"
+      await_js("document.querySelector(#{strip.to_json}) !== window.__strip", wait: LIVE, message: "the second fetch did not draw the card again")
       await_announced
       assert_equal [ "Olga Braun took over this block" ], said
       assert_no_selector "[data-editing-kind=lost], [data-editing-kind=deleted]"
