@@ -282,6 +282,26 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A selected or pressed tile in a grid (`.admin-tile`) is told by its
+  # accent outline alone, 2px outside its edge, so the outline stands on the
+  # card it is in (surface) or on the page (paper), and is held at the
+  # figures it reaches, which are well above 3:1.
+  test "a selected tile's accent outline is 3:1 on surface and on paper" do
+    floors = { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-paper" => { light: 6.2, dark: 7.8 } }
+    each_scheme do |scheme, colour|
+      floors.each { |ground, figures| assert_ratio(figures.fetch(scheme), colour.("--cs-accent"), colour.(ground), "the selected tile's outline on #{ground} (#{scheme})") }
+    end
+  end
+
+  # A word diff's removed words (`Admin::Ui::WordDiffComponent`) are struck
+  # through in ink on sunken: words a person reads, held at the figures they
+  # reach.
+  test "removed words are ink on sunken at 4.5:1" do
+    each_scheme do |scheme, colour|
+      assert_ratio({ light: 14.4, dark: 11.5 }.fetch(scheme), colour.("--cs-ink"), colour.("--cs-sunken"), "removed words on sunken (#{scheme})")
+    end
+  end
+
   # The drop place (`.admin-drag-ghost`, a tile's, a block card's and a tree
   # row's) is a dashed edge with nothing inside it: the edge alone says where
   # the drag lands, so it is a state's 3:1 on the grounds it stands on.

@@ -345,6 +345,34 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal order.sort, order, "rest, the pointer, open or focused, the thread, then the drop place and the lifted tile: the later state wins at one weight"
   end
 
+  # A tile in a grid (`.admin-tile`: the media tiles, the upload tiles,
+  # Translations' language tiles) is drawn by one rule set, its states
+  # elevations and the selection's accent outline. A transform would move
+  # it under the pointer, and a border is an edge drawn for depth.
+  TILE = '.admin-tile:is([aria-current="true"], [aria-pressed="true"])'.freeze
+
+  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, and the accent outline when selected or pressed; never a transform" do
+    rest = single_rule(".admin-tile")
+    [ "border-radius: var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes rest, declaration }
+
+    hovers = self.class.css_blocks("content-spiel.tailwind.css", /@media \(hover: hover\)\s*\{/).select { |body| body.include?(".admin-tile:hover") }
+    assert_equal 1, hovers.size, "the pointer's elevation is drawn only where a pointer can hover"
+    assert_match(/\.admin-tile:hover\s*\{\s*box-shadow:\s*var\(--cs-shadow-2\);\s*\}/, hovers.first)
+    assert_includes single_rule(".admin-tile:hover"), "box-shadow: var(--cs-shadow-2)"
+
+    selected = single_rule(TILE)
+    [ "outline: 2px solid var(--cs-accent)", "outline-offset: 2px", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes selected, declaration }
+
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE ] ].map { |selectors| rules.index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, then the selection: the selection wins under the pointer"
+    tile_rules = rules.select { |selectors, _| selectors.any? { |selector| selector.match?(/\.admin-tile(?![\w-])/) } }
+    tile_rules.each do |selectors, body|
+      assert_no_match(/(?<![\w-])(?:transform|translate|scale|rotate):/, body, "#{selectors.join(", ")} moves the tile")
+      assert_no_match(/(?<![\w-])border(?!-radius)[\w-]*:/, body, "#{selectors.join(", ")} draws a border")
+    end
+  end
+
   test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
     [ 'class="border ', "border-line ", "border-line-strong\"", "border-danger'", "border-accent ", "border-field-line\"", "data-[notes-active]:border-accent " ].each { |sample| assert_match BORDER_EDGE, sample }
     [ "rounded-card ", "outline-accent ", "border-b ", "borderless ", "admin-border-x " ].each { |sample| assert_no_match BORDER_EDGE, sample }
@@ -724,6 +752,44 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
     assert_empty design_offences(/text-\[(?:[0-9]|10)px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
+  end
+
+  # The content-side screens (media, Trash, Translations, Forms, the audit
+  # log) speak in the type scale's tokens and draw no box of their own: a
+  # card is an elevation, a table's lines stay inside its card, and a
+  # control keeps its field-line frame. Each screen's folders join
+  # `CONTENT_SIDE_SCREENS` (globs from the root) as it is drawn on the scale.
+  # Refused there: an arbitrary pixel size, `text-xs` (the label is
+  # `text-label`), the hand-drawn `rounded-cs border border-line` box, a
+  # dashed edge and an important danger edge.
+  CONTENT_SIDE_SCREENS = [].freeze
+  OFF_SCALE_OR_HAND_BOX = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])rounded-cs border border-line(?:-strong)?(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
+  # A file of those screens that may keep one of the refused looks, mapped to
+  # the reason.
+  HAND_BOX_ALLOWED = {}.freeze
+
+  def self.content_side_sources = CONTENT_SIDE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
+
+  test "the content-side screens draw no off-scale size and no hand-drawn box" do
+    CONTENT_SIDE_SCREENS.each { |glob| assert Dir[Rails.root.join(glob)].any?, "#{glob} matches no file: the guard looks at nothing there" }
+    offences = self.class.content_side_sources.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if HAND_BOX_ALLOWED.key?(relative)
+
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        "#{relative}:#{index + 1}: #{line[OFF_SCALE_OR_HAND_BOX]}" if line.match?(OFF_SCALE_OR_HAND_BOX)
+      end
+    end
+    assert_empty offences, "a size is a type token (text-small, text-body, text-label) and a box is a card's elevation"
+    HAND_BOX_ALLOWED.each_key do |path|
+      assert_includes self.class.content_side_sources, Rails.root.join(path).to_s, "#{path} is allowed but is on no content-side screen"
+      assert Rails.root.join(path).read.match?(OFF_SCALE_OR_HAND_BOX), "#{path} draws none of the refused looks: drop it from HAND_BOX_ALLOWED"
+    end
+  end
+
+  test "the off-scale pattern matches a pixel size, text-xs, a hand-drawn box, a dashed edge and an important danger edge, and not a token or a table's line" do
+    [ "text-[13px]", "text-xs", "rounded-cs border border-line", "border-dashed", "!border-danger" ].each { |sample| assert_match OFF_SCALE_OR_HAND_BOX, sample }
+    [ "text-small", "border-b border-line", "text-xs-foo" ].each { |sample| assert_no_match OFF_SCALE_OR_HAND_BOX, sample }
   end
 
   # A triangle glued to its words reads "▾PAGE SETTINGS". A mono-label

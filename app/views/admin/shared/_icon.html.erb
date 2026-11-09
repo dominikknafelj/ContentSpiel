@@ -41,6 +41,11 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path stroke-linecap="round" d="M16 16l4.5 4.5" /></svg>
 <% when :translations %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h9M7.5 3v2M10 5c-.8 3.6-3.2 6.4-6 8M5.5 8.5c1.2 2 2.9 3.6 5 4.5" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 21l4.5-10 4.5 10M13.6 17.5h5.8" /></svg>
+<%# Move up and Move down, a row moved one place in its list (Lucide). %>
+<% when :arrow_up %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 7-7 7 7M12 19V5" /></svg>
+<% when :arrow_down %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M19 12l-7 7-7-7" /></svg>
 <%# The notes' icons (Lucide, 1.5px stroke, as the rest of the set).
     They are drawn at more than one size -- 16px beside "All notes" and in
     the composer's toolbar, 12px on a pinned row and in Resolve -- so these

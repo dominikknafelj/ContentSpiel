@@ -74,10 +74,10 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     assert_no_text "changed since this was translated"
   end
 
-  test "the diff's del and ins use the handoff's tokens" do
+  test "the diff's removed words are struck through on sunken, its added ones underlined on the ok tint" do
     render_outdated(outdated_post)
 
-    assert_selector "del.text-danger-ink.bg-danger-tint"
+    assert_selector "del.text-ink.bg-sunken.line-through"
     assert_selector "ins.text-ok-ink.bg-ok-tint.underline"
   end
 

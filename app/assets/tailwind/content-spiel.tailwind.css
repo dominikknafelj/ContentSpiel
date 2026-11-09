@@ -1428,6 +1428,35 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    (`admin--notes--drawer#markActive`) takes the people frame, in the rule
    above. */
 
+/* A tile in a grid of tiles: the media library's and the picker's
+   (`Admin::MediaLibrary::TileComponent`), an upload's while it sends
+   (`media/upload_tiles.js`) and a language's summary in Translations
+   (`Admin::TranslationScreen::SummaryCardComponent`). Its states are
+   elevations, with no border: the first at rest, the second under a pointer
+   that can hover, and never moved, so nothing shifts under a click. Selected
+   (`aria-current`) or pressed (`aria-pressed`) it is a selection: the 2px
+   accent outline 2px outside its edge, 3:1 on the surface and the page
+   (`test/lib/admin_contrast_test.rb`), at rest's elevation, written after
+   the pointer's so a selected tile keeps its look under the pointer. */
+.admin-tile { border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+@media (hover: hover) {
+  .admin-tile:hover { box-shadow: var(--cs-shadow-2); }
+}
+.admin-tile:is([aria-current="true"], [aria-pressed="true"]) { outline: 2px solid var(--cs-accent); outline-offset: 2px; box-shadow: var(--cs-shadow-1); }
+
+/* A table in its card that scrolls inside itself, so the page never scrolls
+   sideways. `.admin-table-scroll` is Translations' matrix: the card is at
+   most the window's height under the top bar, and its head row sticks to
+   the card's top (a sticky element inside a scrolling box sticks to that
+   box, never to the window), on the surface over the rows, at the raised
+   layer. `.admin-table-scroll--x` is Trash's table: the sideways scroll
+   alone, with no height of its own, so its rows scroll with the page. In
+   both the first column sticks at the left as the card scrolls sideways. */
+.admin-table-scroll { overflow: auto; max-height: calc(100dvh - var(--admin-top-offset) - var(--cs-sp-4) * 2); overscroll-behavior: auto; }
+.admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); }
+.admin-table-scroll--x { overflow-x: auto; }
+:is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
+
 /* A picture in a note or a still GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
    the placeholder gradient behind a picture that is partly transparent.

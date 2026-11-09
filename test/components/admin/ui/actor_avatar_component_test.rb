@@ -1,7 +1,8 @@
 require "test_helper"
 
 # `Admin::Ui::ActorAvatarComponent`: the mark beside an audit sentence, one
-# per kind of actor, always in a 28px slot and hidden from a screen reader.
+# per kind of actor, in a 28px slot or a 22px one, and hidden from a screen
+# reader.
 class Admin::Ui::ActorAvatarComponentTest < ViewComponent::TestCase
   Actor = Audit::Sentence::Actor
 
@@ -40,5 +41,23 @@ class Admin::Ui::ActorAvatarComponentTest < ViewComponent::TestCase
     assert_selector "span.size-7[aria-hidden='true']", exact_text: ""
     assert_no_selector "svg"
     assert_no_selector ".rounded-full"
+  end
+
+  test "size sm draws the 22px circle in a 22px slot, and an unknown size is refused" do
+    user = User.new(name: "Ada Lovelace", email_address: "ada@example.com")
+    render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(user: user, user_id: 7), size: :sm)
+    assert_selector "span.size-\\[22px\\].bg-people-tint[aria-hidden='true']", exact_text: PersonName.initials(PersonName.of(user))
+    assert_no_selector ".size-7"
+
+    render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(user_id: 42), size: :sm)
+    assert_selector "span.size-\\[22px\\].border-field-line[aria-hidden='true']", exact_text: ""
+
+    render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor, size: :sm)
+    assert_selector "span.size-\\[22px\\][aria-hidden='true'] > span.size-5 svg"
+
+    render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(none: true), size: :sm)
+    assert_selector "span.size-\\[22px\\][aria-hidden='true']", exact_text: ""
+
+    assert_raises(ArgumentError) { Admin::Ui::ActorAvatarComponent.new(actor: actor, size: :md) }
   end
 end
