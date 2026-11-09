@@ -1,11 +1,10 @@
 require "test_helper"
 
-# Contrast and buttons spec, "C1": CS Studio's token pairs, measured as
-# `design_tokens_test.rb` measures the site's. Text is 4.5:1 (WCAG 1.4.3);
-# a boundary that identifies a control or a state is 3:1 (1.4.11); a
-# boundary that only groups is held above the floor it reached, so a later
-# change cannot quietly take it back, and below 3:1, where it would be an
-# outline.
+# CS Studio's token pairs, measured as `design_tokens_test.rb` measures the
+# site's. Text is 4.5:1 (WCAG 1.4.3); a boundary that identifies a control
+# or a state is 3:1 (1.4.11); a boundary that only groups is held above the
+# floor it reached, so a later change cannot quietly take it back, and below
+# 3:1, where it would be an outline.
 class AdminContrastTest < ActiveSupport::TestCase
   include ContrastMeasure
 
@@ -297,9 +296,8 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The owner's decision of 2026-11-07: a non-primary button's fill is no
-  # shape on any ground (1.00 to 1.26:1), so its edge carries it, measured on
-  # every ground a button stands on. The tokens are read from the classes
+  # A non-primary button's fill is no shape on any ground (1.00 to 1.26:1),
+  # so its edge carries it, measured on every ground a button stands on. The tokens are read from the classes
   # the component draws.
   BUTTON_GROUNDS = %w[--cs-rail --cs-surface --cs-paper --cs-popover].freeze
 
@@ -669,9 +667,10 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # The current step's row is the accent tint: its name in ink, and its
-  # marker an accent ring around the number in accent, held at the figures
-  # it measures, 5.7 / 6.2:1 (6.25 in dark, drawn as 6.3).
-  test "the current step's words are 4.5:1 on the accent tint and its number on the accent" do
+  # marker an accent ring around the number in accent. The accent on the
+  # tint measures 5.675:1 in light and 6.246:1 in dark, held at 5.7 and 6.2:1
+  # (each a floor to its rounding).
+  test "the current step's words are 4.5:1 on the accent tint, and its number in the accent" do
     each_scheme do |scheme, colour|
       assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint"), "the current step's name (#{scheme})")
       assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's number (#{scheme})")
@@ -682,6 +681,13 @@ class AdminContrastTest < ActiveSupport::TestCase
   test "a done step's check is 3:1 or better on the ok tint" do
     each_scheme do |scheme, colour|
       assert_ratio(3.0, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "a done step's check (#{scheme})")
+    end
+  end
+
+  # The step list stands on the page, so a step to come's ring is measured on
+  # paper: it is the marker's only edge.
+  test "a step to come's ring is 3:1 or better on the page" do
+    each_scheme do |scheme, colour|
       assert_ratio(3.0, colour.("--cs-field-line"), colour.("--cs-paper"), "a step to come's ring on the page (#{scheme})")
     end
   end

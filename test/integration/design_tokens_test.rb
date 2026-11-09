@@ -1,7 +1,7 @@
 require "test_helper"
 
-# Backend (product UI) and frontend (public theme) CSS are two separate builds
-# (spec §9): each carries its own tokens and only the classes its own views use.
+# Backend (product UI) and frontend (public theme) CSS are two separate
+# builds: each carries its own tokens and only the classes its own views use.
 class DesignTokensTest < ActionDispatch::IntegrationTest
   include ContrastMeasure
 
@@ -74,7 +74,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes stylesheet("theme.css"), ".bg-preview-bg"
   end
 
-  # Sections spec §5.3: the two bands and what is written on the strong one,
+  # The two bands and what is written on the strong one,
   # each with its dark value -- a band is drawn in whichever theme the visitor
   # has, unlike the preview bar above.
   BAND_TOKENS = %w[--th-band-tinted --th-band-strong --th-on-band-strong --th-on-band-strong-dim --th-on-band-strong-accent].freeze
@@ -171,10 +171,10 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     refute_match(/color-scheme\s*:/, css.gsub(%r{/\*.*?\*/}m, ""), "color-scheme stays per layout, never global")
   end
 
-  # Code block spec §4: plain rules on tokens, because the span classes are
-  # built from role names and no utility scan would find them.
-  # Block types spec, "Tests": derived from the registry, so a type's
-  # stylesheet is in the build because it declared it, and in it once.
+  # A type's stylesheet holds plain rules on tokens (the Code block's span
+  # classes are built from role names, and no utility scan would find them).
+  # The list is derived from the registry, so a type's stylesheet is in the
+  # build because it declared it, and in it once.
   test "the public stylesheet's entry imports every registered type's stylesheet once, and the default theme's file imports none that a type declares" do
     blocks = BlockTypes.theme_css_blocks
     entry = ThemeCss.entry(ThemeFolder.new(nil), root: Rails.root, blocks: blocks)
@@ -243,8 +243,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Contrast and buttons spec (C1): what the contract now says of
-  # `--th-meta` and `--th-line`, held for the default theme.
+  # What the theme contract says of `--th-meta` (text) and `--th-line` (a
+  # hairline), held for the default theme.
   test "faint text is 4.5:1 on the page and on the tinted band, an outline in it is 3:1, and a line stays a hairline, in both themes" do
     theme_tokens.each do |theme, tokens|
       page = resolve_colour(tokens, "--th-paper")
@@ -326,7 +326,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   NOTE_KINDS = BlockTypes::Note::KINDS.keys.freeze
 
-  # Note block spec, "The public side": plain rules on tokens; each kind's
+  # The Note block's public side: plain rules on tokens; each kind's
   # four tokens drawn in one place; the text, links and inline code the
   # theme's own.
   test "the note's stylesheet is declared by the type, holds no colour of its own, and draws each kind by its four tokens" do
@@ -347,16 +347,16 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/border-left:\s*3px solid var\(--note-line\);/, box)
     head = rule.(".content-block--note .note-head")
     assert_match(/color:\s*var\(--note-ink\);/, head)
-    assert_match(/font-size:\s*inherit;/, head, "the h3 is the body's size, whatever the theme's h3 is (plan ruling 14)")
-    assert_match(/clip-path:\s*inset\(50%\);/, rule.(".content-block--note .note-kind"), "the kind's word before a title is heard, not seen (decision 6)")
+    assert_match(/font-size:\s*inherit;/, head, "the h3 is the body's size, whatever the theme's h3 is")
+    assert_match(/clip-path:\s*inset\(50%\);/, rule.(".content-block--note .note-kind"), "the kind's word before a title is heard, not seen")
     assert_no_match(/color:/, rule.(".content-block--note .note-body"), "the text is the theme's ink, from .cs-prose")
     code = rule.(".content-block--note .note-body :not(pre) > code")
     assert_match(/background:\s*var\(--th-surface\);/, code)
     assert_match(/border:\s*1px solid var\(--th-line\);/, code)
   end
 
-  # Spec decision 9 (Claude Design D4a): Note neutral, Tip the ok green,
-  # Important the accent blue, Warning the warn amber; red is for errors.
+  # Each kind in its hue: Note neutral, Tip the ok green, Important the
+  # accent blue, Warning the warn amber. Red is kept for errors.
   NOTE_HUES = { "note" => "--th-line-strong", "tip" => "--th-ok", "important" => "--th-accent", "warning" => "--th-warn" }.freeze
 
   test "the sixteen note tokens are defined from the theme's base tokens in both schemes, never a literal, each kind in its hue and none in red" do
@@ -373,7 +373,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Note block spec, "Contrast": the text, the link colour and the kind's
+  # The text, the link colour and the kind's
   # ink, each at 4.5:1 on the kind's ground, on the page, in a tinted band
   # and in a strong band, in both schemes. 4 kinds x 3 x 3 grounds x 2 = 72.
   # A note's ground is computed where it is declared: on the page and in a
@@ -398,13 +398,13 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_equal 72, pairs
   end
 
-  # Spec decision 10 (Claude Design D4b), plan ruling 8: on a strong band a
-  # note shares the band's ground and its text is the band's, but each kind
-  # keeps its colour on its rule and its icon (the ink, which colours the
-  # word too): Note the band's dim and text, Important the band's accent,
-  # Tip and Warning their hue mixed with the band's text. The band is a dark
-  # ground in both schemes, so these are light inks in both, each at 3:1 or
-  # better against the band (the ink is held at 4.5:1 above, as text).
+  # On a strong band a note shares the band's ground and its text is the
+  # band's, but each kind keeps its colour on its rule and its icon (the ink,
+  # which colours the word too): Note the band's dim and text, Important the
+  # band's accent, Tip and Warning their hue mixed with the band's text. The
+  # band is a dark ground in both schemes, so these are light inks in both,
+  # each at 3:1 or better against the band (the ink is held at 4.5:1 above, as
+  # text).
   test "on a strong band a note shares the band's ground and each kind keeps its colour: its rule and its icon at 3:1 against the band in both themes; a tinted band leaves the notes alone" do
     strong = band_values("strong")
     expected = {
@@ -440,8 +440,8 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   CARD_TOKENS = %w[--th-card-ground --th-card-line --th-card-icon].freeze
 
-  # The Card's ground, frame and icon are three tokens of its own; the title stays --th-ink and the text
-  # --th-dim.
+  # The Card's ground, frame and icon are three tokens of its own; the title
+  # stays --th-ink and the text --th-dim.
   test "the card's tokens are defined from the theme's base tokens in both schemes, never a literal" do
     theme_tokens.each do |theme, tokens|
       CARD_TOKENS.each do |name|
@@ -498,7 +498,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_operator contrast(quarter, resolve_colour(tokens, "--th-paper")), :<, contrast(three_quarters, resolve_colour(tokens, "--th-paper"))
   end
 
-  # Code block spec §5: one token per role the highlighter names, each with
+  # One token per role the highlighter names, each with
   # its dark value.
   SYNTAX_TOKENS = %w[comment keyword string constant tag attribute embed].map { |role| "--th-syn-#{role}" }.freeze
 
@@ -528,10 +528,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # WCAG 1.4.3 for code (design answer C8: "check all seven, comments are
-  # usually the one that fails"): every role on every ground a code block
-  # has, in both themes. 42 pairs; the lowest is the comment in a dark
-  # strong band, 4.84:1.
+  # WCAG 1.4.3 for code, all seven roles (the comment is the one that usually
+  # fails): every role on every ground a code block has, in both themes. 42
+  # pairs; the lowest is the comment in a dark strong band, 4.84:1.
   test "every syntax colour is readable on every ground a code block has: the page, a tinted band and a strong band, in both themes" do
     pairs = 0
     theme_tokens.each do |theme, tokens|
@@ -548,10 +547,10 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   # The rest of what is written on that ground: plain code (`--th-ink`), the
   # head strip's language (`--th-dim`) and Copy's word, at rest and under the
-  # pointer (the accent and its hover), each text at 4.5:1. And the two
-  # focus rings, which are not text and need 3:1 (WCAG 1.4.11; design answer
-  # C8): Copy's is drawn inside the strip, on the code's ground, and the
-  # code's own is drawn outside the block, on what is around it.
+  # pointer (the accent and its hover), each text at 4.5:1. And the two focus
+  # rings, which are not text and need 3:1 (WCAG 1.4.11): Copy's is drawn
+  # inside the strip, on the code's ground, and the code's own is drawn
+  # outside the block, on what is around it.
   test "plain code, the head strip and Copy are readable on every ground a code block has, and both focus rings stand out, in both themes" do
     theme_tokens.each do |theme, tokens|
       code_grounds(tokens).each do |place, here|
@@ -566,10 +565,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Spec decision 8 (confirmed by the owner): on a strong band the code is
-  # one colour. The band re-values the seven to its own text colour, the
-  # comment to its dim; the test above measures both on the band's sunken
-  # ground. A tinted band re-values none of them.
+  # On a strong band the code is one colour. The band re-values the seven to
+  # its own text colour, the comment to its dim; the test above measures both
+  # on the band's sunken ground. A tinted band re-values none of them.
   test "on a strong band the code is one colour: the seven are the band's text colour, the comment its dim; a tinted band leaves them alone" do
     strong = band_values("strong")
     (SYNTAX_TOKENS - %w[--th-syn-comment]).each { |token| assert_equal "var(--th-on-band-strong)", strong[token], token }
@@ -618,7 +616,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
 
   TABLE_TOKENS = %w[table-rule table-line table-head table-caption table-ground].freeze
 
-  # Table block spec, "The public side": five tokens from the base, in both
+  # The Table block's public side: five tokens from the base, in both
   # schemes, never a literal.
   test "the five table tokens are defined from the theme's base tokens in both schemes, never a literal" do
     theme_tokens.each do |theme, tokens|
