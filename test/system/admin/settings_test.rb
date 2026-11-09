@@ -146,6 +146,29 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The frame's heading and chip are words, not controls: the keyboard goes
+  # from one card's controls straight to the next's.
+  test "a Settings card takes no Tab stop: the keyboard passes its heading and chip and stops only on its controls" do
+    at_window(1600) do
+      visit_screen admin_settings_path
+      find(".admin-settings-layout h1").click
+      stops = Array.new(40) do
+        page.send_keys(:tab)
+        page.evaluate_script(<<~JS)
+          (() => {
+            const element = document.activeElement
+            const card = element.closest(".admin-settings-card")
+            if (!card) return "outside"
+            return element.closest(".admin-settings-card__head h2, .admin-settings-card__head [aria-hidden=true]") ? "head word" : card.id
+          })()
+        JS
+      end
+      assert_not_includes stops, "head word"
+      assert_includes stops, "settings-site-card"
+      assert_includes stops.uniq, "settings-languages-card"
+    end
+  end
+
   # A row is a same-page link, as the nav's are: nothing is left, so the
   # leave guard does not ask, and the typed change stays counted.
   test "a rail link with typed changes jumps to its card without asking" do

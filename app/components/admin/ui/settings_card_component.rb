@@ -36,7 +36,7 @@ module Admin
         keys: [],
         slots: %i[head_end head_note heading_mark],
         controller: nil,
-        keyboard: [ "test/system/admin/form_builder_test.rb", "a builder card takes no Tab stop: the keyboard goes from the form's name field to its first field's controls" ]
+        keyboard: [ "test/system/admin/settings_test.rb", "a Settings card takes no Tab stop: the keyboard passes its heading and chip and stops only on its controls" ]
       )
 
       renders_one :head_end

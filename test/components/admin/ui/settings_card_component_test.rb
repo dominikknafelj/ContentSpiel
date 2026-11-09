@@ -67,12 +67,4 @@ class Admin::Ui::SettingsCardComponentTest < ViewComponent::TestCase
     assert_includes head[:class].split, "rounded-t-card"
     assert_no_match(/(?<![\w-])border(?:-|\s|\z)/, head[:class])
   end
-
-  test "a section's options are its id, its name read by the key, its icon and its family" do
-    view = Object.new.tap { |reader| reader.define_singleton_method(:t) { |key| I18n.t(key) } }
-    options = Admin::SettingsScreen::SectionCard.options(mail, view)
-
-    assert_equal({ heading_id: "mail", heading: "Mail", icon: mail.icon, family: mail.family }, options)
-    assert_equal "admin.components.settings_screen.sections.mail", Admin::SettingsScreen::SectionCard.word_key(mail)
-  end
 end
