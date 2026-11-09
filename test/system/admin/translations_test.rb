@@ -554,7 +554,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     click_on "Español"
     assert_equal "", find_field("settings-es-title").value
     assert_no_selector "#translation-suggestion-settings-es-title textarea", visible: :all
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
     assert_equal "[de] Test Site", site_settings(:default).reload.title(locale: "de")
     assert_nil site_settings(:default).title(locale: "es", fallback: false)
@@ -568,7 +568,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-original-for='tagline']", text: "Things I learned"
 
     fill_in "settings-de-tagline", with: "Was ich gelernt habe"
-    click_on "Save"
+    click_on "Save changes"
     assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
     assert_equal "Things I learned", site_settings(:default).reload.tagline(locale: "en")
 

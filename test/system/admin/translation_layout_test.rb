@@ -103,7 +103,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     original = "[data-block-id='#{block.id}'] [data-original-for='body']"
     field = "[data-block-id='#{block.id}'] .admin-translation-pair > div:first-child"
 
-    page.driver.resize(content_window(1200), 1000)
+    page.current_window.resize_to(content_window(1200), 1000)
     visit "/cs-studio/pages/#{page_record.id}?locale=de"
     await_admin_controllers
     assert_selector "[data-block-id='#{block.id}'] .ProseMirror"
@@ -112,7 +112,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     top_of_original, top_of_field = tops_of(original, field)
     assert_operator top_of_original, :<, top_of_field - 4, "stacked, the original stands above the field"
 
-    page.driver.resize(content_window(1600), 1000)
+    page.current_window.resize_to(content_window(1600), 1000)
     visit "/cs-studio/pages/#{page_record.id}?locale=de"
     await_admin_controllers
     assert_selector "[data-block-id='#{block.id}'] .ProseMirror"
@@ -126,7 +126,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     assert_in_delta field_box[2] - field_box[0], original_box[2] - original_box[0], 1, "the two halves share the form"
   ensure
     page.execute_script("try { window.localStorage.removeItem('cs-tree-folded') } catch (error) {}")
-    page.driver.resize(1400, 1400)
+    page.current_window.resize_to(1400, 1400)
   end
 
   private
