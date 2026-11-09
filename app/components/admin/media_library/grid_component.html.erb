@@ -8,13 +8,13 @@
 <% if assets.empty? %>
   <div class="rounded-card bg-surface shadow-1" data-media-empty>
     <% if filtered? %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No images match the current search or filter.") do |empty_state| %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.no_matches"), description: t(".empty.no_matches_description")) do |empty_state| %>
         <% empty_state.with_action do %>
-          <%= link_to "Clear filters", clear_filters_path, class: setup_secondary_link_class, data: clear_filters_data %>
+          <%= link_to t(".empty.clear"), clear_filters_path, class: setup_secondary_link_class, data: clear_filters_data %>
         <% end %>
       <% end %>
     <% else %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No images.", description: pick? ? "Use Upload above to add one." : "Upload one above.") %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: pick? ? t(".empty.picker_description") : t(".empty.description")) %>
     <% end %>
   </div>
 <% end %>

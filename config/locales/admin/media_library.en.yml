@@ -1,12 +1,46 @@
 # The Media library's components (`app/components/admin/media_library/`):
 # `admin.components.media_library.*` are their keys (docs/reference/i18n.md:
 # one file per component folder). The panel's older words are still
-# literals; only "Download original" is a key so far.
+# literals; only "Download original" is a key so far. A tile's notes words
+# are in `notes.en.yml`, which holds what notes put on other screens.
 en:
   admin:
     components:
       media_library:
-        upload_hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
+        tile:
+          no_alt: "No alt"
+          unused: "Unused"
+        grid:
+          empty:
+            title: "No images."
+            description: "Upload one above."
+            picker_description: "Use Upload above to add one."
+            no_matches: "No matches."
+            no_matches_description: "No images match the current search or filter."
+            clear: "Clear filters"
+        toolbar:
+          search_label: "Search images"
+          search_placeholder: "Search title, alt text or filename"
+          show: "Show"
+          filter: "Filter"
+          clear: "Clear"
+          segments:
+            all: "All"
+            unused: "Unused"
+            missing_alt: "Missing alt"
+            untranslated: "Untranslated"
+            mine: "Mine"
+        # What an upload's progress tile says (`media/upload_tiles.js`, read
+        # from the `data-messages` of the Media screen's upload wrapper and of
+        # the picker's dialog). `status_*` are said to a screen reader.
+        uploads:
+          uploading: "Uploading…"
+          progress: "Uploading %{name}"
+          failed: "Upload failed"
+          offline: "Couldn't upload — check your connection"
+          dismiss: "Dismiss"
+          status_done: "Uploaded %{name}"
+          status_failed: "%{name} was not uploaded: %{reason}"
         panel:
           download_original: "Download original"
           download_hint: "Only editors can download the original."

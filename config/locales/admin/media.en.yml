@@ -1,0 +1,11 @@
+# The Media screen's own keys (docs/reference/i18n.md): `admin.media.index` is
+# the view's lazy-lookup scope (`app/views/admin/media/index.html.erb`). Its
+# toolbar, grid and tiles say theirs as `admin.components.media_library`.
+en:
+  admin:
+    media:
+      index:
+        title: "Media"
+        upload: "Upload images"
+        hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
+        drop: "Drop images to upload"

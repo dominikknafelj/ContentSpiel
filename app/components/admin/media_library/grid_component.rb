@@ -4,19 +4,18 @@ module Admin
   # `app/services/media/*`) for every *bare* `Media::` reference lexically
   # nested under `module Admin` elsewhere in this app -- Ruby's constant
   # lookup checks a class's own lexical scope, `Admin` included, before it
-  # ever falls back to the top level. That trap briefly existed mid-task
-  # (see the git history) and broke the hero-image and image-block upload
-  # paths (`NameError: uninitialized constant Admin::Media::Upload`)
-  # without touching a single line of this module's own code -- named
-  # `MediaLibrary` instead, so `Admin.const_defined?(:Media, false)` never
-  # becomes true and no other `Admin::*` file ever has to remember to
-  # write `::Media::` on its own account. `test/lib/admin_namespace_shadow_
-  # test.rb` guards against this regressing, for every domain module.
+  # ever falls back to the top level, so the hero-image and image-block
+  # upload paths would raise `NameError: uninitialized constant
+  # Admin::Media::Upload` without a line of this module's own code changed.
+  # Named `MediaLibrary`, `Admin.const_defined?(:Media, false)` never becomes
+  # true and no other `Admin::*` file has to remember to write `::Media::` on
+  # its own account. `test/lib/admin_namespace_shadow_test.rb` guards it, for
+  # every domain module.
   module MediaLibrary
-    # The Media module's own grid (media library design spec §6):
-    # one `TileComponent` per asset, each linking to `/media?selected=ID` (the
-    # side panel, `PanelComponent`) with the grid's own state (`link_params`:
-    # `q`, `filter`, `page`) kept; `selected_id` is the tile with the ring.
+    # The Media module's own grid: one `TileComponent` per asset, each
+    # linking to `/media?selected=ID` (the side panel, `PanelComponent`) with
+    # the grid's own state (`link_params`: `q`, `filter`, `page`) kept;
+    # `selected_id` is the tile drawn as chosen (`aria-current`).
     # Every asset this renders must be
     # loaded through `Media::Asset.with_file` (`Media::Search`'s default
     # scope has it) -- `#thumbnail_url` reads `#srcset`, which is
@@ -34,7 +33,8 @@ module Admin
     # The `<ul>` is drawn even when there is nothing to list (the empty state
     # follows it, marked `data-media-empty`): an upload that finishes into an
     # empty library (`media/upload_tiles.js`) has a list to put its tiles in,
-    # and takes the empty state away once it has.
+    # and takes the empty state away once it has. Its words are
+    # `admin.components.media_library.grid.empty.*`.
     class GridComponent < Admin::AdminComponent
       def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default, selected_id: nil, link_params: {})
         @assets = assets
@@ -64,7 +64,7 @@ module Admin
 
       def clear_filters_data = pick? ? {} : { turbo_frame: "content", turbo_action: "replace" }
 
-      # The thumbnail ruling (design spec §6): `Media::Asset#thumbnail_url`.
+      # The grid's thumbnail is `Media::Asset#thumbnail_url`.
       def thumbnail_url(asset) = asset.thumbnail_url
 
       # The panel's URL for one tile: the grid's own state, the editing
@@ -79,8 +79,8 @@ module Admin
       def used_ids = @used_ids ||= Media::Usage.where(media_asset_id: assets.map(&:id)).distinct.pluck(:media_asset_id).to_set
 
       # Open notes per image on this page of the grid, one grouped query like
-      # `used_ids` (notes spec §4.4), and one beside it for the images with
-      # something unread for the viewer (§4.5). Not in the picker: choosing an
+      # `used_ids`, and one beside it for the images with something unread
+      # for the viewer. Not in the picker: choosing an
       # image is not the place to read about it. Both come from
       # `Admin::NoteCountsHelper#media_note_marks`, which is also where the
       # viewer's right to know is asked; `assets` is a page of

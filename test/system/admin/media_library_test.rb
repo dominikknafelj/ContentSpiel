@@ -107,6 +107,29 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"
   end
 
+  # A tile's look is `.admin-tile`'s: elevation 1 at rest, 2 under the
+  # pointer, and the chosen one keeps 1 with the accent outline 2px out. The
+  # figures are read against the tokens resolved in the same page.
+  test "a tile rises under the pointer, and the chosen one has the accent outline 2px out" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    chosen = create_media_asset(filename: "tiny.png")
+    other = create_media_asset(filename: "wide.png")
+    sign_in_via_form(users(:one))
+
+    visit_screen "/cs-studio/media?selected=#{chosen.id}"
+    find("h1").hover
+    shadow_1, shadow_2, accent = token_values("box-shadow: var(--cs-shadow-1)", "box-shadow: var(--cs-shadow-2)", "color: var(--cs-accent)")
+    assert_not_equal shadow_1, shadow_2, "the premise: the two elevations differ"
+
+    assert_equal [ shadow_1, "none" ], tile_look(other).values_at("shadow", "outlineStyle")
+    assert_equal({ "shadow" => shadow_1, "outlineStyle" => "solid", "outlineWidth" => "2px", "outlineOffset" => "2px", "outlineColor" => accent, "borderWidth" => "0px" },
+      tile_look(chosen))
+
+    find("#media-asset-#{other.id} a").hover
+    assert_eventually(message: -> { "the hovered tile's shadow is #{tile_look(other)["shadow"]}" }) { tile_look(other)["shadow"] == shadow_2 }
+    assert_equal "none", tile_look(other)["outlineStyle"]
+  end
+
   # Drop images anywhere on the screen. A real OS drag cannot be
   # driven from here, so the page itself builds the `DataTransfer` and fires the
   # same events a drag would (`dragenter`, then `drop`).
@@ -501,6 +524,31 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   def dispatch_file_drop(*names)
     page.execute_script("#{files_script(*names)} document.querySelector('h1').dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))")
+  end
+
+  # Each declaration's computed value on a probe inside the content frame,
+  # where the screen's own tokens apply.
+  def token_values(*declarations)
+    page.evaluate_script(<<~JS)
+      #{declarations.to_json}.map((declaration) => {
+        const probe = document.createElement("div")
+        probe.style.cssText = declaration
+        document.querySelector("#content").append(probe)
+        const style = getComputedStyle(probe)
+        const value = declaration.startsWith("color") ? style.color : style.boxShadow
+        probe.remove()
+        return value
+      })
+    JS
+  end
+
+  def tile_look(asset)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.querySelector("#media-asset-#{asset.id} a"))
+        return { shadow: style.boxShadow, outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth, outlineOffset: style.outlineOffset, outlineColor: style.outlineColor, borderWidth: style.borderTopWidth }
+      })()
+    JS
   end
 
   # Enter, to whatever has the focus -- no click first (see the keyboard test).

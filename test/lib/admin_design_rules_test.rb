@@ -205,8 +205,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     .reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
   CONTROL_STATE = /(?<![\w-])(?:hover|focus|focus-within|focus-visible|has-checked|has-\[:checked\]|placeholder):|\bcursor-pointer\b/
   STRONG_LINE_ALLOWED = {
-    "data-mind-graph-card" => "the graph's card is a panel that takes the focus; its outline is the focus ring",
-    'CARD = "group block w-full overflow-hidden' => "a media tile is told by its picture; its hover line only groups"
+    "data-mind-graph-card" => "the graph's card is a panel that takes the focus; its outline is the focus ring"
   }.freeze
 
   test "a control is identified by a field-line edge or a fill of its own, never border-line-strong" do
@@ -759,16 +758,38 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # card is an elevation, a table's lines stay inside its card, and a
   # control keeps its field-line frame. Each screen's folders join
   # `CONTENT_SIDE_SCREENS` (globs from the root) as it is drawn on the scale.
-  # Refused there: an arbitrary pixel size, `text-xs` (the label is
-  # `text-label`), the hand-drawn `rounded-cs border border-line` box, a
-  # dashed edge and an important danger edge.
-  CONTENT_SIDE_SCREENS = [].freeze
-  OFF_SCALE_OR_HAND_BOX = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])rounded-cs border border-line(?:-strong)?(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
+  # Refused there, line by line: an arbitrary pixel size, `text-xs` (the
+  # label is `text-label`), a dashed edge and an important danger edge. And,
+  # string by string: the hand-drawn box, `rounded-cs` with `border-line` (or
+  # `-strong`, under any variant) in one quoted class string, in whatever
+  # order. A Ruby literal continued on the next line (`"…" \` then `"…"`) is
+  # one string.
+  CONTENT_SIDE_SCREENS = %w[
+    app/components/admin/media_library/*
+    app/views/admin/media/*
+    app/components/media/picker_component.*
+  ].freeze
+  OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
+  QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
+  BOX_EDGE = /\A(?:[\w-]+:)*border-line(?:-strong)?\z/
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
-  HAND_BOX_ALLOWED = {}.freeze
+  HAND_BOX_ALLOWED = {
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
+  }.freeze
 
   def self.content_side_sources = CONTENT_SIDE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
+
+  # `[line number, what was refused]` for each refused look in `source`.
+  def self.refused_looks(source)
+    lines = source.each_line.each_with_index.filter_map { |line, index| [ index + 1, line[OFF_SCALE] ] if line.match?(OFF_SCALE) }
+    boxes = source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(/"[ \t]*\\\n[ \t]*"/, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if classes.include?("rounded-cs") && classes.any? { |name| name.match?(BOX_EDGE) }
+    end
+    (lines + boxes).sort_by(&:first)
+  end
 
   test "the content-side screens draw no off-scale size and no hand-drawn box" do
     CONTENT_SIDE_SCREENS.each { |glob| assert Dir[Rails.root.join(glob)].any?, "#{glob} matches no file: the guard looks at nothing there" }
@@ -776,20 +797,25 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       relative = Pathname(path).relative_path_from(Rails.root).to_s
       next [] if HAND_BOX_ALLOWED.key?(relative)
 
-      File.readlines(path).each_with_index.filter_map do |line, index|
-        "#{relative}:#{index + 1}: #{line[OFF_SCALE_OR_HAND_BOX]}" if line.match?(OFF_SCALE_OR_HAND_BOX)
-      end
+      self.class.refused_looks(File.read(path)).map { |line, look| "#{relative}:#{line}: #{look}" }
     end
     assert_empty offences, "a size is a type token (text-small, text-body, text-label) and a box is a card's elevation"
     HAND_BOX_ALLOWED.each_key do |path|
       assert_includes self.class.content_side_sources, Rails.root.join(path).to_s, "#{path} is allowed but is on no content-side screen"
-      assert Rails.root.join(path).read.match?(OFF_SCALE_OR_HAND_BOX), "#{path} draws none of the refused looks: drop it from HAND_BOX_ALLOWED"
+      assert self.class.refused_looks(Rails.root.join(path).read).any?, "#{path} draws none of the refused looks: drop it from HAND_BOX_ALLOWED"
     end
   end
 
-  test "the off-scale pattern matches a pixel size, text-xs, a hand-drawn box, a dashed edge and an important danger edge, and not a token or a table's line" do
-    [ "text-[13px]", "text-xs", "rounded-cs border border-line", "border-dashed", "!border-danger" ].each { |sample| assert_match OFF_SCALE_OR_HAND_BOX, sample }
-    [ "text-small", "border-b border-line", "text-xs-foo" ].each { |sample| assert_no_match OFF_SCALE_OR_HAND_BOX, sample }
+  test "the off-scale check finds a pixel size, text-xs, a hand-drawn box in any order, a dashed edge and an important danger edge, and not a token, a table's line or a control's frame" do
+    [ "text-[13px]", "text-xs", %(class="rounded-cs border border-line"), "border-dashed", "!border-danger",
+      %(class="border border-line bg-sunken rounded-cs"), %(class="rounded-cs border hover:border-line-strong"),
+      %(CARD = "block rounded-cs border " \\\n         "border-line".freeze) ].each do |sample|
+      assert_not_empty self.class.refused_looks(sample), sample
+    end
+    [ "text-small", %(class="border-b border-line"), "text-xs-foo", %(class="rounded-cs border border-field-line"),
+      %(class="rounded-cs px-2" title="border-line") ].each do |sample|
+      assert_empty self.class.refused_looks(sample), sample
+    end
   end
 
   # A triangle glued to its words reads "▾PAGE SETTINGS". A mono-label

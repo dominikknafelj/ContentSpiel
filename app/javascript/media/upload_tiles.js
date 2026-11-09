@@ -1,5 +1,7 @@
+import { messages } from "i18n/messages"
+
 // The upload queue the Media screen (`admin--media--upload`) and the media
-// picker (`admin--media--picker`) share (round 3, Task 9).
+// picker (`admin--media--picker`) share.
 //
 // Files go up ONE AT A TIME, each as a progress tile at the start of the grid:
 // its name, a bar, "Uploading…". The server's answer (`Admin::MediaUploadResponses`)
@@ -21,11 +23,25 @@
 // A grid can be replaced under live tiles (a search in the picker, a tile click
 // on the Media screen is a frame navigation): the tiles still uploading or
 // failed are kept here and put back at the start of the new grid by `#reattach`.
-export const TEXTS = {
-  uploading: "Uploading…",
-  dismiss: "Dismiss",
-  failedNetwork: "Couldn't upload — check your connection",
-  failedGeneric: "Upload failed"
+//
+// A progress tile is drawn in the finished tile's box (`tileClass`,
+// `Admin::MediaLibrary::TileComponent::CARD`, handed over by the host's view)
+// and says the words the host's `data-messages` serves
+// (`TileComponent::UPLOAD_MESSAGES`); this module holds neither.
+
+// The words of a progress tile, read once from the host's element: an unknown
+// key throws at connect, not halfway through an upload.
+export function uploadWords(element) {
+  const m = messages(element)
+  return {
+    uploading: m.t("components.media_library.uploads.uploading"),
+    failed: m.t("components.media_library.uploads.failed"),
+    offline: m.t("components.media_library.uploads.offline"),
+    dismiss: m.t("components.media_library.uploads.dismiss"),
+    progress: (name) => m.t("components.media_library.uploads.progress", { name }),
+    done: (name) => m.t("components.media_library.uploads.status_done", { name }),
+    notDone: (name, reason) => m.t("components.media_library.uploads.status_failed", { name, reason })
+  }
 }
 
 export function csrfToken() {
@@ -48,10 +64,14 @@ export class UploadTiles {
   // onUploaded: ({ json, tile, file }) => void -- after the finished tile is in
   //             (when there is a grid to put it in)
   // announce:   (message) => void -- the polite live region
+  // tileClass:  the progress tile's box, the finished tile's own classes
   // buttonClass: the Dismiss button's classes, `Admin::Ui::ButtonComponent`'s
-  //             small secondary, handed over by the view (no copy lives here)
-  constructor({ url, grid, fields = () => ({}), onUploaded = () => {}, announce = () => {}, buttonClass = "" }) {
-    Object.assign(this, { url, grid, fields, onUploaded, announce, buttonClass })
+  //             small secondary
+  // words:      `uploadWords(host element)`
+  // The three are handed over by the view, so no copy of a look or a word
+  // lives here.
+  constructor({ url, grid, fields = () => ({}), onUploaded = () => {}, announce = () => {}, tileClass, buttonClass, words }) {
+    Object.assign(this, { url, grid, fields, onUploaded, announce, tileClass, buttonClass, words })
     this.queue = []
     this.live = []
     this.current = null
@@ -118,7 +138,7 @@ export class UploadTiles {
           // And marking it failed is itself only that tile's business: a tile
           // whose markup is gone must not stop the loop either.
           try {
-            if (generation === this.generation && entry.li.isConnected) this.fail(entry, TEXTS.failedGeneric)
+            if (generation === this.generation && entry.li.isConnected) this.fail(entry, this.words.failed)
           } catch { /* the rest still go */ }
         }
       }
@@ -139,7 +159,7 @@ export class UploadTiles {
       this.finish(entry, json)
     } else {
       const errors = Array.isArray(json?.errors) && json.errors.length > 0 ? json.errors : null
-      this.fail(entry, errors ? errors.join(". ") : (status === 0 ? TEXTS.failedNetwork : TEXTS.failedGeneric))
+      this.fail(entry, errors ? errors.join(". ") : (status === 0 ? this.words.offline : this.words.failed))
     }
   }
 
@@ -179,7 +199,7 @@ export class UploadTiles {
     } else {
       entry.li.remove()
     }
-    this.announce(`Uploaded ${entry.file.name}`)
+    this.announce(this.words.done(entry.file.name))
     this.onUploaded({ json, tile, file: entry.file })
   }
 
@@ -188,9 +208,9 @@ export class UploadTiles {
     li.dataset.state = "failed"
     li.querySelector("[data-upload-bar]").hidden = true
     li.querySelector("[data-upload-status]").textContent = reason
-    li.querySelector("[data-upload-status]").className = "text-xs text-danger-ink"
+    li.querySelector("[data-upload-status]").className = "text-label text-warn-ink"
     li.querySelector("[data-upload-dismiss]").hidden = false
-    this.announce(`${entry.file.name} was not uploaded: ${reason}`)
+    this.announce(this.words.notDone(entry.file.name, reason))
   }
 
   progress(entry, fraction) {
@@ -212,14 +232,14 @@ export class UploadTiles {
     li.dataset.uploadTile = ""
     // The group role is on the card, not the <li>: it would replace the item's
     // listitem role and the grid would stop being a list.
-    const card = element("div", "flex flex-col overflow-hidden rounded-card bg-surface shadow-1")
+    const card = element("div", this.tileClass)
     card.setAttribute("role", "group")
     card.setAttribute("aria-label", name)
     const preview = element("div", "flex aspect-[4/3] w-full flex-col justify-end bg-sunken")
     const bar = element("div", "h-[3px] w-full bg-line")
     bar.dataset.uploadBar = ""
     bar.setAttribute("role", "progressbar")
-    bar.setAttribute("aria-label", `Uploading ${name}`)
+    bar.setAttribute("aria-label", this.words.progress(name))
     bar.setAttribute("aria-valuemin", "0")
     bar.setAttribute("aria-valuemax", "100")
     bar.setAttribute("aria-valuenow", "0")
@@ -232,14 +252,14 @@ export class UploadTiles {
     const body = element("div", "flex flex-col gap-1 px-2.5 py-2")
     const title = element("span", "truncate text-sm font-medium text-ink")
     title.textContent = name
-    const status = element("span", "text-xs text-meta")
+    const status = element("span", "text-label text-meta")
     status.dataset.uploadStatus = ""
-    status.textContent = TEXTS.uploading
+    status.textContent = this.words.uploading
     const dismiss = element("button", `self-start ${this.buttonClass}`)
     dismiss.type = "button"
     dismiss.hidden = true
     dismiss.dataset.uploadDismiss = ""
-    dismiss.textContent = TEXTS.dismiss
+    dismiss.textContent = this.words.dismiss
     dismiss.addEventListener("click", () => this.dismissTile(li))
     body.append(title, status, dismiss)
 

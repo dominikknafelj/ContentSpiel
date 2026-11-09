@@ -53,7 +53,7 @@ export default class extends Controller {
     this.showChosen(false)
     // The Remove button just hid itself; focus goes to Choose rather than
     // being dropped on the page body -- or, for someone who can't choose
-    // (no `media.upload`, so no Choose button), to the field itself
+    // (without the media.upload permission, so no Choose button), to the field itself
     // (`tabindex="-1"` on the component's wrapper).
     if (this.hasChooseTarget) {
       this.chooseTarget.focus()

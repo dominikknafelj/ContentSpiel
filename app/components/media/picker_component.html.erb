@@ -7,7 +7,9 @@
         action: ACTIONS,
         "admin--media--picker-grid-url-value": grid_url,
         "admin--media--picker-upload-url-value": upload_url,
-        "admin--media--picker-button-class-value": Admin::Ui::ButtonComponent.classes(:secondary, size: :small)
+        "admin--media--picker-tile-class-value": Admin::MediaLibrary::TileComponent::CARD,
+        "admin--media--picker-button-class-value": Admin::Ui::ButtonComponent.classes(:secondary, size: :small),
+        messages: messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES)
       } do %>
   <%# Padding lives on the sections below, not the <dialog>: a click on the
       dialog's own padding is a click on the <dialog> element, which the

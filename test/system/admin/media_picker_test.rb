@@ -225,6 +225,39 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
   end
 
+  # The picker draws the library's tile class and keeps its own fixed columns,
+  # which follow the window, not a container.
+  test "the picker's tiles are the library's: a pressed tile has the accent outline, and the columns stay 2 to 6" do
+    visit_editor(@landing)
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") { click_on @asset.title }
+    assert_selector "dialog[open] button.admin-tile[aria-pressed=true]", text: @asset.title
+    assert_equal Admin::MediaLibrary::TileComponent::CARD, find("dialog[open] button[aria-pressed=true]")[:class]
+
+    accent = page.evaluate_script(<<~JS)
+      (() => {
+        const probe = document.createElement("div")
+        probe.style.color = "var(--cs-accent)"
+        document.querySelector("dialog[open]").append(probe)
+        const color = getComputedStyle(probe).color
+        probe.remove()
+        return color
+      })()
+    JS
+    look = page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.querySelector("dialog[open] button[aria-pressed=true]"))
+        return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor, style.borderTopWidth ]
+      })()
+    JS
+    assert_equal [ "solid", "2px", "2px", accent, "0px" ], look
+
+    columns = -> { page.evaluate_script(%(getComputedStyle(document.querySelector("dialog[open] ul.admin-media-grid")).gridTemplateColumns.split(" ").length)) }
+    assert_equal 6, columns.call
+    at_window(600) { assert_eventually(message: -> { "the picker shows #{columns.call} columns at 600px" }) { columns.call == 2 } }
+  end
+
   test "the search is instant with no button, segments filter inside the dialog, and the selection survives" do
     other = create_media_asset(filename: "tiny.png")
     visit_editor(@landing)

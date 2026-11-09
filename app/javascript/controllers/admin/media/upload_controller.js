@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
-import { UploadTiles, updateCounts } from "media/upload_tiles"
+import { UploadTiles, updateCounts, uploadWords } from "media/upload_tiles"
 
-// The Media module's own multi-file upload (media library design spec §6):
+// The Media module's own multi-file upload:
 // files dropped anywhere on the screen (`admin--media--drop`, which hands
 // them over as `admin--media--drop:dropped`), the header's "Upload images" button
 // and the plain file input in the drop zone -- all three end in `#upload`, which
@@ -10,26 +10,33 @@ import { UploadTiles, updateCounts } from "media/upload_tiles"
 // keeps one refused or oversized file (an SVG, something over the site's largest upload) from blocking
 // its siblings: it keeps its own tile with the server's reason and Dismiss, and
 // the others become real tiles. There is no browser `alert()`/`confirm()` here
-// (spec: "no browser dialogs") and, since this round, no reload: the answer carries
+// and no reload: the answer carries
 // the finished tile and the new counts (`media/upload_tiles.js`), so an upload that
 // ends while an editor is typing in the side panel changes nothing under them.
 //
 // The queue is module-level, not per controller: choosing a tile is a frame
 // navigation that replaces this very element, and a file still going up (or a
 // refused one's tile) must outlive that. The next instance takes the queue over
-// (`connect`) and puts the live tiles back at the start of the new grid.
+// (`connect`) and puts the live tiles back at the start of the new grid. The
+// progress tile's box, its Dismiss button's look and its words are the view's
+// (`tile-class`, `button-class`, `data-messages`).
 let tiles = null
 
 export default class extends Controller {
   static targets = [ "input", "status" ]
-  static values = { url: String, buttonClass: String }
+  static values = { url: String, tileClass: String, buttonClass: String }
 
   connect() {
-    if (!tiles) {
-      tiles = new UploadTiles({ url: this.urlValue, grid: () => this.grid, fields: () => this.fields, onUploaded: (done) => this.uploaded(done), announce: (text) => this.announce(text), buttonClass: this.buttonClassValue })
+    // This page's callbacks (its own status region, its own URL) and looks, the same queue.
+    const options = {
+      url: this.urlValue, grid: () => this.grid, fields: () => this.fields, onUploaded: (done) => this.uploaded(done), announce: (text) => this.announce(text),
+      tileClass: this.tileClassValue, buttonClass: this.buttonClassValue, words: uploadWords(this.element)
     }
-    // This page's callbacks (its own status region, its own URL), the same queue.
-    Object.assign(tiles, { url: this.urlValue, grid: () => this.grid, fields: () => this.fields, announce: (text) => this.announce(text), onUploaded: (done) => this.uploaded(done), buttonClass: this.buttonClassValue })
+    if (tiles) {
+      Object.assign(tiles, options)
+    } else {
+      tiles = new UploadTiles(options)
+    }
     tiles.reattach()
   }
 

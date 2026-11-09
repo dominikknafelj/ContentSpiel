@@ -38,8 +38,8 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
 
     grid(loaded(first, second), selected_id: second.id)
     assert_selector "a[aria-current=true]", count: 1
-    assert_selector "#media-asset-#{second.id} a[aria-current=true].border-accent"
-    assert_selector "#media-asset-#{first.id} a.border-line:not([aria-current])"
+    assert_selector "#media-asset-#{second.id} a.admin-tile[aria-current=true]"
+    assert_selector "#media-asset-#{first.id} a.admin-tile:not([aria-current])"
   end
 
   test "Unused is on the tiles nothing uses, from one query for the whole page" do
@@ -104,6 +104,23 @@ class Admin::MediaLibrary::GridComponentTest < ViewComponent::TestCase
     # A non-scalar `q` is no search (and no error).
     grid(Media::Asset.none, at: "/cs-studio/media?q[]=x")
     assert_selector "[data-media-empty]", text: "No images"
+  end
+
+  test "the empty states are keys, and the filtered one offers Clear filters" do
+    words = I18n.t("admin.components.media_library.grid.empty")
+
+    grid(Media::Asset.none)
+    assert_selector "[data-media-empty]", text: words[:title]
+    assert_selector "[data-media-empty]", text: words[:description]
+    assert_no_link words[:clear]
+
+    grid(Media::Asset.none, pick: true)
+    assert_selector "[data-media-empty]", text: words[:picker_description]
+
+    grid(Media::Asset.none, at: "/cs-studio/media?q=nothing")
+    assert_selector "[data-media-empty]", text: words[:no_matches]
+    assert_selector "[data-media-empty]", text: words[:no_matches_description]
+    assert_link words[:clear], href: "/cs-studio/media"
   end
 
   private

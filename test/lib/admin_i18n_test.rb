@@ -440,6 +440,15 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/setup/review.html.erb
     app/views/setup/mail.html.erb
     app/controllers/setup_controller.rb
+    app/components/admin/media_library/grid_component.rb
+    app/components/admin/media_library/grid_component.html.erb
+    app/components/admin/media_library/tile_component.rb
+    app/components/admin/media_library/tile_component.html.erb
+    app/components/admin/media_library/toolbar_component.rb
+    app/components/admin/media_library/toolbar_component.html.erb
+    app/views/admin/media/index.html.erb
+    app/views/admin/media/picker.html.erb
+    app/javascript/media/upload_tiles.js
   ].freeze
 
   PLACEHOLDER = "".freeze
