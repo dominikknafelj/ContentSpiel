@@ -1220,9 +1220,9 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
   # The glow is the stylesheet's, read from what the browser computes on the card
   # while a mark, put in by `editing/marks.js`, stands in its head.
-  def glow_of(block, held: false)
-    page.evaluate_async_script(<<~JS, card(block), block.id.to_s, held)
-      const [ selector, blockId, held, done ] = arguments
+  def glow_of(block, held: false, discussed: false)
+    page.evaluate_async_script(<<~JS, card(block), block.id.to_s, held, discussed)
+      const [ selector, blockId, held, discussed, done ] = arguments
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
       ;(async () => {
         const marks = await import("editing/marks")
@@ -1232,6 +1232,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         const shadow = () => getComputedStyle(card).boxShadow
         const rest = shadow()
         if (held) card.setAttribute("data-card-edge", "held")
+        if (discussed) card.setAttribute("data-notes-active", "")
         const mark = marks.showMark(document, blockId, template)
         const during = getComputedStyle(card).transitionDuration
         await wait(400)
@@ -1241,6 +1242,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         await wait(900)
         const leaving = shadow()
         marks.clearMarks(card)
+        if (discussed) card.removeAttribute("data-notes-active")
         done({ rest, glowing, leaving, during, out, marks: card.querySelectorAll("[data-editing-mark]").length })
       })().catch((error) => done({ error: String(error) }))
     JS
@@ -1260,6 +1262,9 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
 
     held = glow_of(@second, held: true)
     assert_equal held["rest"], held["glowing"], "a held card shows the people outline alone"
+
+    discussed = glow_of(@first, discussed: true)
+    assert_equal discussed["rest"], discussed["glowing"], "a discussed card shows the people outline alone"
 
     page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
     reduced = glow_of(@first)

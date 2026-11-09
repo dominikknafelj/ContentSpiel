@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# Presence where a person sees it (presence spec §5.1, the handoff's items 1
-# to 8 and 13 to 17): the others on a record, in an editor's header and in
+# Presence where a person sees it: the others on a record, in an editor's header and in
 # the media library's image panel, live. Two people are two Capybara
 # sessions. `await_notes_live` waits for presence's subscription too
 # (`live/state`), so an arrival caused after it is heard.
@@ -43,8 +42,8 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
   def tip(user) = "#{circle(user)} [data-tooltip]"
 
-  # The part's own reading has been drawn: what is shown is no longer the
-  # server's first rendering, and the next drawing is a change.
+  # The part's own reading has been drawn: what is shown is not the
+  # server's first rendering any more, and the next drawing is a change.
   def await_drawn(within: ".admin-editor-header")
     await_js("document.querySelector(#{"#{within} [data-controller~='admin--presence--record']".to_json})?.dataset.presenceDrawn === 'true'", wait: LIVE)
   end
@@ -93,7 +92,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
     assert_no_selector "[data-presence-user='#{@me.id}']"
     # The circle: 26px, the initials, first in the action row and 12px before
-    # the status that follows (handoff 1 and 2).
+    # the status that follows.
     assert_selector circle(@dana) + " > span.size-\\[26px\\][aria-hidden=true]", text: "DW", exact_text: true
     box = page.evaluate_script(<<~JS)
       (() => {
@@ -559,7 +558,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  # --- the tooltip (handoff 18), on the circles that are its first hosts ----
+  # --- the tooltip, on the circles that are its first hosts ----
 
   # When the bubble of `user`'s circle was shown, after the pointer came.
   def watch_tooltips
@@ -1032,7 +1031,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     @page.update_columns(trashed_at: Time.current) # version: none (a system test puts its own page in the trash, around the service, to see a 404)
     assert_selector ".admin-editor-header [data-controller~='admin--presence--record'][data-presence-gone=true][data-live-part=answered]", visible: :all, wait: LIVE
     assert_no_selector group
-    assert_eventually(message: "the tab that can no longer read the record kept its row") { marks(@me).none? }
+    assert_eventually(message: "the tab that cannot read the record kept its row") { marks(@me).none? }
 
     # No more reads: the shortened timer would have asked several times.
     asked = page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length")

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The two reads of presence (the presence spec's reads): a record's people and a
+# The two reads of presence a record's people and a
 # list's markers, both through the read scope.
 class Admin::PresenceTest < ActionDispatch::IntegrationTest
   setup do

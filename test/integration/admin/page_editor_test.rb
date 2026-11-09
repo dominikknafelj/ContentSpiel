@@ -262,7 +262,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "main [data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
   end
 
-  test "a stored template the theme no longer declares is kept by an unrelated autosave" do
+  test "a stored template the theme does not declare is kept by an unrelated autosave" do
     with_page_templates("standard", "gallery") { assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok? }
     get "/cs-studio/pages/#{@page.id}"
     assert_select "main form select[name='page[template]'] option[selected][value=gallery]"

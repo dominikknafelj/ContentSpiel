@@ -1,10 +1,10 @@
-# Notes on content (notes spec): threads of short messages on a page, a post,
+# Notes on content threads of short messages on a page, a post,
 # a block or a library image. This file is the namespace's entry: what the
 # models, the services, the queries and the components all ask about a note's
 # place -- which record lists it, which permission reads and moderates it,
 # what it is called in a DOM id.
 #
-# Notes FOLLOW the content (decision D3): whoever may read a record in CS
+# Notes FOLLOW the content whoever may read a record in CS
 # Studio may read and write its notes, and whoever may edit it may moderate
 # them. There is no permission of their own, so everything here is asked of
 # `AccessControl` with the container's own keys.
@@ -19,8 +19,7 @@ module Notes
   # (`container_for`), so a block is no kind and is added here.
   SUBJECT_ONLY_TYPES = %w[ContentBlock].freeze
 
-  # The composer's emoji popover and the reactions offer the same small set
-  # (spec §4.2); the operating system's own picker works in the field as
+  # The composer's emoji popover and the reactions offer the same small set; the operating system's own picker works in the field as
   # anywhere. `Notes::React` accepts these and nothing else.
   EMOJI = %w[👍 👎 ✅ ❌ ❤️ 🎉 🙏 👀 🤔 😀 😅 😂 😍 😮 😢 😡 🔥 ⭐ 💡 ❓ ❗ ⏳ 🚀 📌 📝 🔗 🖼️ 🐛 💬 👋].freeze
 

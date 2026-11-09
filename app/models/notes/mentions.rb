@@ -1,5 +1,5 @@
 module Notes
-  # A mention in a stored body is the token `@[<user id>]` (notes spec §3.2):
+  # A mention in a stored body is the token `@[<user id>]`:
   # an id, so renaming a user changes how old mentions read and a deleted one
   # reads "a deleted user".
   #

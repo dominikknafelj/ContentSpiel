@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The Media module (media library design spec §6): the grid (access,
+# The Media module the grid (access,
 # search, filters, pagination, query count), the detail panel (fields,
 # "Used on", Delete) and the grid's own multi-file upload.
 class Admin::MediaTest < ActionDispatch::IntegrationTest
@@ -322,7 +322,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   # A usage row whose owner is gone (a stale index)
   # still keeps "Used on" from claiming the image is "Not used anywhere
   # yet" -- it says the use can't be shown instead. Move to trash
-  # itself is no longer disabled for this case -- `Trash::Move` only
+  # itself stays enabled for this case -- `Trash::Move` only
   # refuses a *kept* owner, and a stale row (like a trash-only one) isn't
   # one, so disabling the button here would refuse something the server
   # wouldn't.
@@ -343,8 +343,8 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   # `Media::Asset#usages_summary`'s own
   # `owner.owner` second hop -- a block-owned usage is named by its page or
   # post, never the block itself (`Admin::MediaLibrary::PanelComponent
-  # #place_for`) -- used to cost one query per block-owned usage. `Media
-  # ::Asset.preload_usage_places` batches it, one query per owner type, so
+  # #place_for`) -- would cost one query per block-owned usage without `Media
+  # ::Asset.preload_usage_places`, which batches it, one query per owner type, so
   # this stays flat whether the image sits on one block or six.
   test "the detail panel issues a constant number of queries whether an image is used on 1 block or 6" do
     sign_in_as(users(:one))
@@ -450,7 +450,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#toasts .admin-toast[role=status]", text: "Restored “#{asset.title}”"
   end
 
-  # Trashing from the panel used to drop the
+  # Trashing from the panel keeps the
   # search, the segment and the page the editor was working through.
   test "trashing from the panel keeps the grid's search, segment and page" do
     sign_in_as(users(:one))
@@ -534,7 +534,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:author))
     get "/cs-studio/media", params: { selected: asset.id }
     assert_response :success
-    # Plain text, not disabled inputs (handoff B19): no form, no trash, the hint.
+    # Plain text, not disabled inputs no form, no trash, the hint.
     assert_select "#media-panel form", count: 0
     assert_select "#media-panel input, #media-panel textarea", count: 0
     assert_select "#media-panel button", text: /Move to trash/, count: 0

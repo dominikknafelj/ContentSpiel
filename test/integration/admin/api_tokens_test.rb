@@ -1,6 +1,6 @@
 require "test_helper"
 
-# "Connect an AI assistant" (design spec §6.1): the token list, a one-time
+# "Connect an AI assistant" the token list, a one-time
 # reveal of a freshly issued token, and revoke. The raw token exists only
 # in the `create` response itself -- never in a redirect, the flash, the
 # session, the database or the log.
@@ -63,7 +63,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_no_match(/masked|••••/, response.body)
   end
 
-  # Fix round 1: the create form is a plain POST, so the reveal arrives as
+  # The create form is a plain POST, so the reveal arrives as
   # a whole document (see admin/api_tokens/create for why).
   test "the create form opts out of Turbo" do
     sign_in_as(users(:one))
@@ -88,7 +88,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal "no-store", response.headers["Cache-Control"]
-    # Its own document, opted out of Turbo's snapshot cache (fix round 1).
+    # Its own document, opted out of Turbo's snapshot cache.
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']"
     raw = raw_token_from(response.body)
     token = ApiToken.order(:id).last
@@ -170,7 +170,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
   # A failed issue never renders the reveal: no token exists, so the page
   # comes back at 422 with the service's own message under the field it is
-  # about and the typed name kept (it used to redirect with a flash).
+  # about and the typed name kept (no redirect, no flash).
   test "a blank name re-renders the page at 422 with the error under Name and no token" do
     sign_in_as(users(:one))
 
@@ -233,7 +233,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_select "#{dialog} button", text: "Revoke token"
   end
 
-  # Fix round 1 (m4): a stale tab's Revoke keeps the original revoked_at.
+  # A stale tab's Revoke keeps the original revoked_at.
   test "revoking an already-revoked token keeps its revoked_at and says so" do
     sign_in_as(users(:one))
     token, = ApiToken.generate!(users(:one))
@@ -248,7 +248,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_select "[role=status]", text: "Token was already revoked"
   end
 
-  # --- Token groups (access-control design spec §3.3 "Tokens", §5) -------------
+  # --- Token groups ------------------------------------------------------------
 
   test "an author may choose only Read only or Author, defaulting to Read only" do
     # The fixture group is empty (so trivially assignable); a real branch
@@ -302,7 +302,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_select "main", text: /You don't have permission to give a token that group/
   end
 
-  # Final fix wave (S-M6): every signed-in user reaches this endpoint, and the
+  # Every signed-in user reaches this endpoint, and the
   # id is theirs to choose -- the refusal must not hand back the group's name.
   test "a refused group id doesn't disclose the group's name" do
     secret = AccessControl::Group.create!(name: "Project Nightjar")

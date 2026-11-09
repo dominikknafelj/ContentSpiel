@@ -59,8 +59,7 @@ class UserTest < ActiveSupport::TestCase
     assert users(:two).update(owner: true)
   end
 
-  # Final fix wave (C, P16), carried over by the access-control migration
-  # (Task 2): the last-owner check runs *before* the dependent destroys (so
+  # The last-owner check runs *before* the dependent destroys (so
   # a refused delete never even starts deleting sessions/tokens), and
   # counts under a row lock, so two admins destroying/demoting the last two
   # owners at the same moment can't both see "one other owner left" and

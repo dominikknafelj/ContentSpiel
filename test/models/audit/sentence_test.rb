@@ -174,7 +174,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "System deleted 3 submissions of “Contact” after they were delivered", deleted.call({ "count" => 3, "reason" => "delivered" })
     assert_equal "System deleted 1 submission of “Contact” after it was delivered", deleted.call({ "count" => 1, "reason" => "delivered" })
     assert_equal "System deleted 2 submissions of “Contact” that couldn't be delivered in 30 days", deleted.call({ "count" => 2, "reason" => "undelivered" })
-    assert_equal "System deleted 2 submissions of “Contact”", deleted.call({ "count" => 2, "reason" => "a reason this code no longer knows" })
+    assert_equal "System deleted 2 submissions of “Contact”", deleted.call({ "count" => 2, "reason" => "a reason this code does not know" })
   end
 
   test "sentences with no subject" do
@@ -511,7 +511,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You removed the notes on “Pricing”", read(sentence_for(event("notes.removed", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
   end
 
-  # Layout points spec, decision 11: the dashboard joins a run of one
+  # The dashboard joins a run of one
   # person's block edits on one page into one row, and the sentence counts.
   test "a counted block sentence names the count and the type, or blocks for mixed types" do
     page = as(@me) { create_page(title: "Code block demo") }

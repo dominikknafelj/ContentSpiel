@@ -1,7 +1,6 @@
 module Admin
   module AuditScreen
-    # The audit log's filters as one row of drop-downs (design pass round 3,
-    # Task 15, handoff §4.9 and B30): User, Action, Type, Channel and a Date
+    # The audit log's filters as one row of drop-downs: User, Action, Type, Channel and a Date
     # preset, applied as they change (`admin--ui--auto-submit`, no Filter button;
     # `FilterHelper#filter_form_options`). Choosing Custom submits at once and
     # the answer shows From and To beside the Date select, so no script beyond
@@ -46,7 +45,7 @@ module Admin
       def hidden_locale? = @locale != ::Locales.default
 
       # The chosen user is always an option, so the select shows what the list
-      # is filtered by: one who no longer exists (a link from one of their
+      # is filtered by: one who is gone (a link from one of their
       # events; `audit_events.user_id` has no FK) reads "A deleted user".
       def user_options
         options = @users.map { |user| [ user.name_or_email, user.id ] }

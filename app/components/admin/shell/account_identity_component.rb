@@ -1,15 +1,14 @@
 module Admin
   module Shell
     # Who is signed in, as the sidebar's account block says it: the display
-    # name, then "email · role" on one line (handoff: "name, email and role").
+    # name, then "email · role" on one line.
     # Its own component, with an id, because it is the one part of the shell a
     # save on the account screen changes: its "Save" answers with a Turbo
     # Stream that replaces just this (`Admin::AccountsController
     # #update_profile`), so the screen -- and whatever the password form
     # beside the name holds -- stays as it is.
     #
-    # The block is a LINK to the account screen (the notes handoff's decision
-    # 25), where all of this is changed; `url_options` are the address
+    # The block is a LINK to the account screen, where all of this is changed; `url_options` are the address
     # parameters of the page it is drawn on, as for every link of the shell.
     # The name is underlined on hover, as the links under it are.
     #

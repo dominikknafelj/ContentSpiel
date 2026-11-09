@@ -54,7 +54,7 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
     assert_text "via <i>x</i>"
   end
 
-  # Final fix wave (M3): the one place a sentence's route NAME becomes a call.
+  # The one place a sentence's route NAME becomes a call.
   # `Audit::Sentence` only ever builds six; the component checks the name
   # against its own frozen list all the same, so a name from anywhere else is
   # never `public_send` to the helpers -- the subject is then plain text.

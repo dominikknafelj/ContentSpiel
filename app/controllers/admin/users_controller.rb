@@ -1,5 +1,5 @@
 module Admin
-  # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
+  # The Users module list, new/create,
   # edit/update (name, email, the groups, and a password only when one was
   # typed -- `Users::Save`'s own doc comment explains why a blank password
   # field means "leave it alone"), owner (the "Make owner…" / "Remove owner
@@ -26,8 +26,7 @@ module Admin
     STALE_LEAD = "This user was changed".freeze
     STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
 
-    # The whole module is `users.manage` (access-control design spec §3.3
-    # "Users"); `Users::*` check it again, per user, for every write.
+    # The whole module is `users.manage`; `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
     before_action :set_user, only: %i[edit update destroy owner]
 
@@ -85,7 +84,7 @@ module Admin
       end
     end
 
-    # "Make owner…" / "Remove owner rights…" (round 3 Task 12, D18): an instant
+    # "Make owner…" / "Remove owner rights…" an instant
     # action, `owner=1|0`, answered by `Users::Save` and nothing else -- who may
     # change an owner flag, and that the last owner can't be demoted, are its
     # rules, asked again on this very request; the editor only decides whether to
@@ -108,11 +107,11 @@ module Admin
       end
     end
 
-    # Deleting yourself is allowed (spec §6.1), as long as you're not the
+    # Deleting yourself is allowed, as long as you're not the
     # last user -- `deleting_self` is captured *before* `Users::Destroy`
     # runs, since `@user` (and the session `Current.user` resolves through)
     # is gone by the time it returns successfully. There's no session left
-    # to keep serving once your own account no longer exists, so this ends
+    # to keep serving once your own account is gone, so this ends
     # it (`terminate_session`, the same helper `Admin::SessionsController#
     # destroy` uses for an ordinary sign-out) and lands on sign-in exactly
     # like one, instead of leaving a signed-in request pointed at a user row
@@ -152,7 +151,7 @@ module Admin
       params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, group_ids: [])
     end
 
-    # What the editor may draw for `@user` (round 3 Task 12, D17): `:editable`,
+    # What the editor may draw for `@user`: `:editable`,
     # `:owner_protected` or `:outranked` -- the very answer the services enforce,
     # so the page and the writes can't drift. It decides only what is rendered;
     # every refusal stays in `Users::Save`/`Users::Destroy`, which ask again.

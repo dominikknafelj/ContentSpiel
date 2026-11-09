@@ -255,7 +255,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/outline:\s*2px solid var\(--cs-people\)/, frame)
     assert_match(/outline-offset:\s*-2px/, frame)
     assert_no_match(/--cs-accent|--cs-field-line/, frame)
-    notes = rules.select { |selectors, _| selectors.any? { |selector| selector.include?("data-notes-active") } }
+    notes = rules.select { |selectors, _| selectors.any? { |selector| selector.include?("[data-notes-active]") && !selector.include?(":not([data-notes-active])") } }
     assert_equal [ PEOPLE_FRAME ], notes.map(&:first), "a thread open in the notes is drawn by the people frame and by no rule beside it"
     assert_no_match(/admin-people-frame/, ADMIN_SOURCES.map { |path| File.read(path) }.join, "no element carries a class for the frame: the marks are the selectors")
 
@@ -284,7 +284,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   DRAGLESS = ".admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback))".freeze
-  GLOW = ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"])".freeze
+  GLOW = ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])".freeze
 
   test "a card glows in the people hue while its mark stands, never on a held card, and not under reduced motion" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
@@ -1354,7 +1354,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     ICON_CHIP => "the people family's chip",
     "app/components/admin/ui/avatar_component.rb" => "the circle of a person",
     "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes",
-    "app/assets/tailwind/content-spiel.css" => "where the two aliases are written"
+    "app/assets/tailwind/content-spiel.css" => "where the two aliases are written (a stylesheet, not one of ADMIN_SOURCES: named here, read by the still-used test only)"
   }.freeze
   # The stylesheet's rules (`content-spiel.tailwind.css`) that may draw the
   # hue, each as its selector list joined with ", ". The `@theme` block maps
@@ -1363,7 +1363,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     ".admin-notes-marker[data-has-notes]",
     PEOPLE_FRAME.join(", "),
     SECTION_FRAME.join(", "),
-    ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"])"
+    ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])"
   ].freeze
 
   def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }

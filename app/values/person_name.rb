@@ -19,11 +19,9 @@ module PersonName
     # each of the first two ("Dana van Weiss" is "Dv"); ONE word gives its
     # first two letters, digits or emoji ("dana" is "da", "o'neil" is "on");
     # in the case they were written: the avatar's style draws them
-    # upper-case (`Admin::Ui::AvatarComponent`). The only copy of the rule
-    # (layout points spec, decision 10): the scripts that draw a circle
-    # (the mind graph's card, the mention picker) are handed these letters
-    # by the server and compute none. Asked with the text and not the user,
-    # because notes also draws a circle for "a deleted user".
+    # upper-case (`Admin::Ui::AvatarComponent`). The only copy of the rule:
+    # the scripts that draw a circle (the mind graph's card, the mention
+    # picker) are handed these letters by the server and compute none.
     #
     # The odd cases, decided here: a character is a grapheme (an emoji with
     # its joiners and a letter with a combining accent stay whole); a digit

@@ -145,7 +145,7 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
     const item = element("li", "grid grid-cols-[22px_1fr_7px] items-start gap-2 text-small")
     item.dataset.noteRow = ""
     const who = thread.author ?? text.t("mind_graph.script.card.notes.deleted_user")
-    const circle = avatar(thread.initials, { size: "sm", tone: thread.mine ? "own" : "other" })
+    const circle = avatar(thread.initials, { size: "sm", tone: thread.author == null ? "empty" : thread.mine ? "own" : "other" })
 
     const lines = element("span", "flex min-w-0 flex-col gap-0.5")
     const link = element("a", `truncate no-underline hover:underline ${thread.unread ? "text-ink" : "text-dim"}`, thread.text)

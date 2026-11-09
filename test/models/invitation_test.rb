@@ -1,8 +1,7 @@
 require "test_helper"
 
-# An invitation is not a user (spec "Invites", the owner's choice of
-# 2026-10-30): a row of its own whose link's token is signed over `sent_at`
-# and the address (plan Ruling 3, ruling F1), so a resend or a changed
+# An invitation is not a user: a row of its own whose link's token is
+# signed over `sent_at` and the address, so a resend or a changed
 # address kills the old link, a withdrawal (the row deleted) finds nothing,
 # and an accepted invitation still finds its row, which says it is used.
 class InvitationTest < ActiveSupport::TestCase
@@ -39,7 +38,7 @@ class InvitationTest < ActiveSupport::TestCase
     assert_nil Invitation.find_by_token_for(:accept, "junk")
   end
 
-  # Ruling F1, now on the invitation: a link mailed to a wrong address must
+  # A link mailed to a wrong address must
   # not work once the address is another.
   test "a link dies when the invitation's address is changed" do
     invitation = open_invitation("dnaa@example.com")

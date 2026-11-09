@@ -1,6 +1,6 @@
 require "test_helper"
 
-# A block's tile in a section's lane (sections spec §4.2, §4.4): its face, and
+# A block's tile in a section's lane its face, and
 # -- for a viewer who may edit -- the grip the pointer drags it by, the "⋯"
 # menu that is every move's keyboard path, and the block's delete dialog.
 class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
@@ -70,7 +70,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector ".admin-block-tile__face > span:first-child", exact_text: "Image"
   end
 
-  # Plan ruling 12: a note's tile shows its kind's icon, under the id a
+  # A note's tile shows its kind's icon, under the id a
   # save's answer replaces, one icon only, and the face still says "Note".
   test "a note's tile shows its kind's icon beside the type's name, once, and an empty one says its kind and Empty" do
     block = @editor_page.content_blocks.create!(block_type: "note", section: @section, section_column: 2, position: 0, settings: { "kind" => "warning" })
@@ -131,9 +131,8 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   end
 
   # Beside the face a view-only tile has what notes need and nothing of an
-  # editor's (notes spec §4.3, D3: a viewer who can only read the page writes
-  # notes; the handoff's decision 6: through a menu whose only item is "Add
-  # note"), which is why the count here is three.
+  # editor's (a viewer who can only read the page writes
+  # notes, through a menu whose only item is "Add note"), which is why the count here is three.
   test "a view-only tile has its face, its notes marker and a menu with Add note alone: no grip, no move, no dialog" do
     render_tile(editable: false)
 
@@ -147,7 +146,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
   end
 
-  # Sections spec §1 over §6: the tile keeps its grip, so the pointer can
+  # The tile keeps its grip, so the pointer can
   # move it along its lane, to another column and out of the section -- and
   # so can the keyboard. Nothing of it can be read, so it is not copied.
   test "a tile of an unregistered type keeps every move and Delete block…, and has no Duplicate" do
@@ -160,7 +159,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "dialog#delete-block-#{@block.id}", visible: :all
   end
 
-  # Sections spec §6. A copy goes into its source's column, and a section
+  # A copy goes into its source's column, and a section
   # whose type is gone has no column left to take one: the save would be
   # refused, so the item that could only fail is not offered.
   test "a tile in a section whose type is gone has no Duplicate" do
@@ -172,7 +171,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector "form[action$='/duplicate']", visible: :all
   end
 
-  # Notes (notes spec §4.3): the marker is for everyone who can read the page;
+  # Notes: the marker is for everyone who can read the page;
   # "Add note" in the menu is the path that needs no hover.
   test "a tile carries a notes marker, for a viewer who can't edit too, and Add note first in its menu" do
     render_tile(editable: false)
@@ -184,7 +183,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
 
-  # The handoff's decision 6: at rest for nobody.
+  # At rest for nobody.
   test "no tile marks its add-note control as shown at rest" do
     render_tile(editable: false)
     assert_no_selector "[data-notes-add]"

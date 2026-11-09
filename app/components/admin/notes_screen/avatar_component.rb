@@ -28,8 +28,8 @@ module Admin
 
       # The two letters (`PersonName.initials`) of whatever names the person
       # in a note (`PersonNameComponent`: the name, else the part of the
-      # email address before the at sign, else "a deleted user"): the shared
-      # rule, `PersonName.initials`.
+      # email address before the at sign): the shared rule,
+      # `PersonName.initials`. A deleted user never gets here (`call`).
       def initials
         PersonName.initials(Admin::NotesScreen::PersonNameComponent.new(user: @user, user_id: @user_id).label)
       end

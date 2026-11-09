@@ -1,7 +1,6 @@
 module Admin
   module UsersScreen
-    # The user editor's delete zone (round 3 Task 12, handoff §4.9 / Studio Modals
-    # `delete-user`), edit only, below the form: what deleting costs in words, the
+    # The user editor's delete zone, edit only, below the form: what deleting costs in words, the
     # trigger and the confirm dialog. Deleting moved here from the list's rows.
     #
     # - The trigger is `danger_text`; the solid red "Delete user" is the dialog's

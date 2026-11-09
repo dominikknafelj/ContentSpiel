@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The audit log's list and event page as redesigned in round 3, Task 15: day
+# The audit log's list and event page: day
 # headers in the site's time zone, coalesced spans, the filter row with date
 # presets, human sentences, the event page's word diffs and Older/Newer.
 # (`audit_events_test.rb` keeps access, the older filters, disclosure and the
@@ -369,9 +369,9 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='/audit_events?'][href*='channel=admin']", text: "Audit log"
   end
 
-  # Final fix wave (I3): an event's link used to die with its filter -- a URL
-  # carrying `range=today` was a 404 the next morning, and a link pasted with
-  # a filter the event doesn't match was "not found" for an event that exists.
+  # An event's link does not die with its filter: a URL carrying
+  # `range=today` is not a 404 the next morning, nor a link pasted with a
+  # filter the event doesn't match "not found" for an event that exists.
   # The event is found whatever the filter says; outside it, the answer is
   # the event's own filter-free address (where Older/Newer walk the whole log).
   test "an event outside the filters redirects to its filter-free permalink; only a missing id is a 404" do
@@ -409,7 +409,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # Final fix wave (M5b): `offset` is the visitor's to type.
+  # `offset` is the visitor's to type.
   test "an absurd offset is clamped, never a database error" do
     event(Time.current)
 
@@ -422,9 +422,9 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby^=audit-day]", minimum: 1
   end
 
-  # Final fix wave (M12): a filter on a user who has since been deleted (the
-  # link from one of their events) showed "Anyone" in the drop-down while the
-  # list was filtered.
+  # A filter on a user who has since been deleted (the link from one of
+  # their events) shows that user in the drop-down, not "Anyone", while the
+  # list is filtered.
   test "a user filter naming a deleted user is shown as chosen" do
     gone = User.maximum(:id) + 500
     event(Time.current, user_id: gone)
@@ -434,8 +434,8 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "select#user_id option[selected][value='#{gone}']", text: "A deleted user"
   end
 
-  # Final fix wave (M2): a refusal said what was refused but not on what,
-  # though the event page's Object line already names it.
+  # A refusal says what was refused and on what, as the event page's
+  # Object line does.
   test "a refusal names what it was refused on, linked for a viewer who can open it" do
     post = as(@me) { create_post(title: "Guarded post", published: false) }
     denied = event(Time.current, action: "access.denied", user_id: users(:author).id, subject_type: "Post", subject_id: post.id,
@@ -449,7 +449,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(bare)} p", text: "#{users(:author).name_or_email} was refused permission to manage settings"
   end
 
-  # Final fix wave (M10): an image's event links to its panel only for a
+  # An image's event links to its panel only for a
   # viewer who can open the library, and never for a trashed image.
   test "an image's row links to its panel for a media.upload holder, and is plain text without it or once the image is trashed" do
     asset = as(@me) { create_media_asset }
@@ -474,7 +474,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(row)} p a", count: 0
   end
 
-  # Final fix wave: the list and the event page must render whatever a row
+  # The list and the event page must render whatever a row
   # holds -- no subject at all, and JSON columns that aren't the hashes the
   # components expect (a hand-written or a legacy row).
   test "a row with no subject type, a list for its field changes and a list for its metadata renders in the list and on its own page" do

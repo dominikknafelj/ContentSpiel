@@ -1,5 +1,5 @@
 module Admin
-  # Whom a note on this record can mention (notes spec §3.2): the users who
+  # Whom a note on this record can mention: the users who
   # may READ it, by the name a note gives them (`PersonName.of`: someone
   # without a name is the part of their address before the at sign) with the whole email address as the hint on the
   # second line, always. The second place CS Studio

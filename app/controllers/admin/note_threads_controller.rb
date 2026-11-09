@@ -1,7 +1,7 @@
 module Admin
   # One thread of a record's notes, always looked up among the container's
   # threads. `show` is the thread view of the notes frame; opening a thread
-  # is what marks the viewer's deliveries of it read (notes spec §3.3) --
+  # is what marks the viewer's deliveries of it read --
   # through the service, as every write is. `create` starts one, and `change`
   # is its six buttons. `index` is the record's open threads as JSON, for the
   # mind graph's card, which also starts a note through `create` in JSON.
@@ -29,8 +29,7 @@ module Admin
     # How much of a thread's first message the mind graph's card is sent.
     EXCERPT = 140
 
-    # The record's open threads as data, for the mind graph's card (notes
-    # spec §4.4), which is built in the browser with `textContent` only: text
+    # The record's open threads as data, for the mind graph's card which is built in the browser with `textContent` only: text
     # and numbers, no markup. A mention reads as "@Name"; `author` is null
     # for a user who is gone, and the card words that.
     #
@@ -51,10 +50,11 @@ module Admin
           { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
             author: author,
             # The letters of the avatar, written here and only here
-            # (`PersonName.initials`); a gone author is "a deleted user".
-            initials: PersonName.initials(author || t("admin.mind_graph.script.card.notes.deleted_user")),
+            # (`PersonName.initials`); a gone author has none: the card draws
+            # the empty circle, as `Admin::NotesScreen::AvatarComponent` does.
+            initials: author ? PersonName.initials(author) : "",
             replies: thread.messages.size - 1, pinned: thread.pinned,
-            # What turns the row's dot accent in the card (spec §4.5): one
+            # What turns the row's dot accent in the card: one
             # query for the whole listing (`Notes::Listing#unread?`).
             unread: listing.unread?(thread, Current.user),
             # The viewer's own avatar is the filled one, as in the drawer
@@ -143,9 +143,9 @@ module Admin
     # was trashed or purged since the lookup above) changes nothing about
     # what this request shows: the container was found through the read
     # scope a moment ago, and `render_thread` looks the thread up again among
-    # the container's; when it is no longer there, `show` answers the list.
+    # the container's; when it is gone, `show` answers the list.
     #
-    # A GET THAT WRITES. Opening a thread is what reads it (spec §3.3), so
+    # A GET THAT WRITES. Opening a thread is what reads it, so
     # this GET changes rows -- the viewer's own read marks and nothing else,
     # and doing it twice changes nothing more. What it must not be is fetched
     # by anything but a person opening the thread: every link to it carries

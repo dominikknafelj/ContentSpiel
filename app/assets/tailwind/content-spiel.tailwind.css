@@ -1388,13 +1388,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
 /* A card whose head carries a mark ("Updated by", "Taken over by you") glows
    in the people hue while the mark stands: 200ms in, 600ms out, and out as the
-   mark starts to fade. It never stands with the people frame (a held card
-   shows the frame alone), and under reduced motion there is none. The
+   mark starts to fade. It never stands with the people frame (a held or a
+   discussed card shows the frame alone), and under reduced motion there is none. The
    600ms is the glow's way out, so a card being dragged keeps its own
    shadow states without easing. */
 .admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback)) { transition: box-shadow 600ms var(--cs-ease); }
 @media (prefers-reduced-motion: no-preference) {
-  .admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge="held"]) {
+  .admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge="held"]):not([data-notes-active]) {
     box-shadow: var(--cs-shadow-1), 0 0 0 4px color-mix(in oklab, var(--cs-people) 20%, transparent);
     transition-duration: 200ms;
   }

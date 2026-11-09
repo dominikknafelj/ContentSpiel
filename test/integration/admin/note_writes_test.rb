@@ -605,7 +605,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal [ true, false, false ], body["threads"].map { |row| row["pinned"] }
     assert_equal [ false, true, false ], body["threads"].map { |row| row["mine"] }
     assert_nil body["threads"].last["author"]
-    assert_equal "ad", body["threads"].last["initials"]
+    assert_equal "", body["threads"].last["initials"]
   end
 
   test "the card's JSON is not found for a post outside the read scope, a trashed one and an id that names nothing" do

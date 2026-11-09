@@ -81,7 +81,7 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_no_match(/alert\(1\)/, response.body)
   end
 
-  # The pinned cost of the thread view (Task 15): one read for the reactions
+  # The pinned cost of the thread view: one read for the reactions
   # of all its messages, and the people who reacted are named from the one
   # read of the people the thread names.
   test "the thread view costs the same statements with one reaction as with many, on one message or on twelve" do
@@ -135,7 +135,7 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_select "form form", count: 0
   end
 
-  # The handoff's decision 26: no row under a message nobody reacted to; its
+  # No row under a message nobody reacted to; its
   # way to the set is in the meta line, just left of the "⋯" menu.
   test "a message nobody reacted to has no reactions row: its add control is in the meta line, shown on hover or focus" do
     reply = as(users(:two)) { Notes::Reply.call(@thread, body: "Plain") }.record

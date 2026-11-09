@@ -1,7 +1,6 @@
 module Admin
   # The group editor's member chip input asks this what to offer while an editor
-  # types (`Admin::GroupsScreen::MembersComponent`, round 3 Task 11, decision
-  # D16): up to `LIMIT` users whose name or email contains the typed text, those
+  # types (`Admin::GroupsScreen::MembersComponent`): up to `LIMIT` users whose name or email contains the typed text, those
   # that START with it first.
   #
   # Needs `groups.manage` and nothing less (403 otherwise: `forbidden!`, JSON for

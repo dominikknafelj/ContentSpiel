@@ -76,7 +76,7 @@
 - The setup wizard shows how far along it is, marks the current and finished steps, and opens with a welcome.
 - ⌘K offers every section of Settings.
 - In the rich-text Link popover and the Page link dialog, one Escape closes them while a page search is still on its way, and its answer opens nothing afterwards; only a list of suggestions that is shown takes the first Escape.
-- People in CS Studio are rose circles with their initials, and a note count is a rose bubble; unread notes for you are the accent bubble that says how many are new ("3 new"), and a deleted user is an empty circle.
+- People in CS Studio, outside the Users list's one-letter circle, are rose circles with their initials, and a note count is a rose bubble; unread notes for you are the accent bubble that says how many are new ("3 new"), and a deleted user is an empty circle.
 - The page tree and the posts list show who else is on a page or post as avatars, one circle and "+N" while the tree column is narrow.
 - Notes for you can show All, Unread or Mentions, shows who wrote and where on each row, and lists the open threads beside the list.
 - A block someone else is editing has a rose strip and outline, a block whose thread is open takes the same outline, and "Updated by" shows who, with their avatar.

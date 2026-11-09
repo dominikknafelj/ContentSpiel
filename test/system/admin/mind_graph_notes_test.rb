@@ -115,6 +115,25 @@ class Admin::MindGraphNotesSystemTest < Admin::MindGraphSystemTestCase
     assert_nil page.evaluate_script("window.pwned")
   end
 
+  # A deleted author is nobody to name: the empty circle, no letters and no
+  # people colour, as in the notes drawer.
+  test "a note whose author is gone is drawn with the empty circle and no letters" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Left behind") }
+    Notes::Message.update_all(author_id: nil) # version: none (a test makes the writer gone)
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a)
+
+    row = find("[data-mind-graph-card-notes] li[data-note-row]", text: "Left behind")
+    circle = row.find("span[aria-hidden='true']", match: :first)
+    assert_equal "", circle.text(:all)
+    assert_includes circle[:class], "border-field-line"
+    assert_not_includes circle[:class], "bg-people"
+    assert_includes row.text, "a deleted user"
+  end
+
   # A mention typed by hand of someone who may not read the post is refused
   # by the service; the card says why and keeps the text.
   test "a note the server refuses is answered in the card, and what was typed stays in the field" do

@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Reactions on a note (notes spec D10, handoff "Reaction chip"), in the
+# Reactions on a note, in the
 # editor's drawer: a chip per emoji that toggles the viewer's own, the set to
 # add from under each message, and what another person's reaction does to a
 # thread that is open (a live refresh: `Admin::NotesLiveSystemTest` has the
@@ -200,7 +200,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{chips} button[data-reaction='🎉'][data-mine][aria-label='party popper, 1 reaction, yours']"
   end
 
-  # The handoff's decision 22: above the chip, below only when there is no
+  # Above the chip, below only when there is no
   # room above inside the thread's scroll area, and never over row 1.
   test "the set opens above its chip, and below it where row 1 leaves no room above" do
     last = as(users(:two)) { Array.new(2) { |index| Notes::Reply.call(@thread, body: "Reply #{index}\nwith\nseveral\nlines").record } }.last

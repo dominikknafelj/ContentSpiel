@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Screen slots (the presence spec's slots): named places on a screen where a feature
+# Screen slots named places on a screen where a feature
 # registers a component, so a core component renders "what stands here"
 # without naming the feature.
 class Admin::SlotsTest < ViewComponent::TestCase

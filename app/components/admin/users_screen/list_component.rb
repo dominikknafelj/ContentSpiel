@@ -1,6 +1,6 @@
 module Admin
   module UsersScreen
-    # The Users list (round 3 Task 12, handoff §4.9 / `Studio Users.dc.html`): a
+    # The Users list: a
     # card of rows where the WHOLE row is the link to the user's editor -- avatar
     # (the initial, round), the name (or the email), the email beneath when there
     # is a name, "(you)", an OWNER tag, the group chips ("No groups" for none) and
@@ -9,7 +9,7 @@ module Admin
     # stretched over the row by a pseudo-element, so nothing interactive is nested
     # inside another.
     #
-    # AN OPEN INVITATION (mail spec "Invites", design answer M4) is a row
+    # AN OPEN INVITATION is a row
     # among the users, in the order of its address: the name, else the email,
     # the neutral pill "Invited" and the line "Invited 14 Oct · expires
     # 21 Oct", or the pill "Invite expired" once the link has lapsed; its

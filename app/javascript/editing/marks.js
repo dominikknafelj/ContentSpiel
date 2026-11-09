@@ -8,9 +8,11 @@
 // presence and its `admin-editing-mark--leaving`; this module writes only the
 // mark and that class.
 //
-// Whatever a controller shows through here it takes back before Turbo caches
-// the page: `clearMarks(root)` removes every mark under `root` and stops its
-// timers, so a snapshot never holds a mark or a timer about to touch one.
+// Whatever a controller shows through here it takes back with
+// `clearMarks(root)`, which removes every mark under `root` and stops its
+// timers. A controller calls it when it disconnects, which is after Turbo has
+// cloned its snapshot: no snapshot of an editor is kept, since its pages are
+// `turbo-cache-control: no-cache`, and that is why nothing stale is restored.
 const FADE = 200
 const timers = new WeakMap()
 
