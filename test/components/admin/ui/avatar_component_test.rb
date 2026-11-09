@@ -46,6 +46,7 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_equal "+9", Admin::Ui::AvatarComponent.more_label(9)
     assert_equal "9+", Admin::Ui::AvatarComponent.more_label(10)
     assert_equal "9+", Admin::Ui::AvatarComponent.more_label(40)
+    assert_equal [ "1", "9", "9+" ], [ 1, 9, 10 ].map { |count| Admin::Ui::AvatarComponent.count_label(count) }, "a count circle says everyone, with the same limit"
   end
 
   test "the scripts' circle is the component's: ui/avatar.js holds its size and tone classes" do

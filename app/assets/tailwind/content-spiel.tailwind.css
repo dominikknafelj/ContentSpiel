@@ -393,6 +393,11 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-tree-row__state { flex: none; display: inline-flex; align-items: center; margin-inline-start: 6px; }
 .admin-tree-row__title + .admin-tree-row__trailing, .admin-tree-row__title + .admin-tree-row__add,
 .admin-tree-row__state + .admin-tree-row__trailing, .admin-tree-row__state + .admin-tree-row__add { margin-inline-start: auto; }
+/* The auto margin is 0 on a full row, so the 6px before that first part is
+   the title's (or the state's) own end margin: a cut title's ellipsis never
+   touches the markers after it. */
+.admin-tree-row__title:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)),
+.admin-tree-row__state:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)) { margin-inline-end: 6px; }
 .admin-tree-row__trailing { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; }
 /* The row's "+", last: a 20px box with a 12px glyph, meta and ink under
    the pointer. */

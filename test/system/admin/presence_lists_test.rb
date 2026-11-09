@@ -34,13 +34,13 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   # The Pages screen on a page nobody else opens in these tests: its tree
   # lists every page, `@page` among them.
   def open_tree
-    visit "/cs-studio/pages/#{@elsewhere.id}"
+    visit_screen "/cs-studio/pages/#{@elsewhere.id}"
     await_notes_live
     await_read
   end
 
   def open_posts
-    visit "/cs-studio/posts"
+    visit_screen "/cs-studio/posts"
     await_notes_live
     await_read
   end
@@ -207,11 +207,13 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   # Under 240px of a tree row there is no room for circles beside the title:
   # the marker is one count circle, never nothing, with the same words, and
   # the script keeps its number as people come and go. At the column's 220px
-  # minimum a deep row is far under it.
-  test "a deep row in a narrow column keeps its title, shows one count circle for three people, and the script keeps the count as one leaves" do
+  # minimum a deep row is far under it, and its title keeps only what is left
+  # beside the circle (the default column's rows are the measure of the
+  # title's room: the next test).
+  test "a deep row in a narrow column shows one count circle for three people, clear of its title, and the script keeps the count as one leaves" do
     deep = create_page(title: "Our services", parent: create_page(title: "Company", parent: @elsewhere))
     # On the deep page itself, so its branch is open; nobody marks themselves.
-    visit "/cs-studio/pages/#{deep.id}"
+    visit_screen "/cs-studio/pages/#{deep.id}"
     await_notes_live
     await_read
     set_timing("interval", 600)
@@ -238,6 +240,44 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     leave(:jonas)
     assert_selector "#{shown(marker)} [data-presence-total] > span", text: "2", exact_text: true, wait: LIVE
     assert_equal({ "circles" => [], "total" => "2", "label" => "2 people here: Dana Weiss, reader" }, look(marker).slice("circles", "total", "label"))
+  end
+
+  # At the default column (272px: rows of 225, 205 and 185px at the first
+  # three levels) a third-level row, hovered, with two people, gives its
+  # title what is left beside the one count circle: about 81px, never cut to
+  # a few letters by its markers.
+  test "at the default column a hovered third-level row with two people keeps at least 72px of title, clear of the count circle" do
+    # Translated into every language, so the row's only marker is its people
+    # (a translation marker would take its own room beside them).
+    others = (Locales.enabled - [ Locales.default ]).to_h { |locale| [ locale, { title: "Our services and everything we offer" } ] }
+    third = create_page(title: "Our services and everything we offer", parent: @elsewhere, translations: others)
+    # On the row's own page, so its branch is open; nobody marks themselves.
+    visit_screen "/cs-studio/pages/#{third.id}"
+    await_notes_live
+    await_read
+    set_timing("interval", 600)
+    path = "/cs-studio/pages/#{third.id}"
+    join(:dana, @dana, path:)
+    join(:reader, @reader, path:)
+    marker = tree_marker(third)
+    assert_selector "#{shown(marker)} [data-presence-total] > span", text: "2", exact_text: true, visible: :all, wait: LIVE
+
+    row = "#tree li[data-page-id='#{third.id}'] > .admin-tree-row"
+    find(row).hover
+    room = page.evaluate_script(<<~JS)
+      (() => {
+        const row = document.querySelector(#{row.to_json})
+        const [ title, count ] = [ row.querySelector(".admin-tree-row__title"), row.querySelector("[data-presence-total] > span") ]
+        const [ t, c ] = [ title.getBoundingClientRect(), count.getBoundingClientRect() ]
+        const between = [ ...row.querySelectorAll(".admin-tree-row__trailing > *") ].filter((part) => !part.contains(count) && part.getBoundingClientRect().width > 1).map((part) => part.outerHTML.slice(0, 80))
+        return { row: Math.round(row.getBoundingClientRect().width), title: Math.floor(t.width), clear: Math.round(c.left - t.right), count: c.width, between }
+      })()
+    JS
+    assert_equal 185, room["row"], "the row measured is a third-level row of the default column"
+    assert_operator room["title"], :>=, 72, "the title keeps its room beside the markers: #{room.inspect}"
+    assert_operator room["clear"], :>=, 6, "the count circle stands clear of the title: #{room.inspect}"
+    assert_equal 22, room["count"]
+    assert_empty room["between"], "nothing else of the row takes room beside its people"
   end
 
   # The default column's rows are under 240px: one person costs the count

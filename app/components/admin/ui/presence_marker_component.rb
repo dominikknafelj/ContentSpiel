@@ -74,11 +74,7 @@ module Admin
       def more(number) = number.positive? ? Admin::Ui::AvatarComponent.more_label(number) : ""
 
       # The count circle's letters: the count, or "9+" past nine, as "+N" reads.
-      def count_label
-        return "" if count.zero?
-
-        count > Admin::Ui::AvatarComponent::MORE_LIMIT ? t("admin.components.ui.avatar.many") : count.to_s
-      end
+      def count_label = count.zero? ? "" : Admin::Ui::AvatarComponent.count_label(count)
 
       def data
         { presence_count: count, messages: messages_data("components.ui.avatar.more", "components.ui.avatar.many"), **Admin::Ui::TooltipComponent.host_data, **@data }

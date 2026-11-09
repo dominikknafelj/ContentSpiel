@@ -70,6 +70,12 @@ module Admin
         count > MORE_LIMIT ? I18n.t("admin.components.ui.avatar.many") : I18n.t("admin.components.ui.avatar.more", count: count)
       end
 
+      # A count circle's letters (everyone, not "+N"): the number, "9+" past
+      # nine.
+      def self.count_label(count)
+        count > MORE_LIMIT ? I18n.t("admin.components.ui.avatar.many") : count.to_s
+      end
+
       def initialize(initials:, size:, tone: :other, here: false)
         @initials = initials
         @size = SIZES.fetch(size)

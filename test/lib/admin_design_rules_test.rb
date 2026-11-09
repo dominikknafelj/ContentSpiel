@@ -913,16 +913,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # before covers its second letter: a stack's circles stand apart, and with
   # nothing overlapping no ring separates them.
   test "an avatar stack never overlaps and draws no ground ring" do
-    overlapping = Dir[Rails.root.join("app/components/**/*.{rb,erb}")].flat_map do |path|
+    # A file that renders a circle writes no negative start margin anywhere
+    # in it: the classes of a stack's slots are often built apart from the
+    # render (a `circle_class` method, a sibling component file).
+    stacks = Dir[Rails.root.join("app/components/**/*.{rb,erb}")].select { |path| File.read(path).include?("AvatarComponent.new") }
+    stacks = stacks.flat_map { |path| [ path, *Dir[path.sub(/\.(html\.erb|rb)\z/, ".{rb,html.erb}")] ] }.uniq
+    assert stacks.any? { |path| path.end_with?("people_component.rb") }, "the stacks' files are read"
+    overlapping = stacks.flat_map do |path|
       self.class.without_comments(path).lines.each_with_index.filter_map do |line, index|
-        "#{path.delete_prefix("#{Rails.root}/")}:#{index + 1}" if line.include?("AvatarComponent.new") && line.match?(/(?<![\w-])-ml-/)
+        "#{path.delete_prefix("#{Rails.root}/")}:#{index + 1}" if line.match?(/(?<![\w-])-m[ls]-/)
       end
     end
-    assert_empty overlapping, "a circle never stands over the one before it (-ml- beside an avatar's render)"
+    assert_empty overlapping, "a circle never stands over the one before it (a negative start margin in a file that draws circles)"
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     marker_rules = css.scan(/[^{}]*\.admin-presence-marker[^{}]*\{[^}]*\}/)
     assert marker_rules.any?, "the marker's rules are read"
-    assert_empty marker_rules.grep(/margin-inline-start:\s*-/), "a marker's circles never overlap"
+    assert_empty marker_rules.grep(/margin(?:-inline-start|-left|-inline)?:[^;]*-\d/), "a marker's circles never overlap"
     grounds = Dir[Rails.root.join("app/**/*.{rb,erb,js,css}")].reject { |path| path.include?("/app/assets/builds/") }.select { |path| File.read(path).include?("--admin-avatar-ground") }
     assert_empty grounds, "no ring in the colour of a stack's ground: nothing overlaps to be separated"
     marker = Rails.root.join("app/components/admin/ui/presence_marker_component.html.erb").read
@@ -938,6 +944,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tree-row\s*\{[^}]*container:\s*admin-tree-row\s*\/\s*inline-size;/, css)
     assert_match(/\.admin-tree-row__title\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/, css)
     assert_match(/\.admin-tree-row__trailing\s*\{[^}]*flex:\s*none;/, css, "the markers do not shrink")
+    assert_includes css, ".admin-tree-row__title:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)),\n.admin-tree-row__state:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)) { margin-inline-end: 6px; }",
+      "on a full row the auto margin is 0, so the title's own 6px keeps its ellipsis off the markers"
     assert_match(/\.admin-presence-marker > :is\(\[data-presence-more-narrow\], \[data-presence-total\]\)\s*\{\s*display:\s*none;\s*\}/, css, "the count circle rests hidden")
     blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-tree-row \(max-width: 239\.98px\)\s*\{/)
     assert_equal 1, blocks.size, "one row rule"
