@@ -1,11 +1,8 @@
-# An invitation to a person who has no account yet (mail spec "Invites";
-# docs/reference/mail.md). It is NOT a user: it lives in its own table, and
+# An invitation to a person who has no account yet (docs/reference/mail.md). It is NOT a user: it lives in its own table, and
 # accepting it creates the user (`Invitations::Accept`). So no query of
 # `users` -- sign-in, the reset, the owner checks, mentions, a group's member
 # picker, the audit log's people filter -- has to know that invitations
-# exist, and a new one never has to remember to leave them out (the owner's
-# choice of 2026-10-30, replacing an invited state on `users`; the spec's "As
-# built" says why). Nothing of the users side names this class
+# exist, and a new one never has to remember to leave them out. Nothing of the users side names this class
 # (`test/lib/mail_guards_test.rb`).
 #
 # Its life:
@@ -21,12 +18,11 @@
 # `groups` are the groups the person will be put into when they accept; an
 # invitation is a member of nothing until then.
 class Invitation < ApplicationRecord
-  # How long a link works (spec: seven days). The mail names the date from
+  # How long a link works (seven days). The mail names the date from
   # this, so the token and the sentence cannot disagree.
   VALID_FOR = 7.days
 
-  # Signed over `sent_at` and `email_address` (plan Ruling 3 and controller
-  # ruling F1): a resend moves `sent_at`, so the old link dies; a withdrawal
+  # Signed over `sent_at` and `email_address` (a resend moves `sent_at`, so the old link dies; a withdrawal
   # deletes the row, so nothing is found; an address changed on the row
   # would kill the link mailed to the old one. Accepting changes NEITHER, so a
   # used link still finds its row. The token is made only by `InvitesMailer`,
@@ -63,10 +59,10 @@ class Invitation < ApplicationRecord
   # When the current link stops working: seven days after it was sent.
   def expires_at = sent_at && sent_at + VALID_FOR
 
-  # Lapsed: the link no longer works, and the Users screen says so.
+  # Lapsed: the link is dead, and the Users screen says so.
   def expired?(now: Time.current) = expires_at.nil? || expires_at <= now
 
   # The invited person's name, else the address: how the Users screen and
   # the dialogs name an invitation.
-  def display_name = name.presence || email_address
+  def name_or_email = name.presence || email_address
 end

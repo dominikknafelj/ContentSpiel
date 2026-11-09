@@ -1,6 +1,6 @@
 module Admin
   module EditorScreen
-    # A section in the page editor's block list (sections spec §4.1–§4.3): a
+    # A section in the page editor's block list: a
     # card of the list like any other block's -- it is dragged, moved and
     # collapsed by `admin--editor--blocks` exactly as one -- but drawn as
     # structure, not content (E4): a frame in the structure colour around
@@ -9,7 +9,7 @@ module Admin
     # the section's settings as words (`SectionSettingsWordsComponent`). The
     # settings themselves are a form in a region under the head (below).
     #
-    # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
+    # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE. Under
     # the lanes sits one `Admin::EditorScreen::BlockCardComponent` per block of the section,
     # drawn as a `placement: :panel`: hidden, and shown one at a time by
     # `admin--editor--section` when its tile is pressed. A form is never fetched when
@@ -31,12 +31,12 @@ module Admin
     # code asks `container?` (`self.draws?`), the markup says the answer.
     #
     # ON A TRANSLATION TAB A SECTION IS NOT THIS CARD but a heading over its
-    # blocks' cards (spec §4.5, `SectionGroupComponent`): `self.for` is the
+    # blocks' cards (`SectionGroupComponent`): `self.for` is the
     # one door to both, so the page view and a card streamed in
     # (`Admin::Answers::BlockDrawing#card_for`) cannot draw different things.
     #
-    # A SECTION WHOSE TYPE IS GONE (spec §6, `unavailable?`) -- a removed
-    # plugin's container, say -- is no `container?` any more and still holds
+    # A SECTION WHOSE TYPE IS GONE (`unavailable?`) -- a removed
+    # plugin's container, say -- is not a `container?` now and still holds
     # its blocks' rows; `self.draws?` asks the rows too, so it is still drawn
     # here and its blocks do not vanish from the editor. It is the
     # "Unavailable type" card: the danger frame, the type's stored name, one
@@ -101,11 +101,12 @@ module Admin
     #
     # THE CARD'S STATE EDGE is `data-card-edge`, drawn by the stylesheet as a
     # block card's is: "unavailable" turns the frame danger, "held" (someone
-    # else holds the section's own settings) is the field line's outline over
-    # the frame. A section takes no notes (decision 10), so it has no notes
-    # edge: a marker inside it belongs to a tile or a panel, which carry it.
+    # else holds the section's own settings) is the people outline, 2px
+    # outside the frame, whether the server drew `data-card-edge` or only the
+    # frozen settings form says it. A section takes no notes, so it has no
+    # notes edge: a marker inside it belongs to a tile or a panel, which carry it.
     #
-    # THE "⋯" MENU (spec §4.1), for a viewer who may edit: Move up and Move
+    # THE "⋯" MENU, for a viewer who may edit: Move up and Move
     # down are the block card's own buttons (`data-move`, `admin--editor--blocks
     # #moveUp|moveDown`), since a section's card is moved as any card is;
     # `first:` and `last:` are the card's place in the list and say which of
@@ -176,8 +177,8 @@ module Admin
       def self.layout_menu(section:) = Admin::EditorScreen::SectionLayoutMenuComponent.new(section: section)
 
       # Whether a top-level block is drawn as a section: a container, or a
-      # block that still holds blocks although its type is no longer a
-      # container's (a section whose type is gone, spec §6) -- asked of the
+      # block that still holds blocks although its type is not a
+      # container's now (a section whose type is gone) -- asked of the
       # rows the outline was built from, never of the type's name. The page
       # view and `Admin::Answers::BlockDrawing#card_for` both ask here, so
       # a card streamed in is the card a page load would draw.
@@ -185,7 +186,7 @@ module Admin
 
       # What draws a section on this tab: this card on the default language's,
       # where structure is edited, and the plain group of its blocks' cards
-      # on a translation tab (spec §4.5). `options` are the card's own
+      # on a translation tab. `options` are the card's own
       # (`first:`, `last:`, `editable:`, `url_options:`); the group takes what
       # it needs of them.
       def self.for(page:, section:, outline:, locale:, **options)
@@ -237,7 +238,7 @@ module Admin
 
       def last? = @last
 
-      # The section's type is no longer registered: see the class comment.
+      # The section's type is not registered: see the class comment.
       def unavailable? = section.definition.nil?
 
       # ---- The settings form: every id is the block card's (see the class comment).

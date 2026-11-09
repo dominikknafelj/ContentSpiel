@@ -1,9 +1,9 @@
 require "test_helper"
 
-# Contrast and buttons spec (C2, Rulings 6 and 7): a block type declares
-# its icon, and CS Studio draws it in the picker (16px dim), on a card's
-# head (14px dim) and on a section's tile (12px meta).
-class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
+# A block type declares its icon, and CS Studio draws it on its family's chip
+# in the picker, on a card's head, on a tile, on a section's head and on a
+# Notes for you row.
+class Admin::Ui::BlockIconComponentTest < ViewComponent::TestCase
   include GalleryAlbum
 
   test "every icon a block type may name is drawn by the icon partial" do
@@ -20,23 +20,27 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
   end
 
   test "a block type's icon is drawn on its family's chip, and a type with no family on the neutral chip" do
-    { picker: [ "size-6", "size-3.5" ], card: [ "size-6", "size-3.5" ], tile: [ "size-5.5", "size-3.5" ] }.each do |place, (chip, icon)|
-      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: place)
+    { picker: [ "size-6", "size-3.5" ], card: [ "size-6", "size-3.5" ], tile: [ "size-5.5", "size-3.5" ], section: [ "size-5.5", "size-3.5" ], row: [ "size-5", "size-3.5" ] }.each do |place, (chip, icon)|
+      render_inline Admin::Ui::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: place)
       assert_selector "span[data-block-icon=code_xml][aria-hidden=true][class~='#{chip}'][class~='bg-ic-code-bg'][class~='text-ic-code'] svg[class~='#{icon}']"
     end
-    render_inline Admin::EditorScreen::BlockIconComponent.new(definition: ContentModel::BlockTypeDefinition.new("plain").tap { |type| type.icon "pilcrow" }, place: :card)
+    render_inline Admin::Ui::BlockIconComponent.new(definition: ContentModel::BlockTypeDefinition.new("plain").tap { |type| type.icon "pilcrow" }, place: :card)
     assert_selector "span[data-block-icon=pilcrow][class~='bg-sunken'][class~='text-dim']"
     assert_no_selector "span[class*='bg-ic-']"
   end
 
+  test "an unknown place raises" do
+    assert_raises(ArgumentError) { Admin::Ui::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: :header) }
+  end
+
   test "a type that names no icon draws nothing" do
     with_gallery_album do
-      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: BlockTypes.all.find { |type| type.name == "gallery/album" }, place: :picker)
+      render_inline Admin::Ui::BlockIconComponent.new(definition: BlockTypes.all.find { |type| type.name == "gallery/album" }, place: :picker)
       assert_no_selector "span"
     end
   end
 
-  # Note block plan, ruling 12: a type whose icon follows its block.
+  # A type whose icon follows its block.
   def with_flag_type
     BlockTypes.register(:test_flag) do |t|
       TestTypes.declare(t)
@@ -53,21 +57,30 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
     with_flag_type do |flag|
       block = root_page.content_blocks.create!(block_type: "test_flag", position: 0, settings: { "tone" => "loud" })
 
-      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :card, block: block)
+      render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :card, block: block)
       assert_selector "span#block-#{block.id}-icon-card[data-block-icon=triangle_alert][aria-hidden=true][class~='size-6'] svg[class~='size-3.5']"
 
-      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :tile, block: block)
+      render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :tile, block: block)
       assert_selector "span#block-#{block.id}-icon-tile[data-block-icon=triangle_alert][class~='size-5.5'] svg[class~='size-3.5']"
 
-      render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :picker)
+      render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :picker)
       assert_selector "span[data-block-icon=info]:not([id])"
-      assert_equal "block-#{block.id}-icon-tile", Admin::EditorScreen::BlockIconComponent.dom_id(block, :tile)
+      assert_equal "block-#{block.id}-icon-tile", Admin::Ui::BlockIconComponent.dom_id(block, :tile)
+    end
+  end
+
+  test "a row draws no id even for an icon that follows its block, since one block can stand on it twice" do
+    with_flag_type do |flag|
+      block = root_page.content_blocks.create!(block_type: "test_flag", position: 0, settings: { "tone" => "loud" })
+      render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :row, block: block)
+
+      assert_selector "span[data-block-icon=triangle_alert]:not([id])"
     end
   end
 
   test "a type whose icon does not follow its block draws it with no id, also when it is handed a block" do
     block = root_page.content_blocks.create!(block_type: "code", position: 0)
-    render_inline Admin::EditorScreen::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: :card, block: block)
+    render_inline Admin::Ui::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: :card, block: block)
 
     assert_selector "span[data-block-icon=code_xml]:not([id])", count: 1
   end
@@ -77,7 +90,7 @@ class Admin::EditorScreen::BlockIconComponentTest < ViewComponent::TestCase
       flag.icon "info", for_block: ->(_block) { "<svg onload=x>" }
       block = root_page.content_blocks.create!(block_type: "test_flag", position: 0)
 
-      error = assert_raises(ArgumentError) { render_inline Admin::EditorScreen::BlockIconComponent.new(definition: flag, place: :card, block: block) }
+      error = assert_raises(ArgumentError) { render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :card, block: block) }
       assert_includes error.message, "info, lightbulb, circle_alert, triangle_alert"
     end
   end

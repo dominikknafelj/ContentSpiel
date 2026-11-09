@@ -24,7 +24,7 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
   test "another user is named, a token follows via, and the viewer's own token reads You, via" do
     other = sentence("post.created", viewer: users(:two), actor_type: "ApiToken", actor_id: 1, actor_label: "Claude desktop")
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: other)
-    assert_text "#{users(:one).display_name} via Claude desktop created “Hello”"
+    assert_text "#{users(:one).name_or_email} via Claude desktop created “Hello”"
 
     own = sentence("post.created", actor_type: "ApiToken", actor_id: 1, actor_label: "Claude desktop")
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: own)
@@ -54,7 +54,7 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
     assert_text "via <i>x</i>"
   end
 
-  # Final fix wave (M3): the one place a sentence's route NAME becomes a call.
+  # The one place a sentence's route NAME becomes a call.
   # `Audit::Sentence` only ever builds six; the component checks the name
   # against its own frozen list all the same, so a name from anywhere else is
   # never `public_send` to the helpers -- the subject is then plain text.

@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Screen slots (presence spec §4.1): named places on a screen where a feature
+# Screen slots named places on a screen where a feature
 # registers a component, so a core component renders "what stands here"
 # without naming the feature.
 class Admin::SlotsTest < ViewComponent::TestCase
@@ -166,9 +166,9 @@ class Admin::SlotsTest < ViewComponent::TestCase
   test "the real registry holds notes' components, and presence's people in the header at its size and in the panel at its" do
     assert_equal [ Admin::NotesScreen::HeaderButtonComponent ], Admin::Slots.entries("editor.header.actions").map(&:component)
     assert_equal [ Admin::NotesScreen::MediaSectionComponent ], Admin::Slots.entries("media.panel.sections").map(&:component)
-    assert_equal [ Admin::NotesScreen::RowPillComponent, Admin::PresenceScreen::RowMarkerComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
+    assert_equal [ Admin::PresenceScreen::RowMarkerComponent, Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
     assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("posts.row.markers").map(&:component)
-    assert_equal [ [ Admin::PresenceScreen::RowMarkerComponent, { joined: true } ] ], Admin::Slots.entries("posts.row.title").map { |entry| [ entry.component, entry.options ] }
+    assert_equal [ [ Admin::PresenceScreen::RowMarkerComponent, { joined: true, shown: 3 } ] ], Admin::Slots.entries("posts.row.title").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :header } ] ], Admin::Slots.entries("editor.header.people").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :panel } ] ], Admin::Slots.entries("media.panel.header").map { |entry| [ entry.component, entry.options ] }
   end

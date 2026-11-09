@@ -1,7 +1,6 @@
 module Admin
   module NotesScreen
-    # A message's reactions (notes spec §4.5, handoff "Reaction chip" and its
-    # decisions 22-24): a chip per emoji in use, drawn like a tag chip -- the
+    # A message's reactions a chip per emoji in use, drawn like a tag chip -- the
     # emoji and a mono count -- with the accent tint for the viewer's own and
     # the people who reacted in its title; a press gives the viewer's reaction
     # or takes it back. Then the chip that opens the set to add from: the
@@ -9,7 +8,7 @@ module Admin
     # `ComposerComponent::EMOJI_PANEL_CLASS`, over `Notes::EMOJI`), here with
     # each emoji a submit.
     #
-    # TWO PLACES (`place`), one of which is drawn (the handoff's decision 26).
+    # TWO PLACES (`place`), one of which is drawn.
     # - `:row`, under the text, for a message that HAS reactions: its chips,
     #   and the add chip at the end of the row, always on show.
     # - `:meta`, in the message's meta line just left of the "⋯" menu, for a
@@ -40,8 +39,8 @@ module Admin
     # edit form, inside no other form. Where the set opens, Escape and a
     # press outside it are `admin--notes--reactions`' (on the message).
     #
-    # Accent here means "yours": the one control the handoff gives the accent
-    # tint to for something other than "unread for you".
+    # Accent here means "yours": the one control that takes the accent
+    # tint for something other than "unread for you".
     #
     # A chip's accessible name is words -- the emoji's name, how many, whether
     # one is the viewer's, and who -- because a glyph and a number say little
@@ -100,7 +99,7 @@ module Admin
 
       # "Dana, Jonas", in the order they reacted. A reaction goes with its
       # user (the foreign key), so everyone named here exists.
-      def people(reactions) = reactions.filter_map { |reaction| listing.users[reaction.user_id]&.then { |user| ::Notes.name_of(user) } }.join(", ")
+      def people(reactions) = reactions.filter_map { |reaction| listing.users[reaction.user_id]&.then { |user| ::PersonName.of(user) } }.join(", ")
 
       # The emoji in words ("thumbs up"): the locale file's list, in the
       # set's own order.

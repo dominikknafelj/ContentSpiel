@@ -12,12 +12,8 @@
   </span>
   <span class="flex shrink-0 items-center gap-2">
     <% if thread? %>
-      <%# `role="img"` and a label, like the page tree's: a bare "2" says
-          nothing. Hidden, since the link's name reads it (`OneLink`). %>
-      <%= tag.span id: count_id, role: "img", title: t(".open", count: thread.count), aria: { label: t(".open", count: thread.count), hidden: true },
-            class: "admin-notes-marker admin-notes-marker--readonly", data: { has_notes: true } do %>
-        <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><%= thread.count %>
-      <% end %>
+      <%# Hidden, since the link's name reads it (`OneLink`). %>
+      <%= render Admin::Ui::NoteMarkerComponent.new(count: thread.count, label: t(".open", count: thread.count), id: count_id, aria_hidden: true) %>
     <% end %>
     <% if unpublished? %>
       <%= tag.span id: unpublished_id, class: "inline-flex", aria: { hidden: true } do %><%= render Admin::Ui::UnpublishedChipComponent.new %><% end %>

@@ -26,7 +26,7 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_equal [ :admin_page_path, [ @page.id ], { notes: "open", thread: thread.id } ], [ row.route.name, row.route.args, row.route.params ]
   end
 
-  # The handoff's decision 8: a row on a block carries what the block is called.
+  # A row on a block carries what the block is called.
   test "a row on a block carries its heading: the type, the column in a section, and the first words, the file name or the place" do
     @block.assign_body(rich_doc("Our prices start at forty nine euros a month."), locale: :en)
     @block.save!
@@ -93,6 +93,44 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_equal [ old.id ], inbox.rows(limit: 1, offset: 1).map(&:thread_id)
   end
 
+  test "show unread lists the unread deliveries and mentions the mention deliveries, each in the inbox's order" do
+    old = mention(@page)
+    read = travel_to(1.minute.from_now) { mention(@post) }
+    reply = travel_to(2.minutes.from_now) { mention(@asset) }
+    travel_to(3.minutes.from_now) { as(users(:two)) { Notes::Resolve.call(reply) } }
+    Notes::Delivery.where(user: @me, thread: read).update_all(read_at: Time.current) # version: none (a test's own setup)
+
+    assert_equal [ Dashboard::NotesForYou::SHOWS, inbox.rows(limit: 50, show: :all).size ], [ %i[all unread mentions], 3 ]
+    assert_equal [ reply.id, old.id ], inbox.rows(limit: 50, show: :unread).map(&:thread_id)
+    assert_equal [ old.id, read.id ], inbox.rows(limit: 50, show: :mentions).map(&:thread_id)
+    assert_equal [ 3, 2, 2 ], [ inbox.total(show: :all), inbox.total(show: :unread), inbox.total(show: :mentions) ]
+    assert_equal [ read.id ], inbox.rows(limit: 1, offset: 1, show: :mentions).map(&:thread_id)
+    assert_raises(KeyError) { inbox.rows(show: :everything) }
+  end
+
+  test "the counts of all three scopes are one statement, and a count of 0 is 0" do
+    mention(@page)
+    read = mention(@post)
+    Notes::Delivery.where(user: @me, thread: read).update_all(read_at: Time.current) # version: none (a test's own setup)
+
+    counts = nil
+    statements = nil
+    assert_queries_count(1) { statements = capture_sql { counts = inbox.counts } }
+
+    assert_equal({ all: 2, unread: 1, mentions: 2 }, counts)
+    assert_match(/COUNT\(\*\) FILTER/, statements.grep(/"note_deliveries"/).first)
+    assert_equal({ all: 0, unread: 0, mentions: 0 }, inbox(users(:one)).counts)
+  end
+
+  test "a delivery on a trashed record or one the person may not read is in no scope's rows or count" do
+    mention(@page)
+    gone = mention(@post)
+    @post.update!(trashed_at: Time.current)
+
+    assert_equal [ 1, 1, 1 ], inbox.counts.values
+    assert_not_includes inbox.rows(limit: 50, show: :mentions).map(&:thread_id), gone.id
+  end
+
   # `Notes::Deliveries` REUSES a person's row for a thread's first message
   # when the thread is resolved or reopened: it keeps its `created_at`. The
   # inbox dates a row by when it last had something to say, or the news of a
@@ -144,7 +182,7 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_equal [ "mention", nil, nil ], inbox.rows.find { |row| row.thread_id == other.id }.then { |row| [ row.reason, row.by, row.by_id ] }
   end
 
-  test "a delivery on a record I can no longer read, or that is in the trash, is not shown and not counted" do
+  test "a delivery on a record I have lost the right to read, or that is in the trash, is not shown and not counted" do
     mention(@page)
     mention(@post)
     @post.update!(trashed_at: Time.current)
@@ -155,7 +193,7 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_equal 2, Notes::Delivery.where(user: @me).count # the rows stay
   end
 
-  # One right at a time (notes spec §3.3): the row stays in the table and
+  # One right at a time: the row stays in the table and
   # shows nowhere. An image has no read right of its own: `media.upload`
   # opens the library.
   { "page" => "pages.read", "post" => "posts.read", "media" => "media.upload" }.each do |kind, permission|

@@ -79,6 +79,10 @@ en:
           open:
             one: "%{count} open note on %{name}"
             other: "%{count} open notes on %{name}"
+          open_unread:
+            one: "%{count} new open note for you on %{name}"
+            other: "%{count} new open notes for you on %{name}"
+          new: "%{count} new"
           selection: "Add a note on the selected text in %{name}"
         delete_warning:
           one: "This block has %{count} open note. It will be deleted with it."
@@ -171,7 +175,20 @@ en:
         page_title: "Notes for you · CS Studio"
         title: "Notes for you"
         mark_all_read: "Mark all read"
-        empty: "No notes for you."
+        # The filter's name and its three tabs; each tab's count is the
+        # scope's own.
+        filters:
+          label: "Show"
+          all: "All"
+          unread: "Unread"
+          mentions: "Mentions"
+        # What an empty list says, by scope.
+        empty:
+          all:
+            title: "Nothing for you yet"
+            description: "When someone mentions you or replies to you, it shows here."
+          unread: "No unread notes"
+          mentions: "No mentions yet"
       card:
         title: "Notes for you"
         # The line under the heading: what the panel holds.
@@ -233,6 +250,9 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
+          open_notes_unread:
+            one: "%{count} new open note for you"
+            other: "%{count} new open notes for you"
       posts_screen:
         table:
           # The column's name, for a screen reader: its header shows an icon.
@@ -260,6 +280,9 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
+          open_notes_unread:
+            one: "%{count} new open note for you"
+            other: "%{count} new open notes for you"
         rail_panel:
           title: "Notes"
           # The rail's tab (`editor.rail.tabs`), beside Page or Post.
@@ -441,7 +464,8 @@ en:
         # name in a heavier weight), for a person who has since been deleted,
         # and with nobody to name (a reopen records no one).
         inbox_row:
-          unread: "Unread"
+          # The chip on an unread row: new, and for you.
+          new: "New"
           # The verb the row ends in, inside its one link.
           verb: "Open thread"
           untitled: "(untitled)"
@@ -466,3 +490,27 @@ en:
             post: "Post · %{title}"
             media: "Image · %{title}"
             block: "%{place} · %{block}"
+        # The Notes screen's rail of open threads
+        # (`Admin::NotesScreen::OpenThreadsComponent`): what it is, how many
+        # records lie beyond its rows, and what it says with none.
+        open_threads:
+          heading: "Open threads"
+          line: "Unresolved notes on pages, posts and images"
+          empty: "No open threads."
+          more:
+            one: "And %{count} more on other pages"
+            other: "And %{count} more on other pages"
+        # One record of that rail: its notes and when the newest was written.
+        open_thread_row:
+          untitled: "(untitled)"
+          # What a screen reader hears after the visible words: who wrote.
+          by: "by %{names}"
+          two: "%{first} and %{second}"
+          separator: ", "
+          and_more:
+            one: "%{names} and %{count} more"
+            other: "%{names} and %{count} more"
+          deleted: "a deleted user"
+          line_html:
+            one: "%{count} note · %{time}"
+            other: "%{count} notes · %{time}"

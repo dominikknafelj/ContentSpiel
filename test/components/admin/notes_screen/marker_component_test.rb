@@ -13,6 +13,9 @@ class Admin::NotesScreen::MarkerComponentTest < ViewComponent::TestCase
     assert_selector "button[data-notes-name='Rich text']:not([aria-controls])[data-action='mousedown->admin--notes--drawer#hold admin--notes--drawer#open']"
     assert_selector "button [data-notes-count]", visible: :all, text: ""
     assert_selector "button [data-notes-selection]", visible: :all, text: "Note on selection"
+    assert_selector "button > .admin-notes-marker__add svg", visible: :all
+    assert_selector "button > .admin-notes-marker__open svg", visible: :all
+    assert_selector "button > .admin-notes-marker__unread svg[fill=currentColor]", visible: :all
     # Nothing in it says how many: the script fills that from the counts.
     assert_no_selector "button[data-has-notes]"
   end

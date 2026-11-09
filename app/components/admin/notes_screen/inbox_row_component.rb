@@ -14,13 +14,16 @@ module Admin
     # one target and its accessible name is what it says, ending in its
     # verb, "Open thread".
     #
-    # Unread is said four ways, never by colour alone: the accent dot (the
-    # one use of accent here: unread and addressed to the viewer), the name
-    # heavier, the sentence ink instead of dim, and "Unread" for a screen
-    # reader. A read row has none of them.
+    # Unread is said three ways, never by colour alone: the "New" chip (the
+    # one use of accent here: unread and addressed to the viewer, in words), the
+    # name heavier and the sentence ink instead of dim. A read row has none of
+    # them. The avatar, the chips and "New" are no controls and take no focus:
+    # the row is one Tab stop.
     #
     # Nothing here queries: the row carries its users, record and block.
     class InboxRowComponent < Admin::AdminComponent
+      include Admin::NotesScreen::RecordRow
+
       def initialize(row:)
         @row = row
       end
@@ -45,6 +48,14 @@ module Admin
         t(".#{row.reason}.somebody_html", name: tag.strong(::PersonName.of(row.by), class: row.unread ? "font-semibold" : "font-medium"))
       end
 
+      # The record's chip, or for a note on a block its type's, so the line
+      # says what the note is on before it says where.
+      def where_chip
+        return render(Admin::Ui::BlockIconComponent.new(definition: row.block.definition, place: :row, block: row.block)) if row.heading && row.block
+
+        record_chip(row.kind)
+      end
+
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich
       # text · Our prices start at…": the block as the list's group heading
       # names it, its type and then its first words, its image's file name or
@@ -55,10 +66,6 @@ module Admin
 
         t(".where.block", place: place, block: [ helpers.note_subject_label(row.heading, row.kind), helpers.note_subject_detail(row.heading) ].compact.join(" · "))
       end
-
-      # `admin_url_options` is a controller helper, absent when a component
-      # is rendered on its own (a component test).
-      def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
     end
   end
 end

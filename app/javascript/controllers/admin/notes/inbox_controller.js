@@ -321,6 +321,10 @@ export default class extends Controller {
       badge.textContent = unread > 0 ? String(unread) : ""
       badge.hidden = unread === 0
       badge.toggleAttribute("data-badge", unread > 0)
+      // The link is named by the words it shows ("Dashboard, 2 new"), and by its text alone at zero.
+      const link = badge.closest("a[data-nav-label]")
+      if (unread > 0) link?.setAttribute("aria-label", messages(this.element).t("shell.nav.unread_count", { label: link.dataset.navLabel, count: unread }))
+      else link?.removeAttribute("aria-label")
     }
     this.reload(document.getElementById("dashboard-waiting"), this.waitingUrlValue)
     this.reload(document.getElementById("notes-for-you"), this.cardUrlValue)

@@ -9,8 +9,9 @@ module Admin
     #                 `PersonName.initials` of `PersonName.of(user)` (the rule
     #                 notes and presence use); the viewer's own in `:own`, as
     #                 notes draws it, anyone else in `:other`
-    #   a deleted     the `:away` circle, empty: an event records no user's
-    #   user          name (`actor_label` is a token's name or the visitor's),
+    #   a deleted     the `:empty` circle (a hairline, no letters, never
+    #   user          dashed: that is away): an event records no user's
+    #                 name (`actor_label` is a token's name or the visitor's),
     #                 so there are no letters to draw
     #   System        not a person: the neutral settings icon chip, centred in
     #                 the slot
@@ -46,7 +47,7 @@ module Admin
       def call
         if actor.none then tag.span(class: SLOT, aria: { hidden: true })
         elsif actor.user then render(AvatarComponent.new(initials: initials, size: :lg, tone: actor.you ? :own : :other))
-        elsif actor.user_id then render(AvatarComponent.new(initials: "", size: :lg, tone: :away))
+        elsif actor.user_id then render(AvatarComponent.new(initials: "", size: :lg, tone: :empty))
         else tag.span(render(IconChipComponent.new(icon: :settings, family: :neutral)), class: SLOT, aria: { hidden: true })
         end
       end

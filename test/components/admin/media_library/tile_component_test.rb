@@ -105,4 +105,18 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_selector "[data-image-empty]"
     assert_no_match %r{/blobs/}, rendered_content
   end
+
+  test "open notes are the shared bubble on the image, unread says 2 new and is named new for you, and none draws nothing" do
+    asset = create_media_asset
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false, open_notes: 2)
+    assert_selector "span.admin-notes-marker.admin-notes-marker--on-image[data-notes-chip][data-has-notes][role=img][aria-label='2 open notes']", text: "2"
+    assert_no_selector "[data-unread]"
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false, open_notes: 2, notes_unread: true)
+    assert_selector ".admin-notes-marker--on-image[data-unread][aria-label='2 new open notes for you']", text: "2 new"
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
+    assert_no_selector ".admin-notes-marker"
+  end
 end

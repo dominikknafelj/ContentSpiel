@@ -4,8 +4,9 @@ import { settle } from "live/state"
 import { quiet, writeCount } from "saving/queue"
 import { get } from "editing/requests"
 import { anchored, holds, mergeBlockList, mergeUnits } from "editing/merge"
+import { clearMarks, fadeMark } from "editing/marks"
 
-// LIVE REFRESH of an open page or post editor (live-editing spec §3.2). On
+// LIVE REFRESH of an open page or post editor (`docs/reference/live-editing.md`). On
 // the element `Admin::EditorScreen::LiveRegionComponent` renders.
 //
 // It hears, on the record's stream (`Editing::Channel`), THAT something
@@ -73,10 +74,10 @@ import { anchored, holds, mergeBlockList, mergeUnits } from "editing/merge"
 // media picker for a field of it). Such a unit that is kept only for that is
 // fetched again when the menu or dialog closes (a listener, no polling). A
 // unit someone else moved while it holds unsaved text stays where it is and
-// the list is fetched again once its form is no longer unsaved (`moved`).
+// the list is fetched again once its form holds nothing unsaved (`moved`).
 //
-// A 404 of the record or the list means the record is gone or no longer the
-// viewer's to read: the editor says so in the header's notice area (appended;
+// A 404 of the record or the list means the record is gone or not the
+// viewer's to read now: the editor says so in the header's notice area (appended;
 // a "Changed elsewhere" bar already there stays) and offers the way back. One
 // block's 404 may only be a block this page never had: the list says which.
 //
@@ -132,6 +133,7 @@ export default class extends Controller {
     this.element.removeEventListener("admin--editor--blocks:moving", this.moved)
     this.element.removeEventListener("admin--editing--hold:refresh", this.asked_for)
     this.timers.forEach(clearTimeout)
+    clearMarks(this.element)
     this.watchers.forEach((watcher) => watcher.stop())
     this.watchers.clear()
     settle(document.body)
@@ -402,7 +404,7 @@ export default class extends Controller {
     const result = anchored(this.element, () => mergeUnits(this.element, answer.fragment, { unsaved: this.unsaved, onlyChanged, hold: this.holdPart }))
     if (result.moved.length > 0) this.fetchAgainWhenSaved(result.moved)
     if (result.missing) this.want("blocks")
-    result.replaced.forEach((unit) => this.fade(unit.querySelector("[data-editing-mark]")))
+    result.replaced.forEach((unit) => fadeMark(unit.querySelector("[data-editing-mark]"), { after: this.noticeValue }))
     this.dispatch("merged", { detail: { part, gone: [], awayGone: [], ...result } })
   }
 
@@ -526,19 +528,7 @@ export default class extends Controller {
     }
   }
 
-  // "Updated by ..." stays for `notice` and fades over 200ms (handoff 10);
-  // with reduced motion it goes at once.
-  fade(mark) {
-    if (!mark) return
-    const later = (act, ms) => { const timer = setTimeout(() => { this.timers.delete(timer); act() }, ms); this.timers.add(timer) }
-    later(() => {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return mark.remove()
-      mark.classList.add("admin-editing-mark--leaving")
-      later(() => mark.remove(), 200)
-    }, this.noticeValue)
-  }
-
-  // The record is in the trash, deleted or no longer this viewer's: said once,
+  // The record is in the trash, deleted or not this viewer's any more: said once,
   // in the header's notice area, with the way back; the stream is let go, what
   // was waiting is dropped, and the part answers. `#editor-notice` is shared with the 409's "Changed
   // elsewhere" bar: this APPENDS to it. (A later 409 replaces the area's

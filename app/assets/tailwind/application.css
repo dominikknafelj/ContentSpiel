@@ -1,6 +1,6 @@
 /* Product UI (setup wizard, sign-in, password reset). `source(none)` +
    explicit @source paths keep this build blind to the public theme's views,
-   so the two stylesheets stay independent (spec §9). */
+   so the two stylesheets stay independent. */
 @import "tailwindcss" source(none);
 @source "../../views/setup";
 @source "../../views/admin";
@@ -15,7 +15,7 @@
 @source "../../components/media";
 @source "../../javascript/media";
 /* Class names built in JS (the rich-text editor's toolbar state and
-   popovers, tiptap spec §4.1) -- not in any view, so Tailwind has to be
+   popovers) -- not in any view, so Tailwind has to be
    told to look here too. */
 @source "../../javascript/controllers/admin";
 @source "../../javascript/controllers/password_field_controller.js";
@@ -30,6 +30,8 @@
 @source "../../javascript/notes";
 /* The editing merge puts a collapsed card's `hidden` back (`editing/merge.js`). */
 @source "../../javascript/editing";
+/* The scripts' circle of a person (`ui/avatar.js`) holds the avatar's classes. */
+@source "../../javascript/ui/avatar.js";
 /* The page editor's moves put a card's `hidden` and `admin-drag-chosen` on
    and off (`editor/menu_moves.js`, `editor/keyboard_moves.js`). */
 @source "../../javascript/editor";

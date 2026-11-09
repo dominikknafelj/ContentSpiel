@@ -15,6 +15,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     @me = users(:one).tap { |user| user.update!(name: "Olga Braun") }
     @dana = users(:two).tap { |user| user.update!(name: "Dana Weiss") }
     @reader = users(:reader)
+    @jonas = users(:author).tap { |user| user.update!(name: "Jonas Lind") }
     @page = create_page(title: "Pricing")
     @elsewhere = create_page(title: "Elsewhere")
     @post = create_post(title: "Translating Everything With Mobility")
@@ -102,23 +103,25 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   # sibling in the flow: a translation marker at rest is clipped (absolute,
   # 1px) and takes no room. With none in its own box (the tree row's trailing
   # parts), it is the last in the flow before that box (the title, or the
-  # state mark after it).
+  # state mark after it). `circles` are the letters of the circles that take
+  # room, `more` the "+N" that does (the wide or the narrow one), `size` the
+  # first circle's box and `overlap` how far the second stands into the first.
   def look(marker)
     page.evaluate_script(<<~JS)
       (() => {
         const marker = document.querySelector(#{marker.to_json})
-        const [ icon, count ] = [ marker.querySelector("svg"), marker.querySelector("[data-presence-marker-count]") ]
+        const taken = (element) => element.getClientRects().length > 0
+        const circles = [ ...marker.querySelectorAll("[data-presence-avatar]") ].filter(taken).map((slot) => slot.firstElementChild)
+        const more = [ ...marker.querySelectorAll("[data-presence-more], [data-presence-more-narrow]") ].filter(taken).map((slot) => slot.firstElementChild)
+        const box = (element) => element.getBoundingClientRect()
         const inFlowBefore = (element) => [ ...element.parentElement.children ].slice(0, [ ...element.parentElement.children ].indexOf(element)).filter((each) => each.getClientRects().length && getComputedStyle(each).position !== "absolute").pop()
         const before = inFlowBefore(marker) || inFlowBefore(marker.parentElement)
-        const probe = document.body.appendChild(Object.assign(document.createElement("span"), { className: "text-meta" }))
-        const meta = getComputedStyle(probe).color
-        probe.remove()
         return {
-          icon: [ icon.getBoundingClientRect().width, icon.getBoundingClientRect().height ],
-          meta: getComputedStyle(marker).color === meta,
-          after: Math.round((marker.getBoundingClientRect().left - before.getBoundingClientRect().right) * 10) / 10,
-          count: count.hidden ? null : { text: count.textContent, size: getComputedStyle(count).fontSize, mono: /mono/i.test(getComputedStyle(count).fontFamily),
-                                         gap: Math.round((count.getBoundingClientRect().left - icon.getBoundingClientRect().right) * 10) / 10 },
+          circles: circles.map((circle) => circle.textContent),
+          more: more.length ? more.map((circle) => circle.textContent).join(" ") : null,
+          size: circles.length ? [ box(circles[0]).width, box(circles[0]).height ] : null,
+          overlap: circles.length > 1 ? Math.round(box(circles[1]).left - box(circles[0]).right) : null,
+          after: Math.round((box(marker).left - box(before).right) * 10) / 10,
           label: marker.querySelector("[data-presence-marker-label]").textContent,
           tip: marker.querySelector("[data-tooltip]").textContent
         }
@@ -136,7 +139,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     node.fetch("nodes").first.dig("name", "value")
   end
 
-  test "the tree's row shows a marker when someone else is on that page, the count from two, and loses it when they leave; the row is never redrawn" do
+  test "the tree's row shows the avatars of whoever else is on that page, and loses them when they leave; the row is never redrawn" do
     open_tree
     assert_selector "#{tree_marker}[hidden]", visible: :all
     assert_selector "#tree [data-presence-marker]", count: Page.kept.count, visible: :all
@@ -145,12 +148,11 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:dana, @dana)
     assert_selector shown(tree_marker), wait: LIVE
-    # The icon at 12px in meta, alone for one person, last of the row's
-    # markers, and at the row's end: the trailing parts stand there, past the
-    # title and its state, with room left for the "+".
+    # One 22px circle of their letters, last of the row's markers and at the
+    # row's end: the trailing parts stand there, past the title and its state.
     seen = look(tree_marker)
     assert_operator seen.delete("after"), :>, 6
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
+    assert_equal({ "circles" => [ "DW" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
     at_end = page.evaluate_script("(() => { const row = document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row'); return row.getBoundingClientRect().right - document.querySelector(#{tree_marker.to_json}).getBoundingClientRect().right })()")
     assert_operator at_end, :<=, 40, "the marker stands at the row's end, not after the title"
     # Nobody marks themselves: Dana's own tree marks where I am, not her page.
@@ -162,21 +164,50 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#tree a [data-presence-marker]", visible: :all
     assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('#tree [data-presence-marker], #tree [data-presence-marker] *') ].filter((each) => each.tabIndex >= 0).length")
 
+    # Two people are two circles, the second standing 6px into the first, in
+    # order of arrival; the ring is the tree's own ground.
     join(:reader, @reader)
-    assert_selector "#{shown(tree_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
-    # From two the count, in 11px, 4px after the icon; the names in
-    # order of arrival.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "count" => { "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 },
+    assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => -6,
                    "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker).except("after"))
+    ring = page.evaluate_script("getComputedStyle(document.querySelector(#{tree_marker.to_json} + ' [data-presence-avatar] > span')).boxShadow")
+    chrome = page.evaluate_script("(() => { const probe = document.body.appendChild(document.createElement('span')); probe.style.color = 'var(--cs-chrome)'; const color = getComputedStyle(probe).color; probe.remove(); return color })()")
+    assert_includes ring, chrome
 
+    join(:third, @jonas)
+    assert_selector "#{shown(tree_marker)} [data-presence-more]:not([hidden])", text: "+1", exact_text: true, wait: LIVE
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => "+1" }, look(tree_marker).slice("circles", "more"))
+
+    leave(:third)
+    assert_no_selector "#{tree_marker} [data-presence-more]:not([hidden])", wait: LIVE
     leave(:dana)
     assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "reader is here", exact_text: true, visible: :all, wait: LIVE
-    assert_no_selector "#{tree_marker} [data-presence-marker-count]"
+    assert_equal({ "circles" => [ "re" ], "more" => nil }, look(tree_marker).slice("circles", "more"))
     leave(:reader)
     assert_selector "#{tree_marker}[hidden]", visible: :all, wait: LIVE
     assert_equal [ "", "" ], page.evaluate_script("[ document.querySelector(#{tree_marker.to_json} + ' [data-presence-marker-label]').textContent, document.querySelector(#{tree_marker.to_json} + ' [data-tooltip]').textContent ]")
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll(#{tree_marker.to_json} + ' [data-presence-avatar] > span') ].filter((each) => each.textContent !== '').length")
     # The same row and the same marker element all along.
     assert_equal true, page.evaluate_script("window.__row === document.querySelector('#tree li[data-page-id=\"#{@page.id}\"]') && window.__marker === document.querySelector(#{tree_marker.to_json})")
+  end
+
+  # The tree asks its column's width, not a row's: at the default width every
+  # row, nested or not, shows two circles; at the column's 220px minimum every
+  # row shows one and a "+N" that counts the rest, whatever the window's width.
+  test "a narrow tree column gives every row one circle and the +N for the rest" do
+    open_tree
+    set_timing("interval", 600)
+    join(:dana, @dana)
+    join(:reader, @reader)
+    assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
+    assert_equal [ "DW", "re" ], look(tree_marker)["circles"], "a nested row at the default width shows two"
+
+    page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', '220px')")
+    assert_equal({ "circles" => [ "DW" ], "more" => "+1" }, look(tree_marker).slice("circles", "more"))
+    # The words are the same: only the drawing narrows.
+    assert_equal "2 people here: Dana Weiss, reader", look(tree_marker)["label"]
+  ensure
+    page.execute_script("document.documentElement.style.removeProperty('--admin-tree-width')")
   end
 
   test "the posts list marks a row on the title's line, 6px after the title and inside the link, and loses the mark when they leave" do
@@ -191,7 +222,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(post_marker), wait: LIVE
     # Right after the title text, 6px after it, on the title's
     # line; the path line under it is where it was.
-    assert_equal({ "icon" => [ 12, 12 ], "meta" => true, "after" => 6, "count" => nil, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
+    assert_equal({ "circles" => [ "DW" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => nil, "after" => 6, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
     lines = page.evaluate_script(<<~JS)
       (() => {
         const link = document.querySelector("tr#post_#{@post.id} th[scope=row] a")
@@ -204,13 +235,16 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     JS
     assert_equal({ "children" => 2, "sameLine" => true, "pathBelow" => true, "path" => "Not listed" }, lines)
 
-    # It stays meta while the link is hovered, like the path under it.
+    # The circle is the same while the link is hovered.
+    circle = "#{post_marker} [data-presence-avatar] > span"
+    colours = -> { page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{circle.to_json})); return [ style.color, style.backgroundColor ] })()") }
+    before = colours.call
     find("tr#post_#{@post.id} th[scope=row] a > span:first-child > span:first-child").hover
-    assert_equal true, look(post_marker)["meta"]
+    assert_equal before, colours.call
 
     join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
-    assert_selector "#{shown(post_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
-    assert_equal({ "text" => "2", "size" => "11px", "mono" => false, "gap" => 4 }, look(post_marker)["count"])
+    assert_selector "#{shown(post_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "overlap" => -6 }, look(post_marker).slice("circles", "more", "overlap"))
 
     # A long title is cut with an ellipsis before the marker is: the marker
     # keeps its size and stays inside the cell.
@@ -222,16 +256,62 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
         const [ title, marker ] = [ line.firstElementChild, line.querySelector("[data-presence-marker]") ]
         const cell = line.closest("th").getBoundingClientRect()
         return { cut: title.scrollWidth > title.clientWidth, ellipsis: getComputedStyle(title).textOverflow, oneLine: title.getBoundingClientRect().height < 30,
-                 icon: marker.querySelector("svg").getBoundingClientRect().width, inside: marker.getBoundingClientRect().right <= cell.right,
+                 circle: marker.querySelector("[data-presence-avatar] > span").getBoundingClientRect().width, inside: marker.getBoundingClientRect().right <= cell.right,
                  after: Math.round(marker.getBoundingClientRect().left - title.getBoundingClientRect().right) }
       })()
     JS
-    assert_equal({ "cut" => true, "ellipsis" => "ellipsis", "oneLine" => true, "icon" => 12, "inside" => true, "after" => 6 }, cut)
+    assert_equal({ "cut" => true, "ellipsis" => "ellipsis", "oneLine" => true, "circle" => 22, "inside" => true, "after" => 6 }, cut)
 
     leave(:dana)
     leave(:reader)
     assert_selector "#{post_marker}[hidden]", visible: :all, wait: LIVE
     assert_equal plain, accessible_name("tr#post_#{@post.id} th[scope=row] a")
+  end
+
+  # A posts row has room for three circles, and asks its list's own width:
+  # under 640px of it, one circle and a "+N" that counts the rest.
+  test "a posts row shows up to three circles, and one with the +N where its list is narrow" do
+    open_posts
+    set_timing("interval", 600)
+    join(:dana, @dana, path: "/cs-studio/posts/#{@post.id}")
+    join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
+    join(:jonas, @jonas, path: "/cs-studio/posts/#{@post.id}")
+    assert_selector "#{shown(post_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(3)", wait: LIVE
+    assert_equal({ "circles" => [ "DW", "re", "JL" ], "more" => nil, "overlap" => -6 }, look(post_marker).slice("circles", "more", "overlap"))
+
+    original = page.current_window.size
+    page.current_window.resize_to(600, 900)
+    assert_equal({ "circles" => [ "DW" ], "more" => "+2" }, look(post_marker).slice("circles", "more"))
+    assert_equal "3 people here: Dana Weiss, reader, Jonas Lind", look(post_marker)["label"].delete_prefix(", ")
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
+  # The people on a row are no control: the keyboard passes from the row's
+  # link to the next stop, and the words that name them are the link's.
+  test "a row's people take no Tab stop: the keyboard passes from the row's link to the next, and the row's words name them" do
+    open_posts
+    set_timing("interval", 600)
+    join(:dana, @dana, path: "/cs-studio/posts/#{@post.id}")
+    assert_selector shown(post_marker), wait: LIVE
+    link = "tr#post_#{@post.id} th[scope=row] a"
+    assert_match(/, Dana Weiss is here/, accessible_name(link))
+    find(link).send_keys(:tab)
+    inside = page.evaluate_script("!!document.activeElement.closest('[data-presence-marker]')")
+    assert_equal false, inside, "the marker took the Tab"
+    assert_equal false, page.evaluate_script("document.activeElement.matches(#{link.to_json})"), "the Tab did not leave the link"
+
+    join(:dana, @dana)
+    open_tree
+    set_timing("interval", 600)
+    assert_selector shown(tree_marker), wait: LIVE
+    row_link = "#tree li[data-page-id='#{@page.id}'] > div a"
+    link = find(row_link, match: :first)
+    page.execute_script("window.__link = document.querySelector(#{row_link.to_json})")
+    link.send_keys(:tab)
+    assert_equal false, page.evaluate_script("!!document.activeElement.closest('[data-presence-marker]')"), "the marker took the Tab"
+    assert_equal false, page.evaluate_script("document.activeElement === window.__link"), "the Tab did not leave the row's link"
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('#tree *') ].filter((each) => each.tabIndex >= 0 && each.closest('[data-presence-marker]')).length")
   end
 
   # For a screen reader, the marker's words join the link's
@@ -244,7 +324,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_match(/\ATranslating Everything With Mobility\s*, Dana Weiss is here\s+Not listed\z/, accessible_name("tr#post_#{@post.id} th[scope=row] a"))
 
     join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
-    assert_selector "#{shown(post_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
+    assert_selector "#{shown(post_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
     assert_match(/\ATranslating Everything With Mobility\s*, 2 people here: Dana Weiss, reader\s+Not listed\z/, accessible_name("tr#post_#{@post.id} th[scope=row] a"))
     # The count and the tooltip are for the eye: they are not said twice.
     assert_no_match(/reader.*reader|2\s+,/, accessible_name("tr#post_#{@post.id} th[scope=row] a"))
@@ -267,7 +347,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     set_timing("interval", 600)
     join(:dana, @dana)
     join(:reader, @reader)
-    assert_selector "#{shown(tree_marker)} [data-presence-marker-count]", text: "2", exact_text: true, wait: LIVE
+    assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
 
     assert_no_selector "#{tree_marker} [data-tooltip]"
     find(shown(tree_marker)).hover
@@ -371,7 +451,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(tree_marker), wait: LIVE
     watch_fetches
 
-    # Her tab is gone without a word: its row is no longer kept alive.
+    # Her tab is gone without a word: its row is not kept alive any more.
     Presence::Mark.where(user_id: @dana.id).find_each { |mark| mark.update_columns(seen_at: (Presence::STALE_AFTER + 1.second).ago) } # version: none (a test of presence)
     await_frames
     assert_selector shown(tree_marker)
@@ -416,7 +496,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     find("button[aria-label='Open page tree']").click
     assert_selector "#tree-column[data-open]"
     assert_selector shown(tree_marker), wait: LIVE
-    assert_equal [ 12, 12 ], look(tree_marker)["icon"]
+    assert_equal [ 22, 22 ], look(tree_marker)["size"]
     leave(:dana)
     assert_selector "#{tree_marker}[hidden]", visible: :all, wait: LIVE
   ensure
@@ -505,7 +585,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_operator fetches, :>=, 1
     assert_equal [], page.evaluate_script("window.__turbo")
     # The positive control: the collector does hear Turbo. One real visit,
-    # and the same list is no longer empty -- so empty meant "none happened".
+    # and the same list is not empty now -- so empty meant "none happened".
     # (A made-up event would not do: Turbo's own listeners read its detail.)
     click_link "Tags"
     assert_selector "main h1", text: "Tags"

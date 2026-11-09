@@ -64,6 +64,8 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
 <% when :message_square %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></svg>
+<% when :message_square_filled %>
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></svg>
 <% when :message_square_plus %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2ZM12 7v6M9 10h6" /></svg>
 <% when :paperclip %>
@@ -83,7 +85,7 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v18M14 9l3 3-3 3" /></svg>
 <%# The block types' icons (Lucide, 1.5px):
     a block type names one (`ContentModel::BlockTypeDefinition::ICONS`) and
-    `Admin::EditorScreen::BlockIconComponent` draws it at 16, 14 or 12px. %>
+    `Admin::Ui::BlockIconComponent` draws it at 16, 14 or 12px. %>
 <% when :pilcrow %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 0 0 0 9H13" /></svg>
 <% when :image %>
@@ -93,7 +95,7 @@ when :dashboard %>
 <% when :columns_2 %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" /><path stroke-linecap="round" d="M12 3v18" /></svg>
 <%# The Note block's four kinds, Lucide, drawn by
-    `Admin::EditorScreen::BlockIconComponent` on a note's card and tile (`icon for_block:`), and
+    `Admin::Ui::BlockIconComponent` on a note's card and tile (`icon for_block:`), and
     `info` in the picker as the Note type's own. %>
 <% when :info %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 16v-4M12 8h.01" /></svg>

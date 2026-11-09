@@ -887,7 +887,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert_equal [], duplicate_ids
     assert_includes text_of(panel(@inside)), "panel words"
 
-    # Once the form is no longer unsaved the next list takes it to its place, with no notice.
+    # Once the form holds nothing unsaved the next list takes it to its place, with no notice.
     page.execute_script("window.__unsaved = () => false")
     merge_list
     assert_selector "#section-#{section2.id}-lanes #content_block_#{@inside.id}"
@@ -1216,5 +1216,59 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     JS
 
     assert result.all? { |off| off.abs < 2 }, "the block moved against the second merge's place: #{result.map(&:round)}"
+  end
+
+  # The glow is the stylesheet's, read from what the browser computes on the card
+  # while a mark, put in by `editing/marks.js`, stands in its head.
+  def glow_of(block, held: false, discussed: false)
+    page.evaluate_async_script(<<~JS, card(block), block.id.to_s, held, discussed)
+      const [ selector, blockId, held, discussed, done ] = arguments
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      ;(async () => {
+        const marks = await import("editing/marks")
+        const card = document.querySelector(selector)
+        const template = document.createElement("template")
+        template.innerHTML = '<span data-editing-mark class="admin-editing-mark">Taken over by you</span>'
+        const shadow = () => getComputedStyle(card).boxShadow
+        const rest = shadow()
+        if (held) card.setAttribute("data-card-edge", "held")
+        if (discussed) card.setAttribute("data-notes-active", "")
+        const mark = marks.showMark(document, blockId, template)
+        const during = getComputedStyle(card).transitionDuration
+        await wait(400)
+        const glowing = shadow()
+        mark.classList.add("admin-editing-mark--leaving")
+        const out = getComputedStyle(card).transitionDuration
+        await wait(900)
+        const leaving = shadow()
+        marks.clearMarks(card)
+        if (discussed) card.removeAttribute("data-notes-active")
+        done({ rest, glowing, leaving, during, out, marks: card.querySelectorAll("[data-editing-mark]").length })
+      })().catch((error) => done({ error: String(error) }))
+    JS
+  end
+
+  test "an Updated by mark glows the card for its six seconds, not on a held card and not under reduced motion" do
+    assert_equal 6, Editing::NOTICE.in_seconds
+
+    glow = glow_of(@first)
+    assert_nil glow["error"]
+    assert_not_equal glow["rest"], glow["glowing"], "the mark's card glows"
+    assert_match(/4px/, glow["glowing"])
+    assert_equal "0.2s", glow["during"], "200ms in"
+    assert_equal glow["rest"], glow["leaving"], "the glow goes as the mark starts to fade"
+    assert_equal "0.6s", glow["out"], "600ms out"
+    assert_equal 0, glow["marks"]
+
+    held = glow_of(@second, held: true)
+    assert_equal held["rest"], held["glowing"], "a held card shows the people outline alone"
+
+    discussed = glow_of(@first, discussed: true)
+    assert_equal discussed["rest"], discussed["glowing"], "a discussed card shows the people outline alone"
+
+    page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
+    reduced = glow_of(@first)
+    assert_equal reduced["rest"], reduced["glowing"], "no glow under reduced motion"
+    assert_equal "0s", reduced["during"]
   end
 end

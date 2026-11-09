@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The page editor's block list (cs-studio spec §5.1/§9): adding a block
+# The page editor's block list: adding a block
 # through the picker (a plain form submission, `admin--editor--blocks` itself has no
 # hand in it) and drag-reordering existing ones (`admin--editor--blocks#reorder`).
 class Admin::BlocksSystemTest < ApplicationSystemTestCase
@@ -85,11 +85,10 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ first.id, copy.id, second.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
   end
 
-  # Ledger b6 (final fix wave 1): a reorder queued behind an Add (or Duplicate
-  # or Delete) still in flight reads the card list when it is SENT. The queue
-  # used to let it go as soon as the Add was answered -- but Turbo applies that
-  # answer's stream a frame later, so the reorder listed the cards WITHOUT the
-  # new one, the server refused it (422, "must list exactly this page's
+  # A reorder queued behind an Add (or Duplicate or Delete) still in flight
+  # reads the card list when it is SENT. The queue lets it go only once Turbo
+  # has applied the Add's stream, a frame after the answer, or the reorder
+  # would list the cards WITHOUT the new one and the server refused it (422, "must list exactly this page's
   # blocks"), and the order on screen was one that had not been saved.
   test "a Move queued behind an Add block still in flight is sent with the new card in the list" do
     first = @page.content_blocks.create!(block_type: "image", position: 0)
@@ -123,7 +122,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ second.id, first.id, added.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
   end
 
-  # Task 12's b5: a card's menu Move pressed while that card's own autosave is
+  # A card's menu Move pressed while that card's own autosave is
   # still out. The reorder waits behind the save (one write queue per
   # screen), the save lands, then the move: both persist, the typed caption
   # on the moved card included.
@@ -161,13 +160,12 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ "PATCH", "PATCH" ], page.evaluate_script("window.__writes")
   end
 
-  # Ledger m2 (final fix wave 1): moving a card in the DOM (a drag, Move
-  # up/down) disconnects and reconnects its form's `admin--saving--autosave`. The
-  # reconnect used to take whatever the form held for "what the server
-  # holds", and the disconnect had cleared the debounce timer: an edit made
-  # by code inside its debounce (a translation's Use, with focus elsewhere)
-  # was never sent -- not by the timer, not by a later `focusout`, not by the
-  # drain before a visit.
+  # Moving a card in the DOM (a drag, Move up/down) disconnects and reconnects
+  # its form's `admin--saving--autosave`. The reconnect must not take whatever
+  # the form holds for "what the server holds" once the disconnect has cleared
+  # the debounce timer: an edit made by code inside its debounce (a
+  # translation's Use, with focus elsewhere) would never be sent, not by the
+  # timer, not by a later `focusout`, not by the drain before a visit.
   test "an edit still inside its debounce survives its card being moved" do
     first = @page.content_blocks.create!(block_type: "image", position: 0)
     second = @page.content_blocks.create!(block_type: "image", position: 1)
@@ -186,10 +184,10 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_text "CHANGED ELSEWHERE"
   end
 
-  # Follow-up N4: what survives a card being moved is the form's whole save
-  # state, not only its signature. A card paused by a 409 ("Changed
-  # elsewhere" -- its saves are over until Reload) used to come back from the
-  # move un-paused, and the restart of the debounce sent its text again.
+  # What survives a card being moved is the form's whole save state, not only
+  # its signature. A card paused by a 409 ("Changed elsewhere": its saves are
+  # over until Reload) stays paused through the move, or the restart of the
+  # debounce would send its text again.
   test "a card paused by Changed elsewhere stays paused when it is moved" do
     first = @page.content_blocks.create!(block_type: "image", position: 0)
     second = @page.content_blocks.create!(block_type: "image", position: 1)
@@ -337,7 +335,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{second.id}']"
     assert_equal [ second, first ], @page.content_blocks.reload.order(:position).to_a
   end
-  # Final fix wave I3 / fix round 2: every block write touches the page, so
+  # Every block write touches the page, so
   # each block request sends the page form's base along and gets it moved
   # forward when it was current -- through Turbo's own submissions (the
   # picker) and a card's autosave alike. Without that, the page form's next
@@ -360,12 +358,12 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_selector "#changed-elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
-  # Fix round 3: a card's queued follow-up save (`admin--saving--autosave`'s
-  # `pending` retrigger) runs before Turbo applies the previous response's
-  # streams (next animation frame), so it used to send the page form's
-  # *old* base -- the server then rightly refused to move it, the write
-  # touched the page again, and the page form's next save read "Changed
-  # elsewhere" with nobody else involved. The first PATCH is held (same
+  # A card's queued follow-up save (`admin--saving--autosave`'s `pending`
+  # retrigger) runs before Turbo applies the previous response's streams (next
+  # animation frame), so it must not send the page form's *old* base: the
+  # server would rightly refuse to move it, the write
+  # would touch the page again, and the page form's next save would read
+  # "Changed elsewhere" with nobody else involved. The first PATCH is held (same
   # JS-side stub as `autosave_test.rb`'s in-flight test) so the follow-up
   # is certain to be queued behind it.
   test "a queued block save doesn't make the page settings form report a false conflict" do
@@ -411,7 +409,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
   def card_for(block) = "##{ActionView::RecordIdentifier.dom_id(block)}"
 
-  # Task 12's b4: a post list's Limit is a 72px column; its error slot hangs
+  # A post list's Limit is a 72px column; its error slot hangs
   # from the column's right edge and runs leftwards instead of wrapping word by
   # word in 72px.
   test "the Limit error is wider than its 72px column and ends at the column's right edge" do
@@ -435,8 +433,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_in_delta rects["inputRight"], rects["errorRight"], 2
   end
 
-  # Design answer, first reply: a tall empty gap between a card's header and
-  # its first label (the reserved save line, Ruling 20).
+  # No tall empty gap between a card's header and its first label (the
+  # reserved save line).
   test "a card's first label stands just under its header" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     visit "/cs-studio/pages/#{@page.id}"
@@ -487,11 +485,10 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     page.execute_script("document.querySelector(#{card.to_json})?.style.removeProperty('width')") if card
   end
 
-  # A card that is held and has its thread open shows the notes edge: the
-  # three edges weigh the same and the later rule wins, held, then notes,
-  # then unavailable (`content-spiel.tailwind.css`). What the browser draws,
-  # each edge compared with its token resolved on the card.
-  test "a card both held and notes-active draws the notes edge, and an unavailable one the danger edge over both" do
+  # A card that is held and has its thread open shows one people outline, and
+  # one whose type is gone the danger edge over it (`content-spiel.tailwind.css`).
+  # What the browser draws, each edge compared with its token resolved on the card.
+  test "a card both held and discussed draws one people outline, and an unavailable one the danger edge over it" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     visit_editor(@page)
 
@@ -513,12 +510,12 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
         const both = edge()
         card.setAttribute("data-card-edge", "unavailable")
         const unavailable = edge()
-        return { held, both, unavailable, line: token("--cs-field-line"), accent: token("--cs-accent"), danger: token("--cs-danger") }
+        return { held, both, unavailable, people: token("--cs-people"), accent: token("--cs-accent"), danger: token("--cs-danger") }
       })()
     JS
-    assert_equal edges["line"], edges["held"]
-    assert_equal edges["accent"], edges["both"], "held and notes-active: the notes edge"
+    assert_equal edges["people"], edges["held"]
+    assert_equal edges["people"], edges["both"], "held and discussed: the same outline"
     assert_equal edges["danger"], edges["unavailable"]
-    assert_not_equal edges["line"], edges["accent"]
+    assert_not_equal edges["people"], edges["accent"]
   end
 end

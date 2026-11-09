@@ -35,7 +35,7 @@ module Admin
 
       def owner? = user.persisted? ? user.owner_in_database : user.owner?
       # The stored values; an unsaved record (a preview) has none, so its own.
-      def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.display_name)
+      def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.name_or_email)
       def dialog_id = self.class.dialog_id(user)
       def url = helpers.owner_admin_user_path(user, **url_options)
       def reason = "#{name} is the only owner, so their owner rights can't be removed."

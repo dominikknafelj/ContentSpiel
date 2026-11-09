@@ -78,7 +78,8 @@ pin_all_from "app/javascript/editor", under: "editor", preload: "admin"
 pin_all_from "app/javascript/search", under: "search", preload: "admin"
 # The shared controls' plain modules, imported by `controllers/admin/ui/`:
 # `ui/float`, which lifts an open menu or list of suggestions out of a docked
-# rail panel that scrolls, so the panel's edge does not cut it.
+# rail panel that scrolls, so the panel's edge does not cut it, and
+# `ui/avatar`, the person's circle the scripts draw as the component does.
 pin_all_from "app/javascript/ui", under: "ui", preload: "admin"
 
 # The page trees' shared modules: `tree/open_set`, the one writer of the open

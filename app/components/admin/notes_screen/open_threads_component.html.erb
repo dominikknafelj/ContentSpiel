@@ -1,0 +1,16 @@
+<section class="admin-list-rail__rail admin-notes-threads" aria-labelledby="open-threads-heading">
+  <h2 id="open-threads-heading" class="text-h3 text-ink"><%= t(".heading") %></h2>
+  <p class="mt-0.5 text-small text-meta"><%= t(".line") %></p>
+  <% if rows.empty? %>
+    <p class="mt-3 text-small text-meta"><%= t(".empty") %></p>
+  <% else %>
+    <ul class="mt-3 flex flex-col gap-3">
+      <% rows.each do |row| %>
+        <li><%= render Admin::NotesScreen::OpenThreadRowComponent.new(row: row) %></li>
+      <% end %>
+    </ul>
+    <% if more.positive? %>
+      <p class="mt-3 text-small text-meta"><%= t(".more", count: more) %></p>
+    <% end %>
+  <% end %>
+</section>

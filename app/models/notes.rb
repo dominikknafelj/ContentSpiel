@@ -1,10 +1,10 @@
-# Notes on content (notes spec): threads of short messages on a page, a post,
+# Notes on content threads of short messages on a page, a post,
 # a block or a library image. This file is the namespace's entry: what the
 # models, the services, the queries and the components all ask about a note's
 # place -- which record lists it, which permission reads and moderates it,
 # what it is called in a DOM id.
 #
-# Notes FOLLOW the content (decision D3): whoever may read a record in CS
+# Notes FOLLOW the content whoever may read a record in CS
 # Studio may read and write its notes, and whoever may edit it may moderate
 # them. There is no permission of their own, so everything here is asked of
 # `AccessControl` with the container's own keys.
@@ -19,26 +19,11 @@ module Notes
   # (`container_for`), so a block is no kind and is added here.
   SUBJECT_ONLY_TYPES = %w[ContentBlock].freeze
 
-  # The composer's emoji popover and the reactions offer the same small set
-  # (spec §4.2); the operating system's own picker works in the field as
+  # The composer's emoji popover and the reactions offer the same small set; the operating system's own picker works in the field as
   # anywhere. `Notes::React` accepts these and nothing else.
   EMOJI = %w[👍 👎 ✅ ❌ ❤️ 🎉 🙏 👀 🤔 😀 😅 😂 😍 😮 😢 😡 🔥 ⭐ 💡 ❓ ❗ ⏳ 🚀 📌 📝 🔗 🖼️ 🐛 💬 👋].freeze
 
   class << self
-    # What a NOTE calls a person (the handoff's decision 36): their name,
-    # and for someone without one the part of their email address before the
-    # at sign -- "dana" for dana@example.com. The whole address in a
-    # mention's chip and on an author line said more than a note needs to,
-    # to everyone who may read the record. THE ONE PLACE for it: the notes
-    # components (`Admin::NotesScreen::PersonNameComponent`), a mention's
-    # text (`Notes::Mentions.display`), the inbox, the toast, the mention
-    # picker and the mind graph's card all ask here. `User#display_name`,
-    # which the rest of CS Studio uses, is not changed. A name set later
-    # shows everywhere at once: a mention is a token with the person's id.
-    # The rule itself is `PersonName.of` (a value, so that presence, which
-    # does not know notes, names people the same way).
-    def name_of(user) = PersonName.of(user)
-
     # The record whose screen lists a thread on `subject`: a block's owner (a
     # page today), anything else itself. A block that moves between a
     # section's columns keeps its page, so its threads need no update.

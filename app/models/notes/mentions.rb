@@ -1,5 +1,5 @@
 module Notes
-  # A mention in a stored body is the token `@[<user id>]` (notes spec §3.2):
+  # A mention in a stored body is the token `@[<user id>]`:
   # an id, so renaming a user changes how old mentions read and a deleted one
   # reads "a deleted user".
   #
@@ -35,7 +35,7 @@ module Notes
       end
     end
 
-    # `[text, { name => id }]`, the name as a note says it (`Notes.name_of`:
+    # `[text, { name => id }]`, the name as a note says it (`PersonName.of`,
     # the same one the picker inserts). A token whose user is not in
     # `users_by_id` (deleted since) is left as it is, so saving the edit
     # doesn't turn it into loose text.
@@ -45,7 +45,7 @@ module Notes
         user = users_by_id[Regexp.last_match(1).to_i]
         next token unless user
 
-        name = Notes.name_of(user)
+        name = PersonName.of(user)
         names[name] = user.id
         "@#{name}"
       end

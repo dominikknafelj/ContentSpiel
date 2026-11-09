@@ -16,7 +16,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup views/invitations components/admin components/media components/public
-    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing javascript/ui
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
@@ -65,7 +65,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every directory the rules cover is there and has sources" do
     SOURCE_DIRECTORIES.each do |directory|
       root = Rails.root.join("app", directory).to_s
-      assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules no longer look at it"
+      assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
   end
 
@@ -232,39 +232,69 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   EDITOR_CARDS = %w[block_card_component.html.erb block_tile_component.html.erb section_card_component.html.erb].map { |f| "app/components/admin/editor_screen/#{f}" }.freeze
   EDITOR_CARD_WRAPPER = /class[=:].*(?<![\w-])admin-block-(?:card|tile)(?:__head)?(?![\w-])/
   BORDER_EDGE = /(?<![\w-])border(?:-(?:line|line-strong|danger|accent|field-line))?(?=[\s"'])/
-  # In the order they win by: the later rule, at one weight.
-  CARD_EDGES = { '.admin-block-card[data-card-edge="held"]' => "--cs-field-line",
-                 ".admin-block-card:where(:not(.admin-section-card))[data-notes-active]" => "--cs-accent",
-                 '.admin-block-card[data-card-edge="unavailable"]' => "--cs-danger" }.freeze
+  # Held by someone else and discussed in the notes are one frame: the marks
+  # that already exist, in one rule, the people's.
+  PEOPLE_FRAME = [ '.admin-block-card:where(:not(.admin-section-card))[data-card-edge="held"]',
+                   ".admin-block-card:where(:not(.admin-section-card))[data-notes-active]",
+                   ".admin-block-tile[data-notes-active]" ].freeze
+  UNAVAILABLE_EDGE = '.admin-block-card[data-card-edge="unavailable"]'
+  SECTION_FRAME = [ '.admin-section-card[data-card-edge="held"]',
+                    '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))' ].freeze
+  CHOSEN_SECTION = ":is(.admin-section-card, .admin-section-group)[data-chosen]"
 
   test "the editor's cards and tiles draw no border utility: their edges are the stylesheet's state outlines" do
     wrappers = EDITOR_CARDS.flat_map { |path| Rails.root.join(path).readlines.each_with_index.select { |line, _| line.match?(EDITOR_CARD_WRAPPER) }.map { |line, index| [ path, index, line ] } }
     assert_operator wrappers.size, :>=, 3, "the wrapper lines are found: the card's, its head's and the tile's"
     offences = wrappers.select { |_, _, line| line.match?(BORDER_EDGE) }.map { |path, index, _| "#{path}:#{index + 1}" }
     assert_empty offences, "a border utility on a card or tile wrapper"
-
-    CARD_EDGES.each do |selector, token|
-      body = single_rule(selector)
-      assert_match(/outline:\s*2px solid var\(#{token}\)/, body, selector)
-      assert_match(/outline-offset:\s*-2px/, body, selector)
-    end
-    order = CARD_EDGES.keys.map { |selector| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == [ selector ] } }
-    assert_equal order.sort, order, "held, then notes-active, then unavailable: the later edge wins"
   end
 
-  # A live merge synchronises a section's frame, which is not a kept unit,
-  # so a frozen settings form's held edge cannot live in `data-card-edge`
-  # there: the stylesheet draws it from the frozen form.
-  FROZEN_SECTION_EDGE = '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))'
-
-  test "a section whose settings form is frozen draws the held edge from the form, under the unavailable edge" do
-    body = single_rule(FROZEN_SECTION_EDGE)
-    assert_match(/outline:\s*2px solid var\(--cs-field-line\)/, body)
-    assert_match(/outline-offset:\s*-2px/, body)
+  test "held and discussed blocks share one people outline, under the unavailable edge and the chosen section" do
     rules = self.class.css_rules("content-spiel.tailwind.css")
-    frozen = rules.index { |found, _| found == [ FROZEN_SECTION_EDGE ] }
-    unavailable = rules.index { |found, _| found == [ '.admin-block-card[data-card-edge="unavailable"]' ] }
-    assert_operator frozen, :<, unavailable, "the unavailable edge comes later and weighs more"
+    frame = rule_for(PEOPLE_FRAME)
+    assert_match(/outline:\s*2px solid var\(--cs-people\)/, frame)
+    assert_match(/outline-offset:\s*-2px/, frame)
+    assert_no_match(/--cs-accent|--cs-field-line/, frame)
+    notes = rules.select { |selectors, _| selectors.any? { |selector| selector.include?("[data-notes-active]") && !selector.include?(":not([data-notes-active])") } }
+    assert_equal [ PEOPLE_FRAME ], notes.map(&:first), "a thread open in the notes is drawn by the people frame and by no rule beside it"
+    assert_no_match(/admin-people-frame/, ADMIN_SOURCES.map { |path| File.read(path) }.join, "no element carries a class for the frame: the marks are the selectors")
+
+    unavailable = single_rule(UNAVAILABLE_EDGE)
+    assert_match(/outline:\s*2px solid var\(--cs-danger\)/, unavailable)
+    assert_match(/outline-offset:\s*-2px/, unavailable)
+    order = [ PEOPLE_FRAME, [ UNAVAILABLE_EDGE ], [ CHOSEN_SECTION ] ].map { |selectors| rules.index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "the people frame, then the unavailable edge, then the chosen section: the later wins at one weight"
+  end
+
+  # A live merge synchronises a section's frame, which is not a kept unit, so
+  # it may drop a `data-card-edge` the server drew: the stylesheet draws the
+  # outline from the mark and from the frozen settings form alike, and in both
+  # cases outside the frame.
+  test "a held section draws the people outline outside its frame, from the server's mark or its frozen form, under the unavailable edge" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    body = rule_for(SECTION_FRAME)
+    assert_match(/outline:\s*2px solid var\(--cs-people\)/, body)
+    assert_match(/outline-offset:\s*2px/, body)
+    assert(PEOPLE_FRAME.grep(/card-edge/).all? { |selector| selector.include?(":where(:not(.admin-section-card))") }, "the block frame leaves a section out")
+    frame = rules.index { |found, _| found == PEOPLE_FRAME }
+    section = rules.index { |found, _| found == SECTION_FRAME }
+    unavailable = rules.index { |found, _| found == [ UNAVAILABLE_EDGE ] }
+    chosen = rules.index { |found, _| found == [ CHOSEN_SECTION ] }
+    assert_equal [ frame, section, unavailable, chosen ].sort, [ frame, section, unavailable, chosen ], "the unavailable edge and the chosen section come later and win"
+  end
+
+  DRAGLESS = ".admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback))".freeze
+  GLOW = ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])".freeze
+
+  test "a card glows in the people hue while its mark stands, never on a held card, and not under reduced motion" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    glow = self.class.css_rules("content-spiel.tailwind.css").find { |selectors, body| selectors == [ GLOW ] && body.include?("color-mix") }&.last
+    assert glow, "the glow is drawn by the stylesheet"
+    assert_match(/box-shadow:\s*var\(--cs-shadow-1\), 0 0 0 4px color-mix\(in oklab, var\(--cs-people\) 20%, transparent\)/, glow)
+    assert_match(/transition-duration:\s*200ms/, glow)
+    assert_includes css.gsub(/\s+/, " "), "#{DRAGLESS} { transition: box-shadow 600ms var(--cs-ease); }", "600ms out, and not on a card being dragged"
+    assert_match(/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*#{Regexp.escape(GLOW)}\s*\{[^}]*color-mix/, css, "the glow is drawn only where motion is welcome")
+    assert_match(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*#{Regexp.escape(DRAGLESS)}\s*\{\s*transition:\s*none;\s*\}\s*\}/, css, "under reduced motion the card has no transition")
   end
 
   # A section is a frame of the structure colour around its lanes, not a
@@ -292,15 +322,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # A tile's states are drawn by elevation (`.admin-block-tile`): at rest
   # the first, under the pointer the second, open or focused the third with
-  # the accent ring outside its edge, its thread open the accent outline
-  # inside it. No border: the drop place's dashes are the only edge a tile
+  # the accent ring outside its edge. Its thread open is the people
+  # frame, an outline inside its edge. No border: the drop place's dashes are the only edge a tile
   # shows, and only while it is the place a drag would land.
   TILE_STATES = {
     [ ".admin-block-tile" ] => [ "var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ],
     [ ".admin-block-tile:where(:hover)" ] => [ "box-shadow: var(--cs-shadow-2)", "background: var(--cs-tile-raised)" ],
     [ '.admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"]))', ".admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible))" ] =>
       [ "box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent)", "background: var(--cs-tile-raised)" ],
-    [ ".admin-block-tile[data-notes-active]" ] => [ "outline: 2px solid var(--cs-accent)", "outline-offset: -2px" ],
     [ ".admin-drag-ghost" ] => [ "border: 1.5px dashed var(--cs-field-line)", "border-radius: var(--cs-radius-tile)", "box-shadow: none" ],
     [ ".admin-drag-chosen" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ],
     [ ".admin-drag-fallback" ] => [ "background: var(--cs-popover)", "box-shadow: var(--cs-shadow-4)" ]
@@ -363,7 +392,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every hand-built button allowance is still used" do
     HAND_BUTTON_ALLOWED.each_key do |marker|
       assert CONTROL_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE) } },
-        "#{marker} no longer draws a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
+        "#{marker} does not draw a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
     end
   end
 
@@ -686,13 +715,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every count-label allowance is still used" do
     COUNT_LABEL_ALLOWED.each_key do |marker|
       assert TYPE_VOICE_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS) } },
-        "#{marker} no longer draws a count in the label: drop it from COUNT_LABEL_ALLOWED"
+        "#{marker} does not draw a count in the label: drop it from COUNT_LABEL_ALLOWED"
     end
   end
 
-  # 10px thin text looks faint, so the smallest is 11px at weight 500, everywhere.
+  # 10px thin text looks faint, so the smallest is 11px, everywhere, and a
+  # person's initials join it: an avatar draws its letters at `text-count`.
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
-    assert_empty design_offences(/text-\[10px\]/)
+    assert_empty design_offences(/text-\[(?:[0-9]|10)px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
@@ -742,7 +772,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:1680|360|28)px|\b(?:72|100)ch\b/, css)
     assert_no_match(/--cs-editor-column/, css)
     assert_empty design_offences(RAIL_WIDTH_LITERAL, except: RAIL_WIDTH_ALLOWED.keys)
-    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} no longer writes the width: drop its allowance" }
+    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} does not write the width: drop its allowance" }
   end
 
   test "the rail width pattern matches a hard-coded column, rail or gap, and not a token or a type size" do
@@ -796,6 +826,33 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
+  end
+
+  # A row's people narrow by the width of their column (the tree) or list (the
+  # posts), whatever the window's width and whatever the row's depth.
+  test "a row's people narrow by the row's own width, never the window" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-shell__tree\s*\{\s*container:\s*admin-tree-column\s*\/\s*inline-size;/, css)
+    assert_no_match(/\.admin-tree-row\s*\{[^}]*container:/, css, "a row is no container: its depth would decide how many people it shows")
+    [ "admin-tree-column (max-width: 212.98px)", "admin-list (max-width: 639px)" ].each do |query|
+      blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
+      assert_equal 1, blocks.size, "one @container #{query} block"
+      assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
+      assert_includes blocks.first, "[data-presence-more] { display: none; }"
+    end
+    windowed = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/).select { |body| body.include?("admin-presence-marker") }
+    assert_empty windowed, "a row's people are asked of a container, not an @media block"
+  end
+
+  # The ring around a circle is the colour of the row under it, on hover too.
+  test "a row's circles take their ring from the row's ground, at rest, on hover and selected" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row\s*\{[^}]*--admin-avatar-ground:\s*var\(--cs-chrome\);/, css)
+    assert_match(/\.admin-tree-row:hover\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);\s*background:\s*var\(--cs-sunken\);/, css)
+    assert_match(/\.admin-tree-row--selected\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);/, css)
+    row = Rails.root.join("app/components/admin/posts_screen/table_component.html.erb").read
+    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]"
+    assert_includes row, "data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]"
   end
 
   # The docked rail's ground is as tall as the tabs and the
@@ -907,11 +964,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # line, and on the rail's ground through `.admin-list-rail__rail`, which
     # stands after its card rule and so wins on order.
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
+    assert_match(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*0/, docked.first, "docked, the open threads' rail sits at the grid's top")
+    row = Rails.root.join("app/components/admin/notes_screen/open_thread_row_component.html.erb").read
+    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]", "the rail's row takes the paper hover and its avatars' ring follows it"
+    assert_includes row, "-mx-2 flex min-w-0 items-center gap-2.5 rounded-tile px-2 py-1.5", "the fill is on the row's own padding"
+    assert_includes row, "transition-colors duration-120 ease-(--cs-ease) hover:bg-paper"
+    assert_includes row, "motion-reduce:transition-none"
+    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-surface\);/, css)
+    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-rail\);/, docked.first, "docked, the rings stand on the rail's ground at rest")
     outside = css.sub(docked.first, "")
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
     card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)
     assert card, "below the threshold the detail is a card"
     assert_operator card, :<, css.index(docked.first), "the card rule stands before the docked block, so the rail's ground wins"
+    threads_card = outside.index(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*1rem[^}]*background:\s*var\(--cs-surface\)/)
+    assert threads_card, "below the threshold the open threads' rail is a card after the list"
+    assert_operator css.index(/\.admin-notes-threads\s*\{/), :<, css.index(docked.first), "its card rule stands before the docked block"
 
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"
@@ -1227,7 +1295,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
     "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
     "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the unread bubble",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip's dot",
     "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
     "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
     "app/javascript/notes/merge.js" => "the NEW divider",
@@ -1245,7 +1313,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every accent-fill allowance is still used" do
     ACCENT_FILL_ALLOWED.each_key do |relative|
-      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} no longer carries bg-accent: drop it from ACCENT_FILL_ALLOWED"
+      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} does not carry bg-accent: drop it from ACCENT_FILL_ALLOWED"
     end
   end
 
@@ -1257,7 +1325,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
     "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
-    "app/components/admin/notes_screen/body_component.rb" => "your own mention"
+    "app/components/admin/notes_screen/body_component.rb" => "your own mention",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable"
   }.freeze
 
   test "the tint with accent words is a secondary button's, a chip's, your own mention or the current module's row, and nothing else" do
@@ -1266,7 +1335,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every tint-pair allowance is still used" do
     TINT_PAIR_ALLOWED.each_key do |relative|
-      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} no longer wears the pair: drop it from TINT_PAIR_ALLOWED"
+      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} does not wear the pair: drop it from TINT_PAIR_ALLOWED"
     end
   end
 
@@ -1274,11 +1343,27 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # restyle of the palette is one file, and a hue never stands for a thing
   # that is not a type or a module.
   ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
-  PEOPLE_HUE = /ic-people/
+  # The hue of people: the pair's utilities (`bg-people`, `text-people-tint`,
+  # `inset-ring-people`), the two tokens and the icon family they alias.
+  PEOPLE_HUE = /ic-people|(?<![\w-])(?:bg|text|ring|inset-ring|outline|border|fill|stroke)-people(?:-tint)?(?![\w-])|--cs-people/
   ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
-  # Where the people hue may be drawn once it is built; none uses it yet.
-  PEOPLE_HUE_ALLOWED = %w[
-    app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
+  # Where the people hue may be drawn, each file with its reason. A task that
+  # draws it in one more file adds the file here.
+  PEOPLE_HUE_ALLOWED = {
+    "app/components/admin/editor_screen/hold_strip_component.html.erb" => "the hold strip's ground",
+    ICON_CHIP => "the people family's chip",
+    "app/components/admin/ui/avatar_component.rb" => "the circle of a person",
+    "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes",
+    "app/assets/tailwind/content-spiel.css" => "where the two aliases are written (a stylesheet, not one of ADMIN_SOURCES: named here, read by the still-used test only)"
+  }.freeze
+  # The stylesheet's rules (`content-spiel.tailwind.css`) that may draw the
+  # hue, each as its selector list joined with ", ". The `@theme` block maps
+  # the tokens to utilities and is not a rule that draws.
+  PEOPLE_RULES = [
+    ".admin-notes-marker[data-has-notes]",
+    PEOPLE_FRAME.join(", "),
+    SECTION_FRAME.join(", "),
+    ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])"
   ].freeze
 
   def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
@@ -1286,20 +1371,38 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "an icon's hue is drawn only by the icon chip" do
     offences = design_offences(ICON_HUE, except: [ ICON_CHIP ])
     assert_empty offences
-    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip no longer draws a hue: the guard looks at nothing"
+    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip does not draw a hue: the guard looks at nothing"
   end
 
   test "a block type's icon is drawn only through BlockIconComponent" do
     pattern = /\.icon_for\(|(?<![\w:])definition\.icon\b|\btype\.icon\b/
-    offences = design_offences(pattern, except: [ "app/components/admin/editor_screen/block_icon_component.rb" ])
+    offences = design_offences(pattern, except: [ "app/components/admin/ui/block_icon_component.rb" ])
     assert_empty offences
   end
 
-  test "the people hue is drawn only by the icon chip and the people's own components, never by a button" do
-    allowed = PEOPLE_HUE_ALLOWED + Dir[Rails.root.join("app/components/admin/{notes_screen/marker_component*,notes_screen/row_pill_component*,presence_screen/row_marker_component*,editor_screen/hold_strip_component*}")].map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
-    assert_empty design_offences(PEOPLE_HUE, except: allowed)
+  test "the people hue is drawn only where PEOPLE_HUE_ALLOWED says, never by a button" do
+    assert_empty design_offences(PEOPLE_HUE, except: PEOPLE_HUE_ALLOWED.keys)
     assert_no_match PEOPLE_HUE, File.read(Rails.root.join("app/components/admin/ui/button_component.rb"))
     assert_match PEOPLE_HUE, File.read(Rails.root.join(ICON_CHIP)), "the chip draws the people hue"
+  end
+
+  test "the stylesheet draws the people hue only in the people's rules" do
+    offences = self.class.css_rules("content-spiel.tailwind.css").filter_map do |selectors, body|
+      list = selectors.join(", ")
+      list if body.match?(PEOPLE_HUE) && !list.include?("@theme") && PEOPLE_RULES.exclude?(list)
+    end
+    assert_empty offences, "a rule that draws the people hue is added to PEOPLE_RULES, with the people's component that sets its class"
+  end
+
+  test "every people allowance and rule is still used" do
+    PEOPLE_HUE_ALLOWED.each_key do |path|
+      assert_match PEOPLE_HUE, Rails.root.join(path).read, "#{path} does not draw the people hue: drop it from PEOPLE_HUE_ALLOWED"
+    end
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    PEOPLE_RULES.each do |selector|
+      body = rules.find { |selectors, _| selectors.join(", ") == selector }&.last
+      assert body&.match?(PEOPLE_HUE), "#{selector} does not draw the people hue: drop it from PEOPLE_RULES"
+    end
   end
 
   # A circle of a person's letters is `Admin::Ui::AvatarComponent`, so one
@@ -1315,21 +1418,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # component yet. The list may only shrink.
   HAND_BUILT_AVATAR_ALLOWED = {
     "app/components/admin/users_screen/list_component.html.erb" => "the users list's one-letter circle, redrawn with the list",
-    # Scripts that build a circle in the browser from the letters the server
-    # sends; the component draws on the server only.
-    "app/javascript/mind_graph/card_notes.js" => "a note's author on the mind graph's card",
-    "app/javascript/controllers/admin/notes/composer_controller.js" => "the mention picker's people"
+    # The one script that builds a circle in the browser from the letters the
+    # server sends, with the component's own classes.
+    "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes"
   }.freeze
 
   test "nobody draws a circle of initials but AvatarComponent" do
     assert_empty design_offences(HAND_BUILT_AVATAR, except: [ AVATAR_COMPONENT, *HAND_BUILT_AVATAR_ALLOWED.keys ]),
       "a person's circle is Admin::Ui::AvatarComponent, never a hand-built span"
-    assert_match HAND_BUILT_AVATAR, File.read(Rails.root.join(AVATAR_COMPONENT)), "the component no longer matches: the guard looks at nothing"
+    assert_match HAND_BUILT_AVATAR, File.read(Rails.root.join(AVATAR_COMPONENT)), "the component does not match: the guard looks at nothing"
   end
 
   test "every hand-built circle allowed still draws one" do
     HAND_BUILT_AVATAR_ALLOWED.each_key do |path|
-      assert_match HAND_BUILT_AVATAR, Rails.root.join(path).read, "#{path} no longer draws a circle by hand: drop it from HAND_BUILT_AVATAR_ALLOWED"
+      assert_match HAND_BUILT_AVATAR, Rails.root.join(path).read, "#{path} does not draw a circle by hand: drop it from HAND_BUILT_AVATAR_ALLOWED"
     end
   end
 
@@ -1353,6 +1455,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "magic-text", "text-dim", "bg-sunken", "topic-codes", "--cs-accent", "logic-people" ].each { |sample| assert_no_match ICON_HUE, sample }
     assert_match PEOPLE_HUE, "text-ic-people"
     assert_no_match PEOPLE_HUE, "text-ic-code"
+    %w[bg-people inset-ring-people text-people-tint hover:bg-people var(--cs-people) var(--cs-people-tint) ring-people].each { |sample| assert_match PEOPLE_HUE, sample }
+    %w[people_component peoples bg-peoples text-people_x group-people].each { |sample| assert_no_match PEOPLE_HUE, sample }
   end
 
   # Elevation and radii: a shadow is one of the four elevation tokens and a
@@ -1389,7 +1493,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every shadow allowance is still there" do
     assert_empty SHADOW_ALLOWED, "an allowance is added with its reason; this guard reads each entry for the shadow it excuses" if SHADOW_ALLOWED.empty?
-    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
+    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} does not draw a shadow: drop its allowance" }
   end
 
   # The layers: a z-index is one of the `--cs-z-*` tokens of THE LAYERS
@@ -1614,7 +1718,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do
     assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
     %w[status_chip_component.rb scheduled_date_component.rb].each do |file|
-      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} no longer draws them: the guard looks at nothing"
+      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} does not draw them: the guard looks at nothing"
     end
   end
 
@@ -1625,7 +1729,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "the status-fill list holds only files that still draw a status fill" do
     STATUS_FILL_FILES.each do |path|
-      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} no longer draws a status fill: drop it from STATUS_FILL_FILES"
+      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} does not draw a status fill: drop it from STATUS_FILL_FILES"
     end
   end
 

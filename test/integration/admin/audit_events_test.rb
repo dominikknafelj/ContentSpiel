@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The audit log module (design spec §5 "Audit log module", Task 9): access,
+# The audit log module access,
 # filters, pagination, the event page, and subject links. What each service
 # actually records is covered by test/services/audit_events_test.rb -- this
 # covers the screens that read `Audit::Event` back.
@@ -164,14 +164,14 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(event)}", text: /#{Regexp.escape(label)}/
   end
 
-  # Media library Task 1: `MediaAsset` was renamed to `Media::Asset`, but
+  # `MediaAsset` is the legacy name of `Media::Asset`, and
   # `audit_events.subject_type` is append-only and never rewritten (`Audit
-  # ::Event`'s own comment) -- a row recorded before the rename still reads
+  # ::Event`'s own comment) -- a row recorded under it still reads
   # `subject_type: "MediaAsset"` forever. `Audit::Event.polymorphic_class_for`
   # maps that legacy string so `event.subject` (and this index's own
   # `includes(:subject, :user)`, which resolves every row's association up
-  # front) doesn't raise `NameError` loading a constant that no longer
-  # exists. The label itself needs no mapping at all: `subject_label` was
+  # front) doesn't raise `NameError` loading a constant that is
+  # gone. The label itself needs no mapping at all: `subject_label` was
   # captured onto the row at write time (`Audit::Snapshot.label_for`), not
   # re-derived from today's model name -- so it reads back exactly as
   # recorded, same as a deleted subject's event above.
@@ -195,7 +195,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Media asset ##{asset.id}"
   end
 
-  # Final fix wave (M3): filtering by "Media asset" includes the rows
+  # Filtering by "Media asset" includes the rows
   # recorded under the legacy `"MediaAsset"` type -- the same image's
   # history shouldn't split at the rename -- and a subject filter matches
   # its legacy rows too.
@@ -311,8 +311,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
   test "the Activity link is absent without audit.view" do
     sign_in_as(users(:author))
-    # `users(:author)` may edit their own posts (Author group, design spec
-    # §5 "Seeded groups") but holds no `audit.view` -- the editor renders
+    # `users(:author)` may edit their own posts (Author group) but holds no `audit.view` -- the editor renders
     # for them fine, just without the link.
     own_post = as(users(:author)) { create_post(title: "Author's own", published: false) }
 
@@ -347,7 +346,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events"
 
     assert_response :success
-    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via <b>Claude<\/b>/
+    assert_select "li p", text: /#{Regexp.escape(users(:two).name_or_email)} via <b>Claude<\/b>/
     assert_select "li p b", count: 0
   end
 
@@ -368,6 +367,6 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events"
 
-    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via an API token/
+    assert_select "li p", text: /#{Regexp.escape(users(:two).name_or_email)} via an API token/
   end
 end

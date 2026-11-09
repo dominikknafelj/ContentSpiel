@@ -9,7 +9,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     actor = sentence.actor
     name = if actor.none then nil
     elsif actor.you then "You"
-    else (actor.user&.display_name || (actor.user_id ? "a deleted user" : "System"))
+    else (actor.user&.name_or_email || (actor.user_id ? "a deleted user" : "System"))
     end
     via = actor.via_label ? (actor.you ? ", via #{actor.via_label}" : " via #{actor.via_label}") : ""
     words = sentence.parts.map { |part| part.kind == :subject ? "“#{part.text}”" : part.text }.join
@@ -112,7 +112,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
     assert_equal "You created “Hello”", read(sentence_for(created))
     assert_equal "You published “Hello”", read(sentence_for(published))
-    assert_equal "#{@me.display_name} published “Hello”", read(sentence_for(published, viewer: users(:two)))
+    assert_equal "#{@me.name_or_email} published “Hello”", read(sentence_for(published, viewer: users(:two)))
     assert_equal "You moved “Hello” to the trash", read(sentence_for(event("post.trashed", subject_type: "Post", subject_id: post.id, subject_label: "Hello")))
   end
 
@@ -174,7 +174,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "System deleted 3 submissions of “Contact” after they were delivered", deleted.call({ "count" => 3, "reason" => "delivered" })
     assert_equal "System deleted 1 submission of “Contact” after it was delivered", deleted.call({ "count" => 1, "reason" => "delivered" })
     assert_equal "System deleted 2 submissions of “Contact” that couldn't be delivered in 30 days", deleted.call({ "count" => 2, "reason" => "undelivered" })
-    assert_equal "System deleted 2 submissions of “Contact”", deleted.call({ "count" => 2, "reason" => "a reason this code no longer knows" })
+    assert_equal "System deleted 2 submissions of “Contact”", deleted.call({ "count" => 2, "reason" => "a reason this code does not know" })
   end
 
   test "sentences with no subject" do
@@ -205,7 +205,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     denied = event("access.denied", user_id: users(:author).id, metadata: { "permission" => "settings.manage" })
     sentence = sentence_for(denied)
 
-    assert_equal "#{users(:author).display_name} was refused permission to manage settings", read(sentence)
+    assert_equal "#{users(:author).name_or_email} was refused permission to manage settings", read(sentence)
     assert sentence.security
     assert_equal "You were refused access", read(sentence_for(event("access.denied", metadata: {})))
   end
@@ -321,7 +321,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   test "a refusal names its subject when the event has one" do
     denied = event("access.denied", user_id: users(:author).id, subject_label: "Guarded", metadata: { "permission" => "posts.edit" })
 
-    assert_equal "#{users(:author).display_name} was refused permission to edit posts on “Guarded”", read(sentence_for(denied))
+    assert_equal "#{users(:author).name_or_email} was refused permission to edit posts on “Guarded”", read(sentence_for(denied))
     assert_equal "You were refused access on “Guarded”", read(sentence_for(event("access.denied", subject_label: "Guarded", metadata: {})))
   end
 
@@ -356,7 +356,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     created = Audit::Event.find_by!(action: "post.created", subject: through)
 
     assert_equal "You, via Claude desktop created “Via MCP”", read(sentence_for(created))
-    assert_equal "#{@me.display_name} via Claude desktop created “Via MCP”", read(sentence_for(created, viewer: users(:two)))
+    assert_equal "#{@me.name_or_email} via Claude desktop created “Via MCP”", read(sentence_for(created, viewer: users(:two)))
     ApiToken.delete_all
     assert_equal "Claude desktop", sentence_for(created.reload).actor.via_label
   end
@@ -511,7 +511,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_equal "You removed the notes on “Pricing”", read(sentence_for(event("notes.removed", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
   end
 
-  # Layout points spec, decision 11: the dashboard joins a run of one
+  # The dashboard joins a run of one
   # person's block edits on one page into one row, and the sentence counts.
   test "a counted block sentence names the count and the type, or blocks for mixed types" do
     page = as(@me) { create_page(title: "Code block demo") }

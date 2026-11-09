@@ -9,7 +9,7 @@ class User < ApplicationRecord
 
   MINIMUM_PASSWORD_LENGTH = 12
 
-  # Design pass spec §5.5. `allow_nil` is what keeps existing shorter
+  # `allow_nil` is what keeps existing shorter
   # passwords working: `password` is only non-nil while one is being set,
   # so the rule applies to setup, new user, change and reset -- never to a
   # save that leaves the password alone. Length counts characters, not
@@ -18,8 +18,8 @@ class User < ApplicationRecord
   # "Password " prefix for this attribute so `full_messages` reads the same.
   validates :password, length: { minimum: MINIMUM_PASSWORD_LENGTH, message: "Use at least 12 characters." }, allow_nil: true
 
-  # Optional (design pass spec §5.1): shown wherever a user is named, with
-  # the email as the fallback -- `display_name` is the one reader, so no
+  # Optional: shown wherever a user is named, with
+  # the email as the fallback -- `name_or_email` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,
   # so "no name" has one representation.
   normalizes :name, with: ->(name) { name.to_s.strip.presence }
@@ -53,8 +53,7 @@ class User < ApplicationRecord
   # `LOWER(users.email_address)`.
   def self.lowered_email = arel_table[:email_address].lower
 
-  # `prepend: true` (final fix wave, P16; still needed now that this checks
-  # owners rather than "any user" -- access-control design spec §3.2/§6):
+  # `prepend: true` (this checks owners rather than "any user"):
   # `has_many ..., dependent: :destroy` above registered its own
   # `before_destroy` callbacks first, so without it a refused delete would
   # already have destroyed this user's sessions and tokens (rolled back
@@ -63,7 +62,7 @@ class User < ApplicationRecord
   before_destroy :ensure_not_last_owner, prepend: true
 
   # Demoting the last owner (`owner: true -> false`) is refused the same
-  # way deleting them is (design spec §3.2: "At least one owner must always
+  # way deleting them is ("At least one owner must always
   # exist"). "Only owners may change owner" is the other half of that
   # sentence -- an authorization rule `Users::Save` enforces, not
   # something a model validation can see (it has no notion of
@@ -71,16 +70,14 @@ class User < ApplicationRecord
   # itself, regardless of who's doing the demoting.
   validate :at_least_one_owner, if: :demoting_from_owner?
 
-  def display_name = name.presence || email_address
+  def name_or_email = name.presence || email_address
 
   private
 
-  # Owner is the only privilege with no group behind it (design spec §2:
-  # "Owner is a protected user flag, not a group") -- destroying the last
+  # Owner is the only privilege with no group behind it ("Owner is a protected user flag, not a
+  # group") -- destroying the last
   # one would leave nobody able to grant it back, since only an owner may.
-  # This replaces the old "last user" guard (any user, owner or not, used
-  # to be deletable as long as one remained; there were no owners yet). A
-  # non-owner is never blocked here, however few users remain.
+  # A non-owner is never blocked here, however few users remain.
   # `throw :abort` (rather than a plain `errors.add`, which `before_destroy`
   # alone doesn't stop anything on) is what actually halts the destroy;
   # `Users::Destroy` reports this same message back through its `Result`,
@@ -104,8 +101,7 @@ class User < ApplicationRecord
     errors.add(:owner, "can't demote the last owner")
   end
 
-  # Counted under a row lock (final fix wave, P16, carried over unchanged
-  # by the access-control migration): both callers above run inside their
+  # Counted under a row lock : both callers above run inside their
   # own transaction, and `SELECT ... FOR UPDATE` on every owner row makes a
   # second, concurrent demote-or-delete of the other remaining owner wait
   # until the first commits -- at which point Postgres re-reads and this

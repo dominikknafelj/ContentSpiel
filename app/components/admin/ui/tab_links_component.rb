@@ -1,10 +1,13 @@
 module Admin
   module Ui
-    # A row of tabs that are plain links, drawn as the posts list's
-    # segmented control: the current one
-    # inverted and `aria-current="page"`, the others meta words. A tab change
-    # is a navigation. Used by the Trash screen's type tabs (each with its
-    # count) and a form's Form | Submissions.
+    # A row of tabs that are plain links, drawn as one framed segmented
+    # control: the current one an ink segment with paper words at 600 and
+    # `aria-current="page"`, the others dim words that go sunken under the
+    # pointer, a line rule between segments. A tab change is a navigation.
+    # Used by the Notes filter, Waiting for you's filter, the Trash screen's
+    # type tabs (each with its count) and a form's Form | Submissions.
+    # Focus is a 2px accent outline inside the segment; on the current one,
+    # where the accent is too faint on ink in dark, a paper ring 4px inside it.
     #
     # `tabs` is a list of `{ label:, href:, current:, count: nil }`; `label`
     # the `<nav>`'s accessible name. Anything else for the links (`data`)
@@ -28,7 +31,7 @@ module Admin
         controller: nil
       )
 
-      LINK_CLASS = "inline-flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm last:border-r-0".freeze
+      LINK_CLASS = "inline-flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent".freeze
 
       def initialize(tabs:, label:, link_data: {})
         @tabs = tabs
@@ -43,7 +46,7 @@ module Admin
       attr_reader :tabs, :label, :link_data
 
       def link_class(current)
-        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper ring-2 ring-inset ring-paper" : "text-meta hover:bg-sunken"}"
+        "#{LINK_CLASS} #{current ? "bg-ink font-semibold text-paper focus-visible:inset-ring-4 focus-visible:inset-ring-paper" : "text-dim hover:bg-sunken"}"
       end
     end
   end

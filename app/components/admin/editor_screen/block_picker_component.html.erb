@@ -5,7 +5,7 @@
       <% types.each do |type| %>
         <% menu.with_item do %>
           <%= button_to create_path, method: :post, class: "#{menu_item_class} flex items-center gap-2",
-                params: { block: { block_type: type.name }, section_id: section.id, column: column } do %><%= render Admin::EditorScreen::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
+                params: { block: { block_type: type.name }, section_id: section.id, column: column } do %><%= render Admin::Ui::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
         <% end %>
       <% end %>
     <% end %>
@@ -15,7 +15,7 @@
     <%= render Admin::Ui::MenuComponent.new(label: t(".add_block"), align: :left, button_class: end_button_class, aria_label: t(".menu_heading"), close_on_select: true, columns: 3, heading: t(".menu_heading")) do |menu| %>
       <% types.each do |type| %>
         <% menu.with_item do %>
-          <%= button_to create_path, method: :post, class: menu_item_class, params: { block: { block_type: type.name } } do %><%= render Admin::EditorScreen::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
+          <%= button_to create_path, method: :post, class: menu_item_class, params: { block: { block_type: type.name } } do %><%= render Admin::Ui::BlockIconComponent.new(definition: type, place: :picker) %><%= type.label %><% end %>
         <% end %>
       <% end %>
     <% end %>

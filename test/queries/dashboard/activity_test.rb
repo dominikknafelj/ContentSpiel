@@ -14,7 +14,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
   end
 
   def sentences(actor = @me)
-    activity(actor).rows.map { |row| [ row.sentence.actor.you ? "You" : row.sentence.actor.user&.display_name, *words(row) ] }
+    activity(actor).rows.map { |row| [ row.sentence.actor.you ? "You" : row.sentence.actor.user&.name_or_email, *words(row) ] }
   end
 
   test "lists content events only, never access.denied, sessions, users, groups, tokens or settings" do
@@ -71,7 +71,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert block.persisted?
   end
 
-  # Task 16's d1: only a page or post can be "scheduled"; a block event whose
+  # Only a page or post can be "scheduled"; a block event whose
   # only change names published_at must not be a KeyError on the landing page.
   test "a block event that only names a future published_at still reads as a block edit" do
     page = as(@me) { create_page(title: "About") }
@@ -83,8 +83,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal "edited a block on", words(rows.first).first
   end
 
-  # Task 16's d3: the class comment promises "a viewer with no grants runs no
-  # query"; the old `1=0` condition still ran one.
+  # The class comment promises "a viewer with no grants runs no query".
   test "a viewer who can read nothing sends no query at all" do
     as(@me) { create_post(title: "Hidden from them") }
     nobody = User.create!(email_address: "nogrants@example.com", password: "a long enough password")
@@ -165,7 +164,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal counts.first, counts.last
   end
 
-  # --- fix round 1: the read scope is applied in SQL, so the list fills -----
+  # --- the read scope is applied in SQL, so the list fills -------------------
 
   def blog_reader
     group = AccessControl::Group.create!(name: "Blog readers #{SecureRandom.hex(3)}")
@@ -228,7 +227,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal [ kept ], activity.rows.map(&:record), "the last run is cut by the read: dropped, not shown with a false number"
   end
 
-  # --- layout points spec, decision 11: runs ---------------------------------
+  # --- runs of one person's edits -------------------------------------------
 
   def add_blocks(page, types, actor: @me, every: 2.minutes, from: 1.second.from_now.change(usec: 0))
     types.each_with_index.map do |type, index|

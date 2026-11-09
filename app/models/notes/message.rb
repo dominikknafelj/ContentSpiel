@@ -1,6 +1,6 @@
 module Notes
-  # One message of a thread: plain text with mention tokens, emoji and URLs
-  # (decision D8), never rich text. `mentioned_user_ids` is read from the body
+  # One message of a thread: plain text with mention tokens, emoji and URLs,
+  # never rich text. `mentioned_user_ids` is read from the body
   # before every validation, so the column can't say something the text does
   # not. Whether the mentioned people may be mentioned is the services'
   # question (`Notes::Authorization#mention_errors`), not the record's.
@@ -20,10 +20,10 @@ module Notes
     # `Notes::Remove` runs no callback).
     has_many :reactions, -> { order(:created_at, :id) }, class_name: "Notes::Reaction", foreign_key: :message_id, inverse_of: :message
 
-    # The message's files (notes spec D9, §3.6; `Notes::Files` has the rules
-    # and is the one place that attaches them). READ ONLY THROUGH
+    # The message's files (`Notes::Files` has the rules and is the one place
+    # that attaches them). READ ONLY THROUGH
     # `Admin::NoteFilesController`: never `url`, `rails_blob_path`, a signed
-    # id or a variant of one (decision D15) -- Active Storage's read URLs are
+    # id or a variant of one -- Active Storage's read URLs are
     # public to whoever holds one. On a storage service of their own, which
     # those public routes refuse (`Notes::Files::SERVICE`).
     #
@@ -49,6 +49,23 @@ module Notes
       joins(:thread)
         .select(Arel::Nodes::Fragments.new([ per_container, threads[:container_type] ]), threads[:container_id], arel_table[:author_id])
         .order(threads[:container_type], threads[:container_id], arel_table[:created_at].desc, arel_table[:id].desc)
+    }
+
+    # Of the messages in the relation, each person who wrote on each
+    # CONTAINER, as the container, the author and when they wrote last
+    # (`last_wrote_at`), the newest first: one grouped statement however many
+    # records are asked about. The messages of users who are gone share one
+    # row with no author (`author_id` nil), so a deleted writer still counts
+    # as someone who wrote. It joins and groups: narrow the threads
+    # before it (`merge`). Answers "who wrote on this record, and who last?"
+    # for the Notes screen's rail of open threads.
+    scope :authors_per_container, -> {
+      threads = Thread.arel_table
+      last_wrote = arel_table[:created_at].maximum
+      joins(:thread)
+        .group(threads[:container_type], threads[:container_id], arel_table[:author_id])
+        .select(threads[:container_type], threads[:container_id], arel_table[:author_id], last_wrote.as("last_wrote_at"))
+        .order(last_wrote.desc, arel_table[:author_id].desc)
     }
 
     before_validation { self.mentioned_user_ids = Mentions.ids(body) }

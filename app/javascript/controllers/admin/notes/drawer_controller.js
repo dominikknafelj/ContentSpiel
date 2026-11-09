@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
-// Notes on an editor screen (notes spec §4.1, §4.3). Lives on <body>, like
+// Notes on an editor screen. Lives on <body>, like
 // `admin--ui--dialog`: the header's button, the markers on the block cards and
 // the rail's Notes tab are far apart in the document, and cards come and go by
 // Turbo Stream without the screen being drawn again.
@@ -64,13 +64,13 @@ import { messages } from "i18n/messages"
 // like the rest, which is why the server never renders a count into a card.
 //
 // THE ACTIVE BLOCK. While one thread is the notes' view, the card or tile
-// of the block it is on carries `data-notes-active` (an accent edge,
-// handoff "Block card marker"): `markActive`, after every load of the frame,
+// of the block it is on carries `data-notes-active` (the people outline):
+// `markActive`, after every load of the frame,
 // on close, and when a marker connects.
 //
 // A SELECTION. With text selected in a rich-text field, that block's marker
 // reads "Note on selection" and a press starts a note quoting the text (cut
-// to 500 characters; a copy, decision D4). The selection is noted at
+// to 500 characters; a copy). The selection is noted at
 // `mousedown` on the marker, because the press itself may move it, and is
 // good for the click of that same press only: any later press anywhere lets
 // it go first (`release`, heard in the capture phase, before a marker's own
@@ -79,7 +79,7 @@ import { messages } from "i18n/messages"
 // passage travels to the frame as `note_quote`, the one name a quote has in a
 // URL (it is filtered from the log under that name).
 //
-// THE ADDRESS FOLLOWS THE NOTES (the handoff's decision 39; `syncAddress`).
+// THE ADDRESS FOLLOWS THE NOTES (`syncAddress`).
 // While the notes are shown the page's address carries `notes=open`, and
 // `thread=<id>` while a thread is their view; closed, neither. So the address
 // says what is on screen, a reload keeps it (the server opens the Notes tab
@@ -261,7 +261,7 @@ export default class extends Controller {
     }
   }
 
-  // Where the focus goes on close (spec §4.1: back to the trigger): what
+  // Where the focus goes on close (back to the trigger): what
   // opened the notes, or the header's button when nothing a person pressed
   // did (a link with `?notes=open`, the notes remembered from the last
   // editor) or when what they pressed is gone (a marker on a card a stream
@@ -372,7 +372,7 @@ export default class extends Controller {
     return !active || active === document.body || active === from || !active.isConnected || this.drawerTarget.contains(active)
   }
 
-  // The block whose thread is showing (handoff: its card's border is accent
+  // The block whose thread is showing (its card carries the people outline
   // while the thread is open). One at a time; none in the list view or with
   // the notes closed. An attribute, taken back here: nothing a redrawn
   // card could keep by mistake, and nothing Turbo's snapshot of the page
@@ -398,7 +398,7 @@ export default class extends Controller {
     const key = editor ? this.blockKey(editor) : null
     const next = key ? { key, text: text.slice(0, MAX_QUOTE) } : null
     if (next?.key === this.selection?.key && next?.text === this.selection?.text) return
-    // Something else is selected now: what a press held is no longer what
+    // Something else is selected now: what a press held is not what
     // the person means. (A selection that only went away is the press's own
     // doing, and is why it was held.)
     if (next) this.held = null
@@ -570,7 +570,7 @@ export default class extends Controller {
   paint() {
     const text = messages(this.element)
     const { total, subjects } = this.counts
-    // "Unread for you" turns a count accent (spec §4.5): the keys whose open
+    // "Unread for you" turns a count accent: the keys whose open
     // threads hold a delivery the viewer has not read.
     const unread = new Set(this.counts.unread)
 
@@ -592,13 +592,16 @@ export default class extends Controller {
       const name = marker.dataset.notesName
       const number = marker.querySelector("[data-notes-count]")
       const quoting = marker.querySelector("[data-notes-selection]")
-      number.textContent = count > 0 ? String(count) : ""
+      const isUnread = unread.has(key)
+      // Unread says "3 new" in words, beside the stylesheet's filled glyph.
+      number.textContent = count === 0 ? "" : isUnread ? text.t("notes.script.marker.new", { count }) : String(count)
       number.hidden = count === 0 || selecting
       quoting.hidden = !selecting
       marker.toggleAttribute("data-has-notes", count > 0 || selecting)
-      marker.toggleAttribute("data-unread", unread.has(key))
+      marker.toggleAttribute("data-unread", isUnread)
       marker.setAttribute("aria-label", selecting ? text.t("notes.script.marker.selection", { name })
-        : count > 0 ? text.t("notes.script.marker.open", { count, name }) : text.t("notes.script.marker.add", { name }))
+        : count > 0 ? text.t(isUnread ? "notes.script.marker.open_unread" : "notes.script.marker.open", { count, name })
+        : text.t("notes.script.marker.add", { name }))
     })
 
     // A delete dialog's warning. A block's: its own open notes; its key is
@@ -606,7 +609,7 @@ export default class extends Controller {
     // whose type is gone) still warns. A section's
     // (`data-notes-warning="section"`): the open notes on the blocks inside
     // it, by the markers of its tiles, in a sentence of its own. A section
-    // takes no notes itself (the handoff's decision 10: it has no marker and
+    // takes no notes itself (it has no marker and
     // no "Add note"), so its own key is not counted.
     this.warningTargets.forEach((warning) => {
       const within = document.getElementById(warning.dataset.notesWithin)

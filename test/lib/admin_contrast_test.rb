@@ -155,15 +155,38 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # A block card's state edges (`content-spiel.tailwind.css`): held, its
-  # type gone, its thread open. The edge is the card's only outline, so it is
-  # held to a state's 3:1 on the card it is drawn inside and on the canvas
-  # around the card.
-  test "a card's state edge is 3:1 or better against the card and the canvas, in both schemes" do
+  # A block card's state edges (`content-spiel.tailwind.css`): held by
+  # someone else or discussed in the notes (one people outline), and its type
+  # gone (danger). The edge is the card's only outline, so it is held to a
+  # state's 3:1 on the card it is drawn inside, on the tile, on the canvas
+  # around the card and on a section's head.
+  test "the people outline is 3:1 or better on the card, the tile, the canvas and a section's head, in both schemes" do
+    # `--cs-people` is the icon family's people pair under another name.
+    floors = { "--cs-surface" => [ 8.5, 10.1 ], "--cs-tile-raised" => [ 3.0, 3.0 ], "--cs-paper" => [ 7.8, 11.2 ], "--cs-structure-tint" => [ 3.0, 3.0 ], "--cs-rail" => [ 7.5, 8.9 ] }
     each_scheme do |scheme, colour|
-      %w[--cs-field-line --cs-danger --cs-accent].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
+      floors.each do |ground, figures|
+        assert_ratio(figures.fetch(scheme == :light ? 0 : 1), colour.("--cs-ic-people"), colour.(ground), "the people outline on #{ground} (#{scheme})")
+      end
+      %w[--cs-danger].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
         assert_ratio(3.0, colour.(edge), colour.(ground), "the #{edge} edge on #{ground} (#{scheme})")
       end
+    end
+  end
+
+  # The held strip (`Admin::EditorScreen::HoldStripComponent`) is the people
+  # tint: its sentence in ink, the status in meta, and Take over, the small
+  # secondary, with its accent words (read on the tint, and on the button's
+  # own fill) and its field-line edge on the strip.
+  test "the held strip's words, its Take over and its edge hold on the people tint" do
+    each_scheme do |scheme, colour|
+      tint = colour.("--cs-ic-people-bg")
+      light = scheme == :light
+      assert_ratio(light ? 14.7 : 11.5, colour.("--cs-ink"), tint, "the sentence on the tint (#{scheme})")
+      assert_ratio(light ? 5.2 : 5.6, colour.("--cs-meta"), tint, "the status on the tint (#{scheme})")
+      assert_ratio(light ? 5.7 : 6.3, colour.("--cs-accent"), tint, "Take over's words on the tint (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "Take over's words on its own fill (#{scheme})")
+      assert_ratio(light ? 5.6 : 6.2, colour.("--cs-accent"), colour.("--cs-accent-tint"), "Take over's words on its own fill, at the measured figure (#{scheme})")
+      assert_ratio(light ? 3.0 : 3.7, colour.("--cs-field-line"), tint, "Take over's edge on the tint (#{scheme})")
     end
   end
 
@@ -238,12 +261,13 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # A section's frame only groups (2.6:1 on the canvas, held above that
-  # floor); its state edges, held and unavailable, are a state's 3:1 on the
-  # canvas outside it and on the head's tint and the settings' rail inside.
+  # floor); its state edges, held (the people outline) and unavailable, are a
+  # state's 3:1 on the canvas outside it and on the head's tint and the
+  # settings' rail inside.
   test "a section's frame groups, and its held and unavailable edges are 3:1 or better on the canvas, the head and the settings" do
     each_scheme do |scheme, colour|
       assert_operator contrast(colour.("--cs-structure"), colour.("--cs-paper")), :>=, 2.6, "the frame on the canvas (#{scheme})"
-      %w[--cs-field-line --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
+      %w[--cs-ic-people --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
         assert_ratio(3.0, colour.(edge), colour.(ground), "the section's #{edge} edge on #{ground} (#{scheme})")
       end
     end
@@ -346,6 +370,16 @@ class AdminContrastTest < ActiveSupport::TestCase
   test "the accent focus ring is 3:1 or better on every ground, the rail and the popover included" do
     each_scheme do |scheme, colour|
       GROUNDS.each { |ground| assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the focus ring on #{ground} (#{scheme})") }
+    end
+  end
+
+  test "a tab's words are 4.5:1 on the surface, the current one's on ink, and the focus outline 3:1 on the surface and on the current tab's paper ring" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a tab's words on the surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-sunken"), "a hovered tab's words on sunken (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "the current tab's words on ink (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus outline on the surface (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-paper"), colour.("--cs-ink"), "the paper ring on the current tab (#{scheme})")
     end
   end
 
@@ -613,6 +647,73 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The measured pairs, light then dark: the people hue is one pair, with the
+  # tint as the circle's ground, and its letters read on every ground a
+  # circle stands on. Each figure is a floor to its rounding.
+  PEOPLE_FLOORS = {
+    "--cs-people-tint" => [ 7.2, 9.0 ], "--cs-surface" => [ 8.5, 10.1 ], "--cs-paper" => [ 7.8, 11.2 ], "--cs-sunken" => [ 7.0, 9.0 ],
+    "--cs-rail" => [ 7.5, 8.9 ], "--cs-chrome" => [ 8.5, 10.8 ], "--cs-popover" => [ 8.5, 8.0 ]
+  }.freeze
+
+  # The two aliases are written once, in the light block, and follow the dark
+  # values through the icon pair they name (one element, so the alias takes
+  # the value that wins there): a scheme's reading of one is its pair's.
+  def people_token(name)
+    assert_match(/\Avar\(--cs-ic-people(?:-bg)?\)\z/, schemes[:light].fetch(name), "#{name} is an alias of the icon family's people pair")
+    schemes[:light].fetch(name)[/--cs-[\w-]+/]
+  end
+
+  test "the people hue reads 7:1 or better on every CS Studio ground, and on its own tint, in both schemes" do
+    assert_equal "--cs-ic-people", people_token("--cs-people")
+    assert_equal "--cs-ic-people-bg", people_token("--cs-people-tint")
+    each_scheme do |scheme, colour|
+      PEOPLE_FLOORS.each do |ground, floors|
+        ground = people_token(ground) if ground == "--cs-people-tint"
+        ratio = contrast(colour.("--cs-ic-people"), colour.(ground))
+        assert_operator ratio, :>=, 7.0, "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1"
+        assert_operator ratio, :>=, floors.fetch(scheme == :light ? 0 : 1), "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1, under its measured figure"
+      end
+    end
+  end
+
+  # The note bubble (`.admin-notes-marker`): read is the people pair on its
+  # tint, unread the accent fill with on-accent words. Both carry 11px text.
+  test "a read note bubble is 7:1 on its tint and an unread one 4.5:1 on the accent, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(7.0, colour.("--cs-ic-people"), colour.("--cs-ic-people-bg"), "a read bubble's count on its tint (#{scheme})")
+      assert_ratio(floor({ light: 6.9, dark: 8.1 }.fetch(scheme)), colour.("--cs-on-accent"), colour.("--cs-accent"), "an unread bubble's words on the accent (#{scheme})")
+    end
+  end
+
+  # The double ring of an on-image bubble (a 2px surface ring inside a 1px ink
+  # hairline) separates the pill from whatever photo it is drawn on; the
+  # placeholder gradient and black and white are the photos a test can measure.
+  test "the on-image bubble's double ring is 3:1 against the placeholder and the grounds, by the better of its two rings" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ph-a --cs-ph-b --cs-paper --cs-sunken --cs-chrome].each do |ground|
+        best = [ "--cs-surface", "--cs-ink" ].map { |ring| contrast(colour.(ring), colour.(ground)) }.max
+        assert_operator best, :>=, 3.0, "the double ring on #{ground} (#{scheme}) is #{best.round(2)}:1"
+      end
+      { "black" => [ 0.0, 0.0, 0.0 ], "white" => [ 1.0, 1.0, 1.0 ] }.each do |name, ground|
+        best = [ "--cs-surface", "--cs-ink" ].map { |ring| contrast(colour.(ring), ground) }.max
+        assert_operator best, :>=, 3.0, "the double ring on #{name} (#{scheme}) is #{best.round(2)}:1"
+      end
+    end
+  end
+
+  # `:own`'s letters on the solid fill, `:away`'s meta letters and dashed
+  # edge, `:more`'s ink on sunken.
+  test "an avatar's tones: own's surface letters 4.5:1 on people, away's meta 4.5:1 and its dashed edge 3:1 on surface and chrome, more's ink 4.5:1 on sunken" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-surface"), colour.("--cs-ic-people"), "own's surface letters on people (#{scheme})")
+      %w[--cs-surface --cs-chrome].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "away's dashed edge on #{ground} (#{scheme})")
+      end
+      assert_ratio(4.5, colour.("--cs-meta"), colour.("--cs-surface"), "away's meta letters on surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-sunken"), "more's ink on sunken (#{scheme})")
+    end
+  end
+
   test "a Draft chip's words and outline hold on the grounds a chip stands on, in both schemes" do
     each_scheme do |scheme, colour|
       %w[--cs-paper --cs-surface --cs-rail].each do |ground|
@@ -676,6 +777,15 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint"), "the current step's name (#{scheme})")
       assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's number (#{scheme})")
       assert_ratio(floor({ light: 5.7, dark: 6.2 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's ring (#{scheme})")
+    end
+  end
+
+  # The New chip on an unread inbox row: accent words and a 6px accent dot on
+  # the accent tint, 5.675:1 in light and 6.246:1 in dark, held at the same
+  # floors as the step's ring (5.7 and 6.2, each a floor to its rounding).
+  test "the New chip's accent words and dot hold on the accent tint, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(floor({ light: 5.7, dark: 6.2 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-accent-tint"), "the New chip's words and dot (#{scheme})")
     end
   end
 

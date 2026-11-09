@@ -11,7 +11,7 @@
           <span class="flex min-w-0 flex-col gap-px">
             <span class="flex flex-wrap items-center gap-2">
               <% if invited %>
-                <span class="font-medium text-ink"><%= row.display_name %></span>
+                <span class="font-medium text-ink"><%= row.name_or_email %></span>
                 <%= render Admin::Ui::BadgeComponent.new(label: row.expired? ? t(".invite_expired") : t(".invited"), data: { invite_state: row.expired? ? "expired" : "open" }) %>
               <% else %>
                 <%= link_to helpers.edit_admin_user_path(row, **url_options), data: { turbo_frame: "content" },
@@ -38,7 +38,7 @@
         </span>
         <% if invited %>
           <span class="relative z-(--cs-z-raised) justify-self-end" data-invite-menu>
-            <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: row.display_name), close_on_select: true) do |menu| %>
+            <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: row.name_or_email), close_on_select: true) do |menu| %>
               <% menu.with_item do %>
                 <%= button_to t(".resend"), resend_path(row), method: :post %>
               <% end %>

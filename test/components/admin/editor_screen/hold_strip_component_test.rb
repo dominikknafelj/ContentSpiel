@@ -1,7 +1,6 @@
 require "test_helper"
 
-# The strip a held card carries, and the two notices that take its place
-# (live-editing handoff 1, 2, 13 to 20, 23, 24, 26).
+# The strip a held card carries, and the two notices that take its place.
 class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -21,17 +20,26 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     render_inline Admin::EditorScreen::HoldStripComponent.new(subject: subject, hold: hold, viewer: viewer, **options)
   end
 
-  test "a block someone else holds: their avatar, the sentence in 13px ink, Take over, on the sunken strip (handoff 1, 2)" do
+  test "the held strip is on the people tint with the holder's name at 600, their avatar ringed as here, and Take over the small secondary" do
     strip
 
-    assert_selector "div.bg-sunken.border-b.border-line.flex.items-center.gap-2[data-admin--editing--hold-target=strip][data-editing-subject='block-#{@block.id}'][data-editing-kind=held]"
-    assert_selector "span.size-6[aria-hidden=true]", text: "DW"
-    assert_selector "p.text-ink.text-\\[13px\\]", text: "Dana Weiss is editing this block"
-    assert_selector "button[data-action='admin--editing--hold#takeOver']", text: "Take over"
+    assert_selector "div.\\@container.flex-wrap.bg-people-tint.border-b.border-line.items-center.gap-2[data-admin--editing--hold-target=strip][data-editing-subject='block-#{@block.id}'][data-editing-kind=held]"
+    assert_no_selector "div.bg-sunken[data-editing-kind=held]"
+    assert_selector "span.size-\\[26px\\].bg-people-tint.inset-ring-people[aria-hidden=true]", text: "DW"
+    assert_selector "p.text-ink.text-small", text: "Dana Weiss is editing this block"
+    assert_selector "p strong.font-semibold", text: "Dana Weiss"
+    assert_selector "div.\\@max-\\[480px\\]\\:basis-full > button.bg-accent-tint.text-accent[data-action='admin--editing--hold#takeOver']", text: "Take over"
     assert_no_selector "[role=alert]"
   end
 
-  test "Take over and Copy my text are the tinted secondary small button, Discard and Remove the small tertiary one (handoff 2, 14; the design system's default button)" do
+  test "your own other tab is the solid own avatar, with no here ring" do
+    strip(hold: hold_by(@olga), viewer: @olga)
+
+    assert_selector "span.size-\\[26px\\].bg-people.text-surface", text: "OB"
+    assert_no_selector "span.inset-ring-people"
+  end
+
+  test "Take over and Copy my text are the tinted secondary small button, Discard and Remove the small tertiary one" do
     strip
     assert_selector "button.bg-accent-tint.text-accent.px-2.py-0\\.5", text: "Take over"
     assert_no_selector "button.bg-accent"
@@ -65,21 +73,21 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "[data-editing-subject=record]"
   end
 
-  test "the page settings: 'is editing the page settings' (handoff 23)" do
+  test "the page settings: 'is editing the page settings'" do
     strip(subject: @page)
 
     assert_selector "p", text: "Dana Weiss is editing the page settings"
   end
 
-  test "one's own other tab: the own avatar and 'You're editing this in another tab' (handoff 18)" do
+  test "one's own other tab: the own avatar and 'You're editing this in another tab'" do
     strip(hold: hold_by(@olga), own: true)
 
-    assert_selector "span.bg-ink.text-paper", text: "OB"
+    assert_selector "span.bg-people.text-surface", text: "OB"
     assert_selector "p", text: "You're editing this in another tab"
     assert_selector "button", text: "Take over"
   end
 
-  test "someone who may only read sees the strip without Take over (handoff 26)" do
+  test "someone who may only read sees the strip without Take over" do
     strip(take_over: false)
 
     assert_selector "p", text: "Dana Weiss is editing this block"
@@ -96,7 +104,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "[data-editing-expires-in='0']"
   end
 
-  test "it carries the sentences the script shows later: 'Taken over by Dana Weiss' and 'Dana Weiss took over this block' (handoff 13, 19)" do
+  test "it carries the sentences the script shows later: 'Taken over by Dana Weiss' and 'Dana Weiss took over this block'" do
     strip
 
     assert_selector "[data-editing-taken-text='Taken over by Dana Weiss · just now']"
@@ -104,7 +112,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "[data-editing-holder='#{@dana.id}']"
   end
 
-  test "lost: the warn alert, role alert, the sentence, Copy my text and Discard (handoff 14, 20, 24)" do
+  test "lost: the warn alert, role alert, the sentence, Copy my text and Discard" do
     strip(kind: :lost)
 
     assert_selector "div.bg-warn-tint.text-warn-ink.border.border-warn[data-editing-kind=lost] > p[role=alert]"
@@ -120,7 +128,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "p", text: "Someone else changed this block. Your changes weren't saved."
   end
 
-  test "deleted: 'Dana Weiss deleted this block. Your changes weren't saved.', Copy my text and Remove (handoff 15)" do
+  test "deleted: 'Dana Weiss deleted this block. Your changes weren't saved.', Copy my text and Remove" do
     strip(kind: :deleted, hold: nil, actor: @dana)
 
     assert_selector "[role=alert]", text: "Dana Weiss deleted this block. Your changes weren't saved."
@@ -140,7 +148,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "[role=alert]", text: "You deleted this block in another tab. Your changes weren't saved."
   end
 
-  test "the alert is the sentence alone: the polite 'Copied' status is not inside it (handoff 24)" do
+  test "the alert is the sentence alone: the polite 'Copied' status is not inside it" do
     strip(kind: :lost)
 
     assert_selector "[data-editing-kind=lost] > p[role=alert]"
@@ -164,7 +172,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     assert_selector "p:not([aria-hidden])", text: "Dana Weiss"
   end
 
-  test "no colour literal and no lock icon (handoff 5)" do
+  test "no colour literal and no lock icon" do
     strip
 
     html = rendered_content

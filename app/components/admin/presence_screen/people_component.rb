@@ -1,12 +1,9 @@
 module Admin
   module PresenceScreen
-    # Who else has this record open (presence spec §5.1), as initials in
+    # Who else has this record open, as initials in
     # circles: registered at `editor.header.people` (the page and the post
     # editor, `size: :header`) and at `media.panel.header` (the image panel,
-    # `size: :panel`) in `config/initializers/admin_slots.rb`. Every size,
-    # token, gap, order and wording is the handoff's
-    # (`docs/superpowers/specs/2026-10-10-presence-handoff.md`, items 1 to 8
-    # and 13 to 17); what it does not say is listed where it was filled in.
+    # `size: :panel`) in `config/initializers/admin_slots.rb`.
     # Never `Admin::Presence::`, which would shadow `Presence::`.
     #
     # WHAT IS RENDERED. An element for the tab's script
@@ -30,28 +27,29 @@ module Admin
     # controller have found the record through the read scope. Two statements
     # at most.
     #
-    # THE GROUP IS ONE BUTTON (handoff 23), the one Tab stop: the circles and
+    # THE GROUP IS ONE BUTTON, the one Tab stop: the circles and
     # "+N" are inside it and none of them takes the focus. Its name says
     # who EVERYONE is and how they are -- "Also open by 5 people: Dana Weiss,
-    # here; Jonas Lind, away 12 min; …", those behind "+N" included (handoff
-    # 29; "+N" itself is `aria-hidden`) -- and pressing it, anywhere, opens
+    # here; Jonas Lind, away 12 min; …", those behind "+N" included ("+N"
+    # itself is `aria-hidden`) -- and pressing it, anywhere, opens
     # the list of everyone in the same order (`Admin::Ui::MenuComponent`,
     # `list: true`: the list takes the focus, Escape gives it back). With one
     # person it is still the Tab stop and opens a list of one. It IS the menu
     # component's button, so nothing interactive is nested in it: "+N" is a
     # span, which also shows the list on hover without moving the focus.
     # The focus alone opens nothing, and neither does the pointer on the
-    # group: the list would cover the header (handoff 28).
+    # group: the list would cover the header.
     # Nothing is announced: no live region.
     #
     # ONE CIRCLE (`Admin::Ui::AvatarComponent`, a ring in the colour of what
-    # it stands on, 6px over the one before) still shows its own tooltip ON
+    # it stands on, 6px over the one before, with the here ring inside it
+    # for someone who is here and the dashed away tone for someone who is not) still shows its own tooltip ON
     # HOVER (`Admin::Ui::TooltipComponent`): "Dana Weiss · here", "Dana Weiss
     # · away just now" under a minute, "· away 12 min" (whole minutes, rounded
     # down), "· away over an hour" from sixty. A person is named by
     # `PersonName.of`, as in notes.
     #
-    # BELOW 1024px the header shows one circle and "+N" (handoff 15), by
+    # BELOW 1024px the header shows one circle and "+N", by
     # classes and not by a second render: the second and third circle are
     # `max-lg:hidden`, and "+N" holds both counts, one shown at each width; it
     # is there below 1024px from two people on, and from 1024px from four.
@@ -62,21 +60,20 @@ module Admin
     class PeopleComponent < Admin::AdminComponent
       # `shown`: how many circles before "+N"; `narrow`: how many below
       # 1024px (nil: the same at every width, the panel is a column of one
-      # width); `avatar`: `Admin::Ui::AvatarComponent`'s size; `more`: the
-      # "+N" circle's size; `ground`: what the circles stand on, the colour of
-      # their ring and of the "+N" circle, which has no fill (handoff 20, 24);
+      # width); `avatar`: `Admin::Ui::AvatarComponent`'s size, the "+N"
+      # circle's too; `ground`: what the circles stand on, the colour of their
+      # ring;
       # `wrapper`: the element's place in its row -- the header's action row
-      # has a gap of 8px and the people stand 12px before the saved status
-      # (handoff 2); in the panel's file-name row they never give way
-      # (handoff 13), and `mt-1` centres their 20px on the name's first line
-      # of 28px in a row that is aligned to its top (handoff 24); `hang`: the
-      # edge the list hangs from (handoff 19).
-      Size = Data.define(:shown, :narrow, :avatar, :more, :ground, :wrapper, :hang)
+      # has a gap of 8px and the people stand 12px before the saved status;
+      # in the panel's file-name row they never give way
+      # and `mt-[3px]` centres their 22px on the name's first line
+      # of 28px in a row that is aligned to its top; `hang`: the
+      # edge the list hangs from.
+      Size = Data.define(:shown, :narrow, :avatar, :ground, :wrapper, :hang)
       SIZES = {
-        header: Size.new(shown: 3, narrow: 1, avatar: :md, more: "size-6", ground: :paper, wrapper: "mr-1", hang: :left),
-        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, more: "size-5", ground: :surface, wrapper: "ml-auto mt-1 flex-none", hang: :right)
+        header: Size.new(shown: 3, narrow: 1, avatar: :md, ground: :paper, wrapper: "mr-1", hang: :left),
+        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, ground: :surface, wrapper: "ml-auto mt-[3px] flex-none", hang: :right)
       }.freeze
-      GROUNDS = { paper: "bg-paper", surface: "bg-surface" }.freeze
 
       # "away over an hour" from here on.
       LONG_AWAY = 60.minutes
@@ -118,8 +115,8 @@ module Admin
 
       def circles = people.first(@size.shown)
 
-      # The button's name: how many, then EVERYONE and how each is (handoff
-      # 29), in the list's order -- not only the circles shown, so a screen
+      # The button's name: how many, then EVERYONE and how each is, in
+      # the list's order -- not only the circles shown, so a screen
       # reader's user needs no second step to hear who is behind "+N", which
       # is a summary for the eye and is hidden from them.
       def group_label
@@ -136,7 +133,7 @@ module Admin
       def hang = @size.hang
 
       # The one Tab stop, with its focus ring around the group: CS Studio's
-      # 2px corner, since the group is a row and not a pill (handoff 31).
+      # 2px corner, since the group is a row and not a pill.
       def group_class
         "flex cursor-pointer items-center rounded-cs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       end
@@ -151,6 +148,8 @@ module Admin
 
       def tone(person) = person.state == "away" ? :away : :other
 
+      def here?(person) = person.state != "away"
+
       # How many are behind "+N" from 1024px, and below it.
       def more_wide = people.size - @size.shown
 
@@ -160,22 +159,25 @@ module Admin
 
       def more? = more_wide.positive? || more_narrow.positive?
 
-      # "+N": a circle of the avatar's size with no fill, 4px after the last
-      # person and not overlapped, the count `text-count` (11px, the sans). Shown below 1024px
-      # only when the wide row has room for everyone.
+      # "+N": the more circle (`Admin::Ui::AvatarComponent`'s `:more` tone),
+      # overlapping the one before like the others; shown below 1024px only
+      # when the wide row has room for everyone.
       def more_class
-        class_names("ml-1 flex flex-none items-center justify-center rounded-full border border-line-strong text-count leading-none text-dim",
-          @size.more, GROUNDS.fetch(ground), "lg:hidden": !more_wide.positive?)
+        class_names("flex flex-none -ml-1.5", "lg:hidden": !more_wide.positive?)
       end
 
       # "+1", or both counts with one shown at each width.
       def more_label
-        wide = more_wide.positive? ? tag.span(t(".more", count: more_wide), class: ("max-lg:hidden" if narrow?), data: { presence_more: "wide" }) : nil
-        narrow = narrow? ? tag.span(t(".more", count: more_narrow), class: "lg:hidden", data: { presence_more: "narrow" }) : nil
+        wide = more_wide.positive? ? tag.span(more_circle(more_wide), class: ("max-lg:hidden" if narrow?), data: { presence_more: "wide" }) : nil
+        narrow = narrow? ? tag.span(more_circle(more_narrow), class: "lg:hidden", data: { presence_more: "narrow" }) : nil
         safe_join([ wide, narrow ].compact)
       end
 
       private
+
+      def more_circle(count)
+        render Admin::Ui::AvatarComponent.new(initials: Admin::Ui::AvatarComponent.more_label(count), size: avatar_size, tone: :more, ring: ground)
+      end
 
       def shown(person, now)
         name = ::PersonName.of(person.user)

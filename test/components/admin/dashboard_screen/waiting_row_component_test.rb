@@ -20,7 +20,7 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
   def thread_of(record, kind:, count: 1, last_author: users(:two), last_author_id: last_author&.id)
     route = editor(record)
     ThreadRow.new(record:, kind:, title: record.title.presence, count:, at: 2.hours.ago, route: route.with(params: route.params.merge(notes: "open")),
-      last_author:, last_author_id:)
+      last_author:, last_author_id:, authors: [], author_count: 0)
   end
 
   def unpublished_row(record, publisher:)
@@ -60,7 +60,7 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
     page = create_page(title: "Pricing")
 
     render_inline Admin::DashboardScreen::WaitingRowComponent.new(row: both_row(page, publisher: true))
-    assert_selector ".admin-notes-marker.admin-notes-marker--readonly[role=img][aria-label='2 open notes']", text: "2"
+    assert_selector ".admin-notes-marker.admin-notes-marker--readonly[aria-hidden=true][aria-label='2 open notes'][data-has-notes]", text: "2", visible: :all
     assert_selector "[data-unpublished-changes]"
     assert_selector "a", exact_text: "Review and publish…"
     assert_no_selector ".admin-row-verb"

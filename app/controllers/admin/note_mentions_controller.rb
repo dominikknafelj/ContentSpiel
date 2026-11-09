@@ -1,8 +1,7 @@
 module Admin
-  # Whom a note on this record can mention (notes spec §3.2): the users who
-  # may READ it, by the name a note gives them (`Notes.name_of`: someone
-  # without a name is the part of their address before the at sign, the
-  # handoff's decision 36) with the whole email address as the hint on the
+  # Whom a note on this record can mention: the users who
+  # may READ it, by the name a note gives them (`PersonName.of`: someone
+  # without a name is the part of their address before the at sign) with the whole email address as the hint on the
   # second line, always. The second place CS Studio
   # lists users to someone without `users.manage`, and like
   # `Admin::UserSuggestionsController` deliberately not a directory: six rows
@@ -30,7 +29,7 @@ module Admin
       query = params[:q].to_s.strip.first(MAX_QUERY_LENGTH)
       matching = query.empty? ? User.all : User.name_or_email_containing(query).name_or_email_starting_first(query)
       users = matching.by_email.limit(CANDIDATES).select { |user| Notes.readable?(user, @container, channel: :admin) }.first(LIMIT)
-      render json: users.map { |user| { id: user.id, label: Notes.name_of(user), hint: user.email_address, initials: PersonName.initials(Notes.name_of(user)) } }
+      render json: users.map { |user| { id: user.id, label: PersonName.of(user), hint: user.email_address, initials: PersonName.initials(PersonName.of(user)) } }
     end
   end
 end

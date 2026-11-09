@@ -1,0 +1,8 @@
+<ul class="flex flex-col gap-2 p-4">
+  <% BlockTypes.all.each do |type| %>
+    <li class="inline-flex items-center gap-2 text-sm text-dim">
+      <%= render Admin::Ui::BlockIconComponent.new(definition: type, place: place) %>
+      <%= type.label %>
+    </li>
+  <% end %>
+</ul>

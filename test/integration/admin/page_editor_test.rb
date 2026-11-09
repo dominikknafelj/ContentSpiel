@@ -186,7 +186,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "Changed by someone else", page.reload.subtitle
     assert_select_in_stream "page-save-status", /CHANGED ELSEWHERE/
     assert_select_in_stream "editor-notice", /Changed by .+Reload/m
-    assert_select_in_stream "editor-notice", /#{Regexp.escape(users(:two).display_name)}/
+    assert_select_in_stream "editor-notice", /#{Regexp.escape(users(:two).name_or_email)}/
     assert_no_match(/page-base-updated-at/, response.body, "the base must not advance, or the next save would overwrite")
     assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
       patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "Again" } }, as: :turbo_stream
@@ -262,7 +262,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "main [data-template-field=hero]:not([hidden]) [data-field-name=hero_alt]"
   end
 
-  test "a stored template the theme no longer declares is kept by an unrelated autosave" do
+  test "a stored template the theme does not declare is kept by an unrelated autosave" do
     with_page_templates("standard", "gallery") { assert Pages::Save.call(@page, attributes: { template: "gallery" }).ok? }
     get "/cs-studio/pages/#{@page.id}"
     assert_select "main form select[name='page[template]'] option[selected][value=gallery]"

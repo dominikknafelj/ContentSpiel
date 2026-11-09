@@ -34,7 +34,7 @@
               aria-label="<%= t(".move") %>" aria-describedby="block-drag-help"
               data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
     <% end %>
-    <%= render Admin::EditorScreen::BlockIconComponent.new(definition: section.definition, place: :section) %>
+    <%= render Admin::Ui::BlockIconComponent.new(definition: section.definition, place: :section) %>
 
     <%# The name collapses the card, as a block card's does. %>
     <button type="button" class="shrink-0 truncate text-left text-sm font-semibold text-ink"
@@ -158,10 +158,10 @@
     <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
       <% dialog.with_details do %>
         <%= render self.class.delete_count(section: section, count: blocks.size) %>
-        <%# The open notes on the section's blocks, deleted with them (notes spec D12), in
-            a sentence of their own (the handoff's decision 7): filled by `admin--notes--drawer`
+        <%# The open notes on the section's blocks, deleted with them, in
+            a sentence of their own: filled by `admin--notes--drawer`
             from the markers of the tiles inside this card. The section itself takes no
-            notes (decision 10): this card has no marker and no "Add note" in its menu,
+            notes: this card has no marker and no "Add note" in its menu,
             and "Remove section, keep blocks" above stays one press with nothing to say. %>
         <%= tag.p(**Admin::EditorScreen::DeleteBlockDialogComponent.notes_warning_attributes(dom_id, spacing: "mt-2", kind: :section)) %>
       <% end %>

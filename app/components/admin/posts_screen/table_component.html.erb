@@ -19,8 +19,7 @@
         <th scope="col" class="py-2 pr-4">Type</th>
         <th scope="col" class="py-2 pr-4">Status</th>
         <th scope="col" class="py-2 pr-4">Translations</th>
-        <%# A 56px column whose header is the icon alone (notes handoff,
-            "Posts-list count cell"): its name is there for a screen reader,
+        <%# A 56px column whose header is the icon alone: its name is there for a screen reader,
             and the title says what the numbers under it count. %>
         <th scope="col" class="w-14 py-2 pr-4" title="<%= t(".open_notes_title") %>">
           <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><span class="sr-only"><%= t(".notes") %></span>
@@ -34,7 +33,7 @@
     </thead>
     <tbody>
       <% posts.each do |post| %>
-        <tr id="<%= helpers.dom_id(post) %>" class="border-b border-line align-middle hover:bg-paper data-[selected]:bg-accent-tint">
+        <tr id="<%= helpers.dom_id(post) %>" class="border-b border-line align-middle hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)] data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]">
           <% if selectable? %>
           <td class="py-2.5 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select[]", value: post.id, id: "select-post-#{post.id}", aria: { label: "Select #{title_of(post)}" },
@@ -43,14 +42,14 @@
           <% end %>
           <th scope="row" class="w-2/5 max-w-0 py-2.5 pr-4 text-left font-normal<%= " pl-3.5" unless selectable? %>">
             <%= link_to editor_path(post), class: "group/title flex min-w-0 flex-col gap-0.5 text-ink no-underline" do %>
-              <%# The title's line is a row (presence handoff 27): the title, cut
+              <%# The title's line is a row: the title, cut
                   with an ellipsis before anything after it is, then what
                   features register at `posts.row.title`, 6px after it and
                   INSIDE the link -- so nothing registered there may be
                   interactive. The hover underline is the title's and the
                   path's own, each asked of the link (`group/title`): on the
                   link itself it was drawn through everything in it, a
-                  marker's count included, and a child of a flex row cannot
+                  marker's circles included, and a child of a flex row cannot
                   refuse its parent's underline. %>
               <span class="flex min-w-0 items-center gap-1.5">
                 <span class="min-w-0 truncate font-medium group-hover/title:underline"><%= title_of(post) %></span>

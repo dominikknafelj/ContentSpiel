@@ -158,7 +158,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     as(users(:two)) { Notes::Start.call(@second, body: "For @[#{users(:one).id}]: check the date") }
     visit_screen admin_posts_path
 
-    assert_selector "tr#post_#{@second.id} a[data-notes-count][data-unread]", text: "1"
+    assert_selector "tr#post_#{@second.id} a[data-notes-count][data-unread]", text: "1 new"
     assert_no_selector "tr#post_#{@first.id} [data-notes-count]"
     # The pill: 20px high, in accent for the person the note is addressed to.
     assert_equal 20, page.evaluate_script("Math.round(document.querySelector('tr#post_#{@second.id} a[data-notes-count]').getBoundingClientRect().height)")

@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# Presence where a person sees it (presence spec §5.1, the handoff's items 1
-# to 8 and 13 to 17): the others on a record, in an editor's header and in
+# Presence where a person sees it: the others on a record, in an editor's header and in
 # the media library's image panel, live. Two people are two Capybara
 # sessions. `await_notes_live` waits for presence's subscription too
 # (`live/state`), so an arrival caused after it is heard.
@@ -43,8 +42,8 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
   def tip(user) = "#{circle(user)} [data-tooltip]"
 
-  # The part's own reading has been drawn: what is shown is no longer the
-  # server's first rendering, and the next drawing is a change.
+  # The part's own reading has been drawn: what is shown is not the
+  # server's first rendering any more, and the next drawing is a change.
   def await_drawn(within: ".admin-editor-header")
     await_js("document.querySelector(#{"#{within} [data-controller~='admin--presence--record']".to_json})?.dataset.presenceDrawn === 'true'", wait: LIVE)
   end
@@ -92,9 +91,9 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_selector circle(@dana, "here"), wait: LIVE
     assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
     assert_no_selector "[data-presence-user='#{@me.id}']"
-    # The circle: 24px, the initials, first in the action row and 12px before
-    # the status that follows (handoff 1 and 2).
-    assert_selector circle(@dana) + " > span.size-6[aria-hidden=true]", text: "DW", exact_text: true
+    # The circle: 26px, the initials, first in the action row and 12px before
+    # the status that follows.
+    assert_selector circle(@dana) + " > span.size-\\[26px\\][aria-hidden=true]", text: "DW", exact_text: true
     box = page.evaluate_script(<<~JS)
       (() => {
         const people = document.querySelector(".admin-editor-header [data-controller~='admin--presence--record']")
@@ -103,7 +102,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
                  gap: people.nextElementSibling.getBoundingClientRect().left - people.getBoundingClientRect().right }
       })()
     JS
-    assert_equal({ "first" => true, "width" => 24, "height" => 24, "row" => 24, "gap" => 12 }, box)
+    assert_equal({ "first" => true, "width" => 26, "height" => 26, "row" => 26, "gap" => 12 }, box)
     assert_no_selector ".admin-editor-header .admin-presence [title]", visible: :all
   end
 
@@ -166,12 +165,12 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_selector circle(@dana, "away"), wait: LIVE
     assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, away just now']"
     assert_selector tip(@dana), text: "Dana Weiss · away just now", exact_text: true, visible: :all
-    assert_selector circle(@dana) + " > span.bg-paper.border-line.text-meta"
+    assert_selector circle(@dana) + " > span.bg-surface.border-dashed.border-field-line.text-meta"
 
     using_session(:dana) { show_document }
     assert_selector circle(@dana, "here"), wait: LIVE
     assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, here']"
-    assert_selector circle(@dana) + " > span.bg-sunken.border-line-strong.text-ink"
+    assert_selector circle(@dana) + " > span.bg-people-tint.text-people.inset-ring-people"
   end
 
   test "they turn away after the idle time, and here again at the next thing they do" do
@@ -264,7 +263,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
 
     assert_selector circle(@reader, "here"), wait: LIVE
     assert_selector "#{group}[aria-label='Also open by 1 person: reader, here']"
-    assert_selector circle(@reader) + " > span.bg-sunken", text: "RE", exact_text: true
+    assert_selector circle(@reader) + " > span.bg-people-tint", text: "RE", exact_text: true
   end
 
   # Handoff 14 and 25: arriving fades in; leaving does not fade.
@@ -387,17 +386,17 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     set_timing("refresh", 150)
     assert_selector "#{group} [data-presence-more=wide]", text: "+1", exact_text: true, wait: LIVE
     assert_no_selector circle(hidden), visible: :all
-    assert_selector "#{row}[data-presence-state=here] > span.bg-sunken", text: "P3", exact_text: true, visible: :all
+    assert_selector "#{row}[data-presence-state=here] > span.bg-people-tint", text: "P3", exact_text: true, visible: :all
 
     Presence::Mark.where(user_id: hidden.id).update_all(state: "away", state_at: Time.current, seen_at: Time.current) # version: none (a test of presence)
     assert_selector "#{row}[data-presence-state=away] [data-presence-status]", text: "away just now", exact_text: true, visible: :all, wait: LIVE
     # The away look, not only the away words.
-    assert_selector "#{row} > span.bg-paper.text-meta", text: "P3", exact_text: true, visible: :all
-    assert_no_selector "#{row} > span.bg-sunken", visible: :all
+    assert_selector "#{row} > span.border-dashed.bg-surface.text-meta", text: "P3", exact_text: true, visible: :all
+    assert_no_selector "#{row} > span.bg-people-tint", visible: :all
 
     hidden.update!(name: "Zed Young")
     assert_selector "#{row} [data-presence-name]", text: "Zed Young", exact_text: true, visible: :all, wait: LIVE
-    assert_selector "#{row} > span.bg-paper", text: "ZY", exact_text: true, visible: :all, wait: LIVE
+    assert_selector "#{row} > span.border-dashed.bg-surface", text: "ZY", exact_text: true, visible: :all, wait: LIVE
   end
 
   # A drawing replaces the group, and with it the element that knew the list
@@ -487,8 +486,8 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
                  whole: title.firstElementChild.title, ringOnSurface: ring.includes(surface) }
       })()
     JS
-    # 20px circles, centred on the name's one line of 28px (handoff 24).
-    assert_equal({ "circle" => 20, "afterName" => 8, "beforeClose" => 12, "cut" => true, "oneLine" => 28, "centred" => 0, "closeLast" => true, "whole" => asset.title, "ringOnSurface" => true }, row)
+    # 22px circles, centred on the name's one line of 28px.
+    assert_equal({ "circle" => 22, "afterName" => 8, "beforeClose" => 12, "cut" => true, "oneLine" => 28, "centred" => 0, "closeLast" => true, "whole" => asset.title, "ringOnSurface" => true }, row)
 
     # Closing the panel takes its element out of the page: that is leaving.
     using_session(:dana) do
@@ -517,14 +516,17 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     more = page.evaluate_script(<<~JS)
       (() => {
         const group = document.querySelector(#{group.to_json})
-        const [ circle, count ] = [ group.querySelector("[data-presence-user] > span"), group.querySelector("[data-presence-more]").parentElement ]
+        const [ circle, count ] = [ group.querySelector("[data-presence-user] > span"), group.querySelector("[data-presence-more] > span") ]
         const [ a, b ] = [ circle.getBoundingClientRect(), count.getBoundingClientRect() ]
-        const paper = getComputedStyle(document.querySelector(".admin-editor-header")).backgroundColor
-        return { width: b.width, height: b.height, after: b.left - a.right, unfilled: getComputedStyle(count).backgroundColor === paper }
+        const probe = Object.assign(document.createElement("span"), { className: "bg-sunken" })
+        document.body.append(probe)
+        const sunken = getComputedStyle(probe).backgroundColor
+        probe.remove()
+        return { width: b.width, height: b.height, after: b.left - a.right, sunken: getComputedStyle(count).backgroundColor === sunken }
       })()
     JS
-    # A circle of the same size with no fill, 4px after the last person (20).
-    assert_equal({ "width" => 24, "height" => 24, "after" => 4, "unfilled" => true }, more)
+    # A sunken circle of the same size, over the last person by 6px like the others.
+    assert_equal({ "width" => 26, "height" => 26, "after" => -6, "sunken" => true }, more)
 
     # Hovering "+N" shows the list of everyone, in the same order (6), and
     # leaves the focus where it was; a redraw under the open list leaves it
@@ -556,7 +558,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  # --- the tooltip (handoff 18), on the circles that are its first hosts ----
+  # --- the tooltip, on the circles that are its first hosts ----
 
   # When the bubble of `user`'s circle was shown, after the pointer came.
   def watch_tooltips
@@ -1029,7 +1031,7 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     @page.update_columns(trashed_at: Time.current) # version: none (a system test puts its own page in the trash, around the service, to see a 404)
     assert_selector ".admin-editor-header [data-controller~='admin--presence--record'][data-presence-gone=true][data-live-part=answered]", visible: :all, wait: LIVE
     assert_no_selector group
-    assert_eventually(message: "the tab that can no longer read the record kept its row") { marks(@me).none? }
+    assert_eventually(message: "the tab that cannot read the record kept its row") { marks(@me).none? }
 
     # No more reads: the shortened timer would have asked several times.
     asked = page.evaluate_script("performance.getEntriesByType('resource').filter((each) => each.name.includes('/presence/page/')).length")

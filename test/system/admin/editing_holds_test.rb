@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
 # A tab claims what it starts to change, lets go when it is done, and keeps a
-# refused text for copying (live-editing spec §4.2 to §4.4,
-# `controllers/admin/editing/hold_controller.js`). Two people are two Capybara
+# refused text for copying
+# (`controllers/admin/editing/hold_controller.js`). Two people are two Capybara
 # sessions (`using_session`); `await_notes_live` waits for an editor's
 # subscription, so a signal caused afterwards is heard. A colleague's claim made
 # "from outside the browser" is the model's, which sends no signal; one made by
@@ -243,7 +243,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
   test "the claim is sent through the write queue, ahead of the block's first save, and once for three bursts of typing" do
     open_page
     record_requests
-    # THROUGH THE QUEUE, not only first (final review I8: a bare `fetch` at the
+    # THROUGH THE QUEUE, not only first (a bare `fetch` at the
     # first change would also come before a save that waits out its debounce).
     # A write of the test's own has the queue's turn: the claim is made, and
     # is not sent until that write is answered.
@@ -488,8 +488,8 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_writes_settled
     assert_equal 1, claims.size
     # "Long ago" is the script's own clock for this subject, put back, not a
-    # time waited out (final review I9: the wait was a sleep by another name,
-    # and five keys slower than half the shortened hold claimed twice).
+    # time waited out (a sleep would claim twice when five keys come
+    # slower than half the shortened hold).
     age_claim
     expire
     Editing::Reservation.claim(subject: @block, record: @page, user: @dana, tab: "tab-dddddddd")
@@ -552,7 +552,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
 
     using_session(:other) do
       assert_selector "#{card(@block)}[data-editing-held=true] [data-editing-kind=held]", text: "You're editing this in another tab", wait: LIVE
-      assert_selector "#{card(@block)} [data-editing-kind=held] span.bg-ink.text-paper[aria-hidden=true]", wait: LIVE
+      assert_selector "#{card(@block)} [data-editing-kind=held] span.bg-people.text-surface[aria-hidden=true]", wait: LIVE
       assert_equal 0, page.all("#editor-notice > *").size
     end
   end
@@ -888,7 +888,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     type_in(inside, "Quick", within: panel(inside))
     await_delayed
     within(panel(inside)) { click_button "Close" }
-    # The claim on the wire HAS THE QUEUE'S TURN (final review I8): the form's
+    # The claim on the wire HAS THE QUEUE'S TURN: the form's
     # save has been handed to the queue and is not sent while the claim is
     # unanswered. Beside the queue, the save would be on the wire by now.
     await_js "#{autosave_js_of(panel(inside), "autosave.busy")} || window.__sent.some((each) => each.startsWith('PATCH'))", wait: LIVE
@@ -904,7 +904,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_not Editing::Reservation.of(inside).exists?
   end
 
-  # --- fix round 1 -------------------------------------------------------------
+  # --- Helpers and cases that stub a request ------------------------------------
 
   # The NEXT request of `verb` whose URL matches `source` is answered by
   # `answer` (a JS expression: a Response, or a promise of one) instead of
@@ -962,7 +962,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert section
   end
 
-  # Final review I4. `release()` takes the subject out of `held` at once and
+  # `release()` takes the subject out of `held` at once and
   # parks it while the form's last save is outstanding; leaving walked only
   # `held`, so that release was never sent and the hold stayed for two minutes
   # with nobody there. Back is a restoration visit: nothing drains before it,
@@ -1020,11 +1020,9 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_equal 0, hold_controller_js("hold.releasing.size + hold.held.size")
   end
 
-  # Final review I9: this typed fourteen keys 150 ms apart against a hold
-  # shortened to a second and asserted that nothing had been saved inside a
-  # one-second debounce, so one stalled round failed it. Now no pause can save
-  # (the form's debounce is out of reach) and "half a hold later" is the
-  # script's clock put back (`age_claim`); every step waits on a condition.
+  # No pause can save (the form's debounce is out of reach) and "half a hold
+  # later" is the script's clock put back (`age_claim`); every step waits on a
+  # condition, never on a pause.
   test "typing for longer than half a hold without a pause renews the hold: one renewal per half hold, and it never lapses" do
     open_page
     record_requests
@@ -1109,10 +1107,9 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost]", text: "Dana Weiss is editing this block", wait: LIVE
 
     # The winner's second save is a section's, so its block answers 204 and
-    # the LIST is fetched and merged: that merge is what this waits for. (It
-    # used to wait for the region to say `answered`, which it had said since
-    # its first catch-up, so the two assertions ran before the merge was drawn
-    # and guarded nothing: final review I2.)
+    # the LIST is fetched and merged: that merge is what this waits for. (The
+    # region's `answered` has been said since its first catch-up, so waiting on
+    # it would run the two assertions before the merge was drawn.)
     page.execute_script("window.__merged = []; document.getElementById('editing').addEventListener('admin--editing--live:merged', (event) => window.__merged.push(event.detail.part))")
     using_session(:dana) do
       find("#content_block_#{section.id} select[name='block[settings][width]']").all("option").last.select_option
@@ -1123,7 +1120,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Copy my text"
     assert_selector "#block-#{section.id}-hold [data-editing-kind=lost] button", text: "Discard"
 
-    # The frame is synchronised by the merge, so its held edge is the
+    # The frame is synchronised by the merge, so its people outline is the
     # stylesheet's, read from the frozen form: it stays without the attribute.
     assert_selector "#content_block_#{section.id} .admin-section-card__settings > form[data-editing-frozen=true]"
     edge = page.evaluate_script(<<~JS)
@@ -1131,10 +1128,35 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
         const frame = document.getElementById("content_block_#{section.id}")
         frame.removeAttribute("data-card-edge")
         const style = getComputedStyle(frame)
-        return [ style.outlineStyle, style.outlineWidth ]
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-people)"
+        document.body.append(probe)
+        const people = getComputedStyle(probe).color
+        probe.remove()
+        return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor === people ]
       })()
     JS
-    assert_equal [ "solid", "2px" ], edge
+    assert_equal [ "solid", "2px", "2px", true ], edge
+  end
+
+  test "a section held by someone else is outlined outside its frame, from the server's own mark" do
+    section, = section_with_block
+    Editing::Reservation.claim(subject: section, record: @page, user: @dana, tab: "tab-dddddddd")
+    open_page
+
+    assert_selector "#content_block_#{section.id}[data-card-edge=held]"
+    edge = page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.getElementById("content_block_#{section.id}"))
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-people)"
+        document.body.append(probe)
+        const people = getComputedStyle(probe).color
+        probe.remove()
+        return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor === people ]
+      })()
+    JS
+    assert_equal [ "solid", "2px", "2px", true ], edge
   end
 
   # `admin--editing--hold#reveal` through the section's own `showSettings`:

@@ -36,7 +36,7 @@ module Admin
       def call = content_tag(:span, label, class: "admin-user-name")
 
       def label
-        return @user.display_name if @user
+        return @user.name_or_email if @user
 
         @user_id ? DELETED_USER : NOBODY
       end

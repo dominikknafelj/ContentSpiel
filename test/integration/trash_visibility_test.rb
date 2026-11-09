@@ -1148,7 +1148,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       get admin_presence_here_path(kind:, ids: [ kept.id, gone.id ], format: :json)
       # The list's marker data: the kept record's and nothing
       # of the trashed one's.
-      assert_equal({ kept.id.to_s => { "count" => 1, "label" => "#{PersonName.of(users(:one))} is here" } },
+      assert_equal({ kept.id.to_s => { "count" => 1, "label" => "#{PersonName.of(users(:one))} is here", "initials" => [ PersonName.initials(PersonName.of(users(:one))) ] } },
         response.parsed_body, kind)
       assert_not_includes response.body, %("#{gone.id}"), kind
     end
@@ -1231,15 +1231,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
 
     get admin_posts_path
-    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1"
+    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1 new"
     assert_select "[data-notes-count]", count: 1
 
     get admin_page_path(@kept_page)
-    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1 new"
     assert_select "#tree-column [data-notes-marker]", count: 1
 
     get admin_media_path
-    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1"
+    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1 new"
     assert_select "[data-notes-chip]", count: 1
 
     # The panel: a kept image's has its notes frame, a trashed image has no panel.
@@ -1258,10 +1258,11 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # "Notes for you", its full list, Waiting for you's open threads and the
-  # sidebar's unread count all narrow through `Notes.readable_threads`.
+  # "Notes for you", its full list and its rail of open threads (with its
+  # "And N more"), Waiting for you's open threads and the sidebar's unread
+  # count all narrow through `Notes.readable_threads`.
   # Trashed AFTER the note was written, as in life.
-  test "the inbox, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
+  test "the inbox, its rail of open threads, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
     kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
     gone = [ create_page(title: "Later gone"), create_post(title: "Later gone post"), create_media_asset ].map { |subject| [ subject, create_note_for_reader(subject) ] }
     gone.each { |subject, _thread| subject.update!(trashed_at: Time.current) }
@@ -1274,7 +1275,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_no_match "Later gone", response.body
     get admin_notes_path
     assert_select "[data-delivery]", count: 3
+    assert_select ".admin-notes-threads li", count: 3
     assert_no_match "Later gone", response.body
+    assert_no_match "more on other pages", response.body
     get admin_unread_notes_path
     assert_equal({ "unread" => 3 }, response.parsed_body)
 
@@ -1319,6 +1322,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get admin_unread_notes_path
     assert_equal({ "unread" => 0 }, response.parsed_body)
     assert_equal [ [], 0, 0 ], inbox.call.then { |query| [ query.rows, query.total, query.unread_count ] }
+    assert_equal [ { all: 0, unread: 0, mentions: 0 }, [ 0, 0, 0 ] ], [ inbox.call.counts, Dashboard::NotesForYou::SHOWS.map { |show| inbox.call.total(show: show) } ]
+    get admin_notes_path, params: { show: "mentions" }
+    assert_select "[data-delivery]", count: 0
     assert_equal 3, Notes::Delivery.unread.where(user: users(:two)).count
 
     as(users(:one)) { records.each { |record| assert Trash::Restore.call(record.reload).ok? } }

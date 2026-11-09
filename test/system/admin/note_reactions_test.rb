@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Reactions on a note (notes spec D10, handoff "Reaction chip"), in the
+# Reactions on a note, in the
 # editor's drawer: a chip per emoji that toggles the viewer's own, the set to
 # add from under each message, and what another person's reaction does to a
 # thread that is open (a live refresh: `Admin::NotesLiveSystemTest` has the
@@ -74,7 +74,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{set}[open] button[name=emoji]", count: Notes::EMOJI.size
     emoji("thumbs up").click
 
-    assert_selector "#{chips} button[data-reaction='👍'][data-mine][aria-pressed=true][title='#{Notes.name_of(users(:one))}']", text: /👍\s*1/
+    assert_selector "#{chips} button[data-reaction='👍'][data-mine][aria-pressed=true][title='#{PersonName.of(users(:one))}']", text: /👍\s*1/
     assert_no_selector "#{set}[open]"
     assert_eventually(message: "the focus did not go to the new chip") { focused?("#{chips} button[data-reaction='👍']") }
     # After the first reaction the add chip stands at the end of the chip row, on show; the meta line has none.
@@ -138,7 +138,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     watch_thread_fetches
     find("#{chips} button[data-reaction='🎉']").click
 
-    assert_selector "#{chips} button[data-reaction='🎉'][data-mine][title='Dana, #{Notes.name_of(users(:one))}']", text: /🎉\s*2/
+    assert_selector "#{chips} button[data-reaction='🎉'][data-mine][title='Dana, #{PersonName.of(users(:one))}']", text: /🎉\s*2/
     sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "the thread was not fetched" means anything
     assert_equal 0, page.evaluate_script("window.__threadFetches") # no GET: the answer to the tab's own POST drew the chip
   end
@@ -200,7 +200,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{chips} button[data-reaction='🎉'][data-mine][aria-label='party popper, 1 reaction, yours']"
   end
 
-  # The handoff's decision 22: above the chip, below only when there is no
+  # Above the chip, below only when there is no
   # room above inside the thread's scroll area, and never over row 1.
   test "the set opens above its chip, and below it where row 1 leaves no room above" do
     last = as(users(:two)) { Array.new(2) { |index| Notes::Reply.call(@thread, body: "Reply #{index}\nwith\nseveral\nlines").record } }.last

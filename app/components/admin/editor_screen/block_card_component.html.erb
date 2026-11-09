@@ -2,7 +2,7 @@
     inside it, drawn by `content-spiel.tailwind.css` from an attribute: `data-card-edge`
     (`#card_edge`: held by someone else, or its type gone) and `data-notes-active`, set by
     `admin--notes--drawer#markActive` while a thread on this block is the one open in the
-    drawer (notes handoff, "Block card marker"). Each edge stands beside its words: the
+    drawer (the notes marker). Each edge stands beside its words: the
     hold strip, the "Unavailable type" sentence, the open thread. %>
 <%= tag.div id: wrapper_id, class: "admin-block-card rounded-card bg-surface shadow-1", **wrapper_attributes do %>
   <div class="admin-block-card__head flex items-center gap-2 px-3 pt-3 pb-1">
@@ -16,7 +16,7 @@
               aria-label="Move <%= label %>" aria-describedby="block-drag-help"
               data-action="keydown->admin--editor--blocks#key focusout->admin--editor--blocks#blur">⠿</button>
     <% end %>
-    <%= render Admin::EditorScreen::BlockIconComponent.new(definition: definition, place: :card, block: block) unless unavailable? %>
+    <%= render Admin::Ui::BlockIconComponent.new(definition: definition, place: :card, block: block) unless unavailable? %>
 
     <% if unavailable? %>
       <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= unavailable_label %></span>
@@ -25,10 +25,10 @@
         <%= render Admin::Ui::ButtonComponent.new(label: "Delete block…", variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
     <% elsif panel? %>
-      <%# The open form of a block in a section (sections spec §4.3): a heading, not a
+      <%# The open form of a block in a section: a heading, not a
           collapse button -- the tile is what opens and closes it. %>
       <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
-      <span data-editing-mark-slot><%= render updated_mark %></span>
+      <span data-editing-mark-place><%= render updated_mark %></span>
       <%= status_line %>
     <% elsif !list? %>
       <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
@@ -36,7 +36,7 @@
           drawer cannot cover it; the spacer after it takes the rest of the row. %>
       <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
       <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
-      <span data-editing-mark-slot><%= render updated_mark %></span>
+      <span data-editing-mark-place><%= render updated_mark %></span>
       <span class="flex-1"></span>
       <%= status_line %>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
@@ -45,18 +45,18 @@
       <% end %>
     <% else %>
       <%# The name and the notes marker share the row's free width: the marker stands
-          directly after the name, on the left, where the notes drawer cannot cover it
-          (notes handoff), and the rest of the row is the spacer after it. %>
+          directly after the name, on the left, where the notes drawer cannot cover it,
+          and the rest of the row is the spacer after it. %>
       <div class="flex min-w-0 flex-1 items-center gap-2">
         <%# Collapsed, a card shows this label and no line of the block's content, for any type:
             a closed block's one line is on its tile in a section (`TileSummaryComponent`),
-            which is why the Code block's line (design answer C7) is drawn there only. %>
+            which is why the Code block's line is drawn there only. %>
         <button type="button" class="min-w-0 truncate text-left text-sm font-semibold text-ink"
                 aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--editor--blocks#toggle">
           <%= label %>
         </button>
         <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
-        <span data-editing-mark-slot><%= render updated_mark %></span>
+        <span data-editing-mark-place><%= render updated_mark %></span>
       </div>
       <%= status_line %>
 
@@ -64,10 +64,10 @@
           `refreshMoveState` finds them to enable or disable them after a reorder, add or delete. %>
       <% if editable? %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
-          <%# The keyboard and touch path to the strip's button (handoff 2): first while held. %>
+          <%# The keyboard and touch path to the strip's button: first while held. %>
           <% menu.with_item { take_over_item } if read_only_hold? %>
           <%# Always first, and always there: the marker of a block without notes shows only
-              on hover or focus, and neither touch nor a test depends on that (notes spec §4.3). %>
+              on hover or focus, and neither touch nor a test depends on that. %>
           <% menu.with_item { add_note_item } %>
           <% menu.with_item do %>
             <%= tag.button "Move up", type: "button", disabled: first?, class: menu_item_class,
@@ -97,7 +97,7 @@
         <% end %>
       <% else %>
         <%# A viewer who can only read the page: the same "⋯", with "Add note" as its
-            only item (the handoff's decision 6). %>
+            only item. %>
         <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
           <% menu.with_item { add_note_item } %>
         <% end %>
@@ -117,7 +117,7 @@
     <%# Always there, empty unless the block is held: the live script puts the strip and its
         notices here (`HoldStripComponent.slot_id`). %>
     <div id="<%= hold_slot_id %>" data-editing-strip-slot><%= render hold_strip if held? %></div>
-    <%# A change of holder is said here, politely (handoff 19); the sentence comes from the strip. %>
+    <%# A change of holder is said here, politely; the sentence comes from the strip. %>
     <span class="sr-only" aria-live="polite" data-editing-announcer></span>
   <% end %>
 
@@ -134,7 +134,7 @@
         <% end %>
 
         <% if settings_row? %>
-          <%# A post list's three settings in one row (handoff B22): Type, Tag, Limit (72px). %>
+          <%# A post list's three settings in one row: Type, Tag, Limit (72px). %>
           <% type_field, tag_field, limit_field = settings_row_fields %>
           <div class="admin-block-settings-row grid grid-cols-1 items-start gap-x-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_72px]">
             <%= render Admin::Ui::FieldComponent.new(
@@ -176,7 +176,7 @@
                  editable: editable? && !read_only_hold?, body_content: block.body_content_kind, starting_content: starting_content, **translation("body")
                ) %>
             <%# A Table's grid with its controls around it, for someone who may change it now; held or
-                read only, the grid alone (table block spec, decision 13: see `table_controls?`). %>
+                read only, the grid alone (see `table_controls?`). %>
             <% if table_controls? %>
               <%= render Admin::EditorScreen::TableControlsComponent.new(block: block, document: column_value("body"), starting: body_column.starting_content) do %>
                 <%= render body_column %>

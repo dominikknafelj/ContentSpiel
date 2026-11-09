@@ -16,7 +16,7 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_selector "a[href='/e/1']", text: "16:05"
     assert_selector AVATAR, exact_text: PersonName.initials(PersonName.of(users(:one)))
-    assert_selector "p", text: "#{users(:one).display_name} published “Hello”"
+    assert_selector "p", text: "#{users(:one).name_or_email} published “Hello”"
     assert_selector "span.font-cs-mono.text-meta", text: "post.published"
     assert_selector ".admin-channel-chip[data-channel=admin]", text: "Admin"
   end
@@ -47,10 +47,10 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
   test "a person is the shared avatar with two letters; the viewer's own is filled; the system is the neutral icon chip; an event nobody made draws no circle" do
     users(:one).update!(name: "Ada Lovelace")
     row_for("post.published")
-    assert_selector "#{AVATAR}.border-line-strong.bg-sunken.text-ink", exact_text: "AL"
+    assert_selector "#{AVATAR}.bg-people-tint.text-people", exact_text: "AL"
 
     row_for("post.published", viewer: users(:one))
-    assert_selector "#{AVATAR}.bg-ink.text-paper", exact_text: "AL"
+    assert_selector "#{AVATAR}.bg-people.text-surface", exact_text: "AL"
 
     row_for("post.published", user_id: nil)
     assert_selector "li > span.size-7[aria-hidden=true] > span.rounded-chip.size-6.bg-sunken.text-dim svg"
@@ -58,7 +58,7 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "p", text: "System published"
 
     row_for("post.published", user_id: 999_999)
-    assert_selector "#{AVATAR}.border-line.bg-paper.text-meta", exact_text: ""
+    assert_selector "#{AVATAR}.border.border-field-line.bg-surface", exact_text: ""
     assert_selector "p", text: "a deleted user published"
 
     row_for("session.failed", user_id: nil)

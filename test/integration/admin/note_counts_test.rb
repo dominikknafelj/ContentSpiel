@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The open-note count wherever a record is listed (notes spec §4.4): one
+# The open-note count wherever a record is listed: one
 # grouped query per surface, and one beside it for "unread for you", whatever
 # the number of rows and of threads. Each count is the notes pill
 # (`.admin-notes-marker`, the block card's own), drawn by the server with its
@@ -30,14 +30,14 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
   test "the posts list has a Notes column: the open count as a link that opens the post with its drawer, nothing for a post without" do
     get "/cs-studio/posts"
 
-    # The handoff's header: only the 12px icon, named for a screen reader and by its title.
+    # The column's header: only the 12px icon, named for a screen reader and by its title.
     assert_select "table.admin-posts-table th[title='Open notes'][class~='w-14']", text: "Notes" do
       assert_select "svg[class~='size-3']"
     end
     assert_select "tr#post_#{@post.id} a[data-notes-count][href='/cs-studio/posts/#{@post.id}?notes=open'][aria-label='1 open note']", text: "1"
-    # The pill without an icon, neutral.
+    # The shared bubble with its outline glyph, read.
     assert_select "tr#post_#{@post.id} a.admin-notes-marker[data-notes-count][data-has-notes]:not([data-unread])" do
-      assert_select "svg", count: 0
+      assert_select "svg", count: 1
     end
     assert_select "tr#post_#{@quiet.id} [data-notes-count]", count: 0
   end
@@ -59,12 +59,12 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "#media-panel #media-notes turbo-frame#notes[loading=lazy][src='/cs-studio/notes/media/#{@asset.id}/threads/7?view=media']"
     get "/cs-studio/media", params: { selected: @asset.id }
     assert_select "#media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@asset.id}?view=media']"
-    # The handoff's header, "NOTES · 1 OPEN": the number follows the counts
+    # The panel's header, "NOTES · 1 OPEN": the number follows the counts
     # every answer of the frame brings, and the page has its own copy.
     assert_select "#media-notes h3", text: /\ANotes\s+·\s+1 open\z/
     assert_select "#media-notes h3 [data-admin--notes--drawer-target=total]", text: "1"
     assert_select "#media-notes #notes-counts[data-admin--notes--drawer-target=counts]"
-    # No drawer on this screen (the spec wins over the handoff's "Open in drawer").
+    # No drawer on this screen (the notes frame is in the panel).
     assert_select "aside#notes-drawer", count: 0
     # Asked of the frame's own answer: in the page above the frame is not loaded yet.
     get "/cs-studio/notes/media/#{@asset.id}", params: { view: "media" }, headers: { "Turbo-Frame" => "notes" }
@@ -133,7 +133,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/media/#{@asset.id}", params: { media_asset: { title: "Renamed" } }, as: :turbo_stream
 
     assert_response :success
-    assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template span[data-notes-chip][data-unread]", text: "2"
+    assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template span[data-notes-chip][data-unread]", text: "2 new"
   end
 
   # `PATCH /media/:id` is open to `media.manage` alone (`Media::Save`), the
@@ -197,7 +197,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "#tree-column li[data-page-id='#{@page.id}'][data-context-only]"
     assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-notes-marker]", count: 0
     assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-unread]", count: 0
-    assert_select "#tree-column li[data-page-id='#{child.id}'] > div span[data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column li[data-page-id='#{child.id}'] > div span[data-notes-marker][data-unread]", text: "1 new"
     assert_select "#tree-column [data-notes-marker]", count: 1
   end
 

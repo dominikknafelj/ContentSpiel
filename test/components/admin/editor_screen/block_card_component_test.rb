@@ -44,6 +44,15 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector ".admin-block-card__head > .admin-block-card__handle:first-child + [data-block-icon]"
   end
 
+  test "a card's head always holds the place where an Updated by mark stands, with no border utility added" do
+    record = create_page(title: "Mark place test")
+    block = record.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: record)
+
+    assert_selector ".admin-block-card__head span[data-editing-mark-place]:empty", visible: :all
+  end
+
   test "a held card says so in data-card-edge=held, an unavailable one in data-card-edge=unavailable, and neither carries a border utility" do
     held_setup
     reserve(@held_block, @held_page, @dana, B)
@@ -103,7 +112,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button[data-move='up'][disabled], button[data-move='down'][disabled]", visible: :all
   end
 
-  # Sections spec §4.4. Disabled as rendered: whether the page has a section
+  # Disabled as rendered: whether the page has a section
   # is the screen's to say (`admin--editor--blocks#refreshMoveState`), since sections
   # come and go without this card being drawn again.
   test "Move into section… fills the Move dialog and then opens it, and starts disabled" do
@@ -202,7 +211,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     refute_text "Move up"
   end
 
-  # Task 12's b5: a viewer who can't edit the page sees an unavailable card
+  # A viewer who can't edit the page sees an unavailable card
   # with no action at all, and a post list with every field disabled.
   test "a view-only unavailable card has no Delete, no handle and no menu; a view-only post list's fields are disabled and its menu is Add note alone" do
     page = create_page(title: "View only")
@@ -216,7 +225,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     list = page.content_blocks.create!(block_type: "post_list", position: 1, settings: { "limit" => 3, "tag" => "news" })
     render_card(list, page: page, editable: false)
     assert_selector "fieldset[disabled].admin-view-only .admin-block-settings-row"
-    # Its menu holds "Add note" and nothing of an editor's (the handoff's decision 6).
+    # Its menu holds "Add note" and nothing of an editor's.
     assert_no_selector ".admin-block-card__handle, [data-move], form[action$='/duplicate'], dialog", visible: :all
     assert_equal [ "Add note" ], page_menu_items
     assert_no_selector "form[data-controller~='admin--saving--autosave']"
@@ -321,7 +330,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}", text: "Rich text"
     assert_selector "form[data-controller~='admin--saving--autosave']"
     assert_no_selector ".admin-block-card__handle"
-    # The handoff's decision 6: the one item a group card's menu has.
+    # The one item a group card's menu has.
     assert_selector "button[aria-label='Block actions']", count: 1
     assert_equal [ "Add note" ], page_menu_items
     assert_no_selector "[data-admin--editor--blocks-target], [data-admin--editor--section-target]"
@@ -359,10 +368,9 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes--drawer-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
   end
 
-  # The handoff's decision 6, which replaces the ruling that showed the
-  # add-note control at rest where a card had no menu: who can read can write
-  # notes (D3), so a card without an editor's menu gets the "⋯" with "Add
-  # note" as its only item, and the control is at rest for nobody.
+  # Whoever can read can write notes, so a card without an editor's menu gets
+  # the "⋯" with "Add note" as its only item, and the control is at rest for
+  # nobody.
   test "a view-only card and a translation tab's group card have a menu whose only item is Add note; an editor's is unchanged; nothing marks the control as shown at rest" do
     page = create_page(title: "Noted")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
@@ -404,7 +412,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes--drawer-target=warning][data-notes-alone]", visible: :all
   end
 
-  # ----- Held by someone else (live-editing Task 7; handoff 1 to 7, 18, 26) -----
+  # ----- Held by someone else -----
 
   A = "tab-aaaaaaaa".freeze
   B = "tab-bbbbbbbb".freeze
@@ -473,7 +481,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#block-#{@held_block.id}-hold[data-editing-strip-slot]:empty"
   end
 
-  test "the card has the held edge and its menu has Take over first (handoff 2, 3)" do
+  test "the card has the held attribute and its menu has Take over first" do
     held_setup
     reserve(@held_block, @held_page, @dana, B)
 
@@ -486,7 +494,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] button[data-move='up']:not([disabled]), [role=menu] form[action$='/duplicate']", visible: :all
   end
 
-  test "someone who may only read sees the strip without Take over and no held edge (handoff 26)" do
+  test "someone who may only read sees the strip without Take over and no held edge" do
     held_setup
     reserve(@held_block, @held_page, @dana, B)
 
@@ -498,7 +506,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "#content_block_#{@held_block.id}.admin-block-card:not([data-card-edge])"
   end
 
-  test "the rich-text field of a held card has no toolbar and says read-only (handoff 7)" do
+  test "the rich-text field of a held card has no toolbar and says read-only" do
     held_setup(type: "rich_text", body: rich_doc("Words"))
     render_for(users(:one), A)
     assert_selector "[role=toolbar]"
@@ -637,7 +645,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
       assert_no_selector "[name='block[settings][code]'], [name='block[settings][language]'], [name='block[settings][filename]']", visible: :all
       assert_selector "input[name='block[caption]']:not([readonly]):not([disabled])"
       assert_no_selector "[data-controller='admin--ui--override-field']"
-      # Design answer C6: the line above the code, its language linked to the
+      # The line above the code, its language linked to the
       # default tab as the header's own tab is (no `locale`, a top-level visit).
       assert_equal "Code isn't translated. Edit it on the English tab.", Capybara.string(rendered_content).find("details[data-shared-fields] p[data-code-note]", visible: :all).text(:all)
       assert_selector "details[data-shared-fields] p[data-code-note] a[href='/cs-studio/pages/#{page.id}'][data-turbo-frame='_top']", exact_text: "English", visible: :all
@@ -661,7 +669,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-block-body] ##{status}"
   end
 
-  # Plan ruling 3: a field that takes its placeholder from a select shows the
+  # A field that takes its placeholder from a select shows the
   # label of the choice stored, read from the default language, and carries
   # what the browser needs to follow a new choice before it is saved.
   def with_hint_type
@@ -704,8 +712,7 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     block
   end
 
-  # Note block spec, "CS Studio": the kind's icon in the head (plan ruling
-  # 12), the kind's four buttons, the title with the kind's word as its
+  # The kind's icon in the head, the kind's four buttons, the title with the kind's word as its
   # placeholder and its help line, then the text.
   test "a note's card: its kind's icon in the head, the kind's four buttons, the stored one checked, then the title with the kind's word as placeholder and its help, then the text" do
     page = create_page(title: "Note card")

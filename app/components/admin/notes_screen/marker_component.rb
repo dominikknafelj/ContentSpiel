@@ -1,12 +1,11 @@
 module Admin
   module NotesScreen
-    # The notes marker of one block (notes spec §4.3), on its card or tile.
-    # With open threads: a neutral pill with their number (§4.5: accent is
-    # for "unread and addressed to you" only). Without: nothing at rest --
-    # the system shows no count at zero -- and the same control as "add a
-    # note" while the pointer is over the card or the keyboard's focus is in
-    # it. "Add note" in the block's ⋯ menu is the path that depends on
-    # neither.
+    # The notes marker of one block, on its card or tile. With open threads:
+    # the people bubble with their number (accent, "3 new", only for "unread
+    # and addressed to you"). Without: nothing at rest -- the system shows no
+    # count at zero -- and the same control as "add a note" while the pointer
+    # is over the card or the keyboard's focus is in it. "Add note" in the
+    # block's ⋯ menu is the path that depends on neither.
     #
     # The server draws it WITHOUT a number: a card is drawn by the page and by
     # every stream that adds, moves or redraws a block, and none of them
@@ -16,14 +15,15 @@ module Admin
     # selected in that block's rich text. So a marker drawn again by a stream
     # reads right without the server knowing a count at all.
     #
-    # Its look is `.admin-notes-marker` in content-spiel.tailwind.css, not a
+    # Its look is `.admin-notes-marker` in content-spiel.tailwind.css, shared
+    # with `Admin::Ui::NoteMarkerComponent` (the bubble the lists draw), not a
     # list of utilities here: it has four states (at rest, shown, a count,
     # unread) in two sizes (a card's and a tile's), and the size follows from
     # where it stands, so one component draws both.
     #
     # In the document for everyone who can read the page, whether or not they
-    # can edit it (decision D3); a test presses the menu item or focuses the
-    # marker, never waits for a hover.
+    # can edit it; a test presses the menu item or focuses the marker, never
+    # waits for a hover.
     class MarkerComponent < Admin::AdminComponent
       # A slot builds it (`editor.block.markers`): `record` is the block,
       # `label` its name. `viewer:`, `data:` and the rest of a slot's context

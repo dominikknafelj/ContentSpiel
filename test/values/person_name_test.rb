@@ -18,7 +18,7 @@ class PersonNameTest < ActiveSupport::TestCase
     user = users(:two).tap { |each| each.update!(name: nil) }
 
     assert_equal "two", PersonName.of(user)
-    assert_equal user.email_address, user.display_name
+    assert_equal user.email_address, user.name_or_email
   end
 
   test "initials: two words give their first characters, one word its first two letters, as written" do

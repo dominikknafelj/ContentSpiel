@@ -1,0 +1,8 @@
+<% body = capture do %><%= glyph %><span class="admin-notes-marker__count"><%= number %></span><% end %>
+<% if href %>
+  <%= link_to body, href, id:, class: classes, aria: { label: }, data: %>
+<% elsif @aria_hidden %>
+  <%= tag.span body, id:, class: classes, title: label, aria: { hidden: true, label: }, data: %>
+<% else %>
+  <%= tag.span body, id:, role: "img", title: label, class: classes, aria: { label: }, data: %>
+<% end %>

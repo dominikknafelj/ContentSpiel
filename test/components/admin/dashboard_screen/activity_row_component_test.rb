@@ -36,8 +36,8 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     row = row_for(actor: token, channel: :mcp)
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
-    assert_selector "#{AVATAR}.bg-sunken", exact_text: "tw"
-    assert_text "#{users(:two).display_name} via Claude desktop created “Hello”"
+    assert_selector "#{AVATAR}.bg-people-tint", exact_text: "tw"
+    assert_text "#{users(:two).name_or_email} via Claude desktop created “Hello”"
     assert_selector ".admin-channel-chip[data-channel=mcp]", text: "MCP"
   end
 
@@ -56,10 +56,10 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
   test "a person is the shared avatar with two letters; the viewer's own is filled; the system is the neutral icon chip; an event nobody made draws no circle" do
     users(:two).update!(name: "Ada Lovelace")
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two), title: "Theirs"))
-    assert_selector "#{AVATAR}.border-line-strong.bg-sunken.text-ink", exact_text: "AL"
+    assert_selector "#{AVATAR}.bg-people-tint.text-people", exact_text: "AL"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(title: "Mine"))
-    assert_selector "#{AVATAR}.bg-ink.text-paper", exact_text: "on"
+    assert_selector "#{AVATAR}.bg-people.text-surface", exact_text: "on"
     assert_no_selector ".bg-sunken.rounded-full"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: nil, title: "System"))
@@ -68,7 +68,7 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     assert_text "System created"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: 999_999, title: "Deleted"))
-    assert_selector "#{AVATAR}.border-line.bg-paper.text-meta", exact_text: ""
+    assert_selector "#{AVATAR}.border.border-field-line.bg-surface", exact_text: ""
     assert_text "a deleted user created"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: nil, title: "Nobody", none: true))

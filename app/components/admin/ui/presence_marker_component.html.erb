@@ -1,0 +1,9 @@
+<%= tag.span hidden: count.zero?, class: "admin-presence-marker #{Admin::Ui::TooltipComponent::HOST} inline-flex flex-none items-center", data: data do %>
+  <% slots.each do |letters| %>
+    <%= tag.span class: "flex", hidden: letters.nil?, data: { presence_avatar: true } do %><%= render Admin::Ui::AvatarComponent.new(initials: letters.to_s, size: :sm, tone: :other, ring: :ground, here: true) %><% end %>
+  <% end %>
+  <%= tag.span class: "flex", hidden: wide < 1, data: { presence_more: true } do %><%= render Admin::Ui::AvatarComponent.new(initials: more(wide), size: :sm, tone: :more, ring: :ground) %><% end %>
+  <%= tag.span class: "flex", hidden: narrow < 1, data: { presence_more_narrow: true } do %><%= render Admin::Ui::AvatarComponent.new(initials: more(narrow), size: :sm, tone: :more, ring: :ground) %><% end %>
+  <%= tag.span said, class: "sr-only", data: { presence_marker_label: true, presence_lead: lead } %>
+  <%= render Admin::Ui::TooltipComponent.new(text: tip) %>
+<% end %>

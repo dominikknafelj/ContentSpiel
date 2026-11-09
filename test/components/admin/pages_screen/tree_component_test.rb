@@ -96,10 +96,10 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_equal small, large, "the tree ran a query per page"
   end
 
-  # Presence's marker is the last of the row's markers, after the notes
+  # Presence's marker is the first of the row's markers, before the notes
   # pill, among the row's trailing parts; every readable row has its
   # element, hidden where nobody is, and a context-only row has none.
-  test "each readable row ends its markers with presence's, shown where someone else is here, and the tree is the list its script reads" do
+  test "each readable row starts its markers with presence's, before the notes pill, shown where someone else is here, and the tree is the list its script reads" do
     busy, quiet = add_pages(2, "Row")
     as(users(:two)) { Notes::Start.call(busy, body: "A note") }
     Presence::Mark.arrive(user: users(:two), record: busy, tab: "tab-12345678")
@@ -110,7 +110,7 @@ class Admin::PagesScreen::TreeComponentTest < ViewComponent::TestCase
     assert_selector "turbo-frame#tree[data-controller='admin--pages--tree admin--presence--list'][data-live-part=waiting]" \
                     "[data-admin--presence--list-kind-value=page][data-admin--presence--list-url-value='/cs-studio/presence/here?kind=page']"
     row = "li[data-page-id='#{busy.id}'] > div"
-    assert_selector "#{row}.#{ROW[:row]} > .#{ROW[:trailing]} > [data-notes-marker] + [data-presence-marker='page-#{busy.id}']:not([hidden])"
+    assert_selector "#{row}.#{ROW[:row]} > .#{ROW[:trailing]} > [data-presence-marker='page-#{busy.id}']:not([hidden]) + [data-notes-marker]"
     assert_selector "#{row} [data-presence-marker] > [data-presence-marker-label][data-presence-lead='']", text: "#{PersonName.of(users(:two))} is here", exact_text: true
     # Beside the title's link, never inside it.
     assert_no_selector "#{row} a [data-presence-marker]", visible: :all

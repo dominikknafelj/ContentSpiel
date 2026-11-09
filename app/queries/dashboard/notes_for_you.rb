@@ -1,10 +1,13 @@
 module Dashboard
-  # One person's inbox (notes spec §5): the deliveries written for them, on
-  # threads they may read NOW. The read scope is in the query
-  # (`Notes.readable_threads`, which also hides the trash), so a delivery on a
-  # record the person has lost the right to, or that is in the trash, is
-  # neither listed nor counted, while its row stays (§3.3) and is back the
-  # moment the right or the record is.
+  # One person's inbox: the deliveries written for them, on threads they may
+  # read NOW. The read scope is in the query (`Notes.readable_threads`, which
+  # also hides the trash), so a delivery on a record the person has lost the
+  # right to, or that is in the trash, is neither listed nor counted, while
+  # its row stays and is back the moment the right or the record is.
+  #
+  # Three scopes (`SHOWS`): all of them, the unread ones, and the ones that
+  # are a mention. Every list, total and count narrows through `scoped`, so
+  # the read scope applies to each of them alike.
   #
   # Data only, no markup and no component: who did it (as a user, or the id
   # of one who is gone), the first words of the message with mentions as
@@ -25,6 +28,7 @@ module Dashboard
   # plus the stored files of the image blocks among them (`headings_of`).
   class NotesForYou
     EXCERPT = 140
+    SHOWS = %i[all unread mentions].freeze
     KINDS = { "Page" => "page", "Post" => "post", "Media::Asset" => "media" }.freeze
 
     Row = Data.define(:id, :reason, :by, :by_id, :excerpt, :kind, :title, :block, :heading, :route, :unread, :at, :thread_id)
@@ -38,9 +42,17 @@ module Dashboard
       @user = actor.is_a?(ApiToken) ? actor.user : actor
     end
 
-    def rows(limit: 5, offset: 0) = build(mine.inbox_order.limit(limit).offset(offset).includes(:message, :thread).to_a)
+    def rows(limit: 5, offset: 0, show: :all) = build(scoped(show).inbox_order.limit(limit).offset(offset).includes(:message, :thread).to_a)
 
-    def total = mine.count
+    def total(show: :all) = scoped(show).count
+
+    # The size of each scope in ONE statement, for the filter's tabs: `{ all:,
+    # unread:, mentions: }`, a scope with nothing in it counted as 0.
+    def counts
+      table = Notes::Delivery.arel_table
+      all, unread, mentions = mine.pick(Arel.star.count, SqlNodes.count_where(table[:read_at].eq(nil)), SqlNodes.count_where(table[:reason].eq("mention")))
+      { all: all.to_i, unread: unread.to_i, mentions: mentions.to_i }
+    end
 
     # The sidebar's number: one COUNT, narrowed by the read scope.
     def unread_count = mine.unread.count
@@ -50,6 +62,12 @@ module Dashboard
     def find(delivery_id) = build(mine.where(id: delivery_id).includes(:message, :thread).to_a).first
 
     private
+
+    # `fetch`, so a scope that is not in `SHOWS` raises rather than listing
+    # everything.
+    def scoped(show)
+      { all: -> { mine }, unread: -> { mine.unread }, mentions: -> { mine.where(reason: "mention") } }.fetch(show).call
+    end
 
     def mine
       return Notes::Delivery.none unless @user

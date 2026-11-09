@@ -1,7 +1,7 @@
 module Admin
   module EditorScreen
     # What stands between a card's header and its form while someone else is
-    # changing the block (live-editing handoff 1, 13 to 20), and the two
+    # changing the block, and the two
     # notices that take its place: `:lost` (the viewer's own save or claim was
     # refused: a tie, or a tab that woke after a take-over) and `:deleted`
     # (the block was deleted under unsaved text). For the page settings it
@@ -12,14 +12,14 @@ module Admin
     # `Editing::NOTICE` in the tab the block was taken from) and the polite
     # announcement of a change of holder.
     #
-    # `take_over: false` is a viewer who may only read (handoff 26): they see
+    # `take_over: false` is a viewer who may only read: they see
     # the strip, which explains why the content may change while they read,
     # without the button.
     #
     # `data-editing-held` on a unit that carries this strip means "someone else
     # holds this", for a reader as for an editor (the strip is shown to both);
     # whether the form is FROZEN is a separate fact: `fieldset.admin-held`
-    # (and, for a form frozen in place, `data-editing-frozen`, Task 9). A
+    # (and, for a form frozen in place, `data-editing-frozen`). A
     # script that asks "can this form be typed in" asks those, not this.
     #
     # A name is drawn as text (`PersonName.of`), never as markup.
@@ -79,6 +79,7 @@ module Admin
         # The viewer's own other tab deleted it: this tab still holds the text.
         return t(".deleted_own_tab") if @kind == :deleted && @actor && @viewer && @actor.id == @viewer.id
         return t(".lost_own_tab") if @kind == :lost && own?
+        return t(".held.#{noun}_html", name: tag.strong(name, class: "font-semibold")) if name && held?
         return t(".#{@kind}.#{noun}", name: name) if name
 
         t(".#{@kind}_unknown.#{noun}")

@@ -19,6 +19,16 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
 
   def mention(subject, body = "Is this ready, @[#{@me.id}]?") = as(users(:two)) { Notes::Start.call(subject, body: body) }.record
 
+  # The accessible name the browser computes for the first element the
+  # selector finds.
+  def accessible_name(selector)
+    cdp = page.driver.browser.page
+    cdp.command("Accessibility.enable")
+    object = cdp.command("Runtime.evaluate", expression: "document.querySelector(#{selector.to_json})")
+    node = cdp.command("Accessibility.getPartialAXTree", objectId: object.dig("result", "objectId"), fetchRelatives: false)
+    node.fetch("nodes").first.dig("name", "value")
+  end
+
   def open_dashboard
     visit_screen "/cs-studio"
   end
@@ -28,6 +38,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     open_dashboard
 
     assert_selector "#sidebar-badge-dashboard", text: "1"
+    assert_selector "a[aria-label=\"Dashboard, 1 new\"] #sidebar-badge-dashboard"
     within "turbo-frame#notes-for-you" do
       assert_selector "[data-delivery][data-unread]", count: 1
       assert_selector "header", text: "1 new"
@@ -82,6 +93,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     mention(@block, "And this, @[#{@me.id}]")
     open_dashboard
     assert_selector "#sidebar-badge-dashboard", text: "2"
+    assert_selector "a[aria-label=\"Dashboard, 2 new\"] #sidebar-badge-dashboard"
 
     within("turbo-frame#notes-for-you") { press "Mark all read" }
 
@@ -216,5 +228,118 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_current_path "/cs-studio/notes"
     assert_no_selector "#sidebar-badge-dashboard"
     assert_no_button "Mark all read"
+  end
+
+  # The avatar, the where line's chips and New are no controls: from the
+  # row's link the keyboard goes to the next stop, and the link's words name
+  # what they show.
+  test "an inbox row is one Tab stop: its avatar, chips and New take no focus" do
+    mention(@block)
+    mention(@page, "And this, @[#{@me.id}]")
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('[data-delivery] *') ].filter((each) => each.tabIndex >= 0).length")
+    assert_equal 2, page.evaluate_script("document.querySelectorAll('[data-delivery]').length")
+    assert_selector "[data-delivery] [data-inbox-new]", count: 2
+    first = "ul > li:first-child > a[data-delivery]"
+    name = accessible_name(first)
+    page.execute_script("window.__row = document.querySelector(#{first.to_json})")
+    find(first).send_keys(:tab)
+    assert_equal false, page.evaluate_script("document.activeElement === window.__row"), "the Tab did not leave the row's link"
+    assert_equal false, page.evaluate_script("window.__row.contains(document.activeElement)"), "a Tab stop inside the row's link took the focus"
+    assert_match(/\ADana mentioned you\b.*\bNew\b.*\bOpen thread\z/m, name)
+  end
+
+  test "Mentions narrows the list to mentions, its tab current, and a row still opens its thread" do
+    mention(@page)
+    resolved = mention(@block)
+    as(users(:two)) { Notes::Resolve.call(resolved) }
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+
+    within("nav[aria-label=Show]") { click_link "Mentions" }
+
+    assert_current_path "/cs-studio/notes?show=mentions"
+    assert_selector "nav[aria-label=Show] a[aria-current=page]", text: /Mentions\s+1/
+    assert_selector "[data-delivery]", count: 1
+    assert_selector "[data-delivery]", text: "Dana mentioned you"
+    assert_selector "[data-delivery]", text: "Page · Pricing"
+
+    find("[data-delivery]").click
+
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=/, wait: 8)
+  end
+
+  # "New" is on its own line of the end column, under the time and over the
+  # verb, so the verb alone sets the column's width: an unread row's words
+  # keep the room of a read row's, in the full list and in the dashboard's
+  # narrow panel at a 390px window.
+  test "an unread row's sentence is as wide as a read row's, in the list and in the dashboard's panel at 390px" do
+    original = page.current_window.size
+    mention(@page)
+    read = mention(@block, "Read, @[#{@me.id}]")
+    Notes::Delivery.where(user: @me, thread: read).update_all(read_at: Time.current) # version: none (a test's own setup)
+    page.current_window.resize_to(390, 900)
+    widths = <<~JS
+      [ ...document.querySelectorAll("[data-delivery]") ].map((row) => [ row.matches("[data-unread]"), row.querySelector("[data-inbox-sentence]").getBoundingClientRect().width ])
+    JS
+
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+    list = page.evaluate_script(widths).to_h
+    assert_equal 2, list.size, "one unread row and one read row"
+    assert_in_delta list[true], list[false], 1
+
+    visit_screen "/cs-studio"
+    assert_selector "turbo-frame#notes-for-you [data-delivery]", count: 2
+    panel = page.evaluate_script(widths).to_h
+    assert_in_delta panel[true], panel[false], 1
+    verb = page.evaluate_script("document.querySelector('turbo-frame#notes-for-you [data-delivery] .admin-row-verb').getBoundingClientRect().width")
+    assert_operator verb, :<, 100
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
+  # Where the screen's boxes are: the list's card, the rail of open threads
+  # and the rail's computed margin, read in the browser.
+  def rail_layout
+    page.evaluate_script(<<~JS)
+      (() => {
+        const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } }
+        const rail = document.querySelector(".admin-notes-threads")
+        return { list: box(document.querySelector("[data-delivery]").closest("ul").parentElement), rail: box(rail), margin_top: getComputedStyle(rail).marginTop }
+      })()
+    JS
+  end
+
+  test "the rail of open threads docks beside the list from 1200px of the list's width, and falls after it below" do
+    original = page.current_window.size
+    mention(@page)
+    mention(@block, "Another thread, @[#{@me.id}]")
+
+    page.current_window.resize_to(1600, 1000)
+    visit_screen "/cs-studio/notes"
+    assert_selector ".admin-notes-threads li a", text: "Pricing"
+    boxes = rail_layout
+    assert_operator boxes["rail"]["left"], :>=, boxes["list"]["right"], boxes.inspect
+    assert_operator boxes["rail"]["top"], :<, boxes["list"]["top"], "the rail starts at the grid's top, beside the filter and the list"
+    assert_equal "0px", boxes["margin_top"]
+    assert_in_delta 360, boxes["rail"]["width"], 1
+
+    page.current_window.resize_to(1100, 1000)
+    visit_screen "/cs-studio/notes"
+    assert_selector ".admin-notes-threads li a", text: "Pricing"
+    boxes = rail_layout
+    assert_operator boxes["rail"]["top"], :>=, boxes["list"]["bottom"], boxes.inspect
+    assert_in_delta boxes["list"]["left"], boxes["rail"]["left"], 1
+    assert_equal "16px", boxes["margin_top"]
+    assert_in_delta boxes["list"]["width"], boxes["rail"]["width"], 1
+
+    # A row of the rail opens the record's notes, as every link into a record's notes does.
+    find(".admin-notes-threads li a", text: "Pricing").click
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open\z/, wait: 8)
+  ensure
+    page.current_window.resize_to(*original)
   end
 end

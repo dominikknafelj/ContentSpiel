@@ -5,16 +5,17 @@ class Admin::NotesScreen::AvatarComponentTest < ViewComponent::TestCase
     dana = users(:two).tap { |user| user.update!(name: "Dana van Weiss") }
 
     render_inline(Admin::NotesScreen::AvatarComponent.new(user: dana, user_id: dana.id, viewer: dana, size: :message))
-    assert_selector "span.bg-ink.rounded-full[aria-hidden=true]", text: "Dv"
+    assert_selector "span.bg-people.rounded-full[aria-hidden=true]", text: "Dv"
 
     render_inline(Admin::NotesScreen::AvatarComponent.new(user: users(:reader), user_id: users(:reader).id, viewer: dana, size: :row))
-    assert_selector "span.bg-sunken", text: "re"
-    assert_no_selector "span.bg-ink"
+    assert_selector "span.bg-people-tint", text: "re"
+    assert_no_selector "span.bg-people"
   end
 
-  test "a deleted user still gets an avatar" do
+  test "a deleted user is the empty circle: a hairline on the surface, no letters and no people colour" do
     render_inline(Admin::NotesScreen::AvatarComponent.new(user: nil, user_id: 424242, viewer: users(:two), size: :row))
 
-    assert_selector "span.bg-sunken", text: "ad"
+    assert_selector "span.rounded-full.border.border-field-line.bg-surface[aria-hidden=true]", exact_text: ""
+    assert_no_selector "span.bg-people, span.bg-people-tint, span.text-people"
   end
 end

@@ -11,19 +11,20 @@ class Admin::Ui::ActorAvatarComponentTest < ViewComponent::TestCase
     user = User.new(name: "Ada Lovelace", email_address: "ada@example.com")
     render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(user: user, user_id: 7))
 
-    assert_selector "span.size-7.bg-sunken[aria-hidden='true']", exact_text: PersonName.initials(PersonName.of(user))
+    assert_selector "span.size-7.bg-people-tint[aria-hidden='true']", exact_text: PersonName.initials(PersonName.of(user))
   end
 
   test "own: the viewer's own event is the filled circle" do
     render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(you: true, user: users(:one), user_id: users(:one).id))
 
-    assert_selector "span.size-7.bg-ink.text-paper[aria-hidden='true']", exact_text: PersonName.initials(PersonName.of(users(:one)))
+    assert_selector "span.size-7.bg-people.text-surface[aria-hidden='true']", exact_text: PersonName.initials(PersonName.of(users(:one)))
   end
 
-  test "deleted_user: an empty circle in the away tone, since an event records no name" do
+  test "deleted_user: an empty circle with a solid field-line hairline on the surface, since an event records no name" do
     render_inline Admin::Ui::ActorAvatarComponent.new(actor: actor(user_id: 42))
 
-    assert_selector "span.size-7.border-line.text-meta[aria-hidden='true']", exact_text: ""
+    assert_selector "span.size-7.border.border-field-line.bg-surface[aria-hidden='true']", exact_text: ""
+    assert_no_selector ".border-dashed, .bg-people-tint, .text-people"
   end
 
   test "system: not a person, so the neutral settings icon chip in the slot, no circle" do

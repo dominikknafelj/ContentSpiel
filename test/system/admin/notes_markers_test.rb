@@ -112,11 +112,51 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal 0, Notes::Thread.count
   end
 
+  test "an unread block marker says 3 new beside the filled glyph and is named new for you" do
+    as(users(:two)) { 3.times { |index| Notes::Start.call(@text, body: "For @[#{users(:one).id}]: look at this #{index}") } }
+    open_editor
+
+    assert_selector "#{marker(@text)}[data-has-notes][data-unread] [data-notes-count]", text: "3 new"
+    assert_selector "#{marker(@text)}[aria-label='3 new open notes for you on Rich text']"
+    assert_selector "#{marker(@text)} .admin-notes-marker__unread svg"
+    assert_no_selector "#{marker(@text)} .admin-notes-marker__open svg"
+  end
+
+  test "the notes bubble's keyboard: a posts row's bubble is one Tab stop that opens the post's notes, and the tree's and a tile's take none" do
+    post = Current.set(actor: users(:one)) { create_post(title: "Second draft", published: false) }
+    asset = create_media_asset
+    as(users(:two)) do
+      Notes::Start.call(post, body: "Check the date")
+      Notes::Start.call(asset, body: "Crop the edge")
+      Notes::Start.call(@page, body: "Reword the title")
+    end
+
+    visit_screen admin_posts_path
+    link = "tr#post_#{post.id} a[data-notes-count]"
+    assert_selector link
+    assert_equal 0, find(link).evaluate_script("this.tabIndex")
+    find(link).send_keys(:enter)
+    assert_current_path(/\/posts\/#{post.id}\?notes=open\z/)
+    assert_selector "#notes-drawer #notes-list a[data-note-row]", text: "Check the date"
+
+    visit_screen admin_media_path
+    chip = "#media-asset-#{asset.id} [data-notes-chip]"
+    assert_selector chip, text: "1"
+    assert_equal(-1, find(chip).evaluate_script("this.tabIndex"))
+    # The tile's own link is the one stop, and the bubble inside it is no second one.
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#media-asset-#{asset.id} a, #media-asset-#{asset.id} button, #media-asset-#{asset.id} [tabindex=\"0\"]').length")
+    assert_equal true, find(chip).evaluate_script("!!this.closest('a')")
+
+    open_editor
+    assert_selector "[data-notes-marker]", text: "1"
+    assert_equal(-1, find("[data-notes-marker]").evaluate_script("this.tabIndex"))
+  end
+
   test "a section's delete warning counts the notes on its blocks, and a block without notes is deleted without one" do
     as(users(:two)) { Notes::Start.call(@inside, body: "Wrong picture") }
     open_editor
 
-    # The section's own sentence (the handoff's decision 7), not the block's.
+    # The section's own sentence, not the block's.
     assert_selector "#delete-section-#{@section.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: "This section and its blocks have 1 open note. It will be deleted too."
     assert_selector "#delete-block-#{@inside.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: "This block has 1 open note. It will be deleted with it."
     assert_selector "#delete-block-#{@text.id} [data-admin--notes--drawer-target=warning]", visible: :all, text: ""
@@ -128,7 +168,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal "block", holder_display.call("delete-block-#{@inside.id}")
   end
 
-  # The handoff's decisions 7 and 10: the number is the notes on the blocks
+  # The number is the notes on the blocks
   # inside. A section takes none of its own, and one written around the UI
   # (a service call) is not counted here.
   test "a section's delete warning counts its blocks' open notes, in the plural, and not a note on the section itself" do
@@ -155,7 +195,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal 0, Notes::Thread.count
   end
 
-  # The handoff's decision 10.
+  # A section takes no note of its own.
   test "a section's card offers no way to add a note, and Remove section, keep blocks acts at once and says nothing about notes" do
     as(users(:two)) { Notes::Start.call(@inside, body: "Wrong picture") }
     open_editor
@@ -202,6 +242,19 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     find("#note-row-#{thread.id}").click
 
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@text)}[data-notes-active]"
+    outline = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.getElementById(#{ActionView::RecordIdentifier.dom_id(@text).to_json})
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-people)"
+        card.append(probe)
+        const people = getComputedStyle(probe).color
+        probe.remove()
+        const style = getComputedStyle(card)
+        return [ style.outlineStyle, style.outlineWidth, style.outlineColor === people ]
+      })()
+    JS
+    assert_equal [ "solid", "2px", true ], outline
     find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list"
     assert_no_selector "[data-notes-active]"
@@ -266,7 +319,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_writes_settled
   end
 
-  # Where the focus goes when the drawer closes (spec §4.1: back to the
+  # Where the focus goes when the drawer closes (back to the
   # trigger). "Add note" in a menu is hidden again with its menu, so the
   # focus goes to what stands for it on the block and can be seen: the
   # block's marker when it shows, or else its "⋯" button. Never <body>.

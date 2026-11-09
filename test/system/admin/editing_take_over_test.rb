@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
-# Taking over, in the browser (live-editing spec §4.4,
-# `controllers/admin/editing/hold_controller.js`): "Take over" asks the
+# Taking over, in the browser
+# (`controllers/admin/editing/hold_controller.js`): "Take over" asks the
 # holder's tab, which locks its fields for the subject, sends what it has and
 # lets go; a tab that does not answer is passed over after the pass-over time.
 # Two or three people are two or three Capybara sessions (`using_session`).
@@ -621,6 +621,42 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     assert held_by(@me)
   end
 
+  test "after a take-over the head says Taken over by you for six seconds, then the mark fades" do
+    held_by_nobody_listening
+    visit_editor(@page)
+    await_notes_live
+    assert_selector strip
+    expire
+    assert_equal 6000, Editing::NOTICE.in_milliseconds
+    assert_equal "6000", find("#editing", visible: :all)["data-admin--editing--hold-notice-value"]
+    region_set("notice", 1200)
+
+    within(card(@block)) { press "Take over" }
+
+    assert_selector "#{card(@block)} .admin-block-card__head [data-editing-mark-place] [data-editing-mark]", text: "Taken over by you · just now", wait: LIVE
+    assert_no_selector "#{card(@block)} .admin-block-card__head [data-editing-mark] [aria-hidden]"
+    assert_no_selector "#{card(@block)} [data-editing-mark-place] [role], #{card(@block)} [data-editing-mark-place] [aria-live]"
+    assert_no_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
+  end
+
+  test "taking over a block inside a section says Taken over by you on that block's panel, never on its tile" do
+    section = add_block(block_type: "section", settings: { "layout" => "two" })
+    inside = add_block(section_id: section.id, section_column: 1)
+    held_by_nobody_listening(inside)
+    visit_editor(@page)
+    await_notes_live
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    assert_selector "#{panel(inside)} [data-editing-kind=held]", wait: LIVE
+    expire(inside)
+    region_set("notice", 1200)
+
+    within(panel(inside)) { press "Take over" }
+
+    assert_selector "#{panel(inside)} .admin-block-card__head [data-editing-mark-place] [data-editing-mark]", text: "Taken over by you · just now", wait: LIVE
+    assert_no_selector ".admin-block-tile [data-editing-mark]", visible: :all
+    assert_no_selector "#{panel(inside)} [data-editing-mark]", wait: LIVE
+  end
+
   test "a take-over raises no leave prompt and moves no base" do
     open_page
     join(:dana, @dana) do
@@ -958,15 +994,15 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_eventually(wait: LIVE, message: "the take-over was never announced") { said.any? }
       assert_equal [ "Olga Braun took over this block" ], said
       # Another fetch of the same card says nothing more. The fetch is a plain
-      # GET outside the write queue, so it is the merge of its answer that is
-      # waited for (final review I7), and then that no announcement is still
-      # waiting out its 150 ms: the strip that came with the card is a new
-      # element, and a second announcement would have been armed when it connected.
-      listen_merged
+      # GET outside the write queue, and a merge from the take-over may still be
+      # in flight, so no merge event says which merge is the refresh's: what is
+      # waited for is the strip in the document being a new element (the card
+      # was drawn again), and then that no announcement is still waiting out
+      # its 150 ms, which a second announcement would have armed when the new
+      # strip connected.
       page.execute_script("window.__strip = document.querySelector(#{strip.to_json})")
       page.execute_script("document.getElementById('editing').dispatchEvent(new CustomEvent('admin--editing--hold:refresh', { detail: { subject: 'block-#{@block.id}' } }))")
-      await_merged
-      assert_equal false, page.evaluate_script("window.__strip === document.querySelector(#{strip.to_json})"), "the second fetch did not draw the card again"
+      await_js("document.querySelector(#{strip.to_json}) !== window.__strip", wait: LIVE, message: "the second fetch did not draw the card again")
       await_announced
       assert_equal [ "Olga Braun took over this block" ], said
       assert_no_selector "[data-editing-kind=lost], [data-editing-kind=deleted]"

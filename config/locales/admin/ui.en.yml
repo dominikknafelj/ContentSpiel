@@ -20,6 +20,17 @@ en:
         confirm_dialog:
           cancel: "Cancel"
 
+        # The "+N" circle's letters: `many` past nine, where three characters
+        # would not stand in the circle.
+        avatar:
+          more: "+%{count}"
+          many: "9+"
+
+        # An unread count says "new" in words as well as in its fill; the
+        # bubble's name is its caller's (`label:`).
+        note_marker:
+          unread: "%{count} new"
+
         # Shown on sign-in, on the password pages and in the shell when CS
         # Studio is reached over plain HTTP in production. `PUBLIC_HOST` is the
         # environment variable's name and is not translated.
