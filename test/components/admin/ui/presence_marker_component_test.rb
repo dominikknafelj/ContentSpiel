@@ -36,7 +36,7 @@ class Admin::Ui::PresenceMarkerComponentTest < ViewComponent::TestCase
   test "the circles and +N stand 2px apart with no ring, and the count circle holds the number, 9+ past nine" do
     render_marker(people: %w[DW JL], count: 3, shown: 2)
 
-    assert_selector "span.admin-presence-marker.gap-0\\.5"
+    assert_selector "span.admin-presence-marker.gap-0\\.5[data-presence-count='3']", count: 1
     assert_no_selector "[class*='-ml-'], [class*='ring-2'], [class*='avatar-ground']", visible: :all
     assert_selector "span.admin-presence-marker > [data-presence-total]:last-of-type, span.admin-presence-marker > [data-presence-total]", count: 1
     assert_selector "[data-presence-total] > span.size-\\[22px\\].bg-sunken.text-ink[aria-hidden=true]", text: "3", exact_text: true

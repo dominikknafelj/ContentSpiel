@@ -240,7 +240,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    what it holds, so from 1024px the divider is fixed to the window, on the
    column's right edge (the sidebar's 15rem from 1280px, then the column's
    track; the same tokens the grid is laid out by). */
-.admin-shell__tree { container: admin-tree-column / inline-size; position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
+.admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 @media (min-width: 1024px) {
   .admin-shell__tree { position: sticky; top: var(--admin-top-offset); align-self: start; height: calc(100dvh - var(--admin-top-offset)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 }
@@ -1723,34 +1723,27 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 /* The people on a row (`Admin::Ui::PresenceMarkerComponent`): circles that
    stand 2px apart and never overlap (two letters reach about 19px into a
    22px circle, so a circle over the one before would cover its second
-   letter), the wide "+N" at rest, and hidden both the narrow "+N", which
-   counts everyone past the first circle, and the count circle, which counts
-   everyone. Where the width is short a row keeps the first circle and
-   swaps the wide "+N" for the narrow one. In the tree the width asked is the
-   COLUMN's (`.admin-shell__tree`, a size container whose width the grid or
-   the drawer gives it, never its content), so every row of one tree shows
-   the same number of people whatever its depth: 260px of the column, less
-   its 2rem of padding and a classic scrollbar's 15px, which a container
-   query does not count (the 220px minimum is below that width and the
-   default 272px above, with or without the scrollbar). The posts list asks its
-   own container, never the window: the list is as narrow at any window
-   width. A tree row's own width is the floor, written last so it wins:
-   under 240px of the row (a deep row, or a narrow column) there is no room
-   for circles beside the title, and the marker is the count circle alone,
-   never nothing, with its words and tooltip unchanged. A row is never wider
-   than its column's content, so under a 260px column every tree row is
-   under the floor too: there the column's one circle and "+N" is overruled
-   by the count circle, and from 240px of row the column shows two. */
+   letter), then the wide "+N"; hidden are the narrow "+N", which counts
+   everyone past the first circle, and the count circle, which counts
+   everyone.
+   A TREE ROW decides by its own width (`admin-tree-row`, the shared row of
+   the Pages tree, its drawer and the mind graph's list), whatever its
+   depth or column: from 240px its two circles and "+N"; under 240px there
+   is no room for circles beside the title, so one person is their own
+   circle and two or more are the count circle, never nothing, with the
+   words and tooltip unchanged. The marker's `data-presence-count` (the
+   component's, kept by `admin--presence--list`) tells one from more.
+   THE POSTS LIST asks its own container, never the window, since the list
+   is as narrow at any window width: under 640px one circle and the narrow
+   "+N". */
 .admin-presence-marker > :is([data-presence-more-narrow], [data-presence-total]) { display: none; }
-@container admin-tree-column (max-width: 212.98px) {
-  .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
-  .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
-}
 @container admin-list (max-width: 639px) {
   .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
   .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
 }
 @container admin-tree-row (max-width: 239.98px) {
-  .admin-presence-marker > :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }
-  .admin-presence-marker > [data-presence-total] { display: flex; }
+  .admin-presence-marker > :is([data-presence-avatar] ~ [data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }
+  .admin-presence-marker:not([data-presence-count="1"]) > [data-presence-avatar] { display: none; }
+  .admin-presence-marker:not([data-presence-count="1"]) > [data-presence-total] { display: flex; }
 }
+

@@ -894,18 +894,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
   end
 
-  # A row's people narrow by the width of their column (the tree) or list (the
-  # posts), whatever the window's width; a tree row's own width is only the
-  # floor (the next test).
+  # A row's people narrow by the width of a container, never the window's:
+  # a tree row by its own (the next test), a posts row by its list's. The
+  # tree's column is no container: a column under 260px has every row under
+  # the row's rule, so a column rule could never show.
   test "a row's people narrow by the row's own width, never the window" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-shell__tree\s*\{\s*container:\s*admin-tree-column\s*\/\s*inline-size;/, css)
-    [ "admin-tree-column (max-width: 212.98px)", "admin-list (max-width: 639px)" ].each do |query|
-      blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
-      assert_equal 1, blocks.size, "one @container #{query} block"
-      assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
-      assert_includes blocks.first, "[data-presence-more] { display: none; }"
-    end
+    assert_no_match(/container:\s*admin-tree-column|@container admin-tree-column/, css, "the tree's people are decided by the row alone")
+    blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-list \(max-width: 639px\)\s*\{/)
+    assert_equal 1, blocks.size, "one @container admin-list (max-width: 639px) block"
+    assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
+    assert_includes blocks.first, "[data-presence-more] { display: none; }"
     windowed = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/).select { |body| body.include?("admin-presence-marker") }
     assert_empty windowed, "a row's people are asked of a container, not an @media block"
   end
@@ -932,9 +931,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # The title is as wide as its words (the state mark stands 6px after them),
   # and what keeps it from being cut by its markers is the presence marker
-  # stepping down to one count circle where the row is short. Presence never
-  # gives way to nothing.
-  test "a tree row's title keeps its words' width and the marker gives way to one count circle under 240px of the row" do
+  # stepping down to one circle where the row is short: one person's own, or
+  # the count from two. Presence never gives way to nothing.
+  test "a tree row's title keeps its words' width and the marker gives way to one circle under 240px of the row: one person's own, or the count from two" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-tree-row\s*\{[^}]*container:\s*admin-tree-row\s*\/\s*inline-size;/, css)
     assert_match(/\.admin-tree-row__title\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/, css)
@@ -942,10 +941,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-presence-marker > :is\(\[data-presence-more-narrow\], \[data-presence-total\]\)\s*\{\s*display:\s*none;\s*\}/, css, "the count circle rests hidden")
     blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-tree-row \(max-width: 239\.98px\)\s*\{/)
     assert_equal 1, blocks.size, "one row rule"
-    assert_includes blocks.first, ".admin-presence-marker > :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }"
-    assert_includes blocks.first, ".admin-presence-marker > [data-presence-total] { display: flex; }"
+    assert_includes blocks.first, ".admin-presence-marker > :is([data-presence-avatar] ~ [data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }"
+    assert_includes blocks.first, '.admin-presence-marker:not([data-presence-count="1"]) > [data-presence-avatar] { display: none; }', "one person keeps their first circle"
+    assert_includes blocks.first, '.admin-presence-marker:not([data-presence-count="1"]) > [data-presence-total] { display: flex; }', "two and more are the count circle"
     assert_no_match(/data-presence-marker-label|data-tooltip|\.admin-presence-marker\s*\{/, blocks.first, "the words and the tooltip stay, and so does the marker")
-    assert_operator css.index("@container admin-tree-row (max-width: 239.98px)"), :>, css.index("@container admin-tree-column (max-width: 212.98px)"), "the row's floor stands after the column's rule, so it wins"
     assert_no_match(/admin-tree-row__title\s*\{[^}]*7rem/, css)
   end
 

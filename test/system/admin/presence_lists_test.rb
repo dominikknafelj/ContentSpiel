@@ -240,6 +240,28 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal({ "circles" => [], "total" => "2", "label" => "2 people here: Dana Weiss, reader" }, look(marker).slice("circles", "total", "label"))
   end
 
+  # The default column's rows are under 240px: one person costs the count
+  # circle's 22px as their own circle, so they keep it; two are the count.
+  test "under 240px of a tree row one person is their own circle, and from two the count circle" do
+    open_tree
+    set_timing("interval", 600)
+    assert_operator page.evaluate_script("document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row').getBoundingClientRect().width"), :<, 240
+
+    join(:dana, @dana)
+    assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "Dana Weiss is here", exact_text: true, visible: :all, wait: LIVE
+    assert_equal({ "circles" => [ "DW" ], "more" => nil, "total" => nil, "size" => [ 22, 22 ], "width" => 22 }, look(tree_marker).slice("circles", "more", "total", "size", "width"))
+    here = page.evaluate_script("document.querySelector(#{tree_marker.to_json} + ' [data-presence-avatar] > span').className")
+    assert_includes here.split, "inset-ring-people", "the one person keeps the here ring"
+
+    join(:reader, @reader)
+    assert_selector "#{shown(tree_marker)} [data-presence-total] > span", text: "2", exact_text: true, visible: :all, wait: LIVE
+    assert_equal({ "circles" => [], "more" => nil, "total" => "2", "width" => 22, "label" => "2 people here: Dana Weiss, reader" }, look(tree_marker).slice("circles", "more", "total", "width", "label"))
+
+    leave(:reader)
+    assert_selector "#{shown(tree_marker)} [data-presence-marker-label]", text: "Dana Weiss is here", exact_text: true, visible: :all, wait: LIVE
+    assert_equal({ "circles" => [ "DW" ], "total" => nil }, look(tree_marker).slice("circles", "total"))
+  end
+
   test "the posts list marks a row on the title's line, 6px after the title and inside the link, and loses the mark when they leave" do
     long = create_post(title: "A title so long that it cannot possibly fit on one line of the posts list's title column " * 3)
     open_posts

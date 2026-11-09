@@ -15,9 +15,11 @@ module Admin
     # Two "+N": the wide one (everyone past the circles shown) and the narrow
     # one (everyone past the first). The count circle (`data-presence-total`)
     # holds how many are here in all, "9+" past nine, and is what a tree row
-    # too short for circles shows instead of them: presence never gives way
-    # to nothing. The stylesheet chooses by the width of a container, never
-    # the window's (`.admin-presence-marker` in content-spiel.tailwind.css).
+    # too short for circles shows from two people (one person keeps their
+    # own circle): presence never gives way to nothing. The root carries the
+    # count (`data-presence-count`), by which the stylesheet tells one person
+    # from more; it chooses by the width of a container, never the window's
+    # (`.admin-presence-marker` in content-spiel.tailwind.css).
     # The parts stand 2px apart and never overlap, so no ring separates them.
     #
     # The words are one text, for a screen reader (visually hidden, after
@@ -37,7 +39,7 @@ module Admin
         limits: [
           "It knows no feature: the people's letters, the count and the words are its caller's.",
           "It is kept true by admin--presence--list, which writes only its text and hidden.",
-          "Under 240px of its tree row it is one circle holding the count."
+          "Under 240px of its tree row it is one circle: the one person's own, or from two people the count."
         ],
         states: %i[nobody one many one_count],
         keys: [],
@@ -79,7 +81,7 @@ module Admin
       end
 
       def data
-        { messages: messages_data("components.ui.avatar.more", "components.ui.avatar.many"), **Admin::Ui::TooltipComponent.host_data, **@data }
+        { presence_count: count, messages: messages_data("components.ui.avatar.more", "components.ui.avatar.many"), **Admin::Ui::TooltipComponent.host_data, **@data }
       end
     end
   end
