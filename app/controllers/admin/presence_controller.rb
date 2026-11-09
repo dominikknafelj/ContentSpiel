@@ -1,5 +1,5 @@
 module Admin
-  # The two reads of presence (presence spec §5.3), both through the read
+  # The two reads of presence both through the read
   # scope: who else has this record open, and which of a list's records have
   # someone here. A class, never `Admin::Presence`, which would shadow
   # `Presence::`. It only reads: the writes are the channel's.
@@ -28,12 +28,12 @@ module Admin
     end
 
     # What a list's markers show (`admin--presence--list` asks):
-    # `{ "<id>": { "count": 2,
+    # `{ "<id>": { "count": 2, "initials": ["DW", "JL"],
     # "label": "2 people here: Dana Weiss, Jonas Lind" } }` for those of the
     # ids the viewer may read and that have someone else here. `label` names
     # the first five in order of arrival and says how many more; it is the
     # marker's one text, for a screen reader and the
-    # tooltip alike (handoff 32), worded where the first drawing words it
+    # tooltip alike, worded where the first drawing words it
     # (`Admin::PresenceScreen::RowMarkerComponent.words`), so the script
     # holds no wording and a marker reads the same before and after it.
     # A name is what a person typed: it is a JSON string here and text in

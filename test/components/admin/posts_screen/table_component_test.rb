@@ -73,7 +73,7 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "tbody th[scope=row] > a > span:first-child > *", count: 1
   end
 
-  # Presence handoff 27: the title's line is a row -- the title, cut with an
+  # The title's line is a row -- the title, cut with an
   # ellipsis before the marker is, then the marker 6px after it, inside the
   # link; the path line under it is as it was.
   test "the title's line is the title and then presence's marker, inside the link; the path line is unchanged" do
@@ -91,12 +91,12 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     line = "#{link} > span:first-child"
     assert_equal %w[flex gap-1.5 items-center min-w-0], page.find(line)[:class].split.sort
     assert_selector "#{line} > span.min-w-0.truncate.font-medium:first-child", text: "Translating Everything With Mobility", exact_text: true
-    assert_selector "#{line} > span.truncate + span[data-presence-marker='post-#{busy.id}'].flex-none.text-meta:not([hidden])[data-presence-count='2']"
+    assert_selector "#{line} > span.truncate + span[data-presence-marker='post-#{busy.id}'].flex-none:not([hidden])[data-presence-count='2']"
     assert_selector "#{line} > [data-presence-marker] > span.sr-only", text: ", 2 people here: Dana Weiss, reader", exact_text: true
     assert_selector "#{link} > span.truncate.text-small.text-meta:last-child", text: "/blog/translating", exact_text: true
-    # The hover underline is the title's and the path's own (review finding
-    # 4): on the link it was drawn through everything in it, the marker's
-    # count included, and a child cannot refuse a parent's underline.
+    # The hover underline is the title's and the path's own: on the link it
+    # would be drawn through everything in it, the marker's circles included,
+    # and a child cannot refuse a parent's underline.
     assert_no_selector "th[scope=row] > a.hover\\:underline"
     assert_selector "#{line} > span.truncate.group-hover\\/title\\:underline:first-child"
     assert_selector "#{link} > span.group-hover\\/title\\:underline:last-child"

@@ -19,15 +19,16 @@ Rails.application.config.to_prepare do
   Admin::Slots.register "tree.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Page")
   Admin::Slots.register "posts.row.markers", Admin::NotesScreen::RowPillComponent, loader: Admin::NotesScreen::RowPillComponent.loader("Post")
 
-  # Where someone else is working: last among a tree row's markers, and on a
-  # posts row's title line, inside the row's link (`joined`). Each list's
-  # people are read once for all its rows.
-  Admin::Slots.register "tree.row.markers", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("page")
-  Admin::Slots.register "posts.row.title", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("post"), joined: true
+  # Where someone else is working: last among a tree row's markers (room for
+  # two circles), and on a posts row's title line, inside the row's link
+  # (`joined`, room for three). Each list's people are read once for all its
+  # rows.
+  Admin::Slots.register "tree.row.markers", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("page"), shown: 2
+  Admin::Slots.register "posts.row.title", Admin::PresenceScreen::RowMarkerComponent, loader: Admin::PresenceScreen::RowMarkerComponent.loader("post"), joined: true, shown: 3
 
   # On a block: who is changing it, then its notes marker. The avatar draws on
   # a section's tile only (a card has the hold strip); it is first, so it
-  # stands before the marker (live-editing handoff 4). It has no loader: the
+  # stands before the marker . It has no loader: the
   # editors hand the page's holds to the slot as `holds:`, and it asks those.
   Admin::Slots.register "editor.block.markers", Admin::EditorScreen::HolderAvatarComponent
   Admin::Slots.register "editor.block.markers", Admin::NotesScreen::MarkerComponent

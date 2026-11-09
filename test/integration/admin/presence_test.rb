@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The two reads of presence (presence spec §5.3): a record's people and a
+# The two reads of presence (the presence spec's reads): a record's people and a
 # list's markers, both through the read scope.
 class Admin::PresenceTest < ActionDispatch::IntegrationTest
   setup do
@@ -202,10 +202,10 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     assert_equal({ pages.first.id.to_s => 1 }, counts)
   end
 
-  # What a list's marker shows and says (handoff 9, 12, 27): the count, the
-  # names in order of arrival through `PersonName.of`, and the two texts the
-  # marker is given as they are -- the script holds no wording.
-  test "here answers the count and the marker's two texts" do
+  # What a list's marker shows and says: the count, the names in order of
+  # arrival through `PersonName.of`, their initials for the circles and the
+  # one text the marker is given as it is -- the script holds no wording.
+  test "here answers the count, the initials and the marker's text" do
     @other.update!(name: "Dana Weiss")
     @third.update!(name: nil)
     mark(@third, @page, arrived: 9.minutes.ago)
@@ -214,9 +214,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     sign_in_as @viewer
 
     here("page", [ @page.id ])
-    assert_equal({ @page.id.to_s => { "count" => 2, "label" => "2 people here: reader, Dana Weiss" } }, response.parsed_body)
+    assert_equal({ @page.id.to_s => { "count" => 2, "label" => "2 people here: reader, Dana Weiss", "initials" => %w[re DW] } }, response.parsed_body)
     here("post", [ @post.id ])
-    assert_equal({ @post.id.to_s => { "count" => 1, "label" => "Dana Weiss is here" } }, response.parsed_body)
+    assert_equal({ @post.id.to_s => { "count" => 1, "label" => "Dana Weiss is here", "initials" => %w[DW] } }, response.parsed_body)
     assert_equal "no-store", response.headers["Cache-Control"]
   end
 
@@ -232,8 +232,9 @@ class Admin::PresenceTest < ActionDispatch::IntegrationTest
     answer = response.parsed_body
     assert_equal 7, answer.dig(@page.id.to_s, "count")
     assert_equal "7 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 2 more", answer.dig(@page.id.to_s, "label")
-    # One text, for the screen reader and the tooltip alike (handoff 32).
-    assert_equal %w[count label], answer.fetch(@page.id.to_s).keys.sort
+    # One text, for the screen reader and the tooltip alike; the circles are the named five.
+    assert_equal %w[count initials label], answer.fetch(@page.id.to_s).keys.sort
+    assert_equal %w[P0 P1 P2 P3 P4], answer.dig(@page.id.to_s, "initials")
     assert_equal "6 people here: Person 0, Person 1, Person 2, Person 3, Person 4 and 1 more", answer.dig(six.id.to_s, "label")
   end
 

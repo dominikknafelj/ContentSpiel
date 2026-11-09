@@ -1,12 +1,13 @@
 import { Controller } from "@hotwired/stimulus"
 import { listen } from "live/connection"
 import { settle } from "live/state"
+import { messages } from "i18n/messages"
 
-// The markers of ONE list (presence spec §5.1, handoff 9 to 12 and 27): the
+// The markers of ONE list the
 // page tree and the posts list, each of whose rows holds a marker that says
-// whether someone else is working on that record
-// (`Admin::PresenceScreen::RowMarkerComponent`, always rendered, `hidden`
-// where nobody is). The server draws the markers with the list; this keeps
+// whether someone else is working on that record, as circles of their
+// initials (`Admin::PresenceScreen::RowMarkerComponent`, always rendered,
+// `hidden` where nobody is). The server draws the markers with the list; this keeps
 // them true afterwards. It is on the list's root, beside whatever else that
 // element is (the tree's own script), and it does three things:
 //
@@ -25,18 +26,21 @@ import { settle } from "live/state"
 // 3. Says on its element whether its subscription has been answered
 //    (`data-live-part`, `live/state`), which the system tests wait for.
 //
-// IT TOUCHES NOTHING BUT ITS MARKERS: of each, the `hidden`, the count and
-// the one text (for a screen reader and in the tooltip), and only where they
-// differ from what is shown, so a reading that finds nothing new changes
-// nothing and no row is ever redrawn. Everything is put in as TEXT
-// (`textContent`): a name is what a person typed. The words come from the
-// server ready-made (`label`), the same that worded the first
-// drawing; this script holds none.
+// IT TOUCHES NOTHING BUT ITS MARKERS: of each, the `hidden` of the marker
+// and of its circles, the letters in the circles and in the two "+N" (the
+// wide one, past the circles the row has room for, and the narrow one, past
+// the first) and the one text (for a screen reader and in the tooltip), and
+// only where they differ from what is shown, so a reading that finds nothing
+// new changes nothing and no row is ever redrawn. It draws the circles the
+// marker holds and computes no letters: the initials come from the server
+// ready-made, with the words (`label`), the same that worded the first
+// drawing, and the "+N" words come from the marker's `data-messages`.
+// Everything is put in as TEXT (`textContent`): a name is what a person typed.
 //
 // THE MARKERS ARE STIMULUS TARGETS, read from the document each time: the
 // tree is replaced as a whole by a Turbo Stream after a move, a page's row
 // alone after a settings save, the posts table with its frame, and a marker
-// kept in a variable would be one that is no longer in the page. When the list's own element is replaced
+// kept in a variable would be one that has left the page. When the list's own element is replaced
 // (the tree's frame is), the old controller hands its clock to the new one
 // (`handover`): the replacement comes from the server with fresh markers
 // and asks nothing by itself, a reading that was owed is still made, and
@@ -124,7 +128,7 @@ export default class extends Controller {
     clearInterval(this.refreshTimer)
     this.request?.abort()
     this.stop()
-    // The element has left the document: the page's answer no longer waits
+    // The element has left the document: the page's answer stops waiting
     // for it.
     settle(document.body)
   }
@@ -221,25 +225,44 @@ export default class extends Controller {
       const id = marker.dataset.presenceId
       if (!asked.has(id)) return
       const answer = here[id]
-      show(marker, Number(answer?.count) || 0, String(answer?.label || ""))
+      show(marker, Number(answer?.count) || 0, String(answer?.label || ""), Array.isArray(answer?.initials) ? answer.initials : [])
     })
   }
 }
 
-// One marker, as answered: nothing is written that is already there.
-function show(marker, count, label) {
+// One marker, as answered: nothing is written that is already there. A
+// slot's circle is the one element inside it; the slot carries the `hidden`.
+function show(marker, count, label, initials) {
+  const text = messages(marker)
   const parts = {
-    count: marker.querySelector("[data-presence-marker-count]"),
     label: marker.querySelector("[data-presence-marker-label]"),
-    tip: marker.querySelector("[data-tooltip]")
+    tip: marker.querySelector("[data-tooltip]"),
+    slots: [ ...marker.querySelectorAll("[data-presence-avatar]") ],
+    wide: marker.querySelector("[data-presence-more]"),
+    narrow: marker.querySelector("[data-presence-more-narrow]")
   }
   const said = count > 0 && label ? `${parts.label?.dataset.presenceLead || ""}${label}` : ""
-  put(parts.count, count > 1 ? String(count) : "")
   put(parts.label, said)
   put(parts.tip, count > 0 ? label : "")
-  if (parts.count && parts.count.hidden !== count < 2) parts.count.hidden = count < 2
+  parts.slots.forEach((slot, index) => circle(slot, initials[index]))
+  more(text, parts.wide, count - parts.slots.length)
+  more(text, parts.narrow, count - 1)
   if (marker.dataset.presenceCount !== String(count)) marker.dataset.presenceCount = String(count)
   if (marker.hidden !== (count === 0)) marker.hidden = count === 0
+}
+
+function circle(slot, letters) {
+  const empty = typeof letters !== "string"
+  put(slot.firstElementChild, empty ? "" : letters)
+  if (slot.hidden !== empty) slot.hidden = empty
+}
+
+// A "+N" circle: nine and fewer say the number, more say "9+" (the
+// component's rule).
+function more(text, slot, number) {
+  if (!slot) return
+  put(slot.firstElementChild, number > 0 ? (number > 9 ? text.t("components.ui.avatar.many") : text.t("components.ui.avatar.more", { count: number })) : "")
+  if (slot.hidden !== number < 1) slot.hidden = number < 1
 }
 
 function put(element, text) {

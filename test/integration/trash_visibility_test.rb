@@ -1148,7 +1148,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       get admin_presence_here_path(kind:, ids: [ kept.id, gone.id ], format: :json)
       # The list's marker data: the kept record's and nothing
       # of the trashed one's.
-      assert_equal({ kept.id.to_s => { "count" => 1, "label" => "#{PersonName.of(users(:one))} is here" } },
+      assert_equal({ kept.id.to_s => { "count" => 1, "label" => "#{PersonName.of(users(:one))} is here", "initials" => [ PersonName.initials(PersonName.of(users(:one))) ] } },
         response.parsed_body, kind)
       assert_not_includes response.body, %("#{gone.id}"), kind
     end

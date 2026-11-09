@@ -1,34 +1,35 @@
 module Admin
   module PresenceScreen
-    # The marker of a row in a list (presence handoff 9 to 12 and 27): a
-    # Lucide `user` icon at 12px in `text-meta` where someone ELSE is working
-    # on that record, and from two people the count after it in 11px mono
-    # with a 4px gap. Someone who is only away does not count. Registered in
-    # `config/initializers/admin_slots.rb`:
-    # - LAST in `tree.row.markers`, after the notes pill, in the row's own
-    #   6px gap; beside the title's link, not in it. The folded tree (the
-    #   "Pages" menu below 1024px) is the same component, so it shows there;
-    # - in `posts.row.title` with `joined: true`: on the title's line, 6px
-    #   after the title and INSIDE the row's link, whose accessible name its
-    #   words join after a comma ("Translating Everything With Mobility, 2
-    #   people here: …"). It stays `text-meta` when the link is hovered.
+    # The marker of a row in a list: the people who have that record open as
+    # circles (`Admin::Ui::PresenceMarkerComponent`, which this draws and which
+    # knows no presence), where someone ELSE is working on it. Someone who is
+    # only away does not count, so a row draws people who are here and no one
+    # else. Registered in `config/initializers/admin_slots.rb`:
+    # - LAST in `tree.row.markers`, after the notes bubble, in the row's own
+    #   6px gap, with room for two circles; beside the title's link, not in
+    #   it. The folded tree (the "Pages" menu below 1024px) is the same
+    #   component, so it shows there;
+    # - in `posts.row.title` with `joined: true`, room for three circles: on
+    #   the title's line, 6px after the title and INSIDE the row's link, whose
+    #   accessible name its words join after a comma ("Translating Everything
+    #   With Mobility, 2 people here: ..."). It stays `text-meta` when the
+    #   link is hovered.
     #
     # THE ELEMENT IS ALWAYS RENDERED, `hidden` where nobody is, so the list's
     # script (`admin--presence--list`) changes it in place and never redraws
     # a row: `span[data-presence-marker="<kind>-<id>"]`, with the record's id
     # (`data-presence-id`) and the count it shows (`data-presence-count`).
-    # The script writes the count and the one text (twice) and two `hidden`s,
-    # all of them as text.
+    # The script writes the circles' letters, the "+N" and the one text
+    # (twice), all of them as text.
     #
-    # WHAT IT SAYS (handoff 32). One text: "Dana Weiss is here", "2 people
-    # here: Dana Weiss, Jonas Lind", and past five names "… and 2 more". A
-    # screen reader has it as a visually hidden text; the pointer has the
-    # same words in the shared tooltip (`Admin::Ui::TooltipComponent`), not
-    # the bare names, which would not say what they mean. The marker is NO Tab
-    # stop: in the posts list it stands inside a link, where nothing
-    # interactive may be nested, and in the tree a stop per row would double
-    # the tree's; the keyboard's path to the names is the text. Nothing is
-    # announced: no live region.
+    # WHAT IT SAYS. One text: "Dana Weiss is here", "2 people here: Dana Weiss,
+    # Jonas Lind", and past five names "... and 2 more". A screen reader has it
+    # as a visually hidden text; the pointer has the same words in the shared
+    # tooltip (`Admin::Ui::TooltipComponent`), not the bare names, which would
+    # not say what they mean. The marker is NO Tab stop: in the posts list it
+    # stands inside a link, where nothing interactive may be nested, and in the
+    # tree a stop per row would double the tree's; the keyboard's path to the
+    # names is the text. Nothing is announced: no live region.
     #
     # `data` is `Presence::Roster::Here` (or nil: nobody) from the loader,
     # which reads the whole list's people ONCE (`Roster#here_people`: one
@@ -53,26 +54,28 @@ module Admin
         end
       end
 
-      # `{ count:, label: }` for a `Roster::Here` (nil: nobody). The names in
-      # the label are made through `PersonName.of`, as everywhere in presence
-      # and notes.
-      # `label` is the ONE text of a marker (handoff 32): a screen reader
-      # hears it and the tooltip shows it, word for word.
+      # `{ count:, label:, initials: }` for a `Roster::Here` (nil: nobody). The
+      # names in the label are made through `PersonName.of`, as everywhere in
+      # presence and notes; `initials` are those named people's letters, in the
+      # same order, for the circles.
+      # `label` is the ONE text of a marker: a screen reader hears it and the
+      # tooltip shows it, word for word.
       def self.words(here)
-        return { count: 0, label: "" } if here.nil? || here.count.zero?
+        return { count: 0, label: "", initials: [] } if here.nil? || here.count.zero?
 
         names = here.users.map { |user| ::PersonName.of(user) }
         more = here.count - names.size
         list = names.join(I18n.t("#{WORDS}.separator"))
         list = I18n.t("#{WORDS}.and_more", names: list, count: more) if more.positive?
-        { count: here.count, label: I18n.t("#{WORDS}.label", count: here.count, names: list) }
+        { count: here.count, label: I18n.t("#{WORDS}.label", count: here.count, names: list), initials: names.map { |name| ::PersonName.initials(name) } }
       end
 
-      def initialize(record:, viewer:, data: nil, joined: false, **)
+      def initialize(record:, viewer:, data: nil, joined: false, shown: 2, **)
         @record = record
         @viewer = viewer
         @data = data
         @joined = joined
+        @shown = shown
       end
 
       def render? = @viewer.is_a?(::User) && kind.present?
@@ -89,6 +92,10 @@ module Admin
       def lead = @joined ? t(".joined") : ""
 
       def said = count.zero? ? "" : "#{lead}#{words.fetch(:label)}"
+
+      def initials = words.fetch(:initials)
+
+      attr_reader :shown
 
       def marker_data
         { presence_marker: "#{kind.name}-#{@record.id}", presence_id: @record.id, presence_count: count,
