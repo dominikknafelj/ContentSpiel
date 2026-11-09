@@ -1,1 +1,8 @@
-<span data-editing-mark class="admin-editing-mark shrink-0 text-xs text-meta"><%= t(".updated_by", name: name) %> · <%= render Admin::Ui::TimeAgoComponent.new(time: at) %></span>
+<%= tag.span data: { editing_mark: "" }, class: "admin-editing-mark inline-flex shrink-0 items-center gap-1.5 text-label text-meta" do %>
+  <% if taken_over? %>
+    <%= t(".taken_over") %> · <%= t(".just_now") %>
+  <% else %>
+    <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :sm, tone: :other, here: true) %>
+    <span><%= t(".updated_by", name: name) %> · <%= render Admin::Ui::TimeAgoComponent.new(time: at) %></span>
+  <% end %>
+<% end %>

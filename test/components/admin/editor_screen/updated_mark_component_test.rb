@@ -31,6 +31,24 @@ class Admin::EditorScreen::UpdatedMarkComponentTest < ViewComponent::TestCase
     assert_text "Updated by <b>Dana</b>"
   end
 
+  test "the colleague's avatar stands before Updated by" do
+    users(:two).update!(name: "Dana Weiss")
+
+    mark(users(:two))
+
+    assert_selector "span[data-editing-mark].text-label.text-meta > span.size-\\[22px\\].bg-people-tint.inset-ring-people[aria-hidden=true]", text: "DW"
+    assert_selector "span[data-editing-mark] > span[aria-hidden] + span", text: /Updated by Dana Weiss · /
+  end
+
+  test "taken over says Taken over by you · just now, with no avatar" do
+    html = render_inline(Admin::EditorScreen::UpdatedMarkComponent.new(taken_over: true))
+
+    assert_selector "span[data-editing-mark]", text: "Taken over by you · just now"
+    assert_no_selector "[data-editing-mark] [aria-hidden]"
+    assert_no_selector "[role], [aria-live]"
+    assert_not_nil html
+  end
+
   test "no change renders nothing" do
     assert_empty render_inline(Admin::EditorScreen::UpdatedMarkComponent.new(change: nil)).to_html.strip
   end

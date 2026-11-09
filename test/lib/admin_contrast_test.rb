@@ -155,15 +155,37 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # A block card's state edges (`content-spiel.tailwind.css`): held, its
-  # type gone, its thread open. The edge is the card's only outline, so it is
-  # held to a state's 3:1 on the card it is drawn inside and on the canvas
-  # around the card.
-  test "a card's state edge is 3:1 or better against the card and the canvas, in both schemes" do
+  # A block card's state edges (`content-spiel.tailwind.css`): held by
+  # someone else or discussed in the notes (one people outline), and its type
+  # gone (danger). The edge is the card's only outline, so it is held to a
+  # state's 3:1 on the card it is drawn inside, on the tile, on the canvas
+  # around the card and on a section's head.
+  test "the people outline is 3:1 or better on the card, the tile, the canvas and a section's head, in both schemes" do
+    # `--cs-people` is the icon family's people pair under another name.
+    floors = { "--cs-surface" => [ 8.5, 10.1 ], "--cs-tile-raised" => [ 3.0, 3.0 ], "--cs-paper" => [ 7.8, 11.2 ], "--cs-structure-tint" => [ 3.0, 3.0 ], "--cs-rail" => [ 7.5, 8.9 ] }
     each_scheme do |scheme, colour|
-      %w[--cs-field-line --cs-danger --cs-accent].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
+      floors.each do |ground, figures|
+        assert_ratio(figures.fetch(scheme == :light ? 0 : 1), colour.("--cs-ic-people"), colour.(ground), "the people outline on #{ground} (#{scheme})")
+      end
+      %w[--cs-danger].product(%w[--cs-surface --cs-paper]).each do |edge, ground|
         assert_ratio(3.0, colour.(edge), colour.(ground), "the #{edge} edge on #{ground} (#{scheme})")
       end
+    end
+  end
+
+  # The held strip (`Admin::EditorScreen::HoldStripComponent`) is the people
+  # tint: its sentence in ink, the status in meta, and Take over, the small
+  # secondary, with its accent words (read on the tint, and on the button's
+  # own fill) and its field-line edge on the strip.
+  test "the held strip's words, its Take over and its edge hold on the people tint" do
+    each_scheme do |scheme, colour|
+      tint = colour.("--cs-ic-people-bg")
+      light = scheme == :light
+      assert_ratio(light ? 14.7 : 11.5, colour.("--cs-ink"), tint, "the sentence on the tint (#{scheme})")
+      assert_ratio(light ? 5.2 : 5.6, colour.("--cs-meta"), tint, "the status on the tint (#{scheme})")
+      assert_ratio(light ? 5.7 : 6.3, colour.("--cs-accent"), tint, "Take over's words on the tint (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "Take over's words on its own fill (#{scheme})")
+      assert_ratio(light ? 3.0 : 3.7, colour.("--cs-field-line"), tint, "Take over's edge on the tint (#{scheme})")
     end
   end
 
@@ -238,12 +260,13 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # A section's frame only groups (2.6:1 on the canvas, held above that
-  # floor); its state edges, held and unavailable, are a state's 3:1 on the
-  # canvas outside it and on the head's tint and the settings' rail inside.
+  # floor); its state edges, held (the people outline) and unavailable, are a
+  # state's 3:1 on the canvas outside it and on the head's tint and the
+  # settings' rail inside.
   test "a section's frame groups, and its held and unavailable edges are 3:1 or better on the canvas, the head and the settings" do
     each_scheme do |scheme, colour|
       assert_operator contrast(colour.("--cs-structure"), colour.("--cs-paper")), :>=, 2.6, "the frame on the canvas (#{scheme})"
-      %w[--cs-field-line --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
+      %w[--cs-ic-people --cs-danger].product(%w[--cs-paper --cs-structure-tint --cs-rail]).each do |edge, ground|
         assert_ratio(3.0, colour.(edge), colour.(ground), "the section's #{edge} edge on #{ground} (#{scheme})")
       end
     end

@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
-# Taking over, in the browser (live-editing spec §4.4,
-# `controllers/admin/editing/hold_controller.js`): "Take over" asks the
+# Taking over, in the browser
+# (`controllers/admin/editing/hold_controller.js`): "Take over" asks the
 # holder's tab, which locks its fields for the subject, sends what it has and
 # lets go; a tab that does not answer is passed over after the pass-over time.
 # Two or three people are two or three Capybara sessions (`using_session`).
@@ -621,6 +621,25 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     assert held_by(@me)
   end
 
+  test "after a take-over the head says Taken over by you for six seconds, then the mark fades" do
+    open_page
+    held_by_nobody_listening
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    assert_selector strip
+    expire
+    assert_equal 6000, Editing::NOTICE.in_milliseconds
+    assert_equal "6000", find("#editing", visible: :all)["data-admin--editing--hold-notice-value"]
+    region_set("notice", 1200)
+
+    within(card(@block)) { press "Take over" }
+
+    assert_selector "#{card(@block)} .admin-block-card__head [data-editing-mark-place] [data-editing-mark]", text: "Taken over by you · just now", wait: LIVE
+    assert_no_selector "#{card(@block)} .admin-block-card__head [data-editing-mark] [aria-hidden]"
+    assert_no_selector "#{card(@block)} [data-editing-mark-place] [role], #{card(@block)} [data-editing-mark-place] [aria-live]"
+    assert_no_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
+  end
+
   test "a take-over raises no leave prompt and moves no base" do
     open_page
     join(:dana, @dana) do
@@ -959,7 +978,7 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
       assert_equal [ "Olga Braun took over this block" ], said
       # Another fetch of the same card says nothing more. The fetch is a plain
       # GET outside the write queue, so it is the merge of its answer that is
-      # waited for (final review I7), and then that no announcement is still
+      # waited for, and then that no announcement is still
       # waiting out its 150 ms: the strip that came with the card is a new
       # element, and a second announcement would have been armed when it connected.
       listen_merged

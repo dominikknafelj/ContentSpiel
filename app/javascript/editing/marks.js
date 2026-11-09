@@ -1,0 +1,43 @@
+// The words a card's header says for a few seconds: "Updated by ..." (drawn
+// by the server, in the answer to a fetch made with `mark=1`) and "Taken over
+// by you" (a template of the live region, cloned here). Both stand in the
+// header's `[data-editing-mark-place]`.
+//
+// A mark fades over 200ms after `after` milliseconds, and goes at once under
+// reduced motion. The card's glow is the stylesheet's, drawn from the mark's
+// presence and its `admin-editing-mark--leaving`; this module writes only the
+// mark and that class.
+//
+// Whatever a controller shows through here it takes back before Turbo caches
+// the page: `clearMarks(root)` removes every mark under `root` and stops its
+// timers, so a snapshot never holds a mark or a timer about to touch one.
+const FADE = 200
+const timers = new WeakMap()
+
+export function showMark(unit, template) {
+  const place = unit?.querySelector("[data-editing-mark-place]")
+  if (!place || !template) return null
+  const mark = template.content.firstElementChild?.cloneNode(true)
+  if (!mark) return null
+  place.replaceChildren(mark)
+  return mark
+}
+
+export function fadeMark(mark, { after }) {
+  if (!mark) return
+  const ids = []
+  const later = (act, ms) => ids.push(setTimeout(act, ms))
+  timers.set(mark, ids)
+  later(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return mark.remove()
+    mark.classList.add("admin-editing-mark--leaving")
+    later(() => mark.remove(), FADE)
+  }, after)
+}
+
+export function clearMarks(root) {
+  root.querySelectorAll("[data-editing-mark]").forEach((mark) => {
+    timers.get(mark)?.forEach(clearTimeout)
+    mark.remove()
+  })
+}

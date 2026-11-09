@@ -28,7 +28,7 @@
       <%# The open form of a block in a section: a heading, not a
           collapse button -- the tile is what opens and closes it. %>
       <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
-      <span data-editing-mark-slot><%= render updated_mark %></span>
+      <span data-editing-mark-place><%= render updated_mark %></span>
       <%= status_line %>
     <% elsif !list? %>
       <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
@@ -36,7 +36,7 @@
           drawer cannot cover it; the spacer after it takes the rest of the row. %>
       <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
       <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
-      <span data-editing-mark-slot><%= render updated_mark %></span>
+      <span data-editing-mark-place><%= render updated_mark %></span>
       <span class="flex-1"></span>
       <%= status_line %>
       <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
@@ -56,7 +56,7 @@
           <%= label %>
         </button>
         <%= render Admin::Ui::SlotComponent.new(name: "editor.block.markers", record: block, viewer: Current.user, label: label, placement: :card, holds: holds) %>
-        <span data-editing-mark-slot><%= render updated_mark %></span>
+        <span data-editing-mark-place><%= render updated_mark %></span>
       </div>
       <%= status_line %>
 

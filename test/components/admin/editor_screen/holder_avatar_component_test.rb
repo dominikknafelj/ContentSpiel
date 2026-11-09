@@ -1,7 +1,7 @@
 require "test_helper"
 
-# The tile's avatar of whoever is changing a block (live-editing handoff 4, 18,
-# 26): in the slot `editor.block.markers`, on a tile only.
+# The tile's avatar of whoever is changing a block, in the slot
+# `editor.block.markers`, on a tile only.
 class Admin::EditorScreen::HolderAvatarComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -39,9 +39,9 @@ class Admin::EditorScreen::HolderAvatarComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-holder-avatar]"
   end
 
-  # Final review M2/M3: the component had a loader for a host that hands no
-  # holds, and read `Current.editing_tab` to tell the viewer's own tab. No
-  # host needed either: the holds are the slot's context.
+  # The holds are the slot's context: the component has no loader for a host
+  # that hands none, and reads no `Current.editing_tab` to tell the viewer's
+  # own tab.
   test "a host that hands no holds draws no avatar, reads nothing and asks no Current" do
     hold_of
     Current.set(editing_tab: "tab-aaaaaaaa") do
@@ -71,6 +71,13 @@ class Admin::EditorScreen::HolderAvatarComponentTest < ViewComponent::TestCase
     assert_no_selector "button"
     assert_no_selector "[aria-live], [role=status]"
     assert_no_text "Take over"
+  end
+
+  test "a colleague's avatar is ringed as here" do
+    hold_of
+    draw(holds: holds)
+
+    assert_selector "span.size-\\[22px\\].bg-people-tint.inset-ring-people[aria-hidden=true]", text: "DW"
   end
 
   test "a reader's screen gets it too: nothing here asks for a right" do

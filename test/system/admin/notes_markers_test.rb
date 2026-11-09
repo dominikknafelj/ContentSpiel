@@ -242,6 +242,19 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     find("#note-row-#{thread.id}").click
 
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@text)}[data-notes-active]"
+    outline = page.evaluate_script(<<~JS)
+      (() => {
+        const card = document.getElementById(#{ActionView::RecordIdentifier.dom_id(@text).to_json})
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-people)"
+        card.append(probe)
+        const people = getComputedStyle(probe).color
+        probe.remove()
+        const style = getComputedStyle(card)
+        return [ style.outlineStyle, style.outlineWidth, style.outlineColor === people ]
+      })()
+    JS
+    assert_equal [ "solid", "2px", true ], outline
     find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list"
     assert_no_selector "[data-notes-active]"

@@ -3,8 +3,9 @@ import { Turbo } from "@hotwired/turbo-rails"
 import { drained, enqueue } from "saving/queue"
 import { get, post } from "editing/requests"
 import { freeze, textOf } from "editing/freeze"
+import { clearMarks, fadeMark, showMark } from "editing/marks"
 
-// THE TAB'S SIDE OF A RESERVATION (live-editing spec §4.2 to §4.4). One per
+// THE TAB'S SIDE OF A RESERVATION (the reservation rules are in `docs/reference/live-editing.md`). One per
 // editor, on the element `Admin::EditorScreen::LiveRegionComponent` renders,
 // beside `admin--editing--live`; it hears the forms of the screen through
 // events and owns no form.
@@ -34,7 +35,7 @@ import { freeze, textOf } from "editing/freeze"
 //   and claim the block for the old tab id: the new page then reads "You're
 //   editing this in another tab" until that hold lapses (`Editing::HOLD`).
 //   Nothing in a page that is going away orders the two; the way out is Take
-//   over (Task 11).
+//   over.
 // - A REFUSED CLAIM OR SAVE (a 409 whose streams put the `lost` notice into
 //   the card) turns that form read-only in place (`editing/freeze`) and
 //   pauses its autosave: the text stays to be copied. A claim that fails for
@@ -58,7 +59,7 @@ import { freeze, textOf } from "editing/freeze"
 //   same line with the same retries, and drawn from its `notice` event; a 404
 //   draws the plain sentence from the region's template.
 //
-// - TAKING OVER (live-editing spec §4.4; the server side is
+// - TAKING OVER (the server side is
 //   `Editing::TakeOver`, whose class comment has every combination).
 //   REQUESTER: "Take over" posts `take_over` through the write queue and
 //   disables the button a tick later (in the same tick the card's menu, which
@@ -144,7 +145,7 @@ const LOST_FOR = 30000
 const ANNOUNCE_AFTER = 150
 
 export default class extends Controller {
-  static targets = [ "strip", "deleted" ]
+  static targets = [ "strip", "deleted", "takenOver" ]
   static values = {
     claimUrl: String, releaseUrl: String, takeOverUrl: String, handOverUrl: String, withdrawUrl: String, blockUrl: String, hold: Number, passOver: Number, notice: Number,
     timeout: { type: Number, default: 10000 },
@@ -198,6 +199,7 @@ export default class extends Controller {
     window.removeEventListener("pagehide", this.leaving)
     document.removeEventListener("turbo:before-stream-render", this.beforeStream)
     this.timers.forEach((timer) => clearTimeout(timer))
+    clearMarks(this.element)
     this.timers.clear()
     const url = this.hasReleaseUrlValue ? this.releaseUrlValue : null
     const timeout = this.timeoutValue
@@ -216,10 +218,9 @@ export default class extends Controller {
   // WHAT THIS TAB OWES THE SERVER ON LEAVING: a release for every subject it
   // still holds there, each once. That is what is in `held` AND what is in
   // `releasing`: `release()` takes a subject out of `held` at once and parks
-  // it while its form's last save is outstanding, and the first build walked
-  // only `held` here, so a form closed with a save on the wire and then left
-  // kept its hold for two minutes with nobody to release it (final review
-  // I4). Both collections are emptied, so a release that was parked finds its
+  // it while its form's last save is outstanding, so a walk of `held` alone
+  // would leave a form closed with a save on the wire, and then left, holding
+  // for two minutes with nobody to release it. Both collections are emptied, so a release that was parked finds its
   // token gone and is not sent a second time.
   owed() {
     const subjects = new Set([ ...this.held.keys(), ...this.releasing.keys() ])
@@ -344,8 +345,8 @@ export default class extends Controller {
 
     const handedAt = this.lost.get(subject)
     this.lost.delete(subject)
-    // This tab handed it over, or was passed over while awake (ruling): "Taken
-    // over by ..." for `notice`, then what the strip always reads (handoff 13).
+    // This tab handed it over, or was passed over while awake: "Taken
+    // over by ..." for `notice`, then what the strip always reads.
     const handed = handedAt !== undefined && Date.now() - handedAt < LOST_FOR
     // A strip that still names whoever held it when the signal was heard is a
     // read from before the take-over (see the header): it says nothing and
@@ -469,7 +470,7 @@ export default class extends Controller {
     } catch {
       status.textContent = status.dataset.copyFailed
     }
-    // Gone after 2 seconds (handoff 24).
+    // Gone after 2 seconds.
     this.later(status, () => { status.textContent = "" }, 2000)
   }
 
@@ -509,7 +510,7 @@ export default class extends Controller {
     this.element.querySelectorAll(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel, #section-${CSS.escape(id)}-settings`).forEach((each) => each.remove())
   }
 
-  // "Take over" on a strip or in a card's menu (handoff 2). One request per press: the
+  // "Take over" on a strip or in a card's menu. One request per press: the
   // button is disabled at once, and a second press while this tab is asking is
   // nothing. See the header for the answers.
   takeOver(event) {
@@ -573,7 +574,16 @@ export default class extends Controller {
     await Promise.all(waits)
     if (document.hidden) return
     if (this.heldByOther(subject)) return this.end(subject, "failed")
+    this.markTakenOver(subject)
     this.focusFirstField(subject, asking.from)
+  }
+
+  // The block's head says "Taken over by you" for the notice, then the mark fades.
+  markTakenOver(subject) {
+    const id = subject.slice("block-".length)
+    if (!subject.startsWith("block-") || !this.hasTakenOverTarget) return
+    const unit = this.element.querySelector(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel`)
+    fadeMark(showMark(unit, this.takenOverTarget), { after: this.noticeValue })
   }
 
   // Not arrived: the status says why (or nothing), and the button is ready.
@@ -585,7 +595,7 @@ export default class extends Controller {
     this.setTakeOverStatus(subject, status)
   }
 
-  // This tab no longer wants what it asked for: the request is cleared on the
+  // This tab has stopped wanting what it asked for: the request is cleared on the
   // server, so that the holder does not hand the subject to a tab that is not
   // waiting. (The holder is not told: its hand-over finds nothing.)
   withdraw(subject) {

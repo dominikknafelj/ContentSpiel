@@ -547,7 +547,7 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-presence [data-presence-arriving] { animation: admin-presence-in 150ms var(--cs-ease); }
 @keyframes admin-presence-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .admin-presence [data-presence-arriving] { animation: none; } }
-/* The "Updated by ..." mark of a card a colleague saved: it fades over 200ms when its time is up (`admin--editing--live#fade`; with reduced motion the script removes it at once). */
+/* A card's "Updated by ..." or "Taken over by you" mark: it fades over 200ms when its time is up (`editing/marks.js`; with reduced motion the script removes it at once). */
 .admin-editing-mark { transition: opacity 200ms var(--cs-ease); }
 .admin-editing-mark--leaving { opacity: 0; }
 
@@ -1337,7 +1337,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    (2.6:1 on the canvas); its states are edges a state's 3:1 holds, from
    `data-card-edge` as a block card's: its type gone turns the frame danger
    (and the card's danger outline below lies over it), held by someone else
-   is the card's field-line outline over the frame. The head is the
+   is the people outline outside the frame. The head is the
    structure tint with the structure ink, its top corners the frame's less
    the frame's width, and all four when the body is collapsed and the
    settings closed, so the head is the whole card (a collapse closes them;
@@ -1365,22 +1365,39 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-section-word:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 /* A block card's state edge (`Admin::EditorScreen::BlockCardComponent`): a 2px
    outline inside the card's edge, so the card keeps its size and its shadow.
-   Held by someone else is the field line, its type gone is danger, its thread
-   open in the notes (`admin--notes--drawer#markActive`) is the accent.
-   Where two apply, the later rule wins: unavailable over notes-active over
-   held. The three weigh the same, (0,2,0): the notes rule leaves a section's
-   card out inside `:where()`, which adds no weight. Each edge is 3:1 or
-   better on the card and on the canvas (`test/lib/admin_contrast_test.rb`)
-   and is never the only cue: the hold strip, the "Unavailable type" sentence
-   and the open thread say it in words. */
-.admin-block-card[data-card-edge="held"] { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
-/* A section whose settings form `editing/freeze.js` froze: the frame is not a
-   kept unit, so a live merge gives it its server twin's attributes, and this
-   draws the held edge from the frozen form inside it instead. Inside
-   `:where()` it weighs (0,1,0), under the unavailable edge. */
-.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-field-line); outline-offset: -2px; }
-.admin-block-card:where(:not(.admin-section-card))[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+   The people frame is ONE outline for two states, a block someone else holds
+   (`data-card-edge="held"`) and a block whose thread is open in the notes
+   (`data-notes-active`, `admin--notes--drawer#markActive`): both are people,
+   and the strip and the open thread say which in words. The selector list
+   names the marks that already exist; no element carries a class for it.
+   A section is never `data-notes-active` (it has no marker), and its frame is
+   not a kept unit, so its outline is drawn from its frozen settings form,
+   outside the frame at the offset of the chosen section. The unavailable
+   edge and the chosen section come after and win: a block whose type is gone
+   shows danger, a chosen section the accent. All three weigh the same,
+   (0,2,0), and the later rule wins; the `:where()` of the frozen section and
+   of the notes rule adds no weight. Each edge is 3:1 or better on the card
+   and on the canvas (`test/lib/admin_contrast_test.rb`) and is never the
+   only cue. */
+.admin-block-card[data-card-edge="held"],
+.admin-block-card:where(:not(.admin-section-card))[data-notes-active],
+.admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-people); outline-offset: -2px; }
+.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-people); outline-offset: 2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
+/* A card whose head carries a mark ("Updated by", "Taken over by you") glows
+   in the people hue while the mark stands: 200ms in, 600ms out, and out as the
+   mark starts to fade. It never stands with the people frame (a held card
+   shows the frame alone), and under reduced motion there is none. */
+.admin-block-card { transition: box-shadow 600ms var(--cs-ease); }
+@media (prefers-reduced-motion: no-preference) {
+  .admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge="held"]) {
+    box-shadow: var(--cs-shadow-1), 0 0 0 4px color-mix(in oklab, var(--cs-people) 20%, transparent);
+    transition-duration: 200ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-block-card { transition: none; }
+}
 /* The section chosen in the editor's rail (`admin--editor--section-choice`):
    a selection, so the accent, 2px outside the frame (3:1 on the canvas,
    `admin_contrast_test`). Written after the state edges and as heavy, so it
@@ -1404,9 +1421,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-block-tile:where(:has(> .admin-block-tile__face[aria-expanded="true"])),
 .admin-block-tile:where(:has(> .admin-block-tile__face:focus-visible)) { box-shadow: var(--cs-shadow-3), 0 0 0 2px var(--cs-accent); background: var(--cs-tile-raised); }
 /* The tile of the block whose thread is open in the notes
-   (`admin--notes--drawer#markActive`): the card's notes edge, a 2px accent
-   outline inside the edge, which leaves the shadow and the ring alone. */
-.admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+   (`admin--notes--drawer#markActive`) takes the people frame, in the rule
+   above. */
 
 /* A picture in a note or a still GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows

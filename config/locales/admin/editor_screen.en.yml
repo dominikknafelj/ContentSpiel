@@ -291,6 +291,8 @@ en:
         # arrived.
         updated_mark:
           updated_by: "Updated by %{name}"
+          taken_over: "Taken over by you"
+          just_now: "just now"
         # Said in the header's notice area when the open record is in the
         # trash, deleted or not the viewer's to open (`admin--editing--live#gone`).
         live_region:
@@ -318,9 +320,9 @@ en:
           discard: "Discard"
           remove: "Remove"
           held:
-            block: "%{name} is editing this block"
-            post: "%{name} is editing this post"
-            settings: "%{name} is editing the page settings"
+            block_html: "%{name} is editing this block"
+            post_html: "%{name} is editing this post"
+            settings_html: "%{name} is editing the page settings"
           taken:
             block: "Taken over by %{name} · just now"
             post: "Taken over by %{name} · just now"
@@ -362,7 +364,7 @@ en:
           # "Discard" failed: the notice stays.
           discard_failed: "Couldn't load the block. Try again."
         # A live page or post the site has no address for: another record
-        # holds it, so a visitor is told "not found" (drafts plan, task 6).
+        # holds it, so a visitor is told "not found".
         no_address_chip:
           label: "No address"
           title: "Another page or post holds this address, so this one shows “not found” on the site."
@@ -470,8 +472,8 @@ en:
           waiting_lister_unnamed: "Not listed on the site yet: a page lists this post, and its changes are not published."
           # The ⋯ menu's item, while a change waits for its time.
           cancel_scheduled_change: "Cancel scheduled change…"
-          # Under the address of a live record, and of a scheduled one: the
-          # plan's wording, with the button's name as it reads.
+          # Under the address of a live record, and of a scheduled one, with
+          # the button's name as it reads.
           live_hint: "This %{type} is live. Changes are published with “Publish changes…”."
           scheduled_hint: "This %{type} is scheduled. What was scheduled goes live at its time; later changes are published with “Publish changes…”."
         # What the redirect says once the copy is taken.

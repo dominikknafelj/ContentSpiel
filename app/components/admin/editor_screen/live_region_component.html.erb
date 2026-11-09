@@ -11,5 +11,8 @@
 <%# The notice of a deleted block whose own answer could not name who deleted it (a read that
     says 404, or none): the plain sentence, for the id 0 the script puts the block's id in. %>
 <% if @record.is_a?(::Page) %>
+  <%# The head's words after this tab took a block over, which `editing/marks.js` puts where an
+      "Updated by" mark would stand. %>
+  <template data-admin--editing--hold-target="takenOver"><%= render Admin::EditorScreen::UpdatedMarkComponent.new(taken_over: true) %></template>
   <template data-admin--editing--hold-target="deleted"><%= render Admin::EditorScreen::HoldStripComponent.new(subject: ::ContentBlock.new(id: 0), hold: nil, viewer: nil, kind: :deleted, actor: nil) %></template>
 <% end %><% end %>
