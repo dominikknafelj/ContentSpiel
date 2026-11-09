@@ -71,6 +71,8 @@ class Admin::NotesScreen::OpenThreadRowComponentTest < ViewComponent::TestCase
 
     as(users(:two)) { render_inline Admin::NotesScreen::OpenThreadRowComponent.new(row: rows.sole) }
 
+    assert_selector "a span.rounded-full.border-field-line.bg-surface", exact_text: "", count: 1
+    assert_selector "a span.bg-people", exact_text: "DW", count: 1
     assert_equal ", by a deleted user and Dana Weiss", page.find("a .sr-only", visible: :all).text(:all)
   end
 end

@@ -15,8 +15,14 @@ module Admin
         @ring = ring
       end
 
-      # The circle itself is the shared one (`Admin::Ui::AvatarComponent`).
-      def call = render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other, ring: @ring))
+      # The circle itself is the shared one (`Admin::Ui::AvatarComponent`). A
+      # deleted user is nobody to name: the empty circle, with no letters and no
+      # people colour.
+      def call
+        return render(Admin::Ui::AvatarComponent.new(initials: "", size: @size, tone: :empty, ring: @ring)) if @user.nil?
+
+        render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other, ring: @ring))
+      end
 
       private
 
