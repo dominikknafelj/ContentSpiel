@@ -37,7 +37,7 @@ module Admin
       components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
       components.ui.toast.order_failed components.ui.toast.dropped
       layout.leave_dialog.body layout.leave_dialog.body_with_count
-      notes.script.marker.add notes.script.marker.open notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
+      notes.script.marker.add notes.script.marker.open notes.script.marker.open_unread notes.script.marker.new notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
       notes.script.toast.on notes.script.toast.many notes.script.live.new_divider notes.script.live.new_messages notes.script.live.gone
     ].freeze
 

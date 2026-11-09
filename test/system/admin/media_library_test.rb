@@ -437,7 +437,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
 
     visit_screen "/cs-studio/media"
-    assert_selector "#media-asset-#{asset.id} [data-notes-chip][data-unread]", text: "1"
+    assert_selector "#media-asset-#{asset.id} [data-notes-chip][data-unread]", text: "1 new"
     # On the image, 6px from its top right corner, on the surface colour.
     box = page.evaluate_script(<<~JS)
       (() => {

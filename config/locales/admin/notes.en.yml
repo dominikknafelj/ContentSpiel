@@ -79,6 +79,10 @@ en:
           open:
             one: "%{count} open note on %{name}"
             other: "%{count} open notes on %{name}"
+          open_unread:
+            one: "%{count} open note on %{name}, new for you"
+            other: "%{count} open notes on %{name}, new for you"
+          new: "%{count} new"
           selection: "Add a note on the selected text in %{name}"
         delete_warning:
           one: "This block has %{count} open note. It will be deleted with it."
@@ -233,6 +237,9 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
+          open_notes_unread:
+            one: "%{count} open note, new for you"
+            other: "%{count} open notes, new for you"
       posts_screen:
         table:
           # The column's name, for a screen reader: its header shows an icon.
@@ -260,6 +267,9 @@ en:
           open_notes:
             one: "%{count} open note"
             other: "%{count} open notes"
+          open_notes_unread:
+            one: "%{count} open note, new for you"
+            other: "%{count} open notes, new for you"
         rail_panel:
           title: "Notes"
           # The rail's tab (`editor.rail.tabs`), beside Page or Post.

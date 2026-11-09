@@ -65,7 +65,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every directory the rules cover is there and has sources" do
     SOURCE_DIRECTORIES.each do |directory|
       root = Rails.root.join("app", directory).to_s
-      assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules no longer look at it"
+      assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
   end
 
@@ -363,7 +363,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every hand-built button allowance is still used" do
     HAND_BUTTON_ALLOWED.each_key do |marker|
       assert CONTROL_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(PRESSABLE) && line.match?(FIELD_LINE_EDGE) } },
-        "#{marker} no longer draws a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
+        "#{marker} does not draw a pressable field-line edge: drop it from HAND_BUTTON_ALLOWED"
     end
   end
 
@@ -686,7 +686,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every count-label allowance is still used" do
     COUNT_LABEL_ALLOWED.each_key do |marker|
       assert TYPE_VOICE_SOURCES.any? { |path| File.readlines(path).any? { |line| line.include?(marker) && line.match?(COUNT_MARKER) && line.match?(LABEL_CLASS) } },
-        "#{marker} no longer draws a count in the label: drop it from COUNT_LABEL_ALLOWED"
+        "#{marker} does not draw a count in the label: drop it from COUNT_LABEL_ALLOWED"
     end
   end
 
@@ -743,7 +743,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:1680|360|28)px|\b(?:72|100)ch\b/, css)
     assert_no_match(/--cs-editor-column/, css)
     assert_empty design_offences(RAIL_WIDTH_LITERAL, except: RAIL_WIDTH_ALLOWED.keys)
-    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} no longer writes the width: drop its allowance" }
+    RAIL_WIDTH_ALLOWED.each_key { |path| assert_match RAIL_WIDTH_LITERAL, Rails.root.join(path).read, "#{path} does not write the width: drop its allowance" }
   end
 
   test "the rail width pattern matches a hard-coded column, rail or gap, and not a token or a type size" do
@@ -1246,7 +1246,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every accent-fill allowance is still used" do
     ACCENT_FILL_ALLOWED.each_key do |relative|
-      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} no longer carries bg-accent: drop it from ACCENT_FILL_ALLOWED"
+      assert File.read(Rails.root.join(relative)).match?(ACCENT_FILL), "#{relative} does not carry bg-accent: drop it from ACCENT_FILL_ALLOWED"
     end
   end
 
@@ -1267,7 +1267,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every tint-pair allowance is still used" do
     TINT_PAIR_ALLOWED.each_key do |relative|
-      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} no longer wears the pair: drop it from TINT_PAIR_ALLOWED"
+      assert File.read(Rails.root.join(relative)).each_line.any? { |line| line.match?(TINT_PAIR) }, "#{relative} does not wear the pair: drop it from TINT_PAIR_ALLOWED"
     end
   end
 
@@ -1290,14 +1290,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # The stylesheet's rules (`content-spiel.tailwind.css`) that may draw the
   # hue, each as its selector list joined with ", ". The `@theme` block maps
   # the tokens to utilities and is not a rule that draws.
-  PEOPLE_RULES = [].freeze
+  PEOPLE_RULES = [
+    ".admin-notes-marker[data-has-notes]"
+  ].freeze
 
   def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
 
   test "an icon's hue is drawn only by the icon chip" do
     offences = design_offences(ICON_HUE, except: [ ICON_CHIP ])
     assert_empty offences
-    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip no longer draws a hue: the guard looks at nothing"
+    assert File.read(Rails.root.join(ICON_CHIP)).match?(ICON_HUE), "the chip does not draw a hue: the guard looks at nothing"
   end
 
   test "a block type's icon is drawn only through BlockIconComponent" do
@@ -1352,12 +1354,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "nobody draws a circle of initials but AvatarComponent" do
     assert_empty design_offences(HAND_BUILT_AVATAR, except: [ AVATAR_COMPONENT, *HAND_BUILT_AVATAR_ALLOWED.keys ]),
       "a person's circle is Admin::Ui::AvatarComponent, never a hand-built span"
-    assert_match HAND_BUILT_AVATAR, File.read(Rails.root.join(AVATAR_COMPONENT)), "the component no longer matches: the guard looks at nothing"
+    assert_match HAND_BUILT_AVATAR, File.read(Rails.root.join(AVATAR_COMPONENT)), "the component does not match: the guard looks at nothing"
   end
 
   test "every hand-built circle allowed still draws one" do
     HAND_BUILT_AVATAR_ALLOWED.each_key do |path|
-      assert_match HAND_BUILT_AVATAR, Rails.root.join(path).read, "#{path} no longer draws a circle by hand: drop it from HAND_BUILT_AVATAR_ALLOWED"
+      assert_match HAND_BUILT_AVATAR, Rails.root.join(path).read, "#{path} does not draw a circle by hand: drop it from HAND_BUILT_AVATAR_ALLOWED"
     end
   end
 
@@ -1419,7 +1421,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "every shadow allowance is still there" do
     assert_empty SHADOW_ALLOWED, "an allowance is added with its reason; this guard reads each entry for the shadow it excuses" if SHADOW_ALLOWED.empty?
-    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} no longer draws a shadow: drop its allowance" }
+    SHADOW_ALLOWED.each_key { |path| assert Rails.root.join(path).read.match?(SHADOW), "#{path} does not draw a shadow: drop its allowance" }
   end
 
   # The layers: a z-index is one of the `--cs-z-*` tokens of THE LAYERS
@@ -1644,7 +1646,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do
     assert_empty design_offences(LIVE_SCHEDULED_FILL, except: LIVE_SCHEDULED_FILES)
     %w[status_chip_component.rb scheduled_date_component.rb].each do |file|
-      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} no longer draws them: the guard looks at nothing"
+      assert File.read(Rails.root.join("app/components/admin/ui", file)).match?(LIVE_SCHEDULED_FILL), "#{file} does not draw them: the guard looks at nothing"
     end
   end
 
@@ -1655,7 +1657,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "the status-fill list holds only files that still draw a status fill" do
     STATUS_FILL_FILES.each do |path|
-      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} no longer draws a status fill: drop it from STATUS_FILL_FILES"
+      assert Rails.root.join(path).read.match?(STATUS_FILL), "#{path} does not draw a status fill: drop it from STATUS_FILL_FILES"
     end
   end
 

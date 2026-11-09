@@ -1408,9 +1408,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
 
-/* A block card's and a section tile's notes marker
-   (`Admin::NotesScreen::MarkerComponent`). Four states, set by
-   `admin--notes--drawer` as attributes:
+/* The bubble of a record's open notes (`Admin::Ui::NoteMarkerComponent` on
+   rows, tiles and Waiting for you; `Admin::NotesScreen::MarkerComponent` on a
+   block's card or tile, which `admin--notes--drawer` fills with attributes).
+   Four states:
    - at rest without notes it is in its place and not shown (the system draws
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
@@ -1418,53 +1419,59 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      tile, with a 12px icon). Shown at rest for nobody: every card and tile
      has "Add note" in its "⋯" menu, which is the way that needs neither a
      hover nor a keyboard;
-   - `data-has-notes`: a pill with the icon and the count, always shown
-     (20px high on a card, 18px on a tile); also while text is selected in the
-     block, when it reads "Note on selection";
-   - `data-unread` beside it: the pill in accent, the one meaning accent has
-     for a count (unread and addressed to the viewer).
-   A section's card is a card too, so "its card" is asked of the tile first
-   and of a card that is no section: the pointer over a section shows no
-   tile's control but the one it is on. Not shown by `opacity` is still in the
-   Tab order, which is the keyboard's way to it; nothing here moves, so there
-   is nothing to turn off for reduced motion. */
+   - `data-has-notes`: a pill with the outline glyph and the count, on the
+     people tint with no edge, always shown (20px high on a card, 18px on a
+     tile); also while text is selected in the block, when it reads "Note on
+     selection";
+   - `data-unread` beside it: the accent fill with the filled glyph and "3
+     new", the one meaning accent has for a count (unread and addressed to the
+     viewer). The filled glyph is the marker button's third icon, swapped in
+     for the outline one here.
+   A pressable pill (a link, or the block's button) underlines its count on
+   hover and changes no fill; the add control keeps its sunken hover. A
+   section's card is a card too, so "its card" is asked of the tile first and
+   of a card that is no section: the pointer over a section shows no tile's
+   control but the one it is on. Not shown by `opacity` is still in the Tab
+   order, which is the keyboard's way to it; nothing here moves, so there is
+   nothing to turn off for reduced motion. */
 .admin-notes-marker {
   display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px;
   width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--cs-radius);
   color: var(--cs-meta); font-size: 11px; line-height: 1; white-space: nowrap;
   cursor: pointer; opacity: 0;
 }
-.admin-notes-marker:hover { background: var(--cs-sunken); color: var(--cs-ink); }
+.admin-notes-marker:not([data-has-notes]):hover { background: var(--cs-sunken); color: var(--cs-ink); }
 .admin-notes-marker:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .admin-notes-marker:focus-visible,
 .admin-notes-marker[data-has-notes],
 :is(.admin-block-tile, .admin-block-card:not(.admin-section-card)):is(:hover, :focus-within) .admin-notes-marker { opacity: 1; }
 .admin-notes-marker > span { display: inline-flex; align-items: center; }
 .admin-notes-marker > span[hidden],
-.admin-notes-marker:not([data-has-notes]) > .admin-notes-marker__open,
+.admin-notes-marker:not([data-has-notes]) > :is(.admin-notes-marker__open, .admin-notes-marker__unread),
+.admin-notes-marker:not([data-unread]) > .admin-notes-marker__unread,
+.admin-notes-marker[data-unread] > .admin-notes-marker__open,
 .admin-notes-marker[data-has-notes] > .admin-notes-marker__add { display: none; }
-.admin-notes-marker[data-has-notes] { width: auto; height: 20px; padding: 0 7px; border-color: var(--cs-line-strong); border-radius: var(--cs-radius-pill); }
-.admin-notes-marker[data-has-notes][data-unread] { border-color: var(--cs-accent-tint); background: var(--cs-accent-tint); color: var(--cs-accent); }
+.admin-notes-marker[data-has-notes] {
+  width: auto; height: 20px; padding: 0 7px; border-color: transparent; border-radius: var(--cs-radius-pill);
+  background: var(--cs-people-tint); color: var(--cs-people); font-weight: 600;
+}
+.admin-notes-marker[data-has-notes][data-unread] { background: var(--cs-accent); color: var(--cs-on-accent); }
+.admin-notes-marker:is(a, button)[data-has-notes]:hover :is(.admin-notes-marker__count, [data-notes-count]) { text-decoration: underline; }
 .admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: var(--cs-t-label); }
 .admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
 .admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
-/* The same pill where a LIST shows a record's open notes:
-   the posts list's cell, a row of the page tree, a tile of the media grid.
-   There the server draws it with its number and `data-has-notes` (and
+/* The same pill where a LIST shows a record's open notes: the posts list's
+   cell, a row of the page tree, a tile of the media grid, a Waiting for you
+   row. There the server draws it with its number and `data-has-notes` (and
    `data-unread`), so every rule above applies as it stands; what follows is
    only what differs. `--readonly` is a count that is no control (a `span`
    in the tree's row and on a tile, whose own link is the way in): no
-   pointer, no hover. `--small` is the tile's 18px size outside a section
-   tile (the tree's row). `--on-image` is the media tile's chip, 6px from the
-   image's top right corner: it needs the surface behind it to stay readable
-   over a photo, and unread keeps the border for the same reason. */
+   pointer. `--small` is the tile's 18px size outside a section tile (the
+   tree's row). `--on-image` is the media tile's chip, 6px from the image's
+   top right corner, with a 2px surface ring so it reads over a photo. */
 .admin-notes-marker--readonly { cursor: inherit; }
-.admin-notes-marker--readonly:hover { background: transparent; color: var(--cs-meta); }
 .admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: var(--cs-t-label); }
-.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; }
-.admin-notes-marker--on-image[data-has-notes],
-.admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
-.admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
+.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; box-shadow: 0 0 0 2px var(--cs-surface); }
 /* THE THREAD VIEW'S HEADER. While a thread is the
    drawer's view the drawer's own header -- the title, the count, "New note"
    and Close -- is not shown, and the thread's first row is the header: "←

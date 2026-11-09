@@ -208,6 +208,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/dashboard_screen/draft_tile_component.html.erb
     app/components/admin/ui/scheduled_date_component.rb
     app/components/admin/ui/button_component.rb
+    app/components/admin/ui/note_marker_component.html.erb
+    app/components/admin/ui/note_marker_component.rb
     app/components/admin/ui/state_chip_component.rb
     app/components/admin/editor_screen/hold_strip_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb

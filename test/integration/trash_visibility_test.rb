@@ -1231,15 +1231,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
 
     get admin_posts_path
-    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1"
+    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1 new"
     assert_select "[data-notes-count]", count: 1
 
     get admin_page_path(@kept_page)
-    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1 new"
     assert_select "#tree-column [data-notes-marker]", count: 1
 
     get admin_media_path
-    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1"
+    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1 new"
     assert_select "[data-notes-chip]", count: 1
 
     # The panel: a kept image's has its notes frame, a trashed image has no panel.

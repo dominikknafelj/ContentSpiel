@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The open-note count wherever a record is listed (notes spec §4.4): one
+# The open-note count wherever a record is listed: one
 # grouped query per surface, and one beside it for "unread for you", whatever
 # the number of rows and of threads. Each count is the notes pill
 # (`.admin-notes-marker`, the block card's own), drawn by the server with its
@@ -35,9 +35,9 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
       assert_select "svg[class~='size-3']"
     end
     assert_select "tr#post_#{@post.id} a[data-notes-count][href='/cs-studio/posts/#{@post.id}?notes=open'][aria-label='1 open note']", text: "1"
-    # The pill without an icon, neutral.
+    # The shared bubble with its outline glyph, read.
     assert_select "tr#post_#{@post.id} a.admin-notes-marker[data-notes-count][data-has-notes]:not([data-unread])" do
-      assert_select "svg", count: 0
+      assert_select "svg", count: 1
     end
     assert_select "tr#post_#{@quiet.id} [data-notes-count]", count: 0
   end
@@ -133,7 +133,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/media/#{@asset.id}", params: { media_asset: { title: "Renamed" } }, as: :turbo_stream
 
     assert_response :success
-    assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template span[data-notes-chip][data-unread]", text: "2"
+    assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template span[data-notes-chip][data-unread]", text: "2 new"
   end
 
   # `PATCH /media/:id` is open to `media.manage` alone (`Media::Save`), the
@@ -197,7 +197,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "#tree-column li[data-page-id='#{@page.id}'][data-context-only]"
     assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-notes-marker]", count: 0
     assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-unread]", count: 0
-    assert_select "#tree-column li[data-page-id='#{child.id}'] > div span[data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column li[data-page-id='#{child.id}'] > div span[data-notes-marker][data-unread]", text: "1 new"
     assert_select "#tree-column [data-notes-marker]", count: 1
   end
 

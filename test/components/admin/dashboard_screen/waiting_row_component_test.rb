@@ -60,7 +60,7 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
     page = create_page(title: "Pricing")
 
     render_inline Admin::DashboardScreen::WaitingRowComponent.new(row: both_row(page, publisher: true))
-    assert_selector ".admin-notes-marker.admin-notes-marker--readonly[role=img][aria-label='2 open notes']", text: "2"
+    assert_selector ".admin-notes-marker.admin-notes-marker--readonly[aria-hidden=true][aria-label='2 open notes'][data-has-notes]", text: "2", visible: :all
     assert_selector "[data-unpublished-changes]"
     assert_selector "a", exact_text: "Review and publish…"
     assert_no_selector ".admin-row-verb"

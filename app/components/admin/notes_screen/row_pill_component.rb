@@ -1,18 +1,17 @@
 module Admin
   module NotesScreen
-    # The open-notes pill of a row in a list (notes spec §4.4, §4.5), registered
-    # at the `tree.row.markers` and `posts.row.markers` slots
-    # (`config/initializers/admin_slots.rb`). One component for both lists
-    # because the data is the same; the MARKUP is not, so it has two variants,
-    # picked by the record, each byte-for-byte what its list drew before the
-    # slots:
-    # - a page (the tree): a readonly span at the tile's size with the icon.
-    #   It is no link of its own: the row's title opens the page, and its notes
-    #   are one press on the header's button from there;
-    # - a post (the posts list): the pill without an icon, a link that opens
-    #   the post with its drawer open (`?notes=open`), `no-underline`, it is a
-    #   pill and not text.
-    # Neutral; accent (`data-unread`) only while something there is unread and
+    # The open-notes pill of a row in a list, registered at the
+    # `tree.row.markers` and `posts.row.markers` slots
+    # (`config/initializers/admin_slots.rb`). The loader and the words are
+    # notes'; the drawing is the shared `Admin::Ui::NoteMarkerComponent`. One
+    # component for both lists because the data is the same; the variant is
+    # picked by the record:
+    # - a page (the tree): the small readonly image. It is no link of its
+    #   own: the row's title opens the page, and its notes are one press on
+    #   the header's button from there;
+    # - a post (the posts list): a link that opens the post with its drawer
+    #   open (`?notes=open`).
+    # Unread (`data-unread`) only while something there is unread and
     # addressed to the viewer; nothing at zero.
     #
     # `data` is `{ open:, unread: }` from the loader, which reads the counts
@@ -45,6 +44,9 @@ module Admin
       def unread? = @data ? @data.fetch(:unread) : false
 
       def post? = @record.is_a?(::Post)
+
+      # The bubble's name: its count, and "new for you" while any of it is.
+      def label = unread? ? t(".open_notes_unread", count: open_notes) : t(".open_notes", count: open_notes)
 
       def post_path = helpers.admin_post_path(@record, **@url_options.merge(notes: "open"))
     end

@@ -652,6 +652,30 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # Measured, light then dark, each to its rounding down: the ring is a
+  # separation and no edge to read, and a photo's own pixels decide the rest.
+  RING_FLOORS = { "--cs-ph-a" => [ 1.3, 1.1 ], "--cs-ph-b" => [ 1.6, 1.0 ] }.freeze
+
+  # The note bubble (`.admin-notes-marker`): read is the people pair on its
+  # tint, unread the accent fill with on-accent words. Both carry 11px text.
+  test "a read note bubble is 7:1 on its tint and an unread one 4.5:1 on the accent, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(7.0, colour.("--cs-ic-people"), colour.("--cs-ic-people-bg"), "a read bubble's count on its tint (#{scheme})")
+      assert_ratio(floor({ light: 6.9, dark: 8.1 }.fetch(scheme)), colour.("--cs-on-accent"), colour.("--cs-accent"), "an unread bubble's words on the accent (#{scheme})")
+    end
+  end
+
+  # The surface ring of an on-image bubble is what separates the pill from
+  # whatever photo it is drawn on; the placeholder gradient is the one photo
+  # a test can measure.
+  test "the on-image bubble's surface ring reads on a photo's placeholder" do
+    each_scheme do |scheme, colour|
+      %w[--cs-ph-a --cs-ph-b].each do |ground|
+        assert_ratio(RING_FLOORS.fetch(ground).fetch(scheme == :light ? 0 : 1), colour.("--cs-surface"), colour.(ground), "the bubble's surface ring on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   # `:own`'s letters on the solid fill, `:away`'s meta letters and dashed
   # edge, `:more`'s ink on sunken.
   test "an avatar's tones: own's surface letters 4.5:1 on people, away's meta 4.5:1 and its dashed edge 3:1 on surface and chrome, more's ink 4.5:1 on sunken" do
