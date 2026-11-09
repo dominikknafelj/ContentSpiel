@@ -4,6 +4,9 @@ require "test_helper"
 # which presses as one (its title link stretched over it) and ends in a verb.
 class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
   setup do
+    # Midday, so the rows' times (an hour or two ago) fall on the same calendar
+    # day and read "Nh ago", never "yesterday", whenever the suite runs.
+    travel_to Time.zone.local(2026, 10, 7, 12, 0)
     Current.actor = users(:one)
     users(:two).update!(name: "Dana")
   end
