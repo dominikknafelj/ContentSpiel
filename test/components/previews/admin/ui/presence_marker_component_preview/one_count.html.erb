@@ -1,0 +1,7 @@
+<%# The count circle is what a tree row under 240px shows instead of the circles, so the marker stands in a row that short. %>
+<div class="admin-tree-row" style="width: 200px">
+  <span class="admin-tree-row__title">A deep page</span>
+  <span class="admin-tree-row__trailing">
+    <%= render Admin::Ui::PresenceMarkerComponent.new(people: %w[DW JL], count: 3, label: "3 people here: Dana Weiss, Jonas Lind, Mia Kern", shown: 2) %>
+  </span>
+</div>

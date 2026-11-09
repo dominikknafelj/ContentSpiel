@@ -22,7 +22,14 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     sign_in_via_form(@me)
   end
 
-  teardown { page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}") }
+  teardown do
+    page.execute_script("try { window.localStorage.removeItem('cs-notes-open') } catch (error) {}")
+    page.execute_script("document.documentElement.style.removeProperty('--admin-tree-width')")
+  end
+
+  # A tree row shows circles only from 240px of its own width; the default
+  # column's rows are narrower, so a test of the circles widens the column.
+  def wide_tree = page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', '360px')")
 
   # The Pages screen on a page nobody else opens in these tests: its tree
   # lists every page, `@page` among them.
@@ -104,8 +111,10 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   # 1px) and takes no room. With none in its own box (the tree row's trailing
   # parts), it is the last in the flow before that box (the title, or the
   # state mark after it). `circles` are the letters of the circles that take
-  # room, `more` the "+N" that does (the wide or the narrow one), `size` the
-  # first circle's box and `overlap` how far the second stands into the first.
+  # room, `more` the "+N" that does (the wide or the narrow one), `total` the
+  # count circle's when it does, `size` the first circle's box (or the count
+  # circle's), `gap` how far the second stands after the first, and `width`
+  # what the parts that take room span, end to end.
   def look(marker)
     page.evaluate_script(<<~JS)
       (() => {
@@ -113,14 +122,18 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
         const taken = (element) => element.getClientRects().length > 0
         const circles = [ ...marker.querySelectorAll("[data-presence-avatar]") ].filter(taken).map((slot) => slot.firstElementChild)
         const more = [ ...marker.querySelectorAll("[data-presence-more], [data-presence-more-narrow]") ].filter(taken).map((slot) => slot.firstElementChild)
+        const total = [ ...marker.querySelectorAll("[data-presence-total]") ].filter(taken).map((slot) => slot.firstElementChild)
+        const parts = [ ...circles, ...more, ...total ]
         const box = (element) => element.getBoundingClientRect()
         const inFlowBefore = (element) => [ ...element.parentElement.children ].slice(0, [ ...element.parentElement.children ].indexOf(element)).filter((each) => each.getClientRects().length && getComputedStyle(each).position !== "absolute").pop()
         const before = inFlowBefore(marker) || inFlowBefore(marker.parentElement)
         return {
           circles: circles.map((circle) => circle.textContent),
           more: more.length ? more.map((circle) => circle.textContent).join(" ") : null,
-          size: circles.length ? [ box(circles[0]).width, box(circles[0]).height ] : null,
-          overlap: circles.length > 1 ? Math.round(box(circles[1]).left - box(circles[0]).right) : null,
+          total: total.length ? total[0].textContent : null,
+          size: parts.length ? [ box(parts[0]).width, box(parts[0]).height ] : null,
+          gap: circles.length > 1 ? Math.round(box(circles[1]).left - box(circles[0]).right) : null,
+          width: parts.length ? Math.round(box(parts[parts.length - 1]).right - box(parts[0]).left) : null,
           after: Math.round((box(marker).left - box(before).right) * 10) / 10,
           label: marker.querySelector("[data-presence-marker-label]").textContent,
           tip: marker.querySelector("[data-tooltip]").textContent
@@ -141,6 +154,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
   test "the tree's row shows the avatars of whoever else is on that page, and loses them when they leave; the row is never redrawn" do
     open_tree
+    wide_tree
     assert_selector "#{tree_marker}[hidden]", visible: :all
     assert_selector "#tree [data-presence-marker]", count: Page.kept.count, visible: :all
     page.execute_script("window.__row = document.querySelector('#tree li[data-page-id=\"#{@page.id}\"]'); window.__marker = document.querySelector(#{tree_marker.to_json})")
@@ -152,7 +166,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     # row's end: the trailing parts stand there, past the title and its state.
     seen = look(tree_marker)
     assert_operator seen.delete("after"), :>, 6
-    assert_equal({ "circles" => [ "DW" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => nil, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
+    assert_equal({ "circles" => [ "DW" ], "more" => nil, "total" => nil, "size" => [ 22, 22 ], "gap" => nil, "width" => 22, "label" => "Dana Weiss is here", "tip" => "Dana Weiss is here" }, seen)
     at_end = page.evaluate_script("(() => { const row = document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row'); return row.getBoundingClientRect().right - document.querySelector(#{tree_marker.to_json}).getBoundingClientRect().right })()")
     assert_operator at_end, :<=, 40, "the marker stands at the row's end, not after the title"
     # Nobody marks themselves: Dana's own tree marks where I am, not her page.
@@ -164,19 +178,18 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#tree a [data-presence-marker]", visible: :all
     assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('#tree [data-presence-marker], #tree [data-presence-marker] *') ].filter((each) => each.tabIndex >= 0).length")
 
-    # Two people are two circles, the second standing 6px into the first, in
-    # order of arrival; the ring is the tree's own ground.
+    # Two people are two circles, the second standing 2px after the first, in
+    # order of arrival, with no ring around either.
     join(:reader, @reader)
     assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
-    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => -6,
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "total" => nil, "size" => [ 22, 22 ], "gap" => 2, "width" => 46,
                    "label" => "2 people here: Dana Weiss, reader", "tip" => "2 people here: Dana Weiss, reader" }, look(tree_marker).except("after"))
-    ring = page.evaluate_script("getComputedStyle(document.querySelector(#{tree_marker.to_json} + ' [data-presence-avatar] > span')).boxShadow")
-    chrome = page.evaluate_script("(() => { const probe = document.body.appendChild(document.createElement('span')); probe.style.color = 'var(--cs-chrome)'; const color = getComputedStyle(probe).color; probe.remove(); return color })()")
-    assert_includes ring, chrome
+    assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector(#{tree_marker.to_json} + ' [data-presence-avatar] > span')).boxShadow.includes('0px 0px 0px 2px') ? 'ring' : 'none'")
 
+    # Two circles and "+N" take 70px.
     join(:third, @jonas)
     assert_selector "#{shown(tree_marker)} [data-presence-more]:not([hidden])", text: "+1", exact_text: true, wait: LIVE
-    assert_equal({ "circles" => [ "DW", "re" ], "more" => "+1" }, look(tree_marker).slice("circles", "more"))
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => "+1", "width" => 70 }, look(tree_marker).slice("circles", "more", "width"))
 
     leave(:third)
     assert_no_selector "#{tree_marker} [data-presence-more]:not([hidden])", wait: LIVE
@@ -191,23 +204,40 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal true, page.evaluate_script("window.__row === document.querySelector('#tree li[data-page-id=\"#{@page.id}\"]') && window.__marker === document.querySelector(#{tree_marker.to_json})")
   end
 
-  # The tree asks its column's width, not a row's: at the default width every
-  # row, nested or not, shows two circles; at the column's 220px minimum every
-  # row shows one and a "+N" that counts the rest, whatever the window's width.
-  test "a narrow tree column gives every row one circle and the +N for the rest" do
-    open_tree
+  # Under 240px of a tree row there is no room for circles beside the title:
+  # the marker is one count circle, never nothing, with the same words, and
+  # the script keeps its number as people come and go. At the column's 220px
+  # minimum a deep row is far under it.
+  test "a deep row in a narrow column keeps its title, shows one count circle for three people, and the script keeps the count as one leaves" do
+    deep = create_page(title: "Our services", parent: create_page(title: "Company", parent: @elsewhere))
+    # On the deep page itself, so its branch is open; nobody marks themselves.
+    visit "/cs-studio/pages/#{deep.id}"
+    await_notes_live
+    await_read
     set_timing("interval", 600)
-    join(:dana, @dana)
-    join(:reader, @reader)
-    assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
-    assert_equal [ "DW", "re" ], look(tree_marker)["circles"], "a nested row at the default width shows two"
-
     page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', '220px')")
-    assert_equal({ "circles" => [ "DW" ], "more" => "+1" }, look(tree_marker).slice("circles", "more"))
-    # The words are the same: only the drawing narrows.
-    assert_equal "2 people here: Dana Weiss, reader", look(tree_marker)["label"]
-  ensure
-    page.execute_script("document.documentElement.style.removeProperty('--admin-tree-width')")
+    path = "/cs-studio/pages/#{deep.id}"
+    join(:dana, @dana, path:)
+    join(:reader, @reader, path:)
+    join(:jonas, @jonas, path:)
+    marker = tree_marker(deep)
+    assert_selector "#{shown(marker)} [data-presence-marker-label]", text: "3 people here: Dana Weiss, reader, Jonas Lind", exact_text: true, visible: :all, wait: LIVE
+
+    find("#tree li[data-page-id='#{deep.id}'] > .admin-tree-row").hover
+    seen = look(marker)
+    assert_equal({ "circles" => [], "more" => nil, "total" => "3", "size" => [ 22, 22 ], "width" => 22, "tip" => "3 people here: Dana Weiss, reader, Jonas Lind" }, seen.slice("circles", "more", "total", "size", "width", "tip"))
+    room = page.evaluate_script(<<~JS)
+      (() => {
+        const row = document.querySelector("#tree li[data-page-id='#{deep.id}'] > .admin-tree-row")
+        const [ title, marker ] = [ row.querySelector(".admin-tree-row__title"), row.querySelector("[data-presence-marker]") ]
+        return { row: row.getBoundingClientRect().width < 240, clear: marker.getBoundingClientRect().left - title.getBoundingClientRect().right >= 6, flex: getComputedStyle(title).flex }
+      })()
+    JS
+    assert_equal({ "row" => true, "clear" => true, "flex" => "0 1 auto" }, room, "the title keeps its own rule, and the count circle stands clear of it")
+
+    leave(:jonas)
+    assert_selector "#{shown(marker)} [data-presence-total] > span", text: "2", exact_text: true, wait: LIVE
+    assert_equal({ "circles" => [], "total" => "2", "label" => "2 people here: Dana Weiss, reader" }, look(marker).slice("circles", "total", "label"))
   end
 
   test "the posts list marks a row on the title's line, 6px after the title and inside the link, and loses the mark when they leave" do
@@ -222,7 +252,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_selector shown(post_marker), wait: LIVE
     # Right after the title text, 6px after it, on the title's
     # line; the path line under it is where it was.
-    assert_equal({ "circles" => [ "DW" ], "more" => nil, "size" => [ 22, 22 ], "overlap" => nil, "after" => 6, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
+    assert_equal({ "circles" => [ "DW" ], "more" => nil, "total" => nil, "size" => [ 22, 22 ], "gap" => nil, "width" => 22, "after" => 6, "label" => ", Dana Weiss is here", "tip" => "Dana Weiss is here" }, look(post_marker))
     lines = page.evaluate_script(<<~JS)
       (() => {
         const link = document.querySelector("tr#post_#{@post.id} th[scope=row] a")
@@ -244,7 +274,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
     join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
     assert_selector "#{shown(post_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
-    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "overlap" => -6 }, look(post_marker).slice("circles", "more", "overlap"))
+    assert_equal({ "circles" => [ "DW", "re" ], "more" => nil, "gap" => 2 }, look(post_marker).slice("circles", "more", "gap"))
 
     # A long title is cut with an ellipsis before the marker is: the marker
     # keeps its size and stays inside the cell.
@@ -269,19 +299,19 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   end
 
   # A posts row has room for three circles, and asks its list's own width:
-  # under 640px of it, one circle and a "+N" that counts the rest.
-  test "a posts row shows up to three circles, and one with the +N where its list is narrow" do
+  # under 640px of it, one circle and a "+N" that counts the rest, 46px.
+  test "a posts row shows up to three circles 2px apart, and one with the +N in 46px where its list is narrow" do
     open_posts
     set_timing("interval", 600)
     join(:dana, @dana, path: "/cs-studio/posts/#{@post.id}")
     join(:reader, @reader, path: "/cs-studio/posts/#{@post.id}")
     join(:jonas, @jonas, path: "/cs-studio/posts/#{@post.id}")
     assert_selector "#{shown(post_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(3)", wait: LIVE
-    assert_equal({ "circles" => [ "DW", "re", "JL" ], "more" => nil, "overlap" => -6 }, look(post_marker).slice("circles", "more", "overlap"))
+    assert_equal({ "circles" => [ "DW", "re", "JL" ], "more" => nil, "gap" => 2, "width" => 70 }, look(post_marker).slice("circles", "more", "gap", "width"))
 
     original = page.current_window.size
     page.current_window.resize_to(600, 900)
-    assert_equal({ "circles" => [ "DW" ], "more" => "+2" }, look(post_marker).slice("circles", "more"))
+    assert_equal({ "circles" => [ "DW" ], "more" => "+2", "total" => nil, "width" => 46 }, look(post_marker).slice("circles", "more", "total", "width"))
     assert_equal "3 people here: Dana Weiss, reader, Jonas Lind", look(post_marker)["label"].delete_prefix(", ")
   ensure
     page.current_window.resize_to(*original)
@@ -347,7 +377,7 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     set_timing("interval", 600)
     join(:dana, @dana)
     join(:reader, @reader)
-    assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
+    assert_selector "#{shown(tree_marker)} [data-presence-total] > span", text: "2", exact_text: true, visible: :all, wait: LIVE
 
     assert_no_selector "#{tree_marker} [data-tooltip]"
     find(shown(tree_marker)).hover

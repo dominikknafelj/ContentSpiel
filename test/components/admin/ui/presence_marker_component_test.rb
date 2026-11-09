@@ -13,7 +13,7 @@ class Admin::Ui::PresenceMarkerComponentTest < ViewComponent::TestCase
 
     assert_selector "span.admin-presence-marker:not([hidden])"
     assert_selector "[data-presence-avatar]", count: 3, visible: :all
-    assert_selector "[data-presence-avatar]:not([hidden]) > span.size-\\[22px\\].bg-people-tint.text-people.inset-ring-\\[1\\.5px\\].inset-ring-people.ring-2", count: 2
+    assert_selector "[data-presence-avatar]:not([hidden]) > span.size-\\[22px\\].bg-people-tint.text-people.inset-ring-\\[1\\.5px\\].inset-ring-people", count: 2
     assert_selector "[data-presence-avatar]:nth-of-type(1) > span", text: "DW", exact_text: true
     assert_selector "[data-presence-avatar]:nth-of-type(2) > span", text: "JL", exact_text: true
     assert_selector "[data-presence-avatar][hidden]", count: 1, visible: :all
@@ -31,6 +31,23 @@ class Admin::Ui::PresenceMarkerComponentTest < ViewComponent::TestCase
     render_marker(people: %w[DW], count: 1, shown: 2)
     assert_selector "[data-presence-more-narrow][hidden]", visible: :all
     assert_selector "[data-presence-avatar]:not([hidden])", count: 1
+  end
+
+  test "the circles and +N stand 2px apart with no ring, and the count circle holds the number, 9+ past nine" do
+    render_marker(people: %w[DW JL], count: 3, shown: 2)
+
+    assert_selector "span.admin-presence-marker.gap-0\\.5"
+    assert_no_selector "[class*='-ml-'], [class*='ring-2'], [class*='avatar-ground']", visible: :all
+    assert_selector "span.admin-presence-marker > [data-presence-total]:last-of-type, span.admin-presence-marker > [data-presence-total]", count: 1
+    assert_selector "[data-presence-total] > span.size-\\[22px\\].bg-sunken.text-ink[aria-hidden=true]", text: "3", exact_text: true
+    assert_equal %w[presence-avatar presence-avatar presence-more presence-more-narrow presence-total],
+      page.all("span.admin-presence-marker > span[class~=flex]", visible: :all).map { |part| part.native.attributes.keys.find { |name| name.start_with?("data-presence-") }.delete_prefix("data-") }
+
+    render_marker(people: %w[DW JL], count: 12, shown: 2)
+    assert_selector "[data-presence-total] > span", text: "9+", exact_text: true
+
+    render_marker(people: [], count: 0, label: "", shown: 2)
+    assert_selector "[data-presence-total] > span", text: "", exact_text: true, visible: :all
   end
 
   test "ten and more people read 9+" do

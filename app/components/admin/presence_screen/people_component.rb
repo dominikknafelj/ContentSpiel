@@ -41,9 +41,9 @@ module Admin
     # group: the list would cover the header.
     # Nothing is announced: no live region.
     #
-    # ONE CIRCLE (`Admin::Ui::AvatarComponent`, a ring in the colour of what
-    # it stands on, 6px over the one before, with the here ring inside it
-    # for someone who is here and the dashed away tone for someone who is not) still shows its own tooltip ON
+    # ONE CIRCLE (`Admin::Ui::AvatarComponent`, 2px after the one before and
+    # never over it, with the here ring inside it for someone who is here
+    # and the dashed away tone for someone who is not) still shows its own tooltip ON
     # HOVER (`Admin::Ui::TooltipComponent`): "Dana Weiss · here", "Dana Weiss
     # · away just now" under a minute, "· away 12 min" (whole minutes, rounded
     # down), "· away over an hour" from sixty. A person is named by
@@ -61,18 +61,17 @@ module Admin
       # `shown`: how many circles before "+N"; `narrow`: how many below
       # 1024px (nil: the same at every width, the panel is a column of one
       # width); `avatar`: `Admin::Ui::AvatarComponent`'s size, the "+N"
-      # circle's too; `ground`: what the circles stand on, the colour of their
-      # ring;
+      # circle's too;
       # `wrapper`: the element's place in its row -- the header's action row
       # has a gap of 8px and the people stand 12px before the saved status;
       # in the panel's file-name row they never give way
       # and `mt-[3px]` centres their 22px on the name's first line
       # of 28px in a row that is aligned to its top; `hang`: the
       # edge the list hangs from.
-      Size = Data.define(:shown, :narrow, :avatar, :ground, :wrapper, :hang)
+      Size = Data.define(:shown, :narrow, :avatar, :wrapper, :hang)
       SIZES = {
-        header: Size.new(shown: 3, narrow: 1, avatar: :md, ground: :paper, wrapper: "mr-1", hang: :left),
-        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, ground: :surface, wrapper: "ml-auto mt-[3px] flex-none", hang: :right)
+        header: Size.new(shown: 3, narrow: 1, avatar: :md, wrapper: "mr-1", hang: :left),
+        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, wrapper: "ml-auto mt-[3px] flex-none", hang: :right)
       }.freeze
 
       # "away over an hour" from here on.
@@ -128,20 +127,19 @@ module Admin
 
       def avatar_size = @size.avatar
 
-      def ground = @size.ground
-
       def hang = @size.hang
 
       # The one Tab stop, with its focus ring around the group: CS Studio's
-      # 2px corner, since the group is a row and not a pill.
+      # 2px corner, since the group is a row and not a pill. Its circles and
+      # "+N" stand 2px apart.
       def group_class
-        "flex cursor-pointer items-center rounded-cs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        "flex cursor-pointer items-center gap-0.5 rounded-cs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       end
 
-      # A circle's own classes: the tooltip's host, over the one before by
-      # 6px; hidden below 1024px when the narrow header has no room for it.
+      # A circle's own classes: the tooltip's host, hidden below 1024px when
+      # the narrow header has no room for it.
       def circle_class(index)
-        class_names(Admin::Ui::TooltipComponent::HOST, "flex-none rounded-full", "-ml-1.5": index.positive?, "max-lg:hidden": narrow? && index >= @size.narrow)
+        class_names(Admin::Ui::TooltipComponent::HOST, "flex-none rounded-full", "max-lg:hidden": narrow? && index >= @size.narrow)
       end
 
       def circle_data(person) = { presence_user: person.user.id, presence_state: person.state, **Admin::Ui::TooltipComponent.host_data }
@@ -160,10 +158,10 @@ module Admin
       def more? = more_wide.positive? || more_narrow.positive?
 
       # "+N": the more circle (`Admin::Ui::AvatarComponent`'s `:more` tone),
-      # overlapping the one before like the others; shown below 1024px only
+      # 2px after the last circle like the others; shown below 1024px only
       # when the wide row has room for everyone.
       def more_class
-        class_names("flex flex-none -ml-1.5", "lg:hidden": !more_wide.positive?)
+        class_names("flex flex-none", "lg:hidden": !more_wide.positive?)
       end
 
       # "+1", or both counts with one shown at each width.
@@ -176,7 +174,7 @@ module Admin
       private
 
       def more_circle(count)
-        render Admin::Ui::AvatarComponent.new(initials: Admin::Ui::AvatarComponent.more_label(count), size: avatar_size, tone: :more, ring: ground)
+        render Admin::Ui::AvatarComponent.new(initials: Admin::Ui::AvatarComponent.more_label(count), size: avatar_size, tone: :more)
       end
 
       def shown(person, now)

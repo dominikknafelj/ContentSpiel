@@ -7,21 +7,20 @@ module Admin
     class AvatarComponent < Admin::AdminComponent
       SIZES = { row: :md, message: :sm }.freeze
 
-      def initialize(user:, user_id:, viewer:, size:, ring: nil)
+      def initialize(user:, user_id:, viewer:, size:)
         @user = user
         @user_id = user_id
         @viewer = viewer
         @size = SIZES.fetch(size)
-        @ring = ring
       end
 
       # The circle itself is the shared one (`Admin::Ui::AvatarComponent`). A
       # deleted user is nobody to name: the empty circle, with no letters and no
       # people colour.
       def call
-        return render(Admin::Ui::AvatarComponent.new(initials: "", size: @size, tone: :empty, ring: @ring)) if @user.nil?
+        return render(Admin::Ui::AvatarComponent.new(initials: "", size: @size, tone: :empty)) if @user.nil?
 
-        render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other, ring: @ring))
+        render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other))
       end
 
       private

@@ -895,11 +895,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A row's people narrow by the width of their column (the tree) or list (the
-  # posts), whatever the window's width and whatever the row's depth.
+  # posts), whatever the window's width; a tree row's own width is only the
+  # floor (the next test).
   test "a row's people narrow by the row's own width, never the window" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-shell__tree\s*\{\s*container:\s*admin-tree-column\s*\/\s*inline-size;/, css)
-    assert_no_match(/\.admin-tree-row\s*\{[^}]*container:/, css, "a row is no container: its depth would decide how many people it shows")
     [ "admin-tree-column (max-width: 212.98px)", "admin-list (max-width: 639px)" ].each do |query|
       blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
       assert_equal 1, blocks.size, "one @container #{query} block"
@@ -910,15 +910,43 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty windowed, "a row's people are asked of a container, not an @media block"
   end
 
-  # The ring around a circle is the colour of the row under it, on hover too.
-  test "a row's circles take their ring from the row's ground, at rest, on hover and selected" do
+  # Two letters reach about 19px into a 22px circle, so a circle over the one
+  # before covers its second letter: a stack's circles stand apart, and with
+  # nothing overlapping no ring separates them.
+  test "an avatar stack never overlaps and draws no ground ring" do
+    overlapping = Dir[Rails.root.join("app/components/**/*.{rb,erb}")].flat_map do |path|
+      self.class.without_comments(path).lines.each_with_index.filter_map do |line, index|
+        "#{path.delete_prefix("#{Rails.root}/")}:#{index + 1}" if line.include?("AvatarComponent.new") && line.match?(/(?<![\w-])-ml-/)
+      end
+    end
+    assert_empty overlapping, "a circle never stands over the one before it (-ml- beside an avatar's render)"
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-tree-row\s*\{[^}]*--admin-avatar-ground:\s*var\(--cs-chrome\);/, css)
-    assert_match(/\.admin-tree-row:hover\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);\s*background:\s*var\(--cs-sunken\);/, css)
-    assert_match(/\.admin-tree-row--selected\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);/, css)
-    row = Rails.root.join("app/components/admin/posts_screen/table_component.html.erb").read
-    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]"
-    assert_includes row, "data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]"
+    marker_rules = css.scan(/[^{}]*\.admin-presence-marker[^{}]*\{[^}]*\}/)
+    assert marker_rules.any?, "the marker's rules are read"
+    assert_empty marker_rules.grep(/margin-inline-start:\s*-/), "a marker's circles never overlap"
+    grounds = Dir[Rails.root.join("app/**/*.{rb,erb,js,css}")].reject { |path| path.include?("/app/assets/builds/") }.select { |path| File.read(path).include?("--admin-avatar-ground") }
+    assert_empty grounds, "no ring in the colour of a stack's ground: nothing overlaps to be separated"
+    marker = Rails.root.join("app/components/admin/ui/presence_marker_component.html.erb").read
+    assert_includes marker, "inline-flex flex-none items-center gap-0.5", "the marker's parts stand 2px apart"
+  end
+
+  # The title is as wide as its words (the state mark stands 6px after them),
+  # and what keeps it from being cut by its markers is the presence marker
+  # stepping down to one count circle where the row is short. Presence never
+  # gives way to nothing.
+  test "a tree row's title keeps its words' width and the marker gives way to one count circle under 240px of the row" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row\s*\{[^}]*container:\s*admin-tree-row\s*\/\s*inline-size;/, css)
+    assert_match(/\.admin-tree-row__title\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/, css)
+    assert_match(/\.admin-tree-row__trailing\s*\{[^}]*flex:\s*none;/, css, "the markers do not shrink")
+    assert_match(/\.admin-presence-marker > :is\(\[data-presence-more-narrow\], \[data-presence-total\]\)\s*\{\s*display:\s*none;\s*\}/, css, "the count circle rests hidden")
+    blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-tree-row \(max-width: 239\.98px\)\s*\{/)
+    assert_equal 1, blocks.size, "one row rule"
+    assert_includes blocks.first, ".admin-presence-marker > :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }"
+    assert_includes blocks.first, ".admin-presence-marker > [data-presence-total] { display: flex; }"
+    assert_no_match(/data-presence-marker-label|data-tooltip|\.admin-presence-marker\s*\{/, blocks.first, "the words and the tooltip stay, and so does the marker")
+    assert_operator css.index("@container admin-tree-row (max-width: 239.98px)"), :>, css.index("@container admin-tree-column (max-width: 212.98px)"), "the row's floor stands after the column's rule, so it wins"
+    assert_no_match(/admin-tree-row__title\s*\{[^}]*7rem/, css)
   end
 
   # The docked rail's ground is as tall as the tabs and the
@@ -1032,12 +1060,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
     assert_match(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*0/, docked.first, "docked, the open threads' rail sits at the grid's top")
     row = Rails.root.join("app/components/admin/notes_screen/open_thread_row_component.html.erb").read
-    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]", "the rail's row takes the paper hover and its avatars' ring follows it"
+    assert_includes row, "hover:bg-paper motion-reduce", "the rail's row takes the paper hover"
     assert_includes row, "-mx-2 flex min-w-0 items-center gap-2.5 rounded-tile px-2 py-1.5", "the fill is on the row's own padding"
     assert_includes row, "transition-colors duration-120 ease-(--cs-ease) hover:bg-paper"
     assert_includes row, "motion-reduce:transition-none"
-    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-surface\);/, css)
-    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-rail\);/, docked.first, "docked, the rings stand on the rail's ground at rest")
     outside = css.sub(docked.first, "")
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
     card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)

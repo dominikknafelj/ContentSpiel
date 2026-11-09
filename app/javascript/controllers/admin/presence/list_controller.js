@@ -27,14 +27,15 @@ import { messages } from "i18n/messages"
 //    (`data-live-part`, `live/state`), which the system tests wait for.
 //
 // IT TOUCHES NOTHING BUT ITS MARKERS: of each, the `hidden` of the marker
-// and of its circles, the letters in the circles and in the two "+N" (the
+// and of its circles, the letters in the circles, in the two "+N" (the
 // wide one, past the circles the row has room for, and the narrow one, past
-// the first) and the one text (for a screen reader and in the tooltip), and
+// the first) and in the count circle (everyone here, which a tree row too
+// short for circles shows instead) and the one text (for a screen reader and in the tooltip), and
 // only where they differ from what is shown, so a reading that finds nothing
 // new changes nothing and no row is ever redrawn. It draws the circles the
 // marker holds and computes no letters: the initials come from the server
 // ready-made, with the words (`label`), the same that worded the first
-// drawing, and the "+N" words come from the marker's `data-messages`.
+// drawing, and the "+N" and "9+" words come from the marker's `data-messages`.
 // Everything is put in as TEXT (`textContent`): a name is what a person typed.
 //
 // THE MARKERS ARE STIMULUS TARGETS, read from the document each time: the
@@ -239,7 +240,8 @@ function show(marker, count, label, initials) {
     tip: marker.querySelector("[data-tooltip]"),
     slots: [ ...marker.querySelectorAll("[data-presence-avatar]") ],
     wide: marker.querySelector("[data-presence-more]"),
-    narrow: marker.querySelector("[data-presence-more-narrow]")
+    narrow: marker.querySelector("[data-presence-more-narrow]"),
+    total: marker.querySelector("[data-presence-total]")
   }
   const said = count > 0 && label ? `${parts.label?.dataset.presenceLead || ""}${label}` : ""
   put(parts.label, said)
@@ -247,6 +249,7 @@ function show(marker, count, label, initials) {
   parts.slots.forEach((slot, index) => circle(slot, initials[index]))
   more(text, parts.wide, count - parts.slots.length)
   more(text, parts.narrow, count - 1)
+  put(parts.total?.firstElementChild, count > 0 ? (count > 9 ? text.t("components.ui.avatar.many") : String(count)) : "")
   if (marker.dataset.presenceCount !== String(count)) marker.dataset.presenceCount = String(count)
   if (marker.hidden !== (count === 0)) marker.hidden = count === 0
 }

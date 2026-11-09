@@ -14,7 +14,7 @@ module Admin
 
       def empty = sizes { |size| Admin::Ui::AvatarComponent.new(initials: "", size: size, tone: :empty) }
 
-      def here = sizes { |size| Admin::Ui::AvatarComponent.new(initials: "AL", size: size, here: true, ring: :surface) }
+      def here = sizes { |size| Admin::Ui::AvatarComponent.new(initials: "AL", size: size, here: true) }
 
       private
 

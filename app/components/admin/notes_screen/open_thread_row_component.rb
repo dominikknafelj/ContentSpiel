@@ -14,8 +14,8 @@ module Admin
     # Nothing here queries: the row carries its record and its people (a
     # nil among them is a writer who is gone). The
     # circles are the viewer's own when they wrote (the solid fill), and
-    # overlap by 6px with a ring in the colour of what the rail stands on
-    # (`--admin-avatar-ground`).
+    # stand 2px apart, side by side: two letters fill most of a 22px circle,
+    # so a circle over the one before would cover its second letter.
     class OpenThreadRowComponent < Admin::AdminComponent
       include Admin::NotesScreen::RecordRow
 

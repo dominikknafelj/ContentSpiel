@@ -33,7 +33,7 @@
     </thead>
     <tbody>
       <% posts.each do |post| %>
-        <tr id="<%= helpers.dom_id(post) %>" class="border-b border-line align-middle hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)] data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]">
+        <tr id="<%= helpers.dom_id(post) %>" class="border-b border-line align-middle hover:bg-paper data-[selected]:bg-accent-tint">
           <% if selectable? %>
           <td class="py-2.5 pl-3.5 pr-2">
             <%= render Admin::Ui::CheckboxComponent.new(name: "select[]", value: post.id, id: "select-post-#{post.id}", aria: { label: "Select #{title_of(post)}" },

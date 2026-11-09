@@ -356,9 +356,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    its count, never by a heavier title. On a leaf the disclosure is an empty
    box of the same width, so the marks line up across siblings; a flat row
    (the graph's posts and pills) has none. `position: relative`
-   holds the drag handle, which stands in the gutter left of the row. */
-.admin-tree-row { --admin-avatar-ground: var(--cs-chrome); position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
-.admin-tree-row:hover { --admin-avatar-ground: var(--cs-sunken); background: var(--cs-sunken); }
+   holds the drag handle, which stands in the gutter left of the row. The
+   row is a size container on its inline axis (`admin-tree-row`), which
+   changes none of its measures: its width is the column's, never its
+   content's, and its height is its content's. */
+.admin-tree-row { container: admin-tree-row / inline-size; position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
+.admin-tree-row:hover { background: var(--cs-sunken); }
 /* A heading drawn on the row's geometry (a group of the whole site's
    results, `mind_graph/search_results.js`) is pressed by nobody: no hover. */
 h3.admin-tree-row:hover { background: none; }
@@ -456,7 +459,7 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    title does not move. It is a SELECTION and not a marker: accent as a
    marker means "unread and addressed to you", and this bar says only where
    you are. */
-.admin-tree-row--selected { --admin-avatar-ground: var(--cs-sunken); background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
+.admin-tree-row--selected { background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-row--selected .admin-tree-row__title { font-weight: 600; }
 .admin-tree-row--selected .admin-tree-row__mark { color: var(--cs-ink); }
 /* A folded parent a drag opened (`admin--pages--tree`), while the pointer
@@ -997,10 +1000,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-tag-detail { margin-bottom: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
 .admin-tag-detail:has([data-tag-detail-empty]) { display: none; }
 /* The Notes screen's rail of open threads: below the threshold a card after
-   the list, on the surface, so its avatars' rings read `--admin-avatar-ground`
-   in that colour; docked it takes the rail's ground and sits at the grid's
-   top. Written before the docked block, so the rail's rules win on order. */
-.admin-notes-threads { --admin-avatar-ground: var(--cs-surface); margin-top: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
+   the list, on the surface; docked it takes the rail's ground and sits at
+   the grid's top. Written before the docked block, so the rail's rules win
+   on order. */
+.admin-notes-threads { margin-top: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
 /* With no tag at all there is nothing to choose: the rail takes no room at
    any width, on the screen's first draw and after the last delete's answer
    replaces the list with its empty state. The id outweighs the docked rule
@@ -1014,7 +1017,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
   .admin-filter-panel > legend { position: static; float: left; width: auto; height: auto; margin: 0 0 0.25rem; overflow: visible; clip-path: none; white-space: normal; }
   .admin-tag-detail { margin-bottom: 0; }
-  .admin-notes-threads { --admin-avatar-ground: var(--cs-rail); margin-top: 0; }
+  .admin-notes-threads { margin-top: 0; }
   .admin-tag-detail:has([data-tag-detail-empty]) { display: block; }
 }
 /* Settings' layout and its "At a glance" rail
@@ -1718,11 +1721,11 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .form-send-page .form-field__error::before { content: "!"; content: "!" / ""; font-family: var(--cs-mono); margin-right: 0.375rem; }
 
 /* The people on a row (`Admin::Ui::PresenceMarkerComponent`): circles that
-   overlap by 6px, the wide "+N" at rest and the narrow one, which counts
-   everyone past the first circle, hidden. The ring around a circle is the
-   colour of the row it stands on (`--admin-avatar-ground`, which the tree
-   row sets, on hover and selected too, and the circle falls back to the
-   surface from). Where the width is short a row keeps the first circle and
+   stand 2px apart and never overlap (two letters reach about 19px into a
+   22px circle, so a circle over the one before would cover its second
+   letter), the wide "+N" at rest, and hidden both the narrow "+N", which
+   counts everyone past the first circle, and the count circle, which counts
+   everyone. Where the width is short a row keeps the first circle and
    swaps the wide "+N" for the narrow one. In the tree the width asked is the
    COLUMN's (`.admin-shell__tree`, a size container whose width the grid or
    the drawer gives it, never its content), so every row of one tree shows
@@ -1731,9 +1734,14 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    query does not count (the 220px minimum is below that width and the
    default 272px above, with or without the scrollbar). The posts list asks its
    own container, never the window: the list is as narrow at any window
-   width. */
-.admin-presence-marker > [data-presence-avatar] ~ :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { margin-inline-start: -6px; }
-.admin-presence-marker > [data-presence-more-narrow] { display: none; }
+   width. A tree row's own width is the floor, written last so it wins:
+   under 240px of the row (a deep row, or a narrow column) there is no room
+   for circles beside the title, and the marker is the count circle alone,
+   never nothing, with its words and tooltip unchanged. A row is never wider
+   than its column's content, so under a 260px column every tree row is
+   under the floor too: there the column's one circle and "+N" is overruled
+   by the count circle, and from 240px of row the column shows two. */
+.admin-presence-marker > :is([data-presence-more-narrow], [data-presence-total]) { display: none; }
 @container admin-tree-column (max-width: 212.98px) {
   .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
   .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
@@ -1741,4 +1749,8 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 @container admin-list (max-width: 639px) {
   .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
   .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
+}
+@container admin-tree-row (max-width: 239.98px) {
+  .admin-presence-marker > :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }
+  .admin-presence-marker > [data-presence-total] { display: flex; }
 }

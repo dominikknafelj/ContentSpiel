@@ -35,16 +35,10 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_no_selector ".border-dashed, .bg-people-tint, .text-people"
   end
 
-  test "here adds the inner people ring, and a ground ring is drawn outside it" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, here: true))
+  test "here adds the inner people ring, and there is no outer ring" do
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, here: true))
     assert_selector "span.inset-ring-\\[1\\.5px\\].inset-ring-people"
-    assert_no_selector ".ring-2"
-
-    { paper: "ring-paper", surface: "ring-surface", ground: "ring-\\[var\\(--admin-avatar-ground\\,var\\(--cs-surface\\)\\)\\]" }.each do |ring, colour|
-      render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, here: true, ring: ring))
-      assert_selector "span.ring-2.#{colour}.inset-ring-\\[1\\.5px\\].inset-ring-people"
-    end
-    assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :pink) }
+    assert_no_selector "[class*='ring-2'], [class*='ring-paper'], [class*='ring-surface'], [class*='avatar-ground']"
   end
 
   test "+N past nine reads 9+" do
@@ -62,9 +56,9 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     classes.each { |group| assert_includes script, %("#{group}"), "ui/avatar.js lacks #{group.inspect}" }
   end
 
-  test "an unknown size, tone or ring is refused" do
+  test "an unknown size or tone is refused" do
     assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :huge) }
     assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, tone: :green) }
-    assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :chrome) }
+    assert_raises(ArgumentError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, ring: :paper) }
   end
 end
