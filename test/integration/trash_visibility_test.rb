@@ -1258,8 +1258,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  # "Notes for you", its full list, Waiting for you's open threads and the
-  # sidebar's unread count all narrow through `Notes.readable_threads`.
+  # "Notes for you", its full list and its rail of open threads (with its
+  # "And N more"), Waiting for you's open threads and the sidebar's unread
+  # count all narrow through `Notes.readable_threads`.
   # Trashed AFTER the note was written, as in life.
   test "the inbox, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
     kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
@@ -1274,7 +1275,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_no_match "Later gone", response.body
     get admin_notes_path
     assert_select "[data-delivery]", count: 3
+    assert_select ".admin-notes-threads li", count: 3
     assert_no_match "Later gone", response.body
+    assert_no_match "more on other pages", response.body
     get admin_unread_notes_path
     assert_equal({ "unread" => 3 }, response.parsed_body)
 

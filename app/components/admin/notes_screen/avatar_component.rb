@@ -7,15 +7,16 @@ module Admin
     class AvatarComponent < Admin::AdminComponent
       SIZES = { row: :md, message: :sm }.freeze
 
-      def initialize(user:, user_id:, viewer:, size:)
+      def initialize(user:, user_id:, viewer:, size:, ring: nil)
         @user = user
         @user_id = user_id
         @viewer = viewer
         @size = SIZES.fetch(size)
+        @ring = ring
       end
 
       # The circle itself is the shared one (`Admin::Ui::AvatarComponent`).
-      def call = render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other))
+      def call = render(Admin::Ui::AvatarComponent.new(initials: initials, size: @size, tone: own? ? :own : :other, ring: @ring))
 
       private
 

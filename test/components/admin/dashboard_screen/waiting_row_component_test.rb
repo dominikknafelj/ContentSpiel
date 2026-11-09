@@ -20,7 +20,7 @@ class Admin::DashboardScreen::WaitingRowComponentTest < ViewComponent::TestCase
   def thread_of(record, kind:, count: 1, last_author: users(:two), last_author_id: last_author&.id)
     route = editor(record)
     ThreadRow.new(record:, kind:, title: record.title.presence, count:, at: 2.hours.ago, route: route.with(params: route.params.merge(notes: "open")),
-      last_author:, last_author_id:)
+      last_author:, last_author_id:, authors: [], author_count: 0)
   end
 
   def unpublished_row(record, publisher:)

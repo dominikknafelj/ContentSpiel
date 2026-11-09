@@ -935,11 +935,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # line, and on the rail's ground through `.admin-list-rail__rail`, which
     # stands after its card rule and so wins on order.
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
+    assert_match(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*0/, docked.first, "docked, the open threads' rail sits at the grid's top")
     outside = css.sub(docked.first, "")
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
     card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)
     assert card, "below the threshold the detail is a card"
     assert_operator card, :<, css.index(docked.first), "the card rule stands before the docked block, so the rail's ground wins"
+    threads_card = outside.index(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*1rem[^}]*background:\s*var\(--cs-surface\)/)
+    assert threads_card, "below the threshold the open threads' rail is a card after the list"
+    assert_operator css.index(/\.admin-notes-threads\s*\{/), :<, css.index(docked.first), "its card rule stands before the docked block"
 
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"

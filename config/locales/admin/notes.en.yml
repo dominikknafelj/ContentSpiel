@@ -490,3 +490,19 @@ en:
             post: "Post · %{title}"
             media: "Image · %{title}"
             block: "%{place} · %{block}"
+        # The Notes screen's rail of open threads
+        # (`Admin::NotesScreen::OpenThreadsComponent`): what it is, how many
+        # records lie beyond its rows, and what it says with none.
+        open_threads:
+          heading: "Open threads"
+          line: "Unresolved notes on pages, posts and images"
+          empty: "No open threads."
+          more:
+            one: "And %{count} more on other pages"
+            other: "And %{count} more on other pages"
+        # One record of that rail: its notes and when the newest was written.
+        open_thread_row:
+          untitled: "(untitled)"
+          line_html:
+            one: "%{count} note · %{time}"
+            other: "%{count} notes · %{time}"

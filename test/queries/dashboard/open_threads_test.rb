@@ -1,6 +1,10 @@
 require "test_helper"
 
 class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
+  # The statements a read of the rows and of `more_records` takes, for one row
+  # as for eight.
+  STATEMENTS = 6
+
   setup do
     @page = create_page(title: "Pricing")
     @block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
@@ -10,7 +14,7 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
 
   def note(subject) = as(users(:two)) { Notes::Start.call(subject, body: "A note") }.record
 
-  def open_threads(user = users(:reader)) = Dashboard::OpenThreads.new(actor: user, channel: :admin)
+  def open_threads(user = users(:reader), **options) = Dashboard::OpenThreads.new(actor: user, channel: :admin, **options)
 
   test "records with open threads, the most recently active first, with their counts" do
     note(@page)
@@ -25,7 +29,7 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal [ [ "Page", @page.id ], [ "Post", @post.id ] ].to_set, open_threads.record_keys
   end
 
-  # Handoff "Open threads row": "type · last author · time".
+  # A row says who wrote last, as "type · last author · time".
   test "a row names who wrote last among the record's open threads, a resolved thread's reply not counted, and nobody once the author's id is gone" do
     on_page = note(@page)
     travel_to(1.minute.from_now) { as(users(:one)) { Notes::Reply.call(note(@block), body: "Later, on a block") } }
@@ -82,5 +86,45 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal 7, open_threads.record_keys.size
     assert_equal few, capture_sql { open_threads.then { |query| [ query.rows, query.record_keys.size ] } }.size
     assert_equal [ [], 0 ], open_threads(stranger).then { |query| [ query.rows, query.record_keys.size ] }
+  end
+
+  test "each row names the newest two people who wrote on its open threads and how many wrote, in the same statements for one row as for eight" do
+    page_note = note(@page)
+    travel_to(1.minute.from_now) { as(users(:one)) { Notes::Reply.call(page_note, body: "Second") } }
+    travel_to(2.minutes.from_now) { as(users(:reader)) { Notes::Reply.call(page_note, body: "Third") } }
+    travel_to(3.minutes.from_now) { as(users(:two)) { Notes::Reply.call(page_note, body: "Fourth, by the first writer again") } }
+    resolved = travel_to(4.minutes.from_now) { note(@post) }
+    travel_to(5.minutes.from_now) { as(users(:one)) { Notes::Reply.call(resolved, body: "Not shown once resolved") } }
+    as(users(:two)) { Notes::Resolve.call(resolved) }
+    open_threads.rows # warm-up: the fixture user's grants are read once and kept on the object
+
+    assert_equal [ [], 0 ], open_threads.rows.sole.then { |plain| [ plain.authors, plain.author_count ] }, "nobody is read unless asked"
+    row = open_threads(with_authors: true).rows.sole
+    assert_equal [ users(:two), users(:reader) ], row.authors
+    assert_equal 3, row.author_count
+
+    asked = -> { ActiveRecord::Base.uncached { open_threads(with_authors: true).then { |query| [ query.rows, query.more_records ] } } }
+    one = nil
+    assert_queries_count(STATEMENTS) { one = asked.call }
+    Array.new(7) { |index| create_page(title: "Many #{index}") }.each { |page| note(page) }
+    eight = nil
+    assert_queries_count(STATEMENTS) { eight = open_threads(limit: 8, with_authors: true).then { |query| ActiveRecord::Base.uncached { [ query.rows, query.more_records ] } } }
+    assert_equal [ 1, 8 ], [ one.first.size, eight.first.size ]
+  end
+
+  test "more_records is the readable records with open threads beyond the rows" do
+    posts = Array.new(5) { |index| create_post(title: "More #{index}") }
+    posts.each { |post| note(post) }
+    note(@page)
+    hidden = create_post(title: "Trashed later")
+    note(hidden)
+    hidden.update!(trashed_at: Time.current)
+
+    query = Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, limit: 4)
+
+    assert_equal 4, query.rows.size
+    assert_equal 2, query.more_records
+    assert_equal 0, Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, limit: 8).more_records
+    assert_equal 0, open_threads(User.create!(email_address: "stranger2@example.com", password: "a-long-password-1")).more_records
   end
 end

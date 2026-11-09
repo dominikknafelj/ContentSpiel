@@ -300,4 +300,47 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
   ensure
     page.current_window.resize_to(*original)
   end
+
+  # Where the screen's boxes are: the list's card, the rail of open threads
+  # and the rail's computed ground and margin, read in the browser.
+  def rail_layout
+    page.evaluate_script(<<~JS)
+      (() => {
+        const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } }
+        const rail = document.querySelector(".admin-notes-threads")
+        return { container: box(document.querySelector(".admin-list-rail")), list: box(document.querySelector("[data-delivery]").closest("ul").parentElement),
+          rail: box(rail), margin_top: getComputedStyle(rail).marginTop, shadow: getComputedStyle(rail).boxShadow }
+      })()
+    JS
+  end
+
+  test "the rail of open threads docks beside the list from 1200px of the list's width, and falls after it below" do
+    original = page.current_window.size
+    mention(@page)
+    mention(@block, "Another thread, @[#{@me.id}]")
+
+    page.current_window.resize_to(1600, 1000)
+    visit_screen "/cs-studio/notes"
+    assert_selector ".admin-notes-threads li a", text: "Pricing"
+    boxes = rail_layout
+    assert_operator boxes["rail"]["left"], :>=, boxes["list"]["right"], boxes.inspect
+    assert_operator boxes["rail"]["top"], :<, boxes["list"]["top"], "the rail starts at the grid's top, beside the filter and the list"
+    assert_equal "0px", boxes["margin_top"]
+    assert_in_delta 360, boxes["rail"]["width"], 1
+
+    page.current_window.resize_to(1100, 1000)
+    visit_screen "/cs-studio/notes"
+    assert_selector ".admin-notes-threads li a", text: "Pricing"
+    boxes = rail_layout
+    assert_operator boxes["rail"]["top"], :>=, boxes["list"]["bottom"], boxes.inspect
+    assert_in_delta boxes["list"]["left"], boxes["rail"]["left"], 1
+    assert_equal "16px", boxes["margin_top"]
+    assert_in_delta boxes["list"]["width"], boxes["rail"]["width"], 1
+
+    # A row of the rail opens the record's notes, as every link into a record's notes does.
+    find(".admin-notes-threads li a", text: "Pricing").click
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open\z/, wait: 8)
+  ensure
+    page.current_window.resize_to(*original)
+  end
 end

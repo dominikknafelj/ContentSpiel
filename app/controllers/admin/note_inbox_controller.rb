@@ -10,6 +10,11 @@ module Admin
   # none of them is all, and each scope's rows, total and count narrow
   # through the same read scope.
   #
+  # The rail beside the list is the records with open threads
+  # (`Dashboard::OpenThreads`, at most 8 rows and a count of the others),
+  # whatever the filter: it is everybody's open notes the viewer may read,
+  # not their own deliveries.
+  #
   # Five answers: the full list, "Mark all read", Notes for you as its frame
   # and the sidebar's number as JSON, each fetched again on its own, and one
   # delivery as data, for the toast. None of the last three renders the
@@ -33,6 +38,7 @@ module Admin
       @counts = @inbox.counts
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: @inbox.total(show: @show))
       @rows = @pagination.out_of_range? ? [] : @inbox.rows(limit: PER_PAGE, offset: @pagination.offset, show: @show)
+      @threads = Dashboard::OpenThreads.new(actor: Current.actor, limit: 8, with_authors: true)
     end
 
     # Every unread delivery of the actor's, the ones hidden at this moment

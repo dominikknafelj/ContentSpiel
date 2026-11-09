@@ -169,6 +169,28 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "form[action='/cs-studio/notes/read']", count: 0
   end
 
+  test "the screen is the lists' rail: heading row, then the filter, the list and the rail of open threads in that order, the rail a link per record" do
+    get "/cs-studio/notes"
+
+    assert_select ".admin-list-rail > .admin-list-rail__head h1", text: "Notes for you"
+    assert_select ".admin-list-rail__grid > :nth-child(1)[class~=flex]", count: 1
+    assert_select ".admin-list-rail__grid > :nth-child(1) [aria-label='Show']", count: 1
+    assert_select ".admin-list-rail__grid > :nth-child(2) [data-delivery]", count: 1
+    assert_select ".admin-list-rail__grid > section.admin-list-rail__rail.admin-notes-threads:nth-child(3)[aria-labelledby=open-threads-heading]", count: 1
+    assert_select ".admin-notes-threads h2#open-threads-heading", text: "Open threads"
+    assert_select ".admin-notes-threads li a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-prefetch=false][data-turbo-frame=_top]", text: /Pricing\s+1 note · /
+    assert_no_match "max-w-[880px]", response.body
+    assert_no_match "more on other pages", response.body
+
+    get "/cs-studio/notes", params: { show: "mentions" }
+    assert_select ".admin-notes-threads li", count: 1
+
+    as(users(:two)) { Notes::Resolve.call(@thread) }
+    get "/cs-studio/notes"
+    assert_select ".admin-notes-threads li", count: 0
+    assert_select ".admin-notes-threads", text: /No open threads\./
+  end
+
   test "Mark all read on the dashboard's card comes back to the dashboard" do
     get "/cs-studio"
     assert_select "turbo-frame#notes-for-you form[action='/cs-studio/notes/read?back=dashboard'][data-turbo-frame=_top] button", text: "Mark all read"
