@@ -3,7 +3,8 @@
 # the layout and the step list read `setup.layout.*` by full key, and the step
 # names are `setup.steps.<step>`, one per `SetupController::STEPS` entry and
 # nothing else (`test/integration/setup_early_steps_test.rb`). The Mail step's
-# own words are not here yet. `Setup::SystemCheck`'s sentences stay English
+# fields read the Mail form's own words (`admin.components.settings_screen.
+# mail_fields`). `Setup::SystemCheck`'s sentences stay English
 # (docs/reference/i18n.md).
 en:
   setup:
@@ -71,6 +72,17 @@ en:
       network_placeholder: "e.g. GitHub"
       url: "URL"
       url_placeholder: "https://…"
+      continue: "Continue"
+    mail:
+      heading: "Mail"
+      intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
+      username: "Username"
+      password: "Password"
+      login_saved: "A login is saved. Leave both blank to keep it."
+      send_test: "Send test mail"
+      sending: "Sending…"
+      sends_to: "Sends to %{address} (your address)"
+      skip: "Skip for now"
       continue: "Continue"
     languages:
       heading: "Languages"

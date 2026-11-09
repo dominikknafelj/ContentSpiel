@@ -56,4 +56,22 @@ class Admin::SettingsMailSystemTest < ApplicationSystemTestCase
       assert_equal 1, calls.value
     end
   end
+
+  test "the Mail card's security switch sets the port unless another port was typed" do
+    site_settings(:default).update!(mail_port: nil, mail_security: nil)
+    visit_screen "/cs-studio/settings"
+
+    within "#settings-mail-card" do
+      find("label", exact_text: "TLS").click
+      assert_field "Port", with: "465"
+      find("label", exact_text: "STARTTLS").click
+      assert_field "Port", with: "587"
+
+      fill_in "Port", with: "2525"
+      find("label", exact_text: "TLS").click
+      assert_field "Port", with: "2525"
+    end
+    # The port set by the switch counts as a change of the form.
+    assert_selector "[data-admin--saving--save-bar-target=count]", text: "Port"
+  end
 end

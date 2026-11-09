@@ -1,9 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
-// The Mail card's client side (spec "Settings → Mail", design answer M2),
-// beside `admin--saving--pending-lock` on the same root. Modelled on
-// `admin--settings--ai`, whose comments say at length why each part is so.
+// The Mail card's login and focus, beside `admin--saving--pending-lock` and
+// `mail-port` on the same root. Modelled on `admin--settings--ai`, whose
+// comments say at length why each part is so. The port that follows the
+// security is `mail-port`'s (`app/javascript/controllers/mail_port_controller.js`),
+// shared with the wizard's Mail step.
 //
 // 1. The login. Replace swaps the "Set on …" line for the entry (Username,
 //    Password, Save login, Cancel); Cancel or Escape swaps it back and empties
@@ -17,18 +19,12 @@ import { messages } from "i18n/messages"
 //    and its inputs are exempt from the pending lock while it is open
 //    (`admin--saving--pending-lock`, "ONE EXEMPTION").
 //
-// 3. Security. Choosing STARTTLS or TLS puts its port (587, 465: the radio's
-//    `data-port`) into Port, unless a port of another kind was typed there:
-//    only an empty Port, or one holding the other choice's port, follows.
-//
-// 4. Focus. A login write's answer replaces the login component, and a test
+// 3. Focus. A login write's answer replaces the login component, and a test
 //    mail's answer the card's foot with the button in it: both would leave
 //    the focus on <body>. It goes back to the new button (Replace / Send test
 //    mail), or into the entry when the answer re-opened it with an error.
-const PORTS = ["587", "465"]
-
 export default class extends Controller {
-  static targets = ["chip", "entry", "input", "port", "test"]
+  static targets = ["chip", "entry", "input", "test"]
 
   connect() {
     this.started = true
@@ -82,14 +78,5 @@ export default class extends Controller {
     this.holdLogin()
     this.chipTarget.querySelector("button")?.focus()
     this.element.querySelector("#settings-mail-login-errors")?.replaceChildren()
-  }
-
-  security(event) {
-    if (!this.hasPortTarget) return
-    const port = this.portTarget.value.trim()
-    if (port !== "" && !PORTS.includes(port)) return
-    this.portTarget.value = event.target.dataset.port
-    // The footer counts a change by the form's own events.
-    this.portTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 }

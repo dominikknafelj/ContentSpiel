@@ -13,9 +13,10 @@ module Admin
     # read, so a login the current encryption keys can't read still shows as
     # set and can be replaced or removed. The inputs are never pre-filled.
     #
-    # A half the host's environment sets is a sunken box with "Set by the
-    # host" and no input (its value is not shown either: it is a credential);
-    # with both halves from the host there is nothing to save here at all.
+    # A half the host's environment sets is `HostValueComponent`, the mask
+    # with "Set by the host" and no input (its value is not shown either: it
+    # is a credential); with both halves from the host there is nothing to
+    # save here at all.
     #
     # Like the key's, its controls sit inside the Settings form but belong to
     # the login's own form (`LOGIN_FORM`, after the main form) through
@@ -29,8 +30,8 @@ module Admin
       REMOVE_DIALOG = "settings-mail-remove-login-dialog".freeze
       LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
       FIELDS = { username: "mail_username", password: "mail_password" }.freeze
-      # What a login half the host sets is drawn as, here and in the setup
-      # wizard's Mail step: never its value.
+      # What a login half the host sets is drawn as (`HostValueComponent`, on
+      # Settings and in the wizard's Mail step): never its value.
       MASK = "••••••••".freeze
 
       # Whether a mail field is a half of the login, whose value no screen shows.

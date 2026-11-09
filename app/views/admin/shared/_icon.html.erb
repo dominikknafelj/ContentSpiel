@@ -1,10 +1,9 @@
-<%# Small inline icon set for the modules column (cs-studio spec §4.2). A
-    partial rather than a new helper or view component, so Task 3's admin UI
-    kit is free to absorb or replace it outright without this shell needing
-    to change again. `aria-hidden` on every icon and `focusable="false"` for
-    old Edge/IE: the accessible name for a nav item always comes from its own
-    text label (kept in the DOM, just visually hidden below `md` -- see
-    layouts/admin.html.erb), never from the icon. %>
+<%# CS Studio's inline icon set: the sidebar's modules, the chips
+    (`Admin::Ui::IconChipComponent`) and the block types. Each is drawn on a
+    24 grid at a 1.5 stroke; an unknown name raises. `aria-hidden` on every
+    icon and `focusable="false"`: the accessible name always comes from the
+    text beside it (in the sidebar kept in the DOM, visually hidden below
+    `md`, layouts/admin.html.erb), never from the icon. %>
 <% case name
 when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="5" rx="1.5" /><rect x="13" y="10" width="8" height="11" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /></svg>
@@ -55,6 +54,9 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10" /><path stroke-linecap="round" stroke-linejoin="round" d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg>
 <% when :at_sign %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></svg>
+<%# A mail server: the Mail form's Server group. %>
+<% when :server %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="7" rx="1.5" /><rect x="3" y="13" width="18" height="7" rx="1.5" /><circle cx="7" cy="7.5" r="1" fill="currentColor" stroke="none" /><circle cx="7" cy="16.5" r="1" fill="currentColor" stroke="none" /><path stroke-linecap="round" d="M11 7.5h6M11 16.5h6" /></svg>
 <% when :check %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" /></svg>
 <%# Lucide `user`: presence's marker in a list row, at 12px. %>
@@ -79,7 +81,7 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v18M16 15l-3-3 3-3" /></svg>
 <% when :panel_left_open %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v18M14 9l3 3-3 3" /></svg>
-<%# The block types' icons (contrast and buttons spec, C2; Lucide, 1.5px):
+<%# The block types' icons (Lucide, 1.5px):
     a block type names one (`ContentModel::BlockTypeDefinition::ICONS`) and
     `Admin::EditorScreen::BlockIconComponent` draws it at 16, 14 or 12px. %>
 <% when :pilcrow %>
@@ -90,7 +92,7 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16" /></svg>
 <% when :columns_2 %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" /><path stroke-linecap="round" d="M12 3v18" /></svg>
-<%# The Note block's four kinds (note block spec, decision 2; plan ruling 11), Lucide, drawn by
+<%# The Note block's four kinds, Lucide, drawn by
     `Admin::EditorScreen::BlockIconComponent` on a note's card and tile (`icon for_block:`), and
     `info` in the picker as the Note type's own. %>
 <% when :info %>

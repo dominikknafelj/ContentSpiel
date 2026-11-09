@@ -123,18 +123,27 @@ en:
           hold: "Save or cancel the API key first."
         mail_card:
           intro: "Content Spiel sends two kinds of mail: password reset links and invites. Use the SMTP details from your mail provider."
+          all_from_host: "These settings come from the host's environment."
+        # The Mail form's fields, on Settings and in the wizard's Mail step:
+        # a label per `MailSettings` field.
+        mail_fields:
+          server_group: "Server"
+          sender_group: "Sender"
           server: "Server"
           server_placeholder: "smtp.example.com"
           port: "Port"
           security: "Security"
           starttls: "STARTTLS"
           tls: "TLS"
-          none: "None"
           sender_name: "Sender name"
           sender_address: "Sender address"
           sender_address_placeholder: "no-reply@yourdomain"
+        # A mail field the host sets, the security in its words.
+        host_value:
           set_by_host: "Set by the host"
-          all_from_host: "These settings come from the host's environment."
+          starttls: "STARTTLS"
+          tls: "TLS"
+          none: "None"
         mail_login:
           heading: "Login"
           username: "Username"
@@ -144,7 +153,6 @@ en:
           set_on: "Set on %{date}"
           replace: "Replace"
           remove: "Remove…"
-          set_by_host: "Set by the host"
           # Written into the login's entry while it holds text, and shown by
           # the footer in place of its Save (`admin--settings--mail`).
           hold: "Save or cancel the mail login first."

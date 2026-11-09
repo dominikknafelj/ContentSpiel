@@ -53,9 +53,9 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     labels = css_select("form label, form legend").map { |node| node.text.strip }.reject(&:blank?)
     assert_equal [ "Server", "Port", "Security", "STARTTLS", "TLS", "Username", "Password", "Sender name", "Sender address" ], labels
     assert_select "input[name='site_setting[mail_server]'][placeholder='smtp.example.com']"
-    assert_select "input[name='site_setting[mail_port]'][value='587'][data-setup-mail-target=port]"
+    assert_select "input[name='site_setting[mail_port]'][value='587'][data-mail-port-target=port]"
     assert_select "input[type=radio][name='site_setting[mail_security]']", 2
-    assert_select "input[type=radio][value=starttls][checked][data-port='587'][data-action='change->setup-mail#security']"
+    assert_select "input[type=radio][value=starttls][checked][data-port='587'][data-action='change->mail-port#security']"
     assert_select "input[type=radio][value=tls][data-port='465']"
     assert_select "input[type=password][name='site_setting[mail_password]']"
     assert_select "input[name='site_setting[mail_sender_name]'][value=?]", "Dana's Notes"
@@ -63,6 +63,42 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     assert_select "span", text: "Sends to owner@example.com (your address)"
     # Enter submits Continue, never the test mail.
     assert_equal "Continue", css_select("form button[type=submit]").first.text.strip
+  end
+
+  test "the step draws the shared Mail fields: the same groups and controls as Settings" do
+    get setup_step_path("mail")
+
+    assert_select "form[data-controller~=mail-port]"
+    assert_select "[role=group][aria-labelledby=setup-mail-server-group]" do
+      assert_select "[data-field-name=mail_server] input#setup-mail_server[name='site_setting[mail_server]']"
+      assert_select "[data-field-name=mail_port] input#setup-mail_port[data-mail-port-target=port]"
+      assert_select "fieldset#setup-mail_security legend", text: "Security"
+      assert_select "input#setup-mail_username[name='site_setting[mail_username]']"
+      assert_select "input#setup-mail_password[type=password]"
+    end
+    assert_select "[role=group][aria-labelledby=setup-mail-sender-group]" do
+      assert_select "[data-field-name=mail_sender_name] input#setup-mail_sender_name"
+      assert_select "[data-field-name=mail_sender_address] input#setup-mail_sender_address"
+    end
+    assert_select "#setup-mail-server-group", text: "Server"
+    assert_select "#setup-mail-sender-group", text: "Sender"
+  end
+
+  test "the action row is Send test mail with its address, then Back, Skip for now and Continue last; the outcome stands under it" do
+    get setup_step_path("mail")
+
+    row = css_select("#setup-mail-actions").first
+    assert row, "the action row"
+    words = row.css("a, button").map { |node| node.text.strip }
+    assert_equal [ "Send test mail", "Back", "Skip for now", "Continue" ], words
+    assert_select "#setup-mail-actions span.text-small.text-meta", text: "Sends to owner@example.com (your address)"
+  end
+
+  test "a refused field shows its sentence under it, besides the summary" do
+    save_mail(FIELDS.merge(mail_sender_name: "A\nB"))
+
+    assert_response :unprocessable_entity
+    assert_select "#setup-mail_sender_name-errors", text: /Sender name can't contain a line break\./
   end
 
   test "Continue saves through Settings::Save, goes on to Languages and stores the login encrypted and unseen" do

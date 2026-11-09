@@ -160,6 +160,34 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_field "Port", with: "2525"
   end
 
+  # The row puts Send test mail first and Continue last; the form's first
+  # submit button is a hidden Continue, so Enter in any field continues.
+  test "Enter in a Mail field continues and sends no mail, whatever the row's order" do
+    visit "/setup/token"
+    fill_in "Setup token", with: Setup::Token.value
+    press "Continue"
+    assert_selector "h1", text: "System check"
+    press "Continue"
+    fill_in "Email address", with: "owner@example.com"
+    fill_in "Password", with: "password12345"
+    fill_in "Confirm password", with: "password12345"
+    press "Continue"
+    assert_selector "h1", text: "Site identity"
+    fill_in "Site title", with: "Dana's Notes"
+    press "Continue"
+    assert_selector "h1", text: "Mail"
+    ActionMailer::Base.deliveries.clear
+
+    assert_equal "Send test mail", find("#setup-mail-actions").all("button, a").first.text.strip
+    fill_in "Server", with: "smtp.enter.test"
+    fill_in "Sender address", with: "hello@site.test"
+    find_field("Sender address").send_keys(:enter)
+
+    assert_selector "h1", text: "Languages"
+    assert_empty ActionMailer::Base.deliveries
+    assert_equal "smtp.enter.test", SiteSetting.instance.mail_server
+  end
+
   test "Send test mail shows it is working and a second press while waiting sends nothing" do
     visit "/setup/token"
     fill_in "Setup token", with: Setup::Token.value

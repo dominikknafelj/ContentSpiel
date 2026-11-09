@@ -155,6 +155,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/images_dialog_component.html.erb
     app/components/admin/settings_screen/mail_card_component.rb
     app/components/admin/settings_screen/mail_card_component.html.erb
+    app/components/admin/settings_screen/mail_fields_component.rb
+    app/components/admin/settings_screen/mail_fields_component.html.erb
+    app/components/admin/settings_screen/host_value_component.rb
     app/components/admin/settings_screen/mail_login_component.rb
     app/components/admin/settings_screen/mail_login_component.html.erb
     app/components/admin/settings_screen/mail_state_component.rb
@@ -430,6 +433,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/setup/mcp_token_created.html.erb
     app/views/setup/starter_content.html.erb
     app/views/setup/review.html.erb
+    app/views/setup/mail.html.erb
     app/controllers/setup_controller.rb
   ].freeze
 

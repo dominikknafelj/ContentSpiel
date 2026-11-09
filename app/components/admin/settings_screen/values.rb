@@ -83,7 +83,7 @@ module Admin
       # `fallback` the ONE code the row's select shows ("" for none). Typed
       # beats stored, like every other field: after a refused or stale save the
       # order and the selects come back as typed (a code the form didn't carry
-      # keeps its stored place at the end; one that is no longer enabled is
+      # keeps its stored place at the end; one that is not enabled is
       # dropped). The stored side is read from the database (`attribute_in_
       # database`), not the in-memory row: a refused `Locales::Configure` leaves
       # the typed entries assigned to it.
@@ -140,7 +140,7 @@ module Admin
         value = public_send(*SINGLE_READERS.fetch(name) { [ :mail, name ] }).to_s
         case name
         when :image_widths then value.scan(/\d+/)
-        when :mail_security then MailCardComponent::SECURITIES.include?(value) ? value : ::MailSettings::DEFAULT_SECURITY
+        when :mail_security then MailFieldsComponent::SECURITIES.include?(value) ? value : ::MailSettings::DEFAULT_SECURITY
         else value
         end
       end

@@ -3,7 +3,7 @@ require "test_helper"
 # What mail can break without anything failing loudly (docs/reference/mail.md,
 # "Rules a change can break silently"). Source greps: each is a
 # fence against a mistake, not a proof, and each list of exceptions names its
-# reason and fails when an entry no longer excuses anything.
+# reason and fails on an entry that excuses nothing.
 class MailGuardsTest < ActiveSupport::TestCase
   ROOT = Rails.root
 
@@ -43,8 +43,8 @@ class MailGuardsTest < ActiveSupport::TestCase
     "app/models/site_setting.rb" => "the model: encryption of the login, normalisation and the validations of what the screens write",
     "app/models/audit/snapshot.rb" => "the login and the fingerprint are never stored, the state's columns are no audited change",
     "app/services/settings/save.rb" => "the one writer of the settings and the login (the screens' saves)",
-    "app/components/admin/settings_screen/mail_card_component.rb" => "the Settings form's fields: the site's own value to edit; whether the host sets one is asked of MailSettings",
-    "app/components/admin/settings_screen/mail_card_component.html.erb" => "the Settings form's fields, as above",
+    "app/components/admin/settings_screen/mail_fields_component.rb" => "the Settings form's and the wizard's Mail fields: the site's own value to edit; whether the host sets one is asked of MailSettings",
+    "app/components/admin/settings_screen/mail_fields_component.html.erb" => "the Settings form's and the wizard's Mail fields, as above",
     "app/components/admin/settings_screen/values.rb" => "the Settings form's fields, typed against saved, for the save bar's unsaved marks; never a delivery",
     "app/components/admin/settings_screen/mail_login_component.rb" => "the login's form fields and its \"Set on\" date, never a value",
     "app/views/admin/settings/show.html.erb" => "the error summary's links to the card's fields",
