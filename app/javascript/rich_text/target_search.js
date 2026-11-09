@@ -157,12 +157,17 @@ export function createTargetSearch({ input, listbox, message, url, locale, autoS
       event.preventDefault()
       event.stopPropagation()
       pick(active)
-    } else if (event.key === "Escape" && (!listbox.hidden || suggestions.inFlight)) {
-      // The first Escape closes the list (and cancels a search on its way);
-      // only a second one reaches the popover or dialog and closes it.
+    } else if (event.key === "Escape") {
+      // Escape always voids a search that is scheduled or on its way, so a
+      // late answer never opens the list afterwards. It is kept from the
+      // popover or dialog only while the list is shown: then the first Escape
+      // closes the list and a second one the popover or dialog. A search on
+      // its way shows nothing a person could see Escape close, so with the
+      // list hidden this one Escape goes on and closes the owner.
+      suggestions.cancel()
+      if (listbox.hidden) return
       event.preventDefault()
       event.stopPropagation()
-      suggestions.cancel()
       clear()
       say("")
     }

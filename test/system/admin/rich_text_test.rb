@@ -380,6 +380,38 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "one Escape closes the Link popover while a search is still on its way, and the late answer opens nothing" do
+    create_page(title: "About")
+    visit_post
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.__releaseSearch = null
+      window.fetch = (url, options) => {
+        if (!String(url).includes("link_targets")) return original(url, options)
+        window.__searchAsked = true
+        return new Promise((resolve) => { window.__releaseSearch = () => resolve(original(url, { ...options, signal: undefined }).then((response) => { window.__searchAnswered = true; return response })) })
+      }
+    JS
+    editor.click
+    type_text "target"
+    select_editor_text
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "abo"
+      await_js "window.__searchAsked === true" # the search for "abo" is out, and held until released
+      find_field("URL or search").send_keys(:enter)
+      assert_selector "[role=alert]", text: "Pick a page, or enter a URL"
+      assert_no_selector "[role=option]"
+      find_field("URL or search").send_keys(:escape)
+    end
+    refute_selector ".admin-rich-text-popover"
+    page.execute_script("window.__releaseSearch()")
+    await_js "window.__searchAnswered === true" # the late answer for "abo" has reached the page
+    await_frames
+    refute_selector ".admin-rich-text-popover"
+    refute_selector "[role=option]"
+  end
+
   test "arrow keys move through the rows with aria-activedescendant and Enter picks the highlighted one" do
     target = create_page(title: "Zeta")
     create_page(title: "Zebra")

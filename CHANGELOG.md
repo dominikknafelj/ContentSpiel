@@ -75,6 +75,7 @@
 - Every explicit save bar says "Discard", says "Save changes" unless the screen names its own save ("Save group", "Create user"), and marks each changed field.
 - The setup wizard shows how far along it is, marks the current and finished steps, and opens with a welcome.
 - ⌘K offers every section of Settings.
+- In the rich-text Link popover and the Page link dialog, one Escape closes them while a page search is still on its way, and its answer opens nothing afterwards; only a list of suggestions that is shown takes the first Escape.
 
 ### Removed
 
