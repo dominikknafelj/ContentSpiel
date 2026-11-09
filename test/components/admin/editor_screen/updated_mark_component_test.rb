@@ -36,7 +36,8 @@ class Admin::EditorScreen::UpdatedMarkComponentTest < ViewComponent::TestCase
 
     mark(users(:two))
 
-    assert_selector "span[data-editing-mark].text-label.text-meta > span.size-\\[22px\\].bg-people-tint.inset-ring-people[aria-hidden=true]", text: "DW"
+    assert_selector "span[data-editing-mark].text-label.text-meta > span.size-\\[22px\\].bg-people-tint[aria-hidden=true]", text: "DW"
+    assert_no_selector "span[data-editing-mark] .inset-ring-people"
     assert_selector "span[data-editing-mark] > span[aria-hidden] + span", text: /Updated by Dana Weiss · /
   end
 

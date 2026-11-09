@@ -622,9 +622,8 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
   end
 
   test "after a take-over the head says Taken over by you for six seconds, then the mark fades" do
-    open_page
     held_by_nobody_listening
-    visit "/cs-studio/pages/#{@page.id}"
+    visit_editor(@page)
     await_notes_live
     assert_selector strip
     expire
@@ -638,6 +637,24 @@ class Admin::EditingTakeOverSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{card(@block)} .admin-block-card__head [data-editing-mark] [aria-hidden]"
     assert_no_selector "#{card(@block)} [data-editing-mark-place] [role], #{card(@block)} [data-editing-mark-place] [aria-live]"
     assert_no_selector "#{card(@block)} [data-editing-mark]", wait: LIVE
+  end
+
+  test "taking over a block inside a section says Taken over by you on that block's panel, never on its tile" do
+    section = add_block(block_type: "section", settings: { "layout" => "two" })
+    inside = add_block(section_id: section.id, section_column: 1)
+    held_by_nobody_listening(inside)
+    visit_editor(@page)
+    await_notes_live
+    find("#content_block_#{inside.id} .admin-block-tile__face").click
+    assert_selector "#{panel(inside)} [data-editing-kind=held]", wait: LIVE
+    expire(inside)
+    region_set("notice", 1200)
+
+    within(panel(inside)) { press "Take over" }
+
+    assert_selector "#{panel(inside)} .admin-block-card__head [data-editing-mark-place] [data-editing-mark]", text: "Taken over by you · just now", wait: LIVE
+    assert_no_selector ".admin-block-tile [data-editing-mark]", visible: :all
+    assert_no_selector "#{panel(inside)} [data-editing-mark]", wait: LIVE
   end
 
   test "a take-over raises no leave prompt and moves no base" do

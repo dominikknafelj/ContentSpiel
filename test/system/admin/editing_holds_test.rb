@@ -1139,6 +1139,26 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     assert_equal [ "solid", "2px", "2px", true ], edge
   end
 
+  test "a section held by someone else is outlined outside its frame, from the server's own mark" do
+    section, = section_with_block
+    Editing::Reservation.claim(subject: section, record: @page, user: @dana, tab: "tab-dddddddd")
+    open_page
+
+    assert_selector "#content_block_#{section.id}[data-card-edge=held]"
+    edge = page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.getElementById("content_block_#{section.id}"))
+        const probe = document.createElement("span")
+        probe.style.color = "var(--cs-people)"
+        document.body.append(probe)
+        const people = getComputedStyle(probe).color
+        probe.remove()
+        return [ style.outlineStyle, style.outlineWidth, style.outlineOffset, style.outlineColor === people ]
+      })()
+    JS
+    assert_equal [ "solid", "2px", "2px", true ], edge
+  end
+
   # `admin--editing--hold#reveal` through the section's own `showSettings`:
   # the frozen form is in sight and the head's words say the region is open.
   test "a tie on a section's settings closed meanwhile opens the region again, with the notice and the frozen form" do

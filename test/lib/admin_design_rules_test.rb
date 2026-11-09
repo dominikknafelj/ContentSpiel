@@ -234,10 +234,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   BORDER_EDGE = /(?<![\w-])border(?:-(?:line|line-strong|danger|accent|field-line))?(?=[\s"'])/
   # Held by someone else and discussed in the notes are one frame: the marks
   # that already exist, in one rule, the people's.
-  PEOPLE_FRAME = [ '.admin-block-card[data-card-edge="held"]',
+  PEOPLE_FRAME = [ '.admin-block-card:where(:not(.admin-section-card))[data-card-edge="held"]',
                    ".admin-block-card:where(:not(.admin-section-card))[data-notes-active]",
                    ".admin-block-tile[data-notes-active]" ].freeze
   UNAVAILABLE_EDGE = '.admin-block-card[data-card-edge="unavailable"]'
+  SECTION_FRAME = [ '.admin-section-card[data-card-edge="held"]',
+                    '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))' ].freeze
   CHOSEN_SECTION = ":is(.admin-section-card, .admin-section-group)[data-chosen]"
 
   test "the editor's cards and tiles draw no border utility: their edges are the stylesheet's state outlines" do
@@ -264,21 +266,24 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal order.sort, order, "the people frame, then the unavailable edge, then the chosen section: the later wins at one weight"
   end
 
-  # A live merge synchronises a section's frame, which is not a kept unit,
-  # so a frozen settings form's people outline cannot live in `data-card-edge`
-  # there: the stylesheet draws it from the frozen form, outside the frame.
-  FROZEN_SECTION_EDGE = '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))'
-
-  test "a section whose settings form is frozen draws the people outline from the form, outside its frame and under the unavailable edge" do
-    body = single_rule(FROZEN_SECTION_EDGE)
+  # A live merge synchronises a section's frame, which is not a kept unit, so
+  # it may drop a `data-card-edge` the server drew: the stylesheet draws the
+  # outline from the mark and from the frozen settings form alike, and in both
+  # cases outside the frame.
+  test "a held section draws the people outline outside its frame, from the server's mark or its frozen form, under the unavailable edge" do
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    body = rule_for(SECTION_FRAME)
     assert_match(/outline:\s*2px solid var\(--cs-people\)/, body)
     assert_match(/outline-offset:\s*2px/, body)
-    rules = self.class.css_rules("content-spiel.tailwind.css")
-    frozen = rules.index { |found, _| found == [ FROZEN_SECTION_EDGE ] }
+    assert(PEOPLE_FRAME.grep(/card-edge/).all? { |selector| selector.include?(":where(:not(.admin-section-card))") }, "the block frame leaves a section out")
+    frame = rules.index { |found, _| found == PEOPLE_FRAME }
+    section = rules.index { |found, _| found == SECTION_FRAME }
     unavailable = rules.index { |found, _| found == [ UNAVAILABLE_EDGE ] }
-    assert_operator frozen, :<, unavailable, "the unavailable edge comes later and weighs more"
+    chosen = rules.index { |found, _| found == [ CHOSEN_SECTION ] }
+    assert_equal [ frame, section, unavailable, chosen ].sort, [ frame, section, unavailable, chosen ], "the unavailable edge and the chosen section come later and win"
   end
 
+  DRAGLESS = ".admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback))".freeze
   GLOW = ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"])".freeze
 
   test "a card glows in the people hue while its mark stands, never on a held card, and not under reduced motion" do
@@ -287,9 +292,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert glow, "the glow is drawn by the stylesheet"
     assert_match(/box-shadow:\s*var\(--cs-shadow-1\), 0 0 0 4px color-mix\(in oklab, var\(--cs-people\) 20%, transparent\)/, glow)
     assert_match(/transition-duration:\s*200ms/, glow)
-    assert_match(/\.admin-block-card\s*\{\s*transition:\s*box-shadow 600ms var\(--cs-ease\);\s*\}/, css)
+    assert_includes css.gsub(/\s+/, " "), "#{DRAGLESS} { transition: box-shadow 600ms var(--cs-ease); }", "600ms out, and not on a card being dragged"
     assert_match(/@media \(prefers-reduced-motion: no-preference\)\s*\{\s*#{Regexp.escape(GLOW)}\s*\{[^}]*color-mix/, css, "the glow is drawn only where motion is welcome")
-    assert_match(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.admin-block-card\s*\{\s*transition:\s*none;\s*\}\s*\}/, css, "under reduced motion the card has no transition")
+    assert_match(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*#{Regexp.escape(DRAGLESS)}\s*\{\s*transition:\s*none;\s*\}\s*\}/, css, "under reduced motion the card has no transition")
   end
 
   # A section is a frame of the structure colour around its lanes, not a
@@ -1357,7 +1362,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   PEOPLE_RULES = [
     ".admin-notes-marker[data-has-notes]",
     PEOPLE_FRAME.join(", "),
-    '.admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"]))',
+    SECTION_FRAME.join(", "),
     ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"])"
   ].freeze
 

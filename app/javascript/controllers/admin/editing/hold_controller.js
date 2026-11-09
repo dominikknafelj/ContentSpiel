@@ -3,7 +3,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 import { drained, enqueue } from "saving/queue"
 import { get, post } from "editing/requests"
 import { freeze, textOf } from "editing/freeze"
-import { clearMarks, fadeMark, showMark } from "editing/marks"
+import { fadeMark, showMark } from "editing/marks"
 
 // THE TAB'S SIDE OF A RESERVATION (the reservation rules are in `docs/reference/live-editing.md`). One per
 // editor, on the element `Admin::EditorScreen::LiveRegionComponent` renders,
@@ -199,7 +199,6 @@ export default class extends Controller {
     window.removeEventListener("pagehide", this.leaving)
     document.removeEventListener("turbo:before-stream-render", this.beforeStream)
     this.timers.forEach((timer) => clearTimeout(timer))
-    clearMarks(this.element)
     this.timers.clear()
     const url = this.hasReleaseUrlValue ? this.releaseUrlValue : null
     const timeout = this.timeoutValue
@@ -578,12 +577,11 @@ export default class extends Controller {
     this.focusFirstField(subject, asking.from)
   }
 
-  // The block's head says "Taken over by you" for the notice, then the mark fades.
+  // The block's head says "Taken over by you" for the notice, then the mark fades;
+  // `admin--editing--live` takes any mark back when the page is left.
   markTakenOver(subject) {
-    const id = subject.slice("block-".length)
     if (!subject.startsWith("block-") || !this.hasTakenOverTarget) return
-    const unit = this.element.querySelector(`#content_block_${CSS.escape(id)}, #block-${CSS.escape(id)}-panel`)
-    fadeMark(showMark(unit, this.takenOverTarget), { after: this.noticeValue })
+    fadeMark(showMark(this.element, subject.slice("block-".length), this.takenOverTarget), { after: this.noticeValue })
   }
 
   // Not arrived: the status says why (or nothing), and the button is ready.

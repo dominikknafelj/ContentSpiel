@@ -51,7 +51,6 @@ class Admin::EditorScreen::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: record)
 
     assert_selector ".admin-block-card__head span[data-editing-mark-place]:empty", visible: :all
-    assert_no_selector "[data-editing-mark-slot]", visible: :all
   end
 
   test "a held card says so in data-card-edge=held, an unavailable one in data-card-edge=unavailable, and neither carries a border utility" do

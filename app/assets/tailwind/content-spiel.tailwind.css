@@ -1371,24 +1371,28 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    and the strip and the open thread say which in words. The selector list
    names the marks that already exist; no element carries a class for it.
    A section is never `data-notes-active` (it has no marker), and its frame is
-   not a kept unit, so its outline is drawn from its frozen settings form,
-   outside the frame at the offset of the chosen section. The unavailable
+   not a kept unit, so a merge may drop its `data-card-edge`: its outline is
+   drawn from either the server's mark or its frozen settings form, outside
+   the frame (offset 2px) in every held case. The unavailable
    edge and the chosen section come after and win: a block whose type is gone
    shows danger, a chosen section the accent. All three weigh the same,
    (0,2,0), and the later rule wins; the `:where()` of the frozen section and
    of the notes rule adds no weight. Each edge is 3:1 or better on the card
    and on the canvas (`test/lib/admin_contrast_test.rb`) and is never the
    only cue. */
-.admin-block-card[data-card-edge="held"],
+.admin-block-card:where(:not(.admin-section-card))[data-card-edge="held"],
 .admin-block-card:where(:not(.admin-section-card))[data-notes-active],
 .admin-block-tile[data-notes-active] { outline: 2px solid var(--cs-people); outline-offset: -2px; }
+.admin-section-card[data-card-edge="held"],
 .admin-section-card:where(:has(> .admin-section-card__settings form[data-editing-frozen="true"])) { outline: 2px solid var(--cs-people); outline-offset: 2px; }
 .admin-block-card[data-card-edge="unavailable"] { outline: 2px solid var(--cs-danger); outline-offset: -2px; }
 /* A card whose head carries a mark ("Updated by", "Taken over by you") glows
    in the people hue while the mark stands: 200ms in, 600ms out, and out as the
    mark starts to fade. It never stands with the people frame (a held card
-   shows the frame alone), and under reduced motion there is none. */
-.admin-block-card { transition: box-shadow 600ms var(--cs-ease); }
+   shows the frame alone), and under reduced motion there is none. The
+   600ms is the glow's way out, so a card being dragged keeps its own
+   shadow states without easing. */
+.admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback)) { transition: box-shadow 600ms var(--cs-ease); }
 @media (prefers-reduced-motion: no-preference) {
   .admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge="held"]) {
     box-shadow: var(--cs-shadow-1), 0 0 0 4px color-mix(in oklab, var(--cs-people) 20%, transparent);
@@ -1396,7 +1400,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .admin-block-card { transition: none; }
+  .admin-block-card:where(:not(.admin-drag-chosen, .admin-drag-ghost, .admin-drag-fallback)) { transition: none; }
 }
 /* The section chosen in the editor's rail (`admin--editor--section-choice`):
    a selection, so the accent, 2px outside the frame (3:1 on the canvas,

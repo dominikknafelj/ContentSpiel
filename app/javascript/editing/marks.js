@@ -14,8 +14,15 @@
 const FADE = 200
 const timers = new WeakMap()
 
-export function showMark(unit, template) {
-  const place = unit?.querySelector("[data-editing-mark-place]")
+// The block's own unit: its card in the list or its panel in a section. A
+// section's tile carries the card's id too and has no place for a mark.
+function unitOf(root, blockId) {
+  const id = CSS.escape(blockId)
+  return root.querySelector(`.admin-block-card[id="content_block_${id}"], .admin-block-card[id="block-${id}-panel"]`)
+}
+
+export function showMark(root, blockId, template) {
+  const place = unitOf(root, blockId)?.querySelector("[data-editing-mark-place]")
   if (!place || !template) return null
   const mark = template.content.firstElementChild?.cloneNode(true)
   if (!mark) return null

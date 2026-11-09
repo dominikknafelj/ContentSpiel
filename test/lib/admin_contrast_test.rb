@@ -185,6 +185,7 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(light ? 5.2 : 5.6, colour.("--cs-meta"), tint, "the status on the tint (#{scheme})")
       assert_ratio(light ? 5.7 : 6.3, colour.("--cs-accent"), tint, "Take over's words on the tint (#{scheme})")
       assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "Take over's words on its own fill (#{scheme})")
+      assert_ratio(light ? 5.6 : 6.2, colour.("--cs-accent"), colour.("--cs-accent-tint"), "Take over's words on its own fill, at the measured figure (#{scheme})")
       assert_ratio(light ? 3.0 : 3.7, colour.("--cs-field-line"), tint, "Take over's edge on the tint (#{scheme})")
     end
   end

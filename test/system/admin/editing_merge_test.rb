@@ -1221,8 +1221,8 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
   # The glow is the stylesheet's, read from what the browser computes on the card
   # while a mark, put in by `editing/marks.js`, stands in its head.
   def glow_of(block, held: false)
-    page.evaluate_async_script(<<~JS, card(block), held)
-      const [ selector, held, done ] = arguments
+    page.evaluate_async_script(<<~JS, card(block), block.id.to_s, held)
+      const [ selector, blockId, held, done ] = arguments
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
       ;(async () => {
         const marks = await import("editing/marks")
@@ -1232,7 +1232,7 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
         const shadow = () => getComputedStyle(card).boxShadow
         const rest = shadow()
         if (held) card.setAttribute("data-card-edge", "held")
-        const mark = marks.showMark(card, template)
+        const mark = marks.showMark(document, blockId, template)
         const during = getComputedStyle(card).transitionDuration
         await wait(400)
         const glowing = shadow()

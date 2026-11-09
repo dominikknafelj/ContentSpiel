@@ -2,7 +2,7 @@
   <% if taken_over? %>
     <%= t(".taken_over") %> · <%= t(".just_now") %>
   <% else %>
-    <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :sm, tone: :other, here: true) %>
+    <%= render Admin::Ui::AvatarComponent.new(initials: initials, size: :sm, tone: :other) %>
     <span><%= t(".updated_by", name: name) %> · <%= render Admin::Ui::TimeAgoComponent.new(time: at) %></span>
   <% end %>
 <% end %>
