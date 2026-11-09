@@ -10,13 +10,11 @@ module Admin
       # replaces.
       REORDER_STATUS_ID = "content-blocks-status"
 
-      # The page's own list: the blocks outside any
-      # section, which is what the block list shows as cards, what "first" and
-      # "last" are counted among and what a reorder of the page names. A block
-      # in a section's column has its `position` counted in that column, so it
-      # is no part of this order. A fresh query each time it is asked: every
-      # caller reads it after a service has written, but for the order a
-      # reorder's Undo goes back to, which the action reads before it.
+      # The page's own list: the blocks outside any section, which is what the block list shows as
+      # cards, what "first" and "last" are counted among and what a reorder of the page names. A
+      # block in a section's column has its `position` counted in that column, so it is no part of
+      # this order. A fresh query each time it is asked: every caller reads it after a service has
+      # written, but for the order a reorder's Undo goes back to, which the action reads before it.
       def self.top_level_blocks(page) = page.content_blocks.top_level.reorder(:position, :id)
 
       # A section's layout as its type reads it: the schema's default where the
@@ -66,14 +64,12 @@ module Admin
       end
 
       # A block in a section is a tile until it is opened, and the one line on
-      # its tile is drawn from what the block holds: every
-      # answer to its autosave redraws that line, so a tile never shows the
-      # caption or the image of before the save. Its form may well be closed by
-      # the time the answer is here, and then the tile is all there is to see.
-      # A save refused as invalid says so on the tile (`invalid:`), for the same
-      # reason: the error slots are in a form nobody may be looking at. Not a
-      # denied save: that is no fault of the block's, and the error toast says
-      # it.
+      # its tile is drawn from what the block holds: every answer to its autosave redraws that line,
+      # so a tile never shows the caption or the image of before the save. Its form may well be
+      # closed by the time the answer is here, and then the tile is all there is to see. A save
+      # refused as invalid says so on the tile (`invalid:`), for the same reason: the error slots
+      # are in a form nobody may be looking at. Not a denied save: that is no fault of the block's,
+      # and the error toast says it.
       #
       # Only the summary is replaced, never the tile: the tile's button may hold
       # the focus and says which form is open (`aria-expanded`). A refused stale
@@ -99,13 +95,12 @@ module Admin
         end
       end
 
-      # A block in a section is two elements: its tile,
-      # which has the block's `dom_id` and is removed like a card, and its
-      # form's panel under the lanes. The panel goes with it, and it can be the
-      # very thing on screen: an unavailable block's panel has "Delete block…"
-      # in it. Left behind it would stay open with no tile to close it from, its
-      # Delete answering 410. `admin--editor--section` needs no telling: the
-      # open form is whichever panel is showing, and none is.
+      # A block in a section is two elements: its tile, which has the block's `dom_id` and is
+      # removed like a card, and its form's panel under the lanes. The panel goes with it, and it
+      # can be the very thing on screen: an unavailable block's panel has "Delete block…" in it.
+      # Left behind it would stay open with no tile to close it from, its Delete answering 410.
+      # `admin--editor--section` needs no telling: the open form is whichever panel is showing, and
+      # none is.
       def panel_removal_streams(block)
         block.section_id ? [ turbo_stream.remove(Admin::EditorScreen::BlockCardComponent.panel_id(block)) ] : []
       end
@@ -132,12 +127,11 @@ module Admin
       # the lane `tile_streams` appends to), and the section's two counts, which
       # a copy raises as an add does.
       #
-      # NOT OPENED, unlike a block just added, which opens at once: an added block is empty and its form is what
-      # the person came for; a copy already holds what its source holds, and
-      # what follows a Duplicate is as often moving the copy as editing it.
-      # Opening it would also close the form that is open in the section, which
-      # may be the source's, mid-edit. The focus goes to the copy's menu
-      # (`admin--editor--blocks#focusCopy`), from where it is opened, moved or
+      # NOT OPENED, unlike a block just added, which opens at once: an added block is empty and its
+      # form is what the person came for; a copy already holds what its source holds, and what
+      # follows a Duplicate is as often moving the copy as editing it. Opening it would also close
+      # the form that is open in the section, which may be the source's, mid-edit. The focus goes to
+      # the copy's menu (`admin--editor--blocks#focusCopy`), from where it is opened, moved or
       # copied on.
       def copy_tile_streams(copy, source)
         section = copy.section
@@ -157,9 +151,8 @@ module Admin
       end
 
       # Each block a saved reorder moved between containers, in its new shape
-      # and the count of every section that gained or
-      # lost one. `origins` is the request's `moved_from`, which the service
-      # has just found true: where each block was.
+      # and the count of every section that gained or lost one. `origins` is the request's
+      # `moved_from`, which the service has just found true: where each block was.
       #
       # - A card that went into a column becomes a tile, and its form a panel
       #   under that section's lanes.
@@ -252,11 +245,10 @@ module Admin
       end
 
       # A section's structure as the database has it now, for an answer that
-      # must put right what this tab shows of it: a
-      # save of the section that changed how many columns it has (a narrower
-      # layout folds the blocks of the removed columns into the last one left,
-      # `ContentBlocks::Save#fold_removed_columns`) and an add refused because
-      # another tab removed the column it named.
+      # must put right what this tab shows of it: a save of the section that changed how many
+      # columns it has (a narrower layout folds the blocks of the removed columns into the last one
+      # left, `ContentBlocks::Save#fold_removed_columns`) and an add refused because another tab
+      # removed the column it named.
       #
       # THE ONE REDRAW OF A SECTION'S LANES. Three things on screen say which
       # column a block is in, and they are brought up to date together or the

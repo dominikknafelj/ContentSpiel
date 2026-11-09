@@ -26,7 +26,7 @@ module Admin
         interface: %i[definition place block],
         limits: [
           "A type that names no icon draws nothing.",
-          "Only an icon that follows its block carries an id."
+          "Only an icon that follows its block carries an id, and not on a row, where one block can stand twice."
         ],
         states: %i[picker card tile section row],
         keys: [],
@@ -37,7 +37,7 @@ module Admin
 
       PLACES = { picker: :regular, card: :regular, tile: :small, section: :small, row: :xsmall }.freeze
 
-      def self.dom_id(block, place) = "#{Admin::EditorScreen::BlockCardComponent.error_prefix(block)}-icon-#{place}"
+      def self.dom_id(block, place) = "block-#{block.id}-icon-#{place}"
 
       def initialize(definition:, place:, block: nil)
         raise ArgumentError, "unknown place #{place.inspect}" unless PLACES.key?(place)
@@ -51,7 +51,7 @@ module Admin
 
       def call
         render Admin::Ui::IconChipComponent.new(icon: icon_name, family: @definition.family, size: PLACES.fetch(@place),
-          id: (self.class.dom_id(@block, @place) if @block && @definition.icon_follows_block?), data: { block_icon: icon_name })
+          id: (self.class.dom_id(@block, @place) if @block && @place != :row && @definition.icon_follows_block?), data: { block_icon: icon_name })
       end
 
       private

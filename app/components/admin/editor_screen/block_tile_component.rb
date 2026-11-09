@@ -1,10 +1,10 @@
 module Admin
   module EditorScreen
-    # A block inside a section, as it stands in its column: its type (chip and
-    # name) over its preview or its one line (`TileSummaryComponent`), on a button that opens the block's form under
-    # the lanes (`admin--editor--section#toggle`). Its states -- under the
-    # pointer, open or focused, dragged, its thread open -- are the
-    # stylesheet's (`.admin-block-tile`), drawn by elevation.
+    # A block inside a section, as it stands in its column: its type (chip and name) over its
+    # preview or its one line (`TileSummaryComponent`), on a button that opens the block's form
+    # under the lanes (`admin--editor--section#toggle`). Its states -- under the pointer, open or
+    # focused, dragged, its thread open -- are the stylesheet's (`.admin-block-tile`), drawn by
+    # elevation.
     #
     # THE TILE HAS THE BLOCK'S `dom_id`, as a card of the block list has: it
     # is the element that stands for the block where the block is, the one a
@@ -18,50 +18,42 @@ module Admin
     # while its form is to be shown at once (a block just added): the script
     # opens the panel, and the tile must not say "collapsed" in between.
     #
-    # THE GRIP IS FOR THE POINTER ONLY (sections plan, D9): a `<span>` hidden
-    # from a screen reader, not the `<button>` a card's handle is. A card's
-    # handle is also its keyboard path (Space, arrows, Space), which moves a
-    # card along one list; a tile's moves are along its lane, to another
-    # column and out of the section, and those are items of the tile's menu,
-    # where each has a name. A focusable grip beside the face would be a
-    # second stop on every tile for a control the keyboard can't work. Only
-    # for a viewer who can edit, as a card's handle is.
+    # THE GRIP IS FOR THE POINTER ONLY: a `<span>` hidden from a screen reader, not the `<button>` a
+    # card's handle is. A card's handle is also its keyboard path (Space, arrows, Space), which
+    # moves a card along one list; a tile's moves are along its lane, to another column and out of
+    # the section, and those are items of the tile's menu, where each has a name. A focusable grip
+    # beside the face would be a second stop on every tile for a control the keyboard can't work.
+    # Only for a viewer who can edit, as a card's handle is.
     #
-    # THE "⋯" MENU IS THE TILE'S KEYBOARD PATH,
-    # for a viewer who can edit: Move up and Move down along the lane (the
-    # card's own buttons, `data-move` and `admin--editor--blocks#moveUp|moveDown`),
-    # "Move to column…" (the page's one Move dialog, `MoveDialogComponent`),
-    # "Move out of section" (`admin--editor--blocks#moveOut`: to the page's list,
-    # directly after the section), Duplicate, and "Delete block…". Every move
-    # item is rendered enabled: which of them has nowhere to go -- the first
-    # tile's Move up, the last one's Move down, "Move to column…" in a section
-    # of one column -- depends on the tile's neighbours and its section's
-    # layout, which change without the tile being drawn again, so
-    # `admin--editor--blocks#refreshMoveState` says it, as the tile connects and after
-    # every change of a lane.
+    # THE "⋯" MENU IS THE TILE'S KEYBOARD PATH, for a viewer who can edit: Move up and Move down
+    # along the lane (the card's own buttons, `data-move` and
+    # `admin--editor--blocks#moveUp|moveDown`), "Move to column…" (the page's one Move dialog,
+    # `MoveDialogComponent`), "Move out of section" (`admin--editor--blocks#moveOut`: to the page's
+    # list, directly after the section), Duplicate, and "Delete block…". Every move item is rendered
+    # enabled: which of them has nowhere to go -- the first tile's Move up, the last one's Move
+    # down, "Move to column…" in a section of one column -- depends on the tile's neighbours and its
+    # section's layout, which change without the tile being drawn again, so
+    # `admin--editor--blocks#refreshMoveState` says it, as the tile connects and after every change
+    # of a lane.
     #
-    # A tile of a type that is not registered any more keeps the four moves and
-    # "Delete block…", and has no Duplicate: nothing of it can be read, so it
-    # is not copied. Delete is its only action on the block itself; but the tile keeps
-    # its grip, so the pointer moves it along its lane, to another column and
-    # out of the section, and the keyboard has whatever the pointer has.
+    # A tile of a type that is not registered any more keeps the four moves and "Delete block…", and
+    # has no Duplicate: nothing of it can be read, so it is not copied. Delete is its only action on
+    # the block itself; but the tile keeps its grip, so the pointer moves it along its lane, to
+    # another column and out of the section, and the keyboard has whatever the pointer has.
     #
-    # In a section whose own type is gone the tile is drawn the
-    # same and `admin--editor--blocks` disables what cannot be done there -- Move up,
-    # Move down and "Move to column…", since that section has no column the
-    # server would take a block into (`admin--editor--blocks#closed`). "Move out of
-    # section" and "Delete block…" are what is left, and no Duplicate
-    # (`duplicate?`).
+    # In a section whose own type is gone the tile is drawn the same and `admin--editor--blocks`
+    # disables what cannot be done there -- Move up, Move down and "Move to column…", since that
+    # section has no column the server would take a block into (`admin--editor--blocks#closed`).
+    # "Move out of section" and "Delete block…" are what is left, and no Duplicate (`duplicate?`).
     #
     # THE BLOCK'S DELETE DIALOG IS IN THE TILE (`DeleteBlockDialogComponent`,
     # which says why it is not in the form's panel). It is a child of the
     # tile and not of the lane: a lane's children are exactly its tiles.
     #
     # A viewer who can't edit may still open a tile: the form they get is the
-    # disabled one a view-only card shows. They get the face, the notes
-    # marker (whoever can read the page writes notes) and a "⋯" menu whose
-    # only item is "Add note", and nothing else. For an editor "Add note" is the first item of
-    # the tile's menu.
+    # disabled one a view-only card shows. They get the face, the notes marker (whoever can read the
+    # page writes notes) and a "⋯" menu whose only item is "Add note", and nothing else. For an
+    # editor "Add note" is the first item of the tile's menu.
     class BlockTileComponent < AdminComponent
       include HeldUnit
 

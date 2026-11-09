@@ -32,7 +32,6 @@ test/components/admin/dashboard_screen/panel_component_test.rb: 0.0
 test/components/admin/dashboard_screen/row_component_test.rb: 0.5
 test/components/admin/dashboard_screen/translation_panel_component_test.rb: 0.7
 test/components/admin/editor_screen/block_card_component_test.rb: 12.0
-test/components/admin/ui/block_icon_component_test.rb: 0.3
 test/components/admin/editor_screen/block_picker_component_test.rb: 1.0
 test/components/admin/editor_screen/block_samples_card_test.rb: 1.3
 test/components/admin/editor_screen/block_tile_component_test.rb: 3.7
@@ -143,6 +142,7 @@ test/components/admin/trash_screen/row_component_test.rb: 2.1
 test/components/admin/trash_screen/tabs_component_test.rb: 0.0
 test/components/admin/ui/avatar_component_test.rb: 0.0
 test/components/admin/ui/badge_component_test.rb: 0.0
+test/components/admin/ui/block_icon_component_test.rb: 0.3
 test/components/admin/ui/button_component_test.rb: 0.0
 test/components/admin/ui/channel_chip_component_test.rb: 0.0
 test/components/admin/ui/checkbox_component_test.rb: 0.0

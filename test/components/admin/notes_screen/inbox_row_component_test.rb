@@ -17,7 +17,9 @@ class Admin::NotesScreen::InboxRowComponentTest < ViewComponent::TestCase
     assert_selector "a", count: 1
     assert_selector "a[data-delivery][class~='grid-cols-[26px_1fr_auto]'] > span.admin-row-verb.col-start-3:last-child", exact_text: "Open thread"
     assert_selector "a [data-inbox-sentence]", text: "Dana mentioned you"
-    assert_selector "a > span:nth-last-child(2) time"
+    # The end column: the time, then (unread only) New, then the verb last.
+    assert_selector "a > span.col-start-3 time"
+    assert_selector "a > span.col-start-3:has(time) + span[data-inbox-new] + span.admin-row-verb:last-child"
   end
 
   test "an unread row has the New chip and no dot or hidden Unread; a read row's sentence is dim" do
@@ -25,7 +27,7 @@ class Admin::NotesScreen::InboxRowComponentTest < ViewComponent::TestCase
 
     render_inline Admin::NotesScreen::InboxRowComponent.new(row:)
 
-    assert_selector "a > span [data-inbox-new][class~='bg-accent-tint'][class~='rounded-pill'][class~='text-accent']", exact_text: "New"
+    assert_selector "a > span[data-inbox-new][class~='bg-accent-tint'][class~='rounded-pill'][class~='text-accent']", exact_text: "New"
     assert_selector "[data-inbox-new] > span.bg-accent.size-1\\.5[aria-hidden=true]"
     assert_selector "[data-inbox-sentence][class~='text-ink'][class~='text-sm'] strong.font-semibold"
     assert_no_selector ".sr-only"
@@ -36,6 +38,7 @@ class Admin::NotesScreen::InboxRowComponentTest < ViewComponent::TestCase
     render_inline Admin::NotesScreen::InboxRowComponent.new(row: read)
 
     assert_no_selector "[data-inbox-new]"
+    assert_selector "a > span.col-start-3:has(time) + span.admin-row-verb:last-child"
     assert_selector "[data-inbox-sentence][class~='text-dim'] strong.font-medium"
     assert_selector "a:not([data-unread])"
   end

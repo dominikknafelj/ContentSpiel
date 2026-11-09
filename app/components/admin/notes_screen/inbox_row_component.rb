@@ -22,6 +22,11 @@ module Admin
     #
     # Nothing here queries: the row carries its users, record and block.
     class InboxRowComponent < Admin::AdminComponent
+      # The module whose chip stands for each kind of record: the chip is the
+      # sidebar's own (`StudioModules`), read from the registry so the two
+      # cannot differ.
+      MODULES = { "page" => :pages, "post" => :posts, "media" => :media }.freeze
+
       def initialize(row:)
         @row = row
       end
@@ -46,17 +51,13 @@ module Admin
         t(".#{row.reason}.somebody_html", name: tag.strong(::PersonName.of(row.by), class: row.unread ? "font-semibold" : "font-medium"))
       end
 
-      # The chips by the record's kind: the sidebar's own family and icon for
-      # its module (`config/initializers/studio_modules.rb`).
-      CHIPS = { "page" => %i[structure pages], "post" => %i[lists posts], "media" => %i[media media] }.freeze
-
       # The record's chip, or for a note on a block its type's, so the line
       # says what the note is on before it says where.
       def where_chip
         return render(Admin::Ui::BlockIconComponent.new(definition: row.block.definition, place: :row, block: row.block)) if row.heading && row.block
 
-        family, icon = CHIPS.fetch(row.kind)
-        render Admin::Ui::IconChipComponent.new(icon: icon, family: family, size: :xsmall)
+        entry = StudioModules.find(MODULES.fetch(row.kind))
+        render Admin::Ui::IconChipComponent.new(icon: entry.icon, family: entry.family, size: :xsmall)
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich

@@ -114,10 +114,10 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     Notes::Delivery.where(user: @me, thread: read).update_all(read_at: Time.current) # version: none (a test's own setup)
 
     counts = nil
-    statements = capture_sql { counts = inbox.counts }
+    statements = nil
+    assert_queries_count(1) { statements = capture_sql { counts = inbox.counts } }
 
     assert_equal({ all: 2, unread: 1, mentions: 2 }, counts)
-    assert_equal 1, statements.grep(/"note_deliveries"/).size, statements.join("\n")
     assert_match(/COUNT\(\*\) FILTER/, statements.grep(/"note_deliveries"/).first)
     assert_equal({ all: 0, unread: 0, mentions: 0 }, inbox(users(:one)).counts)
   end

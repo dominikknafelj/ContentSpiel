@@ -270,4 +270,34 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
 
     assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=/, wait: 8)
   end
+
+  # "New" is on its own line of the end column, under the time and over the
+  # verb, so the verb alone sets the column's width: an unread row's words
+  # keep the room of a read row's, in the full list and in the dashboard's
+  # narrow panel at a 390px window.
+  test "an unread row's sentence is as wide as a read row's, in the list and in the dashboard's panel at 390px" do
+    original = page.current_window.size
+    mention(@page)
+    read = mention(@block, "Read, @[#{@me.id}]")
+    Notes::Delivery.where(user: @me, thread: read).update_all(read_at: Time.current) # version: none (a test's own setup)
+    page.current_window.resize_to(390, 900)
+    widths = <<~JS
+      [ ...document.querySelectorAll("[data-delivery]") ].map((row) => [ row.matches("[data-unread]"), row.querySelector("[data-inbox-sentence]").getBoundingClientRect().width ])
+    JS
+
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+    list = page.evaluate_script(widths).to_h
+    assert_equal 2, list.size, "one unread row and one read row"
+    assert_in_delta list[true], list[false], 1
+
+    visit_screen "/cs-studio"
+    assert_selector "turbo-frame#notes-for-you [data-delivery]", count: 2
+    panel = page.evaluate_script(widths).to_h
+    assert_in_delta panel[true], panel[false], 1
+    verb = page.evaluate_script("document.querySelector('turbo-frame#notes-for-you [data-delivery] .admin-row-verb').getBoundingClientRect().width")
+    assert_operator verb, :<, 100
+  ensure
+    page.current_window.resize_to(*original)
+  end
 end

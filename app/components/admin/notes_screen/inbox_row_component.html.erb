@@ -1,7 +1,8 @@
 <%# The whole row is ONE link: the avatar, the sentence with where it is and the
     first words under it, then the end column, in a grid of `26px 1fr auto`,
-    `hover:bg-paper`. The end column is the time (with New before it on an
-    unread row) over the verb, so the lines keep the room of one: in a 327px
+    `hover:bg-paper`. The end column is three right-aligned lines: the time,
+    "New" on an unread row only, and the verb. The verb is its widest line, so
+    an unread row's lines keep the room of a read row's: in a 327px
     panel (390px window) they would otherwise be left about 100px and cut
     "Dana mentioned you". The verb stays the link's last child, so `a:hover >
     .admin-row-verb` still finds it. The negative margins take the link to the
@@ -21,7 +22,7 @@
   <% else %>
     <span class="flex size-[26px] items-center justify-center rounded-full bg-sunken text-meta" aria-hidden="true"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3.5" %></span>
   <% end %>
-  <span class="row-span-2 flex min-w-0 flex-col gap-0.5">
+  <span class="row-span-3 flex min-w-0 flex-col gap-0.5">
     <span class="truncate text-sm <%= row.unread ? "text-ink" : "text-dim" %>" data-inbox-sentence><%= sentence %></span>
     <span class="flex min-w-0 items-center gap-1.5" data-inbox-where>
       <%= where_chip %>
@@ -29,11 +30,9 @@
     </span>
     <span class="truncate text-[13px] text-meta" data-inbox-excerpt><%= row.excerpt %></span>
   </span>
-  <span class="flex items-center gap-2 justify-self-end">
-    <% if row.unread %>
-      <span data-inbox-new class="inline-flex items-center gap-1 rounded-pill bg-accent-tint px-2 text-count font-semibold text-accent"><span class="size-1.5 rounded-full bg-accent" aria-hidden="true"></span><%= t(".new") %></span>
-    <% end %>
-    <span class="text-count text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
-  </span>
+  <span class="col-start-3 justify-self-end text-count text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
+  <% if row.unread %>
+    <span data-inbox-new class="col-start-3 inline-flex items-center gap-1 justify-self-end rounded-pill bg-accent-tint px-2 text-count font-semibold text-accent"><span class="size-1.5 rounded-full bg-accent" aria-hidden="true"></span><%= t(".new") %></span>
+  <% end %>
   <span class="admin-row-verb col-start-3 justify-self-end"><%= t(".verb") %></span>
 <% end %>

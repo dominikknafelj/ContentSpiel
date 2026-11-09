@@ -69,6 +69,15 @@ class Admin::Ui::BlockIconComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "a row draws no id even for an icon that follows its block, since one block can stand on it twice" do
+    with_flag_type do |flag|
+      block = root_page.content_blocks.create!(block_type: "test_flag", position: 0, settings: { "tone" => "loud" })
+      render_inline Admin::Ui::BlockIconComponent.new(definition: flag, place: :row, block: block)
+
+      assert_selector "span[data-block-icon=triangle_alert]:not([id])"
+    end
+  end
+
   test "a type whose icon does not follow its block draws it with no id, also when it is handed a block" do
     block = root_page.content_blocks.create!(block_type: "code", position: 0)
     render_inline Admin::Ui::BlockIconComponent.new(definition: BlockTypes.fetch(:code), place: :card, block: block)
