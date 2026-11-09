@@ -76,6 +76,12 @@
 - The setup wizard shows how far along it is, marks the current and finished steps, and opens with a welcome.
 - ⌘K offers every section of Settings.
 - In the rich-text Link popover and the Page link dialog, one Escape closes them while a page search is still on its way, and its answer opens nothing afterwards; only a list of suggestions that is shown takes the first Escape.
+- People in CS Studio are rose circles with their initials, and a note count is a rose bubble; unread notes for you are the accent bubble that says how many are new ("3 new"), and a deleted user is an empty circle.
+- The page tree and the posts list show who else is on a page or post as avatars, one circle and "+N" while the tree column is narrow.
+- Notes for you can show All, Unread or Mentions, shows who wrote and where on each row, and lists the open threads beside the list.
+- A block someone else is editing has a rose strip and outline, a block whose thread is open takes the same outline, and "Updated by" shows who, with their avatar.
+- The tabs of Waiting for you, Trash and the form builder mark the current tab as the filter bar does.
+- The sidebar's unread count stays on the Dashboard item, and its link is named "Dashboard, 2 new".
 
 ### Removed
 
@@ -103,6 +109,8 @@
 - `AccessControl::Permissions.register` takes `grantable:` (default true); `Permissions.grantable` is what a group may hold. A caller that listed `Permissions.all` to offer or seed grants now reads `grantable`.
 - `ContentModel::FieldTypes` has two more built-ins, `email` and `form`, and `text` takes `max:`.
 - A form field type or destination that a gem no longer registers is dormant, not gone: a stored field of it is left out of a send and carried through a save, and a stored destination of it is carried through a save (its deliveries fail `unknown_destination`) and drawn in the builder with a box that removes it. Only one given anew under an unknown name is refused.
+- `User#display_name` and `Invitation#display_name` are `name_or_email`, and `Notes.name_of` is `PersonName.of` (#140): a caller outside this repository that called either gets a `NoMethodError`, since no alias is kept.
+- `Admin::EditorScreen::BlockIconComponent` is `Admin::Ui::BlockIconComponent` (with `place: :row` for a list row), and the note bubble and the presence stack are `Admin::Ui::NoteMarkerComponent` and `Admin::Ui::PresenceMarkerComponent`, each with `Admin::Ui::Contract`. A slot entry of a gem keeps its own name, loader and words and may render them. `Admin::Ui::AvatarComponent` has the sizes `lg`, `md` and `sm` (28, 26 and 22px) and the tones `other`, `own`, `away`, `more` and `empty`, and the icon `message_square_filled` is new.
 - `Posts::Save` and `Pages::Save` refuse a key under a language they would drop, by name, writing and auditing nothing, as `ContentBlocks::Save` does (#147). A caller outside this repository that sent such a key gets a failed result where it got ok.
 - **A promise: the entrypoint.** Every installed wrapper relies on these and nothing else: every image holds an executable `contentspiel` on its `PATH` that takes the arguments exactly as typed; the wrapper runs it with the site's folder mounted at `/site` as the working folder; the subcommand `dev-files` writes `.contentspiel/compose.yml` into the site, which the wrapper's `dev` runs with `docker compose`; a release's image is tagged `X.Y.Z` and the newest is `stable`; and `upgrade` is the command the wrapper runs from `stable`, as it runs every command outside a site. A change to any of them is a breaking change (`docs/reference/hosting.md`, "The wrapper's one promise").
 - **A promise: the pin.** A site names its CMS version in one file at its top, `.contentspiel-version`: one line, `X.Y.Z`. The `contentspiel` command run in the folder or under it uses that version, the site's `config/deploy.yml` reads it into the `Dockerfile`'s `CMS_VERSION`, and `contentspiel upgrade` is what moves it (`docs/reference/hosting.md`, "A site's version").
