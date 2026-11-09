@@ -1,45 +1,64 @@
 require "test_helper"
 
-# The one drawing of a person's circle (notes' avatar and presence's people
-# both draw through it).
+# The one drawing of a person's circle (notes' avatar, presence's people and
+# the scripts' circles are all this one).
 class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
-  test "initials in a round mono circle, upper-case by style and hidden from a screen reader" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "dw", size: :md))
+  test "every size draws its initials at 11px, weight 600, upper-case" do
+    { lg: "size-7", md: "size-\\[26px\\]", sm: "size-\\[22px\\]" }.each do |size, diameter|
+      render_inline(Admin::Ui::AvatarComponent.new(initials: "dw", size: size))
 
-    assert_selector "span.flex.shrink-0.items-center.justify-center.rounded-full.font-medium.uppercase.leading-none.size-6.text-\\[9px\\]" \
-                    ".border.border-line-strong.bg-sunken.text-ink[aria-hidden=true]", text: "dw", exact_text: true
-    assert_no_selector ".ring-2"
+      assert_selector "span.flex.shrink-0.items-center.justify-center.rounded-full.text-count.font-semibold.uppercase.leading-none.#{diameter}[aria-hidden=true]",
+        text: "dw", exact_text: true
+    end
+    assert_no_selector ".ring-2, .inset-ring-\\[1\\.5px\\]"
+    assert_equal "11px", Rails.root.join("app/assets/tailwind/content-spiel.css").read[/--cs-t-count:\s*([^;]+);/, 1]
   end
 
-  test "lg is 28px with 11px letters" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "dw", size: :lg))
+  test "other is the people tint with people letters, own the solid people fill with surface letters, away a dashed edge on surface" do
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md))
+    assert_selector "span.bg-people-tint.text-people"
+    assert_no_selector ".border-dashed, .bg-people, .text-ink"
 
-    assert_selector "span.rounded-full.font-medium.uppercase.size-7.text-count.border.border-line-strong.bg-sunken.text-ink[aria-hidden=true]", exact_text: "dw"
-    assert_no_selector ".size-6, .text-\\[9px\\]"
-  end
-
-  test "the small size, the viewer's own filled tone and the unfilled away tone" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, tone: :own))
-    assert_selector "span.size-5.text-\\[8px\\].bg-ink.text-paper"
-    assert_no_selector ".border"
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, tone: :own))
+    assert_selector "span.bg-people.text-surface"
+    assert_no_selector ".bg-people-tint, .border-dashed"
 
     render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, tone: :away))
-    assert_selector "span.border.border-line.bg-paper.text-meta"
-    assert_no_selector ".bg-sunken, .border-line-strong, .text-ink"
+    assert_selector "span.border-\\[1\\.5px\\].border-dashed.border-field-line.bg-surface.text-meta"
+    assert_no_selector ".bg-people-tint, .bg-people, .text-people"
+
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "+3", size: :md, tone: :more))
+    assert_selector "span.bg-sunken.text-ink[aria-hidden=true]", text: "+3"
   end
 
-  test "a ring in the colour of what the circles stand on, for circles that overlap" do
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :paper))
-    assert_selector "span.ring-2.ring-paper"
+  test "here adds the inner people ring, and a ground ring is drawn outside it" do
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, here: true))
+    assert_selector "span.inset-ring-\\[1\\.5px\\].inset-ring-people"
+    assert_no_selector ".ring-2"
 
-    render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, ring: :surface))
-    assert_selector "span.ring-2.ring-surface"
-    assert_no_selector ".ring-paper"
+    { paper: "ring-paper", surface: "ring-surface", ground: "ring-\\(--admin-avatar-ground\\)" }.each do |ring, colour|
+      render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, here: true, ring: ring))
+      assert_selector "span.ring-2.#{colour}.inset-ring-\\[1\\.5px\\].inset-ring-people"
+    end
     assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :pink) }
   end
 
-  test "an unknown size or tone is refused" do
+  test "+N past nine reads 9+" do
+    assert_equal "+1", Admin::Ui::AvatarComponent.more_label(1)
+    assert_equal "+9", Admin::Ui::AvatarComponent.more_label(9)
+    assert_equal "9+", Admin::Ui::AvatarComponent.more_label(10)
+    assert_equal "9+", Admin::Ui::AvatarComponent.more_label(40)
+  end
+
+  test "the scripts' circle is the component's: ui/avatar.js holds its size and tone classes" do
+    script = Rails.root.join("app/javascript/ui/avatar.js").read
+    classes = [ Admin::Ui::AvatarComponent::LETTERS, *Admin::Ui::AvatarComponent::SIZES.values, *Admin::Ui::AvatarComponent::TONES.values ]
+    classes.each { |group| assert_includes script, %("#{group}"), "ui/avatar.js lacks #{group.inspect}" }
+  end
+
+  test "an unknown size, tone or ring is refused" do
     assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :huge) }
     assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, tone: :green) }
+    assert_raises(KeyError) { Admin::Ui::AvatarComponent.new(initials: "DW", size: :md, ring: :chrome) }
   end
 end

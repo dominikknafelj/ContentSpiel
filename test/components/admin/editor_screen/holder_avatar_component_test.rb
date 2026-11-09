@@ -65,7 +65,7 @@ class Admin::EditorScreen::HolderAvatarComponentTest < ViewComponent::TestCase
     draw(holds: holds)
 
     assert_selector "span[data-holder-avatar][data-controller='admin--ui--tooltip'].relative"
-    assert_selector "span.size-5.border-line-strong[aria-hidden=true]", text: "DW"
+    assert_selector "span.size-\\[22px\\].bg-people-tint[aria-hidden=true]", text: "DW"
     assert_selector "span.sr-only", text: "Dana Weiss is editing this block"
     assert_selector "span[data-tooltip][hidden]", text: "Dana Weiss is editing this block", visible: :all
     assert_no_selector "button"
@@ -83,7 +83,7 @@ class Admin::EditorScreen::HolderAvatarComponentTest < ViewComponent::TestCase
     hold_of(@olga, tab: "tab-bbbbbbbb")
     draw(holds: holds)
 
-    assert_selector "span.size-5.bg-ink.text-paper", text: "OB"
+    assert_selector "span.size-\\[22px\\].bg-people.text-surface", text: "OB"
     assert_selector "span.sr-only", text: "You're editing this in another tab"
   end
 

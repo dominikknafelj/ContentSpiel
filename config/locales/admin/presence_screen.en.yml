@@ -20,7 +20,6 @@ en:
             one: "away %{count} min"
             other: "away %{count} min"
           away_long: "away over an hour"
-          more: "+%{count}"
         # A list row's marker. `label` is what a screen reader hears and what
         # the tooltip shows (handoff 32). `joined` stands before the label where
         # it continues a link's name ("Title, 2 people here: …").

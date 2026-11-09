@@ -60,19 +60,11 @@
 // link to the rest is `a[data-note-more]`.
 import { draftKey } from "controllers/admin/notes/composer_controller"
 import { recordId } from "mind_graph/ids"
+import { avatar } from "ui/avatar"
 
 const LABEL = "m-0 text-label text-meta"
 // Three rows, then "+N more".
 const ROWS = 3
-// The person as a round mark with their initials, as the drawer draws one
-// (`Admin::NotesScreen::AvatarComponent`, whose classes and rule these are:
-// the letters the server sends as `initials`; the viewer's own is
-// filled ink, everyone else's sunken with a line). Decoration: the name is
-// written beside it.
-const AVATAR = "flex size-5 shrink-0 items-center justify-center rounded-full text-[8px] font-medium uppercase leading-none"
-const AVATAR_OWN = "bg-ink text-paper"
-const AVATAR_OTHER = "border border-line-strong bg-sunken text-ink"
-
 function element(tag, className, content) {
   const node = document.createElement(tag)
   if (className) node.className = className
@@ -150,11 +142,10 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
   // while unread, else dim) over who wrote it and its replies, and the unread
   // dot. The first line is the link.
   function row(thread) {
-    const item = element("li", "grid grid-cols-[20px_1fr_7px] items-start gap-2 text-small")
+    const item = element("li", "grid grid-cols-[22px_1fr_7px] items-start gap-2 text-small")
     item.dataset.noteRow = ""
     const who = thread.author ?? text.t("mind_graph.script.card.notes.deleted_user")
-    const avatar = element("span", `${AVATAR} ${thread.mine ? AVATAR_OWN : AVATAR_OTHER}`, thread.initials)
-    avatar.setAttribute("aria-hidden", "true")
+    const circle = avatar(thread.initials, { size: "sm", tone: thread.mine ? "own" : "other" })
 
     const lines = element("span", "flex min-w-0 flex-col gap-0.5")
     const link = element("a", `truncate no-underline hover:underline ${thread.unread ? "text-ink" : "text-dim"}`, thread.text)
@@ -163,7 +154,7 @@ export function cardNotes(node, { text, buttonClasses, type = "post", url, recor
     link.dataset.turboFrame = "_top"
     const facts = thread.replies > 0 ? `${who} · ${text.t("mind_graph.script.card.notes.replies", { count: thread.replies })}` : who
     lines.append(link, element("span", "truncate text-[12px] text-meta", facts))
-    item.append(avatar, lines)
+    item.append(circle, lines)
 
     if (thread.unread) {
       item.dataset.unread = ""

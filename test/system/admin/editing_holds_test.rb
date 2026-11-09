@@ -552,7 +552,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
 
     using_session(:other) do
       assert_selector "#{card(@block)}[data-editing-held=true] [data-editing-kind=held]", text: "You're editing this in another tab", wait: LIVE
-      assert_selector "#{card(@block)} [data-editing-kind=held] span.bg-ink.text-paper[aria-hidden=true]", wait: LIVE
+      assert_selector "#{card(@block)} [data-editing-kind=held] span.bg-people.text-surface[aria-hidden=true]", wait: LIVE
       assert_equal 0, page.all("#editor-notice > *").size
     end
   end

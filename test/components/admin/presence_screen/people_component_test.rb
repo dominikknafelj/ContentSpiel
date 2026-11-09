@@ -48,7 +48,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_includes page.find("div[data-controller]", visible: :all)[:class].split, "has-[button]:flex"
   end
 
-  test "one person here: the group is one button named for everyone in it, around the actor avatar at 24px with a paper ring and its tooltip (1, 3, 7, 23)" do
+  test "one person here: the group is one button named for everyone in it, around the actor avatar at 26px with a paper ring and its tooltip (1, 3, 7, 23)" do
     mark(@dana)
 
     render_people
@@ -59,8 +59,8 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "#{group}.cursor-pointer.rounded-cs.focus-visible\\:outline-2.focus-visible\\:outline-offset-2.focus-visible\\:outline-accent"
     assert_no_selector "#{group}.rounded-full"
     circle = page.find("#{group} > [data-presence-user='#{@dana.id}'][data-presence-state=here]")
-    circle.assert_selector "span.size-6.rounded-full.border.border-line-strong.bg-sunken.text-ink.ring-2.ring-paper[aria-hidden=true]", text: "DW", exact_text: true
-    circle.assert_selector "span.text-\\[9px\\]", text: "DW"
+    circle.assert_selector "span.size-\\[26px\\].rounded-full.bg-people-tint.text-people.inset-ring-people.ring-2.ring-paper[aria-hidden=true]", text: "DW", exact_text: true
+    circle.assert_selector "span.text-count.font-semibold", text: "DW"
     # Its own tooltip, for the pointer; the circle itself is no Tab stop and
     # carries no name of its own: the button says it.
     assert_equal "admin--ui--tooltip", circle["data-controller"]
@@ -86,11 +86,31 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
 
     assert_selector "#{group}[aria-label='Also open by 1 person: Dana Weiss, away 12 min']"
     circle = page.find("[data-presence-user='#{@dana.id}'][data-presence-state=away]")
-    circle.assert_selector "span.size-6.rounded-full.border.border-line.bg-paper.text-meta[aria-hidden=true]", text: "DW"
-    circle.assert_no_selector ".bg-sunken, .border-line-strong"
+    circle.assert_selector "span.size-\\[26px\\].rounded-full.border-dashed.border-field-line.bg-surface.text-meta[aria-hidden=true]", text: "DW"
+    circle.assert_no_selector ".bg-people-tint, .inset-ring-people"
     circle.assert_selector "[data-tooltip]", text: "Dana Weiss · away 12 min", exact_text: true, visible: :all
     # No status dot and no lowered opacity (4).
     assert_no_selector "[class*='opacity-'], [class*='bg-ok']", visible: :all
+  end
+
+  test "a here person's circle has the here ring, an away person's is the away tone, and +N is the more circle" do
+    here = person("Hugh Here")
+    mark(here, arrived: NOW - 10.minutes)
+    mark(@dana, state: "away", arrived: NOW - 9.minutes, since: NOW - 3.minutes)
+
+    render_people
+
+    page.find("[data-presence-user='#{here.id}'] > span.rounded-full").then do |circle|
+      assert_includes circle[:class].split, "inset-ring-people"
+      assert_includes circle[:class].split, "bg-people-tint"
+    end
+    away = page.find("[data-presence-user='#{@dana.id}'] > span.rounded-full", visible: :all)
+    assert_includes away[:class].split, "border-dashed"
+    assert_not_includes away[:class].split, "inset-ring-people"
+
+    3.times { |index| mark(person("Extra #{index}"), arrived: NOW - (8 - index).minutes) }
+    render_people
+    assert_selector "[data-presence-more=wide] > span.bg-sunken.text-ink", text: "+2", visible: :all
   end
 
   test "away is just now under a minute, then whole minutes rounded down, and over an hour from sixty (7, 26)" do
@@ -144,8 +164,8 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "#{group}[aria-label='Also open by 4 people: Ann One, here; Bob Two, here; Cy Three, here; Dana Weiss, away over an hour']"
     assert_equal others.map { |user| user.id.to_s }, page.all("#{group} > [data-presence-user]").map { |each| each["data-presence-user"] }
     more = page.find("#{group} > span:last-child")
-    assert_equal %w[bg-paper border border-line-strong flex flex-none items-center justify-center leading-none ml-1 rounded-full size-6 text-count text-dim], more[:class].split.sort
-    more.assert_selector "[data-presence-more=wide]", text: "+1", exact_text: true, visible: :all
+    assert_equal %w[-ml-1.5 flex flex-none], more[:class].split.sort
+    more.assert_selector "[data-presence-more=wide] > span.size-\\[26px\\].bg-sunken.text-ink.ring-paper", text: "+1", exact_text: true, visible: :all
     # A summary for the eye inside the one control: the name has everyone (29).
     assert_equal "true", more["aria-hidden"]
     # Hovering it shows the list; it is no button of its own.
@@ -160,7 +180,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     # A row: a 24px avatar, the name in 14px ink, the status in 12px meta, 6px
     # by 8px; plain text, nothing in it takes the focus.
     assert_equal %w[flex gap-2 items-center px-2 py-1.5], rows.first[:class].split.sort
-    rows.first.assert_selector "span.size-6[aria-hidden=true]", visible: :all
+    rows.first.assert_selector "span.size-\\[26px\\][aria-hidden=true]", visible: :all
     rows.first.assert_selector "[data-presence-name].text-sm.text-ink", visible: :all
     rows.first.assert_selector "[data-presence-status].text-xs.text-meta", visible: :all
     assert_no_selector "[role=list] a, [role=list] button, [role=list] [tabindex]", visible: :all
@@ -199,7 +219,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_equal 2, rows.size
   end
 
-  test "the panel's size: 20px circles with a ring in the surface colour, two and then +N on the surface, the same at every width (13, 20, 24)" do
+  test "the panel's size: 22px circles with a ring in the surface colour, two and then +N on the surface, the same at every width (13, 20, 24)" do
     [ @dana, @reader, person("Ann One") ].each_with_index { |user, index| mark(user, arrived: NOW - (20 - index).minutes) }
     asset = create_media_asset
     Presence::Mark.update_all(record_type: "Media::Asset", record_id: asset.id) # version: none (a test of presence)
@@ -211,10 +231,9 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     button = "turbo-frame#presence-media-#{asset.id} button"
     assert_selector "#{button}[aria-label='Also open by 3 people: Dana Weiss, here; reader, here; Ann One, here']"
     assert_selector "#{button} > span[aria-hidden=true] > [data-presence-more=wide]", visible: :all
-    assert_selector "#{button} > [data-presence-user] > span.size-5.text-\\[8px\\].ring-2.ring-surface[aria-hidden=true]", count: 2
+    assert_selector "#{button} > [data-presence-user] > span.size-\\[22px\\].text-count.ring-2.ring-surface[aria-hidden=true]", count: 2
     assert_no_selector ".ring-paper", visible: :all
-    assert_selector "#{button} > span.size-5.bg-surface.border-line-strong > [data-presence-more=wide]", text: "+1", exact_text: true, visible: :all
-    assert_no_selector ".bg-paper", visible: :all
+    assert_selector "#{button} > span > [data-presence-more=wide] > span.size-\\[22px\\].bg-sunken.text-ink.ring-surface", text: "+1", exact_text: true, visible: :all
     assert_no_selector "[data-presence-more=narrow]", visible: :all
     assert_no_selector "[class~='lg:hidden'], [class~='max-lg:hidden']", visible: :all
     # The list hangs from the right there, and from the left in the header (19).

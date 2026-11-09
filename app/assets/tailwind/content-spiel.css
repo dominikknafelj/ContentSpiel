@@ -132,6 +132,12 @@
   --cs-ic-structure-bg: #f4e6d4;
   --cs-ic-people: #8c1d5c;
   --cs-ic-people-bg: #fbe6ef;
+  /* The people hue as its own pair, aliases of the icon family's, so a
+     circle, a bubble or an outline of people follows the dark values
+     without a second value. The guard names where they may be drawn
+     (`PEOPLE_HUE_ALLOWED`, `PEOPLE_RULES` in test/lib/admin_design_rules_test.rb). */
+  --cs-people: var(--cs-ic-people);
+  --cs-people-tint: var(--cs-ic-people-bg);
   /* The words on the danger fill: white in light, dark in dark, where
      white measures 3.11:1. */
   --cs-on-danger: #ffffff;

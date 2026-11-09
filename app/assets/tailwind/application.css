@@ -30,6 +30,8 @@
 @source "../../javascript/notes";
 /* The editing merge puts a collapsed card's `hidden` back (`editing/merge.js`). */
 @source "../../javascript/editing";
+/* The scripts' circle of a person (`ui/avatar.js`) holds the avatar's classes. */
+@source "../../javascript/ui/avatar.js";
 /* The page editor's moves put a card's `hidden` and `admin-drag-chosen` on
    and off (`editor/menu_moves.js`, `editor/keyboard_moves.js`). */
 @source "../../javascript/editor";

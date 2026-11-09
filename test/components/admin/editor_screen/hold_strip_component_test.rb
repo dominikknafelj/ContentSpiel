@@ -25,7 +25,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
     strip
 
     assert_selector "div.bg-sunken.border-b.border-line.flex.items-center.gap-2[data-admin--editing--hold-target=strip][data-editing-subject='block-#{@block.id}'][data-editing-kind=held]"
-    assert_selector "span.size-6[aria-hidden=true]", text: "DW"
+    assert_selector "span.size-\\[26px\\][aria-hidden=true]", text: "DW"
     assert_selector "p.text-ink.text-\\[13px\\]", text: "Dana Weiss is editing this block"
     assert_selector "button[data-action='admin--editing--hold#takeOver']", text: "Take over"
     assert_no_selector "[role=alert]"
@@ -74,7 +74,7 @@ class Admin::EditorScreen::HoldStripComponentTest < ViewComponent::TestCase
   test "one's own other tab: the own avatar and 'You're editing this in another tab' (handoff 18)" do
     strip(hold: hold_by(@olga), own: true)
 
-    assert_selector "span.bg-ink.text-paper", text: "OB"
+    assert_selector "span.bg-people.text-surface", text: "OB"
     assert_selector "p", text: "You're editing this in another tab"
     assert_selector "button", text: "Take over"
   end

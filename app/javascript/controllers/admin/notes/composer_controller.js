@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
+import { avatar } from "ui/avatar"
 
 // A note's field (notes spec §4.2, §7 "Unsent text"), on the form
 // `Admin::NotesScreen::ComposerComponent` draws.
@@ -441,14 +442,11 @@ export default class extends Controller {
       option.className = "flex cursor-pointer items-center gap-2 rounded-cs px-2 py-1.5 hover:bg-sunken aria-selected:bg-sunken"
       // The avatar is decoration, as everywhere (`Admin::NotesScreen::AvatarComponent`):
       // the server writes the letters (`PersonName.initials`), none is computed here.
-      const avatar = document.createElement("span")
-      avatar.setAttribute("aria-hidden", "true")
-      avatar.className = "flex size-[22px] shrink-0 items-center justify-center rounded-full border border-line-strong bg-sunken text-[8px] font-medium uppercase leading-none text-ink"
-      avatar.textContent = person.initials
+      const circle = avatar(person.initials, { size: "sm" })
       const name = document.createElement("span")
       name.className = "truncate text-[13px] text-ink"
       name.textContent = person.label
-      option.append(avatar, name)
+      option.append(circle, name)
       if (person.hint) {
         const hint = document.createElement("span")
         hint.className = "truncate text-[11px] text-meta"

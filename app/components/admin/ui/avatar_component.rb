@@ -11,15 +11,23 @@ module Admin
     # names the person beside it or on the element around it, so it is hidden
     # from a screen reader.
     #
-    # `size`: `:lg` is 28px with 11px letters (an activity row's actor, on the
-    # dashboard and in the audit log), `:md` 24px with 9px, `:sm` 20px with 8px.
-    # `tone`: `:other` is anybody (sunken, a strong line, ink); `:own` is the
-    # viewer in a note (filled ink); `:away` is someone whose tab is hidden or
-    # idle (no fill, the plain line, meta letters -- never
-    # a lower opacity, which would take the letters below contrast).
-    # `ring`: a 2px ring in the colour of what the circles stand on, for
-    # circles that overlap: `:paper` (an editor's header) or `:surface` (the
-    # media panel).
+    # `size`: `:lg` is 28px (an activity row's actor), `:md` 26px (the
+    # editor header's people, an inbox row, the hold strip) and `:sm` 22px (a
+    # row's, a tile's, a message's): the letters are 11px, weight 600, at
+    # every size, because two of them need 22px to stand 3px clear of the edge.
+    # `tone`: `:other` is a colleague (the people tint, people letters);
+    # `:own` is the viewer (the solid people fill, surface letters); `:away`
+    # is someone whose tab is hidden or idle (the surface, meta letters and a
+    # dashed edge -- the shape says it, never a lower opacity, which would
+    # take the letters below contrast); `:more` is the "+N" circle (sunken,
+    # ink letters).
+    # `here`: a 1.5px people ring inside the circle, for someone who has the
+    # record open now (an inset ring, so it stays inside the 2px ring below).
+    # `ring`: a 2px ring outside the circle in the colour of what the circles
+    # stand on, for circles that overlap: `:paper`, `:surface`, or `:ground`,
+    # which reads `--admin-avatar-ground` from the stylesheet where the
+    # ground is a rule's and not a token's. The same classes are
+    # `app/javascript/ui/avatar.js`'s, which draws the circle in the browser.
     class AvatarComponent < Admin::AdminComponent
       include Admin::Ui::Contract
 
@@ -28,32 +36,49 @@ module Admin
         motion: :none,
         content_edges: %i[short],
         widths: :fixed_width,
-        interface: %i[initials size tone ring],
+        interface: %i[initials size tone ring here],
         limits: [
           "It is told the initials and knows nothing of users.",
-          "It draws three sizes, three tones and two rings, and anything else is refused."
+          "It draws three sizes, four tones and three rings, and anything else is refused.",
+          "Its letters are 11px at every size."
         ],
-        states: %i[other own away],
-        keys: [],
+        states: %i[other own away more here],
+        keys: %w[more many],
         slots: [],
         controller: nil
       )
 
-      SIZES = { lg: "size-7 text-count", md: "size-6 text-[9px]", sm: "size-5 text-[8px]" }.freeze
-      TONES = { other: "border border-line-strong bg-sunken text-ink", own: "bg-ink text-paper", away: "border border-line bg-paper text-meta" }.freeze
+      SIZES = { lg: "size-7", md: "size-[26px]", sm: "size-[22px]" }.freeze
+      TONES = {
+        other: "bg-people-tint text-people",
+        own: "bg-people text-surface",
+        away: "border-[1.5px] border-dashed border-field-line bg-surface text-meta",
+        more: "bg-sunken text-ink"
+      }.freeze
+      RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface", ground: "ring-2 ring-(--admin-avatar-ground)" }.freeze
+      HERE = "inset-ring-[1.5px] inset-ring-people"
+      LETTERS = "flex shrink-0 items-center justify-center rounded-full text-count font-semibold uppercase leading-none"
 
-      RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface" }.freeze
+      # Above this many the "+N" circle reads "9+": three characters would not
+      # stand in it.
+      MORE_LIMIT = 9
 
-      def initialize(initials:, size:, tone: :other, ring: nil)
+      # The "+N" circle's letters.
+      def self.more_label(count)
+        count > MORE_LIMIT ? I18n.t("admin.components.ui.avatar.many") : I18n.t("admin.components.ui.avatar.more", count: count)
+      end
+
+      def initialize(initials:, size:, tone: :other, ring: nil, here: false)
         @initials = initials
         @size = SIZES.fetch(size)
         @tone = TONES.fetch(tone)
         @ring = ring && RINGS.fetch(ring)
+        @here = here && HERE
       end
 
       def call
         tag.span(@initials, aria: { hidden: true },
-          class: class_names("flex shrink-0 items-center justify-center rounded-full font-medium uppercase leading-none", @size, @tone, @ring))
+          class: class_names(LETTERS, @size, @tone, @here, @ring))
       end
     end
   end

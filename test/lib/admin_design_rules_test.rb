@@ -16,7 +16,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # context: its modules read every one from the tokens (`mind_graph/theme.js`).
   SOURCE_DIRECTORIES = %w[
     views/admin views/layouts views/setup views/invitations components/admin components/media components/public
-    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing
+    javascript/controllers javascript/media javascript/saving javascript/search javascript/rich_text javascript/mind_graph javascript/notes javascript/live javascript/editing javascript/ui
   ].freeze
   ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
@@ -690,9 +690,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # 10px thin text looks faint, so the smallest is 11px at weight 500, everywhere.
+  # 10px thin text looks faint, so the smallest is 11px, everywhere, and a
+  # person's initials join it: an avatar draws its letters at `text-count`.
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
-    assert_empty design_offences(/text-\[10px\]/)
+    assert_empty design_offences(/text-\[(?:[0-9]|10)px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
@@ -1274,12 +1275,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # restyle of the palette is one file, and a hue never stands for a thing
   # that is not a type or a module.
   ICON_HUE = /(?<![\w-])(?:text|bg|fill|stroke)-ic-|--cs-ic-/
-  PEOPLE_HUE = /ic-people/
+  # The hue of people: the pair's utilities (`bg-people`, `text-people-tint`,
+  # `inset-ring-people`), the two tokens and the icon family they alias.
+  PEOPLE_HUE = /ic-people|(?<![\w-])(?:bg|text|ring|inset-ring|outline|border|fill|stroke)-people(?:-tint)?(?![\w-])|--cs-people/
   ICON_CHIP = "app/components/admin/ui/icon_chip_component.rb".freeze
-  # Where the people hue may be drawn once it is built; none uses it yet.
-  PEOPLE_HUE_ALLOWED = %w[
-    app/components/admin/ui/icon_chip_component.rb app/components/admin/ui/avatar_component.rb
-  ].freeze
+  # Where the people hue may be drawn, each file with its reason. A task that
+  # draws it in one more file adds the file here.
+  PEOPLE_HUE_ALLOWED = {
+    ICON_CHIP => "the people family's chip",
+    "app/components/admin/ui/avatar_component.rb" => "the circle of a person",
+    "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes",
+    "app/assets/tailwind/content-spiel.css" => "where the two aliases are written"
+  }.freeze
+  # The stylesheet's rules (`content-spiel.tailwind.css`) that may draw the
+  # hue, each as its selector list joined with ", ". The `@theme` block maps
+  # the tokens to utilities and is not a rule that draws.
+  PEOPLE_RULES = [].freeze
 
   def relative_sources = ADMIN_SOURCES.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
 
@@ -1295,11 +1306,29 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty offences
   end
 
-  test "the people hue is drawn only by the icon chip and the people's own components, never by a button" do
-    allowed = PEOPLE_HUE_ALLOWED + Dir[Rails.root.join("app/components/admin/{notes_screen/marker_component*,notes_screen/row_pill_component*,presence_screen/row_marker_component*,editor_screen/hold_strip_component*}")].map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
-    assert_empty design_offences(PEOPLE_HUE, except: allowed)
+  test "the people hue is drawn only where PEOPLE_HUE_ALLOWED says, never by a button" do
+    assert_empty design_offences(PEOPLE_HUE, except: PEOPLE_HUE_ALLOWED.keys)
     assert_no_match PEOPLE_HUE, File.read(Rails.root.join("app/components/admin/ui/button_component.rb"))
     assert_match PEOPLE_HUE, File.read(Rails.root.join(ICON_CHIP)), "the chip draws the people hue"
+  end
+
+  test "the stylesheet draws the people hue only in the people's rules" do
+    offences = self.class.css_rules("content-spiel.tailwind.css").filter_map do |selectors, body|
+      list = selectors.join(", ")
+      list if body.match?(PEOPLE_HUE) && !list.include?("@theme") && PEOPLE_RULES.exclude?(list)
+    end
+    assert_empty offences, "a rule that draws the people hue is added to PEOPLE_RULES, with the people's component that sets its class"
+  end
+
+  test "every people allowance and rule is still used" do
+    PEOPLE_HUE_ALLOWED.each_key do |path|
+      assert_match PEOPLE_HUE, Rails.root.join(path).read, "#{path} does not draw the people hue: drop it from PEOPLE_HUE_ALLOWED"
+    end
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    PEOPLE_RULES.each do |selector|
+      body = rules.find { |selectors, _| selectors.join(", ") == selector }&.last
+      assert body&.match?(PEOPLE_HUE), "#{selector} does not draw the people hue: drop it from PEOPLE_RULES"
+    end
   end
 
   # A circle of a person's letters is `Admin::Ui::AvatarComponent`, so one
@@ -1315,10 +1344,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # component yet. The list may only shrink.
   HAND_BUILT_AVATAR_ALLOWED = {
     "app/components/admin/users_screen/list_component.html.erb" => "the users list's one-letter circle, redrawn with the list",
-    # Scripts that build a circle in the browser from the letters the server
-    # sends; the component draws on the server only.
-    "app/javascript/mind_graph/card_notes.js" => "a note's author on the mind graph's card",
-    "app/javascript/controllers/admin/notes/composer_controller.js" => "the mention picker's people"
+    # The one script that builds a circle in the browser from the letters the
+    # server sends, with the component's own classes.
+    "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes"
   }.freeze
 
   test "nobody draws a circle of initials but AvatarComponent" do
@@ -1353,6 +1381,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "magic-text", "text-dim", "bg-sunken", "topic-codes", "--cs-accent", "logic-people" ].each { |sample| assert_no_match ICON_HUE, sample }
     assert_match PEOPLE_HUE, "text-ic-people"
     assert_no_match PEOPLE_HUE, "text-ic-code"
+    %w[bg-people inset-ring-people text-people-tint hover:bg-people var(--cs-people) var(--cs-people-tint) ring-people].each { |sample| assert_match PEOPLE_HUE, sample }
+    %w[people_component peoples bg-peoples text-people_x group-people].each { |sample| assert_no_match PEOPLE_HUE, sample }
   end
 
   # Elevation and radii: a shadow is one of the four elevation tokens and a

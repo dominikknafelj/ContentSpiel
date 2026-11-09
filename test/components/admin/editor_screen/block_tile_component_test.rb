@@ -216,7 +216,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     as_viewer(users(:one), tab: "tab-aaaaaaaa") { render_tile }
 
     html = rendered_content
-    assert_selector "#content_block_#{@block.id} [data-holder-avatar] span.size-5", text: "DW"
+    assert_selector "#content_block_#{@block.id} [data-holder-avatar] span.size-\\[22px\\]", text: "DW"
     assert_selector "[data-holder-avatar] span.sr-only", text: "Dana Weiss is editing this block"
     assert_selector "[data-holder-avatar] [data-tooltip]", text: "Dana Weiss is editing this block", visible: :all
     assert_operator html.index("data-holder-avatar"), :<, html.index("notes-marker-ContentBlock-#{@block.id}"), "the avatar comes before the notes marker"

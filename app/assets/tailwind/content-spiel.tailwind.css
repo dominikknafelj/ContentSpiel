@@ -65,6 +65,8 @@
   --color-ic-structure-bg: var(--cs-ic-structure-bg);
   --color-ic-people: var(--cs-ic-people);
   --color-ic-people-bg: var(--cs-ic-people-bg);
+  --color-people: var(--cs-people);
+  --color-people-tint: var(--cs-people-tint);
   --color-on-danger: var(--cs-on-danger);
   --color-cat-1: var(--cs-cat-1);
   --color-cat-2: var(--cs-cat-2);

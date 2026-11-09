@@ -613,6 +613,48 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The measured pairs, light then dark: the people hue is one pair, with the
+  # tint as the circle's ground, and its letters read on every ground a
+  # circle stands on. Each figure is a floor to its rounding.
+  PEOPLE_FLOORS = {
+    "--cs-people-tint" => [ 7.2, 9.0 ], "--cs-surface" => [ 8.5, 10.1 ], "--cs-paper" => [ 7.8, 11.2 ], "--cs-sunken" => [ 7.0, 9.0 ],
+    "--cs-rail" => [ 7.5, 8.9 ], "--cs-chrome" => [ 8.5, 10.8 ], "--cs-popover" => [ 8.5, 8.0 ]
+  }.freeze
+
+  # The two aliases are written once, in the light block, and follow the dark
+  # values through the icon pair they name (one element, so the alias takes
+  # the value that wins there): a scheme's reading of one is its pair's.
+  def people_token(name)
+    assert_match(/\Avar\(--cs-ic-people(?:-bg)?\)\z/, schemes[:light].fetch(name), "#{name} is an alias of the icon family's people pair")
+    schemes[:light].fetch(name)[/--cs-[\w-]+/]
+  end
+
+  test "the people hue reads 7:1 or better on every CS Studio ground, and on its own tint, in both schemes" do
+    assert_equal "--cs-ic-people", people_token("--cs-people")
+    assert_equal "--cs-ic-people-bg", people_token("--cs-people-tint")
+    each_scheme do |scheme, colour|
+      PEOPLE_FLOORS.each do |ground, floors|
+        ground = people_token(ground) if ground == "--cs-people-tint"
+        ratio = contrast(colour.("--cs-ic-people"), colour.(ground))
+        assert_operator ratio, :>=, 7.0, "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1"
+        assert_operator ratio, :>=, floors.fetch(scheme == :light ? 0 : 1) - 0.05, "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1, under its measured figure"
+      end
+    end
+  end
+
+  # `:own`'s letters on the solid fill, `:away`'s meta letters and dashed
+  # edge, `:more`'s ink on sunken.
+  test "an avatar's tones: own's surface letters 4.5:1 on people, away's meta 4.5:1 and its dashed edge 3:1 on surface and chrome, more's ink 4.5:1 on sunken" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-surface"), colour.("--cs-ic-people"), "own's surface letters on people (#{scheme})")
+      %w[--cs-surface --cs-chrome].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "away's dashed edge on #{ground} (#{scheme})")
+      end
+      assert_ratio(4.5, colour.("--cs-meta"), colour.("--cs-surface"), "away's meta letters on surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-sunken"), "more's ink on sunken (#{scheme})")
+    end
+  end
+
   test "a Draft chip's words and outline hold on the grounds a chip stands on, in both schemes" do
     each_scheme do |scheme, colour|
       %w[--cs-paper --cs-surface --cs-rail].each do |ground|

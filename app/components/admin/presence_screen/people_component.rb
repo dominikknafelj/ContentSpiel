@@ -45,7 +45,8 @@ module Admin
     # Nothing is announced: no live region.
     #
     # ONE CIRCLE (`Admin::Ui::AvatarComponent`, a ring in the colour of what
-    # it stands on, 6px over the one before) still shows its own tooltip ON
+    # it stands on, 6px over the one before, with the here ring inside it
+    # for someone who is here and the dashed away tone for someone who is not) still shows its own tooltip ON
     # HOVER (`Admin::Ui::TooltipComponent`): "Dana Weiss · here", "Dana Weiss
     # · away just now" under a minute, "· away 12 min" (whole minutes, rounded
     # down), "· away over an hour" from sixty. A person is named by
@@ -62,21 +63,20 @@ module Admin
     class PeopleComponent < Admin::AdminComponent
       # `shown`: how many circles before "+N"; `narrow`: how many below
       # 1024px (nil: the same at every width, the panel is a column of one
-      # width); `avatar`: `Admin::Ui::AvatarComponent`'s size; `more`: the
-      # "+N" circle's size; `ground`: what the circles stand on, the colour of
-      # their ring and of the "+N" circle, which has no fill (handoff 20, 24);
+      # width); `avatar`: `Admin::Ui::AvatarComponent`'s size, the "+N"
+      # circle's too; `ground`: what the circles stand on, the colour of their
+      # ring;
       # `wrapper`: the element's place in its row -- the header's action row
       # has a gap of 8px and the people stand 12px before the saved status
       # (handoff 2); in the panel's file-name row they never give way
-      # (handoff 13), and `mt-1` centres their 20px on the name's first line
+      # and `mt-[3px]` centres their 22px on the name's first line
       # of 28px in a row that is aligned to its top (handoff 24); `hang`: the
       # edge the list hangs from (handoff 19).
-      Size = Data.define(:shown, :narrow, :avatar, :more, :ground, :wrapper, :hang)
+      Size = Data.define(:shown, :narrow, :avatar, :ground, :wrapper, :hang)
       SIZES = {
-        header: Size.new(shown: 3, narrow: 1, avatar: :md, more: "size-6", ground: :paper, wrapper: "mr-1", hang: :left),
-        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, more: "size-5", ground: :surface, wrapper: "ml-auto mt-1 flex-none", hang: :right)
+        header: Size.new(shown: 3, narrow: 1, avatar: :md, ground: :paper, wrapper: "mr-1", hang: :left),
+        panel: Size.new(shown: 2, narrow: nil, avatar: :sm, ground: :surface, wrapper: "ml-auto mt-[3px] flex-none", hang: :right)
       }.freeze
-      GROUNDS = { paper: "bg-paper", surface: "bg-surface" }.freeze
 
       # "away over an hour" from here on.
       LONG_AWAY = 60.minutes
@@ -151,6 +151,8 @@ module Admin
 
       def tone(person) = person.state == "away" ? :away : :other
 
+      def here?(person) = person.state != "away"
+
       # How many are behind "+N" from 1024px, and below it.
       def more_wide = people.size - @size.shown
 
@@ -160,22 +162,25 @@ module Admin
 
       def more? = more_wide.positive? || more_narrow.positive?
 
-      # "+N": a circle of the avatar's size with no fill, 4px after the last
-      # person and not overlapped, the count `text-count` (11px, the sans). Shown below 1024px
-      # only when the wide row has room for everyone.
+      # "+N": the more circle (`Admin::Ui::AvatarComponent`'s `:more` tone),
+      # overlapping the one before like the others; shown below 1024px only
+      # when the wide row has room for everyone.
       def more_class
-        class_names("ml-1 flex flex-none items-center justify-center rounded-full border border-line-strong text-count leading-none text-dim",
-          @size.more, GROUNDS.fetch(ground), "lg:hidden": !more_wide.positive?)
+        class_names("flex flex-none -ml-1.5", "lg:hidden": !more_wide.positive?)
       end
 
       # "+1", or both counts with one shown at each width.
       def more_label
-        wide = more_wide.positive? ? tag.span(t(".more", count: more_wide), class: ("max-lg:hidden" if narrow?), data: { presence_more: "wide" }) : nil
-        narrow = narrow? ? tag.span(t(".more", count: more_narrow), class: "lg:hidden", data: { presence_more: "narrow" }) : nil
+        wide = more_wide.positive? ? tag.span(more_circle(more_wide), class: ("max-lg:hidden" if narrow?), data: { presence_more: "wide" }) : nil
+        narrow = narrow? ? tag.span(more_circle(more_narrow), class: "lg:hidden", data: { presence_more: "narrow" }) : nil
         safe_join([ wide, narrow ].compact)
       end
 
       private
+
+      def more_circle(count)
+        render Admin::Ui::AvatarComponent.new(initials: Admin::Ui::AvatarComponent.more_label(count), size: avatar_size, tone: :more, ring: ground)
+      end
 
       def shown(person, now)
         name = ::PersonName.of(person.user)
