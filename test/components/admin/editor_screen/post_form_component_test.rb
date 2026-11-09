@@ -129,7 +129,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
   test "the post's settings panel is inside the form and after the main column" do
     as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: @post, locale: "en") }
 
-    assert_selector "#editor-grid.admin-rail-grid[data-controller~='admin--ui--rail']:not(.admin-rail-grid--folded)"
+    assert_selector "#editor-grid.admin-rail-grid[data-controller~='admin--ui--rail']"
     assert_selector "#editor-grid > form#post-form", count: 1
     # The tabs stand after the form in the document (the grid puts them in the
     # rail's first row): Post, then the registered Notes tab.
@@ -149,7 +149,7 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
     assert_equal 2, ids.size
   end
 
-  test "a type's own fields stand in the settings panel; a translation tab folds the rail; the form-only answer is the form alone" do
+  test "a type's own fields stand in the settings panel; a translation tab draws the same rail; the form-only answer is the form alone" do
     ContentTypes.register "test/event" do |t|
       t.label "Event"
       t.list_component Posts::BlogListComponent
@@ -164,7 +164,8 @@ class Admin::EditorScreen::PostFormComponentTest < ViewComponent::TestCase
       assert_selector "#editor-grid-panel-post [data-editor-fields-group]"
 
       as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: saved.record, locale: "de") }
-      assert_selector "#editor-grid.admin-rail-grid--folded > form#post-form"
+      assert_selector "#editor-grid.admin-rail-grid > form#post-form #editor-grid-panel-post"
+      assert_selector "#editor-grid[class='admin-rail-grid']", count: 1
 
       as_owner { render_inline Admin::EditorScreen::PostFormComponent.new(post: saved.record, locale: "en", form_only: true) }
       assert_no_selector "#editor-grid"

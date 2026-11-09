@@ -267,14 +267,16 @@
   /* A filter bar's control height (a form's is 42px): the bar sets it, `.admin-filter-bar` in content-spiel.tailwind.css. */
   --cs-control-compact: 2.375rem;
   /* The editors' and Settings' form column (layout points spec, decision 1),
-     and on an editor's translation tab two 560px columns and their 24px gap
-     (Claude Design's O3). Read by `.admin-form-column` and Settings' grid. */
+     and on an editor's translation tab where the rail does not dock two
+     560px columns and their 24px gap (Claude Design's O3). Read by
+     `.admin-form-column` and Settings' grid. */
   --cs-form-max: 760px;
   --cs-form-max-pair: 1144px;
   /* A docked composition (the editors' blocks column, the dashboard's main
      column, a list, each with a rail beside it): the rail, the space
-     between, and the widest the whole may grow, one left-aligned group whose
-     main column takes what the rail leaves. Read by `.admin-rail-grid`,
+     between, and the widest the whole may grow, one group whose main column
+     takes what the rail leaves, at the content's left edge below the cap
+     and centred past it. Read by `.admin-rail-grid`,
      `.admin-dashboard__grid` and `.admin-list-rail__grid` in
      content-spiel.tailwind.css; CS Studio's alone. */
   --cs-rail-width: 360px;

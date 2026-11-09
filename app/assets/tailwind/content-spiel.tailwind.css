@@ -723,7 +723,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* Side-by-side translation. A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
    primary-language original (`.admin-reference-card`) on the other. The
-   breakpoint is the width of the FORM (`container-type: inline-size` on
+   breakpoint is the width of the FORM (the named container `admin-pair` on
    `.admin-translation-form`: the page-settings form, the post form and each
    block card's form), not the viewport -- the page editor sits beside the tree,
    so a 1400px window can still leave a 700px column. From 824px of form width
@@ -739,26 +739,32 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    no pointer events (and `interactivity: inert` where supported, which also
    drops it from the tab order; Enter/Space on it elsewhere is then a visual
    no-op). The error slot is NOT inside the pair (see the invalid-border
-   notes above: it must stay a direct child of `.admin-column`/`.admin-field`). */
-.admin-translation-form { container-type: inline-size; }
+   notes above: it must stay a direct child of `.admin-column`/`.admin-field`).
+   The container is NAMED, so a pair with no form box above it asks nothing
+   and stays stacked: the post form is `display: contents` while the rail
+   docks, and an unnamed query would then ask the editor area, always 1200px
+   or more there. Stacked is therefore the rule outside the query, and side
+   by side its exception. */
+.admin-translation-form { container: admin-pair / inline-size; }
 /* The editors' form column: left-aligned in the content column, its width a
    token. The class goes on the elements that are there (the post form, the
    page settings panel, the block list) and never on a new wrapper: live
    editing's merge decides by the ids of a unit's ancestors, and a wrapper
-   would be one more. A translation tab's pairs need two columns. */
+   would be one more. A translation tab's pairs need two columns of up to
+   560px. Where the rail docks, the column takes its track whole and the
+   two halves share it, uncapped (the rail's container query, below). */
 .admin-form-column { max-width: var(--cs-form-max); }
 .admin-form-column--pair { max-width: var(--cs-form-max-pair); }
 .admin-translation-pair { display: grid; column-gap: 1.5rem; row-gap: 1rem; grid-template-columns: minmax(0, 1fr); }
-@container (min-width: 824px) {
+.admin-translation-pair > .admin-reference-card { order: -1; }
+@container admin-pair (min-width: 824px) {
   .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 560px)); }
+  .admin-translation-pair > .admin-reference-card { order: 0; }
   .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
   .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
   /* Ruling 9: side by side the summary is inert, so it shows no disclosure triangle. */
   .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
-}
-@container (max-width: 823.98px) {
-  .admin-translation-pair > .admin-reference-card { order: -1; }
 }
 
 /* A section's lanes: side by side while the CARD
@@ -848,13 +854,14 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    two, so the focus follows that order. Every count of columns is written
    here and none is `auto-fit`: a wider dashboard widens the columns and adds
    none. Below the threshold the rail's panels follow the main column as
-   cards, one column, two from 40rem. Docked, the main column stands at the
-   content's left edge and takes what the rail leaves, the rail
-   `--cs-rail-width` wide and `--cs-rail-gap` right of it on the rail's
-   ground, and the whole grows to `--cs-content-max` and no further, so on
-   a wider window the spare width falls right of the rail; the heading row
-   and the mail notice stop at the same cap, so New post… stands over the
-   rail and not out in that spare width. On that ground an information panel has no
+   cards, one column, two from 40rem. Docked, the main column takes what
+   the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
+   right of it on the rail's ground, and the whole grows to
+   `--cs-content-max` and no further: its auto inline margins are 0 below
+   the cap, so it stands at the content's left edge, and on a wider window
+   they split the spare width evenly either side. The heading row and the
+   mail notice stop at the same cap and are centred the same way, so New
+   post… stands over the rail's right edge. On that ground an information panel has no
    card and no band, and its heading keeps its warm ink; its rows, its empty
    line and its footer lose their inset with the head's, so all start at
    the rail's padding. The main column is a container of its own
@@ -886,7 +893,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-dashboard__rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container admin-dashboard (min-width: 1200px) {
-  .admin-dashboard__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
+  .admin-dashboard__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; align-items: start; }
   .admin-dashboard__rail { grid-template-columns: minmax(0, 1fr); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4); }
   .admin-dashboard__rail .admin-dashboard-panel { background: transparent; box-shadow: none; }
   .admin-dashboard__rail .admin-dashboard-panel .admin-dashboard-panel__head { background: transparent; padding-inline: 0; }
@@ -894,7 +901,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-dashboard__rail .admin-dashboard-panel > [data-panel-empty],
   .admin-dashboard__rail .admin-dashboard-panel > footer { padding-inline: 0; }
   .admin-dashboard__head,
-  .admin-dashboard__notice { max-width: var(--cs-content-max); }
+  .admin-dashboard__notice { max-width: var(--cs-content-max); margin-inline: auto; }
 }
 /* The lists' rail (the posts list's filters; the Tags screen's detail). The
    container is the LIST's own width, never the window's (the sidebar and
@@ -917,13 +924,14 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    at every width, so the focus goes heading row, the bar, the rail, the
    list, and only the grid places them; nothing is moved by script. Below
    the threshold it is one column and the rail is a row of the page in that
-   order. Docked, the list stands at the content's left edge and takes what
-   the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
-   right of it, across the first two rows, on the rail's ground; the whole
-   grows to `--cs-content-max` and no further, so on a wider window the
-   spare width falls right of the rail, and the heading row stops at the
-   same cap, so New post stands over the rail and not out in that spare
-   width.
+   order. Docked, the list takes what the rail leaves, the rail
+   `--cs-rail-width` wide and `--cs-rail-gap` right of it, across the first
+   two rows, on the rail's ground; the whole grows to `--cs-content-max`
+   and no further: its auto inline margins are 0 below the cap, so it
+   stands at the content's left edge, and on a wider window they split the
+   spare width evenly either side. The heading row stops at the same cap
+   and is centred the same way, so New post stands over the rail's right
+   edge.
    Docked, the rail sticks under the window's top (`--admin-top-offset`)
    with `--cs-sp-4` above and below it, and scrolls inside itself when it is
    taller than that, so the filters and a tag's detail stay in reach down a
@@ -958,8 +966,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    that shows the empty line, wherever either stands. */
 .admin-list-rail__grid:has(#tags-list [data-empty-state-title]) .admin-tag-detail { display: none; }
 @container admin-list (min-width: 1200px) {
-  .admin-list-rail__head { max-width: var(--cs-content-max); }
-  .admin-list-rail__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); align-items: start; }
+  .admin-list-rail__head { max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-list-rail__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; align-items: start; }
   .admin-list-rail__rail { grid-column: 2; grid-row: 1 / span 2; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); padding: var(--cs-sp-3) var(--cs-sp-4);
     position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-4)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
@@ -984,10 +992,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    it is one column: no tabs, every panel in the page but a docked-only one,
    each where the document puts it.
 
-   Docked, the blocks column stands at the content's left edge and takes
-   what the rail leaves, the rail `--cs-rail-width` wide and `--cs-rail-gap`
-   right of it; the whole grows to `--cs-content-max` and no further, so on
-   a wider window the spare width falls right of the rail. Inside the grown
+   Docked, the blocks column takes what the rail leaves, the rail
+   `--cs-rail-width` wide and `--cs-rail-gap` right of it; the whole grows
+   to `--cs-content-max` and no further: its auto inline margins are 0
+   below the cap, so it stands at the content's left edge, and on a wider
+   window they split the spare width evenly either side (the editor's
+   header row is held to the same box, below). It docks on a translation
+   tab as on the default one. Inside the grown
    column a field of running text keeps a measure (THE MEASURE, below),
    and a wide block takes the column. The rail is the tabs and
    the one current panel, the first two rows of the second column. The
@@ -1015,8 +1026,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    (`ui/float.js`). The Notes panel does not scroll itself: the notes are as
    tall as the panel may be, and scroll their own list.
    `--admin-rail-docked` is the docked state that `admin--ui--rail` reads
-   and writes onto the grid as `data-rail-docked`; the query alone sets it.
-   `--folded` (an editor's translation tab) never docks. */
+   and writes onto the grid as `data-rail-docked`; the query alone sets it. */
 .admin-editor-area { container: admin-editor / inline-size; }
 .admin-rail-grid { --admin-rail-docked: 0; --admin-rail-top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px) + var(--admin-editor-header-gap)); --admin-rail-tabs-height: 3rem; display: grid; grid-template-columns: minmax(0, 1fr); }
 /* The canvas is a stacking context of its own, at every width, at
@@ -1032,7 +1042,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    slide-over and the header, page layers, cover what it raises (the tags'
    and related posts' suggestions); the notes' panel is left out, since the
    slide-over inside it is a page layer and must not be trapped. Where the
-   two meet below the threshold, and on a translation tab at every width,
+   two meet, below the threshold,
    whatever stands first in the document drops its popovers onto the other,
    so the one that comes first is the higher:
    - a panel before the canvas (the page editor's) is at `--cs-z-raised`,
@@ -1043,10 +1053,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      body's Insert menu, its Link popover or a table strip's menu that hangs
      past the canvas over the Excerpt field stays over the field.
    Docked, the canvas and the rail stand side by side and nothing either
-   raises overflows into the other. */
+   raises overflows into the other. The two panel rules weigh (0,1,0), the
+   panel inside `:where()`, so the docked panel's `position: sticky` (0,2,0)
+   wins over both, and the second wins over the first by standing after
+   it. */
 .admin-rail__main { isolation: isolate; z-index: var(--cs-z-lift); }
-.admin-rail__panel:not(:has(> .admin-notes-drawer)) { position: relative; z-index: var(--cs-z-raised); }
-:is(.admin-rail__main ~ .admin-rail__panel, :has(.admin-rail__main) ~ .admin-rail__panel):not(:has(> .admin-notes-drawer)) { position: static; z-index: auto; isolation: isolate; }
+:where(.admin-rail__panel):not(:has(> .admin-notes-drawer)) { position: relative; z-index: var(--cs-z-raised); }
+:where(.admin-rail__main ~ .admin-rail__panel, :has(.admin-rail__main) ~ .admin-rail__panel):not(:has(> .admin-notes-drawer)) { position: static; z-index: auto; isolation: isolate; }
 .admin-rail__tabs { display: none; }
 .admin-rail__panel--docked-only { display: none; }
 .admin-rail__tab { display: inline-flex; align-items: center; gap: 0.375rem; padding-block: 0.5rem; color: var(--cs-meta); cursor: pointer; }
@@ -1057,25 +1070,25 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-rail__tab[aria-selected="true"] { color: var(--cs-ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--cs-accent); }
 .admin-rail__tab:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 @container admin-editor (min-width: 1200px) {
-  .admin-rail-grid:not(.admin-rail-grid--folded) { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); }
-  .admin-rail-grid:not(.admin-rail-grid--folded)::before { content: ""; grid-column: 2; grid-row: 1 / 3; position: sticky; top: var(--admin-rail-top); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { grid-column: 1; grid-row: 1 / -1; }
+  .admin-rail-grid { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-rail-grid::before { content: ""; grid-column: 2; grid-row: 1 / 3; position: sticky; top: var(--admin-rail-top); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
+  .admin-rail-grid .admin-rail__main { grid-column: 1; grid-row: 1 / -1; }
   /* As tall as its own content, not the rail's: a rail taller than a short
      post (the Notes tab) does not stretch the post's main card. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { align-self: start; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__tabs { display: flex; align-items: flex-end; gap: var(--cs-sp-4); grid-column: 2; grid-row: 1; padding: 0 var(--cs-sp-4); }
+  .admin-rail-grid .admin-rail__main { align-self: start; }
+  .admin-rail-grid .admin-rail__tabs { display: flex; align-items: flex-end; gap: var(--cs-sp-4); grid-column: 2; grid-row: 1; padding: 0 var(--cs-sp-4); }
   /* A rail of one tab: its heading, spaced as a heading and not as a row of tabs. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__heading { align-items: center; gap: 0.375rem; padding: 0 var(--cs-sp-4); }
-  .admin-rail-grid:not(.admin-rail-grid--folded) :is(.admin-rail__tabs, .admin-rail__heading) { position: sticky; top: var(--admin-rail-top); height: var(--admin-rail-tabs-height); box-sizing: border-box; align-self: start; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel { grid-column: 2; grid-row: 2; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4);
+  .admin-rail-grid .admin-rail__heading { align-items: center; gap: 0.375rem; padding: 0 var(--cs-sp-4); }
+  .admin-rail-grid :is(.admin-rail__tabs, .admin-rail__heading) { position: sticky; top: var(--admin-rail-top); height: var(--admin-rail-tabs-height); box-sizing: border-box; align-self: start; }
+  .admin-rail-grid .admin-rail__panel { grid-column: 2; grid-row: 2; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4);
     position: sticky; top: calc(var(--admin-rail-top) + var(--admin-rail-tabs-height)); align-self: start;
     max-height: calc(100dvh - var(--admin-rail-top) - var(--admin-rail-tabs-height) - var(--cs-sp-4)); overflow-y: auto; overscroll-behavior: contain; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:not([data-current]) { display: none; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel--docked-only[data-current] { display: block; }
+  .admin-rail-grid .admin-rail__panel:not([data-current]) { display: none; }
+  .admin-rail-grid .admin-rail__panel--docked-only[data-current] { display: block; }
   /* The blocks column takes its track whole, over `.admin-form-column`'s
      (0,1,0) by weight: what keeps running text readable is the measure on
      its fields, never a cap on the column. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-form-column { max-width: none; }
+  .admin-rail-grid .admin-form-column { max-width: none; }
   /* THE MEASURE. A field of running text in the blocks column (the wrapper
      `.admin-column` or `.admin-field`, so its label, its well, its help,
      its Translate box and its error lines together) is `--cs-text-measure`
@@ -1083,14 +1096,25 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      takes the column: the image field and its preview, the Table block's
      grid (a body that holds a table), a group's rows (`groups`, whose own
      fields keep the measure); the block card, its head, a section's frame
-     and lanes and the add menu are no field, and carry none. A translation
-     tab never docks (`--folded`), so its pairs keep their own width. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field) { max-width: var(--cs-text-measure); }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field):has(.admin-code-input) { max-width: var(--cs-code-measure); }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main :is(.admin-column, .admin-field):is([data-controller~="admin--media--field"], :has(.admin-rich-text-table, .admin-groups-field)) { max-width: none; }
+     and lanes and the add menu are no field, and carry none. */
+  .admin-rail-grid .admin-rail__main :is(.admin-column, .admin-field) { max-width: var(--cs-text-measure); }
+  .admin-rail-grid .admin-rail__main :is(.admin-column, .admin-field):has(.admin-code-input) { max-width: var(--cs-code-measure); }
+  .admin-rail-grid .admin-rail__main :is(.admin-column, .admin-field):is([data-controller~="admin--media--field"], :has(.admin-rich-text-table, .admin-groups-field)) { max-width: none; }
+  /* A translation tab's pair (`.admin-translation-pair`, the field's
+     direct child) takes its field's width whole, and the measure goes on
+     each half instead: the field and its original side by side are two
+     columns of running text. */
+  .admin-rail-grid .admin-rail__main :is(.admin-column, .admin-field):has(> .admin-translation-pair) { max-width: none; }
+  .admin-rail-grid .admin-rail__main .admin-translation-pair > * { max-width: var(--cs-text-measure); }
+  /* Side by side (from 824px of the pair's form, as below the threshold),
+     the two halves share that width, uncapped by the 560px they keep
+     undocked. */
+  @container admin-pair (min-width: 824px) {
+    .admin-rail-grid .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
   /* Its top is the rail's: the space it keeps under the settings when they
      stand above it is not kept beside them. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__main { margin-top: 0; }
+  .admin-rail-grid .admin-rail__main { margin-top: 0; }
   /* The page settings in the Page panel: always open, since the tab is the
      choice to see them, so the summary is not drawn and the content is
      forced visible whatever the `<details>`' own `open` (as a translation
@@ -1102,10 +1126,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      a folded `<details>`, so there the settings stay the card they are
      below the threshold, with their summary to open them. */
   @supports selector(::details-content) {
-    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
-    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
-    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > summary { display: none; }
-    .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
+    .admin-rail-grid .admin-rail__panel > .admin-page-settings { background: transparent; box-shadow: none; padding: 0; }
+    .admin-rail-grid .admin-rail__panel > .admin-page-settings::details-content { content-visibility: visible; display: block; }
+    .admin-rail-grid .admin-rail__panel > .admin-page-settings > summary { display: none; }
+    .admin-rail-grid .admin-rail__panel > .admin-page-settings > form { margin-top: 0; }
   }
   /* The post form (`Admin::EditorScreen::PostFormComponent`) generates no
      box while docked, so its settings panel and its main column are the
@@ -1116,22 +1140,58 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
      stand outside every form, as siblings of the form in the same grid. The
      card look the form has below the threshold is the main column's here:
      the settings stand on the rail's ground. */
-  .admin-rail-grid:not(.admin-rail-grid--folded) > #post-form { display: contents; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-post-main { border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: calc(var(--spacing) * 4); }
+  .admin-rail-grid > #post-form { display: contents; }
+  .admin-rail-grid .admin-post-main { border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: calc(var(--spacing) * 4); }
   /* The Notes tab (THE NOTES PANEL, below): docked, the same element is the
      panel's content on the rail's ground, over the slide-over's rules. It
      sticks with its panel, so a marker pressed far down the page opens
      notes that are in view, and is as tall as the panel may be: the notes
      scroll their own list, so the panel keeps no scroll and no padding of
      its own (the notes' header and list have theirs). */
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-rail__panel:has(> .admin-notes-drawer) { padding: 0; overflow: visible; }
-  .admin-rail-grid:not(.admin-rail-grid--folded) .admin-notes-drawer {
+  .admin-rail-grid .admin-rail__panel:has(> .admin-notes-drawer) { padding: 0; overflow: visible; }
+  .admin-rail-grid .admin-notes-drawer {
     position: static; z-index: auto; inset: auto;
     width: auto; height: calc(100dvh - var(--admin-rail-top) - var(--admin-rail-tabs-height) - var(--cs-sp-4));
     --cs-notes-ground: var(--cs-rail);
     background: transparent; box-shadow: none; animation: none;
   }
 }
+/* A post's main column on a translation tab, docked. The post form is
+   `display: contents` while the rail docks, so it is no `admin-pair`
+   container, and its pairs (the post panel's in the 360px rail too) stack.
+   A container inside the form is no way out: Chrome drops the layout of a
+   size container's content under a `display: contents` ancestor once a
+   stream replaces a node inside it (the autosave's error slots), and the
+   title, address and body vanish (no container in it: `admin_design_rules_test`).
+   So the main column's pairs ask the editor area: the column's content box
+   is the area less the rail and its gap (360px and 28px) and the column's
+   own padding (16px either side), so 824px of it, the pair's threshold
+   everywhere else, is 1244px of the area. The rules are the side-by-side
+   block's above, for this column alone. */
+@container admin-editor (min-width: 1244px) {
+  .admin-rail-grid .admin-post-main .admin-translation-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card { order: 0; }
+  .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
+  .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
+  .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
+  .admin-rail-grid .admin-post-main .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
+}
+/* The editor's header row over a docked rail: each of its rows stops at
+   `--cs-content-max` and is centred as the grid under it is, so past the
+   cap Publish stands over the rail's right edge and not out in the spare
+   width; the header itself, its line and its ground, keeps the window's
+   width. The header is no item of the grid, and the page editor's stands
+   outside the editor area (`#editing`, the container the rail docks by),
+   so the docked state is read from the mark `admin--ui--rail` writes on
+   the grid (`data-rail-docked`), which follows the container query: the
+   page's header is the area's sibling, the post's stands inside it. Below
+   the cap the auto margins are 0. The grid centres from the first paint, by
+   the query, and the header row only once the controller has connected and
+   written the mark: past the cap the row moves once, on load, from the
+   window's width to the grid's. No query reaches the page's header, which
+   stands outside the container, so the mark is the one shared answer. */
+.admin-editor-header:has(~ .admin-editor-area [data-rail-docked]) > *,
+.admin-editor-area:has([data-rail-docked]) .admin-editor-header > * { max-width: var(--cs-content-max); margin-inline: auto; }
 /* THE NOTES PANEL (`Admin::NotesScreen::RailPanelComponent`, `#notes-drawer`,
    the content of the rail's Notes tab). One element at every width, never
    moved or cloned, so a note being typed keeps its text and its focus when
@@ -1175,7 +1235,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `data-editing-away`, the one mark the choice writes on the region, which
    live editing's merge leaves alone (its RUNTIME set): a class written by
    the script would be taken away by the next list merge. */
-.admin-section-card__settings[data-editing-away] { margin: 0; padding: 0; background: transparent; }
+:is(.admin-section-card__settings, .admin-section-group__settings)[data-editing-away] { margin: 0; padding: 0; background: transparent; }
 /* A section's header controls. A layout is shown as a
    diagram of its columns, their widths in the layout's own proportions (each
    bar's `flex` is the column's weight, `Admin::EditorScreen
@@ -1246,9 +1306,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    `admin_contrast_test`). Written after the state edges and as heavy, so it
    wins over a held edge: the chosen section is the one the person is
    acting on, and its hold says itself in words, in the strip and the
-   read-only form. A section whose type is gone draws no words and is never
+   read-only form. A translation tab's group is chosen the same way and
+   drawn the same. A section whose type is gone draws no words and is never
    chosen. */
-.admin-section-card[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+:is(.admin-section-card, .admin-section-group)[data-chosen] { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 /* A block's tile in a section's lane (`Admin::EditorScreen::BlockTileComponent`):
    its states are elevations, with no border. At rest the first; under the
    pointer the second, raised, and never moved, so nothing shifts under a

@@ -689,4 +689,131 @@ class Admin::SectionChoiceSystemTest < Admin::SectionsSystemTestCase
       })()
     JS
   end
+
+  # ---- A translation tab (Design System v124): a section is a group whose
+  # heading row carries the head's words; its region shows the settings
+  # read only, moved as the card's is.
+
+  def focus_on?(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
+
+  def group_of(section = @section) = "##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group"
+
+  test "on a translation tab a section group's head words choose it and outline it" do
+    with_locales(%w[en de], default: "en") do
+      at_window(WIDE) do
+        visit_editor(@page, locale: "de")
+        assert_docked
+        assert_equal [ "2 columns", "No background", "Content width" ], all("#{group_of} #section-#{@section.id}-words button").map { |button| button.text.delete("▾").strip }
+        assert_empty_line
+        # A translation tab's help line says what the tab shows: the settings to see, not to change.
+        assert_selector "#editor-grid-panel-section [data-admin--editor--section-choice-target=empty] p",
+          text: "Press a section's settings, such as “3 columns ▾”, to see them here. They are the same in every language.", visible: :all
+
+        find(word("width")).click
+        assert_selector in_rail, visible: :visible
+        assert_one_region
+        assert_selector "#editor-grid-tab-section[aria-selected=true]"
+        assert_selector "#{group_of}[data-chosen]"
+        outline = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector(#{group_of.to_json})); return [ style.outlineStyle, style.outlineWidth, style.outlineOffset ] })()")
+        assert_equal [ "solid", "2px", "2px" ], outline, "the chosen group's accent outline, outside its edge"
+        assert_equal "0px", page.evaluate_script("getComputedStyle(document.querySelector(#{settings_region.to_json})).paddingTop"), "in the rail the region keeps no room of its own"
+
+        # Another section's word takes its place; the first goes home, under its group's heading row.
+        find(word("layout", @second)).click
+        assert_selector in_rail(@second), visible: :visible
+        assert_selector "#{group_of} > [data-section-settings-home] + #{settings_region}", visible: :all
+        assert_no_selector "#{group_of}[data-chosen]"
+        assert_selector "#{group_of(@second)}[data-chosen]"
+        assert_one_region
+        assert_one_region(@second)
+
+        # Escape closes it and puts it home; the rail goes back to the tab
+        # left, and the word that opened it has the focus again.
+        find("#{settings_region(@second)} [data-section-setting='layout']").send_keys(:escape)
+        assert_selector "#{group_of(@second)} > #{settings_region(@second)}[hidden]", visible: :all
+        assert_no_selector "#{group_of(@second)}[data-chosen]"
+        assert_selector "#editor-grid-tab-page[aria-selected=true]"
+        assert_eventually(message: "the focus is back on the word that opened the region") { focus_on?(word("layout", @second)) }
+      end
+    end
+  end
+
+  test "below 1200px a translation tab opens a section's read-only settings under its group" do
+    with_locales(%w[en de], default: "en") do
+      at_window(NARROW) do
+        visit_editor(@page, locale: "de")
+        assert_docked(false)
+        find(word("background")).click
+
+        region = "#{group_of} > .admin-section-group__head ~ #{settings_region}"
+        assert_selector region, visible: :visible
+        assert_operator page.evaluate_script("document.querySelector(#{settings_region.to_json}).getBoundingClientRect().top"),
+          :>, page.evaluate_script("document.querySelector(#{"#{group_of} > .admin-section-group__head".to_json}).getBoundingClientRect().bottom") - 1, "under the heading row"
+        assert page.evaluate_script("document.activeElement === document.querySelector(#{"#{settings_region} [data-section-setting='background']".to_json})"), "the word's row has the focus"
+        assert_equal "true", find(word("background"))["aria-expanded"]
+        %w[form input select textarea button].each { |tag| assert_no_selector "#{settings_region} #{tag}", visible: :all }
+        assert_no_selector "#{group_of}[data-chosen]"
+
+        find(word("background")).click
+        assert_selector "#{settings_region}[hidden]", visible: :all
+        assert_equal "false", find(word("background"))["aria-expanded"]
+        assert focus_on?(word("background")), "a second press leaves the focus on its word"
+
+        # Escape in the region closes it, the focus back on the word that opened it.
+        find(word("width")).click
+        assert_selector settings_region, visible: :visible
+        assert focus_on?("#{settings_region} [data-section-setting='width']")
+        find("#{settings_region} [data-section-setting='width']").send_keys(:escape)
+        assert_selector "#{settings_region}[hidden]", visible: :all
+        assert_eventually(message: "Escape gives the focus back to the word") { focus_on?(word("width")) }
+      end
+    end
+  end
+
+  # A block's card in a group is no panel of the section: Escape in a card
+  # whose block was deleted under unsaved text (`data-editing-gone`, which
+  # live editing's merge writes) leaves it shown, with its text.
+  test "on a translation tab Escape in a gone card of a section's group leaves the card and its text" do
+    with_locales(%w[en de], default: "en") do
+      at_window(NARROW) do
+        visit_editor(@page, locale: "de")
+        card = "#{group_of} > ##{ActionView::RecordIdentifier.dom_id(@left)}"
+        field = "#{card} #block-#{@left.id}-caption"
+        assert_selector field
+        page.execute_script("document.querySelector(#{card.to_json}).dataset.editingGone = 'true'")
+        find(field).send_keys("Links")
+        find(field).send_keys(:escape)
+
+        assert_selector card, visible: :visible
+        assert_no_selector "#{card}[hidden]", visible: :all
+        assert_equal "Links", find(field).value
+      end
+    end
+  end
+
+  test "section=<id> on the default editor chooses that section, and an unknown id chooses nothing" do
+    at_window(WIDE) do
+      visit_screen admin_page_path(@page, section: @second.id)
+      assert_docked
+      assert_selector in_rail(@second), visible: :visible
+      assert_selector "#{card_of(@second)}[data-chosen]"
+      assert_selector "#editor-grid-tab-section[aria-selected=true]"
+      assert_one_region(@second)
+
+      visit_screen admin_page_path(@page, section: 0)
+      assert_docked
+      assert_empty_line
+      assert_no_selector "[data-chosen]"
+      assert_selector "#editor-grid-tab-page[aria-selected=true]"
+    end
+    at_window(NARROW) do
+      visit_screen admin_page_path(@page, section: @second.id)
+      assert_docked(false)
+      assert_selector "#{card_of(@second)} > #{settings_region(@second)}", visible: :visible
+      assert_selector "#{card_of(@section)} > #{settings_region(@section)}[hidden]", visible: :all
+      assert_eventually(message: "the region and its focused control were not scrolled into view") do
+        page.evaluate_script("(() => { const box = document.activeElement.getBoundingClientRect(); return document.querySelector(#{settings_region(@second).to_json}).contains(document.activeElement) && box.top >= 0 && box.bottom <= window.innerHeight })()")
+      end
+    end
+  end
 end

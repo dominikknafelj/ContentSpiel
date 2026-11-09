@@ -174,7 +174,7 @@ class AdminContrastTest < ActiveSupport::TestCase
   # is read from the rule that draws it, so a changed rule is measured too.
   test "the rail's tabs: a tab's words and the selected tab's are 4.5:1 on the rail, its underline 3:1" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    ground = css[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\)::before\s*\{[^}]*background:\s*var\((--cs-[\w-]+)\)/, 1]
+    ground = css[/\.admin-rail-grid::before\s*\{[^}]*background:\s*var\((--cs-[\w-]+)\)/, 1]
     words = css[/\.admin-rail__tab\s*\{[^}]*(?<![\w-])color:\s*var\((--cs-[\w-]+)\)/, 1]
     selected = css[/\.admin-rail__tab\[aria-selected="true"\]\s*\{([^}]*)\}/, 1]
     assert ground && words && selected, "the rail's ground, a tab's words and the selected tab are drawn by the stylesheet"
@@ -195,7 +195,7 @@ class AdminContrastTest < ActiveSupport::TestCase
   # read from the rule that draws it.
   test "the chosen section's outline is 3:1 or better on the canvas, in both schemes" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    rule = css[/\.admin-section-card\[data-chosen\]\s*\{([^}]*)\}/, 1]
+    rule = css[/:is\(\.admin-section-card, \.admin-section-group\)\[data-chosen\]\s*\{([^}]*)\}/, 1]
     assert rule, "the chosen section is drawn by the stylesheet"
     outline = rule[/outline:\s*2px solid var\((--cs-[\w-]+)\)/, 1]
     assert_equal "--cs-accent", outline, "a selection is the accent"
@@ -217,6 +217,24 @@ class AdminContrastTest < ActiveSupport::TestCase
       assert_ratio(4.5, colour.("--cs-structure-ink"), hovered, "a hovered word (#{scheme})")
       %w[--cs-ink --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), tint, "#{ink} on the head (#{scheme})") }
       assert_ratio(3.0, colour.("--cs-accent"), hovered, "a focused word's ring (#{scheme})")
+    end
+  end
+
+  # A translation tab's section group (`.admin-section-group`, `bg-sunken`)
+  # carries the head's words in the same look, on the group's own ground; its
+  # read-only settings stand on the rail's ground, labels in meta and values
+  # in ink.
+  test "a section group's words and its read-only settings are 4.5:1 or better on their grounds" do
+    group = Rails.root.join("app/components/admin/editor_screen/section_group_component.html.erb").read
+    assert_includes group, "bg-sunken", "the group's ground"
+    assert_includes group, "bg-rail", "the read-only settings' ground"
+    each_scheme do |scheme, colour|
+      sunken = colour.("--cs-sunken")
+      hovered = mix(colour.("--cs-structure-ink"), sunken, 0.12)
+      assert_ratio(4.5, colour.("--cs-structure-ink"), sunken, "a word on the group (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-structure-ink"), hovered, "a hovered word on the group (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), hovered, "a focused word's ring on the group (#{scheme})")
+      %w[--cs-ink --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-rail"), "#{ink} on the read-only settings (#{scheme})") }
     end
   end
 
@@ -622,7 +640,7 @@ class AdminContrastTest < ActiveSupport::TestCase
   test "the Notes tab's ground is the rail docked and the popover in the slide-over, and the reply dock paints it" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_equal "--cs-popover", css[/^\.admin-notes-drawer\s*\{[^}]*--cs-notes-ground:\s*var\((--cs-[\w-]+)\)/, 1]
-    assert_equal "--cs-rail", css[/\.admin-rail-grid:not\(\.admin-rail-grid--folded\) \.admin-notes-drawer\s*\{[^}]*--cs-notes-ground:\s*var\((--cs-[\w-]+)\)/, 1]
+    assert_equal "--cs-rail", css[/\.admin-rail-grid \.admin-notes-drawer\s*\{[^}]*--cs-notes-ground:\s*var\((--cs-[\w-]+)\)/, 1]
     dock = notes_template("thread_component.html.erb")[/data-note-part="reply"[^\n]* class="([^"]*)">/, 1]
     assert_includes dock.to_s.split, "bg-(--cs-notes-ground)", "the reply dock stands on the notes' ground, not on the surface"
     refute_includes dock.to_s.split, "bg-surface"

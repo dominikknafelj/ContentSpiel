@@ -313,7 +313,7 @@ export default class extends Controller {
   escape(event) {
     const target = event.target
     if (this.region?.contains(target)) return
-    const head = this.element.querySelector(":scope > .admin-section-card__head")
+    const head = this.element.querySelector(":scope > :is(.admin-section-card__head, .admin-section-group__head)")
     if (this.settingsOpen && head?.contains(target)) return this.settings?.escape(event)
 
     const orphan = target.closest?.("[data-editing-gone]")

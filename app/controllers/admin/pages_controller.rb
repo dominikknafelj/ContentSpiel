@@ -160,6 +160,7 @@ module Admin
         { hero_media_asset: Media::Asset::FILE_INCLUDES },
         { content_blocks: { media_asset: Media::Asset::FILE_INCLUDES } }
       ]).call
+      @chosen_section_id = chosen_section_id
     end
 
     # The settings form's own autosave endpoint: every field in
@@ -310,6 +311,18 @@ module Admin
     end
 
     private
+
+    # `?section=<id>` (a translation tab's "Edit in <language>"): the section the
+    # default tab's editor chooses on load (`admin--editor--section-choice`). Only
+    # one of this page's sections, read from the blocks already loaded, and only on
+    # the default tab, which alone edits a section's settings; anything else (an
+    # unknown id, another page's block, a block that is no section, a section
+    # whose type is gone) chooses nothing, silently.
+    def chosen_section_id
+      return unless admin_locale == Locales.default && params[:section].is_a?(String)
+
+      @page.content_blocks.find { |block| block.id.to_s == params[:section] && block.section_id.nil? && block.container? }&.id
+    end
 
     helper_method :new_page_params
 

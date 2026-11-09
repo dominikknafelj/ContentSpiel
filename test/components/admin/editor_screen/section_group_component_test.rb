@@ -1,9 +1,10 @@
 require "test_helper"
 
-# A section on a translation tab (sections spec §4.5): a heading over its
+# A section on a translation tab (sections spec §4.5): a heading row over its
 # blocks' cards in reading order, each with its pair of fields. Nothing of
 # the lanes -- no tile, no panel, no handle -- because structure is edited on
-# the default language's tab.
+# the default language's tab; its settings are the head's words and a region
+# that shows them read only (Design System v124).
 class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -27,11 +28,13 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
 
   def group = "##{ActionView::RecordIdentifier.dom_id(@section)}.admin-section-group"
 
+  def head = "#{group} > .admin-section-group__head"
+
   test "it is one group under the heading Section, with a card per block in reading order" do
     render_group
 
     assert_selector ".admin-section-group", count: 1
-    assert_selector "#{group}[data-block-id='#{@section.id}'][data-container][data-admin--editor--blocks-target='card'] > h3", text: "Section", exact_text: true
+    assert_selector "#{group}[data-block-id='#{@section.id}'][data-container][data-admin--editor--blocks-target='card'] > .admin-section-group__head > h3", text: "Section", exact_text: true
     cards = page.all("#{group} > .admin-block-card").map { |card| card["data-block-id"].to_i }
     assert_equal [ @text.id, @late.id, @image.id ], cards
   end
@@ -40,7 +43,7 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     as(users(:one), channel: :admin) { render_group }
 
     assert_no_selector ".admin-block-tile", visible: :all
-    assert_no_selector "[data-admin--editor--section-target]", visible: :all
+    assert_no_selector "[data-admin--editor--section-target~='tile'], [data-admin--editor--section-target~='panel'], [data-admin--editor--section-target~='lanes']", visible: :all
     assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "button[aria-label='Section actions']", visible: :all
     # Each block's card has the "⋯" with "Add note" as its only item (the
@@ -50,7 +53,59 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-move]", visible: :all
     assert_no_selector "[data-admin--editor--blocks-target='lane']", visible: :all
     assert_selector "[data-admin--editor--blocks-target='card']", count: 1
-    assert_no_selector ".admin-section-group > [hidden]", visible: :all
+    # Hidden directly in the group: the region's home and the closed region alone.
+    assert_equal [ "span", "section-#{@section.id}-settings" ], page.all(".admin-section-group > [hidden]", visible: :all).map { |node| node[:id] || node.tag_name }
+  end
+
+  test "its heading row says the settings in the card head's words, each opening the read-only region" do
+    @section.update!(settings: { "layout" => "three", "anchor" => "about" })
+    render_group
+
+    assert_selector "#{group}[data-controller='admin--editor--section'][data-admin--editor--section-settings-id-value='section-#{@section.id}-settings']"
+    # Escape is the heading row's: on the group it would reach a block card's
+    # Escape and hide a gone card holding unsaved text.
+    assert_selector "#{head}[data-action='keydown.esc->admin--editor--section#escape']"
+    assert_not_includes page.find(group)["data-action"].to_s, "keydown"
+    words = page.all("#{head} #section-#{@section.id}-words[data-admin--editor--section-target='words'] button", visible: :all)
+    assert_equal [ "3 columns ▾", "No background ▾", "Content width ▾", "#about ▾" ], words.map { |word| word.text(:all).squish }
+    assert_equal %w[layout background width anchor], words.map { |word| word["data-admin--editor--section-field-param"] }
+    words.each { |word| assert_equal "section-#{@section.id}-settings", word["aria-controls"] }
+  end
+
+  test "its settings region shows the words as rows under the form's labels, the same in every language, with a link to the default language" do
+    @section.update!(settings: { "layout" => "three", "anchor" => "about" })
+    render_group
+
+    region = "#{group} > [data-section-settings-home] + #section-#{@section.id}-settings[hidden][data-controller='admin--editor--section-settings'][data-section-id='#{@section.id}']"
+    assert_selector region, visible: :all
+    # Named by the heading and the section's own words, so two sections' regions differ.
+    assert_selector "#{region}[role=region][aria-labelledby='section-#{@section.id}-heading section-#{@section.id}-words']", visible: :all
+    assert_selector "#{head} > #section-#{@section.id}-words", visible: :all
+    assert_selector "#{head} > h3#section-#{@section.id}-heading", text: "Section"
+    rows = page.all("#{region} dl > div[tabindex='-1'][data-section-setting]", visible: :all)
+    assert_equal %w[layout background width anchor], rows.map { |row| row["data-section-setting"] }
+    assert_equal [ [ "Layout", "3 columns" ], [ "Background", "No background" ], [ "Width", "Content width" ], [ "Anchor", "#about" ] ],
+      rows.map { |row| [ row.find("dt", visible: :all).text(:all), row.find("dd", visible: :all).text(:all) ] }
+    assert_selector "#{region} p.text-xs.text-meta", text: "Same in every language", visible: :all
+    assert_selector "#{region} a[href='/cs-studio/pages/#{@owner.id}?section=#{@section.id}']", text: "Edit in English", visible: :all
+  end
+
+  # A translation tab never sends a shared value, and the region is moved
+  # into the rail: nothing in it may be a second copy of the default tab's
+  # form that could be submitted.
+  test "its settings region holds no form and no control" do
+    as(users(:one), channel: :admin) { render_group }
+
+    region = "#section-#{@section.id}-settings"
+    %w[form input select textarea button fieldset].each { |tag| assert_no_selector "#{region} #{tag}", visible: :all }
+    assert_no_selector "#{region} [name]", visible: :all
+    assert_no_selector "#section-#{@section.id}-form", visible: :all
+  end
+
+  test "Style and Anchor rows show only when the head says them" do
+    render_group
+
+    assert_equal %w[layout background width], page.all("#section-#{@section.id}-settings [data-section-setting]", visible: :all).map { |row| row["data-section-setting"] }
   end
 
   test "each block's translated field is a pair with its original, in an autosave form" do
@@ -100,15 +155,18 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
     @section.update_columns(block_type: "gone/section")
     render_group
 
-    assert_selector "#{group} > h3.text-danger-ink", text: "Unavailable type — gone/section", exact_text: true
+    assert_selector "#{head} > h3.text-danger-ink", text: "Unavailable type — gone/section", exact_text: true
     assert_selector "#{group} > .admin-block-card", count: 3
+    # No words, no region: a section whose type is gone is never chosen.
+    assert_no_selector "#section-#{@section.id}-words, #section-#{@section.id}-settings", visible: :all
+    assert_no_selector "#{group}[data-controller]"
   end
 
-  test "an empty section is the heading alone" do
+  test "an empty section is the heading row and its settings alone" do
     [ @text, @image, @late ].each(&:destroy!)
     render_group
 
-    assert_selector "#{group} > *", count: 1
+    assert_equal [ "section-#{@section.id}-header", "span", "section-#{@section.id}-settings" ], page.all("#{group} > *", visible: :all).map { |node| node[:id].presence || node.tag_name }
   end
 
   test ".for is the group on a translation tab and the card on the default language's" do

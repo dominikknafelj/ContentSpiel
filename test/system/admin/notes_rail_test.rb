@@ -219,9 +219,9 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
   end
 
   # The slide-over starts under the editor's header, so the header's actions
-  # stay in reach: the Notes button closes what it opened. A translation tab
-  # never docks the rail, so there it is the slide-over at a wide window too.
-  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{WIDE}px" => [ WIDE, "?locale=de" ] }.each do |where, (width, query)|
+  # stay in reach: the Notes button closes what it opened, on a translation
+  # tab as on the default one.
+  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{MID}px" => [ MID, "?locale=de" ] }.each do |where, (width, query)|
     test "#{where} the header's Publish and Notes stay pressable while the slide-over is open, and Notes closes it" do
       with_locales(%w[en de], default: "en")
       at_window(width) do
@@ -250,7 +250,7 @@ class Admin::NotesRailSystemTest < ApplicationSystemTestCase
   # The header's ⋯ menu drops from the header's right end into the
   # slide-over's place. The header paints above the slide-over, so its menu
   # is over the notes and its items can be pressed.
-  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{WIDE}px" => [ WIDE, "?locale=de" ] }.each do |where, (width, query)|
+  { "at #{MID}px" => [ MID, "" ], "on a translation tab at #{MID}px" => [ MID, "?locale=de" ] }.each do |where, (width, query)|
     test "#{where} the header's ⋯ menu opens above the slide-over" do
       with_locales(%w[en de], default: "en")
       at_window(width) do

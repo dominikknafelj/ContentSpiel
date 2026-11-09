@@ -52,17 +52,19 @@
 <%# The rail (`Admin::Ui::RailTabsComponent`, `RailPanelComponent`, `admin--ui--rail`): the
     settings first in the document, then the blocks, at every width; where the editor area
     has the room the grid places the settings in a rail right of the blocks, with a Page
-    and a Section tab, and below it they stand above the blocks as one column. A
-    translation tab never docks it (`--folded`): its pairs need the width. The page's
-    settings are rendered once, in the Page panel. A section's settings region is moved
+    and a Section tab, and below it they stand above the blocks as one column, on a
+    translation tab as on the default one (there a section's settings are read only:
+    `SectionGroupComponent`). The page's settings are rendered once, in the Page panel. A section's settings region is moved
     into the Section panel when its words are pressed and back under its head when it
-    closes (`admin--editor--section-choice`, which says what moves it and when). %>
+    closes (`admin--editor--section-choice`, which says what moves it and when). The
+    address's `section` (the translation tab's "Edit in <language>") names a section
+    chosen on load, on the default tab only (`@chosen_section_id`). %>
 <% rail_id = "editor-grid" %>
 <%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
 <% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
                                                 query: request.query_parameters, **slot_context) %>
-<%= tag.div id: rail_id, class: [ "admin-rail-grid", ("admin-rail-grid--folded" unless admin_locale.to_s == Locales.default.to_s) ],
-      data: { controller: "admin--ui--rail admin--editor--section-choice",
+<%= tag.div id: rail_id, class: "admin-rail-grid",
+      data: { controller: "admin--ui--rail admin--editor--section-choice", "admin--editor--section-choice-chosen-value": @chosen_section_id,
               action: "admin--ui--rail:reveal->admin--ui--rail#reveal admin--ui--rail:conceal->admin--ui--rail#conceal " \
                       "admin--editor--section:open-settings->admin--editor--section-choice#take " \
                       "admin--editor--section-settings:closed->admin--editor--section-choice#closed " \
@@ -83,7 +85,7 @@
        data-action="focusin->admin--editor--section-choice#keepFocus focusout->admin--editor--section-choice#keepBlur"></div>
   <div class="admin-section-choice__empty" data-admin--editor--section-choice-target="empty">
     <p class="text-sm font-medium text-ink"><%= t("admin.components.editor_screen.section_choice.empty") %></p>
-    <p class="mt-1 text-sm text-meta"><%= t("admin.components.editor_screen.section_choice.help") %></p>
+    <p class="mt-1 text-sm text-meta"><%= t(admin_locale.to_s == Locales.default.to_s ? "admin.components.editor_screen.section_choice.help" : "admin.components.editor_screen.section_choice.help_translation") %></p>
   </div>
 <% end %>
 <%= render rail_slot %>

@@ -2,7 +2,8 @@ require "application_system_test_case"
 
 # The editors' form column (layout points spec, A): 760px wherever the rail
 # does not dock, left-aligned in the content column, the header still full
-# width; a translation tab two columns of up to 560px (O3). Only layout can
+# width; a translation tab, where the rail does not dock, two columns of up
+# to 560px (O3). Only layout can
 # show it.
 class Admin::FormWidthSystemTest < ApplicationSystemTestCase
   setup do
@@ -49,10 +50,13 @@ class Admin::FormWidthSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "at 1600px a translation tab is wider than 760px and at most 1144px, and its pairs sit side by side" do
-    at_1600 do
-      visit "/cs-studio/posts/#{@post.id}?locale=de"
-      await_admin_controllers
+  # Where the rail does not dock (at 1600px the post editor docks it, on a
+  # translation tab too: `editor_rail_test`).
+  test "at 1400px a translation tab is wider than 760px and at most 1144px, and its pairs sit side by side" do
+    at_window(1400, height: 1000) do
+      visit_editor(@post, locale: "de")
+      await_js("window.Stimulus.getControllerForElementAndIdentifier(document.getElementById('editor-grid'), 'admin--ui--rail') !== null")
+      assert_equal false, page.evaluate_script("document.getElementById('editor-grid').hasAttribute('data-rail-docked')"), "the rail docked at 1400px"
 
       form = box("#post-form")
       assert_operator form[2] - form[0], :>, 760

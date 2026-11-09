@@ -8,11 +8,27 @@ module Admin
     # confirmed as on any card; a view-only viewer gets the same cards
     # disabled, with no autosave (`editable:` is handed down).
     #
-    # NOTHING OF THE DEFAULT TAB'S SECTION CARD IS HERE: no lanes, no tiles,
-    # no hidden panels, no settings, no `admin--editor--section`. A translator works
-    # down the page's text; which column a text stands in is layout, and
-    # layout is the same in every language. So the forms are all open, one
-    # under the other, in the order the public page is read.
+    # NOTHING OF THE DEFAULT TAB'S SECTION CARD'S STRUCTURE IS HERE: no lanes,
+    # no tiles, no hidden panels, no settings form. A translator works down
+    # the page's text; which column a text stands in is layout, and layout is
+    # the same in every language. So the forms are all open, one under the
+    # other, in the order the public page is read.
+    #
+    # ITS SETTINGS ARE READ ONLY. The heading row says the section's settings
+    # in the card head's words (`SectionSettingsWordsComponent`, the same
+    # component), and each word opens the settings region
+    # (`#section-<id>-settings`) through `admin--editor--section#openSettings`,
+    # as on the default tab: in place under the heading row below the rail's
+    # threshold, and where the rail docks `admin--editor--section-choice`
+    # moves that same region into the Section tab and outlines the group
+    # (`data-chosen`). The region holds the same words as rows, each under the
+    # settings form's own label, then "Same in every language" and a link to
+    # the default language's editor with the section chosen (`?section=`). It
+    # holds no form and no control: a translation tab never sends a shared
+    # value, and a moved region is never a second copy of the default tab's
+    # form. A row takes the focus (`tabindex="-1"`) when its word opened the
+    # region (`admin--editor--section-settings#focus`). A section whose type
+    # is gone has no words and no region, so it is never chosen.
     #
     # THE GROUP STANDS IN THE BLOCK LIST AS THE SECTION'S CARD DOES: a direct
     # child of the list with the section's `dom_id` and `data-block-id`, and a
@@ -54,6 +70,46 @@ module Admin
 
       def heading = unavailable? ? t(".unavailable", type: section.block_type) : t(".heading")
 
+      def header_id = "section-#{section.id}-header"
+
+      def settings_id = Admin::EditorScreen::SectionCardComponent.settings_id(section)
+
+      # The words of the heading row: rendered first, so the region's rows,
+      # drawn after them, read the same instance's words.
+      def words_component = @words_component ||= Admin::EditorScreen::SectionCardComponent.words(section: section)
+
+      # `[setting, label, word]` for the region's rows: what the head words
+      # say, each under the settings form's own label.
+      def rows
+        words_component.words.map { |field, word| [ field, label_for(field), word ] }
+      end
+
+      def wrapper_data
+        data = { block_id: section.id, container: "", "admin--editor--blocks-target": "card" }
+        return data if unavailable?
+
+        data.merge(controller: "admin--editor--section", "admin--editor--section-settings-id-value": settings_id,
+          action: "admin--editor--section-settings:closed@window->admin--editor--section#settingsClosed")
+      end
+
+      # Escape is heard on the heading row alone, where the words close the
+      # open region (the region hears its own). Never on the group: a block's
+      # card inside it is no panel of the section, and the section's Escape
+      # would take a gone card holding unsaved text for one and hide it.
+      def head_data = unavailable? ? {} : { action: "keydown.esc->admin--editor--section#escape" }
+
+      def heading_id = "section-#{section.id}-heading"
+
+      def words_id = Admin::EditorScreen::SectionCardComponent.words_id(section)
+
+      def default_language = ::Locales.name(::Locales.default, native: true)
+
+      # The default language's editor with this section chosen. No `locale`:
+      # the default language is the editor's own.
+      def edit_path = helpers.admin_page_path(page, section: section.id)
+
+      def edit_class = "#{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)} mt-1 self-start"
+
       def blocks = outline.blocks_in(section)
 
       def card(block)
@@ -65,6 +121,10 @@ module Admin
       private
 
       attr_reader :page, :section, :outline, :locale, :url_options
+
+      def label_for(field)
+        field == "layout" ? t("admin.components.editor_screen.section_layout_menu.label") : t("admin.components.editor_screen.section_card.#{field}")
+      end
     end
   end
 end

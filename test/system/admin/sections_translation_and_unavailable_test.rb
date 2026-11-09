@@ -10,7 +10,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
       visit_editor(@page, locale: "de")
 
       assert_selector ".admin-section-group", count: 1
-      assert_selector ".admin-section-group > h3", text: "Section", exact_text: true
+      assert_selector ".admin-section-group > .admin-section-group__head > h3", text: "Section", exact_text: true
       assert_no_selector ".admin-block-tile"
       cards = page.all(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
       assert_equal [ @left.id, @right.id ], cards
