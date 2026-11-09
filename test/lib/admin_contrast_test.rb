@@ -349,6 +349,16 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  test "a tab's words are 4.5:1 on the surface, the current one's on ink, and the focus outline 3:1 on the surface and on the current tab's paper ring" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a tab's words on the surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-sunken"), "a hovered tab's words on sunken (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "the current tab's words on ink (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus outline on the surface (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-paper"), colour.("--cs-ink"), "the paper ring on the current tab (#{scheme})")
+    end
+  end
+
   test "Live, a scheduled date, a panel head's words, a section head's words and the type chip's words are 4.5:1 or better" do
     each_scheme do |scheme, colour|
       { "--cs-on-live" => "--cs-live", "--cs-on-scheduled" => "--cs-scheduled",

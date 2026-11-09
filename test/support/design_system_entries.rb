@@ -10,13 +10,13 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794187215-67d0".freeze
+  VERSION = "1794233743-c8e3".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
     ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields Cover Dialog FieldFrame FormControls
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
-    GroupFields IconChip ImageField ImageLoading ListState Mails Menu PasswordField
+    GroupFields IconChip ImageField ImageLoading ListState Mails Menu NoteMarker PasswordField PresenceMarker
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
@@ -53,7 +53,7 @@ module DesignSystemEntries
     "Admin::Ui::ScheduledDateComponent" => "StudioDashboardCards",
     "Admin::Ui::StatusChipComponent" => "Badge",
     "Admin::Ui::SystemCheckRowComponent" => "Alerts",
-    "Admin::Ui::TabLinksComponent" => "StudioDashboardCards",
+    "Admin::Ui::TabLinksComponent" => "StudioFilterBar",
     "Admin::Ui::ThemeSwitchComponent" => "StudioShell",
     "Admin::Ui::TimeAgoComponent" => "StudioListTable",
     "Admin::Ui::ToastRegionComponent" => "Toast",
