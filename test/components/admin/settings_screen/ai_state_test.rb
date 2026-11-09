@@ -18,6 +18,13 @@ class Admin::SettingsScreen::AiStateTest < ActiveSupport::TestCase
     assert_equal :key_saved, AiState.of(with(provider: "anthropic", key: true))
   end
 
+  test "a test's result never overrides Off or No key: no provider and a failed test is Off" do
+    assert_equal :off, AiState.of(with(provider: nil, key: false), result: :failed)
+    assert_equal :off, AiState.of(with(provider: nil, key: true), result: :connected)
+    assert_equal :no_key, AiState.of(with(provider: "anthropic", key: false), result: :failed)
+    assert_raises(ArgumentError) { AiState.of(with(provider: nil, key: false), result: :maybe) }
+  end
+
   test "a test's result gives connected or not connected, and each state has its tone" do
     site = with(provider: "anthropic", key: true)
     assert_equal :connected, AiState.of(site, result: :connected)

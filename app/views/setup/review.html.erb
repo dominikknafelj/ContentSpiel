@@ -23,7 +23,7 @@
       <dt class="w-40 shrink-0 text-label text-meta"><%= label %></dt>
       <dd class="flex-1"><%= value %></dd>
       <% if step %>
-        <dd><%= link_to t(".edit"), setup_step_path(step), class: "text-accent underline hover:no-underline" %></dd>
+        <dd><%= link_to t(".edit"), setup_step_path(step), class: "text-accent underline hover:no-underline", aria: { label: t(".edit_row", item: label) } %></dd>
       <% end %>
     </div>
   <% end %>

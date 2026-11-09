@@ -117,6 +117,24 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "details code.font-cs-mono", text: "docker compose logs web"
   end
 
+  # The log help names four commands, and each must exist: a person who runs
+  # one that does not finds no token. `contentspiel dev` runs compose in the
+  # foreground (`install/contentspiel`), so its terminal is where the log is.
+  test "the log help names only commands that exist, and says a token set in SETUP_TOKEN is not printed" do
+    get setup_step_path("token")
+
+    commands = css_select("details code").map { |node| node.text.strip }
+    assert_equal [ "SETUP_TOKEN", "bin/dev", "docker compose logs web", "kamal app logs", "contentspiel dev" ], commands
+    assert_select "details p", text: "The setup token is printed in the server's log when CS Studio starts, unless you set it yourself with SETUP_TOKEN."
+    assert_select "details p", text: "With the contentspiel command: the terminal running contentspiel dev."
+
+    assert Rails.root.join("bin/dev").executable?
+    assert_match(/^services:.*^\s+<%= service %>:/m, Rails.root.join("lib/site_template/compose.yml.tt").read)
+    assert_includes Rails.root.join("lib/site_template/compose.yml.tt").read, "%w[web css]"
+    assert_match(/^gem "kamal"/, Rails.root.join("Gemfile").read)
+    assert_match(/if \[ "\$\{1:-\}" = dev \]; then.*docker compose -f \.contentspiel\/compose\.yml up/m, Rails.root.join("install/contentspiel").read)
+  end
+
   test "a step names itself current, the earlier ones done in the ok tone, and Optional in words" do
     get setup_step_path("admin")
 

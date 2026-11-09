@@ -19,11 +19,11 @@
   <details class="text-small text-dim">
     <summary class="admin-disclosure inline-flex cursor-pointer rounded-button text-sm font-semibold text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><%= t(".log.summary") %></summary>
     <div class="mt-2 space-y-1">
-      <p><%= t(".log.intro") %></p>
+      <p><%= t(".log.intro_html", variable: tag.code("SETUP_TOKEN", class: "font-cs-mono text-ink")) %></p>
       <p><%= t(".log.development_html", command: tag.code("bin/dev", class: "font-cs-mono text-ink")) %></p>
       <p><%= t(".log.compose_html", command: tag.code("docker compose logs web", class: "font-cs-mono text-ink")) %></p>
       <p><%= t(".log.kamal_html", command: tag.code("kamal app logs", class: "font-cs-mono text-ink")) %></p>
-      <p><%= t(".log.contentspiel_html", command: tag.code("contentspiel logs", class: "font-cs-mono text-ink")) %></p>
+      <p><%= t(".log.contentspiel_html", command: tag.code("contentspiel dev", class: "font-cs-mono text-ink")) %></p>
     </div>
   </details>
   <div class="flex items-center justify-end gap-3">

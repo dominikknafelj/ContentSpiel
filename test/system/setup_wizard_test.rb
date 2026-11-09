@@ -118,10 +118,10 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     find("summary", text: "Where do I find the log?").click
 
-    assert_selector "details[open]", text: "The setup token is printed in the server's log when CS Studio starts."
+    assert_selector "details[open]", text: "The setup token is printed in the server's log when CS Studio starts, unless you set it yourself with SETUP_TOKEN."
     assert_selector "details[open] code", text: "docker compose logs web"
     assert_selector "details[open] code", text: "kamal app logs"
-    assert_selector "details[open] code", text: "contentspiel logs"
+    assert_selector "details[open] code", text: "contentspiel dev"
     assert_equal "Where do I find the log?", page.evaluate_script("document.activeElement.textContent").strip
     assert page.evaluate_script(<<~JS), "the disclosure stands under the field, above Continue"
       (() => {

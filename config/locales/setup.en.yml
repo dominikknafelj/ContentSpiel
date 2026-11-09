@@ -44,11 +44,11 @@ en:
       continue: "Continue"
       log:
         summary: "Where do I find the log?"
-        intro: "The setup token is printed in the server's log when CS Studio starts."
+        intro_html: "The setup token is printed in the server's log when CS Studio starts, unless you set it yourself with %{variable}."
         development_html: "In development: the terminal running %{command}."
         compose_html: "With Docker Compose: %{command}."
         kamal_html: "With Kamal: %{command}."
-        contentspiel_html: "With the contentspiel command: %{command}."
+        contentspiel_html: "With the contentspiel command: the terminal running %{command}."
     system_check:
       heading: "System check"
       intro: "These checks don't change anything. A warning tells you what won't work yet — you can continue now and fix it later."
@@ -131,4 +131,5 @@ en:
       none: "None"
       blank: "—"
       edit: "Edit"
+      edit_row: "Edit %{item}"
       finish: "Finish setup"

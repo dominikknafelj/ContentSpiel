@@ -471,6 +471,18 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target=settings-glance-mail]", 0
   end
 
+  # A failed test on a site with no provider redraws the row as it stands:
+  # AI translation is off, never "Not connected".
+  test "a failed Test connection with no provider leaves the rail's row Off" do
+    @site.update!(ai_provider: nil)
+
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target=settings-glance-ai] template" do
+      assert_select "a#settings-glance-ai .admin-state-chip[data-state-tone=off]", text: "Off"
+    end
+  end
+
   # A refused key changes no state, so its answer leaves the row alone.
   test "a blank key's refusal leaves the rail's row alone" do
     save_key(" ")
