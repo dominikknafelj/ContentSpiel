@@ -114,7 +114,7 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-unread]"
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false, open_notes: 2, notes_unread: true)
-    assert_selector ".admin-notes-marker--on-image[data-unread][aria-label='2 open notes, new for you']", text: "2 new"
+    assert_selector ".admin-notes-marker--on-image[data-unread][aria-label='2 new open notes for you']", text: "2 new"
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
     assert_no_selector ".admin-notes-marker"

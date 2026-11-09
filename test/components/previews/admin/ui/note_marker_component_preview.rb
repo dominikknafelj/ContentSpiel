@@ -6,7 +6,7 @@ module Admin
     class NoteMarkerComponentPreview < ViewComponent::Preview
       def read = render(Admin::Ui::NoteMarkerComponent.new(count: 2, label: "2 open notes"))
 
-      def unread = render(Admin::Ui::NoteMarkerComponent.new(count: 3, label: "3 open notes, new for you", unread: true))
+      def unread = render(Admin::Ui::NoteMarkerComponent.new(count: 3, label: "3 new open notes for you", unread: true))
 
       def small = render(Admin::Ui::NoteMarkerComponent.new(count: 2, label: "2 open notes", size: :small))
 

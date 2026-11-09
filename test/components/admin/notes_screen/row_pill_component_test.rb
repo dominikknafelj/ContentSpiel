@@ -25,10 +25,10 @@ class Admin::NotesScreen::RowPillComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-unread]"
 
     render_pill(pricing, { open: 1, unread: true })
-    assert_selector "span[data-notes-marker][data-unread][aria-label='1 open note, new for you']", text: "1 new"
+    assert_selector "span[data-notes-marker][data-unread][aria-label='1 new open note for you']", text: "1 new"
 
     render_pill(post, { open: 3, unread: true }, url_options: {})
-    assert_selector "a[data-unread][aria-label='3 open notes, new for you']", text: "3 new"
+    assert_selector "a[data-unread][aria-label='3 new open notes for you']", text: "3 new"
   end
 
   test "a post's link keeps the list's language" do

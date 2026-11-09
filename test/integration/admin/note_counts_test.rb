@@ -30,7 +30,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
   test "the posts list has a Notes column: the open count as a link that opens the post with its drawer, nothing for a post without" do
     get "/cs-studio/posts"
 
-    # The handoff's header: only the 12px icon, named for a screen reader and by its title.
+    # The column's header: only the 12px icon, named for a screen reader and by its title.
     assert_select "table.admin-posts-table th[title='Open notes'][class~='w-14']", text: "Notes" do
       assert_select "svg[class~='size-3']"
     end
@@ -59,12 +59,12 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "#media-panel #media-notes turbo-frame#notes[loading=lazy][src='/cs-studio/notes/media/#{@asset.id}/threads/7?view=media']"
     get "/cs-studio/media", params: { selected: @asset.id }
     assert_select "#media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@asset.id}?view=media']"
-    # The handoff's header, "NOTES · 1 OPEN": the number follows the counts
+    # The panel's header, "NOTES · 1 OPEN": the number follows the counts
     # every answer of the frame brings, and the page has its own copy.
     assert_select "#media-notes h3", text: /\ANotes\s+·\s+1 open\z/
     assert_select "#media-notes h3 [data-admin--notes--drawer-target=total]", text: "1"
     assert_select "#media-notes #notes-counts[data-admin--notes--drawer-target=counts]"
-    # No drawer on this screen (the spec wins over the handoff's "Open in drawer").
+    # No drawer on this screen (the notes frame is in the panel).
     assert_select "aside#notes-drawer", count: 0
     # Asked of the frame's own answer: in the page above the frame is not loaded yet.
     get "/cs-studio/notes/media/#{@asset.id}", params: { view: "media" }, headers: { "Turbo-Frame" => "notes" }

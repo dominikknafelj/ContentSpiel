@@ -1,7 +1,6 @@
 module Admin
   module Shell
-    # CS Studio's modules column (design pass spec §4, handoff
-    # "StudioSidebar"): the wordmark and the "Jump to..." button, the modules
+    # CS Studio's modules column: the wordmark and the "Jump to..." button, the modules
     # in Content / People / System sections, then the theme switch and the
     # account block. `modules` is `admin_modules`: the rows of the modules
     # registered in `StudioModules`, already narrowed to what this user may
@@ -78,10 +77,22 @@ module Admin
 
       def badge_count(entry) = badges[entry[:name]].to_i
 
+      def filled_badge?(entry) = badge?(entry) && StudioModules.badge_style(entry[:name]) == :filled
+
+      # A link whose badge is addressed to the viewer is named by the words
+      # it shows, in order ("Dashboard, 2 new"), so speech input can say what
+      # it reads; whatever fills the badge keeps the name as the count changes.
+      # Without a count the link keeps its own text as its name.
+      def link_name(entry)
+        return unless filled_badge?(entry) && badge_count(entry).positive?
+
+        t("admin.shell.nav.unread_count", label: entry[:label], count: badge_count(entry))
+      end
+
       def badge_id(entry) = "sidebar-badge-#{entry[:name]}"
 
       # A `:filled` badge (`StudioModules.badge(name, style: :filled)`, the
-      # Dashboard's, handoff "Sidebar badge") is the accent pill: accent there
+      # Dashboard's) is the accent pill: accent there
       # means "unread and addressed to you" and nothing else. A `:plain` one
       # is a number in sans.
       def badge_class(entry)

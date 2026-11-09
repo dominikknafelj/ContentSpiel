@@ -1468,10 +1468,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    in the tree's row and on a tile, whose own link is the way in): no
    pointer. `--small` is the tile's 18px size outside a section tile (the
    tree's row). `--on-image` is the media tile's chip, 6px from the image's
-   top right corner, with a 2px surface ring so it reads over a photo. */
+   top right corner. It takes a double ring, a 2px surface ring inside a 1px
+   ink hairline: one of the two always stands out from the photo behind it
+   (3:1 against any ground, held in admin_contrast_test.rb). */
 .admin-notes-marker--readonly { cursor: inherit; }
 .admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: var(--cs-t-label); }
-.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; box-shadow: 0 0 0 2px var(--cs-surface); }
+.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; box-shadow: 0 0 0 2px var(--cs-surface), 0 0 0 3px var(--cs-ink); }
 /* THE THREAD VIEW'S HEADER. While a thread is the
    drawer's view the drawer's own header -- the title, the count, "New note"
    and Close -- is not shown, and the thread's first row is the header: "←

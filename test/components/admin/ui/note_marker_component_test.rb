@@ -14,11 +14,11 @@ class Admin::Ui::NoteMarkerComponentTest < ViewComponent::TestCase
   end
 
   test "unread is the accent bubble with the filled glyph and says 3 new" do
-    render_inline Admin::Ui::NoteMarkerComponent.new(count: 3, label: "3 open notes, new for you", unread: true)
+    render_inline Admin::Ui::NoteMarkerComponent.new(count: 3, label: "3 new open notes for you", unread: true)
 
     assert_selector ".admin-notes-marker[data-has-notes][data-unread]", text: "3 new"
     assert_selector ".admin-notes-marker svg path[fill=currentColor], .admin-notes-marker svg[fill=currentColor]"
-    assert_selector ".admin-notes-marker[aria-label='3 open notes, new for you']"
+    assert_selector ".admin-notes-marker[aria-label='3 new open notes for you']"
   end
 
   test "with an address it is a link named by its label, without one an image, or hidden where its row's link names it" do
@@ -30,14 +30,16 @@ class Admin::Ui::NoteMarkerComponentTest < ViewComponent::TestCase
     assert_selector "span.admin-notes-marker.admin-notes-marker--readonly.admin-notes-marker--small[role=img][aria-label='1 open note'][title='1 open note'][data-has-notes]"
 
     render_inline Admin::Ui::NoteMarkerComponent.new(count: 1, label: "1 open note", aria_hidden: true, id: "row-count")
-    assert_selector "span#row-count.admin-notes-marker--readonly[aria-hidden=true][aria-label='1 open note']", visible: :all
+    assert_selector "span#row-count.admin-notes-marker--readonly[aria-hidden=true][aria-label='1 open note'][title='1 open note']", visible: :all
     assert_no_selector "span[role=img]", visible: :all
   end
 
-  test "on an image it keeps the surface ring" do
+  test "on an image it takes the class whose rule draws the double ring, a surface ring inside an ink hairline" do
     render_inline Admin::Ui::NoteMarkerComponent.new(count: 1, label: "1 open note", on_image: true)
 
     assert_selector ".admin-notes-marker.admin-notes-marker--on-image"
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_match(/\.admin-notes-marker--on-image \{[^}]*box-shadow: 0 0 0 2px var\(--cs-surface\), 0 0 0 3px var\(--cs-ink\)/, css)
   end
 
   test "an unknown size is refused" do

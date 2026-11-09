@@ -117,7 +117,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     open_editor
 
     assert_selector "#{marker(@text)}[data-has-notes][data-unread] [data-notes-count]", text: "3 new"
-    assert_selector "#{marker(@text)}[aria-label='3 open notes on Rich text, new for you']"
+    assert_selector "#{marker(@text)}[aria-label='3 new open notes for you on Rich text']"
     assert_selector "#{marker(@text)} .admin-notes-marker__unread svg"
     assert_no_selector "#{marker(@text)} .admin-notes-marker__open svg"
   end
@@ -140,8 +140,12 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #notes-list a[data-note-row]", text: "Check the date"
 
     visit_screen admin_media_path
-    assert_selector "#media-asset-#{asset.id} [data-notes-chip]", text: "1"
-    assert_equal(-1, find("#media-asset-#{asset.id} [data-notes-chip]").evaluate_script("this.tabIndex"))
+    chip = "#media-asset-#{asset.id} [data-notes-chip]"
+    assert_selector chip, text: "1"
+    assert_equal(-1, find(chip).evaluate_script("this.tabIndex"))
+    # The tile's own link is the one stop, and the bubble inside it is no second one.
+    assert_equal 1, page.evaluate_script("document.querySelectorAll('#media-asset-#{asset.id} a, #media-asset-#{asset.id} button, #media-asset-#{asset.id} [tabindex=\"0\"]').length")
+    assert_equal true, find(chip).evaluate_script("!!this.closest('a')")
 
     open_editor
     assert_selector "[data-notes-marker]", text: "1"
@@ -164,7 +168,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal "block", holder_display.call("delete-block-#{@inside.id}")
   end
 
-  # The handoff's decisions 7 and 10: the number is the notes on the blocks
+  # The number is the notes on the blocks
   # inside. A section takes none of its own, and one written around the UI
   # (a service call) is not counted here.
   test "a section's delete warning counts its blocks' open notes, in the plural, and not a note on the section itself" do

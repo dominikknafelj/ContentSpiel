@@ -64,8 +64,8 @@ import { messages } from "i18n/messages"
 // like the rest, which is why the server never renders a count into a card.
 //
 // THE ACTIVE BLOCK. While one thread is the notes' view, the card or tile
-// of the block it is on carries `data-notes-active` (an accent edge,
-// handoff "Block card marker"): `markActive`, after every load of the frame,
+// of the block it is on carries `data-notes-active` (the people outline):
+// `markActive`, after every load of the frame,
 // on close, and when a marker connects.
 //
 // A SELECTION. With text selected in a rich-text field, that block's marker
@@ -372,7 +372,7 @@ export default class extends Controller {
     return !active || active === document.body || active === from || !active.isConnected || this.drawerTarget.contains(active)
   }
 
-  // The block whose thread is showing (handoff: its card's border is accent
+  // The block whose thread is showing (its card carries the people outline
   // while the thread is open). One at a time; none in the list view or with
   // the notes closed. An attribute, taken back here: nothing a redrawn
   // card could keep by mistake, and nothing Turbo's snapshot of the page

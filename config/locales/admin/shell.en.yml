@@ -27,6 +27,11 @@ en:
       ai_assistant: "AI assistant"
       system_status: "System status"
       audit_log: "Audit log"
+    # The name of a sidebar link whose badge is addressed to the viewer: the
+    # words it shows, in the order they stand ("Dashboard" and "2" read "Dashboard, 2 new").
+    shell:
+      nav:
+        unread_count: "%{label}, %{count} new"
     module_groups:
       content: "Content"
       people: "People"

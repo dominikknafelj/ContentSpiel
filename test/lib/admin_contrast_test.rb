@@ -652,10 +652,6 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # Measured, light then dark, each to its rounding down: the ring is a
-  # separation and no edge to read, and a photo's own pixels decide the rest.
-  RING_FLOORS = { "--cs-ph-a" => [ 1.3, 1.1 ], "--cs-ph-b" => [ 1.6, 1.0 ] }.freeze
-
   # The note bubble (`.admin-notes-marker`): read is the people pair on its
   # tint, unread the accent fill with on-accent words. Both carry 11px text.
   test "a read note bubble is 7:1 on its tint and an unread one 4.5:1 on the accent, in both schemes" do
@@ -665,13 +661,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The surface ring of an on-image bubble is what separates the pill from
-  # whatever photo it is drawn on; the placeholder gradient is the one photo
-  # a test can measure.
-  test "the on-image bubble's surface ring reads on a photo's placeholder" do
+  # The double ring of an on-image bubble (a 2px surface ring inside a 1px ink
+  # hairline) separates the pill from whatever photo it is drawn on; the
+  # placeholder gradient and black and white are the photos a test can measure.
+  test "the on-image bubble's double ring is 3:1 against the placeholder and the grounds, by the better of its two rings" do
     each_scheme do |scheme, colour|
-      %w[--cs-ph-a --cs-ph-b].each do |ground|
-        assert_ratio(RING_FLOORS.fetch(ground).fetch(scheme == :light ? 0 : 1), colour.("--cs-surface"), colour.(ground), "the bubble's surface ring on #{ground} (#{scheme})")
+      %w[--cs-ph-a --cs-ph-b --cs-paper --cs-sunken --cs-chrome].each do |ground|
+        best = [ "--cs-surface", "--cs-ink" ].map { |ring| contrast(colour.(ring), colour.(ground)) }.max
+        assert_operator best, :>=, 3.0, "the double ring on #{ground} (#{scheme}) is #{best.round(2)}:1"
+      end
+      { "black" => [ 0.0, 0.0, 0.0 ], "white" => [ 1.0, 1.0, 1.0 ] }.each do |name, ground|
+        best = [ "--cs-surface", "--cs-ink" ].map { |ring| contrast(colour.(ring), ground) }.max
+        assert_operator best, :>=, 3.0, "the double ring on #{name} (#{scheme}) is #{best.round(2)}:1"
       end
     end
   end

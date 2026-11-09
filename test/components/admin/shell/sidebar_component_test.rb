@@ -97,13 +97,17 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "#sidebar-badge-trash[hidden]", visible: :all
   end
 
-  # Notes spec §5: the viewer's unread notes, on the Dashboard entry. The
+  # The viewer's unread notes, on the Dashboard entry. The
   # element is always there (a live signal fills it), hidden and empty at
   # zero; accent, the one filled badge, because it means "unread and
   # addressed to you".
   test "the Dashboard badge shows the unread count as a filled accent pill, and is in the page hidden and empty at zero" do
     render_sidebar(labels: %w[Dashboard Trash], badges: { dashboard: 3 })
     assert_selector "a[href='/cs-studio'] #sidebar-badge-dashboard[data-badge].bg-accent.text-on-accent.rounded-full", text: "3"
+    # Named by the words it shows, in order; the accent fill is the sidebar's one count addressed to the viewer.
+    assert_selector "a[href='/cs-studio'][aria-label='Dashboard, 3 new'][data-nav-label=Dashboard]"
+    assert_no_selector "a[href='/cs-studio'] #sidebar-badge-dashboard:not(.bg-accent)"
+    assert_no_selector "a[aria-label]:not([href='/cs-studio'])"
     assert_no_selector "#sidebar-badge-trash"
     assert_selector "#sidebar-badge-trash[hidden]", visible: :all
 
@@ -111,6 +115,7 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "#sidebar-badge-dashboard", visible: :all, count: 1
     assert_equal "", page.find("#sidebar-badge-dashboard", visible: :all).text(:all)
     assert_selector "#sidebar-badge-dashboard[hidden]:not([data-badge])", visible: :all
+    assert_no_selector "a[href='/cs-studio'][aria-label]"
   end
 
   test "a module registered with a filled badge draws it filled, and a plain one plain" do
@@ -136,7 +141,7 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     render_sidebar(labels: %w[Dashboard], user: user)
     assert_selector ".admin-account", text: "Ada Lovelace"
     assert_selector ".admin-account", text: user.email_address
-    # The entry reads "Your account" (the handoff's decision 25), and the
+    # The entry reads "Your account", and the
     # name block above it leads to the same screen.
     assert_selector ".admin-account a[href='/cs-studio/account']", text: /\AYour account\z/
     assert_selector ".admin-account a#account-identity[href='/cs-studio/account']", text: "Ada Lovelace"
@@ -185,7 +190,7 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector "button[data-action='admin--shell--command-palette#open']", text: "Jump to…"
   end
 
-  # Signing out ends the document (ledger C-M2): never a Turbo submission,
+  # Signing out ends the document: never a Turbo submission,
   # which would keep module state for the next user of the tab.
   test "Sign out is a real navigation" do
     render_inline Admin::Shell::SidebarComponent.new(modules: [], user: users(:one), current_path: "/cs-studio", url_options: {})

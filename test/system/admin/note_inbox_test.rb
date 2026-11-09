@@ -28,6 +28,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     open_dashboard
 
     assert_selector "#sidebar-badge-dashboard", text: "1"
+    assert_selector "a[aria-label=\"Dashboard, 1 new\"] #sidebar-badge-dashboard"
     within "turbo-frame#notes-for-you" do
       assert_selector "[data-delivery][data-unread]", count: 1
       assert_selector "header", text: "1 new"
@@ -82,6 +83,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     mention(@block, "And this, @[#{@me.id}]")
     open_dashboard
     assert_selector "#sidebar-badge-dashboard", text: "2"
+    assert_selector "a[aria-label=\"Dashboard, 2 new\"] #sidebar-badge-dashboard"
 
     within("turbo-frame#notes-for-you") { press "Mark all read" }
 

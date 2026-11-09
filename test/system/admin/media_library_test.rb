@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# The Media module's own grid and side panel (media library design spec
-# §6, Task 7; round 3 Task 8): a real multi-file upload through the file
+# The Media module's own grid and side panel: a real multi-file upload through the file
 # input (`admin--media--upload`), then opening one of the uploaded images and
 # setting its German alt text; and the panel's live effect on the tile and the
 # segment counts.
@@ -14,7 +13,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     # A real, single multi-file selection on the visible file input --
     # `admin--media--upload#filesSelected` fires one POST per file, one at a time
-    # (global constraints' own upload ruling), and nothing reloads.
+    # and nothing reloads.
     attach_file("media-upload-input", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
 
     # One at a time, and no reload: each file's tile becomes the real one in turn.
@@ -108,7 +107,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"
   end
 
-  # Round 3 Task 9: drop images anywhere on the screen. A real OS drag cannot be
+  # Drop images anywhere on the screen. A real OS drag cannot be
   # driven from here, so the page itself builds the `DataTransfer` and fires the
   # same events a drag would (`dragenter`, then `drop`).
   test "dropping files anywhere shows the overlay, then a progress tile for each and the real tile after it, with no reload" do
@@ -177,7 +176,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_equal 0, Media::Asset.count
   end
 
-  # Ledger C-M3: a tile's thumbnail dragged within the page carries `Files` too.
+  # A tile's thumbnail dragged within the page carries `Files` too.
   test "a drag that starts in the page never shows the overlay and uploads nothing; a drag from outside afterwards still does" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset(filename: "tiny.png")
@@ -198,7 +197,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:escape)
   end
 
-  # Task 8 M-5: no wait for the promoted visit (`click_tile` waits for it).
+  # No wait for the promoted visit (`click_tile` waits for it).
   test "typing into Alt the moment the panel exists is saved and stays in the field" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Quick one") }
@@ -213,7 +212,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_title(/\AQuick one · Media/)
   end
 
-  # Ledger C-M10 and Task 8's × fallback.
+  # A language tab keeps the focus in the panel, and × falls back to the search.
   test "a language tab in the panel keeps the focus at the panel; × with the tile not listed goes to the search" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")
@@ -392,7 +391,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "[data-upload-tile]", count: 1
   end
 
-  # Notes on an image (notes spec §4.4): this screen has no drawer, so the
+  # Notes on an image: this screen has no drawer, so the
   # panel shows the notes frame in place, below "Used on" and outside the
   # image's own autosaving form.
   test "the panel takes a note on the image while its fields autosave beside it" do
