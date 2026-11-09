@@ -968,21 +968,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:lg|xl|2xl):(?:grid|col|row)/, view, "the view leaves the grid to the stylesheet")
   end
 
-  # Past `--cs-content-max` Settings' docked composition (nav, cards and
-  # rail) is centred in the content area; below it the margins are 0 and it
-  # stands at the left. Written in the docked rule only, never as `mx-auto`
-  # in the view.
-  test "Settings' docked grid centres past --cs-content-max" do
-    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-settings \(min-width: 1200px\)\s*\{/).first
-    grid = docked[/\.admin-settings-layout__grid\s*\{([^}]*)\}/, 1]
-    assert_match(/max-width:\s*var\(--cs-content-max\);/, grid, "the composition grows to the content max and no further")
-    assert_match(/margin-inline:\s*auto;/, grid, "past the max it is centred")
-    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    outside = css.sub(docked, "")
-    assert_no_match(/\.admin-settings-layout__grid\s*\{[^}]*margin/, outside, "below the threshold the grid keeps no margin of its own")
-    assert_no_match(/\bmx-auto\b/, Rails.root.join("app/views/admin/settings/show.html.erb").read)
-  end
-
   # The Tags list's usage bar takes the structure hue through a token of its
   # own, as a tag's square on the canvas does, so it can change without
   # moving the icons; the bar is drawn in one place.
@@ -1026,7 +1011,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every docked composition and its head row centre past --cs-content-max" do
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
-      "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ] }.each do |container, selectors|
+      "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
+      "admin-settings" => [ ".admin-settings-layout__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
@@ -1044,7 +1030,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     # Undocked nothing centres: no rule outside a docked block carries an
     # auto inline margin but the header's, which applies only while docked.
-    outside = %w[admin-editor admin-dashboard admin-list].reduce(css) do |rest, container|
+    outside = %w[admin-editor admin-dashboard admin-list admin-settings].reduce(css) do |rest, container|
       self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
     end
     assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
