@@ -24,7 +24,7 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
   test "another user is named, a token follows via, and the viewer's own token reads You, via" do
     other = sentence("post.created", viewer: users(:two), actor_type: "ApiToken", actor_id: 1, actor_label: "Claude desktop")
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: other)
-    assert_text "#{users(:one).display_name} via Claude desktop created “Hello”"
+    assert_text "#{users(:one).name_or_email} via Claude desktop created “Hello”"
 
     own = sentence("post.created", actor_type: "ApiToken", actor_id: 1, actor_label: "Claude desktop")
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: own)

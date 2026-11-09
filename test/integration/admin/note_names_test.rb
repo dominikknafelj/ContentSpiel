@@ -1,9 +1,9 @@
 require "test_helper"
 
-# A person without a name, as a note shows them (the handoff's decision 36):
-# the part of their email address before the at sign, on every surface where
-# a note names a person. `Notes.name_of` is the one place; `User#display_name`,
-# which the rest of CS Studio uses, still answers the whole address.
+# A person without a name, as a note shows them: the part of their email
+# address before the at sign, on every surface where a note names a person.
+# `PersonName.of` is the one place; `User#name_or_email`, which the rest of
+# CS Studio uses, answers the whole address.
 class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -99,10 +99,15 @@ class Admin::NoteNamesTest < ActionDispatch::IntegrationTest
   end
 
   test "the rest of CS Studio names a nameless user by the whole address, as before" do
-    assert_equal "two@example.com", users(:two).display_name
+    assert_equal "two@example.com", users(:two).name_or_email
     assert_equal "two@example.com", Admin::Ui::UserNameComponent.new(user: users(:two)).label
-    assert_equal "two", Notes.name_of(users(:two))
+    assert_equal "two", PersonName.of(users(:two))
     users(:two).update!(name: "Dana")
-    assert_equal "Dana", Notes.name_of(users(:two))
+    assert_equal "Dana", PersonName.of(users(:two))
+  end
+
+  test "a note names a person by PersonName.of, and Notes has no name of its own" do
+    assert_equal "two", PersonName.of(users(:two))
+    assert_not_respond_to Notes, :name_of
   end
 end

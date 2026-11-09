@@ -37,7 +37,7 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
     assert_selector "#{AVATAR}.bg-sunken", exact_text: "tw"
-    assert_text "#{users(:two).display_name} via Claude desktop created “Hello”"
+    assert_text "#{users(:two).name_or_email} via Claude desktop created “Hello”"
     assert_selector ".admin-channel-chip[data-channel=mcp]", text: "MCP"
   end
 

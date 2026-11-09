@@ -23,7 +23,7 @@ module Admin
       erb_template <<~ERB
         <%= link_to helpers.admin_account_path(**url_options), id: "account-identity",
               class: "group flex min-w-0 flex-col gap-0.5 rounded-button no-underline focus-visible:outline-2 focus-visible:outline-accent" do %>
-          <span class="truncate text-sm font-medium text-ink underline-offset-2 group-hover:underline" title="<%= user.display_name %>"><%= user.display_name %></span>
+          <span class="truncate text-sm font-medium text-ink underline-offset-2 group-hover:underline" title="<%= user.name_or_email %>"><%= user.name_or_email %></span>
           <span class="truncate text-xs text-meta" title="<%= line %>"><%= line %></span>
         <% end %>
       ERB
@@ -50,7 +50,7 @@ module Admin
       attr_reader :user, :url_options
 
       def line
-        [ (user.email_address if user.display_name != user.email_address), role_line ].compact.join(" · ")
+        [ (user.email_address if user.name_or_email != user.email_address), role_line ].compact.join(" · ")
       end
     end
   end

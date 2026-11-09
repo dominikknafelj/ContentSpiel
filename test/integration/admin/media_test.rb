@@ -719,7 +719,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { selected: asset.id }
 
     assert_select "#media-panel", text: /image\/png/
-    assert_select "#media-panel", text: /#{Regexp.escape(users(:one).display_name)}/
+    assert_select "#media-panel", text: /#{Regexp.escape(users(:one).name_or_email)}/
     assert_select "#media-trash-help", text: "Kept in Trash for 30 days."
 
     site_settings(:default).update!(trash_retention_days: 0)

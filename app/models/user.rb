@@ -19,7 +19,7 @@ class User < ApplicationRecord
   validates :password, length: { minimum: MINIMUM_PASSWORD_LENGTH, message: "Use at least 12 characters." }, allow_nil: true
 
   # Optional (design pass spec §5.1): shown wherever a user is named, with
-  # the email as the fallback -- `display_name` is the one reader, so no
+  # the email as the fallback -- `name_or_email` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,
   # so "no name" has one representation.
   normalizes :name, with: ->(name) { name.to_s.strip.presence }
@@ -71,7 +71,7 @@ class User < ApplicationRecord
   # itself, regardless of who's doing the demoting.
   validate :at_least_one_owner, if: :demoting_from_owner?
 
-  def display_name = name.presence || email_address
+  def name_or_email = name.presence || email_address
 
   private
 

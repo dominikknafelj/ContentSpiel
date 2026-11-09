@@ -82,6 +82,15 @@ class InvitationTest < ActiveSupport::TestCase
     assert_empty InvitationGroup.where(invitation_id: invitation.id)
   end
 
+  test "name_or_email is the name, else the whole address" do
+    invitation = Invitation.new(email_address: "ada@example.com")
+    assert_equal "ada@example.com", invitation.name_or_email
+    invitation.name = "   "
+    assert_equal "ada@example.com", invitation.name_or_email
+    invitation.name = "Ada Lovelace"
+    assert_equal "Ada Lovelace", invitation.name_or_email
+  end
+
   test "an inviter or an account that is deleted is nulled, and the invitation stays" do
     inviter = User.create!(email_address: "inviter@example.com", password: "a-long-password-1")
     invitation = open_invitation("dana@example.com", inviter: inviter)

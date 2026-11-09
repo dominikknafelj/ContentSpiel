@@ -39,7 +39,7 @@ module Admin
       def chips
         users.map do |user|
           hint = [ ("Owner" if user.owner?), (user.email_address if user.name.present?) ].compact.join(" · ").presence
-          { value: user.id.to_s, label: user.display_name, hint: hint }
+          { value: user.id.to_s, label: user.name_or_email, hint: hint }
         end
       end
     end

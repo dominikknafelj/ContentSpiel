@@ -29,7 +29,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "#" + ActionView::RecordIdentifier.dom_id(active) do
       assert_select "*", text: /claude-desktop/
-      assert_select "*", text: /#{Regexp.escape(users(:one).display_name)}/
+      assert_select "*", text: /#{Regexp.escape(users(:one).name_or_email)}/
       assert_select "*", text: /203\.0\.113\.5/
       assert_select "*", text: /Active/
       assert_select "*", text: /Admin/ # the token's group
@@ -37,7 +37,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
     assert_select "#" + ActionView::RecordIdentifier.dom_id(revoked) do
       assert_select "*", text: /old-agent/
-      assert_select "*", text: /#{Regexp.escape(users(:two).display_name)}/
+      assert_select "*", text: /#{Regexp.escape(users(:two).name_or_email)}/
       assert_select "*", text: /Revoked/
       assert_select "button", text: "Revoke…", count: 0
       assert_select "[class~='opacity-60']" # dimmed, still listed
@@ -229,7 +229,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
     dialog = "dialog#revoke-api-token-#{token.id}"
     assert_select dialog, text: /Revoke “claude-desktop”\?/
-    assert_select dialog, text: /The assistant acting as #{Regexp.escape(users(:one).display_name)} through this token loses access at once\. The token stays listed as revoked, and its past changes stay in the audit log\./
+    assert_select dialog, text: /The assistant acting as #{Regexp.escape(users(:one).name_or_email)} through this token loses access at once\. The token stays listed as revoked, and its past changes stay in the audit log\./
     assert_select "#{dialog} button", text: "Revoke token"
   end
 

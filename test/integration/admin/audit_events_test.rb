@@ -347,7 +347,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events"
 
     assert_response :success
-    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via <b>Claude<\/b>/
+    assert_select "li p", text: /#{Regexp.escape(users(:two).name_or_email)} via <b>Claude<\/b>/
     assert_select "li p b", count: 0
   end
 
@@ -368,6 +368,6 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events"
 
-    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via an API token/
+    assert_select "li p", text: /#{Regexp.escape(users(:two).name_or_email)} via an API token/
   end
 end

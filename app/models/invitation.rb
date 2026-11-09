@@ -68,5 +68,5 @@ class Invitation < ApplicationRecord
 
   # The invited person's name, else the address: how the Users screen and
   # the dialogs name an invitation.
-  def display_name = name.presence || email_address
+  def name_or_email = name.presence || email_address
 end

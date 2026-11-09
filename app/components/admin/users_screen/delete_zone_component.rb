@@ -32,7 +32,7 @@ module Admin
       attr_reader :user, :own, :last_owner, :url_options
 
       # The stored values; an unsaved record (a preview) has none, so its own.
-      def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.display_name)
+      def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.name_or_email)
       def dialog_id = self.class.dialog_id(user)
       def reason = "#{name} is the only owner, so they can't be deleted."
 

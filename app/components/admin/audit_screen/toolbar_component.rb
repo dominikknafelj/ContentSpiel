@@ -49,7 +49,7 @@ module Admin
       # is filtered by: one who no longer exists (a link from one of their
       # events; `audit_events.user_id` has no FK) reads "A deleted user".
       def user_options
-        options = @users.map { |user| [ user.display_name, user.id ] }
+        options = @users.map { |user| [ user.name_or_email, user.id ] }
         chosen = filter.user_id
         options << [ "A deleted user", chosen ] if chosen && options.none? { |_, id| id == chosen }
         options

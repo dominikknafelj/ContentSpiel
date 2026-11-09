@@ -14,7 +14,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
   end
 
   def sentences(actor = @me)
-    activity(actor).rows.map { |row| [ row.sentence.actor.you ? "You" : row.sentence.actor.user&.display_name, *words(row) ] }
+    activity(actor).rows.map { |row| [ row.sentence.actor.you ? "You" : row.sentence.actor.user&.name_or_email, *words(row) ] }
   end
 
   test "lists content events only, never access.denied, sessions, users, groups, tokens or settings" do

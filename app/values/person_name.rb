@@ -1,13 +1,16 @@
-# What a person is called where a short name is wanted (the notes handoff's
-# decision 36, the presence handoff's item 7): their name, and for someone
-# without one the part of their email address before the at sign -- "dana"
-# for dana@example.com. The whole address said more than a note or an avatar
-# needs to, to everyone who may read the record.
+# The two names CS Studio gives a person. `PersonName.of` is the SHORT name,
+# where a note, a mention or an avatar names someone: their name, and for
+# someone without one the part of their email address before the at sign --
+# "dana" for dana@example.com. The whole address said more than that needs to,
+# to everyone who may read the record. `User#name_or_email` (and
+# `Invitation#name_or_email`) is the WHOLE name, for the rest of CS Studio:
+# the name, else the whole address.
 #
 # A value of its own because two domains that do not know each other ask it:
-# notes (`Notes.name_of`, which answers this) and presence. `User#display_name`,
-# which the rest of CS Studio uses and which answers the whole address, is
-# not changed.
+# notes and presence. Every place that names a person for a note (the notes
+# components, a mention's text, the inbox, the toast, the mention picker, the
+# mind graph's card) asks `PersonName.of`, so a name set later shows
+# everywhere at once: a mention is a token with the person's id.
 module PersonName
   class << self
     def of(user) = user.name.presence || user.email_address.to_s.split("@").first.presence || user.email_address

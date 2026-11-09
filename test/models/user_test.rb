@@ -84,14 +84,14 @@ class UserTest < ActiveSupport::TestCase
     assert_queries_match(/FOR UPDATE/) { users(:one).destroy }
   end
 
-  test "display_name is the name, or the email when there is none" do
+  test "name_or_email is the name, else the whole address" do
     user = users(:one)
     user.name = nil
-    assert_equal user.email_address, user.display_name
+    assert_equal user.email_address, user.name_or_email
     user.name = "   "
-    assert_equal user.email_address, user.display_name
+    assert_equal user.email_address, user.name_or_email
     user.name = " Ada Lovelace "
-    assert_equal "Ada Lovelace", user.display_name
+    assert_equal "Ada Lovelace", user.name_or_email
   end
 
   test "name is optional and capped at 120 characters" do

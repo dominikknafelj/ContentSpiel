@@ -134,7 +134,7 @@ module Admin
     private
 
     def owner_notice(user, was_owner)
-      name = user.display_name
+      name = user.name_or_email
       return (user.owner? ? "#{name} is already an owner" : "#{name} is not an owner") if user.owner? == was_owner
 
       user.owner? ? "#{name} is now an owner" : "#{name} is no longer an owner"

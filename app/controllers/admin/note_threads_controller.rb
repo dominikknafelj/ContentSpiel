@@ -47,7 +47,7 @@ module Admin
         open: listing.open_count,
         threads: threads.map do |thread|
           first = thread.messages.first
-          author = listing.users[first.author_id]&.then { |user| Notes.name_of(user) }
+          author = listing.users[first.author_id]&.then { |user| PersonName.of(user) }
           { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
             author: author,
             # The letters of the avatar, written here and only here

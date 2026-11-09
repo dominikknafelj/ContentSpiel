@@ -107,7 +107,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(failed)} p", text: "Failed sign-in attempt"
     assert_select "##{dom_id(failed)} span.text-warn-ink", text: "session.failed"
     assert_no_match(/who@example\.com/, response.body)
-    assert_select "##{dom_id(mcp)} p", text: /#{Regexp.escape(users(:two).display_name)} via claude-desktop created “From MCP”/
+    assert_select "##{dom_id(mcp)} p", text: /#{Regexp.escape(users(:two).name_or_email)} via claude-desktop created “From MCP”/
     assert_select "##{dom_id(mcp)} .admin-channel-chip[data-channel=mcp]", text: "MCP"
     assert_select "##{dom_id(created)} span.text-warn-ink", count: 0
   end
@@ -444,9 +444,9 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events"
 
-    assert_select "##{dom_id(denied)} p", text: "#{users(:author).display_name} was refused permission to edit posts on “Guarded post”"
+    assert_select "##{dom_id(denied)} p", text: "#{users(:author).name_or_email} was refused permission to edit posts on “Guarded post”"
     assert_select "##{dom_id(denied)} p a[href='/cs-studio/posts/#{post.id}']", text: "Guarded post"
-    assert_select "##{dom_id(bare)} p", text: "#{users(:author).display_name} was refused permission to manage settings"
+    assert_select "##{dom_id(bare)} p", text: "#{users(:author).name_or_email} was refused permission to manage settings"
   end
 
   # Final fix wave (M10): an image's event links to its panel only for a
@@ -515,7 +515,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
     assert_select "h1 a", count: 0
     assert_select "h1", text: /Hidden title/
-    assert_select "h1", text: /#{Regexp.escape(@me.display_name)} created/
+    assert_select "h1", text: /#{Regexp.escape(@me.name_or_email)} created/
   end
 
   # --- cost --------------------------------------------------------------------------

@@ -50,7 +50,7 @@ module Admin
 
       # The editing language rides along when the layout has one; a preview has no controller.
       def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
-      def initial(row) = row.display_name.to_s.strip.first.to_s.upcase
+      def initial(row) = row.name_or_email.to_s.strip.first.to_s.upcase
       def group_names(row) = row.groups.map(&:name).sort
       def you?(user) = current_user && user == current_user
 

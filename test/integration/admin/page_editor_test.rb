@@ -186,7 +186,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "Changed by someone else", page.reload.subtitle
     assert_select_in_stream "page-save-status", /CHANGED ELSEWHERE/
     assert_select_in_stream "editor-notice", /Changed by .+Reload/m
-    assert_select_in_stream "editor-notice", /#{Regexp.escape(users(:two).display_name)}/
+    assert_select_in_stream "editor-notice", /#{Regexp.escape(users(:two).name_or_email)}/
     assert_no_match(/page-base-updated-at/, response.body, "the base must not advance, or the next save would overwrite")
     assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
       patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "Again" } }, as: :turbo_stream

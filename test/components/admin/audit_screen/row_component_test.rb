@@ -16,7 +16,7 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_selector "a[href='/e/1']", text: "16:05"
     assert_selector AVATAR, exact_text: PersonName.initials(PersonName.of(users(:one)))
-    assert_selector "p", text: "#{users(:one).display_name} published “Hello”"
+    assert_selector "p", text: "#{users(:one).name_or_email} published “Hello”"
     assert_selector "span.font-cs-mono.text-meta", text: "post.published"
     assert_selector ".admin-channel-chip[data-channel=admin]", text: "Admin"
   end
