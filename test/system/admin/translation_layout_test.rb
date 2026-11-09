@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Side-by-side translation (design pass round 2, Task 7; handoff §4.1, §9 A7):
+# Side-by-side translation:
 # in a translation tab a translated field and the primary-language original sit
 # beside each other while the form is at least 824px wide, and stack -- the
 # original first -- below that. The breakpoint is a CONTAINER query on the

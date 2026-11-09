@@ -1,9 +1,9 @@
 require "application_system_test_case"
 
 # The publish dialog's button stays where it is when the overview arrives: a
-# person aims at "Publish changes" as the dialog opens, and the answer used to
-# grow the dialog and move the button down 46px, under or past the pointer, and
-# with a long overview onto another control. Measured, with the answer held back
+# person aims at "Publish changes" as the dialog opens, and an answer that
+# grew the dialog would move the button down (46px), under or past the
+# pointer, and with a long overview onto another control. Measured, with the answer held back
 # so that "before" is really before; the dialog's height is what is fixed
 # (`Admin::Ui::DialogComponent`'s `steady:`), and what is longer scrolls inside.
 class Admin::PublishDialogSteadySystemTest < ApplicationSystemTestCase

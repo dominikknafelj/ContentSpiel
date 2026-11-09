@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The Users list and the user editor in a real browser (round 3 Task 12): a row opens
+# The Users list and the user editor in a real browser: a row opens
 # the editor, a ticked group card is one unsaved change, Make owner… confirms and
 # the list shows the Owner tag, the owner and delete buttons wait for unsaved
 # changes, and the password disclosure counts nothing until something is typed and

@@ -1,6 +1,6 @@
 module Admin
   module SettingsScreen
-    # The Publishing card: today one setting, how long the trash keeps an
+    # The Publishing card: one setting, how long the trash keeps an
     # item. A plain number input in a sentence, `0` meaning "never" --
     # `SiteSetting#trash_retention_days`'s own numericality validation is what
     # a negative value comes back as an error from. A field of the one

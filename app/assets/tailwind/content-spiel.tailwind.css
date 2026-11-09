@@ -746,7 +746,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    fill (`bg-tag-usage`, drawn in the view) is the row's readable count over
    the largest on the screen (`--usage`, 0 to 1, `TagsHelper#tag_usage`). The
    track is paper, on which the fill keeps its figure (a sunken track would
-   take it under the spec's light figure); at 0 the track stays empty. */
+   take it under 6.2:1 in light); at 0 the track stays empty. */
 .admin-tag-usage { display: block; height: 4px; margin-top: 0.25rem; border-radius: var(--cs-radius-pill); background: var(--cs-paper); overflow: hidden; }
 .admin-tag-usage__bar { display: block; height: 100%; width: calc(var(--usage) * 100%); border-radius: var(--cs-radius-pill); }
 
@@ -793,7 +793,7 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
   .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
   .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
-  /* Ruling 9: side by side the summary is inert, so it shows no disclosure triangle. */
+  /* Side by side the summary is inert, so it shows no disclosure triangle. */
   .admin-translation-pair > .admin-reference-card > details > summary::before { display: none; }
 }
 

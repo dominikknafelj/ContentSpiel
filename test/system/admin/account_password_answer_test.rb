@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# After the password form is saved or refused (the notes handoff's decision
-# 42): the page is at `/account#password`, the Password card is in view, and
+# After the password form is saved or refused the page is at `/account#password`, the Password card is in view, and
 # the focus is on the message, which a screen reader then announces.
 #
 # In a window short enough that the card is NOT in view from the top of the
@@ -34,7 +33,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     within("#password") { press "Change password" }
   end
 
-  # The handoff's decision 43: the answer is said INSIDE the Password card,
+  # The answer is said INSIDE the Password card, beside what it answers,
   # and that is what takes the focus.
   def in_view?(selector)
     page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return box.top >= 0 && box.bottom <= window.innerHeight })()")

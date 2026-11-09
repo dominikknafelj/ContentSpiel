@@ -77,7 +77,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
   end
 
-  # Signs in through the real sign-in form (cs-studio spec §3/§9). `Session
+  # Signs in through the real sign-in form. `Session
   # TestHelper#sign_in_as` -- what every integration test uses -- only ever
   # sets cookies on the test process's own internal Rack::Test session; a
   # system test's browser is a *separate* HTTP client Cuprite drives, so
@@ -329,7 +329,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     record.update_columns(**columns) # version: none (a test's own clock bookkeeping)
   end
 
-  # Waits until the page's notes are live (notes spec §6): `admin--notes--live`
+  # Waits until the page's notes are live: `admin--notes--live`
   # and `admin--notes--inbox` are connected, the socket is up and EVERY
   # subscription of the page -- the person's (the inbox controller's) and one
   # per record shown (the live controller's) -- has been answered by the

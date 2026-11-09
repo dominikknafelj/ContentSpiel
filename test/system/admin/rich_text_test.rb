@@ -1,12 +1,12 @@
 require "application_system_test_case"
 
-# The Tiptap editor in CS Studio (tiptap spec §4.1/§9): `admin--rich-text--editor`
+# The Tiptap editor in CS Studio: `admin--rich-text--editor`
 # mounts Tiptap on `Admin::Columns::RichTextColumnComponent`, writes
 # `editor.getJSON()` into the column's hidden `…[body]` input and dispatches
 # `input` so the form's own `admin--saving--autosave` sends it. Every test here ends
 # by reading the *saved* document back and running it through
 # `RichText::Document#validate` -- the editor's schema has to match
-# `RichText::Schema` exactly (task 7's "schema fidelity" ruling), so anything
+# `RichText::Schema` exactly, so anything
 # it can produce must be something the server accepts.
 #
 # Clicks are scripted (`press`), never native, for the reason
@@ -266,7 +266,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     refute_selector ".ProseMirror [data-youtube-id]"
   end
 
-  # --- Fix round 1 (Task 13) ------------------------------------------------
+  # --- Dialogs, links, paste and the translation column ----------------------
 
   test "reopening the page dialog never piles up listeners: one pick applies exactly one link, to the picked page" do
     target = create_page(title: "Contact")
@@ -572,10 +572,10 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
   # The page editor sits beside the tree, so at 1100px a block card's form is
   # under 824px wide: the original (reference card) stacks ABOVE the editor
-  # (design pass round 2, Task 7), which leaves the toolbar the whole column.
+  # which leaves the toolbar the whole column.
   # It stays inside its own box -- no tool pokes out sideways, and the
   # original is above it, not beside it -- and the Insert menu still opens.
-  # (Round 1's `flex-wrap` remains the fallback for a column narrower still.)
+  # (The toolbar's `flex-wrap` is the fallback for a column narrower still.)
   test "in a narrow translation column (page editor beside the tree) the original stacks above the toolbar, which stays inside its box, and the Insert menu stays reachable" do
     page.current_window.resize_to(1100, 1000)
     page_record = create_page(title: "About")
@@ -605,9 +605,8 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(1400, 1400)
   end
 
-  # Design pass round 1, bug 5: with the primary-language original shown
-  # beside the editor (half the column each) the toolbar used to wrap onto
-  # several rows. It is one row now, and the Insert menu -- which sits inside
+  # With the primary-language original shown beside the editor (half the
+  # column each) the toolbar stays one row, and the Insert menu -- which sits inside
   # the toolbar -- is neither clipped by it nor out of reach: its items are
   # visible, inside the viewport, and still run their command.
   test "in a translation the toolbar is one row and the Insert menu opens and runs YouTube" do
@@ -735,8 +734,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal rich_doc("First"), first.reload.body_document(locale: :en).to_h
   end
 
-  # Turbo Stream replacement of a whole block card (task 7's lifecycle
-  # ruling): the old card's `admin--rich-text--editor` disconnects (destroying its
+  # Turbo Stream replacement of a whole block card: the old card's `admin--rich-text--editor` disconnects (destroying its
   # editor), the new card's connects and mounts exactly one editor, and
   # typing into the new one still autosaves. Also detaches and re-attaches
   # the *same* card element (what a drag reorder does), which Stimulus
@@ -805,7 +803,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_selector ".ProseMirror:focus"
   end
 
-  # Task 7 fix round 1 (I1): a unicode URL is stored canonical (punycode
+  # A unicode URL is stored canonical (punycode
   # host, percent-encoded path) and the server accepts it.
   test "a unicode link saves" do
     visit_post
@@ -838,11 +836,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal [ { "type" => "link", "attrs" => { "href" => "mailto:a@b.com" } } ], linked["marks"]
   end
 
-  # Final fix wave (D, P10/P11): `rich_text/schema`'s href normalisation,
+  # `rich_text/schema`'s href normalisation,
   # run in the browser itself (the functions are the editor's own module,
   # imported through the page's import map). An absolute href is parsed
   # without a base -- with CS Studio's origin as base, `https:example.com`
-  # resolved to a path on the studio's own host -- and a bare unicode
+  # would resolve to a path on the studio's own host -- and a bare unicode
   # domain gets `https://` like an ASCII one, instead of being stored as a
   # relative path.
   test "href normalisation handles scheme-relative-looking and unicode input" do
@@ -872,7 +870,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     ], results
   end
 
-  # Task 7 fix round 1 (m2/m1): merely focusing the editor (Tiptap's
+  # Merely focusing the editor (Tiptap's
   # trailing-node plugin appends an empty paragraph after a final embed on
   # first focus) and moving focus into a popover are not edits -- neither
   # may write the hidden input or send a save.
@@ -899,10 +897,10 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal 0, page.evaluate_script("window.__patches")
   end
 
-  # Final fix wave (A): what the Markdown loader (MCP's write path) builds
-  # must be a document the real editor loads -- not just one the server
-  # validates. Each of these used to save fine through MCP and then open
-  # read-only in CS Studio ("contains something the editor can't show").
+  # What the Markdown loader (MCP's write path) builds must be a document the
+  # real editor loads -- not just one the server validates. Each of these is
+  # a shape the server accepts that would otherwise open read-only in CS
+  # Studio ("contains something the editor can't show").
   test "documents the Markdown loader builds open editable in the editor" do
     page_record = create_page(title: "Target")
     [

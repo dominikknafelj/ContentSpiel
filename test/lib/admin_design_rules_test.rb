@@ -690,13 +690,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  # Design answer C1: "10px thin looks faint: 11px at weight 500 everywhere".
+  # 10px thin text looks faint, so the smallest is 11px at weight 500, everywhere.
   test "no text under 11px in CS Studio's markup, and a mono label is text-label" do
     assert_empty design_offences(/text-\[10px\]/)
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
-  # Design answer, first reply: "▾PAGE SETTINGS" had no space. A mono-label
+  # A triangle glued to its words reads "▾PAGE SETTINGS". A mono-label
   # summary draws its own triangle, 6px from the words, that a screen reader skips.
   test "a disclosure's triangle is the stylesheet's, apart from its words, turned when open" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
@@ -1570,8 +1570,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # Status colour belongs to the status components. The Live and Scheduled
   # fills are the solid chips', so a new use of them is a new state of the
-  # chip; the ok, warn and danger fills are held to the files that draw one
-  # today. The list shrinks as screens move their fills into a status
+  # chip; the ok, warn and danger fills are held to the files that draw one.
+  # The list shrinks as screens move their fills into a status
   # component, and a status component joins it only in place of the screens'
   # fills it takes over. The wizard's step list draws a done step's check in
   # the ok tone, never the Live fill: a finished step is not a publication.

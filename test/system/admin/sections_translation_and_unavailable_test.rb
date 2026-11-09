@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
 class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystemTestCase
-  # ---- The translation view (sections spec §4.5) ----------------------------
+  # ---- The translation view ------------------------------------------------
 
   test "on a translation tab a section is a heading over its blocks in reading order, each with its pair of fields" do
     with_locales(%w[en de], default: "en") do
@@ -39,7 +39,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
       assert_no_selector "#{group} .admin-block-card__handle", visible: :all
       assert_no_selector "#{group} button[aria-label='Section actions']", visible: :all
       # Each card in the group has the "⋯" with "Add note" as its only item
-      # (the notes handoff's decision 6), and nothing that moves or deletes.
+      # (a translation is no place to restructure), and nothing that moves or deletes.
       assert_equal [ "Add note" ] * all("#{group} > .admin-block-card").size,
         all("#{group} button[aria-label='Block actions'] + [role=menu] :is(button, a)", visible: :all).map { |item| item.text(:all).strip }
       assert_no_selector "#{group} [data-move], #{group} dialog", visible: :all
@@ -56,7 +56,7 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
     end
   end
 
-  # ---- Small screens (sections spec §4.6) -----------------------------------
+  # ---- Small screens -------------------------------------------------------
 
   # The breakpoint is the section card's own width (a container query), so
   # only a browser can show it. Wide first: the test would pass on lanes that
@@ -83,10 +83,10 @@ class Admin::SectionsTranslationAndUnavailableSystemTest < Admin::SectionsSystem
     page.current_window.resize_to(1400, 1400)
   end
 
-  # ---- Unavailable types (sections spec §6) ---------------------------------
+  # ---- Unavailable types ---------------------------------------------------
 
-  # Spec §6 says Delete is the tile's only action; the menu moves were kept
-  # for it on purpose (the grip moves it, so the keyboard must: see
+  # Delete is the only action that changes an unavailable tile; the menu
+  # moves stay on purpose (the grip moves it, so the keyboard must: see
   # `Admin::EditorScreen::BlockTileComponent`). What it loses is Duplicate.
   test "a block of a type that is gone is an Unavailable tile that can be moved and deleted, and not copied" do
     @left.update_columns(block_type: "gone/thing")

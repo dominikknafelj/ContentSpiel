@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Browser-only behaviour of round 3's Task 16: the System status Copy button
+# What only a browser shows of System status and the preview bar: the Copy button
 # (with and without the Clipboard API) and the preview bar's geometry.
 class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
   setup do

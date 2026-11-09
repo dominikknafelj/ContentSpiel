@@ -15,7 +15,7 @@ module Admin
     # re-marks translations but deletes nothing, and turning a language off keeps
     # its translations (`Locales::Disable`). The "(N items)" in the default
     # dialog is `Translations::StateIndex.translated_record_count` -- how many
-    # records hold a translation today -- counted once at render.
+    # records hold a translation -- counted once at render.
     class LanguageDialogsComponent < Admin::AdminComponent
       def initialize(site_setting:)
         @site_setting = site_setting

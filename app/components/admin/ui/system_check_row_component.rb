@@ -16,10 +16,11 @@ module Admin
     # `text` value; it is a static string (`Setup::SystemCheck::
     # SITE_ADDRESS_COMMAND`), never built from anything of the viewer's.
     #
-    # A result may carry a `link` (a symbol: the model names no route). Today
-    # `:mail_settings` and `:image_settings`, drawn as "Open Mail settings →"
-    # at `mail_settings_href` and "Open Image settings →" at `image_settings_href`,
-    # which the screen hands over (System status, for a viewer who holds
+    # A result may carry a `link` (a symbol: the model names no route):
+    # `:mail_settings`, `:image_settings` and `:forms`, drawn as "Open Mail
+    # settings →" at `mail_settings_href`, "Open Image settings →" at
+    # `image_settings_href` and "Open Forms →" at `forms_href`, which the
+    # screen hands over (System status, for a viewer who holds
     # `settings.manage`); without an address there is no link, whatever the
     # result says.
     class SystemCheckRowComponent < AdminComponent

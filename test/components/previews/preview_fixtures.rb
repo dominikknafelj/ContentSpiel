@@ -20,8 +20,8 @@
 # `ActiveStorage::FileNotFoundError`. So a library image's blob is made with
 # `ActiveStorage::Blob.create_and_upload!`, which writes the file at once,
 # and the blob is attached. The cost: a blob uploaded this way stays on disk
-# after a Lookbook visit, while its database rows are rolled back with the
-# rest.
+# (under `storage/` in development, `tmp/storage` in test) after a Lookbook
+# visit, while its database rows are rolled back with the rest.
 module PreviewFixtures
   module_function
 

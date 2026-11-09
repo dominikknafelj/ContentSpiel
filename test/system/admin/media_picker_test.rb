@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The one media picker (media library design spec §6):
+# The one media picker:
 # `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
 # search, segments, selectable tiles, a header Upload and a footer "N selected ·
 # Cancel · Use image" -- opened from the page hero field, an image block's image
@@ -397,9 +397,9 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   private
 
-  # Round 1 second review: Design's screenshot showed the picker at the bottom
-  # of the page, cut off, with the page behind shifted and a black band on top.
-  # This opens it in a real browser (1400x900) with the page scrolled down 600px
+  # A modal opened from far down a page must stand in the viewport, not at
+  # the bottom of the page cut off, with the page behind shifted and a band
+  # on top. This opens it in a real browser (1400x900) with the page scrolled down 600px
   # and checks the dialog lies inside the viewport and nothing behind it moved.
   # The page is scrolled to where the Choose image button sits 300px below the
   # viewport top (about 600px down), not to a fixed 600: the editor header is

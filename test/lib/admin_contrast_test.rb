@@ -297,8 +297,8 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # A non-primary button's fill is no shape on any ground (1.00 to 1.26:1),
-  # so its edge carries it, measured on every ground a button stands on. The tokens are read from the classes
-  # the component draws.
+  # so its edge carries it, measured on every ground a button stands on. The
+  # tokens are read from the classes the component draws.
   BUTTON_GROUNDS = %w[--cs-rail --cs-surface --cs-paper --cs-popover].freeze
 
   def button_token(variant, size, prefix)
@@ -659,7 +659,8 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # The wizard's progress bar is a graphic, so its floor is 3:1: the accent
-  # fill against the card's sunken track it is drawn on (5.67 / 6.32:1 today).
+  # fill against the card's sunken track it is drawn on, which measures
+  # 5.67:1 in light and 6.32:1 in dark.
   test "the wizard's progress fill is 3:1 or better against its sunken track, in both schemes" do
     each_scheme do |scheme, colour|
       assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-sunken"), "the progress fill on its track (#{scheme})")

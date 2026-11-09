@@ -1,7 +1,6 @@
 require "application_system_test_case"
 
-# The translation helpers end to end, in a real browser (translation
-# helpers spec §4-§6): the editor's Translate / Use / "Translate empty
+# The translation helpers end to end, in a real browser: the editor's Translate / Use / "Translate empty
 # fields" / "Use all" (`admin--translation--translate`), which only a browser can run --
 # the request is a `fetch`, Use fills the input and lets the form's own
 # `admin--saving--autosave` save it, and a rich-text Use goes through the Tiptap

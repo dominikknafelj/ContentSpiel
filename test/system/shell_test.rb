@@ -48,11 +48,11 @@ class ShellTest < ApplicationSystemTestCase
     page.current_window.resize_to(1400, 1400)
   end
 
-  # Review B, M4: the tree drawer closes when a page picked in it has loaded
-  # into `#content` -- not on any frame's load. ⌘K's results frame loads as
-  # the palette opens and on every keystroke; it used to close the drawer
-  # behind the palette (as did the New page / New post frames and the media
-  # picker's).
+  # The tree drawer closes when a page picked in it has loaded into
+  # `#content` -- not on any frame's load. ⌘K's results frame loads as the
+  # palette opens and on every keystroke, and must not close the drawer
+  # behind the palette (nor must the New page / New post frames and the
+  # media picker's).
   test "below 1024 the tree drawer stays open while another frame loads, and closes when a tree link has loaded" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     other = create_page(title: "Other")
@@ -87,8 +87,8 @@ class ShellTest < ApplicationSystemTestCase
     assert_selector "#sidebar nav[aria-label='Modules']"
   end
 
-  # Round 1 departure, dark and light: the sidebar's background ran only to the
-  # viewport's bottom. Its grid cell now stretches the whole page and paints the
+  # Dark and light: the sidebar's background reaches the page's bottom, not
+  # only the viewport's. Its grid cell stretches the whole page and paints the
   # chrome background; the nav inside stays pinned to the viewport.
   %w[light dark].each do |theme|
     test "the sidebar background fills the page and the nav stays pinned on a long page (#{theme})" do
@@ -113,7 +113,7 @@ class ShellTest < ApplicationSystemTestCase
     end
   end
 
-  # The notes handoff's decision 25: the sidebar's entry reads "Your account",
+  # The sidebar's entry reads "Your account",
   # and the person's name block above it is a link to the same screen, whose
   # cards are Profile, Notes and Password. A name saved there is drawn again
   # in the block (a stream), which is still the link.

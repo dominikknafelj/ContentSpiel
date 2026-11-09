@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
-# Translation helpers spec §6.2, in a real browser: the API key is saved by
-# its own button (not the settings form's autosave), comes back as "API
-# key: set" with an empty field, and Test connection answers inline. The
+# The AI translation card in a real browser: the API key is saved by its
+# own button (not the settings form's save bar), comes back as the "Key
+# saved" chip with an empty field, and Test connection answers inline. The
 # provider is `GatedProvider` (test/support/gated_provider.rb) registered
 # for this test -- the app server runs in this process, so it sees the same
 # registry -- and never reaches the network; a test that needs a request in
@@ -85,9 +85,9 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /No unsaved changes/i
   end
 
-  # Final wave B, ledger C-M8 and Task 7 minor 7: the main Save re-renders the
-  # screen and dropped a typed key without a word; and Cancel / Save key left
-  # the focus on <body>.
+  # The main Save re-renders the screen, which would drop a typed key without
+  # a word, so a typed key holds it back; and Cancel / Save key must not
+  # leave the focus on <body>.
   test "a typed, unsaved key holds the main Save back; Cancel and Save key hand the focus on" do
     visit "/cs-studio/settings"
     await_admin_controllers
@@ -118,9 +118,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_eventually { page.evaluate_script("document.activeElement.textContent.trim()") == "Replace" }
   end
 
-  # Round 2, N3: a typed key locked the footer's Save ("Save or cancel the API
-  # key first.") while the changed form locked the key's input and Save key
-  # ("Save or discard your changes first."): neither could be saved.
+  # A typed key locks the bar's Save ("Save or cancel the API key first.")
+  # and a changed form locks the key's controls ("Save or discard your
+  # changes first."), so the key's input and Save key must stay usable, or
+  # neither could ever be saved.
   test "a typed key and a changed form don't lock each other: Save key stays pressable, and then the main Save is" do
     site_settings(:default).update!(ai_api_key: "sk-old-key-0000")
     visit "/cs-studio/settings"
@@ -140,7 +141,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
 
     # Emptied to type another key (select all, delete): the field under the
     # caret stays usable for as long as the entry is open; only Save key waits
-    # for there being something to save (round 3, Minor 2).
+    # for there being something to save.
     # (By script, with the `input` event a real deletion fires: the driver's
     # own way of clearing a field fires none.)
     page.execute_script("const key = document.getElementById('settings-ai_api_key'); key.focus(); key.value = ''; key.dispatchEvent(new Event('input', { bubbles: true }))")
@@ -166,9 +167,9 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_equal "another-model", site_settings(:default).reload.ai_model
   end
 
-  # Task 7 minor 11: a key write that lands while a Test is in flight replaces
-  # the test's form; its end never reached the controller and the button
-  # stayed disabled, with its spinner, until a reload.
+  # A key write that lands while a Test is in flight replaces the test's
+  # form, so the test's end never reaches the controller: the button must
+  # not stay disabled, with its spinner, until a reload.
   test "a key saved while a test is in flight leaves Test connection usable afterwards" do
     site_settings(:default).update!(ai_api_key: KEY)
     visit "/cs-studio/settings"
@@ -276,7 +277,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-ai-key", text: "No key"
   end
 
-  # Contrast and buttons spec, Ruling 11: a busy button is disabled but not
+  # A busy button is disabled but not
   # drawn as a disabled one; it keeps its variant's colours beside its spinner.
   test "Test connection keeps its look while it is busy" do
     site_settings(:default).update!(ai_api_key: KEY)

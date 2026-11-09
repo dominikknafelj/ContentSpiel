@@ -4,10 +4,11 @@ import { messages } from "i18n/messages"
 // Instant actions wait for pending changes. An explicit-save screen also has
 // actions that happen at once -- Add language, Turn off, Test connection, Save
 // key -- and each answers by re-rendering the screen, which would throw away
-// whatever the main form holds unsaved. So while any `admin--saving--save-bar` form on the page is unsaved,
-// every `control` target inside this element is disabled and the `hint`
-// target says why: "Save or discard your changes first." Both revert the
-// moment the form is clean again (saved, cancelled, or typed back).
+// whatever the main form holds unsaved. So while any `admin--saving--save-bar`
+// form on the page is unsaved, every `control` target inside this element is
+// disabled and the `hint` target says why: "Save or discard your changes
+// first." Both revert the moment the form is clean again (saved, discarded,
+// or typed back).
 //
 //   <div data-controller="admin--saving--pending-lock">
 //     <button data-admin--saving--pending-lock-target="control">Test connection</button>

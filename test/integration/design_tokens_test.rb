@@ -203,7 +203,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_match(/\.content-block--code \.code-head\s*\{[^}]*color:\s*var\(--th-dim\);/m, css, "meta on the sunken ground is 4.71:1 in the light theme; the head reads as dim, the stronger")
   end
 
-  # Design answers C1 and C8, each a rule on tokens.
+  # The code block's head and its code are each a rule on tokens.
   test "the code block's head is hidden where it is bare and ruled off from the code, selected code is the accent pair, the scrollbar follows the theme and the focus ring is the accent" do
     css = Rails.root.join("app/assets/tailwind/themes/default/code.css").read.gsub(%r{/\*.*?\*/}m, "")
     rule = ->(selector) { css[/(?:^|\})\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/m, 1].to_s }
@@ -226,7 +226,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   # What is written on a strong band's accent is the band's own colour.
-  # Design answer D2: a strong band is the strongest step of its OWN scheme,
+  # A strong band is the strongest step of its OWN scheme,
   # the inverted page in light and a raised dark ground in dark, so a code
   # block in it is dark in both.
   test "in a strong band the ink on the accent is the band's colour, readable on the band's accent, and a code block is dark in both schemes" do

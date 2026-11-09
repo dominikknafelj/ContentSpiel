@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
 # A mention's chime and desktop notification, and their two switches on the
-# account screen (notes spec §6.4, D18, D19).
+# account screen.
 #
 # Nothing here makes a sound or asks the real browser: `AudioContext` and
 # `Notification` are replaced in the page by fakes that count what they are
@@ -276,7 +276,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_equal 1, notified.size
   end
 
-  # --- several notes at once (the handoff's decision 18) ---------------------------
+  # --- several notes at once ---------------------------------------------------------
 
   def named_toasts = all("#toasts .admin-toast[data-note-toast=one]").map(&:text)
 
@@ -609,7 +609,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     Users::UpdateProfile.define_singleton_method(:call, original) if original
   end
 
-  # The handoff's decision 13: the name and the switches are one form.
+  # The name and the switches are one form, under one bar.
   test "the name and the two switches are saved by one footer, keep what the password form holds, and reach this page and the next" do
     visit "/cs-studio/account"
     await_admin_controllers
