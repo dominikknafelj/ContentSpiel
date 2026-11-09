@@ -380,7 +380,7 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # The canvas's figures (spec, stage 5a), each a floor to its rounding: a
+  # The canvas's figures, each a floor to its rounding: a
   # figure of 6.9 is met by 6.85. A post's hues mean post types, so each slot
   # keeps its own hue angle; only its lightness is tuned into the band.
   CANVAS = "--cs-surface"
@@ -657,6 +657,32 @@ class AdminContrastTest < ActiveSupport::TestCase
     each_scheme do |scheme, colour|
       %w[--cs-ink --cs-dim --cs-meta].each { |ink| assert_ratio(4.5, colour.(ink), colour.("--cs-popover"), "#{ink} on the bar (#{scheme})") }
       assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-popover"), "the bar's dot (#{scheme})")
+    end
+  end
+
+  # The wizard's progress bar is a graphic, so its floor is 3:1: the accent
+  # fill against the card's sunken track it is drawn on (5.67 / 6.32:1 today).
+  test "the wizard's progress fill is 3:1 or better against its sunken track, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-sunken"), "the progress fill on its track (#{scheme})")
+    end
+  end
+
+  # The current step's row is the accent tint: its name in ink, and its
+  # marker an accent ring around the number in accent, held at the figures
+  # it measures, 5.7 / 6.2:1 (6.25 in dark, drawn as 6.3).
+  test "the current step's words are 4.5:1 on the accent tint and its number on the accent" do
+    each_scheme do |scheme, colour|
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-accent-tint"), "the current step's name (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's number (#{scheme})")
+      assert_ratio(floor({ light: 5.7, dark: 6.2 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-accent-tint"), "the current step's ring (#{scheme})")
+    end
+  end
+
+  test "a done step's check is 3:1 or better on the ok tint" do
+    each_scheme do |scheme, colour|
+      assert_ratio(3.0, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "a done step's check (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-field-line"), colour.("--cs-paper"), "a step to come's ring on the page (#{scheme})")
     end
   end
 

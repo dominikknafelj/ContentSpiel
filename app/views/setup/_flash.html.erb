@@ -1,5 +1,6 @@
 <%# An inline box, not a toast: toasts are CS Studio only (they need the
-    admin JS entry, which the wizard doesn't load). %>
+    admin JS entry, which the wizard doesn't load). The words are the
+    controller's, from `setup.flash.*`. %>
 <% if flash[:alert] %>
   <p class="mb-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert"><%= flash[:alert] %></p>
 <% end %>

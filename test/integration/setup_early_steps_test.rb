@@ -99,14 +99,49 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the step list marks the current step, done steps and optional ones" do
+  test "the token step welcomes, says Step 1 of 9 and has one primary" do
+    get setup_step_path("token")
+
+    assert_response :success
+    assert_select "main", text: /Welcome to Content·Spiel/ do
+      assert_select "span[aria-hidden=true].bg-ic-structure-bg"
+    end
+    assert_select "h1", text: "Let's set up your site"
+    assert_select "nav[aria-label='Setup steps']" do
+      assert_select "[aria-hidden=true] > span.bg-accent[style='width: 11%']"
+      assert_select "p", text: "Step 1 of 9"
+    end
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+    assert_equal [ "Continue" ], css_select("[class]").select { |node| node["class"].include?(primary) }.map { |node| node.text.strip }
+    assert_select "details > summary", text: "Where do I find the log?"
+    assert_select "details code.font-cs-mono", text: "docker compose logs web"
+  end
+
+  test "a step names itself current, the earlier ones done in the ok tone, and Optional in words" do
     get setup_step_path("admin")
 
-    assert_select "nav[aria-label='Setup steps'] li[aria-current=step]", text: /Admin account/
-    assert_select "nav[aria-label='Setup steps'] li", text: /✓.*Setup token/m
-    assert_select "nav[aria-label='Setup steps'] li", text: /System check\s+optional/
+    assert_select "nav[aria-label='Setup steps'] li[aria-current=step]", count: 1, text: /Admin account/ do
+      assert_select "span.border-accent.text-accent", text: "3"
+    end
+    assert_select "nav[aria-label='Setup steps'] li", text: /Setup token/ do
+      assert_select "span.bg-ok-tint.text-ok-ink svg"
+      assert_select ".sr-only", text: "Done:"
+    end
+    assert_select "nav[aria-label='Setup steps'] li", text: /System check\s+Optional/ do
+      assert_select "span.text-label.text-meta", text: "Optional"
+    end
+    assert_select "nav[aria-label='Setup steps'] li", text: /Site identity/ do
+      assert_select "span.border-field-line.text-meta", text: "4"
+    end
+    assert_select "nav[aria-label='Setup steps'] .bg-live", count: 0
+    assert_select "nav[aria-label='Setup steps'] p", text: "Step 3 of 9"
     assert_select "header", text: /Content·Spiel/
+    assert_select "header", text: /First-run setup/
     assert_select "[role=radiogroup][aria-label='Theme']"
+  end
+
+  test "setup.steps holds exactly the steps" do
+    assert_equal SetupController::STEPS, I18n.t("setup.steps").keys.map(&:to_s)
   end
 
   test "the admin step failing shows the error summary and keeps field names" do

@@ -1,0 +1,41 @@
+<%# The progress and the step list, beside the step's card. Full keys only:
+    a lazy lookup here reads `setup.steps.*`, the tree that holds the step
+    names and nothing else. The bar is a picture of the line under it, so a
+    screen reader hears "Step n of m" once.
+    Each step has a 20px round marker: a done one the ok tone with a check,
+    never the Live fill (a finished step is not a publication); the current
+    one an accent ring round its number on the accent tint, its name in ink
+    at 600; one to come a field-line ring with its number in meta. The steps
+    are not links: each persists as submitted and the order is fixed. %>
+<% progress = setup_progress(@step) %>
+<nav aria-label="<%= t("setup.layout.steps_label") %>" class="py-2">
+  <div class="px-2.5 pb-3.5">
+    <div class="h-1 overflow-hidden rounded-full bg-sunken" aria-hidden="true">
+      <span class="block h-full rounded-full bg-accent" style="width: <%= (progress[:fraction] * 100).round %>%"></span>
+    </div>
+    <p class="mt-1.5 text-small text-meta"><%= t("setup.layout.progress", number: progress[:number], total: progress[:total]) %></p>
+  </div>
+  <ol class="space-y-0.5">
+    <% SetupController::STEPS.each_with_index do |step, index| %>
+      <% current = step == @step %>
+      <% done = setup_step_done?(step, @step) %>
+      <%= tag.li class: [ "flex items-center gap-2.5 rounded-cs px-2.5 py-1.5 text-sm", current ? "bg-accent-tint font-semibold text-ink" : "text-dim" ],
+        aria: { current: ("step" if current) } do %>
+        <% if done %>
+          <span class="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-ok-tint text-ok-ink">
+            <%= render "admin/shared/icon", name: :check, size: "size-3" %>
+          </span>
+          <span class="sr-only"><%= t("setup.layout.done") %></span>
+        <% elsif current %>
+          <span class="inline-flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-accent text-label font-semibold text-accent"><%= index + 1 %></span>
+        <% else %>
+          <span class="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-field-line text-label font-semibold text-meta"><%= index + 1 %></span>
+        <% end %>
+        <span class="flex-1"><%= step_label(step) %></span>
+        <% if optional_step?(step) %>
+          <span class="text-label text-meta"><%= t("setup.layout.optional") %></span>
+        <% end %>
+      <% end %>
+    <% end %>
+  </ol>
+</nav>

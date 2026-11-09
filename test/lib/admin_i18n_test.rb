@@ -416,6 +416,21 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/note_inbox/index.html.erb
     app/views/admin/note_inbox/_card.html.erb
     app/controllers/admin/note_inbox_controller.rb
+    app/views/layouts/setup.html.erb
+    app/views/setup/_steps.html.erb
+    app/views/setup/_back.html.erb
+    app/views/setup/_flash.html.erb
+    app/views/setup/_system_check_results.html.erb
+    app/views/setup/token.html.erb
+    app/views/setup/system_check.html.erb
+    app/views/setup/admin.html.erb
+    app/views/setup/site.html.erb
+    app/views/setup/languages.html.erb
+    app/views/setup/mcp_token.html.erb
+    app/views/setup/mcp_token_created.html.erb
+    app/views/setup/starter_content.html.erb
+    app/views/setup/review.html.erb
+    app/controllers/setup_controller.rb
   ].freeze
 
   PLACEHOLDER = "".freeze
@@ -434,12 +449,12 @@ class AdminI18nTest < ActiveSupport::TestCase
   STOP_WORDS = %w[now ago not the is are to of your this that need needs changed since you and or in on for with from has have
     was were be can no yet just all any more less new].freeze
 
-  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL)\b|\) AS [a-z_]+|->>/
+  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL|LOCK TABLE)\b|\) AS [a-z_]+|->>/
   # An HTTP header name: any `X-` header, or one of the standard names listed.
   # NOT "any hyphenated Title-Case token": that shape is also a label
   # ("Read-Only", "Sign-In", "Up-To-Date"), which is copy -- on a JavaScript
   # sink line too. A header this list lacks fails the guard until it is added.
-  STANDARD_HEADERS = %w[Content-Type Turbo-Frame].freeze
+  STANDARD_HEADERS = %w[Content-Type Turbo-Frame Cache-Control].freeze
   HEADER = /\A(?:X(?:-[A-Z][A-Za-z]*)+|#{Regexp.union(STANDARD_HEADERS).source})\z/
   MARKER = /i18n-ok:\s*\S.{9,}/
 
@@ -705,7 +720,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--saving--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
       "Admin::Ui::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
-      "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
+      "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "Cache-Control", "LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
   end

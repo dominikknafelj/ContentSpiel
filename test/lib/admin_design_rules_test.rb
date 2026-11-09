@@ -491,7 +491,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   UPPER_TRACKED_ALLOWED = {
     "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
     "CONTENT·SPIEL" => "the product layout's wordmark",
-    "Content·Spiel</span>" => "the setup layout's wordmark"
+    %("Content·Spiel" %></span>) => "the setup layout's wordmark"
   }.freeze
   # CS Studio's sources, the setup pages and the three layouts around them.
   # The public site is the theme's and out of scope: its pages keep their look.
@@ -594,7 +594,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/save_status_component.rb" => "the save status line stays mono capitals",
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
-    "app/views/setup/token.html.erb" => "the setup token's input holds a key value",
+    "app/views/setup/token.html.erb" => "the setup token's input holds a key value, and the log's commands are code",
     "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
     "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
     "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
@@ -1249,7 +1249,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/media/upload_tiles.js" => "a progress bar",
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
     "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",
-    "app/components/admin/ui/save_bar_component.html.erb" => "the save bar's unsaved dot, beside its words"
+    "app/components/admin/ui/save_bar_component.html.erb" => "the save bar's unsaved dot, beside its words",
+    "app/views/setup/_steps.html.erb" => "the wizard's progress bar"
   }.freeze
 
   test "only a button, the checkbox, a count pill, the unread bubble, a progress bar and the unsaved marks carry the accent fill" do
@@ -1572,7 +1573,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # chip; the ok, warn and danger fills are held to the files that draw one
   # today. The list shrinks as screens move their fills into a status
   # component, and a status component joins it only in place of the screens'
-  # fills it takes over.
+  # fills it takes over. The wizard's step list draws a done step's check in
+  # the ok tone, never the Live fill: a finished step is not a publication.
   LIVE_SCHEDULED_FILL = /(?<![\w-])(?:bg|text|border)-(?:live|on-live|scheduled|on-scheduled)(?![\w-])/
   LIVE_SCHEDULED_FILES = %w[app/components/admin/ui/status_chip_component.html.erb app/components/admin/ui/status_chip_component.rb
     app/components/admin/ui/scheduled_date_component.rb].freeze
@@ -1620,6 +1622,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/shared/_stale_banner.html.erb
     app/views/invitations/show.html.erb
     app/views/setup/_flash.html.erb
+    app/views/setup/_steps.html.erb
   ].freeze
 
   test "the live and scheduled fills are drawn only by the status chip and the scheduled date" do

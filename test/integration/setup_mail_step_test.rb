@@ -1,8 +1,8 @@
 require "test_helper"
 
-# The setup wizard's optional Mail step (spec "The setup wizard", design
-# answer M1): after Site identity, skippable, the same fields and service as
-# Settings → Mail, a test mail to the admin, and the one test-mail limit.
+# The setup wizard's optional Mail step: after Site identity, skippable, the
+# same fields and service as Settings → Mail, a test mail to the admin, and
+# the one test-mail limit.
 class SetupMailStepTest < ActionDispatch::IntegrationTest
   include LogCapture
 
@@ -30,7 +30,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     get setup_step_path("mail")
     assert_response :success
     assert_select "h1", text: /Mail/
-    assert_select "h1", text: /optional/
+    assert_select "h1", text: /Optional/
     assert_match(/Content Spiel sends two kinds of mail: password reset links and invites\. Use the SMTP details from your mail provider\./, response.body)
     assert_select "a[href=?]", setup_step_path("languages"), text: "Skip for now"
 
@@ -139,7 +139,7 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     end
   end
 
-  # Spec decision 3 (final review 1): the host's login is a credential. Each
+  # The host's login is a credential. Each
   # half is checked alone, and the whole body is searched, not one element.
   { "MAIL_SMTP_USERNAME" => "host-login-user-4711", "MAIL_SMTP_PASSWORD" => "host-login-pass-0815" }.each do |variable, secret|
     test "the host's #{variable} is Set by the host and its value is nowhere in the step's page" do

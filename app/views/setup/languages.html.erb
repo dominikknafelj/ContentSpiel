@@ -1,27 +1,25 @@
-<% content_for :title, "Languages" %>
-<h1 class="text-h1 font-semibold">Languages</h1>
+<% content_for :title, step_label("languages") %>
+<h1 class="text-h1 font-semibold"><%= t(".heading") %></h1>
 <p class="mt-2 text-dim">
-  Your site is available in the languages below. Pick the default: it's served without a
-  language prefix in the URL (for example <code class="font-cs-mono">/about</code> instead of
-  <code class="font-cs-mono">/de/about</code>).
+  <%= t(".intro_html", plain: tag.code("/about", class: "font-cs-mono"), prefixed: tag.code("/de/about", class: "font-cs-mono")) %>
 </p>
 
 <%= form_with model: @site_setting, url: setup_step_path("languages"), method: :patch, class: "mt-6 space-y-4" do |form| %>
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
 
   <div>
-    <%= form.label :default_locale, "Default language", class: setup_label_class %>
+    <%= form.label :default_locale, t(".default"), class: setup_label_class %>
     <%= form.select :default_locale, language_options, {}, class: setup_select_class %>
   </div>
 
   <div>
-    <%= form.label :extra_locales, "Additional languages", class: setup_label_class %>
+    <%= form.label :extra_locales, t(".additional"), class: setup_label_class %>
     <%= form.select :extra_locales, language_options,
       { selected: Locales.enabled - [ Locales.default ] }, multiple: true, class: setup_select_class %>
   </div>
 
-  <div class="flex items-center gap-4">
-    <%= render Admin::Ui::ButtonComponent.new(label: "Continue", type: "submit") %>
+  <div class="flex items-center justify-end gap-3">
     <%= render "setup/back" %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".continue"), type: "submit") %>
   </div>
 <% end %>

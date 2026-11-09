@@ -1,42 +1,42 @@
-<% content_for :title, "Site identity" %>
-<h1 class="text-h1 font-semibold">Site identity</h1>
-<p class="mt-2 text-dim">How your site introduces itself. You can change all of this later in the admin under Site settings.</p>
+<% content_for :title, step_label("site") %>
+<h1 class="text-h1 font-semibold"><%= t(".heading") %></h1>
+<p class="mt-2 text-dim"><%= t(".intro") %></p>
 
 <%= form_with model: @site_setting, url: setup_step_path("site"), method: :patch, class: "mt-6 space-y-4" do |form| %>
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
   <div>
-    <%= form.label :title, "Site title", class: setup_label_class %>
+    <%= form.label :title, t(".title"), class: setup_label_class %>
     <%= form.text_field :title, value: @site_setting.title(locale: @site_setting.default_locale), required: true, class: setup_input_class %>
   </div>
   <div>
-    <%= form.label :tagline, class: setup_label_class %>
+    <%= form.label :tagline, t(".tagline"), class: setup_label_class %>
     <%= form.text_field :tagline, value: @site_setting.tagline(locale: @site_setting.default_locale), class: setup_input_class %>
   </div>
   <div>
-    <%= form.label :logo, class: setup_label_class %>
+    <%= form.label :logo, t(".logo"), class: setup_label_class %>
     <%# The drop zone's Stimulus controller lives in controllers/ (not
         controllers/admin/) because setup loads only the `application` entry. `form.label :logo` above points at this id. %>
-    <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "site_setting_logo", accept: "image/*", label: "Logo") %>
+    <%= render Admin::Ui::FileDropComponent.new(name: "site_setting[logo]", id: "site_setting_logo", accept: "image/*", label: t(".logo")) %>
   </div>
 
   <fieldset>
-    <legend class="<%= setup_label_class %>">Social links</legend>
+    <legend class="<%= setup_label_class %>"><%= t(".social_links") %></legend>
     <% links = @site_setting.social_links.to_a %>
     <% rows = links + Array.new([ 4 - links.size, 1 ].max) { [ "", "" ] } %>
     <div class="mt-1 space-y-2">
       <% rows.each do |name, url| %>
         <div class="grid grid-cols-2 gap-2">
-          <%= text_field_tag "site_setting[social_links][][name]", name, placeholder: "e.g. GitHub",
-            aria: { label: "Network" }, class: setup_input_class %>
-          <%= url_field_tag "site_setting[social_links][][url]", url, placeholder: "https://…",
-            aria: { label: "URL" }, class: setup_input_class %>
+          <%= text_field_tag "site_setting[social_links][][name]", name, placeholder: t(".network_placeholder"),
+            aria: { label: t(".network") }, class: setup_input_class %>
+          <%= url_field_tag "site_setting[social_links][][url]", url, placeholder: t(".url_placeholder"),
+            aria: { label: t(".url") }, class: setup_input_class %>
         </div>
       <% end %>
     </div>
   </fieldset>
 
-  <div class="flex items-center gap-4">
-    <%= render Admin::Ui::ButtonComponent.new(label: "Continue", type: "submit") %>
+  <div class="flex items-center justify-end gap-3">
     <%= render "setup/back" %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".continue"), type: "submit") %>
   </div>
 <% end %>

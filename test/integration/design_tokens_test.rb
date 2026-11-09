@@ -28,9 +28,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes css, "--th-paper"
     assert_includes css, "cs-prose"
     assert_not_includes css, "--cs-"
-    # `md:rounded-l-cs` is only used by the setup wizard's layout.
-    assert_not_includes css, "md\\:rounded-l-cs"
-    assert_includes stylesheet("tailwind.css"), "md\\:rounded-l-cs"
+    # `md:p-11` is only used by the setup wizard's layout.
+    assert_not_includes css, "md\\:p-11"
+    assert_includes stylesheet("tailwind.css"), "md\\:p-11"
   end
 
   # A caption is text, not a label: the sans at the small size in the faint

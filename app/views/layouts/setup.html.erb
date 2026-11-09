@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-surface="studio" lang="en">
   <head>
-    <title><%= content_for(:title) || "Set up ContentSpiel" %></title>
+    <title><%= content_for(:title) || t("setup.layout.title") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -13,44 +13,23 @@
   <%# scheme-light/dark:scheme-dark: native controls and the canvas follow
       the token theme. Scoped to this product layout on purpose -- a global
       color-scheme would restyle the public site for dark-OS visitors.
-      Header as on sign-in (handoff "Setup Wizard"); below it a card with the
-      numbered step list on the left. Done steps carry a check and read dim,
-      the current one is ink and medium weight, optional ones are marked in
-      mono. The steps are not links: each persists as submitted and the order
-      is fixed. %>
+      The header as on sign-in; below it the step list (`setup/steps`) and,
+      28px to its right, the card that holds the step. The words are read by
+      full key (`setup.layout.*`): a lazy lookup from a layout lands in
+      `layouts.setup.*`. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <span class="text-xs font-bold uppercase tracking-wide">Content·Spiel</span>
+      <span class="text-xs font-bold uppercase tracking-wide"><%= "Content·Spiel" %></span><%# i18n-ok: the product's wordmark, never translated %>
       <div class="flex items-center gap-4">
-        <span class="hidden text-label text-meta sm:inline">First-run setup</span>
+        <span class="hidden text-small text-meta sm:inline"><%= t("setup.layout.first_run") %></span>
         <%= render Admin::Ui::ThemeSwitchComponent.new %>
       </div>
     </header>
 
-    <div class="mx-auto grid max-w-4xl gap-0 px-4 pb-16 md:grid-cols-[14rem_minmax(0,1fr)]">
-      <nav aria-label="Setup steps" class="rounded-t-cs border border-line bg-paper px-3 py-6 md:rounded-l-cs md:rounded-tr-none md:border-r-0">
-        <ol class="space-y-0.5">
-          <% SetupController::STEPS.each_with_index do |step, index| %>
-            <% current = step == @step %>
-            <% done = setup_step_done?(step, @step) %>
-            <%= tag.li class: "flex items-center gap-3 rounded-cs px-2.5 py-2 #{current ? "bg-sunken font-medium text-ink" : "text-dim"}", aria: { current: ("step" if current) } do %>
-              <span class="w-4 text-xs <%= done ? "text-ok-ink" : "text-meta" %>">
-                <% if done %>
-                  <span aria-hidden="true">✓</span><span class="sr-only">Done: </span>
-                <% else %>
-                  <%= index + 1 %>
-                <% end %>
-              </span>
-              <span class="flex-1"><%= step_label(step) %></span>
-              <% if optional_step?(step) %>
-                <span class="text-label text-meta">optional</span>
-              <% end %>
-            <% end %>
-          <% end %>
-        </ol>
-      </nav>
+    <div class="mx-auto grid max-w-[980px] gap-7 px-4 pb-16 md:grid-cols-[250px_minmax(0,1fr)]">
+      <%= render "setup/steps" %>
 
-      <main class="min-h-[32rem] rounded-b-cs border border-line bg-surface p-6 md:rounded-r-cs md:rounded-bl-none md:p-10">
+      <main class="min-h-[32rem] rounded-rail bg-surface p-6 shadow-2 md:p-11">
         <%# The wizard takes the setup token and the first account's password,
             before anyone is signed in: in production over plain HTTP it says
             so to everyone, as the sign-in page does (the component's own

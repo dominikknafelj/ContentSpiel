@@ -1,14 +1,11 @@
-<% content_for :title, "System check" %>
-<h1 class="text-h1 font-semibold">System check</h1>
-<p class="mt-2 text-dim">
-  These checks don't change anything. A warning tells you what won't work yet —
-  you can continue now and fix it later.
-</p>
+<% content_for :title, step_label("system_check") %>
+<h1 class="text-h1 font-semibold"><%= t(".heading") %> <span class="text-label text-meta"><%= t("setup.layout.optional") %></span></h1>
+<p class="mt-2 text-dim"><%= t(".intro") %></p>
 
 <%= render "setup/system_check_results", results: @results %>
 
 <div class="mt-6 flex items-center gap-3">
-  <%= link_to "Continue", setup_step_path(next_step), class: setup_primary_button_class %>
-  <%= link_to "Re-run checks", setup_step_path("system_check"), class: setup_secondary_link_class %>
+  <%= link_to t(".rerun"), setup_step_path("system_check"), class: "#{setup_secondary_link_class} mr-auto" %>
   <%= render "setup/back" %>
+  <%= link_to t(".continue"), setup_step_path(next_step), class: setup_primary_button_class %>
 </div>

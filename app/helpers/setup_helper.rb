@@ -26,8 +26,8 @@ module SetupHelper
     Admin::Ui::ButtonComponent.classes(:secondary)
   end
 
-  # "Skip" on an optional step: accent words, no fill, so Continue stays the
-  # one emphasised action (the component's :tertiary).
+  # Back and "Skip for now": accent words, no fill, so the step's primary
+  # stays its one emphasised action (the component's :tertiary).
   def setup_tertiary_link_class
     Admin::Ui::ButtonComponent.classes(:tertiary)
   end
@@ -38,13 +38,22 @@ module SetupHelper
     SetupController::STEPS.index(step) < SetupController::STEPS.index(current)
   end
 
+  # Where a step stands among all of them: its number, the count and the
+  # bar's share. The progress is the step's place, never a time: a step can
+  # take a minute or an afternoon.
+  def setup_progress(step)
+    number = SetupController::STEPS.index(step) + 1
+    total = SetupController::STEPS.size
+    { number: number, total: total, fraction: (number.to_f / total).round(2) }
+  end
+
   # Native name (e.g. "Deutsch" for "de") -- the setup wizard is naming
   # languages for whoever picks them, not describing them in English.
   def language_name(code)
     ::Locales.name(code, native: true)
   end
 
-  # `<option>` pairs for every *supported* language (spec §4.1), not just the
+  # `<option>` pairs for every *supported* language, not just the
   # ones currently enabled -- the languages step is exactly where a site
   # turns a new one on, so it has to offer the full ~40-language list rather
   # than the handful `Locales.enabled` already returns. Sorted by code, which

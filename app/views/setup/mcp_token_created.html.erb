@@ -1,9 +1,9 @@
-<% content_for :title, "Connect an AI agent" %>
-<h1 class="text-h1 font-semibold">Your token</h1>
-<p class="mt-2 text-dim">This is the only time the full token is shown. Copy it into your agent's config now. It carries the Admin group and acts as you; if you lose it, or want a narrower one, create a new one from CS Studio's "AI assistant" page and revoke this one there.</p>
+<% content_for :title, t("setup.mcp_token.heading") %>
+<h1 class="text-h1 font-semibold"><%= t(".heading") %></h1>
+<p class="mt-2 text-dim"><%= t(".intro") %></p>
 
 <pre id="mcp-token" class="mt-4 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
 
-<div class="mt-6">
-  <%= link_to "Continue", setup_step_path("starter_content"), class: setup_primary_button_class %>
+<div class="mt-6 flex items-center justify-end gap-3">
+  <%= link_to t(".continue"), setup_step_path("starter_content"), class: setup_primary_button_class %>
 </div>
