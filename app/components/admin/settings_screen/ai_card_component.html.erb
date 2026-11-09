@@ -1,4 +1,4 @@
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("ai"), id: "settings-ai-card",
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("ai"), self), id: "settings-ai-card",
       intro: t(".intro"),
       data: { controller: "admin--settings--ai admin--saving--pending-lock",
               messages: messages_data("components.settings_screen.ai_card.save_first", "components.settings_screen.ai_key.hold") }) do %>

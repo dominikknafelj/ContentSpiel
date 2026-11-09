@@ -2,11 +2,11 @@
   <%# A grid, so the chip centres on the heading's line and the intro and the
       note stand under the heading, not under the chip. %>
   <div class="admin-settings-card__head grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 rounded-t-card bg-rail px-4 py-3">
-    <%= render Admin::Ui::IconChipComponent.new(icon: section.icon, family: section.family, size: :small, class: "col-start-1 row-start-1") %>
+    <%= render Admin::Ui::IconChipComponent.new(icon: icon, family: family, size: :small, class: "col-start-1 row-start-1") %>
     <%# The heading's mark stands beside it, never in it, so the section keeps
         its name. %>
     <div class="col-start-2 row-start-1 flex min-w-0 items-center">
-      <h2 id="<%= section.id %>" class="text-h2 font-semibold text-ink"><%= word %></h2>
+      <h2 id="<%= heading_id %>" class="text-h2 font-semibold text-ink"><%= heading %></h2>
       <%= heading_mark if heading_mark? %>
     </div>
     <% if intro.present? %>

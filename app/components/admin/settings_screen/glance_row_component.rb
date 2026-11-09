@@ -59,7 +59,7 @@ module Admin
 
       def default_line = glance("languages.default", language: ::Locales.name(default, native: true))
 
-      def word = t(CardComponent.word_key(section))
+      def word = t(SectionCard.word_key(section))
 
       # The state chips' tones and words, in the order they are drawn.
       def chips

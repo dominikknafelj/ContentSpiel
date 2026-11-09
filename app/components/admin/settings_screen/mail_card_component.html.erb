@@ -1,4 +1,4 @@
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("mail"), id: "settings-mail-card", intro: t(".intro"),
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("mail"), self), id: "settings-mail-card", intro: t(".intro"),
       data: { controller: "admin--settings--mail mail-port admin--saving--pending-lock", messages: messages_data("components.settings_screen.mail_login.hold") }) do |card| %>
   <% card.with_head_end do %>
     <%= render Admin::SettingsScreen::MailStateComponent.new(mail_settings: mail_settings) %>

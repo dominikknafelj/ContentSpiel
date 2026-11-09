@@ -1,5 +1,5 @@
 # The sections of the Settings screen, in the nav's order: each one card
-# (`Admin::SettingsScreen::CardComponent`), one nav link and one ⌘K row
+# (`Admin::Ui::SettingsCardComponent`), one nav link and one ⌘K row
 # (`Jump::Search`). `id` is the card heading's id, so `#mail` is the anchor every
 # link uses; `permission` is the right that owns the card (Languages has its
 # own, the others are `settings.manage`), so a viewer is never offered a

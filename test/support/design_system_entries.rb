@@ -52,6 +52,7 @@ module DesignSystemEntries
     "Admin::Ui::RecordChipComponent" => "IconChip",
     "Admin::Ui::SaveStatusComponent" => "SaveBar",
     "Admin::Ui::ScheduledDateComponent" => "StudioDashboardCards",
+    "Admin::Ui::SettingsCardComponent" => "StudioSettings",
     "Admin::Ui::StatusChipComponent" => "Badge",
     "Admin::Ui::SystemCheckRowComponent" => "Alerts",
     "Admin::Ui::TabLinksComponent" => "StudioFilterBar",

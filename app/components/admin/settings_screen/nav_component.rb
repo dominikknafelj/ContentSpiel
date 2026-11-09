@@ -26,7 +26,7 @@ module Admin
 
       attr_reader :sections
 
-      def word(section) = t(CardComponent.word_key(section))
+      def word(section) = t(SectionCard.word_key(section))
     end
   end
 end
