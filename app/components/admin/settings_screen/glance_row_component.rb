@@ -9,7 +9,9 @@ module Admin
     #   in its own language, as the Languages card names it); no state chip,
     #   since a count is no state.
     # - AI translation: `AiState`, the word and tone the key's chip says;
-    #   after a Test connection on this visit (`ai_result:`), its result.
+    #   after a Test connection on this visit (`ai_result:`), its result, but
+    #   only once a provider and a key are both saved: Off and No key
+    #   outrank it.
     # - Mail: `MailSettings#state` in `MailStateComponent::TONES`, with the
     #   Mail card's words.
     # - Images: Ready, the count waiting to be made with the saved settings,

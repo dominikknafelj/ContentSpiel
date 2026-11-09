@@ -131,5 +131,8 @@ en:
       none: "None"
       blank: "—"
       edit: "Edit"
+      # The review link's accessible name. Keep the visible word, `edit`
+      # ("Edit"), at its start, as the same word, so saying what is seen
+      # activates the link (WCAG 2.5.3, label in name).
       edit_row: "Edit %{item}"
       finish: "Finish setup"
