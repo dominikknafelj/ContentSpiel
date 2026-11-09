@@ -189,7 +189,7 @@ export default class extends Controller {
   }
 
   // A finished upload: the counts follow it, and the first of the batch is the
-  // selection (handoff C36b) -- selected, not chosen: the editor confirms.
+  // selection -- selected, not chosen: the editor confirms.
   uploaded({ json, tile }) {
     updateCounts(json.counts, { picker: true })
     if (!this.selectNextUpload || !tile) return

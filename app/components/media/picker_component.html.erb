@@ -9,17 +9,17 @@
         "admin--media--picker-upload-url-value": upload_url,
         "admin--media--picker-tile-class-value": Admin::MediaLibrary::TileComponent::CARD,
         "admin--media--picker-button-class-value": Admin::Ui::ButtonComponent.classes(:secondary, size: :small),
-        messages: messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES)
+        messages: messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES, *Media::PickerComponent::FOOTER_MESSAGES)
       } do %>
   <%# Padding lives on the sections below, not the <dialog>: a click on the
       dialog's own padding is a click on the <dialog> element, which the
       body-level `admin--ui--dialog#backdrop` reads as a backdrop click. %>
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
-      <h2 id="<%= part_id("title") %>" class="text-h2 text-ink">Choose an image</h2>
+      <h2 id="<%= part_id("title") %>" class="text-h2 text-ink"><%= t("admin.media.picker.title") %></h2>
       <div class="flex items-center gap-3">
-        <%= render Admin::Ui::ButtonComponent.new(label: "Upload", variant: :secondary, type: "button", data: { action: "admin--media--picker#browse" }) %>
-        <%= tag.button "×", type: "button", "aria-label": "Close", class: "rounded-cs px-2 text-2xl leading-none text-meta hover:text-ink focus:outline-2 focus:outline-accent",
+        <%= render Admin::Ui::ButtonComponent.new(label: t("admin.media.picker.upload"), variant: :secondary, type: "button", data: { action: "admin--media--picker#browse" }) %>
+        <%= tag.button "×", type: "button", "aria-label": t("admin.media.picker.close"), class: "rounded-cs px-2 text-2xl leading-none text-meta hover:text-ink focus:outline-2 focus:outline-accent",
               data: { action: "admin--media--picker#dismiss" } %>
       </div>
     </div>
@@ -27,7 +27,7 @@
     <%# No `name`: the files go to the upload endpoint by XHR, never with any
         form's own data. Visually hidden, not `hidden`: still a labelled field
         (the header's Upload button clicks it). %>
-    <%= label_tag part_id("file"), "Image file", class: "sr-only" %>
+    <%= label_tag part_id("file"), t("admin.media.picker.file"), class: "sr-only" %>
     <%= tag.input type: "file", id: part_id("file"), accept: accept, multiple: true, class: "sr-only",
           data: { "admin--media--picker-target": "file", action: "change->admin--media--picker#upload" } %>
     <p class="sr-only" role="status" aria-live="polite" data-admin--media--picker-target="status"></p>
@@ -42,10 +42,10 @@
 
     <div class="flex items-center justify-between gap-4 border-t border-line px-6 py-3">
       <%# What is chosen, said in words and announced as it changes. %>
-      <p class="text-sm text-meta" role="status" aria-live="polite" data-admin--media--select-target="status">No image selected</p>
+      <p class="text-sm text-meta" role="status" aria-live="polite" data-admin--media--select-target="status"><%= t("admin.media.picker.none") %></p>
       <div class="flex items-center gap-2">
-        <%= render Admin::Ui::ButtonComponent.new(label: "Cancel", variant: :tertiary, type: "button", data: { action: "admin--media--picker#dismiss" }) %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "Use image", variant: :primary, type: "button", disabled: true,
+        <%= render Admin::Ui::ButtonComponent.new(label: t("admin.media.picker.cancel"), variant: :tertiary, type: "button", data: { action: "admin--media--picker#dismiss" }) %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t("admin.media.picker.use"), variant: :primary, type: "button", disabled: true,
               data: { "admin--media--select-target": "use", action: "admin--media--select#confirm" }) %>
       </div>
     </div>

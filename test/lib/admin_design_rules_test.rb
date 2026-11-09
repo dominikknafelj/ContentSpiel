@@ -763,7 +763,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # string by string: the hand-drawn box, `rounded-cs` with `border-line` (or
   # `-strong`, under any variant) in one quoted class string, in whatever
   # order. A Ruby literal continued on the next line (`"…" \` then `"…"`) is
-  # one string.
+  # one string, and a `#{NAME}` of a string constant the same file assigns
+  # (`NAME = "…"`) is read as that constant's classes. Not seen: `+` or
+  # adjacent literals, a constant from another file, ERB or a ternary inside
+  # the attribute, `class_names(…)`, an array or `%w[…]` (the reference's
+  # "No guard" list, `docs/reference/design-system.md`).
   CONTENT_SIDE_SCREENS = %w[
     app/components/admin/media_library/*
     app/views/admin/media/*
@@ -772,6 +776,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
   BOX_EDGE = /\A(?:[\w-]+:)*border-line(?:-strong)?\z/
+  CONTINUED = /"[ \t]*\\\n[ \t]*"/
+  STRING_CONSTANT = /\b([A-Z][A-Z0-9_]*)\s*=\s*"((?:[^"\n]|#{CONTINUED.source})*)"/
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
   HAND_BOX_ALLOWED = {
@@ -782,10 +788,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   # `[line number, what was refused]` for each refused look in `source`.
   def self.refused_looks(source)
+    constants = source.scan(STRING_CONSTANT).to_h { |name, value| [ name, value.gsub(CONTINUED, " ") ] }
+    source = source.gsub(/#\{([A-Z][A-Z0-9_]*)\}/) { constants.fetch(Regexp.last_match(1), Regexp.last_match(0)) }
     lines = source.each_line.each_with_index.filter_map { |line, index| [ index + 1, line[OFF_SCALE] ] if line.match?(OFF_SCALE) }
     boxes = source.to_enum(:scan, QUOTED).filter_map do
       match = Regexp.last_match
-      classes = (match[1] || match[2]).gsub(/"[ \t]*\\\n[ \t]*"/, " ").split
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
       [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if classes.include?("rounded-cs") && classes.any? { |name| name.match?(BOX_EDGE) }
     end
     (lines + boxes).sort_by(&:first)
@@ -809,11 +817,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "the off-scale check finds a pixel size, text-xs, a hand-drawn box in any order, a dashed edge and an important danger edge, and not a token, a table's line or a control's frame" do
     [ "text-[13px]", "text-xs", %(class="rounded-cs border border-line"), "border-dashed", "!border-danger",
       %(class="border border-line bg-sunken rounded-cs"), %(class="rounded-cs border hover:border-line-strong"),
-      %(CARD = "block rounded-cs border " \\\n         "border-line".freeze) ].each do |sample|
+      %(CARD = "block rounded-cs border " \\\n         "border-line".freeze),
+      %(BASE = "block rounded-cs".freeze\nPICK = "\#{BASE} border border-line".freeze) ].each do |sample|
       assert_not_empty self.class.refused_looks(sample), sample
     end
     [ "text-small", %(class="border-b border-line"), "text-xs-foo", %(class="rounded-cs border border-field-line"),
-      %(class="rounded-cs px-2" title="border-line") ].each do |sample|
+      %(class="rounded-cs px-2" title="border-line"),
+      %(BASE = "block rounded-cs".freeze\nPICK = "\#{OTHER} border border-line".freeze) ].each do |sample|
       assert_empty self.class.refused_looks(sample), sample
     end
   end

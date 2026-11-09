@@ -9,3 +9,16 @@ en:
         upload: "Upload images"
         hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
         drop: "Drop images to upload"
+      # `Media::PickerComponent`, the Media screen's dialog that every image
+      # field opens (outside `app/components/admin/`, so read with full keys),
+      # and its grid view (`admin/media/picker`). `none` and `selected` are
+      # also `admin--media--select`'s, from the dialog's `data-messages`.
+      picker:
+        title: "Choose an image"
+        upload: "Upload"
+        close: "Close"
+        file: "Image file"
+        none: "No image selected"
+        selected: "1 selected"
+        cancel: "Cancel"
+        use: "Use image"
