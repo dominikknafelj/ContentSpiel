@@ -10,7 +10,7 @@ module Admin
       # replaces.
       REORDER_STATUS_ID = "content-blocks-status"
 
-      # The page's own list (sections spec §3.1): the blocks outside any
+      # The page's own list: the blocks outside any
       # section, which is what the block list shows as cards, what "first" and
       # "last" are counted among and what a reorder of the page names. A block
       # in a section's column has its `position` counted in that column, so it
@@ -66,7 +66,7 @@ module Admin
       end
 
       # A block in a section is a tile until it is opened, and the one line on
-      # its tile is drawn from what the block holds (sections spec §4.2): every
+      # its tile is drawn from what the block holds: every
       # answer to its autosave redraws that line, so a tile never shows the
       # caption or the image of before the save. Its form may well be closed by
       # the time the answer is here, and then the tile is all there is to see.
@@ -94,12 +94,12 @@ module Admin
       # level has no tile) does nothing.
       def block_icon_streams(block)
         %i[card tile].map do |place|
-          turbo_stream.replace(Admin::EditorScreen::BlockIconComponent.dom_id(block, place),
-            Admin::EditorScreen::BlockIconComponent.new(definition: block.definition, place: place, block: block))
+          turbo_stream.replace(Admin::Ui::BlockIconComponent.dom_id(block, place),
+            Admin::Ui::BlockIconComponent.new(definition: block.definition, place: place, block: block))
         end
       end
 
-      # A block in a section is two elements (sections spec §4.3): its tile,
+      # A block in a section is two elements: its tile,
       # which has the block's `dom_id` and is removed like a card, and its
       # form's panel under the lanes. The panel goes with it, and it can be the
       # very thing on screen: an unavailable block's panel has "Delete block…"
@@ -132,8 +132,7 @@ module Admin
       # the lane `tile_streams` appends to), and the section's two counts, which
       # a copy raises as an add does.
       #
-      # NOT OPENED, unlike a block just added (sections spec §4.3, "a block
-      # just added opens at once"): an added block is empty and its form is what
+      # NOT OPENED, unlike a block just added, which opens at once: an added block is empty and its form is what
       # the person came for; a copy already holds what its source holds, and
       # what follows a Duplicate is as often moving the copy as editing it.
       # Opening it would also close the form that is open in the section, which
@@ -158,7 +157,7 @@ module Admin
       end
 
       # Each block a saved reorder moved between containers, in its new shape
-      # (sections spec §4.4), and the count of every section that gained or
+      # and the count of every section that gained or
       # lost one. `origins` is the request's `moved_from`, which the service
       # has just found true: where each block was.
       #
@@ -192,7 +191,7 @@ module Admin
         outline = fresh_outline
         # Every top-level block by id, not only the containers: a block moved
         # out of a section whose type is gone left a card that still counts
-        # its blocks, in its delete dialog (spec §6).
+        # its blocks, in its delete dialog.
         sections = outline.top_level.index_by(&:id)
         top_level = outline.top_level
         touched = []
@@ -253,7 +252,7 @@ module Admin
       end
 
       # A section's structure as the database has it now, for an answer that
-      # must put right what this tab shows of it (sections spec §3.3, §6): a
+      # must put right what this tab shows of it: a
       # save of the section that changed how many columns it has (a narrower
       # layout folds the blocks of the removed columns into the last one left,
       # `ContentBlocks::Save#fold_removed_columns`) and an add refused because

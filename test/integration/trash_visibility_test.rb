@@ -1319,6 +1319,9 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get admin_unread_notes_path
     assert_equal({ "unread" => 0 }, response.parsed_body)
     assert_equal [ [], 0, 0 ], inbox.call.then { |query| [ query.rows, query.total, query.unread_count ] }
+    assert_equal [ { all: 0, unread: 0, mentions: 0 }, [ 0, 0, 0 ] ], [ inbox.call.counts, Dashboard::NotesForYou::SHOWS.map { |show| inbox.call.total(show: show) } ]
+    get admin_notes_path, params: { show: "mentions" }
+    assert_select "[data-delivery]", count: 0
     assert_equal 3, Notes::Delivery.unread.where(user: users(:two)).count
 
     as(users(:one)) { records.each { |record| assert Trash::Restore.call(record.reload).ok? } }

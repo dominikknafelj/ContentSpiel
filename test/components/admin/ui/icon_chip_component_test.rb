@@ -17,6 +17,11 @@ class Admin::Ui::IconChipComponentTest < ViewComponent::TestCase
     assert_selector "span[class~='size-5.5'][class~='rounded-chip'] svg[class~='size-3.5']"
   end
 
+  test "the xsmall chip is 20px, the icon still 14px" do
+    render_inline Admin::Ui::IconChipComponent.new(icon: :columns_2, family: :structure, size: :xsmall)
+    assert_selector "span[class~='size-5'][class~='rounded-chip'] svg[class~='size-3.5']"
+  end
+
   test "people is a hue of its own" do
     render_inline Admin::Ui::IconChipComponent.new(icon: :pilcrow, family: :people)
     assert_selector "span[class~='bg-ic-people-bg'][class~='text-ic-people']"

@@ -4,8 +4,7 @@
 # none yet.
 #
 # This is a copy. The artifact is changed by the design agent, and its
-# changes reach this file by hand, as the theme contract's reach
-# test/support/contract_ledger.rb: a card added, renamed or removed there is
+# changes reach this file by hand: a card added, renamed or removed there is
 # an edit here, and a stale entry here fails the guard.
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
@@ -32,6 +31,7 @@ module DesignSystemEntries
   # names the component. A component whose card is its own name less
   # `Component` (`Admin::Ui::ButtonComponent`, Button) is not listed.
   COVERED_BY = {
+    "Admin::Ui::BlockIconComponent" => "IconChip",
     "Admin::Ui::ChannelChipComponent" => "Badge",
     "Admin::Ui::CheckboxComponent" => "FormControls",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",

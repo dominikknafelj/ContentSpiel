@@ -756,6 +756,15 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The New chip on an unread inbox row: accent words and a 6px accent dot on
+  # the accent tint, 5.675:1 in light and 6.246:1 in dark, held at the same
+  # floors as the step's ring (5.7 and 6.2, each a floor to its rounding).
+  test "the New chip's accent words and dot hold on the accent tint, in both schemes" do
+    each_scheme do |scheme, colour|
+      assert_ratio(floor({ light: 5.7, dark: 6.2 }.fetch(scheme)), colour.("--cs-accent"), colour.("--cs-accent-tint"), "the New chip's words and dot (#{scheme})")
+    end
+  end
+
   test "a done step's check is 3:1 or better on the ok tint" do
     each_scheme do |scheme, colour|
       assert_ratio(3.0, colour.("--cs-ok-ink"), colour.("--cs-ok-tint"), "a done step's check (#{scheme})")

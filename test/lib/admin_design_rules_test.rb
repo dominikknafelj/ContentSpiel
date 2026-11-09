@@ -1255,7 +1255,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
     "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
     "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the unread bubble",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip's dot",
     "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
     "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
     "app/javascript/notes/merge.js" => "the NEW divider",
@@ -1285,7 +1285,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
     "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
-    "app/components/admin/notes_screen/body_component.rb" => "your own mention"
+    "app/components/admin/notes_screen/body_component.rb" => "your own mention",
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable"
   }.freeze
 
   test "the tint with accent words is a secondary button's, a chip's, your own mention or the current module's row, and nothing else" do
@@ -1331,7 +1332,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
   test "a block type's icon is drawn only through BlockIconComponent" do
     pattern = /\.icon_for\(|(?<![\w:])definition\.icon\b|\btype\.icon\b/
-    offences = design_offences(pattern, except: [ "app/components/admin/editor_screen/block_icon_component.rb" ])
+    offences = design_offences(pattern, except: [ "app/components/admin/ui/block_icon_component.rb" ])
     assert_empty offences
   end
 

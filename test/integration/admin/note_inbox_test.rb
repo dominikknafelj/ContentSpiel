@@ -29,7 +29,8 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
       assert_select "footer a[href='/cs-studio/notes'][data-turbo-frame=_top]", text: "All notes for you →"
       assert_select "header a", count: 0
       # Unread is said in words too, and counted in the card's header.
-      assert_select "[data-delivery][data-unread] .sr-only", text: "Unread"
+      assert_select "[data-delivery][data-unread] [data-inbox-new]", text: "New"
+      assert_select "[data-delivery] .sr-only", count: 0
       assert_select "header [data-notes-new]", text: "1 new"
     end
     assert_select "turbo-frame#dashboard-waiting section.admin-dashboard-panel--action[aria-labelledby=dashboard-waiting-title]" do
@@ -90,6 +91,84 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "form[action='/cs-studio/notes/read']", count: 0
   end
 
+  test "the filter's tabs carry their counts, a count of 0 included, and the shown scope is the current tab" do
+    get "/cs-studio/notes"
+
+    assert_select "nav[aria-label=Show] a", count: 3
+    assert_select "nav[aria-label=Show] a[href='/cs-studio/notes'][aria-current=page]", text: /All\s+1/
+    assert_select "nav[aria-label=Show] a[href='/cs-studio/notes?show=unread']:not([aria-current])[data-turbo-prefetch=false]", text: /Unread\s+1/
+    assert_select "nav[aria-label=Show] a[href='/cs-studio/notes?show=mentions']", text: /Mentions\s+1/
+
+    as(users(:reader)) { Notes::MarkRead.call }
+    get "/cs-studio/notes", params: { show: "unread" }
+
+    assert_select "nav[aria-label=Show] a[aria-current=page]", count: 1
+    assert_select "nav[aria-label=Show] a[href='/cs-studio/notes?show=unread'][aria-current=page]", text: /Unread\s+0/
+    assert_select "nav[aria-label=Show] a[href='/cs-studio/notes'] .text-count", text: "1"
+  end
+
+  test "each scope lists its own deliveries" do
+    as(users(:two)) { Notes::Resolve.call(@thread) }
+    as(users(:reader)) { Notes::MarkRead.call }
+    other = as(users(:two)) { Notes::Start.call(create_post(title: "Hello"), body: "Look, @[#{users(:reader).id}]") }.record
+    as(users(:two)) { Notes::Resolve.call(other) }
+
+    get "/cs-studio/notes", params: { show: "mentions" }
+    assert_select "[data-delivery]", count: 0
+
+    get "/cs-studio/notes", params: { show: "unread" }
+    assert_select "[data-delivery]", count: 1
+  end
+
+  test "an unknown show is All" do
+    get "/cs-studio/notes", params: { show: "everything" }
+
+    assert_response :ok
+    assert_select "[data-delivery]", count: 1
+    assert_select "nav[aria-label=Show] a[aria-current=page]", text: /All/
+  end
+
+  test "a page beyond the last under a scope says so and goes back to that scope's first page, and the pager keeps the scope" do
+    get "/cs-studio/notes", params: { show: "unread", page: 9 }
+    assert_select "a[href='/cs-studio/notes?show=unread']", text: "Back to page 1"
+
+    get "/cs-studio/notes", params: { page: 9 }
+    assert_select "a[href='/cs-studio/notes']", text: "Back to page 1"
+
+    as(users(:two)) { 51.times { |index| Notes::Start.call(@page, body: "Note #{index} for @[#{users(:reader).id}]") } }
+    get "/cs-studio/notes", params: { show: "mentions" }
+    assert_select "nav a[href*='show=mentions'][href*='page=2']"
+    get "/cs-studio/notes", params: { show: "mentions", page: 2 }
+    assert_select "[data-delivery]", count: 2
+  end
+
+  test "each scope's empty list says its own sentence" do
+    as(users(:reader)) { Notes::MarkRead.call }
+
+    get "/cs-studio/notes", params: { show: "unread" }
+    assert_select ".admin-empty-state", text: "No unread notes"
+    as(users(:two)) { Notes::Resolve.call(@thread) }
+    as(users(:reader)) { Notes::MarkRead.call }
+    get "/cs-studio/notes", params: { show: "mentions" }
+    assert_select ".admin-empty-state", text: "No mentions yet"
+
+    sign_in_as(users(:one))
+    get "/cs-studio/notes"
+    assert_select ".admin-empty-state", text: /Nothing for you yet\s+When someone mentions you or replies to you, it shows here\./
+    assert_select ".admin-empty-state a, .admin-empty-state button", count: 0
+  end
+
+  test "Mark all read is a small secondary, shown only while something is unread, and the screen draws no primary" do
+    get "/cs-studio/notes"
+    small_secondary = Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split.map { |name| "[class~='#{name}']" }.join
+    assert_select "form[action='/cs-studio/notes/read'] button#{small_secondary}", text: "Mark all read"
+    assert_select "main [class~='text-on-accent']", count: 0
+
+    as(users(:reader)) { Notes::MarkRead.call }
+    get "/cs-studio/notes"
+    assert_select "form[action='/cs-studio/notes/read']", count: 0
+  end
+
   test "Mark all read on the dashboard's card comes back to the dashboard" do
     get "/cs-studio"
     assert_select "turbo-frame#notes-for-you form[action='/cs-studio/notes/read?back=dashboard'][data-turbo-frame=_top] button", text: "Mark all read"
@@ -100,8 +179,8 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_equal 0, Notes::Delivery.unread.where(user: users(:reader)).count
   end
 
-  # Accepted (the controller's ruling): "Mark all read" reads every unread
-  # delivery of the person's, the ones hidden at that moment included.
+  # "Mark all read" reads every unread delivery of the person's, the ones
+  # hidden at that moment included.
   test "Mark all read also reads what is hidden at that moment" do
     post_record = create_post(title: "Hidden")
     as(users(:two)) { Notes::Start.call(post_record, body: "For @[#{users(:reader).id}]") }
@@ -143,7 +222,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/notes"
     assert_select "[data-delivery]", count: 0
-    assert_select "main", text: /No notes for you/
+    assert_select "main", text: /Nothing for you yet/
   end
 
   test "a page beyond the last says so, and the inbox needs a sign-in" do
@@ -212,7 +291,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
   end
 
   # The scoped fetch behind the toast (the person's signal says nothing): a
-  # delivery on a record the person can no longer read, one in the trash and
+  # delivery on a record the person has lost the right to read, one in the trash and
   # an id that names nothing are the same 404, and none of them says which.
   test "a delivery on a record the person may not read any more is not found, like one that is not there" do
     delivery = Notes::Delivery.find_by!(user: users(:reader))

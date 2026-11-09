@@ -175,7 +175,20 @@ en:
         page_title: "Notes for you · CS Studio"
         title: "Notes for you"
         mark_all_read: "Mark all read"
-        empty: "No notes for you."
+        # The filter's name and its three tabs; each tab's count is the
+        # scope's own.
+        filters:
+          label: "Show"
+          all: "All"
+          unread: "Unread"
+          mentions: "Mentions"
+        # What an empty list says, by scope.
+        empty:
+          all:
+            title: "Nothing for you yet"
+            description: "When someone mentions you or replies to you, it shows here."
+          unread: "No unread notes"
+          mentions: "No mentions yet"
       card:
         title: "Notes for you"
         # The line under the heading: what the panel holds.
@@ -451,7 +464,8 @@ en:
         # name in a heavier weight), for a person who has since been deleted,
         # and with nobody to name (a reopen records no one).
         inbox_row:
-          unread: "Unread"
+          # The chip on an unread row: new, and for you.
+          new: "New"
           # The verb the row ends in, inside its one link.
           verb: "Open thread"
           untitled: "(untitled)"

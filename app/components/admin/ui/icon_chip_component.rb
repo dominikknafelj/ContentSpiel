@@ -7,8 +7,8 @@ module Admin
     # surface, rail, chrome and popover in both schemes.
     #
     # `family` is a block-type family, `:people` or `:neutral` (the sunken
-    # pair, for a type that names no family). `size` is `:regular` (24px) or `:small` (22px, a
-    # tile's and a section's head); the icon is 14px in both.
+    # pair, for a type that names no family). `size` is `:regular` (24px), `:small` (22px, a
+    # tile's and a section's head) or `:xsmall` (20px, a list row's); the icon is 14px in all three.
     #
     # Decoration: a chip always stands beside its type's or module's name,
     # so it is `aria-hidden` and has no words of its own. Anything else the
@@ -24,9 +24,9 @@ module Admin
         interface: %i[icon family size],
         limits: [
           "It is the one place an icon's hue is drawn, in a family's pair and nowhere else.",
-          "It draws eight families and two sizes, and anything else is refused."
+          "It draws eight families and three sizes, and anything else is refused."
         ],
-        states: %i[regular small],
+        states: %i[regular small xsmall],
         keys: [],
         slots: [],
         controller: nil
@@ -42,7 +42,7 @@ module Admin
         people: "bg-ic-people-bg text-ic-people",
         neutral: "bg-sunken text-dim"
       }.freeze
-      SIZES = { regular: "size-6", small: "size-5.5" }.freeze
+      SIZES = { regular: "size-6", small: "size-5.5", xsmall: "size-5" }.freeze
       CLASS = "inline-flex shrink-0 items-center justify-center rounded-chip".freeze
 
       def initialize(icon:, family:, size: :regular, **html)

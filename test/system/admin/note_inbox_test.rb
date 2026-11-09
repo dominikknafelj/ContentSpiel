@@ -19,6 +19,16 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
 
   def mention(subject, body = "Is this ready, @[#{@me.id}]?") = as(users(:two)) { Notes::Start.call(subject, body: body) }.record
 
+  # The accessible name the browser computes for the first element the
+  # selector finds.
+  def accessible_name(selector)
+    cdp = page.driver.browser.page
+    cdp.command("Accessibility.enable")
+    object = cdp.command("Runtime.evaluate", expression: "document.querySelector(#{selector.to_json})")
+    node = cdp.command("Accessibility.getPartialAXTree", objectId: object.dig("result", "objectId"), fetchRelatives: false)
+    node.fetch("nodes").first.dig("name", "value")
+  end
+
   def open_dashboard
     visit_screen "/cs-studio"
   end
@@ -218,5 +228,46 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_current_path "/cs-studio/notes"
     assert_no_selector "#sidebar-badge-dashboard"
     assert_no_button "Mark all read"
+  end
+
+  # The avatar, the where line's chips and New are no controls: from the
+  # row's link the keyboard goes to the next stop, and the link's words name
+  # what they show.
+  test "an inbox row is one Tab stop: its avatar, chips and New take no focus" do
+    mention(@block)
+    mention(@page, "And this, @[#{@me.id}]")
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('[data-delivery] *') ].filter((each) => each.tabIndex >= 0).length")
+    assert_equal 2, page.evaluate_script("document.querySelectorAll('[data-delivery]').length")
+    assert_selector "[data-delivery] [data-inbox-new]", count: 2
+    first = "ul > li:first-child > a[data-delivery]"
+    name = accessible_name(first)
+    page.execute_script("window.__row = document.querySelector(#{first.to_json})")
+    find(first).send_keys(:tab)
+    assert_equal false, page.evaluate_script("document.activeElement === window.__row"), "the Tab did not leave the row's link"
+    assert_equal false, page.evaluate_script("!!document.activeElement.closest('[data-delivery]')"), "a Tab stop inside the row took the focus"
+    assert_match(/\ADana mentioned you\b.*\bNew\b.*\bOpen thread\z/m, name)
+  end
+
+  test "Mentions narrows the list to mentions, its tab current, and a row still opens its thread" do
+    mention(@page)
+    resolved = mention(@block)
+    as(users(:two)) { Notes::Resolve.call(resolved) }
+    visit_screen "/cs-studio/notes"
+    assert_selector "[data-delivery]", count: 2
+
+    within("nav[aria-label=Show]") { click_link "Mentions" }
+
+    assert_current_path "/cs-studio/notes?show=mentions"
+    assert_selector "nav[aria-label=Show] a[aria-current=page]", text: /Mentions\s+1/
+    assert_selector "[data-delivery]", count: 1
+    assert_selector "[data-delivery]", text: "Dana mentioned you"
+    assert_selector "[data-delivery]", text: "Page · Pricing"
+
+    find("[data-delivery]").click
+
+    assert_current_path(/\/pages\/#{@page.id}\?notes=open&thread=/, wait: 8)
   end
 end
