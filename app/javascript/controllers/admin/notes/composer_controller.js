@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 import { avatar } from "ui/avatar"
 
-// A note's field (notes spec §4.2, §7 "Unsent text"), on the form
+// A note's field (with its unsent text kept), on the form
 // `Admin::NotesScreen::ComposerComponent` draws.
 //
 // - Enter adds a line; Ctrl/⌘+Enter sends the form.
@@ -20,14 +20,14 @@ import { avatar } from "ui/avatar"
 //   guard, which is about content. It does not outlive the person either:
 //   signing out removes every draft from the tab, and a page loaded for
 //   someone else removes what is not theirs (`forgetDrafts`).
-// - AN EDIT THAT WAS LEFT (the handoff's decision 27; `edit`). An edit form
+// - AN EDIT THAT WAS LEFT (`edit`). An edit form
 //   opens filled with the saved text, so "put back into an empty field"
 //   never applied to it and its draft was stored and then lost. For an edit
 //   the draft is what differs from the text the form was drawn with: typing
 //   that text back removes it, and a form drawn while one exists gets the
 //   draft IN PLACE of the saved text; that it is unsaved is said in the
 //   message's meta line (`admin--notes--unsaved`), never above the field
-//   (decision 29). That goes for a draft older than the saved text too (the
+//   That goes for a draft older than the saved text too (the
 //   author saved a newer one from another tab): it is their own words, so it
 //   is put back and said, never dropped in silence and never kept in
 //   silence -- Cancel shows the newer text. Saving forgets the draft here
@@ -40,13 +40,13 @@ import { avatar } from "ui/avatar"
 //   to turn into tokens. A name the picker did not insert is just text.
 // - An emoji button puts its character in at the caret.
 // - The send key is said by the submit button's tooltip and its
-//   `aria-keyshortcuts` (decision 30). The server writes the Ctrl form;
+//   `aria-keyshortcuts` The server writes the Ctrl form;
 //   on an Apple platform it is written again here: "Send (⌘↵)", `Meta+Enter`.
 // - The submit is disabled while the field is empty. The server draws it
 //   enabled (without this script the field's own `required` says so), and a
 //   draft put back on connect enables it again.
 //
-// - FILES (notes spec §3.6; `files`, on every form but an edit's). The
+// - FILES (`files`, on every form but an edit's). The
 //   paperclip opens the form's one file field, and what is chosen travels
 //   with the note as one multipart post. The chosen files are the file
 //   field's own -- a `DataTransfer` rebuilds its list when one is added or
@@ -58,7 +58,7 @@ import { avatar } from "ui/avatar"
 //   TEXT, AND THE NAMES OF THE FILES CHOSEN WITH IT: a script cannot put a
 //   file back into a file field, so chosen files are gone when the form is
 //   drawn again. A draft that comes back therefore says so above the field
-//   (`lost`, the handoff's decision 33): "Choose the files again:
+//   (`lost`): "Choose the files again:
 //   press-kit.pdf, about.png". After a note that was refused the server
 //   draws the same line with the names it was just sent. The line goes, and
 //   the names with it, once files are chosen or the note is sent. While a note
@@ -101,7 +101,7 @@ const APPLE = /mac|iphone|ipad|ipod/i
 const ROWS = 6
 // A lookup waits for a pause in the typing, not for every letter.
 const LOOKUP_DELAY_MS = 150
-// How long a send must be out before the form says so (decision 41): a send
+// How long a send must be out before the form says so : a send
 // that is answered sooner shows nothing, so the state never flashes.
 const SENDING_AFTER_MS = 300
 
@@ -125,14 +125,14 @@ export default class extends Controller {
     // merged answer, `admin--notes--live#redrawThread`), and a baseline read
     // from `value` there was the text typed so far -- from then on the edit
     // looked unchanged, its draft was removed by the next keystroke that
-    // left the field as it was, and "Unsaved edit" no longer protected it.
+    // left the field as it was, and nothing protected the "Unsaved edit" any more.
     //
     // One form is drawn with something else in its field: an edit that was
     // REFUSED comes back holding the refused text. The server then hands the
     // saved text beside it (`saved`), or that typed text would be the
     // baseline in the same way.
     this.drawn = this.hasSavedValue ? this.savedValue : this.fieldTarget.defaultValue
-    // The files a form drawn again no longer holds: the server's, after a refusal.
+    // The files a form drawn again does not hold: the server's, after a refusal.
     this.lost = this.hasLostTarget ? this.list(this.lostTarget.dataset.names) : []
     const draft = this.stored()
     // A draft is put back into a field as the server drew it, never over one
@@ -231,7 +231,7 @@ export default class extends Controller {
     this.refresh()
   }
 
-  // The toolbar's at-sign button (handoff "Mention picker"): the same as
+  // The toolbar's at-sign button (the mention picker): the same as
   // typing "@" at the caret, with a space before it when a word ends there.
   mention() {
     if (this.out) return
@@ -254,12 +254,12 @@ export default class extends Controller {
   // not disabled: a disabled field is left out of the form's data when Turbo
   // builds the request, and loses the focus.)
   //
-  // WHAT IT LOOKS LIKE (the handoff's decision 41), once the send has been
+  // WHAT IT LOOKS LIKE once the send has been
   // out for `SENDING_AFTER_MS`: the field's text dim, the submit reading
   // "Sending…" with `aria-busy` (it is disabled already, with the button's
   // own disabled look), and the paperclip, emoji and at-sign disabled (the
   // emoji set is a <details>: `inert`, its <summary> `aria-disabled` with
-  // the same look as the other two, decision 45). No
+  // the same look as the other two). No
   // spinner. All of it is taken back in one place (`settled`), on every way
   // a send ends -- `turbo:submit-end` follows an answer of any status, a
   // network error and an aborted or stopped submission alike -- and when a
@@ -420,7 +420,7 @@ export default class extends Controller {
       const response = await fetch(url, { headers: { Accept: "application/json" }, signal: this.aborter.signal })
       if (!response.ok) return this.closeSuggestions()
       const people = await response.json()
-      // An answer for what is no longer being asked (the text moved on while
+      // An answer for what nobody asks any more (the text moved on while
       // it was on its way) is dropped: the lookup for the new text shows.
       if (this.query !== query) return
       this.show(people)

@@ -20,12 +20,15 @@ module Admin
     # is someone whose tab is hidden or idle (the surface, meta letters and a
     # dashed edge -- the shape says it, never a lower opacity, which would
     # take the letters below contrast); `:more` is the "+N" circle (sunken,
-    # ink letters).
+    # ink letters); `:empty` is nobody to name, a deleted user or the system
+    # (a solid hairline on the surface, no letters and no hue: the dashed edge
+    # means only away).
     # `here`: a 1.5px people ring inside the circle, for someone who has the
     # record open now (an inset ring, so it stays inside the 2px ring below).
     # `ring`: a 2px ring outside the circle in the colour of what the circles
     # stand on, for circles that overlap: `:paper`, `:surface`, or `:ground`,
-    # which reads `--admin-avatar-ground` from the stylesheet where the
+    # which reads `--admin-avatar-ground` (the surface where nothing sets it)
+    # from the stylesheet where the
     # ground is a rule's and not a token's. The same classes are
     # `app/javascript/ui/avatar.js`'s, which draws the circle in the browser.
     class AvatarComponent < Admin::AdminComponent
@@ -39,10 +42,10 @@ module Admin
         interface: %i[initials size tone ring here],
         limits: [
           "It is told the initials and knows nothing of users.",
-          "It draws three sizes, four tones and three rings, and anything else is refused.",
+          "It draws three sizes, five tones and three rings, and anything else is refused.",
           "Its letters are 11px at every size."
         ],
-        states: %i[other own away more here],
+        states: %i[other own away more empty here],
         keys: %w[more many],
         slots: [],
         controller: nil
@@ -53,9 +56,10 @@ module Admin
         other: "bg-people-tint text-people",
         own: "bg-people text-surface",
         away: "border-[1.5px] border-dashed border-field-line bg-surface text-meta",
-        more: "bg-sunken text-ink"
+        more: "bg-sunken text-ink",
+        empty: "border border-field-line bg-surface"
       }.freeze
-      RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface", ground: "ring-2 ring-(--admin-avatar-ground)" }.freeze
+      RINGS = { paper: "ring-2 ring-paper", surface: "ring-2 ring-surface", ground: "ring-2 ring-[var(--admin-avatar-ground,var(--cs-surface))]" }.freeze
       HERE = "inset-ring-[1.5px] inset-ring-people"
       LETTERS = "flex shrink-0 items-center justify-center rounded-full text-count font-semibold uppercase leading-none"
 

@@ -68,7 +68,7 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     assert_text "System created"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: 999_999, title: "Deleted"))
-    assert_selector "#{AVATAR}.border-dashed.border-field-line.bg-surface.text-meta", exact_text: ""
+    assert_selector "#{AVATAR}.border.border-field-line.bg-surface", exact_text: ""
     assert_text "a deleted user created"
 
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_with(user: nil, user_id: nil, title: "Nobody", none: true))

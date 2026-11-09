@@ -9,10 +9,13 @@ const TONES = {
   other: "bg-people-tint text-people",
   own: "bg-people text-surface",
   away: "border-[1.5px] border-dashed border-field-line bg-surface text-meta",
-  more: "bg-sunken text-ink"
+  more: "bg-sunken text-ink",
+  empty: "border border-field-line bg-surface"
 }
 
 export function avatar(initials, { size, tone = "other" }) {
+  if (!(size in SIZES)) throw new Error(`unknown avatar size: ${size}`)
+  if (!(tone in TONES)) throw new Error(`unknown avatar tone: ${tone}`)
   const node = document.createElement("span")
   node.className = `${LETTERS} ${SIZES[size]} ${TONES[tone]}`
   node.setAttribute("aria-hidden", "true")

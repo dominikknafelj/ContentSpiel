@@ -58,7 +58,7 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "p", text: "System published"
 
     row_for("post.published", user_id: 999_999)
-    assert_selector "#{AVATAR}.border-dashed.border-field-line.bg-surface.text-meta", exact_text: ""
+    assert_selector "#{AVATAR}.border.border-field-line.bg-surface", exact_text: ""
     assert_selector "p", text: "a deleted user published"
 
     row_for("session.failed", user_id: nil)

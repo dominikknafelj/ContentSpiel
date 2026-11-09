@@ -12,6 +12,8 @@ module Admin
 
       def more = sizes { |size| Admin::Ui::AvatarComponent.new(initials: Admin::Ui::AvatarComponent.more_label(3), size: size, tone: :more) }
 
+      def empty = sizes { |size| Admin::Ui::AvatarComponent.new(initials: "", size: size, tone: :empty) }
+
       def here = sizes { |size| Admin::Ui::AvatarComponent.new(initials: "AL", size: size, here: true, ring: :surface) }
 
       private

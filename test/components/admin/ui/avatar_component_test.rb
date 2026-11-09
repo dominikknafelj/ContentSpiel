@@ -29,6 +29,10 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
 
     render_inline(Admin::Ui::AvatarComponent.new(initials: "+3", size: :md, tone: :more))
     assert_selector "span.bg-sunken.text-ink[aria-hidden=true]", text: "+3"
+
+    render_inline(Admin::Ui::AvatarComponent.new(initials: "", size: :md, tone: :empty))
+    assert_selector "span.border.border-field-line.bg-surface"
+    assert_no_selector ".border-dashed, .bg-people-tint, .text-people"
   end
 
   test "here adds the inner people ring, and a ground ring is drawn outside it" do
@@ -36,7 +40,7 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_selector "span.inset-ring-\\[1\\.5px\\].inset-ring-people"
     assert_no_selector ".ring-2"
 
-    { paper: "ring-paper", surface: "ring-surface", ground: "ring-\\(--admin-avatar-ground\\)" }.each do |ring, colour|
+    { paper: "ring-paper", surface: "ring-surface", ground: "ring-\\[var\\(--admin-avatar-ground\\,var\\(--cs-surface\\)\\)\\]" }.each do |ring, colour|
       render_inline(Admin::Ui::AvatarComponent.new(initials: "DW", size: :sm, here: true, ring: ring))
       assert_selector "span.ring-2.#{colour}.inset-ring-\\[1\\.5px\\].inset-ring-people"
     end
@@ -53,6 +57,8 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
   test "the scripts' circle is the component's: ui/avatar.js holds its size and tone classes" do
     script = Rails.root.join("app/javascript/ui/avatar.js").read
     classes = [ Admin::Ui::AvatarComponent::LETTERS, *Admin::Ui::AvatarComponent::SIZES.values, *Admin::Ui::AvatarComponent::TONES.values ]
+    assert_includes script, "unknown avatar size", "an unknown size is refused as the component refuses it"
+    assert_includes script, "unknown avatar tone"
     classes.each { |group| assert_includes script, %("#{group}"), "ui/avatar.js lacks #{group.inspect}" }
   end
 

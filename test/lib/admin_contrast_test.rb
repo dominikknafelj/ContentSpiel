@@ -637,7 +637,7 @@ class AdminContrastTest < ActiveSupport::TestCase
         ground = people_token(ground) if ground == "--cs-people-tint"
         ratio = contrast(colour.("--cs-ic-people"), colour.(ground))
         assert_operator ratio, :>=, 7.0, "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1"
-        assert_operator ratio, :>=, floors.fetch(scheme == :light ? 0 : 1) - 0.05, "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1, under its measured figure"
+        assert_operator ratio, :>=, floors.fetch(scheme == :light ? 0 : 1), "--cs-people on #{ground} (#{scheme}) is #{ratio.round(2)}:1, under its measured figure"
       end
     end
   end
