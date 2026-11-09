@@ -96,4 +96,23 @@ class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
     assert drawn_as?(page.find("#settings-mail-login button[form=settings-mail-login-form]", text: "Save login"), :secondary)
     assert_no_selector "button.bg-accent", visible: :all
   end
+
+  # The card stands inside `#settings-form`: Enter in one of its fields
+  # presses the form's first submit button. Every submit drawn in the card
+  # belongs to another form (the login's, the test mail's) by `form=`, so
+  # Enter saves through the bar and never sends a mail or a login.
+  test "every submit button in the card names its own form, so Enter in a Mail field never presses one" do
+    submits_without_form = lambda do
+      submits = page.all("button:not([type]), button[type=submit], input[type=submit], input[type=image]", visible: :all)
+      assert_not_empty submits
+      submits.reject { |button| button[:form].present? }.map { |button| button.native.to_html }
+    end
+
+    render_card
+    assert_empty submits_without_form.call, "with no login stored"
+
+    SiteSetting.instance.update!(mail_username: "u", mail_password: "p")
+    render_card
+    assert_empty submits_without_form.call, "with a login stored"
+  end
 end

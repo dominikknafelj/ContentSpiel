@@ -11,11 +11,14 @@
                mail_sender_name: @site_setting.title(locale: @site_setting.default_locale) }
   # What a field shows: what was typed (after a refused save or a test), else what is stored, else the step's default.
   shown = ->(name) { typed.key?(name) ? typed[name].to_s : (@site_setting.public_send(name).presence || defaults[name]).to_s }
+  # The summary's links: each field's input, the login's halves too; a field the host sets has none.
+  error_ids = (Admin::SettingsScreen::MailFieldsComponent::SETTING.to_a + [ %i[mail_username username], %i[mail_password password] ])
+    .reject { |_name, field| mail.from_host?(field) }.to_h { |name, _field| [ name.to_s, "setup-#{name}" ] }
 %>
 
 <%= form_with url: setup_step_path("mail"), method: :patch, scope: :site_setting, class: "mt-6 max-w-[520px] space-y-4",
       data: { controller: "mail-port" } do %>
-  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
+  <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @site_setting.errors, field_ids: error_ids) %>
   <%# Enter in a field submits the form's FIRST submit button. The row below
       puts Send test mail first, so this hidden Continue stands before every
       field: Enter means Continue and never sends a mail. %>

@@ -101,6 +101,16 @@ class SetupMailStepTest < ActionDispatch::IntegrationTest
     assert_select "#setup-mail_sender_name-errors", text: /Sender name can't contain a line break\./
   end
 
+  test "the error summary links each refused field to its input" do
+    save_mail(FIELDS.merge(mail_sender_name: "A\nB", mail_port: "70000"))
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert] a[href='#setup-mail_sender_name']"
+    assert_select "[role=alert] a[href='#setup-mail_port']"
+    assert_select "input#setup-mail_sender_name"
+    assert_select "input#setup-mail_port"
+  end
+
   test "Continue saves through Settings::Save, goes on to Languages and stores the login encrypted and unseen" do
     save_mail
     assert_redirected_to setup_step_path("languages")

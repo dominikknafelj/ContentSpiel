@@ -36,19 +36,24 @@ class Admin::SettingsScreen::MailFieldsComponentTest < ViewComponent::TestCase
     assert_selector "input#settings-mail_sender_address[placeholder='no-reply@yourdomain']"
   end
 
-  test "a field the host sets is the sunken box with Set by the host, and a login half shows the mask and never its value" do
-    render_fields(env: { "MAIL_SMTP_SERVER" => "smtp.host.test", "MAIL_SMTP_SECURITY" => "tls", "MAIL_SMTP_USERNAME" => "host-user-secret" }) do
-      host = MailSettings.current(SiteSetting.instance, env: { "MAIL_SMTP_USERNAME" => "host-user-secret" })
-      ApplicationController.render(Admin::SettingsScreen::HostValueComponent.new(field: :username, label: "Username", mail_settings: host), layout: false)
-    end
+  # The login is the slot's: the fields draw no input of it, and the mask of
+  # a login half is `HostValueComponent`'s (host_value_component_test.rb).
+  HOST = { "MAIL_SMTP_SERVER" => "smtp.host.test", "MAIL_SMTP_PORT" => "2525", "MAIL_SMTP_SECURITY" => "tls",
+           "MAIL_SMTP_USERNAME" => "host-user-secret", "MAIL_SMTP_PASSWORD" => "host-pass-secret",
+           "MAIL_SENDER_NAME" => "Host Site", "MAIL_SENDER_ADDRESS" => "host@site.test" }.freeze
 
-    assert_no_selector "input[name='site_setting[mail_server]']"
+  test "a field the host sets is the sunken box with Set by the host, and a login half shows the mask and never its value" do
+    render_fields(env: HOST) { "" }
+
     assert_selector "[data-field-name=mail_server] [data-host-field=server] .bg-sunken", text: "smtp.host.test"
     assert_selector "[data-field-name=mail_server] [data-host-field=server]", text: "Set by the host"
     assert_selector "[data-field-name=mail_security] [data-host-field=security] .bg-sunken", text: "TLS"
-    assert_no_selector "input[name='site_setting[mail_security]']"
-    assert_selector "[data-host-field=username] .bg-sunken[aria-hidden=true]", text: Admin::SettingsScreen::MailLoginComponent::MASK
+    %w[mail_server mail_port mail_security mail_sender_name mail_sender_address mail_username mail_password].each do |name|
+      assert_no_selector "input[name='site_setting[#{name}]']", visible: :all
+    end
+    assert_no_selector "input", visible: :all
     assert_not_includes page.native.to_html, "host-user-secret"
+    assert_not_includes page.native.to_html, "host-pass-secret"
   end
 
   test "the security radios carry their port and mail-port's action, inside a fieldset with its legend" do
