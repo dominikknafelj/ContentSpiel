@@ -470,7 +470,9 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     assert same?("__a", form)
     assert_selector settings_region, visible: :hidden
     assert_selector "#section-#{@section.id}-lanes [data-column='2'] [data-block-id='#{added.id}']"
-    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "false", each["aria-expanded"] }
+    # Retrying selectors: a save's answer replaces the words, so a node read once may be gone.
+    assert_selector "#section-#{@section.id}-words button[aria-expanded='false']"
+    assert_no_selector "#section-#{@section.id}-words button:not([aria-expanded='false'])"
 
     find(section_word("layout")).click
     assert_selector settings_region, visible: :visible
@@ -485,7 +487,9 @@ class Admin::EditingMergeSystemTest < ApplicationSystemTestCase
     merge_list
 
     assert_selector settings_region, visible: :visible
-    page.all("#section-#{@section.id}-words button").each { |each| assert_equal "true", each["aria-expanded"] }
+    # Retrying selectors: a save's answer replaces the words, so a node read once may be gone.
+    assert_selector "#section-#{@section.id}-words button[aria-expanded='true']"
+    assert_no_selector "#section-#{@section.id}-words button:not([aria-expanded='true'])"
   end
 
   # WHAT A SCRIPT MOVED AWAY. The rail moves a section's settings region out
