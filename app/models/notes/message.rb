@@ -54,14 +54,15 @@ module Notes
     # Of the messages in the relation, each person who wrote on each
     # CONTAINER, as the container, the author and when they wrote last
     # (`last_wrote_at`), the newest first: one grouped statement however many
-    # records are asked about. A message with no author (the user is gone)
-    # names nobody and is left out. It joins and groups: narrow the threads
+    # records are asked about. The messages of users who are gone share one
+    # row with no author (`author_id` nil), so a deleted writer still counts
+    # as someone who wrote. It joins and groups: narrow the threads
     # before it (`merge`). Answers "who wrote on this record, and who last?"
     # for the Notes screen's rail of open threads.
     scope :authors_per_container, -> {
       threads = Thread.arel_table
       last_wrote = arel_table[:created_at].maximum
-      joins(:thread).where.not(author_id: nil)
+      joins(:thread)
         .group(threads[:container_type], threads[:container_id], arel_table[:author_id])
         .select(threads[:container_type], threads[:container_id], arel_table[:author_id], last_wrote.as("last_wrote_at"))
         .order(last_wrote.desc, arel_table[:author_id].desc)

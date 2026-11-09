@@ -22,10 +22,7 @@ module Admin
     #
     # Nothing here queries: the row carries its users, record and block.
     class InboxRowComponent < Admin::AdminComponent
-      # The module whose chip stands for each kind of record: the chip is the
-      # sidebar's own (`StudioModules`), read from the registry so the two
-      # cannot differ.
-      MODULES = { "page" => :pages, "post" => :posts, "media" => :media }.freeze
+      include Admin::NotesScreen::RecordRow
 
       def initialize(row:)
         @row = row
@@ -56,8 +53,7 @@ module Admin
       def where_chip
         return render(Admin::Ui::BlockIconComponent.new(definition: row.block.definition, place: :row, block: row.block)) if row.heading && row.block
 
-        entry = StudioModules.find(MODULES.fetch(row.kind))
-        render Admin::Ui::IconChipComponent.new(icon: entry.icon, family: entry.family, size: :xsmall)
+        record_chip(row.kind)
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich
@@ -70,10 +66,6 @@ module Admin
 
         t(".where.block", place: place, block: [ helpers.note_subject_label(row.heading, row.kind), helpers.note_subject_detail(row.heading) ].compact.join(" · "))
       end
-
-      # `admin_url_options` is a controller helper, absent when a component
-      # is rendered on its own (a component test).
-      def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
     end
   end
 end

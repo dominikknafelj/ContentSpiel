@@ -39,4 +39,38 @@ class Admin::NotesScreen::OpenThreadRowComponentTest < ViewComponent::TestCase
     assert_selector "a .truncate.text-sm.text-ink", exact_text: "(untitled)"
     assert_selector "a .text-meta", text: "1 note · "
   end
+
+  def writers_of(*people)
+    thread = as(users(:two)) { Notes::Start.call(@page, body: "First").record }
+    people.each_with_index do |person, index|
+      Notes::Message.create!(thread: thread, author: person, body: "Reply #{index}", created_at: (index + 1).minutes.from_now)
+    end
+    as(users(:two)) { render_inline Admin::NotesScreen::OpenThreadRowComponent.new(row: rows.sole) }
+    page.find("a .sr-only", visible: :all).text(:all)
+  end
+
+  test "the link's name keeps its visible words first and then names the writers: one, two, more than two, and one who is gone" do
+    assert_equal ", by Dana Weiss", writers_of
+    assert_selector "a > span > .truncate.text-small", text: /\A1 note · .*, by Dana Weiss\z/
+    assert_selector "a [aria-hidden=true].rounded-full", count: 1
+  end
+
+  test "two writers read joined by and" do
+    assert_equal ", by Jonas Lind and Dana Weiss", writers_of(users(:one))
+  end
+
+  test "more than two writers read as the newest two and how many more" do
+    assert_equal ", by Dana Weiss, reader and 1 more", writers_of(users(:one), users(:reader), users(:two))
+  end
+
+  test "a writer who is gone reads a deleted user" do
+    gone = User.create!(email_address: "gone-writer@example.com", password: "a-long-password-1")
+    thread = as(users(:two)) { Notes::Start.call(@page, body: "First").record }
+    Notes::Message.create!(thread: thread, author: gone, body: "Bye", created_at: 1.minute.from_now)
+    Notes::Message.where(author_id: gone.id).update_all(author_id: nil) # version: none (a test's own setup: what the foreign key does when the author is deleted)
+
+    as(users(:two)) { render_inline Admin::NotesScreen::OpenThreadRowComponent.new(row: rows.sole) }
+
+    assert_equal ", by a deleted user and Dana Weiss", page.find("a .sr-only", visible: :all).text(:all)
+  end
 end

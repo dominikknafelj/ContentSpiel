@@ -179,6 +179,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select ".admin-list-rail__grid > section.admin-list-rail__rail.admin-notes-threads:nth-child(3)[aria-labelledby=open-threads-heading]", count: 1
     assert_select ".admin-notes-threads h2#open-threads-heading", text: "Open threads"
     assert_select ".admin-notes-threads li a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-prefetch=false][data-turbo-frame=_top]", text: /Pricing\s+1 note · /
+    assert_select ".admin-notes-threads li a span.rounded-full[aria-hidden=true]", text: "Da", count: 1
     assert_no_match "max-w-[880px]", response.body
     assert_no_match "more on other pages", response.body
 

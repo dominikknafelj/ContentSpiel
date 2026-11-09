@@ -302,14 +302,13 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
   end
 
   # Where the screen's boxes are: the list's card, the rail of open threads
-  # and the rail's computed ground and margin, read in the browser.
+  # and the rail's computed margin, read in the browser.
   def rail_layout
     page.evaluate_script(<<~JS)
       (() => {
         const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } }
         const rail = document.querySelector(".admin-notes-threads")
-        return { container: box(document.querySelector(".admin-list-rail")), list: box(document.querySelector("[data-delivery]").closest("ul").parentElement),
-          rail: box(rail), margin_top: getComputedStyle(rail).marginTop, shadow: getComputedStyle(rail).boxShadow }
+        return { list: box(document.querySelector("[data-delivery]").closest("ul").parentElement), rail: box(rail), margin_top: getComputedStyle(rail).marginTop }
       })()
     JS
   end

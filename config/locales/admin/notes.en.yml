@@ -503,6 +503,14 @@ en:
         # One record of that rail: its notes and when the newest was written.
         open_thread_row:
           untitled: "(untitled)"
+          # What a screen reader hears after the visible words: who wrote.
+          by: "by %{names}"
+          two: "%{first} and %{second}"
+          separator: ", "
+          and_more:
+            one: "%{names} and %{count} more"
+            other: "%{names} and %{count} more"
+          deleted: "a deleted user"
           line_html:
             one: "%{count} note · %{time}"
             other: "%{count} notes · %{time}"

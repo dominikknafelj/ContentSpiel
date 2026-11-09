@@ -127,4 +127,30 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal 0, Dashboard::OpenThreads.new(actor: users(:two), channel: :admin, limit: 8).more_records
     assert_equal 0, open_threads(User.create!(email_address: "stranger2@example.com", password: "a-long-password-1")).more_records
   end
+
+  test "a row's people are the newest two who wrote on its open threads the viewer may read, and the more line counts only readable records" do
+    asset = create_media_asset
+    note(asset)
+    as(users(:one)) { Notes::Reply.call(Notes::Thread.find_by!(container_type: "Media::Asset", container_id: asset.id), body: "Only the owner can read this image") }
+    on_page = note(@page)
+    travel_to(1.minute.from_now) { as(users(:one)) { Notes::Reply.call(on_page, body: "Second") } }
+    done = travel_to(2.minutes.from_now) { as(users(:one)) { Notes::Start.call(@page, body: "Resolved soon") }.record }
+    gone = User.create!(email_address: "writer-of-resolved@example.com", password: "a-long-password-1")
+    Notes::Message.create!(thread: done, author: gone, body: "Only on a resolved thread", created_at: 3.minutes.from_now)
+    as(users(:two)) { Notes::Resolve.call(done) }
+    trashed = create_post(title: "Trashed later")
+    note(trashed)
+    trashed.update!(trashed_at: Time.current)
+
+    reader = open_threads(users(:reader), with_authors: true, limit: 1)
+    row = reader.rows.sole
+
+    assert_equal @page, row.record
+    assert_equal [ users(:one), users(:two) ], row.authors
+    assert_equal 2, row.author_count, "neither the resolved thread's writer nor the image's counts"
+    assert_equal 0, reader.more_records, "the image the viewer may not read and the trashed post are not 'more'"
+
+    owner = open_threads(users(:two), with_authors: true, limit: 1)
+    assert_equal 1, owner.more_records, "for someone who may read the image it is one more record"
+  end
 end

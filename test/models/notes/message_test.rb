@@ -47,7 +47,7 @@ class Notes::MessageTest < ActiveSupport::TestCase
     assert_equal 0, Notes::Delivery.count
   end
 
-  test "authors_per_container answers each container's authors with when each wrote last, narrowed by the threads merged in" do
+  test "authors_per_container answers each container's authors with when each wrote last (the deleted users as one row with no author), narrowed by the threads merged in" do
     other = Notes::Thread.create!(subject: @thread.subject, last_message_at: Time.current)
     post_thread = Notes::Thread.create!(subject: create_post(title: "Elsewhere"), last_message_at: Time.current)
     early = 3.hours.ago.change(usec: 0)
@@ -61,6 +61,7 @@ class Notes::MessageTest < ActiveSupport::TestCase
       [ row[:container_type], row[:container_id], row.author_id, row[:last_wrote_at].change(usec: 0) ]
     end
 
-    assert_equal [ [ "Page", @thread.container_id, users(:two).id, early + 2.hours ], [ "Page", @thread.container_id, users(:one).id, early + 1.hour ] ], rows
+    assert_equal [ [ "Page", @thread.container_id, nil, early + 3.hours ], [ "Page", @thread.container_id, users(:two).id, early + 2.hours ],
+                   [ "Page", @thread.container_id, users(:one).id, early + 1.hour ] ], rows
   end
 end

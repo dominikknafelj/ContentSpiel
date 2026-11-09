@@ -1262,7 +1262,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # "And N more"), Waiting for you's open threads and the sidebar's unread
   # count all narrow through `Notes.readable_threads`.
   # Trashed AFTER the note was written, as in life.
-  test "the inbox, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
+  test "the inbox, its rail of open threads, Waiting for you's threads and the sidebar's count show notes on kept records and never on trashed ones" do
     kept = [ @kept_page, @kept_post, @kept_asset ].map { |subject| create_note_for_reader(subject) }
     gone = [ create_page(title: "Later gone"), create_post(title: "Later gone post"), create_media_asset ].map { |subject| [ subject, create_note_for_reader(subject) ] }
     gone.each { |subject, _thread| subject.update!(trashed_at: Time.current) }

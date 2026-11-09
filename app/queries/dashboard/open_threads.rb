@@ -25,7 +25,7 @@ module Dashboard
   # `with_authors: true` also reads who wrote on each record's open threads,
   # in one more statement for all the rows: `authors` are the newest two
   # people, the newest first, and `author_count` how many people wrote (a
-  # deleted user is nobody, in neither). Without it they are empty and zero,
+  # deleted user is a nil among the authors and one in the count). Without it they are empty and zero,
   # and nothing is read: Waiting for you has no use for them.
   #
   # `more_records` is how many records with open threads the viewer may read
@@ -67,7 +67,7 @@ module Dashboard
           author_id = author_ids[[ type, id ]]
           Row.new(record: record, kind: NotesForYou::KINDS.fetch(type), title: record.title.presence, count: count, at: at, route: route,
             last_author: authors[author_id], last_author_id: author_id,
-            authors: wrote.fetch([ type, id ], []).first(SHOWN_AUTHORS).filter_map { |writer_id, _| authors[writer_id] },
+            authors: wrote.fetch([ type, id ], []).first(SHOWN_AUTHORS).map { |writer_id, _| authors[writer_id] },
             author_count: wrote.fetch([ type, id ], []).size)
         end
       end

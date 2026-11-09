@@ -936,6 +936,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # stands after its card rule and so wins on order.
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
     assert_match(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*0/, docked.first, "docked, the open threads' rail sits at the grid's top")
+    row = Rails.root.join("app/components/admin/notes_screen/open_thread_row_component.html.erb").read
+    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]", "the rail's row takes the paper hover and its avatars' ring follows it"
+    assert_includes row, "-mx-2 flex min-w-0 items-center gap-2.5 rounded-tile px-2 py-1.5", "the fill is on the row's own padding"
+    assert_includes row, "transition-colors duration-120 ease-(--cs-ease) hover:bg-paper"
+    assert_includes row, "motion-reduce:transition-none"
+    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-surface\);/, css)
+    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-rail\);/, docked.first, "docked, the rings stand on the rail's ground at rest")
     outside = css.sub(docked.first, "")
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
     card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)
