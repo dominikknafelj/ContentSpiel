@@ -136,11 +136,11 @@ class Admin::PresenceScreen::RowMarkerComponentTest < ViewComponent::TestCase
     assert_equal [], capture_sql { assert_equal({}, loader.call(pages, viewer: nil)) }
   end
 
-  test "it is registered last among the tree's markers, and in the posts list's title line as part of the link" do
+  test "it is registered first among the tree's markers, before the notes bubble, and in the posts list's title line as part of the link" do
     tree = Admin::Slots.entries("tree.row.markers")
-    assert_equal [ Admin::NotesScreen::RowPillComponent, Admin::PresenceScreen::RowMarkerComponent ], tree.map(&:component)
-    assert tree.last.loader
-    assert_equal({ shown: 2 }, tree.last.options)
+    assert_equal [ Admin::PresenceScreen::RowMarkerComponent, Admin::NotesScreen::RowPillComponent ], tree.map(&:component)
+    assert tree.first.loader
+    assert_equal({ shown: 2 }, tree.first.options)
     title = Admin::Slots.entries("posts.row.title")
     assert_equal [ Admin::PresenceScreen::RowMarkerComponent ], title.map(&:component)
     assert_equal({ joined: true, shown: 3 }, title.first.options)

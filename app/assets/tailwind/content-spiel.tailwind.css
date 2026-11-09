@@ -240,7 +240,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    what it holds, so from 1024px the divider is fixed to the window, on the
    column's right edge (the sidebar's 15rem from 1280px, then the column's
    track; the same tokens the grid is laid out by). */
-.admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
+.admin-shell__tree { container: admin-tree-column / inline-size; position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 @media (min-width: 1024px) {
   .admin-shell__tree { position: sticky; top: var(--admin-top-offset); align-self: start; height: calc(100dvh - var(--admin-top-offset)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 }
@@ -357,8 +357,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    box of the same width, so the marks line up across siblings; a flat row
    (the graph's posts and pills) has none. `position: relative`
    holds the drag handle, which stands in the gutter left of the row. */
-.admin-tree-row { container: admin-tree-row / inline-size; --admin-avatar-ground: var(--cs-chrome); position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
-.admin-tree-row:hover { background: var(--cs-sunken); }
+.admin-tree-row { --admin-avatar-ground: var(--cs-chrome); position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
+.admin-tree-row:hover { --admin-avatar-ground: var(--cs-sunken); background: var(--cs-sunken); }
 /* A heading drawn on the row's geometry (a group of the whole site's
    results, `mind_graph/search_results.js`) is pressed by nobody: no hover. */
 h3.admin-tree-row:hover { background: none; }
@@ -1662,13 +1662,20 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    overlap by 6px, the wide "+N" at rest and the narrow one, which counts
    everyone past the first circle, hidden. The ring around a circle is the
    colour of the row it stands on (`--admin-avatar-ground`, which the tree
-   row sets and the circle falls back to the surface from). A narrow row
-   keeps the first circle and swaps the wide "+N" for the narrow one; the
-   width asked is the row's own container, never the window's: the tree
-   column is as narrow at any window width. */
+   row sets, on hover and selected too, and the circle falls back to the
+   surface from). Where the width is short a row keeps the first circle and
+   swaps the wide "+N" for the narrow one. In the tree the width asked is the
+   COLUMN's (`.admin-shell__tree`, a size container whose width the grid or
+   the drawer gives it, never its content), so every row of one tree shows
+   the same number of people whatever its depth: 260px of the column, less
+   its 2rem of padding and a classic scrollbar's 15px, which a container
+   query does not count (the 220px minimum is below that width and the
+   default 272px above, with or without the scrollbar). The posts list asks its
+   own container, never the window: the list is as narrow at any window
+   width. */
 .admin-presence-marker > [data-presence-avatar] ~ :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { margin-inline-start: -6px; }
 .admin-presence-marker > [data-presence-more-narrow] { display: none; }
-@container admin-tree-row (max-width: 260px) {
+@container admin-tree-column (max-width: 212.98px) {
   .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
   .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
 }

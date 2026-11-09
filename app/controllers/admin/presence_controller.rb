@@ -1,5 +1,5 @@
 module Admin
-  # The two reads of presence both through the read
+  # The two reads of presence, both through the read
   # scope: who else has this record open, and which of a list's records have
   # someone here. A class, never `Admin::Presence`, which would shadow
   # `Presence::`. It only reads: the writes are the channel's.

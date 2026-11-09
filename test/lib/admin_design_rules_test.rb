@@ -771,22 +771,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # a narrower content column gives the rail room the window does not show.
   # The blocks column opts in by its class, found anywhere in the grid (a
   # `display: contents` form between), and nothing else is placed in it.
-  # A row's people narrow by the row's own width: the tree column is as
-  # narrow at any window width, and the posts list sits in a list container.
-  test "a row's people narrow by the row's own width, never the window" do
-    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-tree-row\s*\{\s*container:\s*admin-tree-row\s*\/\s*inline-size;/, css)
-    [ "admin-tree-row (max-width: 260px)", "admin-list (max-width: 639px)" ].each do |query|
-      blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
-      assert_equal 1, blocks.size, "one @container #{query} block"
-      assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
-      assert_includes blocks.first, "[data-presence-more] { display: none; }"
-    end
-    windowed = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/).select { |body| body.include?("admin-presence-marker") }
-    assert_empty windowed, "a row's people are asked of the row's container, not an @media block"
-    assert_match(/\.admin-tree-row--selected\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);/, css)
-  end
-
   test "the rail is laid out by the editor area's container, never the window" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-editor-area\s*\{\s*container:\s*admin-editor\s*\/\s*inline-size;\s*\}/, css)
@@ -813,6 +797,33 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
     assert medias.any?, "the stylesheet's @media blocks were found"
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
+  end
+
+  # A row's people narrow by the width of their column (the tree) or list (the
+  # posts), whatever the window's width and whatever the row's depth.
+  test "a row's people narrow by the row's own width, never the window" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-shell__tree\s*\{\s*container:\s*admin-tree-column\s*\/\s*inline-size;/, css)
+    assert_no_match(/\.admin-tree-row\s*\{[^}]*container:/, css, "a row is no container: its depth would decide how many people it shows")
+    [ "admin-tree-column (max-width: 212.98px)", "admin-list (max-width: 639px)" ].each do |query|
+      blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
+      assert_equal 1, blocks.size, "one @container #{query} block"
+      assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
+      assert_includes blocks.first, "[data-presence-more] { display: none; }"
+    end
+    windowed = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/).select { |body| body.include?("admin-presence-marker") }
+    assert_empty windowed, "a row's people are asked of a container, not an @media block"
+  end
+
+  # The ring around a circle is the colour of the row under it, on hover too.
+  test "a row's circles take their ring from the row's ground, at rest, on hover and selected" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row\s*\{[^}]*--admin-avatar-ground:\s*var\(--cs-chrome\);/, css)
+    assert_match(/\.admin-tree-row:hover\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);\s*background:\s*var\(--cs-sunken\);/, css)
+    assert_match(/\.admin-tree-row--selected\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);/, css)
+    row = Rails.root.join("app/components/admin/posts_screen/table_component.html.erb").read
+    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]"
+    assert_includes row, "data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]"
   end
 
   # The docked rail's ground is as tall as the tabs and the

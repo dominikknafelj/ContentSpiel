@@ -3,7 +3,7 @@ import { listen } from "live/connection"
 import { settle } from "live/state"
 import { messages } from "i18n/messages"
 
-// The markers of ONE list the
+// The markers of ONE list: the
 // page tree and the posts list, each of whose rows holds a marker that says
 // whether someone else is working on that record, as circles of their
 // initials (`Admin::PresenceScreen::RowMarkerComponent`, always rendered,

@@ -50,12 +50,6 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
   def leave(name) = using_session(name) { visit "/cs-studio/tags" }
 
-  # The tree column at a width where a nested row is wider than the narrow
-  # rule's 260px (the default column's nested rows are narrower).
-  def widen_tree(width = "24rem")
-    page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', #{width.to_json})")
-  end
-
   def tree_marker(record = @page) = "#tree [data-presence-marker='page-#{record.id}']"
 
   def post_marker(record = @post) = "tr#post_#{record.id} th[scope=row] a [data-presence-marker='post-#{record.id}']"
@@ -147,7 +141,6 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
 
   test "the tree's row shows the avatars of whoever else is on that page, and loses them when they leave; the row is never redrawn" do
     open_tree
-    widen_tree
     assert_selector "#{tree_marker}[hidden]", visible: :all
     assert_selector "#tree [data-presence-marker]", count: Page.kept.count, visible: :all
     page.execute_script("window.__row = document.querySelector('#tree li[data-page-id=\"#{@page.id}\"]'); window.__marker = document.querySelector(#{tree_marker.to_json})")
@@ -198,18 +191,16 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     assert_equal true, page.evaluate_script("window.__row === document.querySelector('#tree li[data-page-id=\"#{@page.id}\"]') && window.__marker === document.querySelector(#{tree_marker.to_json})")
   end
 
-  # The tree's rows ask their own width: at 260px of the row and under, one
-  # circle and a "+N" that counts the rest, whatever the window's width.
-  test "a narrow tree row keeps one circle and the +N for the rest" do
+  # The tree asks its column's width, not a row's: at the default width every
+  # row, nested or not, shows two circles; at the column's 220px minimum every
+  # row shows one and a "+N" that counts the rest, whatever the window's width.
+  test "a narrow tree column gives every row one circle and the +N for the rest" do
     open_tree
-    widen_tree
     set_timing("interval", 600)
     join(:dana, @dana)
     join(:reader, @reader)
     assert_selector "#{shown(tree_marker)} [data-presence-avatar]:not([hidden]):nth-of-type(2)", wait: LIVE
-    wide = page.evaluate_script("document.querySelector(#{tree_marker.to_json}).closest('.admin-tree-row').getBoundingClientRect().width")
-    assert_operator wide, :>, 272, "the wide column's row is wider than the narrow rule"
-    assert_equal [ "DW", "re" ], look(tree_marker)["circles"]
+    assert_equal [ "DW", "re" ], look(tree_marker)["circles"], "a nested row at the default width shows two"
 
     page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', '220px')")
     assert_equal({ "circles" => [ "DW" ], "more" => "+1" }, look(tree_marker).slice("circles", "more"))
@@ -314,8 +305,13 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
     open_tree
     set_timing("interval", 600)
     assert_selector shown(tree_marker), wait: LIVE
-    stops = page.evaluate_script("[ ...document.querySelectorAll('#tree *') ].filter((each) => each.tabIndex >= 0 && each.closest('[data-presence-marker]')).length")
-    assert_equal 0, stops
+    row_link = "#tree li[data-page-id='#{@page.id}'] > div a"
+    link = find(row_link, match: :first)
+    page.execute_script("window.__link = document.querySelector(#{row_link.to_json})")
+    link.send_keys(:tab)
+    assert_equal false, page.evaluate_script("!!document.activeElement.closest('[data-presence-marker]')"), "the marker took the Tab"
+    assert_equal false, page.evaluate_script("document.activeElement === window.__link"), "the Tab did not leave the row's link"
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('#tree *') ].filter((each) => each.tabIndex >= 0 && each.closest('[data-presence-marker]')).length")
   end
 
   # For a screen reader, the marker's words join the link's
@@ -348,7 +344,6 @@ class Admin::PresenceListsSystemTest < ApplicationSystemTestCase
   test "hovering a marker shows its words in the shared tooltip, in the tree and in the posts list, whole and on top, and a name is text" do
     @reader.update!(name: %(<img src=x onerror="window.__owned = true">))
     open_tree
-    widen_tree
     set_timing("interval", 600)
     join(:dana, @dana)
     join(:reader, @reader)

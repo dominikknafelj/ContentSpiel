@@ -5,7 +5,7 @@ module Admin
     # knows no presence), where someone ELSE is working on it. Someone who is
     # only away does not count, so a row draws people who are here and no one
     # else. Registered in `config/initializers/admin_slots.rb`:
-    # - LAST in `tree.row.markers`, after the notes bubble, in the row's own
+    # - FIRST in `tree.row.markers`, before the notes bubble, in the row's own
     #   6px gap, with room for two circles; beside the title's link, not in
     #   it. The folded tree (the "Pages" menu below 1024px) is the same
     #   component, so it shows there;

@@ -140,7 +140,7 @@ A slot is a name at a place on a screen where a feature draws something of its o
 | `editor.header.actions` | the editors' action row | notes' button |
 | `media.panel.header` | the image panel's file-name row, between the name and the "×" | presence's people, `size: :panel` |
 | `media.panel.sections` | the panel's sections | notes' section |
-| `tree.row.markers` | a page tree row, after the title | notes' pill, then presence's marker |
+| `tree.row.markers` | a page tree row, after the title | presence's marker, then notes' pill |
 | `posts.row.markers` | the posts list's Notes cell | notes' pill |
 | `posts.row.title` | the posts list's title line, inside the link | presence's marker, `joined: true` |
 | `editor.rail.tabs` | the editors' rail, a tab and its panel (`docs/reference/slots.md`, "A panel slot") | notes' Notes tab |
