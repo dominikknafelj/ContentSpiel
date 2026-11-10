@@ -19,7 +19,7 @@
     <%= hidden_field_tag "form[tab]", locale, id: nil %>
 
     <% if default_tab? %>
-      <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-form", heading: t(".form_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
+      <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-form", heading: t(".form_card"), **self.class.card_chip) do %>
         <div class="admin-field p-4" data-field-name="name">
           <%= label_tag name_id, t(".name"), class: "#{setup_label_class} mb-1" %>
           <%= text_field_tag "form[name]", draft.name, id: name_id, maxlength: Forms::Form::NAME_MAX, autocomplete: "off",
@@ -31,7 +31,7 @@
       <% end %>
     <% end %>
 
-    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-fields", heading: t(".fields_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-fields", heading: t(".fields_card"), **self.class.card_chip) do %>
       <div class="flex flex-col gap-2 p-4">
         <% if default_tab? %>
           <%= hidden_field_tag "form[field_order]", draft.rows.map(&:row).join(" "), id: "form-field-order",
@@ -73,7 +73,7 @@
       </div>
     <% end %>
 
-    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-after", heading: t(".after_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-after", heading: t(".after_card"), **self.class.card_chip) do %>
       <div class="flex flex-col gap-4 p-4">
         <% unless default_tab? %><p class="text-sm text-meta"><%= t(".falls_back", language: default_language) %></p><% end %>
         <div>

@@ -858,7 +858,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
 /* Pick up where you left off's tiles (`Admin::DashboardScreen::DraftTileComponent`),
    one column below the main column's 32rem (the dashboard's layout,
-   below). A tile presses as one: its title link's `::after` covers the
+   below). Each is an `.admin-tile` (below), which draws its look; this
+   rule is how it presses as one: its title link's `::after` covers the
    tile, rounded with it, and the focus ring is drawn on it. */
 .admin-draft-tiles { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
 .admin-draft-tile { position: relative; }
@@ -868,11 +869,13 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row and the draft tile around their stretched
-   links, the Notes for you row that is the link). */
+   (the Waiting for you row, the draft tile and a Translations row around
+   their stretched links, the Notes for you row that is the link). */
 .admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
 .admin-waiting-row:hover .admin-row-verb,
 .admin-waiting-row:focus-within .admin-row-verb,
+.admin-translation-row:hover .admin-row-verb,
+.admin-translation-row:focus-within .admin-row-verb,
 .admin-draft-tile:hover .admin-row-verb,
 .admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
@@ -1490,8 +1493,9 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 
 /* A tile in a grid of tiles: the media library's and the picker's
    (`Admin::MediaLibrary::TileComponent`), an upload's while it sends
-   (`media/upload_tiles.js`) and a language's summary in Translations
-   (`Admin::TranslationScreen::SummaryCardComponent`). Its states are
+   (`media/upload_tiles.js`), a language's summary in Translations
+   (`Admin::TranslationScreen::SummaryCardComponent`) and a draft on the
+   Dashboard (`Admin::DashboardScreen::DraftTileComponent`). Its states are
    elevations, with no border: the first at rest, the second under a pointer
    that can hover, and never moved, so nothing shifts under a click. Selected
    (`aria-current`) or pressed (`aria-pressed`) it is a selection: the 2px

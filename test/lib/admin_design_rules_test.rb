@@ -110,6 +110,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
       app/components/admin/dashboard_screen/translation_panel_component.html.erb app/components/admin/dashboard_screen/translation_panel_component.rb
+      app/components/admin/ui/language_progress_component.html.erb app/components/admin/ui/language_progress_component.rb
     ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
@@ -345,7 +346,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A tile in a grid (`.admin-tile`: the media tiles, the upload tiles,
-  # Translations' language tiles) is drawn by one rule set, its states
+  # Translations' language tiles, the Dashboard's draft tiles) is drawn by one rule set, its states
   # elevations and the selection's accent outline. A transform would move
   # it under the pointer, and a border is an edge drawn for depth.
   TILE = '.admin-tile:is([aria-current="true"], [aria-pressed="true"])'.freeze
@@ -370,6 +371,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       assert_no_match(/(?<![\w-])(?:transform|translate|scale|rotate):/, body, "#{selectors.join(", ")} moves the tile")
       assert_no_match(/(?<![\w-])border(?!-radius)[\w-]*:/, body, "#{selectors.join(", ")} draws a border")
     end
+  end
+
+  # A tile's look written as utilities (the tile radius with an elevation of
+  # its own) is a second tile beside `.admin-tile`, which a restyle of the
+  # tile would miss. Read a line at a time.
+  HAND_TILE = /(?=.*(?<![\w-])rounded-tile(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*shadow-[1-4](?![\w-])).*/
+
+  test "no hand-drawn tile: the tile radius never stands with an elevation utility on one line" do
+    assert_empty design_offences(HAND_TILE), "a tile is .admin-tile, never rounded-tile with a shadow utility"
+  end
+
+  test "the hand-drawn tile pattern matches the tile radius with an elevation, and not either alone" do
+    [ 'class="rounded-tile bg-surface shadow-1 p-4"', '"shadow-1 rounded-tile"', "rounded-tile hover:shadow-2" ].each { |sample| assert_match HAND_TILE, sample }
+    [ 'class="rounded-tile bg-paper"', 'class="rounded-card shadow-1"', "admin-tile p-4", "rounded-tile shadow-menu", "rounded-tile-x shadow-1" ].each { |sample| assert_no_match HAND_TILE, sample }
   end
 
   test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
@@ -1862,7 +1877,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/dashboard_screen/translation_panel_component.html.erb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/changes_overview_component.html.erb
     app/components/admin/editor_screen/delete_block_dialog_component.rb
@@ -1881,12 +1895,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/mail_alert_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
-    app/components/admin/translation_screen/summary_card_component.html.erb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
     app/components/admin/ui/insecure_notice_component.rb
+    app/components/admin/ui/language_progress_component.html.erb
     app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/mail_failed_notice_component.rb
     app/components/admin/ui/state_chip_component.rb
@@ -2100,9 +2114,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row and the draft tile around their stretched
-    # links, and the Notes for you row that is the link, each on hover and focus.
+    # The Waiting for you row, the draft tile and a Translations row around
+    # their stretched links, and the Notes for you row that is the link, each
+    # on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
+                   ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end

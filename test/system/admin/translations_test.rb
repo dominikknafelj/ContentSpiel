@@ -467,6 +467,24 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-original-for='title']", text: "Only in English"
   end
 
+  # A language tile is one link: its bar and its counts
+  # (`Admin::Ui::LanguageProgressComponent`) are part of it and take no
+  # focus, so from the heading the keyboard stops on the German tile, then
+  # the Spanish one.
+  test "a language tile is one stop for the keyboard: its progress takes no focus" do
+    create_post(title: "Only in English")
+
+    visit_screen "/cs-studio/translations"
+    # A press on the heading puts the sequential focus starting point there.
+    find("h1", text: "Translations").click
+    focused = -> { page.evaluate_script("document.activeElement.closest('[data-translation-summary] a')?.dataset.locale ?? document.activeElement.tagName") }
+    page.driver.browser.keyboard.type(:tab)
+    assert_equal "de", focused.call
+    page.driver.browser.keyboard.type(:tab)
+    assert_equal "es", focused.call
+    assert_selector "[data-translation-summary] a[data-locale=de] [role=progressbar]:not([tabindex])"
+  end
+
   test "a click on an empty part of a row opens the row's language, and a cell's link still opens its own" do
     post = create_post(title: "Only in English")
 

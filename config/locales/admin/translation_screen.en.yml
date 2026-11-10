@@ -38,17 +38,10 @@ en:
           missing: "Missing"
           outdated: "Outdated"
         # `Admin::TranslationScreen::SummaryCardComponent`, a language's tile.
-        # The link's name says what pressing it does; the figures describe it.
+        # The link's name says what pressing it does; the figures describe it
+        # (the bar and the counts are `Admin::Ui::LanguageProgressComponent`'s).
         summary_card:
           link_label:
             language: "%{language}: show items to translate"
             all: "%{language}: show all languages"
           done: "%{percent}% done"
-          progress_label: "%{language} translated"
-          all_translated: "All translated"
-          outdated:
-            one: "%{count} outdated"
-            other: "%{count} outdated"
-          missing:
-            one: "%{count} missing"
-            other: "%{count} missing"

@@ -131,27 +131,26 @@ module Admin
       # - else "System": a trusted nil actor (the retention job never trashes,
       #   but a console or system move does), or no event of this trashing --
       #   a branch member trashed with its root has none of its own.
+      #
+      # The name is read from `#who_actor`'s facts, so the avatar and the
+      # name beside it are one person.
       def who_label(item)
-        event = trashing_event(item)
-        label =
-          if item.trashed_by then label_for(item.trashed_by)
-          elsif event&.user_id then label_for(event.user)
-          elsif event&.via_label then Admin::Ui::UserNameComponent::DELETED_USER
-          else return Admin::Ui::UserNameComponent::NOBODY
-          end
-        return label unless event&.via_label
+        actor = who_actor(item)
+        return Admin::Ui::UserNameComponent::NOBODY if actor.user_id.nil? && actor.via_label.nil?
+
+        label = label_for(actor)
+        return label unless actor.via_label
 
         # "You, via <token>" with the comma, "<name> via <token>" without: the
         # audit log's own two forms (`Admin::AuditScreen::SentenceComponent`).
-        who_actor(item).you ? t(".you_via", token: event.via_label) : t(".via", name: label, token: event.via_label)
+        actor.you ? t(".you_via", token: actor.via_label) : t(".via", name: label, token: actor.via_label)
       end
 
       # Who trashed the item as the audit log's actor facts, for the row's
-      # avatar (`Admin::Ui::ActorAvatarComponent`): read from the same two
-      # sources, in the same order, as `#who_label`, so the circle and the
-      # name beside it are one person. A token's event with no user stands
-      # for a deleted user by the token's id, as `Audit::Sentence` does, and
-      # nobody recorded is System (no user, no id).
+      # avatar (`Admin::Ui::ActorAvatarComponent`) and for `#who_label`. A
+      # token's event with no user stands for a deleted user by the token's
+      # id, as `Audit::Sentence` does, and nobody recorded is System (no
+      # user, no id).
       def who_actor(item)
         event = trashing_event(item)
         user, user_id =
@@ -165,10 +164,10 @@ module Admin
 
       # A user who was there: "You", their name, or -- gone since -- "a deleted
       # user" (`Admin::Ui::UserNameComponent`, the one place a user is named).
-      def label_for(user)
-        return t(".you") if you?(user)
+      def label_for(actor)
+        return t(".you") if actor.you
 
-        user ? Admin::Ui::UserNameComponent.new(user:).label : Admin::Ui::UserNameComponent::DELETED_USER
+        actor.user ? Admin::Ui::UserNameComponent.new(user: actor.user).label : Admin::Ui::UserNameComponent::DELETED_USER
       end
 
       def you?(user) = user.present? && Current.actor.is_a?(User) && Current.actor.id == user.id

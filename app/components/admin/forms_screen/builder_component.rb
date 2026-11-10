@@ -34,10 +34,15 @@ module Admin
     # `.admin-field` wrapper, whose error slot is its direct child.
     class BuilderComponent < Admin::AdminComponent
       FORM_ID = "form-builder".freeze
+
       # Every card of a form (the builder's, Where submissions go, Placed on
-      # and a submission's) wears the Forms module's chip, the sidebar's icon and family.
-      CARD_ICON = :clipboard_list
-      CARD_FAMILY = :form
+      # and a submission's) wears the Forms module's chip, read from the
+      # sidebar's registry (`StudioModules`), so it follows the sidebar's
+      # icon and family.
+      def self.card_chip
+        entry = ::StudioModules.find(:forms)
+        { icon: entry.icon, family: entry.family }
+      end
 
       def initialize(form:, draft:, locale:, placements:, errors: [], mail_settings: nil, keys: nil, dirty: false,
         stale: false, stale_change: nil, base: nil, url_options: {})

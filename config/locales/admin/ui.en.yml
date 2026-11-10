@@ -145,6 +145,24 @@ en:
           outdated: "%{language}: outdated"
           more: "+%{count} ▾"
 
+        # One language's progress, on the Dashboard and the Translations
+        # tiles: the bar's name after the language's own name, then the
+        # counts, outdated first, or "All translated".
+        # A word diff's screen-reader cues, each before its word.
+        word_diff:
+          removed: "Removed: "
+          added: "Added: "
+
+        language_progress:
+          progress_label: "%{language} translated"
+          all_translated: "All translated"
+          outdated:
+            one: "%{count} outdated"
+            other: "%{count} outdated"
+          missing:
+            one: "%{count} missing"
+            other: "%{count} missing"
+
         # The accessible name of an editor rail's tablist; each tab's own
         # words are its editor's.
         rail_tabs:

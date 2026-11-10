@@ -5,21 +5,5 @@
     <span class="text-sm font-semibold text-ink"><%= name %></span>
     <span id="<%= done_id %>" class="text-label text-meta"><%= t(".done", percent: percent) %></span>
   </span>
-  <span class="block h-1 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="<%= t(".progress_label", language: name) %>"
-        aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= percent %>">
-    <span class="block h-full rounded-full bg-ok <%= width_class %>"></span>
-  </span>
-  <span id="<%= counts_id %>" class="text-sm">
-    <% if done? %>
-      <span class="text-meta"><%= t(".all_translated") %></span>
-    <% else %>
-      <% if outdated.positive? %>
-        <span class="text-warn-ink"><span aria-hidden="true">↻</span> <%= t(".outdated", count: outdated) %></span>
-      <% end %>
-      <% if outdated.positive? && missing.positive? %><span class="text-meta" aria-hidden="true">·</span><% end %>
-      <% if missing.positive? %>
-        <span class="text-meta"><%= t(".missing", count: missing) %></span>
-      <% end %>
-    <% end %>
-  </span>
+  <%= render progress %>
 <% end %>

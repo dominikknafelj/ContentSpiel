@@ -10,7 +10,7 @@ class Admin::Answers::RailTabStreamsTest < ActionView::TestCase
   test "a save's answer updates each registered tab's contents by id, and no panel" do
     page = create_page(title: "About")
     Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe, RailTabProbe::Quiet ]) do
-      streams = Admin::Answers::RailTabStreams.for(page, view: view, viewer: users(:one))
+      streams = Admin::Answers::RailTabStreams.for(page, slot: "editor.rail.tabs", view: view, viewer: users(:one))
       nodes = Nokogiri::HTML5.fragment(streams.join).element_children
 
       assert_equal [ [ "update", "editor-grid-tab-probe" ] ], nodes.map { |node| [ node["action"], node["target"] ] }
@@ -21,9 +21,9 @@ class Admin::Answers::RailTabStreamsTest < ActionView::TestCase
 
   test "nothing registered is no stream, and the rail's id is the caller's" do
     page = create_page(title: "About")
-    Admin::Slots.with("editor.rail.tabs" => []) { assert_empty Admin::Answers::RailTabStreams.for(page, view: view, viewer: nil) }
+    Admin::Slots.with("editor.rail.tabs" => []) { assert_empty Admin::Answers::RailTabStreams.for(page, slot: "editor.rail.tabs", view: view, viewer: nil) }
     Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe ]) do
-      target = Nokogiri::HTML5.fragment(Admin::Answers::RailTabStreams.for(page, view: view, viewer: nil, rail_id: "r").join).element_children.sole["target"]
+      target = Nokogiri::HTML5.fragment(Admin::Answers::RailTabStreams.for(page, slot: "editor.rail.tabs", view: view, viewer: nil, rail_id: "r").join).element_children.sole["target"]
       assert_equal "r-tab-probe", target
     end
   end
@@ -37,7 +37,7 @@ class Admin::Answers::RailTabStreamsTest < ActionView::TestCase
     as(users(:two)) { Notes::Start.call(page, body: "A note") }
 
     streams = nil
-    statements = capture_sql { streams = Admin::Answers::RailTabStreams.for(page, view: view, viewer: users(:one)) }
+    statements = capture_sql { streams = Admin::Answers::RailTabStreams.for(page, slot: "editor.rail.tabs", view: view, viewer: users(:one)) }
 
     assert_empty statements.grep(/note_threads|note_deliveries/), "the stream read the notes' counts"
     node = Nokogiri::HTML5.fragment(streams.join).element_children.sole

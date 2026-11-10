@@ -18,7 +18,7 @@
         <tbody>
           <% items.each do |item| %>
             <% focus = editor_path(item, focus_locale(item)) %>
-            <tr id="<%= row_id(item) %>" class="admin-translation-row group relative border-b border-line last:border-b-0">
+            <tr id="<%= row_id(item) %>" class="admin-translation-row relative border-b border-line last:border-b-0">
               <th scope="row" class="min-w-60 max-w-80 p-0 text-left font-medium">
                 <%= link_to title(item), focus, class: "relative block truncate px-4 py-2 text-ink hover:underline", aria: { label: open_label(item) }, data: { turbo_frame: "_top" } %>
               </th>
@@ -35,7 +35,7 @@
               <td class="px-4 py-2 text-right text-sm whitespace-nowrap">
                 <%# The row's stretched link: no tab stop and nothing for a screen reader (the title link is both), and absolute against the row, not the sticky title cell. %>
                 <%= link_to "", focus, tabindex: -1, aria: { hidden: true }, class: "absolute inset-0", data: { turbo_frame: "_top", translation_row_link: "" } %>
-                <span class="admin-translation-row__action text-dim group-hover:text-accent group-focus-within:text-accent" aria-hidden="true"><%= action(item) %></span>
+                <span class="admin-row-verb admin-translation-row__action" aria-hidden="true"><%= action(item) %></span>
               </td>
             </tr>
           <% end %>

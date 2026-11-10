@@ -13,7 +13,7 @@ class Admin::DashboardScreen::DraftTileComponentTest < ViewComponent::TestCase
 
     render_inline Admin::DashboardScreen::DraftTileComponent.new(record: post.reload)
 
-    assert_selector "article.admin-draft-tile.rounded-tile.bg-surface.shadow-1.p-4" do
+    assert_selector "article.admin-draft-tile.admin-tile.p-4:not(.shadow-1):not(.rounded-tile)" do
       assert_selector ".admin-type-dot", text: "Blog"
       assert_selector "a.admin-draft-tile__link.text-h3[href='/cs-studio/posts/#{post.id}'][data-turbo-frame=_top]", exact_text: "Half-written"
       assert_selector "p.line-clamp-2", exact_text: "Where the story begins."
@@ -27,7 +27,7 @@ class Admin::DashboardScreen::DraftTileComponentTest < ViewComponent::TestCase
     assert_equal verb_id, page.find("a.admin-draft-tile__link")["aria-describedby"]
     assert_equal "true", page.find("span.admin-row-verb")["aria-hidden"], "the verb is read once, as the link's description"
     assert_nil page.find("a.admin-draft-tile__link")["aria-labelledby"], "the tile's link is named by its title"
-    assert_includes page.find("article")[:class], "hover:shadow-2"
+    assert_not_includes page.find("article")[:class], "hover:shadow-2", "the pointer's lift is .admin-tile's"
 
     draft = create_page(title: "About", published: false)
     render_inline Admin::DashboardScreen::DraftTileComponent.new(record: draft)

@@ -1,5 +1,5 @@
 <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-placements", heading: t(".title"),
-      icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
+      **Admin::FormsScreen::BuilderComponent.card_chip) do %>
   <div class="p-4 text-sm">
     <% if pages.empty? && hidden.zero? %>
       <p class="text-dim"><%= t(".none") %></p>

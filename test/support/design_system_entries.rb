@@ -41,6 +41,7 @@ module DesignSystemEntries
     "Admin::Ui::FieldComponent" => "FieldFrame",
     "Admin::Ui::FileDropComponent" => "ImageField",
     "Admin::Ui::InsecureNoticeComponent" => "Alerts",
+    "Admin::Ui::LanguageProgressComponent" => "StudioTranslations",
     "Admin::Ui::LanguageTabsComponent" => "StudioTranslationPair",
     "Admin::Ui::LibraryImageComponent" => "StudioMediaGrid",
     "Admin::Ui::MailFailedNoticeComponent" => "Alerts",

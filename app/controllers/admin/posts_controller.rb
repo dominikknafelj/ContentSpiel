@@ -202,7 +202,7 @@ module Admin
 
       streams.concat(group_error_streams(result.record, definition, fields_hash)) if definition && fields_hash
       streams.concat(publishing_state_streams(@post)) if result.ok?
-      streams.concat(Admin::Answers::RailTabStreams.for(result.record, view: view_context, viewer: Current.actor, locale: admin_locale,
+      streams.concat(Admin::Answers::RailTabStreams.for(result.record, slot: "editor.rail.tabs", view: view_context, viewer: Current.actor, locale: admin_locale,
         url_options: admin_url_options)) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)

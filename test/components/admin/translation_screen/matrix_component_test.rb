@@ -76,9 +76,11 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
     assert_selector "thead th[scope=col]", text: "Item"
     assert_selector "thead th[scope=col]", text: "Type"
     assert_selector "thead th[scope=col] .sr-only", text: "Action"
-    # The verb is always there, dim, and accent while the row is under the
-    # pointer or holds the focus.
-    assert_selector "tr#{row}.group .admin-translation-row__action.text-dim.group-hover\\:text-accent.group-focus-within\\:text-accent"
+    # The verb is always there, the shared row verb (dim, and accent while
+    # the row is under the pointer or holds the focus: the stylesheet's
+    # `.admin-translation-row` selectors, pinned in admin_design_rules_test).
+    assert_selector "tr#{row} span.admin-row-verb.admin-translation-row__action[aria-hidden=true]"
+    assert_no_selector "#{row} [class*='group-hover'], #{row} .admin-row-verb.text-dim"
   end
 
   test "the site settings row links to Settings in that language" do

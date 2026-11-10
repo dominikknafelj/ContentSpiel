@@ -5,7 +5,7 @@
     <p class="text-meta"><%= meta %></p>
   </div>
 
-  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-answers", heading: t(".answers"), icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-answers", heading: t(".answers"), **Admin::FormsScreen::BuilderComponent.card_chip) do %>
     <div class="p-4">
       <% if readable? %>
         <dl class="flex flex-col gap-3.5">
@@ -24,7 +24,7 @@
     </div>
   <% end %>
 
-  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-delivery", heading: t(".delivery"), icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-delivery", heading: t(".delivery"), **Admin::FormsScreen::BuilderComponent.card_chip) do %>
     <ul class="divide-y divide-line px-4">
       <% deliveries.each do |delivery| %>
         <li class="flex flex-col gap-1.5 py-2.5" data-delivery-state="<%= delivery.state %>" data-delivery-id="<%= delivery.id %>">

@@ -1,5 +1,5 @@
 <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-destinations", heading: t(".title"),
-      icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
+      **Admin::FormsScreen::BuilderComponent.card_chip) do %>
   <div class="flex flex-col gap-5 p-4">
     <%= helpers.render "admin/shared/field_errors", id: "form-destinations-errors", messages: errors %>
 
