@@ -510,10 +510,11 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
         (() => { const s = document.querySelector("#{scroller}").getBoundingClientRect();
         const th = document.querySelector("thead th[data-locale=de]"); const r = th.getBoundingClientRect();
         const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return { offset: Math.abs(r.top - s.top), hit: th.contains(el) } })()
+        return { offset: Math.abs(r.top - s.top), hit: th.contains(el), line: getComputedStyle(th).boxShadow } })()
       JS
       assert_operator head["offset"], :<, 1, "the head row stays at the box's top as its rows scroll"
       assert head["hit"], "the head row is over the rows that scroll under it"
+      assert_match(/\A(?=.*\binset\b)(?=.*\b0px -1px 0px\b).*\z/, head["line"], "the head's bottom line travels with the sticky head")
 
       # The card scrolls sideways: the Item column stays at its left, over
       # the cells and their links, and the head's corner over the head.
