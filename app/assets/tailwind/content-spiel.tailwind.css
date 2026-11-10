@@ -671,7 +671,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .cs-toggle:checked { background: var(--cs-accent); border-color: var(--cs-accent); }
 .cs-toggle:checked::before { transform: translateX(calc(2.25rem - 2px - var(--cs-toggle-knob) - 2 * var(--cs-toggle-gap))); background: var(--cs-surface); }
 .cs-toggle:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
-.cs-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
+/* A switch nobody may change keeps its full colour, never faded: off, the
+   sunken track and field-line outline of rest with the meta knob; on, a meta
+   track (the accent says it can be pressed) with the surface knob, each part
+   3:1 on a card and on the rail (admin_contrast_test). The cursor and the
+   label's meta words say it is fixed. */
+.cs-toggle:disabled { cursor: not-allowed; opacity: 1; }
+.cs-toggle:disabled:not(:checked) { background: var(--cs-sunken); border-color: var(--cs-field-line); }
+.cs-toggle:disabled:not(:checked)::before { background: var(--cs-meta); }
+.cs-toggle:disabled:checked { background: var(--cs-meta); border-color: var(--cs-meta); }
+.cs-toggle:disabled:checked::before { background: var(--cs-surface); }
+.cs-toggle:disabled + label, label:has(> .cs-toggle:disabled) { color: var(--cs-meta); }
 @media (prefers-reduced-motion: reduce) { .cs-toggle, .cs-toggle::before { transition: none; } }
 
 /* Invalid field border, derived from the error slot's content. Autosave streams replace a field's error slot but never its input,

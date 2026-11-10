@@ -51,6 +51,21 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A disabled switch keeps its full colour: off, the sunken track in its
+  # field-line outline with a meta knob; on, a meta track with a surface
+  # knob. Each part that tells the state stands at 3:1 on what it meets,
+  # on a card and on the rail.
+  test "a disabled switch's track and knob are 3:1 or better, off and on, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-surface --cs-rail].each do |ground|
+        assert_ratio(3, colour.("--cs-field-line"), colour.(ground), "the off track's outline on #{ground} (#{scheme})")
+        assert_ratio(3, colour.("--cs-meta"), colour.(ground), "the on track on #{ground} (#{scheme})")
+      end
+      assert_ratio(3, colour.("--cs-meta"), colour.("--cs-sunken"), "the off knob on the sunken track (#{scheme})")
+      assert_ratio(3, colour.("--cs-surface"), colour.("--cs-meta"), "the on knob on the meta track (#{scheme})")
+    end
+  end
+
   test "dim stays a step above meta on every ground" do
     each_scheme do |scheme, colour|
       GROUNDS.each do |ground|

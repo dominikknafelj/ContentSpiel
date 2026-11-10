@@ -31,6 +31,7 @@ module Admin
 
       TONES = { neutral: "bg-sunken text-meta", warn: "bg-warn-tint text-warn-ink" }.freeze
       CLASS = "inline-flex shrink-0 items-center gap-1 rounded-cs px-1.5 py-0.5 text-label".freeze
+      MARK_CLASS = "inline-flex".freeze
 
       renders_one :mark
 
@@ -44,7 +45,7 @@ module Admin
 
       def call
         tag.span(**@html, class: [ CLASS, TONES.fetch(@tone), @html[:class] ].compact.join(" ")) do
-          safe_join([ (tag.span(mark, class: "inline-flex", aria: { hidden: true }) if mark?), @label ].compact)
+          safe_join([ (tag.span(mark, class: MARK_CLASS, aria: { hidden: true }) if mark?), @label ].compact)
         end
       end
     end

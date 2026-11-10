@@ -2239,6 +2239,33 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-checkbox:disabled + label", "label:has(> .cs-checkbox:disabled)" ]))
   end
 
+  # A switch that cannot be changed is never faded either: off, the sunken
+  # track and field-line outline it has at rest with the meta knob; on, a
+  # meta track (not the accent, which says it can be pressed) with the
+  # surface knob; its label reads meta. A disabled segment keeps its
+  # colour too: meta words, no hover, and a chosen one stays inverted.
+  test "a disabled switch keeps its colour, refuses the pointer, is meta when on and its label reads meta" do
+    switch = single_rule(".cs-toggle:disabled")
+    assert_match(/cursor:\s*not-allowed;/, switch)
+    assert_match(/opacity:\s*1;/, switch)
+    off = single_rule(".cs-toggle:disabled:not(:checked)")
+    assert_match(/background:\s*var\(--cs-sunken\);/, off)
+    assert_match(/border-color:\s*var\(--cs-field-line\);/, off)
+    assert_match(/background:\s*var\(--cs-meta\);/, single_rule(".cs-toggle:disabled:not(:checked)::before"))
+    on = single_rule(".cs-toggle:disabled:checked")
+    assert_match(/background:\s*var\(--cs-meta\);/, on)
+    assert_match(/border-color:\s*var\(--cs-meta\);/, on)
+    assert_match(/background:\s*var\(--cs-surface\);/, single_rule(".cs-toggle:disabled:checked::before"))
+    assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-toggle:disabled + label", "label:has(> .cs-toggle:disabled)" ]))
+    rules = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?(".cs-toggle") } }
+    rules.each { |selectors, body| assert_no_match(/opacity:\s*0/, body, selectors.join(", ")) }
+
+    segment = Admin::Fields::SelectField::SEGMENT_CLASS.split
+    assert_empty segment.grep(/opacity/), "a disabled segment is not faded"
+    %w[has-[:disabled]:cursor-not-allowed has-[:disabled]:not-has-[:checked]:text-meta has-[:disabled]:not-has-[:checked]:hover:bg-transparent
+       has-[:checked]:bg-ink has-[:checked]:text-paper].each { |name| assert_includes segment, name }
+  end
+
   # THE TREE: both trees draw one row (`Admin::Ui::TreeItemComponent`), whose
   # geometry is the four `--cs-tree-*` lengths and whose looks are the one
   # `.admin-tree` block. The files that draw a tree row, where an indent or a

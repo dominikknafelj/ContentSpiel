@@ -179,7 +179,7 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_equal "admin-scope-chip text-small text-dim", page.find("[data-chips] > span", text: "All pages")[:class]
 
     # The script redraws the chips after every change, with these strings.
-    assert_equal({ neutral_chip: neutral, warn_chip: warn, all_chip: "admin-scope-chip text-small text-dim", dot: "h-[7px] w-[7px] shrink-0 rounded-full" },
+    assert_equal({ neutral_chip: neutral, warn_chip: warn, all_chip: "admin-scope-chip text-small text-dim", mark: Admin::Ui::BadgeComponent::MARK_CLASS, dot: "h-[7px] w-[7px] shrink-0 rounded-full" },
       Admin::GroupsScreen::PermissionRowComponent.chip_classes)
   end
 
@@ -193,6 +193,7 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_selector "label .admin-locked-note.text-small.text-meta", text: "You can't grant this"
     assert_no_selector "[class*=opacity]"
     assert_no_selector "label span.text-dim"
+    assert_no_selector "[class='']"
   end
 
   test "the scope toggle is a small tertiary button whose words the script reads from its data" do

@@ -3,7 +3,9 @@
     <%# The accessible name is the registry's full label ("Edit pages"): the short label is only what a row under a "Pages" band needs to say
         (`accessible_label` puts the short one in front where the full one doesn't contain it). %>
     <% if locked? %>
-      <%# Ticked and disabled, in the disabled look, which reaches the label that follows it: it is not submitted, so the hidden inputs after the label carry the grant. %>
+      <%# Ticked and disabled, in the disabled look, which reaches the label
+          that follows it: it is not submitted, so the hidden inputs after the
+          label carry the grant. %>
       <%= render Admin::Ui::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: true, disabled: true, id: checkbox_id,
             aria: { label: accessible_label, describedby: "#{checkbox_id}-locked" }) %>
     <% else %>
@@ -11,7 +13,7 @@
             data: { action: "change->admin--groups--permission-matrix#toggle" }) %>
     <% end %>
     <label for="<%= checkbox_id %>" class="flex min-w-0 <%= locked? ? "cursor-default" : "cursor-pointer" %> flex-col">
-      <span class="<%= "text-ink" unless locked? %>"><%= short_label %></span>
+      <%= tag.span(short_label, class: ("text-ink" unless locked?)) %>
       <code class="font-cs-mono text-small text-meta" title="<%= permission.key %>"><%= permission.key %></code>
       <% if locked? %><span id="<%= checkbox_id %>-locked" class="admin-locked-note text-small text-meta"><%= t(".locked") %></span><% end %>
     </label>

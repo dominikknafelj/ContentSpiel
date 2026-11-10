@@ -31,13 +31,14 @@ module Admin
       # The posts list's scope toggle's look (`PostsScreen::ToolbarComponent::
       # SEGMENT_CLASS`: the chosen segment inverted, ink on paper, with a
       # paper focus ring), with a disabled state for a held or view-only
-      # form. The group around the segments is outlined in
+      # form: never faded, a segment's words meta with no hover, and the
+      # chosen one still inverted. The group around the segments is outlined in
       # `border-field-line`, as every control is.
       SEGMENT_CLASS = "flex cursor-pointer items-center border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken " \
                       "has-[:checked]:bg-ink has-[:checked]:font-semibold has-[:checked]:text-paper has-[:checked]:hover:bg-ink " \
                       "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent " \
                       "has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4 " \
-                      "has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 has-[:disabled]:not-has-[:checked]:hover:bg-transparent".freeze
+                      "has-[:disabled]:cursor-not-allowed has-[:disabled]:not-has-[:checked]:text-meta has-[:disabled]:not-has-[:checked]:hover:bg-transparent".freeze
 
       def option_pairs
         options = field.options[:options]

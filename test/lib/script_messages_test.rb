@@ -8,7 +8,8 @@ require "test_helper"
 # top-level key under `admin` in the locale files -- and checks it is in a list
 # a `messages_data` call renders: `Admin::MessagesHelper::SCRIPT_MESSAGES` (the
 # set on <body>), the literal arguments of a `messages_data(...)` call in a
-# view or component, or a constant list splatted into one. A `${...}` in the script's key stands for one segment
+# view or component, or a constant list splatted into one (namespaced, or a
+# constant of the file's own class). A `${...}` in the script's key stands for one segment
 # and is served if any served key fits it, a `#{...}` in the server's for a
 # placeholder (`components.ui.chip_input.nouns.#{noun}.create`).
 class ScriptMessagesTest < ActiveSupport::TestCase
@@ -32,11 +33,18 @@ class ScriptMessagesTest < ActiveSupport::TestCase
 
   def served
     calls = Dir[Rails.root.join("app/{views,components,helpers}/**/*.{rb,erb}")].flat_map do |path|
-      File.read(path).lines.reject { |line| line.match?(/\A\s*#/) }.join.gsub(/<%#.*?%>/m, "").scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten
+      source = File.read(path).lines.reject { |line| line.match?(/\A\s*#/) }.join.gsub(/<%#.*?%>/m, "")
+      source.scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten.map { |call| [ call, path ] }
     end
-    literals = calls.flat_map { |call| call.scan(/"([^"]+)"/).flatten }
-    # A list handed over whole, `messages_data(*Admin::EditorScreen::NewRecordMessages::KEYS)`.
-    splats = calls.flat_map { |call| call.scan(/\*((?:[A-Z]\w*::)+[A-Z_]+)\b/).flatten }.flat_map { |name| name.constantize }
+    literals = calls.flat_map { |call, _path| call.scan(/"([^"]+)"/).flatten }
+    # A list handed over whole, `messages_data(*Admin::EditorScreen::NewRecordMessages::KEYS)`,
+    # or a constant of the file's own class, `messages_data(*SCRIPT_MESSAGES)`.
+    splats = calls.flat_map do |call, path|
+      call.scan(/\*((?:[A-Z]\w*::)*[A-Z][A-Z0-9_]+)\b/).flatten.flat_map do |name|
+        owner = name.include?("::") ? Object : Rails.autoloaders.main.cpath_expected_at(path)&.constantize
+        owner ? owner.const_get(name) : []
+      end
+    end
     (Admin::MessagesHelper::SCRIPT_MESSAGES + literals + splats).map { |key| key.gsub(/#\{.*?\}/, "x") }
   end
 

@@ -11,7 +11,7 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_equal %w[Posts Pages], page.all("[aria-labelledby=group-content-permissions] .admin-area-heading").map { |heading| heading.text.strip }
     assert_selector "h2", text: "Content permissions"
     assert_selector "h2", text: "Other permissions"
-    assert_selector "section h3", count: 4
+    assert_selector "[aria-labelledby=group-other-permissions] section h3", count: 4
   end
 
   test "ticked grants tick their rows and toggles, and a stale grant keeps its note" do
@@ -39,7 +39,8 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_equal "Content permissions", content.find("h2#group-content-permissions").text
     assert_selector "section[aria-labelledby=group-content-permissions] .admin-settings-card__head p", text: "Each permission has its own scope. No scope means everything."
     assert_selector "section[aria-labelledby=group-content-permissions] .admin-settings-card__head span.bg-ic-structure-bg"
-    assert_equal %w[Posts Pages], content.all(".admin-area-heading.bg-paper.text-label.text-meta").map { |band| band.text.strip }
+    assert_equal %w[Posts Pages], content.all("section[aria-labelledby^=content-band-] > h3.admin-area-heading.bg-paper.text-label.text-meta").map { |band| band.text.strip }
+    assert_equal 5, content.all("section[aria-labelledby=content-band-posts] [data-permission]").size
     assert_equal 11, content.all("[data-permission]").size
 
     other = page.find("section.admin-settings-card[aria-labelledby=group-other-permissions]")
@@ -51,6 +52,7 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
 
     # The script draws its chips with the row's class strings and the row's words.
     root = page.find(".admin-permission-matrix[data-controller='admin--groups--permission-matrix']")
+    assert_equal 5, Admin::GroupsScreen::PermissionRowComponent.chip_classes.size
     Admin::GroupsScreen::PermissionRowComponent.chip_classes.each do |kind, classes|
       assert_equal classes, root["data-admin--groups--permission-matrix-#{kind.to_s.dasherize}-value"], kind
     end
@@ -93,8 +95,8 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [])
 
     assert_selector "[data-permission='acme/widgets.edit']"
-    assert_selector ".admin-area-heading", text: "Widgets"
-    assert_no_selector "section h3", text: "Widgets"
+    assert_selector "[aria-labelledby=group-content-permissions] section > h3.admin-area-heading", text: "Widgets"
+    assert_no_selector "[aria-labelledby=group-other-permissions] h3", text: "Widgets"
   ensure
     AccessControl::Permissions.reset!
     AccessControl::BuiltIns.register

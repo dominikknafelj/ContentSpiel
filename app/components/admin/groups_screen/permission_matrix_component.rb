@@ -6,7 +6,8 @@ module Admin
     #   each (`GroupsScreen::PermissionRowComponent`) -- Posts x5, Pages x6 -- under
     #   its area's band, each with its own scope chips and "Edit scope";
     # - **Other permissions**: the rest, one list of area bands with a switch
-    #   per row (`GroupsScreen::ToggleListComponent`).
+    #   per row (`GroupsScreen::ToggleListComponent`). Every band is a
+    #   section's `h3`, in both cards.
     #
     # This component only composes them: it loads what the rows share (the page
     # tree, once for all six pages rows; the notes about stale grants) and decides
@@ -92,10 +93,14 @@ module Admin
 
       attr_reader :form_name, :locale
 
-      def script_messages = messages_data(*Admin::GroupsScreen::PermissionMatrixComponent::SCRIPT_MESSAGES)
+      def script_messages = messages_data(*SCRIPT_MESSAGES)
 
       # The chips' class strings, handed to the script, which redraws them.
       def script_values = PermissionRowComponent.chip_classes.transform_keys { |kind| :"admin__groups__permission_matrix_#{kind}_value" }
+
+      # Each area is a section under its band, an `h3`, as the switches' are, so
+      # a screen reader moves from band to band through both cards.
+      def band_id(area) = "content-band-#{area.to_s.parameterize}"
 
       # The scoped permissions by area, in registry order.
       def sections = AccessControl::Permissions.grantable.reject { |permission| permission.scopes.empty? }.group_by(&:area)

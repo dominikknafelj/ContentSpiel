@@ -38,10 +38,10 @@ module Admin
 
       attr_reader :form_name
 
-      # `[area, title, permissions]` per band that has a permission, in order.
+      # `[area, permissions]` per band that has a permission, in order.
       def bands
         by_band = AccessControl::Permissions.grantable.select { |permission| permission.scopes.empty? }.group_by { |permission| band_for(permission) }
-        (BANDS | by_band.keys).filter_map { |area| [ area, title(area), by_band[area] ] if by_band[area] }
+        (BANDS | by_band.keys).filter_map { |area| [ area, by_band[area] ] if by_band[area] }
       end
 
       def band_for(permission) = OVERSIGHT.include?(permission.key) ? :oversight : permission.area

@@ -11,9 +11,10 @@ module Admin
     # counts adding or removing a member and nothing else: typing in the search box
     # is swallowed by the chip input and has no name.
     #
-    # OWNERS. The suggestions never offer one (the help line says why), but an owner who is ALREADY a member is drawn as a
-    # chip like anyone else and stays until someone removes it, so an untouched save
-    # keeps them (`Groups::Save` replaces the list wholesale; leaving a stored member
+    # OWNERS. The suggestions never offer one (the help line says why), but
+    # an owner who is ALREADY a member is drawn as a chip like anyone else and
+    # stays until someone removes it, so an untouched save keeps them
+    # (`Groups::Save` replaces the list wholesale; leaving a stored member
     # out would silently remove them). Whether the viewer may add or remove a given
     # member is `Groups::Save`'s call -- a refusal is the 403 page -- and is not
     # second-guessed here.

@@ -17,8 +17,8 @@ module Admin
     # input, until Remove) and a stored branch root the viewer can't open (a
     # hidden input, until nobody).
     #
-    # TWO STATES (both presentation: the params above are the same, and
-    # `Groups::Save` is still the one that decides):
+    # TWO STATES (both presentation: neither changes the params above, and
+    # `Groups::Save` decides every write):
     #
     # - LOCKED (`locked:`, an editable form whose viewer couldn't hand this grant
     #   out): a ticked, disabled box in the disabled look (no opacity of its own:
@@ -72,7 +72,7 @@ module Admin
       # with these.
       def self.chip_classes
         badge = ->(tone) { [ Ui::BadgeComponent::CLASS, Ui::BadgeComponent::TONES.fetch(tone), CHIP_CLASS ].join(" ") }
-        { neutral_chip: badge.(:neutral), warn_chip: badge.(:warn), all_chip: ALL_CLASS, dot: DOT_CLASS }
+        { neutral_chip: badge.(:neutral), warn_chip: badge.(:warn), all_chip: ALL_CLASS, mark: Ui::BadgeComponent::MARK_CLASS, dot: DOT_CLASS }
       end
 
       def initialize(permission:, scope: nil, tree: nil, open: false, form_name: "group[grants]", locked: false, view_only: false)

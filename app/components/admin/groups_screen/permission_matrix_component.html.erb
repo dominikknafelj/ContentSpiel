@@ -5,7 +5,8 @@
 
   <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "group-content-permissions", heading: t(".content"), icon: :pages, family: :structure, intro: t(".content_intro")) do %>
     <% sections.each do |area, permissions| %>
-      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= area %></div>
+      <section aria-labelledby="<%= band_id(area) %>">
+      <h3 id="<%= band_id(area) %>" class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= area %></h3>
       <% permissions.each do |permission| %>
         <%= render row_for(permission) %>
         <% notes = stale_notes(permission) %>
@@ -18,6 +19,7 @@
           </div>
         <% end %>
       <% end %>
+      </section>
     <% end %>
   <% end %>
 

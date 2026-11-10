@@ -1,7 +1,7 @@
 <div class="admin-toggle-list">
-  <% bands.each do |area, title, permissions| %>
+  <% bands.each do |area, permissions| %>
     <section aria-labelledby="<%= band_id(area) %>">
-      <h3 id="<%= band_id(area) %>" class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= title %></h3>
+      <h3 id="<%= band_id(area) %>" class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= title(area) %></h3>
       <% permissions.each do |permission| %>
         <label for="<%= field_id(permission) %>" class="flex <%= locked?(permission) ? "cursor-default" : "cursor-pointer" %> items-center justify-between gap-3 border-b border-line px-4 py-2 last:border-b-0">
           <span class="flex min-w-0 flex-col">

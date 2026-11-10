@@ -562,6 +562,29 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal members_before, group.memberships.reload.pluck(:user_id)
   end
 
+  # A text field posts "" for a group with no description; the model reads a
+  # blank description as none, so the form as rendered is no change.
+  test "a group with no description saved as rendered writes nothing and audits nothing" do
+    group = AccessControl::Group.create!(name: "Undescribed")
+    AccessControl::Membership.create!(user: users(:reader), group: group)
+    assert_nil group.reload.description
+    updated_at = group.updated_at
+    sign_in_as(users(:one))
+
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_response :success
+    params = params_as_rendered
+    assert_equal "", params.dig("group", "description")
+
+    assert_no_difference -> { Audit::Event.count } do
+      patch "/cs-studio/groups/#{group.id}", params: params
+    end
+
+    assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
+    assert_nil group.reload.description
+    assert_equal updated_at, group.updated_at
+  end
+
   # --- View only ----------------------------------------------------------------
 
   test "a group the viewer can't manage as it stands is read-only: the notice, a disabled fieldset, no footer, no delete zone; a scope can still be opened" do

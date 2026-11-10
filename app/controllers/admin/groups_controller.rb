@@ -6,9 +6,10 @@ module Admin
   #
   # `groups.manage` opens the module; `Groups::Save`/`Groups::Destroy`
   # decide every write again, including the no-escalation rules for
-  # non-owners -- a refusal there is the 403 page with the service's reason. A deliberate "Save group" submit rather than autosave,
-  # like the Users module: a half-ticked permission matrix must never be
-  # saved on its own.
+  # non-owners -- a refusal there is the 403 page with the service's
+  # reason. A deliberate "Save group" submit rather than autosave, like the
+  # Users module: a half-ticked permission matrix must never be saved on
+  # its own.
   class GroupsController < BaseController
     include StaleForm
 

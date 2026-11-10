@@ -47,7 +47,8 @@
         <% end %>
       </div>
       <% if kept_page_ids.any? %>
-        <p class="admin-unreadable-branches text-sm text-warn-ink"><%= t(".unreadable_branches") %></p>
+        <%# Drawn with the editor's page, a standing warning read where it stands: an alert role would be announced on every visit. %>
+        <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "admin-unreadable-branches") do %><%= t(".unreadable_branches") %><% end %>
       <% end %>
     </div>
   <% end %>

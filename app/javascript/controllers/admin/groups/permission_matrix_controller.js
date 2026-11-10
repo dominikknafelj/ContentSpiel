@@ -33,7 +33,7 @@ import { messages } from "i18n/messages"
 //   announces it with a bubbling `change`, since a hidden input is invisible to
 //   the form's footer unless something dispatches.
 export default class extends Controller {
-  static values = { neutralChip: String, warnChip: String, allChip: String, dot: String }
+  static values = { neutralChip: String, warnChip: String, allChip: String, mark: String, dot: String }
 
   connect() {
     this.rows.forEach((row) => {
@@ -169,7 +169,7 @@ export default class extends Controller {
     span.className = kind === "warn" ? this.warnChipValue : this.neutralChipValue
     if (dot) {
       const mark = document.createElement("span")
-      mark.className = "inline-flex"
+      mark.className = this.markValue
       mark.setAttribute("aria-hidden", "true")
       const circle = document.createElement("span")
       circle.className = `${this.dotValue} ${dot}`
