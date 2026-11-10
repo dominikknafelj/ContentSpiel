@@ -1,8 +1,9 @@
 module Admin
   module Ui
     # `Admin::Ui::CopyValueComponent`, a value a person copies exactly: a
-    # one-line command, a token in its block, and a long client configuration,
-    # which scrolls inside its box.
+    # one-line command, a token in its block, a long client configuration,
+    # which scrolls inside its box, and a command with no Copy (the setup
+    # wizard's, which loads no admin script).
     class CopyValueComponentPreview < ViewComponent::Preview
       def inline
         render Admin::Ui::CopyValueComponent.new(id: "preview-command", value: Setup::SystemCheck::SITE_ADDRESS_COMMAND,
@@ -11,6 +12,11 @@ module Admin
 
       def block
         render Admin::Ui::CopyValueComponent.new(id: "preview-token", value: "0f3a" * 16, copy_label: "Copy token", layout: :block)
+      end
+
+      def plain
+        render Admin::Ui::CopyValueComponent.new(id: "preview-plain", value: Setup::SystemCheck::SITE_ADDRESS_COMMAND,
+          copy_label: "Copy command for Site address", copyable: false)
       end
 
       def long

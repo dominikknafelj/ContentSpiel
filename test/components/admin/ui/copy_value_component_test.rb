@@ -5,7 +5,6 @@ require "test_helper"
 # and nothing else: the one copy script reads it from there, so no attribute
 # holds a second copy of it, which matters most for a token shown once.
 class Admin::Ui::CopyValueComponentTest < ViewComponent::TestCase
-  CLIPBOARD = Rails.root.join("app/javascript/controllers/admin/ui/clipboard_controller.js")
   REVEAL = Rails.root.join("app/javascript/controllers/admin/tokens/reveal_controller.js")
 
   # Every attribute value of the rendered fragment.
@@ -33,6 +32,15 @@ class Admin::Ui::CopyValueComponentTest < ViewComponent::TestCase
     assert_no_selector "code"
   end
 
+  test "without copyable it is the same value box alone: no script, no button, no status" do
+    copy_box = Nokogiri::HTML::DocumentFragment.parse(render_inline(Admin::Ui::CopyValueComponent.new(id: "check-command-0", value: "bin/rails x", copy_label: "Copy command for Mail")).to_html)
+    plain = Nokogiri::HTML::DocumentFragment.parse(render_inline(Admin::Ui::CopyValueComponent.new(id: "check-command-0", value: "bin/rails x", copy_label: "Copy command for Mail", copyable: false)).to_html)
+    assert_equal copy_box.at_css("code")[:class], plain.at_css("code")[:class], "one look for the value, with or without Copy"
+    assert_selector "div > code#check-command-0", exact_text: "bin/rails x"
+    assert_no_selector "[data-controller], [data-messages], [data-admin--ui--clipboard-target], [role=status]", visible: :all
+    assert_no_selector "button"
+  end
+
   test "an unknown layout is refused" do
     assert_raises(ArgumentError) { Admin::Ui::CopyValueComponent.new(id: "x", value: "v", copy_label: "Copy", layout: :wide) }
   end
@@ -46,17 +54,15 @@ class Admin::Ui::CopyValueComponentTest < ViewComponent::TestCase
     assert_equal 1, rendered_content.scan(token).size, "the token is written once, as the source's text"
     assert attribute_values.none? { |value| value.include?(token) }, "an attribute holds the token"
 
-    # Copy writes the source's text when no value was handed over, and a
-    # failed clipboard selects that same text.
-    clipboard = CLIPBOARD.read
-    assert_includes clipboard, "this.textValue || this.urlValue || this.sourceText()"
-    assert_match(/sourceText\(\) \{\s*return this\.hasSourceTarget \? this\.sourceTarget\.textContent\.trim\(\) : ""/, clipboard)
-    assert_includes clipboard, "this.select(this.sourceTarget)"
-    # Every `secret` target, the source included, is blanked at pagehide.
-    reveal = REVEAL.read
-    assert_includes reveal, %(window.addEventListener("pagehide", this.forget))
-    assert_includes reveal, %(this.secretTargets.forEach((element) => { element.textContent = "" }))
-    assert_no_match(/\bcopy\b\s*\(/, reveal, "the reveal copies nothing: the one copy script is admin--ui--clipboard")
+    # Copy writes the source's text: the box hands the script no text or url
+    # value to prefer (the browser test "Copy writes the command, says
+    # Copied, …" holds that what is copied is that text).
+    assert_no_selector "[data-admin--ui--clipboard-text-value], [data-admin--ui--clipboard-url-value]"
+    # The token's text is a `secret` target, the one the reveal blanks at
+    # pagehide. Source text is the only seam for the blanking itself: no
+    # browser test observes the blanking, and a component test runs no script.
+    assert_includes REVEAL.read, %(window.addEventListener("pagehide", this.forget))
+    assert_includes REVEAL.read, %(this.secretTargets.forEach((element) => { element.textContent = "" }))
   end
 
   test "a caller's class is added to the box's own" do

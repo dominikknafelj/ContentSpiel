@@ -13,13 +13,14 @@ module Admin
     #
     # `copyable:` is off in the setup wizard. The wizard loads the `application`
     # entry point only, and `admin--ui--clipboard` is an admin controller, so a Copy
-    # button there would be dead; the command is still shown, in the copy
-    # box's own look, as text a visitor can select.
+    # button there would be dead; the command is still shown, as the copy
+    # box without its Copy, text a visitor can select.
     #
     # The command is rendered as text (ERB-escaped) and copied from that text;
     # it is a static string (`Setup::SystemCheck::SITE_ADDRESS_COMMAND`),
     # never built from anything of the viewer's. `index:` is the row's place
-    # in its list, which keeps the command's id one of a kind on the page.
+    # in its list, required, which keeps the command's id one of a kind on
+    # the page.
     #
     # A result may carry a `link` (a symbol: the model names no route):
     # `:mail_settings`, `:image_settings` and `:forms`, drawn as "Open Mail
@@ -49,7 +50,7 @@ module Admin
 
       LINK_CLASS = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
 
-      def initialize(result:, index: 0, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil)
+      def initialize(result:, index:, copyable: true, mail_settings_href: nil, image_settings_href: nil, forms_href: nil)
         @result = result
         @index = index
         @copyable = copyable
@@ -68,11 +69,11 @@ module Admin
 
       def forms_link? = result.link == :forms && @forms_href.present?
 
-      def copyable? = @copyable && result.command.present?
+      def copyable? = @copyable
 
       def copy_value
         Admin::Ui::CopyValueComponent.new(id: "check-command-#{@index}", value: result.command,
-          copy_label: t(".copy_label", label: result.label), layout: :inline, class: "mt-2")
+          copy_label: t(".copy_label", label: result.label), layout: :inline, copyable: copyable?, class: "mt-2")
       end
 
       def state_chip

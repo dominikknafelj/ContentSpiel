@@ -5,7 +5,9 @@
   <% else %>
     <pre id="<%= id %>" class="min-w-0 flex-1 overflow-x-auto rounded-field bg-sunken px-3 py-2 font-cs-mono text-small text-ink" <%= tag.attributes(**source_attributes) %>><%= value %></pre>
   <% end %>
-  <button type="button" aria-label="<%= copy_label %>" data-admin--ui--clipboard-target="button" data-action="click->admin--ui--clipboard#copy"
-          class="shrink-0 <%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>"><%= t(".copy") %></button>
-  <span data-admin--ui--clipboard-target="status" role="status" aria-live="polite" class="sr-only"></span>
+  <% if copyable? %>
+    <button type="button" aria-label="<%= copy_label %>" data-admin--ui--clipboard-target="button" data-action="click->admin--ui--clipboard#copy"
+            class="shrink-0 <%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>"><%= t(".copy") %></button>
+    <span data-admin--ui--clipboard-target="status" role="status" aria-live="polite" class="sr-only"></span>
+  <% end %>
 <% end %>

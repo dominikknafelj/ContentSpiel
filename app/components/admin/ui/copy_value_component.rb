@@ -28,12 +28,13 @@ module Admin
         motion: :none,
         content_edges: %i[short long],
         widths: :from_container,
-        interface: %i[id value copy_label layout source_data],
+        interface: %i[id value copy_label layout copyable source_data],
         limits: [
           "It copies the value's text and writes it into no attribute.",
-          "A value too long for its box scrolls inside the box, never the page."
+          "A value too long for its box scrolls inside the box, never the page.",
+          "Without copyable it is the value alone, selectable text with no Copy."
         ],
-        states: %i[inline block],
+        states: %i[inline block plain],
         script_states: {
           copied: [ "test/system/admin/system_status_and_preview_test.rb", "Copy writes the command, says Copied, and announces it politely" ],
           selected: [ "test/system/admin/system_status_and_preview_test.rb", "without a Clipboard API the command is selected instead and nothing raises" ]
@@ -50,13 +51,14 @@ module Admin
       # every screen from <body>'s, for the editor header's Copy).
       MESSAGES = %w[components.ui.copy_value.copied components.ui.copy_value.failed components.ui.copy_value.selected].freeze
 
-      def initialize(id:, value:, copy_label:, layout: :inline, source_data: {}, **html)
+      def initialize(id:, value:, copy_label:, layout: :inline, copyable: true, source_data: {}, **html)
         raise ArgumentError, "unknown copy box layout #{layout.inspect}" unless LAYOUTS.include?(layout)
 
         @id = id
         @value = value
         @copy_label = copy_label
         @layout = layout
+        @copyable = copyable
         @source_data = source_data
         @html = html
       end
@@ -67,11 +69,17 @@ module Admin
 
       def inline? = @layout == :inline
 
-      def source_attributes = { data: { "admin--ui--clipboard-target": "source" }.merge(@source_data) }
+      def copyable? = @copyable
+
+      def source_attributes
+        target = copyable? ? { "admin--ui--clipboard-target": "source" } : {}
+        { data: target.merge(@source_data) }
+      end
 
       def root_attributes
-        @html.merge(class: [ CLASS, @html[:class] ].compact.join(" "),
-          data: @html.fetch(:data, {}).merge(controller: "admin--ui--clipboard", messages: messages_data(*MESSAGES)))
+        data = @html.fetch(:data, {})
+        data = data.merge(controller: "admin--ui--clipboard", messages: messages_data(*MESSAGES)) if copyable?
+        @html.merge(class: [ CLASS, @html[:class] ].compact.join(" "), data: data)
       end
     end
   end

@@ -5,10 +5,8 @@
   <div class="min-w-0 flex-1">
     <p class="font-semibold text-ink"><%= result.label %></p>
     <p class="text-dim"><%= result.message %></p>
-    <% if copyable? %>
+    <% if result.command.present? %>
       <%= render copy_value %>
-    <% elsif result.command.present? %>
-      <code class="mt-2 block overflow-x-auto rounded-field bg-sunken px-3 py-2 font-cs-mono text-small text-ink"><%= result.command %></code>
     <% end %>
     <% if mail_settings_link? %>
       <p class="mt-2"><%= link_to t(".open_mail_settings"), @mail_settings_href, class: LINK_CLASS %></p>

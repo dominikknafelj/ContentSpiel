@@ -1,10 +1,10 @@
 module Admin
   module TokensScreen
     # Step 1 of the AI assistant page, "Create a token": a Name (required,
-    # 1-60 characters), a Group select with the selected
-    # group's description on one line beneath (every option carries it in
-    # `data-description`, `admin--tokens--group-hint` swaps the text, so no request),
-    # and Create token.
+    # 1-60 characters), a Group select with the selected group's description
+    # on one line beneath (every option carries it in `data-description`,
+    # `admin--tokens--group-hint` swaps the text, so no request), and Create
+    # token.
     #
     # The form is a plain, non-Turbo POST (`data-turbo="false"`): the answer to
     # a successful create is a rendered document holding the raw token, which
