@@ -55,7 +55,7 @@ The questions file holds Q1–Q11, each with a recommended answer. **Until the o
 - **Q1, the lists.**
   - No filter bar.
   - The heading row: `text-h1`, the intro in `text-small dim`, and the actions on the right, wrapping under the heading below 640px.
-  - One card holding a real `<table>` in `.admin-table-scroll--x`, with the first column sticky and the head `text-label meta` over `line-strong`.
+  - One card holding a real `<table>` in `.admin-table-scroll--x`, with the head `text-label meta` over `line-strong`. The first column is sticky only in a table whose row is not one link (the tokens table): a sticky cell is the containing block of `.admin-row-link`'s cover, which would then cover the name cell alone, so Users and Groups, whose rows are one link, scroll whole (ruling 2026-11-10, Task 5).
   - A row that opens an editor has its name as `.admin-row-link`, ends in `.admin-row-verb` "Edit", and is `paper` under the pointer.
 - **Q2, a user's row.**
   - `AvatarComponent :md`: `:own` for you, `:other` for anyone else, `:other` for an open invitation too, told apart by its "Invited" / "Invite expired" badge (decided: the dashed edge means away, and someone not yet in is not away).
