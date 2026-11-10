@@ -21,6 +21,8 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   # stand in the shell's tree column, outside the graph's element.
   LIST = "#tree-column [data-mind-graph-list]".freeze
   FIND = "#tree-column input[aria-controls='mind-graph-tree']".freeze
+  # The find's status line under the field, where it says the count.
+  FIND_STATUS = "#tree-column [role=search] [role=status]".freeze
   SEARCH_SITE = "#{LIST} [data-mind-graph-search-site]".freeze
   RESULTS = "#{LIST} [data-mind-graph-results]".freeze
 
@@ -305,8 +307,22 @@ class Admin::MindGraphSystemTestCase < ApplicationSystemTestCase
   # Types `query` into the column's find field and presses the last line,
   # "Search the whole site for …", which shows the whole site's results in
   # the list's place.
+  #
+  # It first waits for the find to SAY its count. The status line under the
+  # field is empty while the person types and is written 300 ms after the
+  # last key (`admin--tree--find#sayLater`); it then takes a line, and
+  # everything under it in the column moves down by that much (about 20px):
+  # the last line, and the results drawn in the list's place. A press on a
+  # result that the write fell inside (Cuprite works out the point, then
+  # presses and releases there) lands on the group's heading above it, and
+  # nothing is opened: on a loaded runner the result's `click_frame_link`
+  # then waited out its `turbo:load` for nothing. With no tree to narrow
+  # (`ul#mind-graph-tree`, the id the field's `aria-controls` names) there is
+  # no count: the find empties the line at once and never writes it.
   def search_whole_site(query)
     find(FIND).fill_in(with: query)
+    await_js("!document.getElementById('mind-graph-tree') || document.querySelector(#{FIND_STATUS.to_json}).textContent.trim() !== ''",
+      message: "the find never said its count under the field")
     find("#{SEARCH_SITE} button", text: "Search the whole site for “#{query}”").click
   end
 
