@@ -33,6 +33,14 @@ class Admin::UsersScreen::InviteDialogComponentTest < ViewComponent::TestCase
     assert_no_selector "div#invite_email_address-errors > p", visible: :all
   end
 
+  test "two refusals about no field are two lines, never one sentence glued with and" do
+    dialog(errors: [ "Invites need mail.", "Try again later." ])
+
+    notice = page.find("div[role=alert]", visible: :all)
+    assert_equal [ "Invites need mail.", "Try again later." ], notice.all("p", visible: :all).map { |line| line.text(:all) }
+    assert_no_text "and Try", normalize_ws: true
+  end
+
   test "an untouched dialog shows no error and no notice" do
     dialog
 

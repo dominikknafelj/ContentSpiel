@@ -1,5 +1,5 @@
 <%= render Admin::Ui::DialogComponent.new(id: DIALOG_ID, title: t(".title"), width: :form, open_on_load: refused?) do |dialog| %>
-  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, class: "mb-4") do %><%= general_errors.to_sentence %><%# i18n-ok: to_sentence joins with the locale's support.array words %><% end %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, class: "mb-4") do %><%= safe_join(general_errors.map { |message| tag.p(message) }) %><% end %>
 
   <%= form_with url: create_path, method: :post, id: FORM_ID, class: "flex flex-col gap-4", data: { turbo_frame: "_top" }, html: { novalidate: true } do %>
     <div class="admin-field">
