@@ -38,28 +38,30 @@ module Admin
       def shown_tokens = tokens.first(MAX_TOKENS_SHOWN)
       def hidden_tokens = token_count - shown_tokens.size
 
-      # Two sentences, each whole: what happens to the members, then to the
-      # tokens.
-      def effect = "#{t(".members", count: member_count)} #{t(".tokens", count: token_count)}"
+      # What deleting costs, whole in each shape. A key is pluralised on one
+      # count, so the words with both counts are nested: the outer level is
+      # the members' plural category, the inner one the tokens', which `t`
+      # pluralises.
+      def effect
+        t(".effect.#{members_category("effect")}", count: token_count, members: member_count)
+      end
 
-      # One whole sentence per shape. A key is pluralised on one count, so the
-      # sentence with both is nested: its outer level is the members' plural
-      # category, its inner one the tokens', which `t` pluralises.
+      # One whole sentence per shape, nested as `effect` is where it names both.
       def dialog_body
         return t(".dialog_body.no_members", count: token_count) if member_count.zero?
         return t(".dialog_body.members_only", count: member_count) if token_count.zero?
 
-        t(".dialog_body.members_and_tokens.#{members_category}", count: token_count, members: member_count)
+        t(".dialog_body.members_and_tokens.#{members_category("dialog_body.members_and_tokens")}", count: token_count, members: member_count)
       end
 
-      # The members' category is the I18n backend's own choice, made by asking
-      # it to pluralise the outer level on the members' count and reading back
-      # which branch it answered: whatever rule the backend applies to every
+      # The members' category of the nested key at `path` is the I18n
+      # backend's own choice, made by asking it to pluralise the outer level on
+      # the members' count and reading back which branch it answered: whatever rule the backend applies to every
       # other `count` (Rails' one/other, or a locale's `i18n.plural.rule` under
       # `I18n::Backend::Pluralization`, with its `few` and `many`) applies here
       # too, and a language's file decides which branches it has.
-      def members_category
-        key = "admin.components.#{self.class.translation_scope}.dialog_body.members_and_tokens"
+      def members_category(path)
+        key = "admin.components.#{self.class.translation_scope}.#{path}"
         I18n.t(key).key(I18n.t(key, count: member_count))
       end
     end

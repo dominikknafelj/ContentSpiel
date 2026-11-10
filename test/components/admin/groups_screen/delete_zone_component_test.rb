@@ -42,13 +42,15 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
 
     zone(group, members: 0)
     assert_selector "dialog p", exact_text: "It has no members. Users themselves are not deleted.", visible: :all
+    assert_selector "section[data-zone=delete] p", exact_text: "It has no members. It has no AI tokens."
   end
 
   # A language with a `few` category (CLDR's, under `I18n::Backend::Pluralization`)
   # is handed its `few` sentence for the members, not `one` or `other` picked by
   # comparing with 1. A throwaway backend loads the app's locale files, takes a
   # plural rule with `few` for 3 and a `few` branch of the sentence, and is put
-  # back afterwards.
+  # back afterwards. The zone's `effect` has no `few` branch, so it takes
+  # `other`, as Pluralization falls back.
   test "the members' sentence follows the locale's plural rule, a few category included" do
     backend = Class.new(I18n::Backend::Simple) { include I18n::Backend::Pluralization }.new
     backend.store_translations(:en, i18n: { plural: { rule: ->(count) { count == 1 ? :one : (2..4).cover?(count) ? :few : :other } } })
@@ -61,6 +63,7 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     group = AccessControl::Group.create!(name: "Bots")
 
     zone(group, members: 3, tokens: [ token("Sync", users(:reader)) ])
+    assert_selector "section[data-zone=delete] p", exact_text: "3 members lose its permissions. 1 AI token is revoked.", count: 1
     assert_selector "dialog p", exact_text: "Its 3 members (few) lose these permissions, and its 1 AI token is revoked.", visible: :all
 
     zone(group, members: 5, tokens: [ token("Deploy", users(:reader)) ])

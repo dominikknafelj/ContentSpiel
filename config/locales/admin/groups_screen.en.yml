@@ -88,14 +88,20 @@ en:
           locked: "You can't grant this"
         delete_zone:
           heading: "Delete this group"
-          members:
-            zero: "It has no members."
-            one: "1 member loses its permissions."
-            other: "%{count} members lose its permissions."
-          tokens:
-            zero: "It has no AI tokens."
-            one: "1 AI token is revoked."
-            other: "%{count} AI tokens are revoked."
+          # What deleting costs: the members' category, then the tokens'.
+          effect:
+            zero:
+              zero: "It has no members. It has no AI tokens."
+              one: "It has no members. 1 AI token is revoked."
+              other: "It has no members. %{count} AI tokens are revoked."
+            one:
+              zero: "1 member loses its permissions. It has no AI tokens."
+              one: "1 member loses its permissions. 1 AI token is revoked."
+              other: "1 member loses its permissions. %{count} AI tokens are revoked."
+            other:
+              zero: "%{members} members lose its permissions. It has no AI tokens."
+              one: "%{members} members lose its permissions. 1 AI token is revoked."
+              other: "%{members} members lose its permissions. %{count} AI tokens are revoked."
           trigger: "Delete group…"
           built_in: "A built-in group can be changed but not deleted."
           dialog_title: "Delete “%{name}”?"
