@@ -121,7 +121,7 @@
       drawn after the zone, as every zone's dialogs are. %>
   <% if can_delete? %>
     <% help = move_to_trash_disabled? ? safe_join([ in_use_reason, " ", link_to(t(".trash.see_where"), "#media-used-on", class: "underline") ]) : retention_help %>
-    <%= render Admin::Ui::ActionZoneComponent.new(label: t(".trash.confirm"), body: help, body_id: "media-trash-help", data: { zone: "trash" }) do |zone| %>
+    <%= render Admin::Ui::ActionZoneComponent.new(label: t(".trash.zone"), body: help, body_id: "media-trash-help", data: { zone: "trash" }) do |zone| %>
       <% zone.with_trigger do %>
         <% if move_to_trash_disabled? %>
           <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.button"), variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
