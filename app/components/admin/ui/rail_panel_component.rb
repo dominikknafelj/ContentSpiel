@@ -25,7 +25,8 @@ module Admin
         states: %i[rest current docked_only],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_navigation_test.rb", "a rail's panel takes no focus of its own: Tab from its current tab goes to the first control inside it" ]
       )
 
       def initialize(rail_id:, key:, current: false, docked_only: false)

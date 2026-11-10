@@ -5,7 +5,8 @@ require "ripper"
 # and `assert_contract` holds the declaration to the code: the keywords of
 # `initialize`, the ViewComponent slots, the keys it owns in ui.en.yml, its
 # controller's file and that the component attaches it itself, and the browser
-# tests its script-held states and its keyboard name. The components are
+# tests its script-held states and its keyboard name (or the sentence that it
+# takes no focus). The components are
 # derived from the files, so a new one is in every check from the day its
 # file is written.
 #
@@ -13,20 +14,6 @@ require "ripper"
 # accessibility sentence, the motion, the content edges, the widths and the
 # limits.
 module UiContract
-  # The components of app/components/admin/ui made before the contract that
-  # name no keyboard browser test yet: one on it may declare `keyboard: nil`,
-  # and every other component names its test. Frozen: it only shrinks, when a
-  # component on it declares its keyboard test or is deleted, and nothing is
-  # ever added (test/lib/component_parts_test.rb).
-  MADE_BEFORE_CONTRACT = %w[
-    Admin::Ui::ButtonComponent Admin::Ui::CheckboxComponent Admin::Ui::ConfirmDialogComponent Admin::Ui::DialogComponent
-    Admin::Ui::ErrorSummaryComponent Admin::Ui::FieldComponent Admin::Ui::FileDropComponent Admin::Ui::LanguageTabsComponent
-    Admin::Ui::MailFailedNoticeComponent Admin::Ui::PaginationComponent Admin::Ui::PasswordFieldComponent
-    Admin::Ui::PrefixInputComponent Admin::Ui::RailPanelComponent Admin::Ui::RailTabComponent Admin::Ui::SaveBarComponent
-    Admin::Ui::SaveStatusComponent Admin::Ui::SystemCheckRowComponent Admin::Ui::TabLinksComponent
-    Admin::Ui::ThemeSwitchComponent Admin::Ui::ToastComponent
-  ].freeze
-
   # A new component whose keyboard browser test comes in a later task of the
   # same pull request, mapped to the reason, so no commit between the two is
   # red. Empty when a pull request is merged.

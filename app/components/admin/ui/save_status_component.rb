@@ -35,7 +35,8 @@ module Admin
           stale held held_own_tab held_unknown saved_over signed_out retry
         ],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a save status's Retry is a Tab stop, and Enter on it sends the save again" ]
       )
 
       # `signed_out` is never rendered by any

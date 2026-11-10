@@ -41,7 +41,8 @@ module Admin
         # every leaf under `save_bar`.
         keys: %w[save_changes discard changes names more separator per_language order_changed unsaved no_changes blocked],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a save bar's Save is reached with Tab from the form's fields, and Enter on it saves" ]
       )
 
       # `contained: true` is the footer of ONE card, drawn inside it: under a

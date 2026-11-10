@@ -55,7 +55,8 @@ module Admin
         },
         keys: %w[nav_label missing_title missing outdated_title outdated more],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_navigation_test.rb", "the language tabs' links are Tab stops after the current language, and Enter on one opens that language, which becomes the current" ]
       )
 
       MODES = %i[links buttons].freeze
