@@ -236,6 +236,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb
     app/components/admin/editor_screen/new_post_dialog_component.rb
+    app/components/admin/editor_screen/changed_elsewhere_component.rb
+    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/new_post_dialog_component.html.erb
     app/components/admin/editor_screen/new_post_form_component.rb
     app/components/admin/editor_screen/new_post_form_component.html.erb
