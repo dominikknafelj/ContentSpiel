@@ -1,9 +1,11 @@
 # The registry of Tiptap/ProseMirror node and mark types (design spec §3.2)
 # that `RichText::Document#validate` and, from Task 2 on, the HTML and
 # Markdown renderers walk. Built-ins register here from
-# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`;
-# plugins will call the same `register_node`/`register_mark` later, under a
-# prefixed `owner/name`.
+# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`.
+# A gem cannot register here: no hook replays an outside node or mark after
+# that `reset!` (`ContentSpiel::Plugins` has none for the schema), so one a
+# gem registers is wiped at boot and on every reload. An outside name would
+# be a prefixed `owner/name` (`NAME_FORMAT`).
 #
 # This mirrors `ContentModel::Registry` (open-types spec §3.2) in spirit --
 # register/fetch-by-name/reset!, a duplicate raises, a malformed name is
