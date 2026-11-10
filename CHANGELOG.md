@@ -102,6 +102,7 @@
 - The posts list's `status` parameter and its `draft` spelling (`?status=draft`): an address that carries it lists every post, as with no filter. `scope` (`all`, `live`, `drafts`, `scheduled`) is the list's one name for it.
 - `Admin::Ui::AvatarComponent`'s `ring:` keyword and its rings: a stack's circles stand apart and need no ground ring. A caller that passes `ring:` gets an `ArgumentError`.
 - `Admin::SettingsScreen::CardComponent`: it is `Admin::Ui::SettingsCardComponent`, with no alias.
+- `Admin::DashboardScreen::TranslationPanelComponent::WIDTHS`: the progress bar's widths are `Admin::Ui::LanguageProgressComponent`'s.
 
 ### For a gem or an outside caller
 
