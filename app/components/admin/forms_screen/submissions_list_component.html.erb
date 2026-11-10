@@ -28,7 +28,7 @@
         <tbody>
           <% submissions.each do |submission| %>
             <tr id="<%= helpers.dom_id(submission) %>" class="relative border-b border-line align-middle last:border-b-0">
-              <td class="z-(--cs-z-raised) py-2.5 pr-4 whitespace-nowrap">
+              <td class="pointer-events-none z-(--cs-z-raised) py-2.5 pr-4 whitespace-nowrap">
                 <%= link_to submission_path(submission), class: TIME_LINK_CLASS, data: { turbo_frame: "content" } do %><%= render Admin::Ui::TimeAgoComponent.new(time: submission.created_at) %><% end %>
               </td>
               <td class="max-w-0 w-full py-2.5 pr-4">

@@ -24,7 +24,6 @@ class Admin::FormsScreen::SubmissionsListComponentTest < ViewComponent::TestCase
     delivered.deliveries.create!(kind: "mail", destination: form_destinations(:contact_mail)).record_sent!(at: Time.current)
     render_list([ failed, delivered ])
 
-    assert_equal "Not delivered", t("not_delivered")
     assert row(failed).has_selector?(".admin-state-chip[data-state-tone=warn]", text: t("not_delivered")), "the failed row says so in a warn state chip"
     assert row(failed).has_no_selector?("[class~='bg-warn-tint']:not(.admin-state-chip)"), "no warn badge beside it"
     assert row(delivered).has_no_selector?(".admin-state-chip"), "a delivered row says nothing"

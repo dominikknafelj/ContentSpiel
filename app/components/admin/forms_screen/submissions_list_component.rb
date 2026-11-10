@@ -24,13 +24,15 @@ module Admin
     # from the first cell: a sticky cell is the containing block of what is
     # absolute inside it, so the link would cover that cell alone. The first
     # cell stands at the raised layer, over the stretched link, so its own
-    # link takes the pointer and draws its focus ring.
+    # link takes the pointer and draws its focus ring; the cell itself lets
+    # the pointer through (`pointer-events-none`, the link `-auto`), so its
+    # padding opens the row as every other cell does.
     #
     # DELETE ALL counts the form's whole count, not the page's, because that
     # is what it deletes (`Forms::DeleteSubmissions`, `all: true`).
     class SubmissionsListComponent < Admin::AdminComponent
       DIALOG_ID = "delete-all-submissions-dialog".freeze
-      TIME_LINK_CLASS = "text-small text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent".freeze
+      TIME_LINK_CLASS = "pointer-events-auto text-small text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent".freeze
 
       def initialize(form:, submissions:, pagination:, total:, page_url:, url_options: {})
         @form = form

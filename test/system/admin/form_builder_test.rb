@@ -135,7 +135,7 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     assert boxes["scrollHeight"] <= boxes["clientHeight"], "the open menu does not lengthen the table box's scroll: #{boxes.inspect}"
   end
 
-  test "a submission's row opens from any cell, its time link takes the pointer in the sticky first cell, and the whole row is on paper under the pointer" do
+  test "a submission's row opens from any cell: the summary and the sticky first cell's padding are under the row's link, the time link is over it, and the whole row is on paper under the pointer" do
     form = forms(:contact)
     record = Forms::Submission.create!(form: form, locale: "en", answers: [
       { "key" => "f_name0001", "type" => "short_text", "label" => "Your name", "value" => "Ada Lovelace", "display" => "Ada Lovelace" }
@@ -153,13 +153,15 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
         const summary = row.querySelector("td:nth-child(2)")
         return { grounds: [ ...row.cells ].map((cell) => getComputedStyle(cell).backgroundColor),
           timeHit: document.elementFromPoint(...centre(time)) === time || time.contains(document.elementFromPoint(...centre(time))),
-          summaryHit: document.elementFromPoint(...centre(summary)).matches("a[aria-hidden=true][tabindex='-1']") }
+          summaryHit: document.elementFromPoint(...centre(summary)).matches("a[aria-hidden=true][tabindex='-1']"),
+          paddingHit: ((r) => document.elementFromPoint(r.left + 4, (r.top + r.bottom) / 2))(row.cells[0].getBoundingClientRect()).matches("a[aria-hidden=true][tabindex='-1']") }
       })()
     JS
     assert_equal 1, looks["grounds"].uniq.size, "every cell of the row, the sticky first one too, takes one ground: #{looks.inspect}"
     assert_not_equal "rgba(0, 0, 0, 0)", looks["grounds"].first, "the row's ground is the paper's, not none: #{looks.inspect}"
     assert looks["timeHit"], "the first cell's own link is over the row's stretched link: #{looks.inspect}"
     assert looks["summaryHit"], "the summary is under the row's stretched link: #{looks.inspect}"
+    assert looks["paddingHit"], "the first cell's padding, 4px in from its left edge, is under the row's stretched link: #{looks.inspect}"
 
     # A press where the summary is, at the pointer's place: whatever is
     # topmost there takes it, as it would a person's.

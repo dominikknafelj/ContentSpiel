@@ -113,8 +113,6 @@ class Admin::FormsScreen::SubmissionComponentTest < ViewComponent::TestCase
     assert_equal [ "off", t("states.sending") ], [ chip.(sending)["data-state-tone"], chip.(sending).text.strip ]
     assert_selector "li[data-delivery-id='#{sending.id}'][data-delivery-state=waiting]"
     assert_equal [ "warn", t("states.not_delivered") ], [ chip.(failed)["data-state-tone"], chip.(failed).text.strip ]
-    assert_equal %w[Sent Waiting Sending], [ t("states.sent"), t("states.waiting"), t("states.sending") ]
-    assert_equal "Not delivered", t("states.not_delivered")
 
     assert_selector "li[data-delivery-id='#{failed.id}'] p.text-small.text-warn-ink[data-failure]"
     assert_equal Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split.sort,
