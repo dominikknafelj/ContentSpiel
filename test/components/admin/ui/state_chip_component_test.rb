@@ -46,6 +46,18 @@ class Admin::Ui::StateChipComponentTest < ViewComponent::TestCase
     assert_no_selector ".text-meta"
   end
 
+  test "a detail may be markup, a time element, kept as markup; a plain string is escaped" do
+    time = render_inline(Admin::Ui::TimeAgoComponent.new(time: 2.hours.ago)).to_html.html_safe
+    render_inline Admin::Ui::StateChipComponent.new(tone: :off, label: "Revoked", detail: time)
+
+    assert_selector "span.admin-state-chip + span.text-small.text-meta > time[datetime]"
+    assert_equal "Revoked · #{page.find('time').text}", page.find("span.inline").text.squish
+
+    render_inline Admin::Ui::StateChipComponent.new(tone: :off, label: "Off", detail: "<b>x</b>")
+    assert_no_selector "b"
+    assert_selector "span.text-meta", text: "· <b>x</b>"
+  end
+
   test "an unknown tone is refused" do
     assert_raises(ArgumentError) { Admin::Ui::StateChipComponent.new(tone: :live, label: "Live") }
     assert_equal %i[ok warn danger off], Admin::Ui::StateChipComponent::TONES

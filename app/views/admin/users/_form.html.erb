@@ -1,11 +1,15 @@
-<%# The user form, new and edit (round 3 Task 12; handoff `Studio User Edit`): Name
-    and Email in a card (the password under them), then the Groups cards, then the
-    save footer. `state` is `Users::Manageability`'s answer for an existing user:
-    `:editable`, or a READ-ONLY state (`:owner_protected`, `:outranked`) -- the
-    notice, the whole form in `<fieldset disabled class="admin-view-only">` (nothing
-    submittable), no footer; and no owner or delete zone either (the page draws
-    those). It decides what is drawn only: `Users::Save` refuses a forged PATCH
-    all the same, with one `access.denied`.
+<%# The user form, new and edit: the Details card (Name, Email, the password
+    under them), then the Groups card, then the save footer. `state` is
+    `Users::Manageability`'s answer for an existing user: `:editable`, or a
+    READ-ONLY state (`:owner_protected`, `:outranked`) -- the notice, the
+    whole form in `<fieldset disabled class="admin-view-only">` (nothing
+    submittable), no footer; and no owner or delete zone either (the page
+    draws those). It decides what is drawn only: `Users::Save` refuses a
+    forged PATCH all the same, with one `access.denied`.
+
+    Each text field is an `.admin-field` whose error slot
+    (`admin/shared/_field_errors`) is its direct child, so a refused field
+    takes the shared invalid edge from its message.
 
     PASSWORD. On a NEW user the two fields, Show and the strength meter. On an edit
     they sit behind "Set a new password…" (`<details>`, so it opens without
@@ -13,73 +17,77 @@
     disclosure clears what was typed (`admin--users--password-disclosure`), so a
     half-typed password can't be submitted by accident. A typed password is never
     rendered back; after a refusal it opens again on the field the error names.
+    The summary is a small tertiary button, `w-fit` because `.admin-disclosure`
+    lays it out as a flex row that would otherwise take the card's width.
 
-    The footer counts what the form would SUBMIT (`admin--saving--save-bar`): a ticked card
-    is one change, opening the disclosure without typing is none. The group cards
+    The footer counts what the form would SUBMIT (`admin--saving--save-bar`): a ticked tile
+    is one change, opening the disclosure without typing is none. The group tiles
     are `user[group_ids][]` after a blank sentinel. %>
 <% read_only = state != :editable %>
 <% selected_group_ids = params.dig(:user, :group_ids)&.compact_blank&.map(&:to_i) || user.group_ids %>
-<% field_ids = { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" } %>
 
 <%= form_with url: url, method: method, id: "user-form", data: (read_only ? {} : save_bar_form_data(dirty: user.errors.any? || @stale_form.present?, always: user.new_record?)) do %>
-  <%= tag.fieldset disabled: read_only || nil, class: [ "min-w-0 border-0 p-0", ("admin-view-only" if read_only) ] do %>
+  <%= tag.fieldset disabled: read_only || nil, class: [ "flex min-w-0 flex-col gap-6 border-0 p-0", ("admin-view-only" if read_only) ] do %>
     <%# The stale-save base (`Admin::StaleForm`); after a refusal the posted (stale)
         base stays, so the next Save is refused too until Reload. %>
     <% if user.persisted? %>
       <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "user-base-updated-at", value: params[:base_updated_at].presence || user.updated_at.iso8601(6) } %>
     <% end %>
-    <section class="flex flex-col gap-4 rounded-card bg-surface shadow-1 p-[18px]">
-      <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
-        <div>
-          <%= label_tag "user_name", "Name", class: setup_label_class %>
-          <%= text_field_tag "user[name]", user.name, id: "user_name", maxlength: 120, autocomplete: "name", placeholder: "Shown instead of the email",
-                aria: { describedby: "user_name_help", invalid: (user.errors.include?(:name) ? "true" : nil) }.compact,
-                class: [ setup_input_class, ("!border-danger" if user.errors.include?(:name)) ] %>
-          <p id="user_name_help" class="mt-1 text-sm text-meta">Optional. Shown instead of the email.</p>
-        </div>
-        <div>
-          <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
-          <%= email_field_tag "user[email_address]", user.email_address, id: "user_email_address", autofocus: !read_only,
-                autocomplete: "username", placeholder: "name@example.com", aria: { invalid: (user.errors.include?(:email_address) ? "true" : nil) }.compact,
-                class: [ setup_input_class, ("!border-danger" if user.errors.include?(:email_address)) ] %>
-        </div>
-      </div>
-
-      <% if user.new_record? %>
-        <div class="max-w-[420px]">
-          <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "Password", meter: true) %>
-        </div>
-        <div class="max-w-[420px]">
-          <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
-        </div>
-      <% elsif !read_only %>
-        <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
-            (Users::Save), so the meter must not hold the submit back; the server still enforces the
-            minimum on a typed one. %>
-        <details class="admin-set-password" data-controller="admin--users--password-disclosure" data-action="toggle->admin--users--password-disclosure#toggled"
-                 <%# Open again when a password was posted, even after a refusal for another reason: the typed value is never rendered back, so the editor must see the empty fields and retype. %>
-                 <%= "open" if user.errors.include?(:password) || user.errors.include?(:password_confirmation) || params.dig(:user, :password).present? || params.dig(:user, :password_confirmation).present? %>>
-          <summary class="inline-block cursor-pointer text-sm text-accent hover:text-accent-hover">Set a new password…</summary>
-          <div class="mt-3 flex max-w-[420px] flex-col gap-4">
-            <div>
-              <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "New password", meter: true, required: false) %>
-              <p class="mt-1 text-sm text-meta">Leave this closed to keep the current password.</p>
-            </div>
-            <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm new password", required: false) %>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "user-details", heading: t(".details"), icon: :user, family: :people) do %>
+      <div class="flex flex-col gap-4 p-4">
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
+          <div class="admin-field">
+            <%= label_tag "user_name", t(".name"), class: setup_label_class %>
+            <%= text_field_tag "user[name]", user.name, id: "user_name", maxlength: 120, autocomplete: "name", placeholder: t(".name_placeholder"),
+                  aria: { describedby: "user_name_help user_name-errors", invalid: (user.errors.include?(:name) ? "true" : nil) }.compact,
+                  class: setup_input_class %>
+            <p id="user_name_help" class="mt-1 text-small text-meta"><%= t(".name_help") %></p>
+            <%= render "admin/shared/field_errors", id: "user_name-errors", messages: user.errors.full_messages_for(:name) %>
           </div>
-        </details>
-      <% end %>
-    </section>
+          <div class="admin-field">
+            <%= label_tag "user_email_address", t(".email"), class: setup_label_class %>
+            <%= email_field_tag "user[email_address]", user.email_address, id: "user_email_address", autofocus: !read_only,
+                  autocomplete: "username", placeholder: t(".email_placeholder"),
+                  aria: { describedby: "user_email_address-errors", invalid: (user.errors.include?(:email_address) ? "true" : nil) }.compact,
+                  class: setup_input_class %>
+            <%= render "admin/shared/field_errors", id: "user_email_address-errors", messages: user.errors.full_messages_for(:email_address) %>
+          </div>
+        </div>
 
-    <div class="mt-6">
-      <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: all_groups, selected_ids: selected_group_ids, assignable_ids: assignable_group_ids,
-            manage_groups: can?("groups.manage"), url_options: admin_url_options) %>
-    </div>
+        <% if user.new_record? %>
+          <div class="max-w-[420px]">
+            <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: t(".password"), meter: true) %>
+          </div>
+          <div class="max-w-[420px]">
+            <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: t(".password_confirmation")) %>
+          </div>
+        <% elsif !read_only %>
+          <%# No `data-password-submit` on this form's button: a blank password means "keep the current one"
+              (Users::Save), so the meter must not hold the submit back; the server still enforces the
+              minimum on a typed one. %>
+          <details class="admin-set-password" data-controller="admin--users--password-disclosure" data-action="toggle->admin--users--password-disclosure#toggled"
+                   <%# Open again when a password was posted, even after a refusal for another reason: the typed value is never rendered back, so the editor must see the empty fields and retype. %>
+                   <%= "open" if user.errors.include?(:password) || user.errors.include?(:password_confirmation) || params.dig(:user, :password).present? || params.dig(:user, :password_confirmation).present? %>>
+            <summary class="admin-disclosure w-fit <%= Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>"><%= t(".set_password") %></summary>
+            <div class="mt-3 flex max-w-[420px] flex-col gap-4">
+              <div>
+                <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: t(".new_password"), meter: true, required: false) %>
+                <p class="mt-1 text-small text-meta"><%= t(".keep_password") %></p>
+              </div>
+              <%= render Admin::Ui::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: t(".new_password_confirmation"), required: false) %>
+            </div>
+          </details>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: all_groups, selected_ids: selected_group_ids, assignable_ids: assignable_group_ids,
+          manage_groups: can?("groups.manage"), url_options: admin_url_options) %>
   <% end %>
 
   <% unless read_only %>
     <%# The Save button carries `data-password-submit` on a NEW user only: the meter holds it back until the password is long enough. %>
     <%= render Admin::Ui::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options),
-          save_label: (user.new_record? ? "Create user" : "Save user"), save_data: (user.new_record? ? { password_submit: true } : {})) %>
+          save_label: (user.new_record? ? t(".create") : t(".save")), save_data: (user.new_record? ? { password_submit: true } : {})) %>
   <% end %>
 <% end %>

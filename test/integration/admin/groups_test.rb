@@ -1,6 +1,6 @@
 require "test_helper"
 
-# The Groups module (access-control design spec §5): list, editor, delete.
+# The Groups module: list, editor, delete.
 # The rules themselves are `Groups::Save`/`Groups::Destroy`'s (test/
 # services/groups); this covers the screens and the params they send.
 class Admin::GroupsTest < ActionDispatch::IntegrationTest
@@ -30,7 +30,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "each row is one link to the editor: no Edit button, nothing interactive nested in it" do
+  test "each row is one link to the editor, ending in the words Edit: no button, nothing interactive nested in it" do
     sign_in_as(users(:one))
     get "/cs-studio/groups"
 
@@ -40,8 +40,9 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
       assert_select "a", count: 1
       assert_select "button", count: 0
     end
+    assert_select "#" + dom_id(group) + " .admin-row-verb[aria-hidden=true]", text: "Edit"
     assert_select "a", text: "Edit", count: 0
-    assert_select "a[href='/cs-studio/groups/new']", text: "New group"
+    assert_select "a[href='/cs-studio/groups/new'][class=?]", Admin::Ui::ButtonComponent.classes(:primary), text: "New group"
     assert_select "p", text: "Built-in groups can be changed but not deleted. Deleting a custom group removes its permissions from its members and revokes its AI tokens."
   end
 
@@ -71,7 +72,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     many = count_queries { get "/cs-studio/groups" }
 
     assert_equal few, many
-    assert_select "ul li", minimum: 10
+    assert_select "table.admin-groups-list tbody tr", minimum: 10
   end
 
   test "create a group with posts.edit scoped to blog and own, then edit it" do
@@ -145,7 +146,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "button", text: /Delete group/, count: 0
-    assert_select ".admin-delete-zone", text: "A built-in group can be changed but not deleted."
+    assert_select "[data-zone=built_in]", text: "A built-in group can be changed but not deleted."
 
     delete "/cs-studio/groups/#{group.id}"
     assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
@@ -173,7 +174,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert Audit::Event.exists?(action: "token.revoked", subject_type: "ApiToken", subject_id: token.id)
   end
 
-  # Review Focus 3: a grant scoped to a deleted branch root or an
+  # A grant scoped to a deleted branch root or an
   # unregistered content type still opens, with the stale values shown as
   # removed.
   test "a group with stale grants still loads, showing the stale values as removed" do
@@ -243,13 +244,13 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_equal({ "page_ids" => [ hidden.id ] }, group.grants.reload.sole.scope)
   end
 
-  # --- Review Focus 3: a form submitted exactly as rendered changes nothing --------
+  # --- A form submitted exactly as rendered changes nothing --------------------------
 
   # The tri-state tree is where this could break: an ancestor shown "-"
   # (indeterminate, unchecked) and a descendant shown as a greyed tick
   # (disabled) must never be submitted, a stored root the viewer can't open must
   # be carried, and a removed content type must be carried too.
-  # NOTE (round 3 Task 11): `editor_branch` can't hand out most of this group's
+  # NOTE: `editor_branch` can't hand out most of this group's
   # grants, so the editor draws it read-only (a disabled fieldset, no footer) and
   # nothing here is really "pressed Save". The form's inputs are still rendered, and
   # this test posts them as a forged untouched save: what it pins is that the
@@ -341,7 +342,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_select "[data-save-bar-dirty-value], [data-admin--saving--save-bar-dirty-value=true]"
   end
 
-  test "a plugin permission is a toggle in a card of its own area, and saves" do
+  test "a plugin permission is a switch under a band of its own area, and saves" do
     AccessControl::Permissions.register "acme/widgets.use", label: "Use widgets", area: "Widgets", action: :use
     sign_in_as(users(:one))
 
@@ -356,15 +357,32 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     AccessControl::BuiltIns.register
   end
 
-  test "the editor is eleven rows and three toggle cards, up to 1000px, with the key as each row's title" do
+  test "the editor is a Group card and eleven rows and the switches in their bands, up to 1000px, with the key as each row's title" do
     sign_in_as(users(:one))
     get "/cs-studio/groups/new"
 
     assert_select "[data-permission]", count: 11
     assert_select "[data-permission='posts.delete'] code[title='posts.delete']"
     assert_select "section h3", text: /Content|Administration|Oversight/, count: 3
+    assert_select "#group-form section.admin-settings-card[aria-labelledby=group-details]" do
+      assert_select "h2#group-details", text: "Group"
+      assert_select ".admin-field > input#group_name[aria-describedby='group_name-errors'] ~ #group_name-errors"
+      assert_select ".admin-field > input#group_description ~ #group_description-errors"
+      assert_select ".admin-column input#group_member_ids"
+    end
     assert_select ".max-w-\\[1000px\\]"
     assert_select "[class*='mx-auto']", count: 0
+  end
+
+  test "a refused name is drawn on the shared invalid edge: its message in the field's own slot, no important danger border" do
+    sign_in_as(users(:one))
+
+    post "/cs-studio/groups", params: { group: { name: "", description: "", member_ids: [ "" ] } }
+
+    assert_response :unprocessable_entity
+    assert_select ".admin-field > input#group_name[aria-invalid=true]"
+    assert_select ".admin-field > #group_name-errors > p", minimum: 1
+    assert_select "[class*='!border-danger']", count: 0
   end
 
   test "a non-owner can't plant an unregistered content type name through the form (403, nothing stored)" do
@@ -400,7 +418,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
 
   private
 
-  # The group of the Review Focus 3 tests, and the pages it points at. `editor_branch`
+  # The group of the saved-as-rendered tests, and the pages it points at. `editor_branch`
   # manages groups and reads only `section`'s branch -- `hidden` is a stored root
   # they can't open.
   def review_focus_group

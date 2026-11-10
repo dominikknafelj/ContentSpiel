@@ -54,7 +54,7 @@ class Admin::FiltersTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_no_match(/evil\.example/, response.body)
     assert_select "nav[aria-label='Pagination'] a[href*='q=needle'][href*='page=2']"
-    assert_select "nav[aria-label='Pagination']", text: /1–48 OF 50/ # the searched total, not the whole library
+    assert_select "nav[aria-label='Pagination']", text: /1–48 of 50/ # the searched total, not the whole library
   end
 
   test "route-option params never reach the media picker pager" do

@@ -122,6 +122,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/forms/builder_controller.js
     app/components/admin/ui/settings_card_component.rb
     app/components/admin/ui/settings_card_component.html.erb
+    app/components/admin/ui/action_zone_component.rb
+    app/components/admin/ui/action_zone_component.html.erb
+    app/components/admin/ui/copy_value_component.rb
+    app/components/admin/ui/copy_value_component.html.erb
+    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/system_check_row_component.html.erb
+    app/javascript/controllers/admin/ui/clipboard_controller.js
+    app/javascript/controllers/admin/tokens/reveal_controller.js
     app/components/admin/settings_screen/section_card.rb
     app/components/admin/settings_screen/nav_component.rb
     app/components/admin/settings_screen/nav_component.html.erb
@@ -174,7 +182,48 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/list_component.html.erb
     app/components/admin/users_screen/invite_dialog_component.rb
     app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/components/admin/users_screen/delete_zone_component.rb
+    app/components/admin/users_screen/delete_zone_component.html.erb
+    app/components/admin/users_screen/owner_zone_component.rb
+    app/components/admin/users_screen/owner_zone_component.html.erb
+    app/components/admin/users_screen/group_cards_component.rb
+    app/components/admin/users_screen/group_cards_component.html.erb
+    app/views/admin/users/index.html.erb
+    app/views/admin/users/_form.html.erb
+    app/views/admin/users/edit.html.erb
+    app/views/admin/users/new.html.erb
+    app/components/admin/groups_screen/delete_zone_component.rb
+    app/components/admin/groups_screen/delete_zone_component.html.erb
+    app/components/admin/groups_screen/list_component.rb
+    app/components/admin/groups_screen/list_component.html.erb
+    app/components/admin/groups_screen/members_component.rb
+    app/components/admin/groups_screen/members_component.html.erb
+    app/components/admin/groups_screen/permission_matrix_component.rb
+    app/components/admin/groups_screen/permission_matrix_component.html.erb
+    app/components/admin/groups_screen/permission_row_component.rb
+    app/components/admin/groups_screen/permission_row_component.html.erb
+    app/components/admin/groups_screen/scope_editor_component.rb
+    app/components/admin/groups_screen/scope_editor_component.html.erb
+    app/components/admin/groups_screen/toggle_list_component.rb
+    app/components/admin/groups_screen/toggle_list_component.html.erb
+    app/views/admin/groups/index.html.erb
+    app/views/admin/groups/_form.html.erb
+    app/views/admin/groups/edit.html.erb
+    app/views/admin/groups/new.html.erb
+    app/javascript/controllers/admin/groups/permission_matrix_controller.js
+    app/javascript/controllers/admin/groups/branch_picker_controller.js
     app/controllers/admin/invites_controller.rb
+    app/components/admin/tokens_screen/create_step_component.rb
+    app/components/admin/tokens_screen/create_step_component.html.erb
+    app/components/admin/tokens_screen/connect_step_component.rb
+    app/components/admin/tokens_screen/connect_step_component.html.erb
+    app/components/admin/tokens_screen/table_component.rb
+    app/components/admin/tokens_screen/table_component.html.erb
+    app/views/admin/api_tokens/_screen.html.erb
+    app/views/admin/api_tokens/index.html.erb
+    app/views/admin/api_tokens/create.html.erb
+    app/views/admin/accounts/edit.html.erb
+    app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
     app/views/admin/posts/index.html.erb
@@ -488,6 +537,22 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/audit_screen/changes_component.html.erb
     app/views/admin/audit_events/index.html.erb
     app/views/admin/audit_events/show.html.erb
+    app/views/layouts/product.html.erb
+    app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/shared/_product_wordmark.html.erb
+    app/views/admin/sessions/new.html.erb
+    app/views/admin/passwords/new.html.erb
+    app/views/admin/passwords/edit.html.erb
+    app/views/invitations/show.html.erb
+    app/controllers/admin/sessions_controller.rb
+    app/controllers/admin/passwords_controller.rb
+    app/controllers/invitations_controller.rb
+    app/components/admin/ui/password_field_component.rb
+    app/components/admin/ui/password_field_component.html.erb
+    app/javascript/controllers/password_field_controller.js
+    app/views/admin/system_status/show.html.erb
+    app/views/admin/errors/forbidden.html.erb
+    app/views/admin/errors/not_found.html.erb
   ].freeze
 
   PLACEHOLDER = "".freeze

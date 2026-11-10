@@ -30,6 +30,30 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # - `rgb(` / `rgba(` / `hsl(` / `hsla(`.
   RAW_COLOUR = /(?<![\w#&\/-])#(?:\h{8}|\h{6}|\h{3,4})(?![\w-])|\b(?:rgb|hsl)a?\(/
 
+  # The mails: the mailer layout, the button and every mailer's views
+  # (`app/views/*_mailer`, so a new mailer's are read too). A mail has no
+  # tokens and a client reads no stylesheet, so its colours are named CSS
+  # colours written inline, with one exception: the button's violet,
+  # `MAIL_ACCENT`, which is `--cs-accent`'s light value (a mail has no dark
+  # scheme). The exception admits that spelling and no other, in a mail
+  # source alone.
+  MAIL_SOURCES = (Dir[Rails.root.join("app/views/layouts/mailer.*")] + Dir[Rails.root.join("app/views/{mails,*_mailer}")].select { |path| File.directory?(path) })
+    .map { |path| Pathname(path).relative_path_from(Rails.root).to_s }.sort.freeze
+  MAIL_ACCENT = "#6236d9".freeze
+  # The violet as a whole literal: `#6236d9ff` is another colour, and stays caught.
+  MAIL_ACCENT_LITERAL = /#{MAIL_ACCENT}(?!\h)/
+  MAIL_FILES = MAIL_SOURCES.flat_map do |source|
+    path = Rails.root.join(source)
+    path.file? ? [ path.to_s ] : Dir[path.join("**/*.erb")]
+  end.freeze
+
+  # A line's raw colour literals, after a mail source's one admitted value
+  # is taken out of it.
+  def raw_colours(line, mail:)
+    line = line.gsub(MAIL_ACCENT_LITERAL, "") if mail
+    line.scan(RAW_COLOUR)
+  end
+
   # Any `dark:` variant -- `dark:bg-…`, an arbitrary `dark:[…]`, a stacked
   # `dark:hover:bg-…` or `hover:dark:bg-…` -- except `dark:scheme-dark`, the
   # one place the theme is handed to the browser's own controls. Tokens
@@ -67,10 +91,40 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       root = Rails.root.join("app", directory).to_s
       assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
+    mailers = Dir[Rails.root.join("app/mailers/*_mailer.rb")].map { |path| File.basename(path, ".rb") } - %w[application_mailer]
+    mailers.each { |mailer| assert_includes MAIL_SOURCES, "app/views/#{mailer}", "#{mailer}'s views are read by the colour rule" }
+    assert_includes MAIL_SOURCES, "app/views/mails"
+    assert_includes MAIL_SOURCES, "app/views/layouts/mailer.html.erb"
+    MAIL_SOURCES.each do |source|
+      root = Rails.root.join(source).to_s
+      assert MAIL_FILES.any? { |path| path == root || path.start_with?("#{root}/") }, "#{source} has no .erb file: the colour rule looks at nothing there"
+    end
   end
 
-  test "no raw colour literals in CS Studio" do
-    assert_empty design_offences(RAW_COLOUR)
+  test "no colour literal in CS Studio's sources or a mail's, but the mail's violet" do
+    offences = (ADMIN_SOURCES | MAIL_FILES).flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        found = raw_colours(line, mail: MAIL_FILES.include?(path))
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{found.join(" ")}" if found.any?
+      end
+    end
+    assert_empty offences
+
+    assert_empty raw_colours("background:#{MAIL_ACCENT};", mail: true), "the violet is admitted in a mail source"
+    assert_equal [ MAIL_ACCENT ], raw_colours("background:#{MAIL_ACCENT};", mail: false), "and refused in CS Studio's"
+    [ "background:#6236DA;", "color:#000;", "background:#6236d9ff;" ].each do |sample|
+      assert_not_empty raw_colours(sample, mail: true), "#{sample} is refused in a mail source"
+    end
+  end
+
+  test "a mail's one colour literal is the accent's violet, on the button alone" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    light = css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1]
+    assert_equal MAIL_ACCENT, light[/--cs-accent:\s*([^;]+);/, 1].strip, "the mail's violet is --cs-accent's light value"
+
+    holders = (ADMIN_SOURCES | MAIL_FILES).select { |path| File.read(path).include?(MAIL_ACCENT) }
+    assert_equal [ "app/views/mails/_button.html.erb" ], holders.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+    assert_equal 1, Rails.root.join("app/views/mails/_button.html.erb").read.scan(MAIL_ACCENT).size, "once, on the button's link"
   end
 
   test "no dark: variants in CS Studio except dark:scheme-dark" do
@@ -346,12 +400,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A tile in a grid (`.admin-tile`: the media tiles, the upload tiles,
-  # Translations' language tiles, the Dashboard's draft tiles) is drawn by one rule set, its states
-  # elevations and the selection's accent outline. A transform would move
+  # Translations' language tiles, the Dashboard's draft tiles, the user
+  # editor's group tiles) is drawn by one rule set, its states elevations
+  # and the selection's accent outline, which a ticked label tile takes too.
+  # A locked tile is sunken with no shadow, after the selection so a ticked
+  # locked one keeps the outline and not the shadow. A transform would move
   # it under the pointer, and a border is an edge drawn for depth.
   TILE = '.admin-tile:is([aria-current="true"], [aria-pressed="true"])'.freeze
+  TICKED_TILE = ".admin-tile:has(> input:checked)".freeze
+  LOCKED_TILES = [ ".admin-tile[data-locked]", ".admin-tile[data-locked]:has(> input:checked)" ].freeze
 
-  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, and the accent outline when selected or pressed; never a transform" do
+  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, the accent outline when selected, pressed or ticked, sunken when locked; never a transform" do
     rest = single_rule(".admin-tile")
     [ "border-radius: var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes rest, declaration }
 
@@ -360,12 +419,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tile:hover\s*\{\s*box-shadow:\s*var\(--cs-shadow-2\);\s*\}/, hovers.first)
     assert_includes single_rule(".admin-tile:hover"), "box-shadow: var(--cs-shadow-2)"
 
-    selected = single_rule(TILE)
+    selected = rule_for([ TILE, TICKED_TILE ])
     [ "outline: 2px solid var(--cs-accent)", "outline-offset: 2px", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes selected, declaration }
+    locked = rule_for(LOCKED_TILES)
+    [ "background: var(--cs-sunken)", "box-shadow: none", "color: var(--cs-meta)" ].each { |declaration| assert_includes locked, declaration }
+    assert_no_match(/outline/, locked, "a ticked locked tile keeps the selection's outline")
 
     rules = self.class.css_rules("content-spiel.tailwind.css")
-    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE ] ].map { |selectors| rules.index { |found, _| found == selectors } }
-    assert_equal order.sort, order, "rest, the pointer, then the selection: the selection wins under the pointer"
+    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE, TICKED_TILE ], LOCKED_TILES ].map { |selectors| rules.index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, the selection, then the lock: the selection wins under the pointer, and the lock over both"
     tile_rules = rules.select { |selectors, _| selectors.any? { |selector| selector.match?(/\.admin-tile(?![\w-])/) } }
     tile_rules.each do |selectors, body|
       assert_no_match(/(?<![\w-])(?:transform|translate|scale|rotate):/, body, "#{selectors.join(", ")} moves the tile")
@@ -561,8 +623,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   UPPER_TRACKED = /(?<![\w-])uppercase(?![\w-])[^"'`]*(?<![\w-])tracking-[\w\[\].-]+|(?<![\w-])tracking-[\w\[\].-]+[^"'`]*(?<![\w-])uppercase(?![\w-])/
   UPPER_TRACKED_ALLOWED = {
     "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
-    "CONTENT·SPIEL" => "the product layout's wordmark",
-    %("Content·Spiel" %></span>) => "the setup layout's wordmark"
+    "CONTENT·SPIEL" => "the wordmark of the product and setup layouts"
   }.freeze
   # CS Studio's sources, the setup pages and the three layouts around them.
   # The public site is the theme's and out of scope: its pages keep their look.
@@ -666,7 +727,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
     "app/views/setup/token.html.erb" => "the setup token's input holds a key value, and the log's commands are code",
-    "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
+    "app/components/admin/ui/copy_value_component.html.erb" => "a value a person copies exactly: a token, an address, a command",
     "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
     "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
     "app/components/admin/audit_screen/event_header_component.html.erb" => "the event header's values (action, subject key)",
@@ -768,11 +829,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
-  # The content-side screens (media, Trash, Translations, Forms, the audit
-  # log) speak in the type scale's tokens and draw no box of their own: a
-  # card is an elevation, a table's lines stay inside its card, and a
-  # control keeps its field-line frame. Each screen's folders join
-  # `CONTENT_SIDE_SCREENS` (globs from the root) as it is drawn on the scale.
+  # The screens drawn on the type scale (media, Trash, Translations, Forms,
+  # the audit log, and the people and system screens as each joins) speak in
+  # the type scale's tokens and draw no box of their own: a card is an
+  # elevation, a table's lines stay inside its card, and a control keeps its
+  # field-line frame. Each screen's folders join `TYPE_SCALE_SCREENS` (globs
+  # from the root) as it is drawn on the scale.
   # Refused there, line by line: an arbitrary pixel size, `text-xs` (the
   # label is `text-label`), a dashed edge and an important danger edge. And,
   # string by string: the hand-drawn box, `rounded-cs` with `border-line` (or
@@ -783,7 +845,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # adjacent literals, a constant from another file, ERB or a ternary inside
   # the attribute, `class_names(…)`, an array or `%w[…]` (the reference's
   # "No guard" list, `docs/reference/design-system.md`).
-  CONTENT_SIDE_SCREENS = %w[
+  TYPE_SCALE_SCREENS = %w[
     app/components/admin/media_library/*
     app/views/admin/media/*
     app/components/media/picker_component.*
@@ -798,6 +860,23 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/form_submissions/*
     app/components/admin/audit_screen/*
     app/views/admin/audit_events/*
+    app/components/admin/users_screen/*
+    app/views/admin/users/*
+    app/components/admin/groups_screen/*
+    app/views/admin/groups/*
+    app/components/admin/tokens_screen/*
+    app/views/admin/api_tokens/*
+    app/views/layouts/product.html.erb
+    app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/shared/_product_wordmark.html.erb
+    app/views/admin/sessions/*
+    app/views/admin/passwords/*
+    app/views/invitations/*
+    app/views/admin/accounts/*
+    app/views/admin/system_status/*
+    app/views/admin/errors/*
+    app/views/setup/*
+    app/views/layouts/setup.html.erb
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -807,10 +886,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
   HAND_BOX_ALLOWED = {
-    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
+    "app/views/admin/shared/_product_wordmark.html.erb" => "the wordmark's 12px capitals, the product's mark as every layout's header draws it"
   }.freeze
 
-  def self.content_side_sources = CONTENT_SIDE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
+  def self.type_scale_sources = TYPE_SCALE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
 
   # `[line number, what was refused]` for each refused look in `source`.
   def self.refused_looks(source)
@@ -826,8 +906,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "the content-side screens draw no off-scale size and no hand-drawn box" do
-    CONTENT_SIDE_SCREENS.each { |glob| assert Dir[Rails.root.join(glob)].any?, "#{glob} matches no file: the guard looks at nothing there" }
-    offences = self.class.content_side_sources.flat_map do |path|
+    TYPE_SCALE_SCREENS.each { |glob| assert Dir[Rails.root.join(glob)].any?, "#{glob} matches no file: the guard looks at nothing there" }
+    offences = self.class.type_scale_sources.flat_map do |path|
       relative = Pathname(path).relative_path_from(Rails.root).to_s
       next [] if HAND_BOX_ALLOWED.key?(relative)
 
@@ -835,7 +915,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
     assert_empty offences, "a size is a type token (text-small, text-body, text-label) and a box is a card's elevation"
     HAND_BOX_ALLOWED.each_key do |path|
-      assert_includes self.class.content_side_sources, Rails.root.join(path).to_s, "#{path} is allowed but is on no content-side screen"
+      assert_includes self.class.type_scale_sources, Rails.root.join(path).to_s, "#{path} is allowed but is on no type-scale screen"
       assert self.class.refused_looks(Rails.root.join(path).read).any?, "#{path} draws none of the refused looks: drop it from HAND_BOX_ALLOWED"
     end
   end
@@ -873,9 +953,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # it and the main column, the 1680px a docked composition grows to) are
   # tokens of the same kind, beside it.
   RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:1680|360|28)px\]|(?:max-|min-)?width:\s*(?:1680|360)px|(?:column-)?gap:\s*28px/
-  RAIL_WIDTH_ALLOWED = {
-    "app/views/layouts/product.html.erb" => "the sign-in pages' centred column, a whole-screen form's width that is not the rail's"
-  }.freeze
+  RAIL_WIDTH_ALLOWED = {}.freeze
 
   test "the form column's width is a token: 760px and 1144px are written once, in content-spiel.css" do
     tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
@@ -1624,7 +1702,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # The circles still drawn by hand, each with the reason it is not the
   # component yet. The list may only shrink.
   HAND_BUILT_AVATAR_ALLOWED = {
-    "app/components/admin/users_screen/list_component.html.erb" => "the users list's one-letter circle, redrawn with the list",
     # The one script that builds a circle in the browser from the letters the
     # server sends, with the component's own classes.
     "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes"
@@ -1838,8 +1915,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # the thing: an alert's tint and an error's outline, a drop zone's dashes.
   CARD_BORDER_ALLOWED = {
     "app/components/admin/ui/error_summary_component.html.erb" => "an alert keeps its tinted edge",
-    "app/components/admin/ui/insecure_notice_component.rb" => "an alert keeps its tinted edge",
-    "app/components/admin/ui/mail_failed_notice_component.rb" => "an alert keeps its tinted edge",
     "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
   }.freeze
 
@@ -1877,46 +1952,22 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
-    app/components/admin/editor_screen/changes_overview_component.html.erb
-    app/components/admin/editor_screen/delete_block_dialog_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb
-    app/components/admin/editor_screen/live_region_component.html.erb
     app/components/admin/editor_screen/no_address_chip_component.html.erb
-    app/components/admin/editor_screen/publish_changes_dialog_component.html.erb
-    app/components/admin/editor_screen/table_controls_component.html.erb
-    app/components/admin/forms_screen/list_component.rb
-    app/components/admin/forms_screen/new_form_dialog_component.html.erb
-    app/components/admin/groups_screen/permission_matrix_component.html.erb
-    app/components/admin/groups_screen/scope_editor_component.html.erb
-    app/components/admin/notes_screen/thread_component.rb
     app/components/admin/pages_screen/tree_state_mark_component.rb
-    app/components/admin/settings_screen/language_dialogs_component.html.erb
-    app/components/admin/settings_screen/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_test_outcome_component.rb
-    app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
-    app/components/admin/ui/insecure_notice_component.rb
     app/components/admin/ui/language_progress_component.html.erb
     app/components/admin/ui/language_tabs_component.html.erb
-    app/components/admin/ui/mail_failed_notice_component.rb
+    app/components/admin/ui/notice_component.rb
     app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb
     app/components/admin/ui/unpublished_chip_component.html.erb
     app/components/admin/ui/word_diff_component.rb
-    app/components/admin/users_screen/invite_dialog_component.html.erb
     app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/password_field_controller.js
-    app/views/admin/accounts/edit.html.erb
-    app/views/admin/passwords/edit.html.erb
-    app/views/admin/passwords/new.html.erb
-    app/views/admin/sessions/new.html.erb
-    app/views/admin/shared/_stale_banner.html.erb
-    app/views/invitations/show.html.erb
-    app/views/setup/_flash.html.erb
     app/views/setup/_steps.html.erb
   ].freeze
 
@@ -1943,6 +1994,53 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-live-ness", "text-delivered", "live-region", "bg-sunken" ].each { |sample| assert_no_match LIVE_SCHEDULED_FILL, sample }
     [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
     [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
+  end
+
+  # An alert box is `Admin::Ui::NoticeComponent`: a status tint on a radius,
+  # in one quoted class string (a constant the file spells is read in place
+  # of its interpolation), is a box of words drawn by hand. A chip or a badge
+  # has a tint but no card radius in its string, a fill that is a state's mark
+  # no radius at all. Not seen: a radius and a tint written in separate
+  # strings (`class: [ "rounded-cs", "bg-warn-tint" ]`), and a script's
+  # `classList.add(...)`. What may keep a box of its own, with the reason:
+  HAND_NOTICE_ALLOWED = {
+    "app/components/admin/ui/error_summary_component.html.erb" => "the error summary is its own component, focused on arrival"
+  }.freeze
+  NOTICE_TINT = /\A(?:[\w-]+:)*bg-(?:warn|ok|danger)-tint\z/
+  NOTICE_RADII = %w[rounded-cs rounded-card].freeze
+
+  # `[line number, class string]` for each hand-drawn box in `source`.
+  def self.hand_notices(source)
+    constants = source.scan(STRING_CONSTANT).to_h { |name, value| [ name, value.gsub(CONTINUED, " ") ] }
+    source = source.gsub(/#\{([A-Z][A-Z0-9_]*)\}/) { constants.fetch(Regexp.last_match(1), Regexp.last_match(0)) }
+    source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if classes.intersect?(NOTICE_RADII) && classes.any? { |name| name.match?(NOTICE_TINT) }
+    end
+  end
+
+  test "an alert box is NoticeComponent: no file outside it draws a box of bg-warn-tint, bg-ok-tint or bg-danger-tint beside rounded-cs or rounded-card" do
+    skipped = [ "app/components/admin/ui/notice_component.rb", *HAND_NOTICE_ALLOWED.keys ]
+    offences = (relative_sources - skipped).flat_map do |path|
+      self.class.hand_notices(Rails.root.join(path).read).map { |line, box| "#{path}:#{line}: #{box}" }
+    end
+    assert_empty offences, "a box of words is Admin::Ui::NoticeComponent (or its classes, for a box a script fills)"
+    HAND_NOTICE_ALLOWED.each_key do |path|
+      assert self.class.hand_notices(Rails.root.join(path).read).any?, "#{path} draws no box of its own: drop it from the list"
+    end
+  end
+
+  test "the hand-drawn notice pattern matches the stale banner's old box and the sign-in's, and not a state chip or the badge's warn tone" do
+    [ %(<div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">),
+      %(<p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert">),
+      %(BOX = "rounded-card px-3".freeze\ntag.p(class: "\#{BOX} bg-ok-tint text-ok-ink")) ].each do |sample|
+      assert_not_empty self.class.hand_notices(sample), sample
+    end
+    [ Admin::Ui::StateChipComponent::GROUNDS.fetch(:warn), %(CLASS = "admin-state-chip rounded-cs border px-2".freeze),
+      %(class="#{Admin::Ui::BadgeComponent::TONES.fetch(:warn)}"), %(class="rounded-full bg-ok-tint text-ok-ink") ].each do |sample|
+      assert_empty self.class.hand_notices(sample), sample
+    end
   end
 
   # The page tree's width state on <html>: the chosen width
@@ -2114,13 +2212,109 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row, the draft tile and a Translations row around
-    # their stretched links, and the Notes for you row that is the link, each
-    # on hover and focus.
+    # The Waiting for you row, the draft tile, a Translations row and a table
+    # row of one link (`.admin-row-link`) around their stretched links, and
+    # the Notes for you row that is the link, each on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
                    ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
+                   "tr:has(.admin-row-link):hover .admin-row-verb", "tr:has(.admin-row-link):focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
+  end
+
+  # A row that opens one thing is pressed anywhere: its one link is
+  # `.admin-row-link`, whose `::after` covers the row, and the focus ring is
+  # drawn on that cover. The rule is the stylesheet's alone, so a row never
+  # spells the stretch in utilities of its own, and its other controls stand
+  # above the cover at `--cs-z-raised`.
+  ROW_LINK_PARTS = [ /\A(?:[\w-]+:)*after:absolute\z/, /\A(?:[\w-]+:)*after:inset-0\z/ ].freeze
+
+  # `[line number, the string]` for each quoted class string in `source` that
+  # holds both an `after:absolute` and an `after:inset-0`, in either order
+  # and whatever stands between them.
+  def self.hand_row_links(source)
+    source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if ROW_LINK_PARTS.all? { |part| classes.any? { |name| name.match?(part) } }
+    end
+  end
+
+  test "a row's stretched link is .admin-row-link, written once" do
+    offences = ADMIN_SOURCES.flat_map do |path|
+      self.class.hand_row_links(File.read(path)).map { |line, string| "#{Pathname(path).relative_path_from(Rails.root)}:#{line}: #{string}" }
+    end
+    assert_empty offences, "a row's stretched link takes .admin-row-link, never after:absolute and after:inset-0 of its own"
+    [ %(class="font-medium after:absolute after:inset-0 after:content-['']"), %(class="after:inset-0 text-ink after:absolute"),
+      %(class: "after:absolute font-medium focus-visible:after:outline-2 after:inset-0") ].each do |sample|
+      assert_not_empty self.class.hand_row_links(sample), sample
+    end
+    [ %(class="admin-row-link font-medium after:absolute-ish after:inset-0"), %(class="after:absolute" title="after:inset-0"),
+      %(class="after:absolute after:top-0") ].each do |sample|
+      assert_empty self.class.hand_row_links(sample), sample
+    end
+
+    assert_match(/position:\s*relative;/, rule_for([ "tr:has(.admin-row-link)", "li:has(> * .admin-row-link)" ]))
+    cover = single_rule(".admin-row-link::after")
+    assert_match(/content:\s*"";/, cover)
+    assert_match(/position:\s*absolute;/, cover)
+    assert_match(/inset:\s*0;/, cover)
+    assert_match(/outline:\s*none;/, single_rule(".admin-row-link:focus-visible"))
+    ring = single_rule(".admin-row-link:focus-visible::after")
+    assert_match(/outline:\s*2px solid var\(--cs-accent\);/, ring)
+    assert_match(/outline-offset:\s*-2px;/, ring)
+
+    named = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?("admin-row-link") } }
+    verb, named = named.partition { |selectors, _| selectors.any? { |selector| selector.include?(".admin-row-verb") } }
+    # The verb at a link row's end stands in a cell of its own, outside the
+    # link, so the row lights it: the accent rule names the row link's row.
+    assert_equal 1, verb.size, "the row verb's accent is one rule: #{verb.map(&:first).inspect}"
+    assert_includes verb.first.first, "tr:has(.admin-row-link):hover .admin-row-verb"
+    assert_includes verb.first.first, "tr:has(.admin-row-link):focus-within .admin-row-verb"
+    sticky, link = named.partition { |selectors, _| selectors.any? { |selector| selector.include?(":first-child") } }
+    assert_equal 4, link.size, "the row link is four rules, written once: #{link.map(&:first).inspect}"
+    # A sticky cell is the containing block of the cover, which would then
+    # cover that cell alone: a table whose row is one link has no sticky first column.
+    assert_equal 1, sticky.size, "the sticky first column is one rule: #{sticky.map(&:first).inspect}"
+    assert_match(/:where\(table:not\(:has\(\.admin-row-link\)\)\)/, sticky.first.first.join(","))
+    assert_match(/position:\s*sticky;/, sticky.first.last)
+  end
+
+  # A box that cannot be changed keeps its full colour, so its tick reads at
+  # the browser's own 3:1 on the card; the cursor and the label's meta words
+  # say it is fixed, never a faded box.
+  test "a disabled checkbox keeps its colour, refuses the pointer and its label reads meta" do
+    box = single_rule(".cs-checkbox:disabled")
+    assert_match(/cursor:\s*not-allowed;/, box)
+    assert_match(/opacity:\s*1;/, box)
+    assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-checkbox:disabled + label", "label:has(> .cs-checkbox:disabled)" ]))
+  end
+
+  # A switch that cannot be changed is never faded either: off, the sunken
+  # track and field-line outline it has at rest with the meta knob; on, a
+  # meta track (not the accent, which says it can be pressed) with the
+  # surface knob; its label reads meta. A disabled segment keeps its
+  # colour too: meta words, no hover, and a chosen one stays inverted.
+  test "a disabled switch keeps its colour, refuses the pointer, is meta when on and its label reads meta" do
+    switch = single_rule(".cs-toggle:disabled")
+    assert_match(/cursor:\s*not-allowed;/, switch)
+    assert_match(/opacity:\s*1;/, switch)
+    off = single_rule(".cs-toggle:disabled:not(:checked)")
+    assert_match(/background:\s*var\(--cs-sunken\);/, off)
+    assert_match(/border-color:\s*var\(--cs-field-line\);/, off)
+    assert_match(/background:\s*var\(--cs-meta\);/, single_rule(".cs-toggle:disabled:not(:checked)::before"))
+    on = single_rule(".cs-toggle:disabled:checked")
+    assert_match(/background:\s*var\(--cs-meta\);/, on)
+    assert_match(/border-color:\s*var\(--cs-meta\);/, on)
+    assert_match(/background:\s*var\(--cs-surface\);/, single_rule(".cs-toggle:disabled:checked::before"))
+    assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-toggle:disabled + label", "label:has(> .cs-toggle:disabled)" ]))
+    rules = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?(".cs-toggle") } }
+    rules.each { |selectors, body| assert_no_match(/opacity:\s*0/, body, selectors.join(", ")) }
+
+    segment = Admin::Fields::SelectField::SEGMENT_CLASS.split
+    assert_empty segment.grep(/opacity/), "a disabled segment is not faded"
+    %w[has-[:disabled]:cursor-not-allowed has-[:disabled]:not-has-[:checked]:text-meta has-[:disabled]:not-has-[:checked]:hover:bg-transparent
+       has-[:checked]:bg-ink has-[:checked]:text-paper].each { |name| assert_includes segment, name }
   end
 
   # THE TREE: both trees draw one row (`Admin::Ui::TreeItemComponent`), whose

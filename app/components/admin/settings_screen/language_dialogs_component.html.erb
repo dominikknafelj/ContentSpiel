@@ -4,7 +4,8 @@
   <%= render Admin::Ui::ConfirmDialogComponent.new(id: default_dialog_id(code), title: t(".default_dialog.title", language: name(code)),
         body: t(".default_dialog.body", language: name(code), default_language: name(default_code), default_code: default_code)) do |dialog| %>
     <% dialog.with_details do %>
-      <p class="rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-ink"><%= t(".default_dialog.details", language: name(code), items: items_phrase) %></p>
+      <%# The warn notice with no role: a line of the dialog, read with it. %>
+      <%= render Admin::Ui::NoticeComponent.new(tone: :warn, role: nil).with_content(t(".default_dialog.details", language: name(code), items: items_phrase)) %>
     <% end %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: admin_settings_default_language_path(code), method: :patch do %>

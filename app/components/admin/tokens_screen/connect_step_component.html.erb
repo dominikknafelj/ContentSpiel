@@ -1,24 +1,15 @@
 <section class="rounded-card bg-surface shadow-1 p-4">
-  <h2 class="text-h2 text-ink">2 · Add it to your assistant</h2>
-  <p class="mt-1 text-meta">Point your assistant at this URL and send the token as a bearer token<%= " (this configuration already holds the token above)" if secret? %>.</p>
+  <h2 class="text-h2 text-ink"><%= t(".title") %></h2>
+  <p class="mt-1 text-small text-dim"><%= secret? ? t(".with_token") : t(".intro") %></p>
 
   <div class="mt-3">
-    <p class="<%= setup_label_class %>">MCP URL</p>
-    <div class="mt-1 flex flex-wrap items-center gap-2">
-      <code id="mcp-url" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken px-3 py-2 font-cs-mono text-ink"><%= mcp_url %></code>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the MCP URL" }, data: copy_data("mcp-url")) %>
-    </div>
+    <p class="<%= setup_label_class %>"><%= t(".mcp_url") %></p>
+    <%= render Admin::Ui::CopyValueComponent.new(id: "mcp-url", value: mcp_url, copy_label: t(".copy_mcp_url"), class: "mt-1") %>
   </div>
 
   <div class="mt-4">
-    <p class="<%= setup_label_class %>">Client configuration</p>
-    <div class="mt-1 flex flex-wrap items-start gap-2">
-      <pre id="<%= secret? ? "api-token-config" : "mcp-client-config" %>" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono text-sm"
-        <%= tag.attributes(data: config_data) %>><%= config %></pre>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the client configuration" },
-            data: copy_data(secret? ? "api-token-config" : "mcp-client-config")) %>
-    </div>
+    <p class="<%= setup_label_class %>"><%= t(".configuration") %></p>
+    <%= render Admin::Ui::CopyValueComponent.new(id: config_id, value: config, copy_label: t(".copy_configuration"), layout: :block,
+          source_data: config_data, class: "mt-1") %>
   </div>
-
-  <p data-admin--tokens--reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
 </section>

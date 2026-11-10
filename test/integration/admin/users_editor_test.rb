@@ -1,10 +1,10 @@
 require "test_helper"
 
-# The Users list and the user editor (round 3 Task 12): the list's columns and
+# The Users list and the user editor: the list's columns and
 # its one last-sign-in query, the group cards, the owner endpoint, the delete
 # zone, the two read-only states (a forged write against either is still
-# refused, with one `access.denied`) and Review Focus 3 -- the form submitted
-# exactly as rendered changes nothing.
+# refused, with one `access.denied`), the stale save's banner, and the form
+# submitted exactly as rendered changing nothing.
 class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -61,22 +61,23 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "a[href='/cs-studio/users/new']", text: "New user"
     assert_select "#{row(users(:two))} a[href='/cs-studio/users/#{users(:two).id}/edit']", text: "Tara Two"
     assert_select "#{row(users(:two))} span", text: "two@example.com"
-    assert_select "#{row(users(:two))} [aria-hidden=true]", text: "T"
+    assert_select "#{row(users(:two))} [aria-hidden=true]", text: "TT"
     assert_select "#{row(users(:two))} [data-column=groups]", text: /Admin/
     assert_select "#{row(users(:two))} [data-column=last-sign-in] time", text: "just now"
     assert_select "#{row(users(:one))}", text: /\(you\)/
     assert_select "#{row(users(:one))}", text: /Owner/
     assert_select "#{row(users(:one))} [data-column=groups]", text: "No groups"
-    # Each row says what its time is (the heading is not a table header).
-    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: /\ALast sign-in:\s*Never\z/
-    assert_select "#{row(users(:one))} [data-column=last-sign-in] .sr-only", text: /Last sign-in:/
+    # The column's header names each row's time.
+    assert_select ".admin-users-list thead th[scope=col]", text: "Last sign-in"
+    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: /\A\s*Never\s*\z/
     assert_select "#{row(users(:reader))} [data-column=groups]", text: "Read only"
     assert_select ".admin-users-list a", text: /\A(Edit|Delete)\z/, count: 0
+    assert_select "#{row(users(:two))} .admin-row-verb", text: "Edit"
     assert_select ".admin-users-list button", count: 0
     assert_select "dialog[id^=delete-user]", count: 0
   end
 
-  # Final fix wave (Task 12): end to end. Every other test here writes the
+  # End to end. Every other test here writes the
   # event by hand; this one signs in through the real form and reads what the
   # list reads.
   test "signing in through the sign-in form is what the list's last sign-in shows" do
@@ -140,7 +141,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     end
     many = count_for.call
 
-    assert_select ".admin-users-list li", count: User.count
+    assert_select ".admin-users-list tbody tr", count: User.count
     assert_equal 1, many.count { |sql| sql.match?(/MAX\("audit_events"\."occurred_at"\)/) }
     assert_equal few.size, many.size, "the list must not query per user:\n#{(many - few).first(5).join("\n")}"
   end
@@ -267,8 +268,27 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "input[type=password][name='user[password]']"
     assert_select "[data-password-field-target=bar]", minimum: 1
     assert_select "#user-form .admin-save-bar button[type=submit]", text: "Create user"
-    assert_select ".admin-owner-zone, .admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "details.admin-set-password", count: 0
+  end
+
+  # The 409 banner is the shared warn notice: announced at once, and its Reload
+  # a way out the leave guard lets through (`data-save-bar-cancel`) into the
+  # content frame.
+  test "a stale save's banner is the warn notice, with Reload as its way out" do
+    user = users(:author)
+    get "/cs-studio/users/#{user.id}/edit"
+    stale = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+    travel 1.minute
+    user.update!(name: "Renamed elsewhere")
+
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name", email_address: user.email_address, group_ids: [ "" ] }, base_updated_at: stale }
+
+    assert_response :conflict
+    assert_select "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", count: 1 do |banner|
+      assert_includes banner.text.squish, "This user was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
+      assert_select "a[href='/cs-studio/users/#{user.id}/edit'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
+    end
   end
 
   # --- The owner endpoint ---------------------------------------------------------
@@ -289,7 +309,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal({ "owner" => [ false, true ] }, Audit::Event.find_by!(action: "user.owner_changed", subject: users(:reader)).field_changes)
 
     get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select ".admin-owner-zone button", text: "Remove owner rights…"
+    assert_select "[data-zone=owner] button", text: "Remove owner rights…"
     assert_select "dialog#owner-user-#{users(:reader).id}", text: /Remove owner rights from reader@example.com\?.*They keep their groups and the permissions those give\./m
     assert_select "dialog#owner-user-#{users(:reader).id} button[type=submit]", text: "Remove owner rights"
 
@@ -297,6 +317,17 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_response :see_other
     assert_not users(:reader).reload.owner?
     assert_equal 2, Audit::Event.where(action: "user.owner_changed", subject: users(:reader)).count
+  end
+
+  test "the four owner toasts are admin.users.owner keys, each naming the person" do
+    reader = users(:reader)
+    { "now" => [ "1", "is now an owner" ], "already" => [ "1", "is already an owner" ],
+      "no_longer" => [ "0", "is no longer an owner" ], "not" => [ "0", "is not an owner" ] }.each do |key, (owner, words)|
+      assert_equal "reader@example.com #{words}", I18n.t("admin.users.owner.#{key}", name: "reader@example.com")
+
+      patch "/cs-studio/users/#{reader.id}/owner", params: { owner: owner }
+      assert_equal "reader@example.com #{words}", flash[:notice]
+    end
   end
 
   test "the owner endpoint is Users::Save: a non-owner's forged PATCH is refused with one access.denied" do
@@ -356,17 +387,17 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   test "the owner and delete buttons wait for unsaved changes, outside the form" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
 
-    assert_select ".admin-owner-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Make owner…"
-    assert_select ".admin-delete-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
-    assert_select "#user-form .admin-owner-zone, #user-form .admin-delete-zone, #user-form dialog", count: 0
-    assert_select ".admin-delete-zone [data-admin--saving--pending-lock-target=hint][hidden]"
+    assert_select "[data-zone=owner][data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Make owner…"
+    assert_select "[data-zone=delete][data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
+    assert_select "#user-form [data-zone], #user-form dialog", count: 0
+    assert_select "[data-zone=delete] [data-admin--saving--pending-lock-target=hint][hidden]"
   end
 
   # --- The delete zone -------------------------------------------------------------
 
   test "the delete dialog names the user and says what stays; for your own account it says it signs you out" do
     get "/cs-studio/users/#{users(:two).id}/edit"
-    assert_select ".admin-delete-zone button.text-danger-ink", text: "Delete user…"
+    assert_select "[data-zone=delete] button.text-danger-ink", text: "Delete user…"
     assert_select "dialog#delete-user-#{users(:two).id}", text: /Delete two@example.com\?.*They can't sign in any more and their AI tokens stop working\. Their pages, posts and media stay; posts they wrote are left without an author\./m
     assert_select "dialog#delete-user-#{users(:two).id} form[action='/cs-studio/users/#{users(:two).id}'] button.bg-danger", text: "Delete user"
 
@@ -389,7 +420,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert Audit::Event.exists?(action: "token.revoked")
   end
 
-  # --- The read-only states (B28) --------------------------------------------------
+  # --- The read-only states --------------------------------------------------------
 
   test "a non-owner viewing an owner sees a read-only form with the reason, no footer and no zones; a forged write is refused" do
     sign_in_manager
@@ -397,11 +428,11 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users/#{users(:one).id}/edit"
 
     assert_response :success
-    assert_select ".admin-view-only-notice", text: "Only owners can change other owners."
+    assert_select "div.admin-view-only-notice[role=note].rounded-card.bg-sunken.text-dim", text: "Only owners can change other owners."
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
     assert_select "#user-form[data-controller]", count: 0
-    assert_select ".admin-owner-zone, .admin-delete-zone, details.admin-set-password", count: 0
+    assert_select "[data-zone], details.admin-set-password", count: 0
 
     digest = users(:one).password_digest
     assert_difference -> { denied_events_for(users(:one)).count }, 1 do
@@ -424,10 +455,10 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users/#{users(:two).id}/edit"
 
     assert_response :success
-    assert_select ".admin-view-only-notice", text: "This user has permissions you don't have, so you can't change them."
+    assert_select "div.admin-view-only-notice[role=note].rounded-card.bg-sunken.text-dim", text: "This user has permissions you don't have, so you can't change them."
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
-    assert_select ".admin-owner-zone, .admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'][data-locked]", text: /You can't grant this group\./
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'] input[type=checkbox][checked][disabled]"
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'] input[type=hidden][name='user[group_ids][]'][value='#{access_control_groups(:admin).id}']"
@@ -439,7 +470,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_difference -> { denied_events_for(users(:two)).count }, 1 do
       delete "/cs-studio/users/#{users(:two).id}"
     end
-    # A forged owner PATCH too (final fix wave, Task 12): refused, and nobody
+    # A forged owner PATCH too: refused, and nobody
     # becomes an owner. Which rule answers (outranked, or owner-only) is the
     # service's; here it must be a refusal that writes nothing.
     assert_difference -> { denied_events_for(users(:two)).count }, 1 do
@@ -459,7 +490,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "#user-form .admin-save-bar"
   end
 
-  # --- Review Focus 3: the form submitted exactly as rendered changes nothing -------
+  # --- The form submitted exactly as rendered changes nothing ----------------------
 
   test "as a non-owner, the edit form submitted as rendered changes nothing: groups, password, sessions, audit" do
     sign_in_manager
@@ -506,6 +537,81 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal [ access_control_groups(:admin).id ], target.group_ids
   end
 
+  # A non-owner may change their own account (`Users::Manageability`: acting
+  # on yourself is never outranked) while holding a group they could not hand
+  # on: its tile is locked and ticked, and its disabled box posts nothing, so
+  # the hidden input is what keeps the membership. Without it the save would
+  # read as taking them out of the group, which `Users::Save` refuses. Under
+  # today's hand-on rule (`AccessControl.can_assign_group?`) this state can't
+  # be reached: a member can always hand on a group they hold, save one that
+  # stores a right nobody may hand on (`forms.submit`), which the grant's
+  # validation refuses, so the test writes it past the validation, as only a
+  # console could. It guards how `Users::Save` reads a carried group should
+  # that rule ever tighten.
+  test "a user saved as rendered with a group the viewer can't grant keeps the membership" do
+    managers = sign_in_manager
+    me = users(:editor_branch)
+    locked = AccessControl::Group.create!(name: "Visitors' right")
+    AccessControl::Grant.new(group: locked, permission: "forms.submit", scope: {}).save!(validate: false)
+    AccessControl::Membership.create!(user: me, group: locked)
+    groups_before = me.reload.group_ids.sort
+
+    get "/cs-studio/users/#{me.id}/edit"
+    assert_response :success
+    assert_select "#user-form fieldset[disabled]", count: 0
+    assert_select "label[data-group-card='#{locked.id}'][data-locked] > input[type=checkbox][checked][disabled]"
+    assert_select "label[data-group-card='#{managers.id}']:not([data-locked]) > input[type=checkbox][checked]:not([disabled])"
+    params = rendered_params
+    assert_equal groups_before.map(&:to_s).sort, params.dig("user", "group_ids").compact_blank.sort
+
+    events_before = Audit::Event.count
+    patch "/cs-studio/users/#{me.id}", params: params
+
+    assert_response :see_other
+    assert_equal events_before, Audit::Event.count, "an untouched save writes no event"
+    assert_equal groups_before, me.reload.group_ids.sort
+  end
+
+  # --- The editor's frame ------------------------------------------------------------
+
+  test "the editor is a Details card and a Groups card, under a label-sized breadcrumb, a small Activity link and the last sign-in in small words" do
+    get "/cs-studio/users/#{users(:two).id}/edit"
+
+    assert_select "p.text-label.text-meta a[href='/cs-studio/users']", text: "Users"
+    assert_select "a[href^='/cs-studio/audit'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary, size: :small), text: "Activity"
+    assert_select "[data-last-sign-in].text-small.text-dim", text: "Never signed in."
+    assert_select "#user-form section.admin-settings-card[aria-labelledby=user-details]" do
+      assert_select "h2#user-details", text: "Details"
+      assert_select ".admin-field input#user_name[aria-describedby='user_name_help user_name-errors']"
+      assert_select ".admin-field input#user_email_address[aria-describedby='user_email_address-errors']"
+      assert_select ".admin-field > #user_name-errors", count: 1
+      assert_select ".admin-field > #user_email_address-errors", count: 1
+      assert_select "details.admin-set-password > summary.admin-disclosure", text: "Set a new password…" do |summary|
+        assert_empty Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split - summary.first["class"].split
+      end
+    end
+    assert_select "#user-form section.admin-settings-card.admin-user-groups[aria-labelledby=user-groups-title] h2", text: "Groups"
+  end
+
+  test "a refused field is drawn on the shared invalid edge: its message in its own slot, and no important danger border" do
+    patch "/cs-studio/users/#{users(:two).id}", params: { user: { email_address: users(:one).email_address } }
+
+    assert_response :unprocessable_entity
+    assert_select ".admin-field > #user_email_address-errors p", text: /Email address has already been taken/
+    assert_select "input#user_email_address[aria-invalid=true]"
+    assert_not_includes response.body, "!border-danger"
+  end
+
+  test "New user's title, heading and breadcrumb, and its two password fields in the Details card" do
+    get "/cs-studio/users/new"
+
+    assert_select "title", text: /New user/
+    assert_select "p.text-label.text-meta a[href='/cs-studio/users']", text: "Users"
+    assert_select "h1", text: "New user"
+    assert_select "section.admin-settings-card[aria-labelledby=user-details] input[type=password]", count: 2
+    assert_select "#user-form .admin-save-bar button[type=submit]", text: "Create user"
+  end
+
   test "a typed password changes it and ends the user's sessions, still one service rule" do
     target = users(:two)
     target.sessions.create!
@@ -517,7 +623,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal 0, target.sessions.count
   end
 
-  # --- Fix round 1 ---------------------------------------------------------------
+  # --- The owner PATCH, a refusal's password fields, and where a save lands ---------
 
   test "a no-op owner PATCH by a non-owner is not a change, so the service has nothing to refuse" do
     sign_in_manager

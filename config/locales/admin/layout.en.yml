@@ -6,6 +6,10 @@ en:
     layout:
       # The page title when a screen sets none.
       title: "CS Studio"
+      # The product layout's (`layouts/product.html.erb`: sign-in, the
+      # password reset, an invitation), when its page sets none.
+      product:
+        title: "Sign in"
       leave_dialog:
         title: "Leave without saving?"
         # `admin--saving--save-bar` writes the sentence as it opens the dialog:

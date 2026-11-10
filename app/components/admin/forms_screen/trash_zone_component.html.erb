@@ -1,11 +1,9 @@
 <% if zone? %>
-  <section class="admin-delete-zone mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4" aria-labelledby="form-trash-zone-title">
-    <div class="flex min-w-0 flex-col gap-0.5">
-      <h2 id="form-trash-zone-title" class="text-h3 text-ink"><%= t(".title") %></h2>
-      <p class="text-small text-dim"><%= t(".body") %></p>
-    </div>
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
-  </section>
+  <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "form-trash-zone-title", heading: t(".title"), body: t(".body"), class: "mt-2", data: { zone: "trash" }) do |zone| %>
+    <% zone.with_trigger do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
+    <% end %>
+  <% end %>
 <% end %>
 
 <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".dialog_title", name: name), body: body) do |dialog| %>

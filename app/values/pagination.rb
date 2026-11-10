@@ -1,5 +1,4 @@
-# Page-number pagination for CS Studio lists (design pass spec §4, handoff
-# §9 A6): "51-100 OF 312" plus page links, the page in the URL. A value
+# Page-number pagination for CS Studio lists: "51–100 of 312" plus page links, the page in the URL. A value
 # object so the arithmetic -- and what junk in `?page=` means -- lives in
 # one place instead of once per controller: anything that isn't a positive
 # integer is page 1; a page past the end is reported (`out_of_range?`), not

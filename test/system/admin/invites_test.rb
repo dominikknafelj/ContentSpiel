@@ -1,11 +1,11 @@
 require "application_system_test_case"
 
-# Invites as people take them (mail spec "Invites", design answers M4 and
-# M5): an owner invites someone from the Users screen, the invited person
-# opens the mailed link (its token after a "#", which the page's script
+# Invites as people take them: an owner invites someone from the Users
+# screen, the invited person opens the mailed link (its token after a "#", which the page's script
 # moves into the form and out of the address), sets a password, lands on
 # the dashboard signed in with the account accepting made, and can sign in
-# with it afterwards; and an invitation's row menu resends and withdraws.
+# with it afterwards; and an invitation's row menu, which stands over the
+# users' stretched row links, resends and withdraws.
 class Admin::InvitesSystemTest < ApplicationSystemTestCase
   include ActionMailer::TestHelper
 
@@ -91,17 +91,30 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     assert_no_selector FORM
   end
 
-  test "resend and withdraw from the row menu" do
+  test "an invitation's menu opens over its row, Resend and Withdraw work, and a press on the menu never opens an editor" do
     dana = open_invitation("dana@example.com", sent_at: 2.days.ago)
     was_sent = dana.sent_at
+    menu = "button[aria-label='Actions for dana@example.com']"
 
-    visit admin_users_path
-    await_admin_controllers
+    visit_screen admin_users_path
+    # Tab goes from a user's name, the row's one stop, to the next row's menu.
+    page.execute_script("document.querySelector(\"#{row(users(:author))} a.admin-row-link\").focus()")
+    # The row holding the focus lights its Edit, which stands outside the link.
+    verb_colour = ->(user) { page.evaluate_script("getComputedStyle(document.querySelector(\"#{row(user)} .admin-row-verb\")).color") }
+    assert_not_equal verb_colour.call(users(:two)), verb_colour.call(users(:author)), "the focused row's Edit is not lit"
+    page.driver.browser.keyboard.type(:Tab)
+    assert_equal "Actions for dana@example.com", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+
     within(row(dana)) do
       assert_text "Invited"
-      find("button[aria-label='Actions for dana@example.com']").click
-      press "Resend invite"
+      # A native click: it fails when anything stands over the button.
+      find(menu).click
+      assert_selector "#{menu}[aria-expanded=true]"
+      assert_selector "[role=menu]", visible: true
     end
+    assert_current_path admin_users_path
+    assert_selector "h1", text: "Users"
+    within(row(dana)) { press "Resend invite" }
     assert_text "New invite sent to dana@example.com."
     assert_operator dana.reload.sent_at, :>, was_sent
 
@@ -116,5 +129,16 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     assert_text "Invite to dana@example.com withdrawn."
     assert_no_selector row(dana)
     assert_not Invitation.exists?(dana.id)
+
+    # A user's row is pressed anywhere: its link's cover reaches the whole
+    # row, its Edit at the far end too. A press on the point where Edit stands.
+    verb = page.evaluate_script(<<~JS)
+      (() => { const box = document.querySelector("#{row(users(:two))} .admin-row-verb").getBoundingClientRect()
+        return [ box.left + box.width / 2, box.top + box.height / 2 ] })()
+    JS
+    assert page.evaluate_script("document.elementFromPoint(#{verb.join(', ')}).matches('#{row(users(:two))} a.admin-row-link')"),
+      "the row link's cover does not reach Edit"
+    page.driver.browser.mouse.click(x: verb.first, y: verb.last)
+    assert_selector "h1", text: users(:two).name_or_email
   end
 end

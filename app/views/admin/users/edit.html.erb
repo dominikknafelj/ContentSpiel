@@ -1,25 +1,26 @@
-<%# Edit a user (cs-studio spec §6.1; round 3 Task 12, handoff `Studio User Edit`): the
-    heading is the user's name (as stored: a refused save's typed name isn't the
-    title), "Last signed in …" under it (from `session.created` audit events, D19),
-    the form, then -- for an editable user -- the owner zone (owners only) and the
-    delete zone, both AFTER the form (forms don't nest) and both instant actions
-    that wait for pending changes. A user the viewer can't manage
-    (`Users::Manageability`) is read-only with the reason. Up to 880px. %>
+<%# Edit a user: the heading is the user's name (as stored: a refused save's
+    typed name isn't the title), "Last signed in …" under it (from
+    `session.created` audit events), the form, then -- for an editable user --
+    the owner zone (owners only) and the delete zone, both AFTER the form
+    (forms don't nest) and both instant actions that wait for pending changes.
+    A user the viewer can't manage (`Users::Manageability`) is read-only, and
+    a neutral notice says why: a note, read where it stands and never a Tab
+    stop. Up to 880px. %>
 <% state = manageability(@user) %>
 <% heading = @user.name_in_database.presence || @user.email_address_in_database %>
 <% content_for :title, heading %>
 <div class="max-w-[880px]">
-  <p class="mb-1 text-xs text-meta"><%= link_to "Users", admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
+  <p class="mb-1 text-label text-meta"><%= link_to t(".breadcrumb"), admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
   <div class="mb-1 flex items-center justify-between gap-3">
     <h1 class="text-h1 text-ink"><%= heading %></h1>
-    <%# The Activity link (design spec §5 "Audit log module", Task 9): opens the audit log filtered to this
-        user -- visible only with `audit.view`. `_top`, not the content frame it sits in. %>
+    <%# Opens the audit log filtered to this user, with `audit.view` only.
+        `_top`, not the content frame it sits in. %>
     <% if can?("audit.view") %>
-      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), data: { turbo_frame: "_top" }, class: setup_secondary_link_class %>
+      <%= link_to t(".activity"), admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), data: { turbo_frame: "_top" }, class: Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %><%# i18n-ok: "User" is the audit log's subject_type, a class name %>
     <% end %>
   </div>
-  <p class="mb-4 text-sm text-dim" data-last-sign-in>
-    <% if @last_sign_in %>Last signed in <%= render Admin::Ui::TimeAgoComponent.new(time: @last_sign_in) %>.<% else %>Never signed in.<% end %>
+  <p class="mb-4 text-small text-dim" data-last-sign-in>
+    <% if @last_sign_in %><%= t(".last_signed_in_html", time: render(Admin::Ui::TimeAgoComponent.new(time: @last_sign_in))) %><% else %><%= t(".never_signed_in") %><% end %>
   </p>
 
   <% if @stale_form %>
@@ -30,11 +31,9 @@
 
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
-  <% case state %>
-  <% when :owner_protected %>
-    <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">Only owners can change other owners.</p>
-  <% when :outranked %>
-    <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This user has permissions you don't have, so you can't change them.</p>
+  <% reason = { owner_protected: t(".owner_protected"), outranked: t(".outranked") }[state] %>
+  <% if reason %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, class: "admin-view-only-notice mb-4") do %><%= reason %><% end %>
   <% end %>
 
   <%= render "admin/users/form", user: @user, url: admin_user_path(@user, **admin_url_options), method: :patch, state: state %>

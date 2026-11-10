@@ -192,6 +192,39 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert_nil User.find_by(email_address: "dana@example.com")
   end
 
+  # Each refusal is a line of the one alert, never a glued sentence, and
+  # each field says its own under it with the refused edge, tied to its
+  # input; the field's words carry no live role (the alert is announced).
+  test "a password refused twice over is one alert with a line per message, and each field draws its own" do
+    accept(password: "short", confirmation: "other")
+    assert_response :unprocessable_entity
+
+    assert_select "#alert[role=alert] > p", count: 2
+    assert_select "#alert > p", text: "Use at least 12 characters."
+    assert_select "#alert > p", text: "Password confirmation doesn't match Password"
+    assert_select "#alert", text: /\band\b/, count: 0
+    { "password" => "Use at least 12 characters.", "password_confirmation" => "Password confirmation doesn't match Password" }.each do |id, message|
+      assert_select ".admin-password-field.admin-password-field--invalid input##{id}[aria-invalid=true][aria-describedby~='#{id}-errors']"
+      assert_select "##{id}-errors", text: /#{Regexp.escape(message)}/
+      assert_select "##{id}-errors[role], ##{id}-errors[aria-live]", count: 0
+    end
+    assert @dana.reload.open?
+  end
+
+  # Only a forged post passes the field's maxlength, but the answer is the
+  # password's: the message under Name, with the refused edge, tied to it.
+  test "a refused name draws its message and the invalid edge on the Name field" do
+    accept(name: "x" * 121)
+    assert_response :unprocessable_entity
+
+    assert_select "#alert > p", text: /Name is too long/
+    assert_select "input#name[aria-invalid=true][aria-describedby~='name-errors']"
+    assert_select "#name-errors p", text: /Name is too long/
+    assert_select "#name-errors[role], #name-errors[aria-live]", count: 0
+    assert_select "input#password[aria-invalid]", count: 0
+    assert @dana.reload.open?
+  end
+
   test "a refused password draws the form again with the token, the address and the typed name, and the next try takes it" do
     accept(name: "Dana D", password: "short", confirmation: "short")
     assert_response :unprocessable_entity

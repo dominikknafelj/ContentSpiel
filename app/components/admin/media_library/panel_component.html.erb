@@ -114,26 +114,33 @@
       autosave form above, since what stands here brings forms of its own. %>
   <%= render Admin::Ui::SlotComponent.new(name: "media.panel.sections", record: asset, viewer: viewer, **slot_context) %>
 
+  <%# The shared action zone with no heading: the panel is a narrow column,
+      so the cost line stands first and the trigger under it. While a kept
+      place uses the image the trigger is disabled and the line says where;
+      otherwise it says how long the trash keeps it. The confirm dialog is
+      drawn after the zone, as every zone's dialogs are. %>
   <% if can_delete? %>
-    <div class="flex flex-col items-start gap-1.5 border-t border-line pt-4">
-      <% if move_to_trash_disabled? %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.button"), variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
-        <%# `text-dim`, not `text-meta`: `meta` is too faint for a sentence to read. %>
-        <p id="media-trash-help" class="text-sm text-dim"><%= in_use_reason %> <a href="#media-used-on" class="underline"><%= t(".trash.see_where") %></a></p>
-      <% else %>
-        <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.button"), variant: :danger_text, type: "button",
-              data: dialog_trigger(delete_dialog_id), aria: { describedby: "media-trash-help" }) %>
-        <p id="media-trash-help" class="text-sm text-dim"><%= retention_help %></p>
-        <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".trash.title"), body: t(".trash.body")) do |dialog| %>
-          <% dialog.with_confirm_action do %>
-            <%# `_top`: a whole-page visit, so the sidebar's Trash badge
-                updates and the Undo toast isn't relayed out of the frame. %>
-            <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
-              <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.confirm"), variant: :danger, type: "submit") %>
-            <% end %>
+    <% help = move_to_trash_disabled? ? safe_join([ in_use_reason, " ", link_to(t(".trash.see_where"), "#media-used-on", class: "underline") ]) : retention_help %>
+    <%= render Admin::Ui::ActionZoneComponent.new(label: t(".trash.confirm"), body: help, body_id: "media-trash-help", data: { zone: "trash" }) do |zone| %>
+      <% zone.with_trigger do %>
+        <% if move_to_trash_disabled? %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.button"), variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
+        <% else %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.button"), variant: :danger_text, type: "button",
+                data: dialog_trigger(delete_dialog_id), aria: { describedby: "media-trash-help" }) %>
+        <% end %>
+      <% end %>
+    <% end %>
+    <% unless move_to_trash_disabled? %>
+      <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".trash.title"), body: t(".trash.body")) do |dialog| %>
+        <% dialog.with_confirm_action do %>
+          <%# `_top`: a whole-page visit, so the sidebar's Trash badge
+              updates and the Undo toast isn't relayed out of the frame. %>
+          <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".trash.confirm"), variant: :danger, type: "submit") %>
           <% end %>
         <% end %>
       <% end %>
-    </div>
+    <% end %>
   <% end %>
 </section>

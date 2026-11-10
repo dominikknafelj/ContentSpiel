@@ -20,7 +20,7 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
 
   # How much of the Password card's heading is inside the window.
   def card_in_view?
-    page.evaluate_script("(() => { const box = document.querySelector('#password h3').getBoundingClientRect(); return box.top >= 0 && box.bottom <= window.innerHeight })()")
+    page.evaluate_script("(() => { const box = document.querySelector('#password h2').getBoundingClientRect(); return box.top >= 0 && box.bottom <= window.innerHeight })()")
   end
 
   def send_password(current:, new: "a-new-long-password-1")
@@ -60,9 +60,15 @@ class Admin::AccountPasswordAnswerSystemTest < ApplicationSystemTestCase
     assert_selector "#password .admin-error-summary[role=alert]", text: "That's not your current password."
     assert_selector ".admin-error-summary", count: 1
     # Below the sentence about sessions, above the fields; the field keeps its own line.
-    order = page.evaluate_script("[ '#password h3 + p', '#password .admin-error-summary', '#current_password' ].map((selector) => document.querySelector(selector).getBoundingClientRect().top)")
+    order = page.evaluate_script("[ '#password .admin-settings-card__head > p', '#password .admin-error-summary', '#current_password' ].map((selector) => document.querySelector(selector).getBoundingClientRect().top)")
     assert_equal order.sort, order
     assert_selector "#password .admin-password-field", text: "That's not your current password."
+    # The refused field draws the danger edge under its well, and the
+    # accepted ones keep the field line.
+    edge = ->(id) { page.evaluate_script("getComputedStyle(document.getElementById(#{id.to_json})).borderBottomColor") }
+    danger = page.evaluate_script("(() => { const probe = document.createElement('i'); probe.style.color = 'var(--cs-danger)'; document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour })()")
+    assert_equal danger, edge.call("current_password")
+    assert_not_equal danger, edge.call("new_password")
     assert_eventually(message: "the address is #{address}") { address == "/cs-studio/account#password" }
     assert_eventually(message: "the Password card is not in view") { card_in_view? }
     assert_eventually(message: "the card's alert is not in view") { in_view?("#password .admin-error-summary") }

@@ -123,8 +123,8 @@ class ShellTest < ApplicationSystemTestCase
 
     within("#sidebar .admin-account") { click_link "Your account" }
     assert_selector "h1", text: "Your account"
-    assert_equal %w[Profile Notes Password], all("turbo-frame#content section h3").map(&:text)
-    assert_selector "#password-form section h3 + p", text: "You'll stay signed in here. Other sessions are signed out."
+    assert_equal %w[Profile Notes Password], all("turbo-frame#content section h2").map(&:text)
+    assert_selector "#password-form section .admin-settings-card__head > p", text: "You'll stay signed in here. Other sessions are signed out."
     assert_title "Your account"
 
     visit admin_tags_path

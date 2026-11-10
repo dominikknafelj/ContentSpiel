@@ -43,4 +43,40 @@ class Admin::Ui::PasswordFieldComponentTest < ViewComponent::TestCase
     assert_selector ".admin-password-field[data-controller=password-field]"
     assert_no_selector "input[value]"
   end
+  # The well stands outside `.admin-field` on most screens, so its refused
+  # look is the component's own: the root's class sets the danger edge, and
+  # each message carries the decorative "!" of the shared error slot.
+  test "a refused password draws the danger edge and the error mark" do
+    render_inline(Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", errors: [ "Use at least 12 characters." ]))
+    assert_selector ".admin-password-field.admin-password-field--invalid input#password[aria-invalid=true]"
+    assert_selector ".admin-password-field > #password-errors > p span[aria-hidden=true]", text: "!"
+    assert_selector "#password-errors > p", text: "Use at least 12 characters."
+
+    render_inline(Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password"))
+    assert_no_selector ".admin-password-field--invalid"
+    assert_no_selector "input[aria-invalid]"
+    assert_no_selector "#password-errors"
+
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-password-field--invalid\s*\{\s*--cs-field-invalid-border:\s*var\(--cs-danger\);\s*\}/, css)
+    assert_match(/\.admin-password-field--invalid input\s*\{\s*border-bottom-color:\s*var\(--cs-field-invalid-border\);\s*\}/, css)
+  end
+
+  test "Show, Hide, the hint and the meter's words are keys the script reads" do
+    render_inline(Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true))
+    scope = "admin.components.ui.password_field"
+    assert_selector "button[data-password-field-target=toggle]", exact_text: I18n.t("#{scope}.show")
+    assert_selector "[data-password-field-target=hint]", exact_text: I18n.t("#{scope}.minimum", count: User::MINIMUM_PASSWORD_LENGTH)
+
+    served = JSON.parse(page.find(".admin-password-field")["data-messages"])
+    %w[show hide strength.too_short strength.fair strength.good strength.strong].each do |key|
+      assert_equal I18n.t("#{scope}.#{key}"), served["components.ui.password_field.#{key}"], key
+    end
+
+    script = Rails.root.join("app/javascript/controllers/password_field_controller.js").read
+    assert_includes script, %(import { messages } from "i18n/messages")
+    %w[hide show strength.too_short strength.fair strength.good strength.strong].each do |key|
+      assert_includes script, %("components.ui.password_field.#{key}"), key
+    end
+  end
 end

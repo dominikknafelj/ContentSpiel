@@ -22,6 +22,16 @@ class Admin::FormsScreen::TrashZoneComponentTest < ViewComponent::TestCase
     assert_includes text, t("placed_effect")
   end
 
+  test "the builder's zone is the shared action zone; the list's dialog comes alone" do
+    render_inline Admin::FormsScreen::TrashZoneComponent.new(form: forms(:contact), placements: Placed.new([], 0))
+    assert_selector "section.admin-action-zone.mt-2[data-zone=trash][aria-labelledby=form-trash-zone-title] > button.text-danger-ink", text: t("button")
+    assert_selector "section[data-zone=trash] h2#form-trash-zone-title", text: t("title")
+
+    render_inline Admin::FormsScreen::TrashZoneComponent.new(form: forms(:contact), placements: Placed.new([], 0), zone: false)
+    assert_no_selector "[data-zone]"
+    assert_selector "dialog#trash-form-#{forms(:contact).id}-dialog", visible: :all
+  end
+
   test "only pages the viewer can't open, and only readable ones, each have their sentence" do
     assert_includes body([], 1), t("placed_hidden_only", count: 1)
     assert_includes body([ create_page(title: "Home") ], 0), t("placed", count: 1, titles: "Home")

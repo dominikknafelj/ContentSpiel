@@ -1,21 +1,21 @@
-<%# The one-time reveal (design spec §6.1, Task 9) -- rendered straight from
-    `Admin::ApiTokensController#create`, served `no-store`; see that
-    action's own comment for why nothing else ever holds the raw token.
+<%# The one-time reveal, rendered straight from
+    `Admin::ApiTokensController#create` and served `no-store`; that action's
+    comment says why nothing else ever holds the raw token.
     This is a whole document (the create form posts with
-    `data-turbo="false"`, fix round 1), so its `<head>` can carry
-    `turbo-cache-control: no-cache` from the very first byte: Turbo never
+    `data-turbo="false"`), so its `<head>` carries
+    `turbo-cache-control: no-cache` from the first byte: Turbo never
     snapshots this page, so leaving it (any link) and coming Back refetches
-    the list instead of restoring the reveal. A frame-rendered reveal
-    couldn't guarantee that -- Turbo's promoted frame visit caches snapshots
-    (and fires `turbo:before-cache`) on its own schedule, which either kept
-    the reveal in the cache or, with `data-turbo-temporary`, removed it from
-    the live page right after it rendered.
-    `admin--tokens--reveal` does the copying (Clipboard API, falling back to
-    selecting the text) and blanks the token on `pagehide` for the
-    browser's own back/forward cache. Round 3 draws it as the AI assistant
-    page itself (the warn box in step 1, the token in step 2's configuration),
-    listing the new token in the table beneath. %>
-<% content_for :title, "AI assistant" %>
+    the list instead of restoring the reveal. A frame-rendered reveal can't
+    promise that: Turbo's promoted frame visit caches snapshots (and fires
+    `turbo:before-cache`) on its own schedule, which either keeps the reveal
+    in the cache or, with `data-turbo-temporary`, removes it from the live
+    page right after it renders.
+    The copy boxes copy their own text (`admin--ui--clipboard`, falling back
+    to selecting it), and `admin--tokens--reveal` blanks the token on
+    `pagehide` for the browser's own back/forward cache. The reveal is the
+    AI assistant page itself (the warn notice in step 1, the token in step
+    2's configuration), listing the new token in the table beneath. %>
+<% content_for :title, t(".title") %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>

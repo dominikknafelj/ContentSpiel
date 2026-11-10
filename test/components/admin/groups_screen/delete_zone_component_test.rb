@@ -1,6 +1,7 @@
 require "test_helper"
 
-# The group editor's delete zone (round 3 Task 11, handoff C37).
+# The group editor's delete zone: the shared action zone, the neutral note
+# of a built-in group, and the dialog's whole sentences.
 class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
   def zone(group, members: 2, tokens: [])
     with_request_url("/cs-studio/groups/#{group.id}/edit") do
@@ -10,6 +11,37 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
 
   def token(name, user)
     ApiToken.generate!(user, group: AccessControl::Group.find_by!(name: "Admin"), name: name)[0]
+  end
+
+  test "a custom group is the shared zone, with no pending lock" do
+    zone(AccessControl::Group.create!(name: "Bots"))
+
+    assert_selector "section.admin-action-zone.mt-6[data-zone=delete][aria-labelledby=delete-zone-title]:not([data-controller])"
+    assert_selector "section[data-zone=delete] h2#delete-zone-title.text-h3", text: "Delete this group"
+    assert_selector "section[data-zone=delete] > button.text-danger-ink", text: "Delete group…"
+  end
+
+  test "a group with 1 member and 12 tokens names 10 tokens and says 2 more, in whole sentences" do
+    group = AccessControl::Group.create!(name: "Bots")
+    tokens = Array.new(12) { |index| token("Bot #{index + 1}", users(:reader)) }
+    zone(group, members: 1, tokens: tokens)
+
+    assert_selector "section[data-zone=delete] p", exact_text: "1 member loses its permissions. 12 AI tokens are revoked."
+    assert_selector "dialog p", exact_text: "Its 1 member loses these permissions, and its 12 AI tokens are revoked. Users themselves are not deleted.", visible: :all
+    assert_selector "dialog li", count: Admin::GroupsScreen::DeleteZoneComponent::MAX_TOKENS_SHOWN, visible: :all
+    assert_selector "dialog p", exact_text: "and 2 more", visible: :all
+  end
+
+  test "the dialog's sentence for no members with tokens, and for many members with one token" do
+    group = AccessControl::Group.create!(name: "Bots")
+    zone(group, members: 0, tokens: [ token("Deploy", users(:reader)) ])
+    assert_selector "dialog p", exact_text: "It has no members, and its 1 AI token is revoked. Users themselves are not deleted.", visible: :all
+
+    zone(group, members: 3, tokens: [ token("Sync", users(:reader)) ])
+    assert_selector "dialog p", exact_text: "Its 3 members lose these permissions, and its 1 AI token is revoked. Users themselves are not deleted.", visible: :all
+
+    zone(group, members: 0)
+    assert_selector "dialog p", exact_text: "It has no members. Users themselves are not deleted.", visible: :all
   end
 
   test "a custom group: the effect in words, a danger-text trigger, and the dialog with the solid danger confirm" do
@@ -27,10 +59,12 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     assert_selector "dialog li", text: "Deploy — reader@example.com", visible: :all
   end
 
-  test "a built-in group shows the note instead: no trigger, no dialog" do
+  test "a built-in group says so in a neutral note in the zone's place" do
     zone(access_control_groups(:editor))
 
-    assert_text "A built-in group can be changed but not deleted."
+    note = page.find("div[data-zone=built_in][role=note]", text: "A built-in group can be changed but not deleted.")
+    Admin::Ui::NoticeComponent.classes(:neutral).split.each { |utility| assert_includes note[:class].split, utility }
+    assert_no_selector "section"
     assert_no_selector "button"
     assert_no_selector "dialog", visible: :all
   end

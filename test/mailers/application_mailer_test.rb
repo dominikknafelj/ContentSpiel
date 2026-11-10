@@ -234,6 +234,23 @@ class ApplicationMailerTest < ActionMailer::TestCase
     end
   end
 
+  # The layout every mail's HTML part is drawn in: light only (a client in
+  # dark mode is asked not to invert it), and its colours named, the button's
+  # violet being the button's own (`mails/_button`, `admin_design_rules_test`).
+  test "the layout says the mail is light only and names its colours" do
+    html = Nokogiri::HTML5(SystemMailer.test_mail(users(:one)).html_part.body.to_s)
+    assert_equal "light", html.at_css('head meta[name="color-scheme"]')&.[]("content")
+    assert_equal "light", html.at_css('head meta[name="supported-color-schemes"]')&.[]("content")
+    assert_no_match(/prefers-color-scheme|<style/, html.to_html, "no dark rule and no stylesheet")
+
+    body = html.at_css("body")["style"]
+    card = html.at_css("body > div")["style"]
+    assert_includes body, "background:whitesmoke;"
+    assert_includes body, "color:black;"
+    assert_includes card, "background:white;"
+    assert_equal [ "dimgray" ], html.css("body > div > p:last-child").map { |footer| footer["style"][/color:(\w+)/, 1] }
+  end
+
   test "the sender is the effective one, with its name" do
     with_mail_state(:working, mail_sender_name: "Ana's \"Site\"", mail_sender_address: "hello@example.test") do
       assert_equal "\"Ana's \\\"Site\\\"\" <hello@example.test>", ProbeMailer.probe("bea@example.test").header[:from].value

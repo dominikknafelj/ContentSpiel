@@ -1,10 +1,15 @@
-<%# The group editor (access-control design spec §5): name, description,
-    members (chips, round 3 Task 11) and the permission rows (up to 1000px wide,
-    left-aligned: Task 10). Members send a blank first value so an empty list
-    still arrives as one.
+<%# The group editor, new and edit, up to 1000px and left-aligned: the Group
+    card (name, description, members), then the permission matrix's two
+    cards, then the save footer. Members send a blank first value so an
+    empty list still arrives as one.
 
-    VIEW ONLY (`view_only`, a group the viewer can't manage as it stands; handoff
-    C37): the notice, then the whole form inside `<fieldset disabled
+    Each text field is an `.admin-field` whose error slot
+    (`admin/shared/_field_errors`) is its direct child, so a refused field
+    takes the shared invalid edge from its message; the members' chip input
+    is a column with its own slot.
+
+    VIEW ONLY (`view_only`, a group the viewer can't manage as it stands): a
+    neutral notice says why, then the whole form inside `<fieldset disabled
     class="admin-view-only">` -- every control inert, nothing submittable -- and no
     footer. `Groups::Save` refuses a forged PATCH that takes anything away or
     hands anything on all the same -- a removed content type's name included,
@@ -22,41 +27,45 @@
 <%= render Admin::Ui::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
 <% if view_only %>
-  <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This group has permissions you can't hand out, so you can only view it.</p>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, class: "admin-view-only-notice mb-4") do %><%= t(".view_only") %><% end %>
 <% end %>
 
 <%= form_with url: url, method: method, id: "group-form", data: (view_only ? {} : save_bar_form_data(dirty: group.errors.any? || @stale_form.present?, always: group.new_record? || drops_dormant)) do %>
-  <%= tag.fieldset disabled: view_only || nil, class: [ "min-w-0 border-0 p-0", ("admin-view-only" if view_only) ] do %>
+  <%= tag.fieldset disabled: view_only || nil, class: [ "flex min-w-0 flex-col gap-6 border-0 p-0", ("admin-view-only" if view_only) ] do %>
     <%# The stale-save base (`Admin::StaleForm`): inside the fieldset, so a read-only
         form submits none; after a refusal the posted (stale) base stays, so the next
         Save is refused too until Reload. %>
     <% if group.persisted? %>
       <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "group-base-updated-at", value: params[:base_updated_at].presence || group.updated_at.iso8601(6) } %>
     <% end %>
-    <div class="mb-4 max-w-md">
-      <%= label_tag "group_name", "Name", class: setup_label_class %>
-      <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
-      <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?,
-            aria: { invalid: (group.errors.include?(:name) ? "true" : nil) }.compact,
-            class: [ setup_input_class, ("!border-danger" if group.errors.include?(:name)) ] %>
-    </div>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "group-details", heading: t(".group"), icon: :groups, family: :people) do %>
+      <div class="flex flex-col gap-4 p-4">
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
+          <div class="admin-field">
+            <%= label_tag "group_name", t(".name"), class: setup_label_class %>
+            <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
+            <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?,
+                  aria: { describedby: "group_name-errors", invalid: (group.errors.include?(:name) ? "true" : nil) }.compact,
+                  class: setup_input_class %>
+            <%= render "admin/shared/field_errors", id: "group_name-errors", messages: group.errors.full_messages_for(:name) %>
+          </div>
+          <div class="admin-field">
+            <%= label_tag "group_description", t(".description"), class: setup_label_class %>
+            <%= text_field_tag "group[description]", group.description, id: "group_description",
+                  aria: { describedby: "group_description-errors", invalid: (group.errors.include?(:description) ? "true" : nil) }.compact,
+                  class: setup_input_class %>
+            <%= render "admin/shared/field_errors", id: "group_description-errors", messages: group.errors.full_messages_for(:description) %>
+          </div>
+        </div>
+        <%= render Admin::GroupsScreen::MembersComponent.new(users: members, search_url: admin_user_suggestions_path(**admin_url_options)) %>
+      </div>
+    <% end %>
 
-    <div class="mb-6 max-w-md">
-      <%= label_tag "group_description", "Description", class: setup_label_class %>
-      <%= text_field_tag "group[description]", group.description, id: "group_description", class: setup_input_class %>
-    </div>
-
-    <div class="mb-6">
-      <%= render Admin::GroupsScreen::MembersComponent.new(users: members, search_url: admin_user_suggestions_path(**admin_url_options)) %>
-    </div>
-
-    <div class="mb-6">
-      <%= render Admin::GroupsScreen::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only, stored: @stored_grants || []) %>
-    </div>
+    <%= render Admin::GroupsScreen::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only, stored: @stored_grants || []) %>
   <% end %>
 
   <% unless view_only %>
-    <%= render Admin::Ui::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: group.new_record? ? "Create group" : "Save group") %>
+    <%= render Admin::Ui::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: group.new_record? ? t(".create") : t(".save")) %>
   <% end %>
 <% end %>
 </div>

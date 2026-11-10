@@ -1,17 +1,17 @@
 require "test_helper"
 
-# The matrix only composes the rows and the toggle cards (round 3 Task 10).
+# The matrix only composes the rows and the toggle list, in two card frames.
 class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCase
-  test "eleven rows under their areas, then the toggle cards" do
+  test "eleven rows under their areas, then the toggle list" do
     render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [])
 
     assert_selector "[data-permission]", count: 11
     assert_equal %w[posts.read posts.create posts.edit posts.publish posts.delete pages.read pages.create pages.edit pages.publish pages.move pages.delete],
       page.all("[data-permission]").map { |row| row["data-permission"] }
-    assert_equal %w[Posts Pages], page.all(".admin-area-heading").map { |heading| heading.text.strip }
+    assert_equal %w[Posts Pages], page.all("[aria-labelledby=group-content-permissions] .admin-area-heading").map { |heading| heading.text.strip }
     assert_selector "h2", text: "Content permissions"
     assert_selector "h2", text: "Other permissions"
-    assert_selector "section h3", count: 4
+    assert_selector "[aria-labelledby=group-other-permissions] section h3", count: 4
   end
 
   test "ticked grants tick their rows and toggles, and a stale grant keeps its note" do
@@ -32,6 +32,56 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_no_selector ".admin-stale-grant", text: /retired_type/
   end
 
+  test "content permissions and other permissions are two card frames, each area a band" do
+    render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [])
+
+    content = page.find("section.admin-settings-card[aria-labelledby=group-content-permissions]")
+    assert_equal "Content permissions", content.find("h2#group-content-permissions").text
+    assert_selector "section[aria-labelledby=group-content-permissions] .admin-settings-card__head p", text: "Each permission has its own scope. No scope means everything."
+    assert_selector "section[aria-labelledby=group-content-permissions] .admin-settings-card__head span.bg-ic-structure-bg"
+    assert_equal %w[Posts Pages], content.all("section[aria-labelledby^=content-band-] > h3.admin-area-heading.bg-paper.text-label.text-meta").map { |band| band.text.strip }
+    assert_equal 5, content.all("section[aria-labelledby=content-band-posts] [data-permission]").size
+    assert_equal 11, content.all("[data-permission]").size
+
+    other = page.find("section.admin-settings-card[aria-labelledby=group-other-permissions]")
+    assert_equal "Other permissions", other.find("h2#group-other-permissions").text
+    assert_selector "section[aria-labelledby=group-other-permissions] .admin-settings-card__head span.bg-sunken.text-dim"
+    assert_equal %w[Content Administration Oversight Forms], other.all(".admin-area-heading.bg-paper.text-label.text-meta").map { |band| band.text.strip }
+    assert_no_selector "section.admin-settings-card section.rounded-card"
+    assert_selector "section.admin-settings-card", count: 2
+
+    # The script draws its chips with the row's class strings and the row's words.
+    root = page.find(".admin-permission-matrix[data-controller='admin--groups--permission-matrix']")
+    assert_equal 5, Admin::GroupsScreen::PermissionRowComponent.chip_classes.size
+    Admin::GroupsScreen::PermissionRowComponent.chip_classes.each do |kind, classes|
+      assert_equal classes, root["data-admin--groups--permission-matrix-#{kind.to_s.dasherize}-value"], kind
+    end
+    messages = JSON.parse(root["data-messages"])
+    assert_equal "! %{name} · type removed", messages["components.groups_screen.permission_row.chips.removed_type"]
+    assert_equal({ "one" => "includes %{count} subpage", "other" => "includes %{count} subpages" }, messages["components.groups_screen.scope_editor.notes.includes"])
+  end
+
+  test "a stale grant's note is the warn notice under its row" do
+    group = AccessControl::Group.create!(name: "Stale #{SecureRandom.hex(3)}")
+    group.grants.create!(permission: "pages.edit", scope: { "page_ids" => [ 0 ] })
+    group.grants.new(permission: "gone.plugin", scope: {}).save!(validate: false)
+    live = AccessControl::LiveGrants.new(group.grants.to_a)
+
+    render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: live.carried_attributes, stale: live)
+
+    compact = Admin::Ui::NoticeComponent.classes(:warn, size: :compact)
+    note = page.find("[data-permission='pages.edit'] + div > .admin-stale-grant")
+    assert_equal "#{compact} admin-stale-grant", note[:class]
+    assert_match(/page that no longer exists/, note.text)
+    assert_nil note[:role], "a standing warning is read where it stands"
+    assert_selector "[data-permission='pages.edit'] + div.pl-\\[calc\\(1\\.25rem\\+0\\.75rem\\+1rem\\)\\]"
+
+    unregistered = page.find(".admin-permission-matrix > .admin-stale-grant")
+    assert_equal "#{Admin::Ui::NoticeComponent.classes(:warn)} admin-stale-grant", unregistered[:class]
+    assert_equal "The permission “gone.plugin” no longer exists and will be removed when you save.", unregistered.text
+    assert_no_selector "[class*='rounded-cs border border-warn']"
+  end
+
   test "the rows named by open_keys start open" do
     render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [ { permission: "posts.edit", scope: {} }, { permission: "posts.read", scope: {} } ], open_keys: [ "posts.edit" ])
 
@@ -45,14 +95,14 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     render_inline Admin::GroupsScreen::PermissionMatrixComponent.new(grants: [])
 
     assert_selector "[data-permission='acme/widgets.edit']"
-    assert_selector ".admin-area-heading", text: "Widgets"
-    assert_no_selector "section h3", text: "Widgets"
+    assert_selector "[aria-labelledby=group-content-permissions] section > h3.admin-area-heading", text: "Widgets"
+    assert_no_selector "[aria-labelledby=group-other-permissions] h3", text: "Widgets"
   ensure
     AccessControl::Permissions.reset!
     AccessControl::BuiltIns.register
   end
 
-  # --- Locked ticks and view-only (round 3 Task 11) ---------------------------------
+  # --- Locked ticks and view-only --------------------------------------------------
 
   def viewer_holding(grants)
     user = User.create!(email_address: "viewer-#{SecureRandom.hex(3)}@example.org", password: "a-long-enough-password")
@@ -84,7 +134,7 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_selector "[data-permission='posts.read']:not([data-locked]) button", text: "Edit scope", visible: :all
     assert_selector "input[type=checkbox][name='group[grants][trash.empty][enabled]'][disabled]"
     assert_selector "input[type=checkbox][name='group[grants][tags.manage][enabled]']:not([disabled])"
-    assert_selector ".admin-locked-hint"
+    assert_selector "p.admin-locked-hint.text-small.text-meta"
   end
 
   test "a grant that isn't what the group stores (a typed tick, a changed row) is never locked" do
@@ -96,7 +146,7 @@ class Admin::GroupsScreen::PermissionMatrixComponentTest < ViewComponent::TestCa
     assert_no_selector ".admin-locked-hint"
   end
 
-  # Final fix wave (Task 11): the case a lock on POSTED values got wrong. The
+  # The case a lock on POSTED values would get wrong. The
   # group stores `posts.edit {blog}` (the viewer's own right, so no lock); the
   # editor widened the row to `{blog, now_update}` and the save was refused.
   # The row now holds a scope the viewer couldn't hand out -- but it is what

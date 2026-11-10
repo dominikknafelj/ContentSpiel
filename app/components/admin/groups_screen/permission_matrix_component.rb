@@ -1,17 +1,17 @@
 module Admin
   module GroupsScreen
-    # The group editor's permissions (access-control design spec §5 "Groups
-    # module"; round 3 Task 10 rebuilt it from a checkbox list into rows):
+    # The group editor's permissions, in two card frames:
     #
     # - **Content permissions**: every permission that carries a scope, one row
     #   each (`GroupsScreen::PermissionRowComponent`) -- Posts x5, Pages x6 -- under
-    #   its area's heading, each with its own scope chips and "Edit scope";
-    # - **Other permissions**: the rest, as cards of toggles
-    #   (`GroupsScreen::ToggleListComponent`).
+    #   its area's band, each with its own scope chips and "Edit scope";
+    # - **Other permissions**: the rest, one list of area bands with a switch
+    #   per row (`GroupsScreen::ToggleListComponent`). Every band is a
+    #   section's `h3`, in both cards.
     #
     # This component only composes them: it loads what the rows share (the page
     # tree, once for all six pages rows; the notes about stale grants) and decides
-    # which rows start open. The posted params did not change:
+    # which rows start open. The posted params:
     #
     #   group[grants][posts.edit][enabled]         "1" when ticked
     #   group[grants][posts.edit][content_types][] type names
@@ -21,12 +21,16 @@ module Admin
     # `grants` is what's ticked now: the group's grants as the editor carries
     # them (`AccessControl::LiveGrants#carried_attributes`: live values plus a
     # removed content type), or the submitted ones when a save failed. `stale` is
-    # the group's `LiveGrants`, for the notes on what a save will still drop
-    # (Review Focus 3) -- a deleted branch root, a grant that matches nothing any
-    # more (shown unticked; see `LiveGrants` for why it can't be shown ticked; one
-    # that names only removed content types says that saving removes it and who can
-    # manage the group until then, `#dormant_note`), an unregistered permission. A removed content type is no longer a note: it is a
-    # chip with Remove inside the row (`ScopeEditorComponent`).
+    # the group's `LiveGrants`, for the notes on what a save will still drop -- a
+    # deleted branch root, a grant that matches nothing any more (shown unticked;
+    # see `LiveGrants` for why it can't be shown ticked; one that names only
+    # removed content types says that saving removes it and who can manage the
+    # group until then, `#dormant_note`), an unregistered permission. Each is a
+    # warn notice: under its row, compact and indented like the scope editor;
+    # an unregistered permission, which has no row, at the top. They are
+    # standing warnings, read where they stand, so they take no live role. A
+    # removed content type is no note: it is a badge with Remove inside the row
+    # (`ScopeEditorComponent`).
     #
     # `open_keys`: the rows whose scope editor starts open -- after a failed save,
     # the ones the error names, so the editor can see what was refused.
@@ -36,10 +40,10 @@ module Admin
     # -- and a grant whose only roots were unreadable doesn't turn into an
     # unscoped one.
     #
-    # LOCKED TICKS (round 3 Task 11, D15) are DEFENSIVE. A grant the group already
-    # STORES that the viewer couldn't hand out themselves (`AccessControl.can_grant?`
-    # false on its scope as stored, a removed content type's name included) would be
-    # drawn locked: greyed, "You can't grant this", no scope editor, carried by hidden
+    # LOCKED TICKS are DEFENSIVE. A grant the group already STORES that the viewer
+    # couldn't hand out themselves (`AccessControl.can_grant?` false on its scope as
+    # stored, a removed content type's name included) would be drawn locked: the
+    # disabled tick, "You can't grant this", no scope editor, carried by hidden
     # inputs holding the whole scope as stored (`PermissionRowComponent`), so a form
     # saved as rendered changes nothing. But a stored group with such a grant is one
     # the viewer can't manage at all (`can_manage_group?` asks the same question of
@@ -54,7 +58,7 @@ module Admin
     # per member. `Groups::Save` decides every write; this is only what the form shows
     # and carries.
     #
-    # A REMOVED CONTENT TYPE (a warn chip with Remove, `ScopeEditorComponent`) is
+    # A REMOVED CONTENT TYPE (a warn badge with Remove, `ScopeEditorComponent`) is
     # therefore only ever editable for a viewer who could grant that name: an owner,
     # or someone whose own grant for the permission names no types or names that one.
     # For anyone else the group is view-only -- the name is dormant, not gone, and
@@ -64,8 +68,15 @@ module Admin
     # disabled fieldset.
     #
     # Showing and hiding the editors and rewriting the chips is
-    # `admin--groups--permission-matrix`; the tri-state tree is `admin--groups--branch-picker`.
+    # `admin--groups--permission-matrix`; the tri-state tree is
+    # `admin--groups--branch-picker`. Both read their words from this element's
+    # `data-messages` (`SCRIPT_MESSAGES`), the keys the rows and the scope
+    # editors draw with, and the first its chips' class strings from its values
+    # (`PermissionRowComponent.chip_classes`).
     class PermissionMatrixComponent < AdminComponent
+      SCRIPT_MESSAGES = (%w[all_pages all_types own_only more removed_type under unreadable].map { |key| "components.groups_screen.permission_row.chips.#{key}" } +
+        %w[included partial includes].map { |key| "components.groups_screen.scope_editor.notes.#{key}" }).freeze
+
       def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default, open_keys: [], tree: nil, view_only: false, stored: [])
         @view_only = view_only
         @stored = Array(stored).to_h { |grant| [ grant[:permission].to_s, AccessControl::LiveGrants.normalize_scope(grant[:scope]) ] }
@@ -81,6 +92,15 @@ module Admin
       private
 
       attr_reader :form_name, :locale
+
+      def script_messages = messages_data(*SCRIPT_MESSAGES)
+
+      # The chips' class strings, handed to the script, which redraws them.
+      def script_values = PermissionRowComponent.chip_classes.transform_keys { |kind| :"admin__groups__permission_matrix_#{kind}_value" }
+
+      # Each area is a section under its band, an `h3`, as the switches' are, so
+      # a screen reader moves from band to band through both cards.
+      def band_id(area) = "content-band-#{area.to_s.parameterize}"
 
       # The scoped permissions by area, in registry order.
       def sections = AccessControl::Permissions.grantable.reject { |permission| permission.scopes.empty? }.group_by(&:area)
@@ -111,7 +131,7 @@ module Admin
         return [] unless @stale
 
         entry = @stale.entry_for(permission.key)
-        notes = entry ? entry.removed_notes.map { |value| "#{value.upcase_first}: removed when you save." } : []
+        notes = entry ? entry.removed_notes.map { |value| t(".removed_value", value: value.upcase_first) } : []
         @stale.dead_for(permission.key).each do |dead|
           notes << (dead.dormant ? dormant_note(dead) : dead_note(dead))
         end
@@ -119,8 +139,8 @@ module Admin
       end
 
       def dead_note(dead)
-        what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
-        "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
+        what = dead.removed.any? ? dead.removed.to_sentence : t(".dead_nothing") # i18n-ok: Array#to_sentence joins with the locale's support.array words
+        t(".dead", what: what)
       end
 
       # A dead grant that a re-registered content type would bring back
@@ -131,7 +151,7 @@ module Admin
       # form of such a group has Save enabled from the start (`admin/groups/_form`).
       def dormant_note(dead)
         names = Array(dead.dormant["content_types"]) - AccessControl::Permissions.content_type_choices
-        "Limited to a content type that no longer exists (#{names.join(", ")}). Saving removes it; until then only someone who could grant that type can manage this group."
+        t(".dormant", names: names.join(", "))
       end
 
       # Stored grants whose permission key isn't registered any more -- no
@@ -140,7 +160,7 @@ module Admin
         return [] unless @stale
 
         @stale.dead.reject { |dead| AccessControl::Permissions.find(dead.permission) }
-          .map { |dead| "The permission “#{dead.permission}” no longer exists and will be removed when you save." }
+          .map { |dead| t(".unregistered", key: dead.permission) }
       end
 
       def toggle_grants = @grants.slice(*AccessControl::Permissions.grantable.select { |permission| permission.scopes.empty? }.map(&:key))

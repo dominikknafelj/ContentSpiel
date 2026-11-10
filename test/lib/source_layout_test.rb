@@ -96,8 +96,11 @@ class SourceLayoutTest < ActiveSupport::TestCase
   #
   # `notes.en.yml` is the one exception. Besides notes' own keys it holds notes'
   # wording on other screens (the block card's and the tile's "Add note", the
-  # tree node's and the legend's markers), merged into those screens' scopes by
-  # Rails; moving them into the screens' files would put notes' strings in core files.
+  # tree node's and the legend's markers, Your account's Notes card,
+  # `admin.accounts.notes`), merged into those screens' scopes by Rails; moving
+  # them into the screens' files would put notes' strings in core files. Of
+  # `admin.accounts` it holds that card's keys and nothing else: the screen's
+  # own are `accounts.en.yml`'s.
   LOCALE_EXCEPTIONS = %w[notes].freeze
 
   # Every locale file of the folder, whatever its language: `<folder>.<locale>.yml` holds
@@ -124,6 +127,12 @@ class SourceLayoutTest < ActiveSupport::TestCase
       next if scopes.empty?
       assert_equal [ name ], scopes, "#{File.basename(path)} holds #{scopes.inspect}"
     end
+  end
+
+  test "notes.en.yml holds, of Your account's keys, the Notes card's alone" do
+    accounts = YAML.load_file(ROOT.join("config/locales/admin/notes.en.yml")).dig("en", "admin", "accounts")
+    assert_equal [ "notes" ], accounts.keys, "the account screen's own keys are accounts.en.yml's"
+    assert_nil YAML.load_file(ROOT.join("config/locales/admin/accounts.en.yml")).dig("en", "admin", "accounts", "notes"), "the Notes card's keys are notes.en.yml's"
   end
 
   test "a component scope has keys in one locale file per language, except where an exception names it, and names a folder" do

@@ -7,7 +7,13 @@
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%# The wizard loads the `application` entry point. The one step that
+        shows a token, `mcp_token_created`, asks for `admin` instead
+        (`content_for :entry_point`), so the token's copy box and its
+        blanking at `pagehide` are CS Studio's own scripts, the AI assistant
+        page's, and it puts `turbo-cache-control: no-cache` in `:head`. %>
+    <%= javascript_importmap_tags(content_for(:entry_point) == "admin" ? "admin" : "application") %>
+    <%= yield :head %>
   </head>
 
   <%# scheme-light/dark:scheme-dark: native controls and the canvas follow
@@ -19,7 +25,7 @@
       `layouts.setup.*`. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <span class="text-xs font-bold uppercase tracking-wide"><%= "Content·Spiel" %></span><%# i18n-ok: the product's wordmark, never translated %>
+      <%= render "admin/shared/product_wordmark", link: false %>
       <div class="flex items-center gap-4">
         <span class="hidden text-small text-meta sm:inline"><%= t("setup.layout.first_run") %></span>
         <%= render Admin::Ui::ThemeSwitchComponent.new %>

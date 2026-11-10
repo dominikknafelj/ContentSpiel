@@ -58,7 +58,7 @@ module Admin
         redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: t("admin.invites.resent", email: @invitation.email_address)
       else
         forbidden_or(result) do
-          redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
+          redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.first
         end
       end
     end
@@ -71,7 +71,7 @@ module Admin
         redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: t("admin.invites.withdrawn", email: email)
       else
         forbidden_or(result) do
-          redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: to_sentence joins with the locale's support.array words
+          redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.first
         end
       end
     end

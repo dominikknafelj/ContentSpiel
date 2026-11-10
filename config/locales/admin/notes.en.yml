@@ -135,29 +135,11 @@ en:
             one: "%{count} new message ↓"
             other: "%{count} new messages ↓"
           gone: "This thread was deleted"
-    # The account screen's "Notes" card: two settings of the person's, and
-    # what this browser says about showing notifications. Read with full keys
-    # from `admin/accounts/edit.html.erb` and `Admin::AccountsController`.
-    # The card is one of two in the account screen's first form, "Your
-    # account": Profile, the name, and Notes, with one footer, whose button is the bar's own "Save changes" and whose
-    # toast is the app's own "Settings saved" (no full stop, as on the
-    # Settings screen).
+    # The account screen's "Notes" card (`admin/accounts/edit.html.erb`, read
+    # with full keys): two settings of the person's, and what this browser
+    # says about showing notifications. The screen's other keys are in
+    # `accounts.en.yml`.
     accounts:
-      # The screen's heading, its title in the browser's tab and the
-      # sidebar's entry that leads to it: one name for the one place.
-      title: "Your account"
-      saved: "Settings saved"
-      profile:
-        title: "Profile"
-        name: "Your name"
-      # The third card: the password form, with what a change does to the
-      # person's sessions under its title.
-      password:
-        title: "Password"
-        sessions: "You'll stay signed in here. Other sessions are signed out."
-        # The form's answer, said in the card, where the form is.
-        changed: "Password changed. Your other sessions were signed out."
-        limited: "Try again later."
       notes:
         title: "Notes"
         description: "What happens in this browser when someone mentions you in a note."

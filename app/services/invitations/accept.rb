@@ -25,7 +25,9 @@ module Invitations
   #               the invitation.
   # Any other failure is the form's: `errors` are the new user's sentences (a
   # blank, short or unconfirmed password; a name too long), `record` is the
-  # invitation, still open.
+  # invitation, still open, whose `errors` hold the same sentences by the
+  # field they belong to (`messages_for(:password)`), so the page can put
+  # each under its own field. The invitation is not saved with them.
   #
   # The row is locked and asked again before anything is written, so a second
   # press that arrives while the first is in flight reads `:used`.
@@ -90,6 +92,7 @@ module Invitations
       user.errors.add(:password_confirmation, :blank) if @password.present? && @password_confirmation.blank?
       if user.errors.any? || !user.save
         @user_errors = user.errors.full_messages
+        user.errors.each { |error| @invitation.errors.add(error.attribute, error.full_message) }
         return nil
       end
       user

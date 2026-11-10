@@ -1,0 +1,15 @@
+# System status (docs/reference/i18n.md): `admin/system_status/show.html.erb`,
+# read by lazy lookup. The rows' words are `Admin::Ui::SystemCheckRowComponent`'s
+# (`ui.en.yml`), and the checks' own sentences stay `Setup::SystemCheck`'s English.
+en:
+  admin:
+    system_status:
+      show:
+        title: "System status"
+        # The line under the heading, plural by the total (`count`): `time`
+        # is the site's time in the `admin.time` format, so a translation
+        # orders the three as its language does.
+        summary:
+          one: "%{passed} of %{count} check passed · last run %{time}"
+          other: "%{passed} of %{count} checks passed · last run %{time}"
+        run_again: "Run checks again"

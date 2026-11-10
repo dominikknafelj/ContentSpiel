@@ -11,8 +11,8 @@ module Admin
     # The sentence is `MailStateSentence`'s, the card's and System status's
     # own, so it names a reason and never the server's line.
     #
-    # In the insecure notice's style (`InsecureNoticeComponent`): a warn alert,
-    # `role=alert`, never danger on a screen of cards.
+    # The compact warn notice (`Admin::Ui::NoticeComponent`), as the insecure
+    # notice is: an alert, never danger on a screen of cards.
     class MailFailedNoticeComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -32,10 +32,8 @@ module Admin
         controller: nil
       )
 
-      BASE_CLASS = "rounded-card border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
-
       # `href` is where "Open Mail settings →" goes, resolved by the screen.
-      # `class:` places the notice and is added to the component's own.
+      # `class:` places the notice and is added to the notice's own.
       def initialize(mail_settings:, href:, **html)
         @mail_settings = mail_settings
         @href = href
@@ -47,8 +45,6 @@ module Admin
       private
 
       def sentence = ::MailStateSentence.for(@mail_settings)
-
-      def attributes = @html.merge(id: "mail-failed-notice", role: "alert", class: [ BASE_CLASS, @html[:class] ].compact.join(" "))
     end
   end
 end

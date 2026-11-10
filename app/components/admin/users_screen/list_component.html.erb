@@ -1,65 +1,85 @@
-<div class="admin-users-list rounded-card bg-surface shadow-1">
-  <div class="<%= COLUMNS %> border-b border-line-strong py-2 text-label text-meta" aria-hidden="true">
-    <span><%= t(".user") %></span><span><%= t(".groups") %></span><span><%= t(".last_sign_in") %></span><span></span>
-  </div>
-  <ul>
-    <% rows.each do |row| %>
-      <% invited = invitation?(row) %>
-      <li id="<%= helpers.dom_id(row) %>" class="<%= COLUMNS %> relative border-b border-line py-2.5 last:rounded-b-cs last:border-b-0 hover:bg-paper" <%= "data-invited" if invited %>>
-        <span class="flex min-w-0 items-center gap-2.5">
-          <span class="grid size-[26px] flex-none place-items-center rounded-full bg-sunken text-xs font-semibold text-dim" aria-hidden="true"><%= initial(row) %></span>
-          <span class="flex min-w-0 flex-col gap-px">
-            <span class="flex flex-wrap items-center gap-2">
-              <% if invited %>
-                <span class="font-medium text-ink"><%= row.name_or_email %></span>
-                <%= render Admin::Ui::BadgeComponent.new(label: row.expired? ? t(".invite_expired") : t(".invited"), data: { invite_state: row.expired? ? "expired" : "open" }) %>
+<div class="rounded-card bg-surface shadow-1">
+  <%# A row that is one link has no sticky first cell: a sticky cell would be the
+      containing block of the link's cover, which would then cover the name
+      alone. The table scrolls sideways whole. The menu's panel may hang below
+      the card, so the card does not clip; `ui/float` lifts it out of the scroll. %>
+  <div class="admin-table-scroll--x rounded-card">
+    <table class="admin-users-list admin-card-table w-full border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-line-strong text-left text-label text-meta">
+          <th scope="col" class="py-2 pr-4"><%= t(".user") %></th>
+          <th scope="col" class="py-2 pr-4"><%= t(".groups") %></th>
+          <th scope="col" class="py-2 pr-4"><%= t(".last_sign_in") %></th>
+          <th scope="col" class="py-2"><span class="sr-only"><%= t(".actions_column") %></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.each do |row| %>
+          <% invited = invitation?(row) %>
+          <tr id="<%= helpers.dom_id(row) %>" class="border-b border-line last:border-b-0 hover:bg-paper" <%= "data-invited" if invited %>>
+            <th scope="row" class="py-2.5 pr-4 text-left font-normal">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <%= render Admin::Ui::AvatarComponent.new(initials: PersonName.initials(row.name_or_email), size: :md, tone: avatar_tone(row)) %>
+                <span class="flex min-w-0 flex-col gap-px">
+                  <span class="flex flex-wrap items-center gap-2">
+                    <% if invited %>
+                      <span class="font-medium text-ink"><%= row.name_or_email %></span>
+                      <%= render Admin::Ui::BadgeComponent.new(label: row.expired? ? t(".invite_expired") : t(".invited"), data: { invite_state: row.expired? ? "expired" : "open" }) %>
+                    <% else %>
+                      <%= link_to helpers.edit_admin_user_path(row, **url_options), data: { turbo_frame: "content" },
+                            class: "admin-row-link font-medium text-ink" do %><%= render Admin::Ui::UserNameComponent.new(user: row) %><% end %>
+                      <% if you?(row) %><span class="text-small text-meta"><%= t(".you") %></span><% end %>
+                      <% if row.owner? %><%= render Admin::Ui::BadgeComponent.new(label: t(".owner")) %><% end %>
+                    <% end %>
+                  </span>
+                  <% if row.name.present? %><span class="truncate text-small text-meta"><%= row.email_address %></span><% end %>
+                  <% if invited && !row.expired? %><span class="text-small text-meta" data-invite-dates><%= invite_dates(row) %></span><% end %>
+                </span>
+              </span>
+            </th>
+            <td class="py-2.5 pr-4" data-column="groups">
+              <% names = group_names(row) %>
+              <% if names.empty? %>
+                <span class="text-small text-meta"><%= t(".no_groups") %></span>
               <% else %>
-                <%= link_to helpers.edit_admin_user_path(row, **url_options), data: { turbo_frame: "content" },
-                      class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::Ui::UserNameComponent.new(user: row) %><% end %>
-                <% if you?(row) %><span class="text-sm text-meta"><%= t(".you") %></span><% end %>
-                <% if row.owner? %><%= render Admin::Ui::BadgeComponent.new(label: t(".owner")) %><% end %>
+                <span class="flex flex-wrap gap-1">
+                  <% names.each do |name| %><%= render Admin::Ui::BadgeComponent.new(label: name) %><% end %>
+                </span>
               <% end %>
-            </span>
-            <% if row.name.present? %><span class="truncate text-sm text-meta"><%= row.email_address %></span><% end %>
-            <% if invited && !row.expired? %><span class="text-xs text-meta" data-invite-dates><%= invite_dates(row) %></span><% end %>
-          </span>
-        </span>
-        <span class="flex flex-wrap gap-1" data-column="groups">
-          <% names = group_names(row) %>
-          <% if names.empty? %>
-            <span class="text-sm text-meta"><%= t(".no_groups") %></span>
-          <% else %>
-            <% names.each do |name| %><span class="rounded-full bg-sunken px-2 py-0.5 text-xs text-ink"><%= name %></span><% end %>
-          <% end %>
-        </span>
-        <span class="text-xs text-meta" data-column="last-sign-in">
-          <%# The column heading is not a table header (the list is a `ul`), so each row says what its time is. %>
-          <span class="sr-only"><%= t(".last_sign_in_label") %> </span><% if !invited && last_sign_ins[row.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[row.id]) %><% else %><%= t(".never") %><% end %>
-        </span>
-        <% if invited %>
-          <span class="relative z-(--cs-z-raised) justify-self-end" data-invite-menu>
-            <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: row.name_or_email), close_on_select: true) do |menu| %>
-              <% menu.with_item do %>
-                <%= button_to t(".resend"), resend_path(row), method: :post %>
+            </td>
+            <td class="py-2.5 pr-4 whitespace-nowrap text-small text-meta" data-column="last-sign-in">
+              <% if !invited && last_sign_ins[row.id] %><%= render Admin::Ui::TimeAgoComponent.new(time: last_sign_ins[row.id]) %><% else %><%= t(".never") %><% end %>
+            </td>
+            <td class="py-2.5 text-right">
+              <% if invited %>
+                <span class="relative z-(--cs-z-raised) inline-flex" data-invite-menu>
+                  <%= render Admin::Ui::MenuComponent.new(label: "⋯", aria_label: t(".actions", name: row.name_or_email), close_on_select: true) do |menu| %>
+                    <% menu.with_item do %>
+                      <%= button_to t(".resend"), resend_path(row), method: :post %>
+                    <% end %>
+                    <% menu.with_item do %>
+                      <%= tag.button t(".withdraw_menu"), type: "button", class: "text-danger-ink", data: dialog_trigger(withdraw_dialog_id(row)) %>
+                    <% end %>
+                  <% end %>
+                </span>
+              <% else %>
+                <span class="admin-row-verb" aria-hidden="true"><%= t(".edit") %></span>
               <% end %>
-              <% menu.with_item do %>
-                <%= tag.button t(".withdraw_menu"), type: "button", class: "text-danger-ink", data: dialog_trigger(withdraw_dialog_id(row)) %>
-              <% end %>
-            <% end %>
-          </span>
-          <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: withdraw_dialog_id(row), title: t(".withdraw_title"),
-                body: t(".withdraw_body", email: row.email_address)) do |dialog| %>
-            <% dialog.with_confirm_action do %>
-              <%= form_with url: withdraw_path(row), method: :delete do %>
-                <%= render Admin::Ui::ButtonComponent.new(label: t(".withdraw"), variant: :danger, type: "submit") %>
-              <% end %>
-            <% end %>
-          <% end %>
-        <% else %>
-          <span class="justify-self-end text-meta" aria-hidden="true">›</span>
+            </td>
+          </tr>
         <% end %>
-      </li>
-    <% end %>
-  </ul>
+      </tbody>
+    </table>
+  </div>
 </div>
-<p class="mt-3 text-xs text-meta"><%= t(".delete_hint") %></p>
+<% invitations.each do |invitation| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: withdraw_dialog_id(invitation), title: t(".withdraw_title"),
+        body: t(".withdraw_body", email: invitation.email_address)) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: withdraw_path(invitation), method: :delete do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".withdraw"), variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<p class="mt-3 text-small text-meta"><%= t(".delete_hint") %></p>

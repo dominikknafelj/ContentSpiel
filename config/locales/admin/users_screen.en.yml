@@ -1,11 +1,8 @@
-# The Users screen (docs/reference/i18n.md): `admin.components.users_screen.*`
-# are its components' keys (the list and the invite dialog; the group cards,
-# the owner and delete zones still hold their words as literals);
-# `admin.users.index` is the list page's lazy-lookup scope (only the invite
-# strings so far); `admin.invites` what `Admin::InvitesController` answers.
-#
-# The invite words are the mail spec's and design answer M4's; the toasts
-# and the dialog's Name help are this build's (a design question each).
+# The Users screen's components (docs/reference/i18n.md):
+# `admin.components.users_screen.*` are the list's, the invite dialog's,
+# the group tiles' and the owner and delete zones' keys; `admin.invites`
+# what `Admin::InvitesController` answers. The
+# Users views' own keys and the controller's flashes are `users.en.yml`.
 en:
   admin:
     components:
@@ -14,11 +11,12 @@ en:
           user: "User"
           groups: "Groups"
           last_sign_in: "Last sign-in"
-          last_sign_in_label: "Last sign-in:"
           you: "(you)"
           owner: "Owner"
           no_groups: "No groups"
           never: "Never"
+          edit: "Edit"
+          actions_column: "Actions"
           delete_hint: "Delete a user from their edit page. Their pages, posts and media stay; their posts are left without an author."
           invited: "Invited"
           invite_expired: "Invite expired"
@@ -38,11 +36,32 @@ en:
           resend: "Resend"
           cancel: "Cancel"
           submit: "Send invite"
-    users:
-      index:
-        invite: "Invite person…"
-        invites_need_mail: "Invites need mail."
-        set_up_mail: "Set up mail →"
+        group_cards:
+          title: "Groups"
+          manage: "Manage groups →"
+          locked: "You can't grant this group."
+        delete_zone:
+          heading: "Delete user"
+          body: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working."
+          reason: "%{name} is the only owner, so they can't be deleted."
+          trigger: "Delete user…"
+          dialog_title: "Delete %{name}?"
+          dialog_body: "They can't sign in any more and their AI tokens stop working. Their pages, posts and media stay; posts they wrote are left without an author."
+          dialog_body_own: "This is your own account — deleting it signs you out."
+          confirm: "Delete user"
+        owner_zone:
+          heading: "Owner"
+          body: "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner."
+          reason: "%{name} is the only owner, so their owner rights can't be removed."
+          make: "Make owner…"
+          remove: "Remove owner rights…"
+          make_title: "Make %{name} an owner?"
+          remove_title: "Remove owner rights from %{name}?"
+          make_body: "Owners have every permission, including managing other owners and removing your owner rights."
+          remove_body: "They keep their groups and the permissions those give."
+          remove_body_own: "You keep your groups and the permissions those give."
+          make_confirm: "Make owner"
+          remove_confirm: "Remove owner rights"
     invites:
       sent: "Invite sent to %{email}."
       resent: "New invite sent to %{email}."

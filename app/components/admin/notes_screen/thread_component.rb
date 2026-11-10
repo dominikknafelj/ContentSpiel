@@ -118,9 +118,6 @@ module Admin
 
       def button_failure = (own_failure unless reply_failure)
 
-      # The warn alert, as CS Studio draws one, at the handoff's 13px.
-      REFUSAL_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2 text-[13px] text-warn-ink".freeze
-
       # Whether what was refused is that the note, or what it was on, is no
       # longer there: the one sentence every notes service answers for that
       # (`Notes::Authorization#gone`). Nothing is left to act on then, and

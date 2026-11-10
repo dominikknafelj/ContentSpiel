@@ -1,9 +1,10 @@
-<%# An inline box, not a toast: toasts are CS Studio only (they need the
-    admin JS entry, which the wizard doesn't load). The words are the
-    controller's, from `setup.flash.*`. %>
+<%# An inline notice, not a toast: toasts are CS Studio only (they need the
+    admin JS entry, which the wizard doesn't load). The regular size, the
+    wizard's 14px; its role is the tone's (a refusal an alert, a success a
+    status). The words are the controller's, from `setup.flash.*`. %>
 <% if flash[:alert] %>
-  <p class="mb-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert"><%= flash[:alert] %></p>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, class: "mb-4").with_content(flash[:alert]) %>
 <% end %>
 <% if flash[:notice] %>
-  <p class="mb-4 rounded-cs bg-ok-tint px-3 py-2 text-sm text-ok-ink" role="status"><%= flash[:notice] %></p>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :ok, class: "mb-4").with_content(flash[:notice]) %>
 <% end %>

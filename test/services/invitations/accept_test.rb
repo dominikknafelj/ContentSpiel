@@ -84,6 +84,11 @@ class Invitations::AcceptTest < ActiveSupport::TestCase
     assert_includes results[2].errors, "Password confirmation doesn't match Password"
     assert_includes results[3].errors, "Password confirmation can't be blank"
     assert_includes results[4].errors, "Name is too long (maximum is 120 characters)"
+    # The same sentences by field, on the (unsaved) invitation, for the page
+    # to put each under its own input.
+    assert_equal [ "Use at least 12 characters." ], results[1].record.errors.messages_for(:password)
+    assert_equal [ "Password confirmation doesn't match Password" ], results[2].record.errors.messages_for(:password_confirmation)
+    assert_equal [ "Name is too long (maximum is 120 characters)" ], results[4].record.errors.messages_for(:name)
     results.each do |result|
       assert_not result.ok?
       assert_equal @invitation, result.record

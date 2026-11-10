@@ -2,35 +2,32 @@
     the new-password form, is edit.html.erb): "request" (the default), "sent"
     (?sent=1, after a request) and "expired" (?expired=1, a bad or used
     link). The sent state is the same words for a known and an unknown
-    address -- the controller redirects both identically. %>
-<%# Handoff "Studio Password Reset": directly on the page, no card; the site
-    name above the heading (`admin/shared/_auth_heading`); links in the accent
-    colour, underlined on hover only. %>
+    address -- the controller redirects both identically. Each stands on the
+    product layout's panel, the site name above the heading
+    (`admin/shared/_auth_heading`), and ends in the tertiary way back. %>
 <div class="flex flex-col gap-[18px]">
-  <% back_link = link_to "← Back to sign in", admin_sign_in_path, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %>
+  <% back_link = link_to t(".back"), admin_sign_in_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
   <% if params[:sent] == "1" %>
-    <%= render "admin/shared/auth_heading", title: "Check your email" %>
-    <p class="text-sm leading-relaxed text-dim">If that address belongs to an account, we've sent a link. It expires in 15 minutes.</p>
+    <%= render "admin/shared/auth_heading", title: t(".sent_title") %>
+    <p class="text-sm leading-relaxed text-dim"><%= t(".sent") %></p>
     <p><%= back_link %></p>
   <% elsif params[:expired] == "1" %>
     <%= render "admin/shared/auth_heading", title: t(".expired_title") %>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert"><%= t(".expired") %></p>
-    <%= link_to "Send a new link", new_admin_password_path, class: "#{setup_primary_button_class} w-full text-center" %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact) do %><%= t(".expired") %><% end %>
+    <%= link_to t(".request_new"), new_admin_password_path, class: "#{setup_primary_button_class} w-full justify-center" %>
     <p><%= back_link %></p>
   <% else %>
-    <%= render "admin/shared/auth_heading", title: "Reset password" %>
-    <p class="text-sm leading-relaxed text-dim">Enter the email you sign in with. We'll send a link to set a new password.</p>
+    <%= render "admin/shared/auth_heading", title: t(".title") %>
+    <p class="text-sm leading-relaxed text-dim"><%= t(".intro") %></p>
 
-    <% if flash[:alert] %>
-      <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
-    <% end %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= flash[:alert] %><% end %>
 
     <%= form_with url: admin_password_path, class: "flex flex-col gap-[18px]" do |form| %>
-      <div>
-        <%= form.label :email_address, "Email", class: setup_label_class %>
+      <div class="admin-field">
+        <%= form.label :email_address, t(".email"), class: setup_label_class %>
         <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
       </div>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full") %>
     <% end %>
 
     <p><%= back_link %></p>

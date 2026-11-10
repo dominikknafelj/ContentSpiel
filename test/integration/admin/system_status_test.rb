@@ -1,6 +1,6 @@
 require "test_helper"
 
-# System status (design spec §6.1): the setup wizard's own read-only
+# System status: the setup wizard's own read-only
 # `Setup::SystemCheck` results, re-run on every load ("Run again" is a
 # plain reload), with a summary, warnings first and a copyable command.
 class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
@@ -25,7 +25,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
   end
 
   # The page is shown to anyone with `system_status.view`: it names the
-  # theme's folder and never where the server keeps it (theming spec §1).
+  # theme's folder and never where the server keeps it.
   #
   # And it says when the stylesheet is not that theme's, with the stamp the
   # build wrote (`ThemeFolder.stamp`), read for real here: this suite's
@@ -60,7 +60,34 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     end
 
     results = Setup::SystemCheck.run
-    assert_select "h1 + p", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
+    assert_select "h1.text-h1", text: "System status"
+    assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
+    assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
+  end
+
+  # The summary is plural by the total: no site runs a single check, so the
+  # `one` form is read from the key itself.
+  test "the summary's words follow the total's plural" do
+    words = ->(passed, count) { I18n.t("admin.system_status.show.summary", passed: passed, count: count, time: "17:30") }
+
+    assert_equal "1 of 1 check passed · last run 17:30", words.(1, 1)
+    assert_equal "5 of 6 checks passed · last run 17:30", words.(5, 6)
+  end
+
+  # One card holds the rows, divided inside it; the wizard keeps its own
+  # ruled list (`setup/_system_check_results`'s default frame).
+  test "the checks are one card with their rows divided inside it, and no summary chip" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+
+    assert_select "div.rounded-card.bg-surface.shadow-1", count: 1 do
+      assert_select "> ul.divide-y.divide-line.px-4", count: 1 do
+        assert_select "> li.admin-system-check", count: Setup::SystemCheck.run.size
+      end
+    end
+    assert_select "ul.border-y", count: 0
+    assert_select ".admin-system-check-summary, [data-summary-chip]", count: 0
   end
 
   test "warnings are listed before OK rows" do
@@ -103,7 +130,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     with_mail_state(:untested) do
       get "/cs-studio/system_status"
 
-      assert_select "[data-controller='admin--ui--clipboard'][data-admin--ui--clipboard-text-value=?]", Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+      assert_select "[data-controller='admin--ui--clipboard'] code[data-admin--ui--clipboard-target=source]", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
     end
     [ :working, :failed ].each do |state|
       with_mail_state(state) do

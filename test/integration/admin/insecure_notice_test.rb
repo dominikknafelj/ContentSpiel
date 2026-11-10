@@ -48,7 +48,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
         get path
 
         assert_response :success
-        assert_select "main p#insecure-notice[role=alert]", text: NOTICE, count: 1
+        assert_select "main div#insecure-notice[role=alert]", text: NOTICE, count: 1
       end
       end
     end
@@ -78,7 +78,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
       get "/cs-studio"
 
       assert_response :success
-      assert_select "main.admin-shell__main > p#insecure-notice[role=alert]", text: NOTICE, count: 1
+      assert_select "main.admin-shell__main > div#insecure-notice[role=alert]", text: NOTICE, count: 1
       # Outside the content frame: a frame navigation keeps it.
       assert_select "turbo-frame#content #insecure-notice", count: 0
     end
@@ -96,7 +96,7 @@ class Admin::InsecureNoticeTest < ActionDispatch::IntegrationTest
         get "/cs-studio"
 
         assert_response :success
-        assert_select "main.admin-shell__main > p#insecure-notice[role=alert]", text: NOTICE, count: 1
+        assert_select "main.admin-shell__main > div#insecure-notice[role=alert]", text: NOTICE, count: 1
       end
     end
   end

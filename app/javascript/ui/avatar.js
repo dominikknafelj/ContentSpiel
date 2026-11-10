@@ -9,7 +9,7 @@ const TONES = {
   other: "bg-people-tint text-people",
   own: "bg-people text-surface",
   away: "border-[1.5px] border-dashed border-field-line bg-surface text-meta",
-  more: "bg-sunken text-ink",
+  more: "border border-meta bg-surface text-ink",
   empty: "border border-field-line bg-surface"
 }
 

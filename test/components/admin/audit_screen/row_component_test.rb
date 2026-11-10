@@ -123,4 +123,12 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector ".admin-channel-chip[data-channel=mcp]", text: "MCP"
     assert_selector "p", text: /via claude-desktop/
   end
+
+  test "the row's one link is .admin-row-link" do
+    row_for("post.published")
+
+    assert_selector "li > a.admin-row-link[href='/e/1']", count: 1
+    assert_selector "a.admin-row-link", count: 1
+    assert_empty page.find("a.admin-row-link")["class"].split.grep(/\Aafter:/)
+  end
 end

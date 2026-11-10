@@ -51,6 +51,33 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A mail has no tokens: its button's ground is the one hex literal a mail
+  # may write (--cs-accent's light value, `admin_design_rules_test`), read
+  # from the button's own style, under named white words.
+  test "a mail button's white words on the violet are 4.5:1" do
+    style = Rails.root.join("app/views/mails/_button.html.erb").read[/<a\b.*?style="([^"]+)"/m, 1]
+    assert_includes style, "color:white;", "the words are white"
+    violet = resolve_colour({ "button" => style[/background:(#\h{6});/, 1] }, "button")
+    white = resolve_colour({ "words" => "#ffffff" }, "words")
+    assert_ratio(4.5, white, violet, "the button's white words on the violet")
+    assert_ratio(6.8, white, violet, "the button's white words on the violet, at the measured figure")
+  end
+
+  # A disabled switch keeps its full colour: off, the sunken track in its
+  # field-line outline with a meta knob; on, a meta track with a surface
+  # knob. Each part that tells the state stands at 3:1 on what it meets,
+  # on a card and on the rail.
+  test "a disabled switch's track and knob are 3:1 or better, off and on, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-surface --cs-rail].each do |ground|
+        assert_ratio(3, colour.("--cs-field-line"), colour.(ground), "the off track's outline on #{ground} (#{scheme})")
+        assert_ratio(3, colour.("--cs-meta"), colour.(ground), "the on track on #{ground} (#{scheme})")
+      end
+      assert_ratio(3, colour.("--cs-meta"), colour.("--cs-sunken"), "the off knob on the sunken track (#{scheme})")
+      assert_ratio(3, colour.("--cs-surface"), colour.("--cs-meta"), "the on knob on the meta track (#{scheme})")
+    end
+  end
+
   test "dim stays a step above meta on every ground" do
     each_scheme do |scheme, colour|
       GROUNDS.each do |ground|
@@ -173,6 +200,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The count circle ("+N", `AvatarComponent`'s `:more`) is the surface inside
+  # a 1px `meta` edge: a hovered or selected tree row is `sunken`, so the
+  # edge, not the fill, draws the circle on every ground a stack meets.
+  test "the count circle's edge is 5:1 or better on every ground a stack meets, and its number on its fill, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-chrome --cs-sunken --cs-paper --cs-rail --cs-accent-tint].each do |ground|
+        assert_ratio(5.0, colour.("--cs-meta"), colour.(ground), "the count circle's edge on #{ground} (#{scheme})")
+      end
+      assert_ratio(7.0, colour.("--cs-ink"), colour.("--cs-surface"), "the count circle's number on its fill (#{scheme})")
+    end
+  end
+
   # The held strip (`Admin::EditorScreen::HoldStripComponent`) is the people
   # tint: its sentence in ink, the status in meta, and Take over, the small
   # secondary, with its accent words (read on the tint, and on the button's
@@ -282,9 +321,10 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # A selected or pressed tile in a grid (`.admin-tile`) is told by its
-  # accent outline alone, 2px outside its edge, so the outline stands on the
-  # card it is in (surface) or on the page (paper), and is held at the
+  # A selected, pressed or ticked tile in a grid (`.admin-tile`; a ticked
+  # one is the user editor's group tile, inside the Groups card) is told by
+  # its accent outline alone, 2px outside its edge, so the outline stands on
+  # the card it is in (surface) or on the page (paper), and is held at the
   # figures it reaches, which are well above 3:1.
   test "a selected tile's accent outline is 3:1 on surface and on paper" do
     floors = { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-paper" => { light: 6.2, dark: 7.8 } }
@@ -789,6 +829,16 @@ class AdminContrastTest < ActiveSupport::TestCase
       %w[--cs-surface --cs-rail].each do |ground|
         assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the off chip's edge and ring on #{ground} (#{scheme})")
         assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "the off chip's word on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # `Admin::Ui::NoticeComponent`'s four tones: warn, ok and danger write the
+  # role's ink on its tint, neutral writes dim on sunken.
+  test "a notice's words read on its ground in every tone" do
+    each_scheme do |scheme, colour|
+      [ %w[--cs-warn-ink --cs-warn-tint], %w[--cs-ok-ink --cs-ok-tint], %w[--cs-danger-ink --cs-danger-tint], %w[--cs-dim --cs-sunken] ].each do |ink, ground|
+        assert_ratio(4.5, colour.(ink), colour.(ground), "a notice's #{ink} on #{ground} (#{scheme})")
       end
     end
   end

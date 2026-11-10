@@ -1,4 +1,8 @@
 <%# The link as one button, with the whole address in plain text under it
-    (a client that strips buttons, or a person who wants to copy it). %>
-<p style="margin:24px 0;"><a href="<%= url %>" style="display:inline-block;padding:12px 20px;background:black;color:white;text-decoration:none;border-radius:6px;font-weight:600;"><%= label %></a></p>
+    (a client that strips buttons, or a person who wants to copy it). The
+    violet is --cs-accent's light value, the one colour literal the design
+    rules admit in a mail (admin_design_rules_test), with white words at
+    6.89:1 (admin_contrast_test); a solid fill with no shadow, since a mail
+    client may drop one. %>
+<p style="margin:24px 0;"><a href="<%= url %>" style="display:inline-block;padding:12px 20px;background:#6236d9;color:white;text-decoration:none;border-radius:8px;font-weight:600;"><%= label %></a></p>
 <p style="margin:0 0 24px;font-size:13px;color:dimgray;word-break:break-all;"><%= url %></p>

@@ -1,46 +1,59 @@
 module Admin
   module UsersScreen
-    # The user editor's Groups field (round 3 Task 12, handoff §4.9 and §10 B28):
-    # a card per group in a two-column grid, instead of a row of checkboxes. The
-    # CARD IS THE LABEL -- a real `<label>` around a real checkbox, the name and the
-    # description -- so a click anywhere on it ticks it, the name `user[group_ids][]`
-    # and the values are what the form always posted, and a ticked card is tinted
-    # (`has-[:checked]`, so it follows the box with no script).
+    # The Groups field of the user editor and of the invite dialog: a tile per
+    # group in a grid. THE TILE IS THE LABEL -- a real `<label>` around a real
+    # checkbox, the name and the description -- so a click anywhere on it
+    # ticks it, and the name `user[group_ids][]` and the values are what the
+    # form always posted. Its look is `.admin-tile`'s (content-spiel.tailwind.css):
+    # the checkbox is the label's own child, so `.admin-tile:has(> input:checked)`
+    # draws a ticked tile's selected outline with no script.
     #
     # A GROUP THE VIEWER CAN'T ASSIGN (`assignable_ids` doesn't hold it) is a
-    # sunken card with a greyed, disabled box and "You can't grant this group.".
-    # A disabled box posts nothing, so when it is ticked -- the user holds the
-    # group -- a hidden input carries the membership: the form submitted exactly
-    # as rendered then changes nothing about it (Review Focus 3), and
-    # `Users::Save` still decides every added or removed group on the request
-    # itself (it ignores an unchanged one). Such a card is shown unticked too, for
-    # a group the user doesn't hold: it can't be ticked from here.
+    # `data-locked` tile, sunken with no shadow and meta words, with a disabled
+    # box and "You can't grant this group.". A disabled box posts nothing, so
+    # when it is ticked -- the user holds the group -- a hidden input carries
+    # the membership: the form submitted exactly as rendered then changes
+    # nothing about it, and `Users::Save` still decides every added or removed
+    # group on the request itself (it ignores an unchanged one). Such a tile is
+    # shown unticked too, for a group the user doesn't hold: it can't be ticked
+    # from here.
     #
     # The list starts with the blank sentinel `user[group_ids][]=""`, so that
-    # unticking every card still submits `group_ids` (an empty list, not "leave
-    # alone"). "Manage groups →" is for a `groups.manage` holder.
+    # unticking every tile still submits `group_ids` (an empty list, not "leave
+    # alone"). On the editor (`frame: true`) the tiles stand in the Groups
+    # card, with "Manage groups →" at its head's end for a `groups.manage`
+    # holder; in a dialog (`frame: false`) there is no card, since a dialog
+    # is a surface of its own: the tiles stand in a fieldset whose legend,
+    # in the label voice of the dialog's other fields, names them. Manage
+    # groups is the card's alone.
     class GroupCardsComponent < AdminComponent
-      def initialize(groups:, selected_ids:, assignable_ids:, manage_groups: false, url_options: {})
+      HEADING_ID = "user-groups-title".freeze
+
+      def initialize(groups:, selected_ids:, assignable_ids:, manage_groups: false, url_options: {}, frame: true)
         @groups = groups
         @selected_ids = selected_ids.to_set
         @assignable_ids = assignable_ids.to_set
         @manage_groups = manage_groups
         @url_options = url_options
+        @frame = frame
       end
 
       private
 
-      attr_reader :groups, :selected_ids, :assignable_ids, :manage_groups, :url_options
+      attr_reader :groups, :selected_ids, :assignable_ids, :manage_groups, :url_options, :frame
 
       def locked?(group) = !assignable_ids.include?(group.id)
       def checked?(group) = selected_ids.include?(group.id)
       def input_id(group) = "user_group_ids_#{group.id}"
 
-      CARD = "grid grid-cols-[minmax(0,1fr)_1rem] items-start gap-2.5 rounded-cs border px-3.5 py-3 text-ink".freeze
-      OPEN_CARD = "#{CARD} cursor-pointer border-line bg-surface has-[:checked]:border-accent has-[:checked]:bg-accent-tint".freeze
-      LOCKED_CARD = "#{CARD} cursor-not-allowed border-line bg-sunken".freeze
+      def tile_class(group)
+        [ "admin-tile grid grid-cols-[minmax(0,1fr)_1rem] items-start gap-2.5 px-3 py-2.5", locked?(group) ? "cursor-not-allowed" : "cursor-pointer text-ink" ].join(" ")
+      end
 
-      def card_class(group) = locked?(group) ? LOCKED_CARD : OPEN_CARD
+      def manage_link
+        link_to t(".manage"), helpers.admin_groups_path(**url_options), data: { turbo_frame: "content" },
+          class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
+      end
     end
   end
 end

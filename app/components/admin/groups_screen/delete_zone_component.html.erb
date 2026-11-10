@@ -1,16 +1,15 @@
 <% if group.built_in? %>
-  <p class="admin-delete-zone mt-6 max-w-[1000px] rounded-cs border border-line bg-sunken px-3 py-2.5 text-sm text-dim">A built-in group can be changed but not deleted.</p>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, class: "mt-6 max-w-[1000px]", data: { zone: "built_in" }).with_content(t(".built_in")) %>
 <% else %>
-  <section class="admin-delete-zone mt-6 flex max-w-[1000px] flex-wrap items-center justify-between gap-3 rounded-cs border border-line px-3.5 py-3" aria-labelledby="delete-zone-title">
-    <div class="flex min-w-0 flex-col gap-0.5">
-      <h2 id="delete-zone-title" class="text-base font-medium text-ink">Delete this group</h2>
-      <p class="text-sm text-dim"><%= members_effect %> <%= tokens_effect %></p>
-    </div>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Delete group…", variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
-  </section>
+  <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "delete-zone-title", heading: t(".heading"), body: effect,
+        class: "mt-6 max-w-[1000px]", data: { zone: "delete" }) do |zone| %>
+    <% zone.with_trigger do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".trigger"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
+    <% end %>
+  <% end %>
 
   <%# Outside the group form (forms don't nest), after it. %>
-  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete “#{group.name_was.presence || group.name}”?", body: dialog_body) do |dialog| %>
+  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".dialog_title", name: group.name_was.presence || group.name), body: dialog_body) do |dialog| %>
     <% if token_count.positive? %>
       <% dialog.with_details do %>
         <ul class="admin-delete-group-tokens list-disc pl-5 text-sm">
@@ -18,12 +17,12 @@
             <li><%= token.name %> — <%= render Admin::Ui::UserNameComponent.new(user: token.user, user_id: token.user_id) %></li>
           <% end %>
         </ul>
-        <% if hidden_tokens.positive? %><p class="mt-1 text-sm text-dim">and <%= hidden_tokens %> more</p><% end %>
+        <% if hidden_tokens.positive? %><p class="mt-1 text-sm text-dim"><%= t(".more", count: hidden_tokens) %></p><% end %>
       <% end %>
     <% end %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: helpers.admin_group_path(group, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "Delete group", variant: :danger, type: "submit") %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".confirm"), variant: :danger, type: "submit") %>
       <% end %>
     <% end %>
   <% end %>

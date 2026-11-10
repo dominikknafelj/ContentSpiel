@@ -1,4 +1,4 @@
-# The page an invitation link opens (mail spec "Invites", design answer M5):
+# The page an invitation link opens:
 # `<admin>/invitation#<token>`. The person has no account they can sign in
 # with yet, so it is outside CS Studio's shell and needs no sign-in, and it
 # is drawn in the sign-in pages' layout. It follows the password reset page
@@ -15,7 +15,7 @@
 # answer of this controller is kept by a cache (`no-store`, which also keeps
 # it out of the back/forward cache): the refused form carries the token.
 #
-# FOUR ANSWERS (M5): the form; "expired" for a link that lapsed, was
+# FOUR ANSWERS: the form; "expired" for a link that lapsed, was
 # replaced by a resend, was withdrawn (the invitation is gone), or is no
 # token at all -- ONE answer, so the page never says whether an invitation
 # existed; and "used" for a link whose invitation was accepted (the token is
@@ -78,7 +78,7 @@ class InvitationsController < ApplicationController
       # Someone else signed in in this browser (a colleague's machine, the
       # inviter testing their own invite) is signed out first, their session
       # ended on the server and not only replaced in the cookie: the browser
-      # is the invited person's from here on (plan ruling T9a).
+      # is the invited person's from here on.
       terminate_session if resume_session
       start_new_session_for(result.record)
       # Recorded as sign-in records it (`Admin::SessionsController#create`):
@@ -92,10 +92,14 @@ class InvitationsController < ApplicationController
       render :show, status: :unprocessable_entity
     else
       # Rendered, not redirected: the form needs the token again, and a
-      # redirect could carry it only in an address or in the session.
+      # redirect could carry it only in an address or in the session. The
+      # service's messages are whole sentences: the alert above the form says
+      # them all, a line each, and each field says its own under it (the
+      # invitation's `errors`, by field: `Invitations::Accept`).
       @token = token_param
       @invitation = result.record
-      flash.now[:alert] = result.errors.to_sentence
+      @field_errors = @invitation.errors.to_hash
+      flash.now[:alert] = result.errors
       render :show, status: :unprocessable_entity
     end
   end

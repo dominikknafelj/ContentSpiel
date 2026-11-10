@@ -27,6 +27,10 @@ module AccessControl
 
     validates :name, presence: true, uniqueness: { case_sensitive: false }
 
+    # A blank description is none: the editor's text field posts "" for a
+    # group that has none, so the form saved as rendered is no change.
+    normalizes :description, with: ->(text) { text.to_s.strip.presence }
+
     # The group of this name, whatever its case: names are unique without
     # case (the index on lower(name)), so a lookup by a built-in name finds
     # what `Groups::EnsureBuiltIns` counts as there.

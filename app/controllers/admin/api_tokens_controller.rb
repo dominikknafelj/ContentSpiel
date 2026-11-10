@@ -1,5 +1,5 @@
 module Admin
-  # "Connect an AI assistant" (design spec §6.1, Task 9): every MCP bearer
+  # "Connect an AI assistant": every MCP bearer
   # token, active and revoked, with when/where it was last used; "Create
   # token" (`ApiTokens::Issue`, the only place a raw token is ever minted);
   # and Revoke (`ApiTokens::Revoke`, immediate -- `ApiToken.authenticate`
@@ -9,13 +9,12 @@ module Admin
   # holding one inherits that user's authoring identity (`ApiToken`'s own
   # comment), so nobody mints a token that authenticates as someone else.
   #
-  # Open to every signed-in user (access-control design spec §5 "AI
-  # assistant tokens"): everyone sees and revokes their own tokens; only
+  # Open to every signed-in user: everyone sees and revokes their own tokens; only
   # `tokens.manage` sees -- and so can revoke -- everyone's, e.g. a
   # credential that's leaked. Another user's token is outside the list for
   # anyone else, so revoking it by id is a 404, not a 403.
   #
-  # Each token is bounded by a group (design spec §3.3 "Tokens"): the form
+  # Each token is bounded by a group: the form
   # offers only the groups the user may assign, defaulting to Read only,
   # and `ApiTokens::Issue` checks the submitted one again -- a forged
   # `group_id` for a group the user can't assign is refused with the 403
@@ -64,8 +63,14 @@ module Admin
           # A refusal that named no group (or one that is gone) offers the
           # default again rather than an empty select.
           @selected_group_id = group&.id || default_group&.id
-          messages = result.errors.presence || [ "The token couldn't be created" ]
-          @name_errors, @group_errors = messages.partition { |message| message.start_with?("Name ") }
+          # The refused record carries its errors by attribute
+          # (`ApiTokens::Issue`), so Name takes the record's `:name` errors and
+          # Group every other message: the group's own ("Choose a group for
+          # the token", "Group must exist") and any about no field, which
+          # stands beside the field nearest Create token rather than being
+          # dropped. The service's messages are whole sentences, shown as given.
+          @name_errors = result.record.errors.full_messages_for(:name)
+          @group_errors = result.errors - @name_errors
           render :index, status: :unprocessable_entity
         end
         return
@@ -78,25 +83,23 @@ module Admin
       render :create
     end
 
-    # An already-revoked token (a stale tab's Revoke button, fix round 1,
-    # m4) is answered with a notice and left alone -- revoking it again
-    # would overwrite `revoked_at`, the list's record of *when* it stopped
-    # working.
+    # An already-revoked token (a stale tab's Revoke button) is answered with
+    # a notice and left alone -- revoking it again would overwrite
+    # `revoked_at`, the list's record of *when* it stopped working.
     def destroy
       api_token = visible_tokens.find(params[:id])
 
       if api_token.revoked_at
-        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: "Token was already revoked"
+        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: t("admin.api_tokens.already_revoked")
         return
       end
 
       result = ApiTokens::Revoke.call(api_token)
+      # `ApiTokens::Revoke` refuses only by denial (a missing right), which
+      # is the 403 page; it has no failure of its own to put in a flash.
+      return forbidden!(result.errors.first) if result.denied?
 
-      if result.ok?
-        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: "Token revoked"
-      else
-        forbidden_or(result) { redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
-      end
+      redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: t("admin.api_tokens.revoked")
     end
 
     private
@@ -117,8 +120,7 @@ module Admin
       can?("tokens.manage") ? ApiToken.all : ApiToken.where(user: Current.user)
     end
 
-    # The form's preselected group (design spec §5: "defaulting to Read
-    # only"), when the user may assign it.
+    # The form's preselected group, Read only, when the user may assign it.
     helper_method def default_group
       @assignable_groups.find { |group| group.name == AccessControl::Seeds::READ_ONLY_NAME }
     end
@@ -137,7 +139,7 @@ module Admin
           "contentspiel" => {
             "type" => "http",
             "url" => mcp_url,
-            "headers" => { "Authorization" => "Bearer #{token}" }
+            "headers" => { "Authorization" => "Bearer #{token}" } # i18n-ok: the HTTP header and its auth scheme, read by a client
           }
         }
       )

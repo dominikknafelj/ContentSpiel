@@ -1,7 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
 // The group editor's permission rows (`Admin::GroupsScreen::PermissionMatrixComponent`,
-// `Admin::GroupsScreen::PermissionRowComponent`, round 3 Task 10).
+// `Admin::GroupsScreen::PermissionRowComponent`).
 //
 // - Opens and closes each row's scope editor ("Edit scope" / "Done": the
 //   button carries `aria-expanded` and `aria-controls`). Opening moves focus
@@ -14,10 +15,14 @@ import { Controller } from "@hotwired/stimulus"
 //   shows the buttons of the ticked rows.
 // - Rewrites the scope CHIPS from the ticked boxes after every change in an
 //   editor. The rules are `PermissionRowComponent#chips`' (and its class
-//   strings), spelled again here: "All content types" / "All pages" for no
-//   restriction, a chip with the type's dot per chosen type, "Own only",
-//   "Under <page>" per branch root ("A page you can't open" per kept one), at
-//   most three and then "+N", and a warn chip per removed content type.
+//   strings, above), spelled again here: "All content types" / "All pages" for
+//   no restriction, a badge with the type's dot as its mark per chosen type,
+//   "Own only", "Under <page>" per branch root ("A page you can't open" per kept
+//   one), at most three and then "+N", and a warn badge per removed content
+//   type. The words are the matrix's `data-messages`, the keys the row draws
+//   with, and the class strings its values, the component's own
+//   (`PermissionRowComponent.chip_classes`), so a redrawn chip is the first
+//   paint's; the open and closed labels of a row's button are its own data.
 // - A LOCKED row (`data-locked`: a grant the viewer can't hand out, carried by hidden
 //   inputs) has no button and no editor and never reacts; a VIEW-ONLY form's
 //   toggle is an `<a role="button">` (a link survives the disabled fieldset that
@@ -28,6 +33,8 @@ import { Controller } from "@hotwired/stimulus"
 //   announces it with a bubbling `change`, since a hidden input is invisible to
 //   the form's footer unless something dispatches.
 export default class extends Controller {
+  static values = { neutralChip: String, warnChip: String, allChip: String, mark: String, dot: String }
+
   connect() {
     this.rows.forEach((row) => {
       if (row.hasAttribute("data-locked")) return
@@ -125,37 +132,48 @@ export default class extends Controller {
 
     // Nothing live ticked is "all" -- what Save stores even while a removed type
     // is still carried -- so say so, then the warn chips.
-    if (items.length === 0) container.append(this.chip(pages ? "All pages" : "All content types", "dim"))
+    const t = (key, vars) => messages(this.element).t(key, vars)
+    if (items.length === 0) {
+      container.append(this.chip(pages ? t("components.groups_screen.permission_row.chips.all_pages") : t("components.groups_screen.permission_row.chips.all_types"), "dim"))
+    }
 
     items.slice(0, 3).forEach((item) => container.append(this.chip(item.label, "plain", item.dot)))
-    if (items.length > 3) container.append(this.chip(`+${items.length - 3}`, "more"))
-    removed.sort().forEach((name) => container.append(this.chip(`! ${name} · type removed`, "warn")))
+    if (items.length > 3) container.append(this.chip(t("components.groups_screen.permission_row.chips.more", { count: items.length - 3 }), "more"))
+    removed.sort().forEach((name) => container.append(this.chip(t("components.groups_screen.permission_row.chips.removed_type", { name }), "warn")))
   }
 
   typeItems(editor) {
     const items = Array.from(editor.querySelectorAll("input[type=checkbox][data-chip-label]:checked"))
       .map((box) => ({ label: box.dataset.chipLabel, dot: box.dataset.chipDot }))
-    if (editor.querySelector("input[data-chip-own]:checked")) items.push({ label: "Own only" })
+    if (editor.querySelector("input[data-chip-own]:checked")) items.push({ label: messages(this.element).t("components.groups_screen.permission_row.chips.own_only") })
     return items
   }
 
   pageItems(editor) {
     const roots = Array.from(editor.querySelectorAll("input[type=checkbox][data-chip-label]:checked:not(:disabled)"))
-      .map((box) => ({ label: `Under ${box.dataset.chipLabel}` }))
+      .map((box) => ({ label: messages(this.element).t("components.groups_screen.permission_row.chips.under", { title: box.dataset.chipLabel }) }))
     const kept = editor.querySelectorAll("input[type=hidden][data-admin--groups--branch-picker-target='kept']").length
-    return roots.concat(Array.from({ length: kept }, () => ({ label: "A page you can't open" })))
+    const unreadable = messages(this.element).t("components.groups_screen.permission_row.chips.unreadable")
+    return roots.concat(Array.from({ length: kept }, () => ({ label: unreadable })))
   }
 
+  // The badge, as `BadgeComponent` draws it: the mark (hidden from a screen
+  // reader, the label says what it shows) before the label.
   chip(label, kind, dot) {
-    const base = "admin-scope-chip inline-flex items-center gap-1.5 whitespace-nowrap rounded-cs border px-2 py-0.5 text-xs"
     const span = document.createElement("span")
-    span.className = kind === "dim" ? `${base} border-transparent text-dim`
-      : kind === "warn" ? `${base} border-warn text-warn-ink`
-      : `${base} border-transparent bg-sunken text-ink`
+    if (kind === "dim") {
+      span.className = this.allChipValue
+      span.append(label)
+      return span
+    }
+    span.className = kind === "warn" ? this.warnChipValue : this.neutralChipValue
     if (dot) {
       const mark = document.createElement("span")
+      mark.className = this.markValue
       mark.setAttribute("aria-hidden", "true")
-      mark.className = `h-[7px] w-[7px] shrink-0 rounded-full ${dot}`
+      const circle = document.createElement("span")
+      circle.className = `${this.dotValue} ${dot}`
+      mark.append(circle)
       span.append(mark)
     }
     span.append(label)

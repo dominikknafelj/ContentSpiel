@@ -1,0 +1,17 @@
+# The AI assistant views and `Admin::ApiTokensController`
+# (docs/reference/i18n.md): `admin.api_tokens.index`, `create` and `screen`
+# are the list's, the one-time reveal's and their shared partial's
+# lazy-lookup scopes, and the flashes are `admin.api_tokens.*`. No key here
+# takes the token: the reveal draws it as the copy box's text alone.
+en:
+  admin:
+    api_tokens:
+      revoked: "Token revoked"
+      already_revoked: "Token was already revoked"
+      index:
+        title: "AI assistant"
+      create:
+        title: "AI assistant"
+      screen:
+        title: "Connect an AI assistant"
+        intro: "An assistant connects over MCP with a token and acts as the user who created it, limited to the token's group."

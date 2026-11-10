@@ -38,19 +38,27 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/bg-blue|rounded-(md|lg|xl)/, response.body)
   end
 
-  # Handoff "Studio Sign In": the form sits directly on the page, 360px wide, no
-  # card; the site name (default language) above a 28px heading; "Forgot your
-  # password?" right-aligned on the Password label row, 12px, not underlined.
-  test "sign-in has no card, the site name above the heading, and the forgot link on the password label row" do
+  # The sign-in pages stand on one panel, the setup wizard's: a surface at
+  # elevation 2 in a 420px column, the site's name over a heading on the
+  # type scale, every alert the compact notice, and the full-width submit
+  # the one primary. "Forgot your password?" is a tertiary link on the
+  # Password label row.
+  test "the sign-in page is one panel with one primary, its alerts the compact notice" do
     put_mail_state(:working)
-    get admin_sign_in_path
-    assert_select "main div.bg-surface.border", count: 0
-    assert_select "main > div.max-w-\\[360px\\]"
-    assert_select ".admin-site-name + h1.font-semibold", text: "Sign in"
-    assert_select ".admin-site-name", text: site_settings(:default).title
-    assert_select ".admin-password-field > div.justify-between label[for=password]"
-    assert_select ".admin-password-field > div.justify-between a.text-xs", text: "Forgot your password?"
-    assert_select "a.underline", count: 0
+    post admin_sign_in_path, params: { email_address: @user.email_address, password: "wrong" }
+    follow_redirect!
+
+    assert_select "main > div.mx-auto.w-full.max-w-\\[420px\\] > div.rounded-rail.bg-surface.p-6.shadow-2", count: 1 do
+      assert_select ".admin-site-name.text-small.text-dim + h1.text-h1.font-semibold.break-words", text: "Sign in"
+      assert_select ".admin-site-name", text: site_settings(:default).title
+      assert_select "div#alert[role=alert].rounded-card.bg-danger-tint.text-small", text: "Try another email address or password."
+      assert_select ".admin-field label[for=email_address]", text: "Email"
+      assert_select ".admin-password-field > div.justify-between label[for=password]"
+      assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), css_select("a[href='#{new_admin_password_path}']").sole["class"]
+    end
+    assert_select "main .bg-accent", count: 1
+    assert_select "main button[type=submit].bg-accent.w-full", text: "Sign in"
+    assert_select "main .rounded-cs.bg-danger-tint", count: 0
   end
 
   test "a failed sign-in shows one alert line above the form" do

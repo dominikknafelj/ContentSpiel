@@ -523,15 +523,15 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
         const group = document.querySelector(#{group.to_json})
         const [ circle, count ] = [ group.querySelector("[data-presence-user] > span"), group.querySelector("[data-presence-more] > span") ]
         const [ a, b ] = [ circle.getBoundingClientRect(), count.getBoundingClientRect() ]
-        const probe = Object.assign(document.createElement("span"), { className: "bg-sunken" })
+        const probe = Object.assign(document.createElement("span"), { className: "bg-surface" })
         document.body.append(probe)
-        const sunken = getComputedStyle(probe).backgroundColor
+        const surface = getComputedStyle(probe).backgroundColor
         probe.remove()
-        return { width: b.width, height: b.height, after: b.left - a.right, sunken: getComputedStyle(count).backgroundColor === sunken }
+        return { width: b.width, height: b.height, after: b.left - a.right, surface: getComputedStyle(count).backgroundColor === surface }
       })()
     JS
-    # A sunken circle of the same size, 2px after the last person like the others.
-    assert_equal({ "width" => 26, "height" => 26, "after" => 2, "sunken" => true }, more)
+    # A count circle on the surface, of the same size, 2px after the last person like the others.
+    assert_equal({ "width" => 26, "height" => 26, "after" => 2, "surface" => true }, more)
 
     # Hovering "+N" shows the list of everyone, in the same order (6), and
     # leaves the focus where it was; a redraw under the open list leaves it

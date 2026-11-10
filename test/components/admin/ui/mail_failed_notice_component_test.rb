@@ -9,7 +9,7 @@ class Admin::Ui::MailFailedNoticeComponentTest < ViewComponent::TestCase
     with_mail_state(:failed) do
       render_inline(notice(class: "mb-4"))
 
-      assert_selector "p#mail-failed-notice[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink.mb-4",
+      assert_selector "div#mail-failed-notice[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink.mb-4",
         text: /Last send failed \d+ \w+, \d\d:\d\d: the server refused the login\./
       assert_selector "a[href='/cs-studio/settings#mail']", text: "Open Mail settings →"
       # The reason, never the server's line.

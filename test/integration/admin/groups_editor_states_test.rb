@@ -1,11 +1,10 @@
 require "test_helper"
 
-# The group editor's members, locked ticks, delete zone and view-only state
-# (round 3 Task 11). The rules are `Groups::Save`/`Groups::Destroy`'s and are
-# unchanged: everything here is what the form shows and carries, plus -- for the
-# forged requests -- proof that the services still refuse. Review Focus 3 throughout:
-# a form submitted exactly as rendered changes nothing, for an owner and for a
-# non-owner manager.
+# The group editor's members, locked ticks, delete zone and view-only state.
+# The rules are `Groups::Save`/`Groups::Destroy`'s: everything here is what the
+# form shows and carries, plus -- for the forged requests -- proof that the
+# services refuse. Throughout: a form submitted exactly as rendered changes
+# nothing, for an owner and for a non-owner manager.
 class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
   include ContentHelper
 
@@ -53,7 +52,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_empty group.users.reload
   end
 
-  # Final fix wave (Task 11): the chip input posts ids; a forged one is the
+  # The chip input posts ids; a forged one is the
   # service's to judge. An id that names nobody is no member (never a 500, and
   # no change recorded); an owner's id -- never offered by the suggestions --
   # is still a user id, so it is added like any other: owners already hold
@@ -187,7 +186,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     get "/cs-studio/groups/#{group.id}/edit"
 
     assert_response :success
-    assert_select "p.admin-view-only-notice", text: "This group has permissions you can't hand out, so you can only view it."
+    assert_select ".admin-view-only-notice[role=note]", text: "This group has permissions you can't hand out, so you can only view it."
     assert_select "form#group-form fieldset.admin-view-only[disabled]" do
       assert_select "[data-permission='posts.edit'] input[type=checkbox][name$='[enabled]'][checked]"
       # The removed type is still there to be read.
@@ -198,7 +197,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_select "[data-locked]", count: 0
     assert_select ".admin-save-bar", count: 0
     assert_select "form#group-form button[type=submit]", count: 0
-    assert_select ".admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     page = Nokogiri::HTML(response.body)
     enabled = page.css("form#group-form input[name], form#group-form select[name], form#group-form textarea[name], form#group-form button").reject { |field| field.ancestors("fieldset[disabled]").any? || field["type"] == "hidden" && field["name"] == "_method" }
     assert_empty enabled.map { |field| field["name"] || field.text.strip }, "nothing in the form may be enabled, Remove included"
@@ -211,13 +210,13 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "p.admin-view-only-notice"
+    assert_select ".admin-view-only-notice[role=note]"
     assert_select "form#group-form fieldset.admin-view-only[disabled]"
     assert_select ".admin-save-bar", count: 0
 
     sign_in_as(users(:one))
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "p.admin-view-only-notice", count: 0
+    assert_select ".admin-view-only-notice[role=note]", count: 0
     assert_select "fieldset[disabled]", count: 0
     assert_select ".admin-save-bar"
   end
@@ -299,7 +298,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal before, grants_snapshot(group)
   end
 
-  # Fix round 2 of Task 10: the request the editor makes when "Own only" is unticked
+  # The request the editor makes when "Own only" is unticked
   # on a row that carries a removed type, without pressing Remove first -- the form as
   # rendered, minus `own`. For a viewer who holds {blog} the group is view-only, so
   # the form as rendered is taken from an owner's editor and the request is a forged
@@ -424,7 +423,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     sign_in_as(manager)
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "p.admin-view-only-notice", count: 0
+    assert_select ".admin-view-only-notice[role=note]", count: 0
     assert_select "fieldset[disabled]", count: 0
     assert_select ".admin-save-bar"
   end
@@ -443,7 +442,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_select "form#group-form[data-admin--saving--save-bar-always-value=false]"
   end
 
-  # Final fix wave (Task 11): the two groups differ ONLY in how many unscoped
+  # The two groups differ ONLY in how many unscoped
   # rows and toggles are ticked (one against seven), every one of them a grant
   # the viewer holds and so has to be checked for a lock. Exactly the same
   # number of queries -- not "at most a few more", which a query per row could
@@ -467,7 +466,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal base, with_more, "ticked rows must not run queries of their own"
   end
 
-  # --- Review Focus 3, non-owner, editable form, page tree --------------------------
+  # --- Saved as rendered: non-owner, editable form, page tree -----------------------
 
   test "a non-owner who can manage the group, with an unreadable carried root, a redundant root, a removed type and an owner member, saves it untouched: nothing changes" do
     section = as_owner { create_page(title: "Section") }
@@ -510,6 +509,82 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal members_before, group.memberships.reload.pluck(:user_id).sort
   end
 
+  # A lock is defensive: a group storing a grant the viewer couldn't hand out
+  # is one they can't manage, so it is drawn view-only before any row locks.
+  # The draw is asked to treat it as manageable here, so the locked row and
+  # the locked switch are drawn beside a removed type and a kept branch; the
+  # save then meets the real rule. The form as rendered posts every grant
+  # back as stored, so it takes nothing away and changes nothing.
+  test "a group saved as rendered by a viewer with a locked grant, a removed type and a kept branch writes nothing and audits nothing" do
+    section = as_owner { create_page(title: "Section") }
+    a = as_owner { create_page(title: "Branch A", parent: section) }
+    gone = as_owner { create_page(title: "Soon trashed", parent: section) }
+    as_owner { assert Trash::Move.call(gone).ok? }
+    sign_in_as(manager_user(grants: {
+      "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {},
+      "pages.read" => { "page_ids" => [ section.id ] }, "pages.edit" => { "page_ids" => [ section.id ] }
+    }))
+    group = AccessControl::Group.create!(name: "Locked and carried", description: "Carried")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type], "own" => true })
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => %w[now_update retired_type] })
+    AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ a.id, gone.id ].sort })
+    AccessControl::Grant.create!(group: group, permission: "tags.manage", scope: {})
+    AccessControl::Membership.create!(user: users(:author), group: group)
+
+    with_singleton_override(AccessControl, :can_manage_group?, ->(*, **) { true }) do
+      get "/cs-studio/groups/#{group.id}/edit"
+    end
+    assert_response :success
+    assert_select "fieldset[disabled]", count: 0
+    assert_select "[data-permission='posts.edit'][data-locked]" do
+      assert_select "input[type=checkbox][name$='[enabled]'][checked][disabled]:not([class*=opacity])"
+      assert_select "input[type=hidden][name='group[grants][posts.edit][content_types][]'][value=retired_type]"
+    end
+    assert_select "[data-permission='posts.read']:not([data-locked]) [data-removed-type=retired_type] input[type=hidden][value=retired_type]"
+    assert_select "[data-permission='pages.edit']:not([data-locked]) input[type=hidden][data-admin--groups--branch-picker-target=kept][value='#{gone.id}']"
+    assert_select "input[type=checkbox][name='group[grants][tags.manage][enabled]'][checked][disabled]:not([class*=opacity])"
+    assert_select "input[type=hidden][name='group[grants][tags.manage][enabled]'][value='1']"
+    assert_select "input[type=hidden][name='group[member_ids][]'][value='']"
+    assert_select "p.admin-locked-hint"
+
+    grants_before = grants_snapshot(group)
+    members_before = group.memberships.reload.pluck(:user_id)
+    params = params_as_rendered
+    assert_equal %w[blog retired_type], params.dig("group", "grants", "posts.edit", "content_types").sort
+    assert_equal [ a.id, gone.id ].map(&:to_s).sort, params.dig("group", "grants", "pages.edit", "page_ids").compact_blank.sort
+
+    assert_no_difference -> { Audit::Event.count } do
+      patch "/cs-studio/groups/#{group.id}", params: params
+    end
+
+    assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
+    assert_equal grants_before, grants_snapshot(group)
+    assert_equal members_before, group.memberships.reload.pluck(:user_id)
+  end
+
+  # A text field posts "" for a group with no description; the model reads a
+  # blank description as none, so the form as rendered is no change.
+  test "a group with no description saved as rendered writes nothing and audits nothing" do
+    group = AccessControl::Group.create!(name: "Undescribed")
+    AccessControl::Membership.create!(user: users(:reader), group: group)
+    assert_nil group.reload.description
+    updated_at = group.updated_at
+    sign_in_as(users(:one))
+
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_response :success
+    params = params_as_rendered
+    assert_equal "", params.dig("group", "description")
+
+    assert_no_difference -> { Audit::Event.count } do
+      patch "/cs-studio/groups/#{group.id}", params: params
+    end
+
+    assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
+    assert_nil group.reload.description
+    assert_equal updated_at, group.updated_at
+  end
+
   # --- View only ----------------------------------------------------------------
 
   test "a group the viewer can't manage as it stands is read-only: the notice, a disabled fieldset, no footer, no delete zone; a scope can still be opened" do
@@ -521,14 +596,14 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     get "/cs-studio/groups/#{group.id}/edit"
 
     assert_response :success
-    assert_select "p.admin-view-only-notice", text: "This group has permissions you can't hand out, so you can only view it."
+    assert_select ".admin-view-only-notice[role=note]", text: "This group has permissions you can't hand out, so you can only view it."
     assert_select "form#group-form fieldset.admin-view-only[disabled]" do
       assert_select "input[name='group[name]']"
       assert_select "[data-permission='posts.edit'] input[type=checkbox][name$='[enabled]'][checked]"
     end
     assert_select ".admin-save-bar", count: 0
     assert_select "form#group-form button[type=submit]", count: 0
-    assert_select ".admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "dialog[id^=delete-group]", count: 0
     assert_select "button", text: "Edit scope", count: 0
     # The scope toggle is a link, which a disabled fieldset leaves alone.
@@ -564,14 +639,14 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
   test "a built-in group the viewer can manage shows its note, not the delete zone; one they can't is read-only" do
     sign_in_as(users(:one))
     get "/cs-studio/groups/#{access_control_groups(:read_only).id}/edit"
-    assert_select ".admin-delete-zone", text: "A built-in group can be changed but not deleted."
+    assert_select "[data-zone=built_in]", text: "A built-in group can be changed but not deleted."
     assert_select "button", text: /Delete group/, count: 0
     assert_select "dialog[id^=delete-group]", count: 0
 
     sign_in_as(manager_user(grants: { "groups.manage" => {} }))
     get "/cs-studio/groups/#{access_control_groups(:admin).id}/edit"
-    assert_select "p.admin-view-only-notice"
-    assert_select ".admin-delete-zone", count: 0
+    assert_select ".admin-view-only-notice[role=note]"
+    assert_select "[data-zone]", count: 0
   end
 
   # --- The delete zone -----------------------------------------------------------
@@ -587,7 +662,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/groups/#{group.id}/edit"
 
-    assert_select ".admin-delete-zone" do
+    assert_select "[data-zone=delete]" do
       assert_select "h2", text: "Delete this group"
       assert_select "p", text: "2 members lose its permissions. 1 AI token is revoked."
       assert_select "button.text-danger, button[class*='danger']", text: "Delete group…"
@@ -621,11 +696,11 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     assert_select "dialog#delete-group-#{group.id} li", count: Admin::GroupsScreen::DeleteZoneComponent::MAX_TOKENS_SHOWN
     assert_select "dialog#delete-group-#{group.id}", text: /and 3 more/
-    assert_select ".admin-delete-zone p", text: "It has no members. 13 AI tokens are revoked."
+    assert_select "[data-zone=delete] p", text: "It has no members. 13 AI tokens are revoked."
 
     empty = AccessControl::Group.create!(name: "Empty")
     get "/cs-studio/groups/#{empty.id}/edit"
-    assert_select ".admin-delete-zone p", text: "It has no members. It has no AI tokens."
+    assert_select "[data-zone=delete] p", text: "It has no members. It has no AI tokens."
     assert_select "dialog#delete-group-#{empty.id} p", text: "It has no members. Users themselves are not deleted."
   end
 

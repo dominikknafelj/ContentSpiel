@@ -19,8 +19,8 @@ class Admin::Ui::PresenceMarkerComponentTest < ViewComponent::TestCase
     assert_selector "[data-presence-avatar][hidden]", count: 1, visible: :all
     assert_selector "[data-presence-avatar][hidden] > span", text: "", exact_text: true, visible: :all
     # Wide: everyone past the circles; narrow: everyone past the first.
-    assert_selector "[data-presence-more]:not([hidden]) > span.bg-sunken", text: "+2", exact_text: true
-    assert_selector "[data-presence-more-narrow]:not([hidden]) > span.bg-sunken", text: "+4", exact_text: true
+    assert_selector "[data-presence-more]:not([hidden]) > span.border-meta", text: "+2", exact_text: true
+    assert_selector "[data-presence-more-narrow]:not([hidden]) > span.border-meta", text: "+4", exact_text: true
   end
 
   test "up to the circles shown there is no wide +N, and a lone person has no narrow one" do
@@ -39,7 +39,7 @@ class Admin::Ui::PresenceMarkerComponentTest < ViewComponent::TestCase
     assert_selector "span.admin-presence-marker.gap-0\\.5[data-presence-count='3']", count: 1
     assert_no_selector "[class*='-ml-'], [class*='ring-2'], [class*='avatar-ground']", visible: :all
     assert_selector "span.admin-presence-marker > [data-presence-total]:last-of-type, span.admin-presence-marker > [data-presence-total]", count: 1
-    assert_selector "[data-presence-total] > span.size-\\[22px\\].bg-sunken.text-ink[aria-hidden=true]", text: "3", exact_text: true
+    assert_selector "[data-presence-total] > span.size-\\[22px\\].border-meta.bg-surface.text-ink[aria-hidden=true]", text: "3", exact_text: true
     assert_equal %w[presence-avatar presence-avatar presence-more presence-more-narrow presence-total],
       page.all("span.admin-presence-marker > span[class~=flex]", visible: :all).map { |part| part.native.attributes.keys.find { |name| name.start_with?("data-presence-") }.delete_prefix("data-") }
 

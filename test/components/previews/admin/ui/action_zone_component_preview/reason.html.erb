@@ -1,0 +1,7 @@
+<%= render Admin::Ui::ActionZoneComponent.new(heading_id: "preview-zone", heading: "Delete user",
+      body: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working.",
+      reason: "mara@example.com is the only owner, so they can't be deleted.") do |zone| %>
+  <% zone.with_trigger do %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Delete user…", variant: :danger_text, size: :small, disabled: true) %>
+  <% end %>
+<% end %>

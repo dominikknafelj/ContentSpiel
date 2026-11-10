@@ -40,7 +40,8 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
       assert_select "*", text: /#{Regexp.escape(users(:two).name_or_email)}/
       assert_select "*", text: /Revoked/
       assert_select "button", text: "Revoke…", count: 0
-      assert_select "[class~='opacity-60']" # dimmed, still listed
+      assert_select "[class*='opacity-']", count: 0 # still listed, its words meta, never dimmed
+      assert_select "td.text-meta", minimum: 1
     end
     assert_not_includes response.body, active.lookup_digest
   end
@@ -65,6 +66,31 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
   # The create form is a plain POST, so the reveal arrives as
   # a whole document (see admin/api_tokens/create for why).
+  test "Create token is the page's one primary button" do
+    sign_in_as(users(:one))
+    ApiToken.generate!(users(:one), name: "claude-desktop")
+    get "/cs-studio/api_tokens"
+
+    wanted = Admin::Ui::ButtonComponent.classes(:primary).split
+    primaries = Nokogiri::HTML5(response.body).css("main [class]").select do |node|
+      (wanted - node["class"].split).empty? && node.ancestors.none? { |up| up.name == "dialog" || up["role"] == "dialog" }
+    end
+    assert_equal [ "Create token" ], primaries.map { |node| node.text.squish }
+    assert_select "h1.text-h1", text: "Connect an AI assistant"
+    assert_select "h1 + p.text-small.text-dim", text: /acts as the user who created it/
+  end
+
+  test "the flashes are their keys' words" do
+    sign_in_as(users(:one))
+    token, = ApiToken.generate!(users(:one))
+
+    delete "/cs-studio/api_tokens/#{token.id}"
+    follow_redirect!
+    assert_select "[role=status]", text: I18n.t("admin.api_tokens.revoked")
+    assert_equal "Token revoked", I18n.t("admin.api_tokens.revoked")
+    assert_equal "Token was already revoked", I18n.t("admin.api_tokens.already_revoked")
+  end
+
   test "the create form opts out of Turbo" do
     sign_in_as(users(:one))
     get "/cs-studio/api_tokens"
@@ -96,8 +122,8 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_equal access_control_groups(:read_only), token.group
     assert_equal "claude-desktop", token.name
     assert_equal token, ApiToken.authenticate(raw)
-    assert_select "[role=status]", text: /Copy this token now\. It won't be shown again\./
-    assert_select "button", text: "Copy token"
+    assert_select "[role=alert]", text: /Copy this token now\. It won't be shown again\./
+    assert_select "button[aria-label='Copy token']", text: "Copy"
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
     assert_select "pre#api-token-config", text: /Bearer #{raw}/
     assert_select "table", text: /claude-desktop/
@@ -179,10 +205,34 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_select "#token-name-error", text: /Name can't be blank/
+    assert_select "#token-name-errors", text: /Name can't be blank/
     assert_select "#api-token-value", count: 0
-    assert_select "[role=status]", text: /Copy this token now/, count: 0
+    # The reveal is a warn notice, `role=alert`; a refusal draws none of it.
+    assert_select "[role=alert]", text: /Copy this token now/, count: 0
+    assert_select "[data-admin--tokens--reveal-target=secret]", count: 0
     assert_select "select[name=group_id] option[selected][value=?]", access_control_groups(:read_only).id.to_s
+  end
+
+  # The service's refusal is placed by attribute: the race's "name taken",
+  # which no validation of the form's record raised, still reaches Name.
+  test "a name error reaches the name slot by its attribute, and nothing reaches Group" do
+    sign_in_as(users(:one))
+    original = ApiToken.method(:generate!)
+    ApiToken.define_singleton_method(:generate!) do |user, **options|
+      ApiToken.new(user:, group: options[:group], name: options[:name], lookup_digest: "forced-duplicate").save!(validate: false)
+      original.call(user, **options)
+    end
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens", params: { name: "raced", group_id: access_control_groups(:read_only).id }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#token-name-errors > p > span:not([aria-hidden])", text: "Name #{ApiToken::NAME_TAKEN}", count: 1
+    assert_select "input#token-name[aria-invalid=true]"
+    assert_select "#token-group-errors > p", count: 0
+  ensure
+    ApiToken.define_singleton_method(:generate!, original)
   end
 
   test "a missing name field is the blank-name error too" do
@@ -193,7 +243,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_select "#token-name-error", text: /Name can't be blank/
+    assert_select "#token-name-errors", text: /Name can't be blank/
   end
 
   test "a duplicate active name is refused at 422 with the typed name kept" do
@@ -205,7 +255,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_select "#token-name-error", text: /already the name of one of this user's active tokens/
+    assert_select "#token-name-errors", text: /already the name of one of this user's active tokens/
     assert_select "input[name=name][value='Claude-Desktop']"
     assert_select "#api-token-value", count: 0
   end
@@ -324,9 +374,10 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     # Under Group and nowhere else: its own slot, tied to the select -- not "any alert on the page".
-    assert_select "#token-group-error", text: "Choose a group for the token", count: 1
-    assert_select "select#group_id[aria-describedby~='token-group-error']"
-    assert_select "#token-name-error", count: 0
+    assert_select "#token-group-errors > p > span:not([aria-hidden])", text: "Choose a group for the token", count: 1
+    assert_select "select#group_id[aria-describedby~='token-group-errors']"
+    assert_select "#token-name-errors > p", count: 0
+    assert_select "input#token-name[aria-invalid]", count: 0
   end
 
   test "users see only their own tokens unless they have tokens.manage" do

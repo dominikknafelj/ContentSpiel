@@ -37,7 +37,6 @@ module Admin
     class DestinationsComponent < Admin::AdminComponent
       MAIL = "mail".freeze
       RECIPIENTS_ID = "form-destination-mail-recipients".freeze
-      WARN_CLASS = ListComponent::WARN_CLASS
       INDENT = "pl-[26px]".freeze
 
       def initialize(draft:, locale:, keys:, mail_settings:, errors: [], mail_errors: [], kept_submissions: false)

@@ -1,21 +1,24 @@
 module Admin
   module UsersScreen
-    # "Invite a person" (mail spec "Invites", design answer M4): the Users
-    # screen's dialog behind "Invite person". Email (required), Name
-    # (optional: the person can change it on their page), and Groups, the
-    # user editor's own group cards (`GroupCardsComponent`, with the same
-    # `user[group_ids][]` names, so the dialog posts what the editor would).
-    # "Send invite" and Cancel.
+    # "Invite a person": the Users screen's dialog behind "Invite person".
+    # Email (required), Name (optional: the person can change it on their
+    # page), and Groups, the user editor's own group tiles
+    # (`GroupCardsComponent`, with the same `user[group_ids][]` names, so the
+    # dialog posts what the editor would), drawn with no card frame, since
+    # the dialog is the surface. "Send invite" and Cancel.
     #
     # REFUSED, the Users page is drawn again (`Admin::InvitesController#
     # create`) with this dialog open (`open_on_load`), what was typed and the
-    # sentence under the field it is about. "This address is already
-    # invited." comes with a Resend button for that invitation (`resend_invitation`): a
-    # button of ITS OWN form (`form=`), which stands outside the invite form,
-    # so it is never the invite form's default button and Enter in the
-    # address field still sends the invite. A refusal that is about no field
-    # ("Invites need mail.", when mail stopped working since the page was
-    # drawn) is a line at the top.
+    # sentence in the error slot of the field it is about. Each field is an
+    # `.admin-field` with its slot (`admin/shared/_field_errors`) as a direct
+    # child, so a sentence there draws the shared invalid edge on the field.
+    # "This address is already invited." comes with a Resend button for that
+    # invitation (`resend_invitation`), inside the slot: a button of ITS OWN
+    # form (`form=`), which stands outside the invite form, so it is never the
+    # invite form's default button and Enter in the address field still sends
+    # the invite. A refusal that is about no field ("Invites need mail.", when
+    # mail stopped working since the page was drawn) is the danger notice at
+    # the top.
     #
     # The form goes to `_top`: a whole visit, whose `turbo:load` opens the
     # dialog again when it was refused (`admin--ui--dialog`).
@@ -41,6 +44,18 @@ module Admin
       def refused? = errors.any?
 
       def email_errors = sentences(:email_address)
+
+      # The address's sentences for its error slot, the last one ending in
+      # Resend when the address is already invited.
+      def email_messages
+        return email_errors unless resend_invitation && email_errors.any?
+
+        [ *email_errors[0...-1], safe_join([ email_errors.last, " ", resend_button ]) ]
+      end
+
+      def resend_button
+        tag.button(t(".resend"), type: "submit", form: RESEND_FORM_ID, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small))
+      end
 
       def name_errors = sentences(:name)
 

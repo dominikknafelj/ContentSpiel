@@ -33,10 +33,12 @@ class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTest
     assert_selector "table", text: "claude-desktop"
 
     # No Clipboard API (e.g. plain http off localhost): the text is
-    # selected instead, and the status line says so -- no dialog.
+    # selected instead, and the status line says so -- no dialog. Every
+    # copy box's button reads "Copy"; the token's is named for it.
     page.execute_script("Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })")
-    press "Copy token"
-    assert_text "the text is selected"
+    find("button[aria-label='Copy token']").click
+    assert_selector "button[aria-label='Copy token']", text: "Copy failed"
+    assert_selector "[data-admin--ui--clipboard-target=status]", text: "the text is selected", visible: :all
     assert_equal raw, page.evaluate_script("window.getSelection().toString()").strip
 
     # Leaving and coming Back refetches the list: the token is gone, its name stays.

@@ -1,0 +1,7 @@
+<div class="max-w-[320px]">
+  <%= render Admin::Ui::ActionZoneComponent.new(label: "Move to trash", body: "Kept in the trash for 30 days, then deleted for good.", body_id: "preview-zone-help") do |zone| %>
+    <% zone.with_trigger do %>
+      <%= render Admin::Ui::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button", aria: { describedby: "preview-zone-help" }) %>
+    <% end %>
+  <% end %>
+</div>

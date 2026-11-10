@@ -1,0 +1,120 @@
+# The Groups screen's components (docs/reference/i18n.md):
+# `admin.components.groups_screen.*`.
+#
+# The matrix's script redraws a row's chips and a branch's note after every
+# change, from the same keys (`permission_row.chips`,
+# `scope_editor.notes`), which the matrix hands it as `data-messages`.
+#
+# The dialog's body is one whole sentence per shape (no members; members
+# only; members and tokens), so a language can order the counts its own
+# way. `members_and_tokens` is keyed first by the members' category, which
+# `Admin::GroupsScreen::DeleteZoneComponent#dialog_body` picks by hand
+# (`one` for 1, `other` otherwise), not I18n; then I18n pluralises it on
+# the tokens' count. HAZARD: the hand choice holds only under Rails' own
+# one/other rule, and breaks once CLDR plural rules (few, many) are added.
+en:
+  admin:
+    components:
+      groups_screen:
+        list:
+          group: "Group"
+          members_column: "Members"
+          tokens_column: "Tokens"
+          actions: "Actions"
+          built_in: "Built-in"
+          members:
+            one: "member"
+            other: "members"
+          tokens:
+            one: "token"
+            other: "tokens"
+          edit: "Edit"
+          footnote: "Built-in groups can be changed but not deleted. Deleting a custom group removes its permissions from its members and revokes its AI tokens."
+        members:
+          label: "Members"
+          placeholder: "Add a user…"
+          help: "Owners aren't listed: they already have every permission."
+          owner: "Owner"
+        permission_matrix:
+          content: "Content permissions"
+          content_intro: "Each permission has its own scope. No scope means everything."
+          other: "Other permissions"
+          locked_hint: "A greyed tick is a permission you can't hand out yourself. It stays as it is; ask an owner to change it."
+          removed_value: "%{value}: removed when you save."
+          dead: "This permission was limited to %{what}, so it matched nothing. It stays off unless you tick it again."
+          dead_nothing: "nothing"
+          dormant: "Limited to a content type that no longer exists (%{names}). Saving removes it; until then only someone who could grant that type can manage this group."
+          unregistered: "The permission “%{key}” no longer exists and will be removed when you save."
+        permission_row:
+          short:
+            read: "Read"
+            create: "Create"
+            edit: "Edit"
+            publish: "Publish"
+            move: "Move"
+            delete: "Move to trash"
+          accessible_label: "%{short}: %{label}"
+          locked: "You can't grant this"
+          edit_scope: "Edit scope"
+          done: "Done"
+          view_scope: "View scope"
+          hide_scope: "Hide scope"
+          chips:
+            all_pages: "All pages"
+            all_types: "All content types"
+            own_only: "Own only"
+            more: "+%{count}"
+            removed_type: "! %{name} · type removed"
+            under: "Under %{title}"
+            unreadable: "A page you can't open"
+        scope_editor:
+          types: "Content types · none ticked = all"
+          removed_type: "%{name} · this type no longer exists"
+          remove: "Remove"
+          own_only: "Own only"
+          own_hint: "· Only posts the user wrote."
+          branches: "Page branches · ticking a page includes everything under it · none = all"
+          kept: "A page you can't open (kept)"
+          unreadable_branches: "Some of these branches are pages you can't open. Only someone who can open them can change this permission."
+          cant_open: "You can't open this page"
+          notes:
+            included: "included"
+            partial: "contains a chosen page"
+            includes:
+              one: "includes %{count} subpage"
+              other: "includes %{count} subpages"
+        toggle_list:
+          oversight: "Oversight"
+          locked: "You can't grant this"
+        delete_zone:
+          heading: "Delete this group"
+          members:
+            zero: "It has no members."
+            one: "1 member loses its permissions."
+            other: "%{count} members lose its permissions."
+          tokens:
+            zero: "It has no AI tokens."
+            one: "1 AI token is revoked."
+            other: "%{count} AI tokens are revoked."
+          trigger: "Delete group…"
+          built_in: "A built-in group can be changed but not deleted."
+          dialog_title: "Delete “%{name}”?"
+          dialog_body:
+            no_members:
+              zero: "It has no members. Users themselves are not deleted."
+              one: "It has no members, and its 1 AI token is revoked. Users themselves are not deleted."
+              other: "It has no members, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+            members_only:
+              one: "Its 1 member loses these permissions. Users themselves are not deleted."
+              other: "Its %{count} members lose these permissions. Users themselves are not deleted."
+            members_and_tokens:
+              one:
+                one: "Its 1 member loses these permissions, and its 1 AI token is revoked. Users themselves are not deleted."
+                other: "Its 1 member loses these permissions, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+              other:
+                one: "Its %{members} members lose these permissions, and its 1 AI token is revoked. Users themselves are not deleted."
+                other: "Its %{members} members lose these permissions, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+          more:
+            one: "and %{count} more"
+            other: "and %{count} more"
+          confirm: "Delete group"

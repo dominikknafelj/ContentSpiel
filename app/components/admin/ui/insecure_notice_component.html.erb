@@ -1,1 +1,1 @@
-<%= tag.p t(".body"), **attributes %>
+<%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, **@html, id: "insecure-notice").with_content(t(".body")) %>

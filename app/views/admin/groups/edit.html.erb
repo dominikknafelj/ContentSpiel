@@ -1,9 +1,9 @@
-<%# Editing a group (access-control design spec §5, round 3 Task 11): the form,
-    then -- for a custom group the viewer can manage -- the delete zone and the
-    confirm dialog that names the active tokens `Groups::Destroy` revokes, both
-    outside the form (forms don't nest). A built-in group shows the note in the
-    zone's place; a group the viewer can only view shows neither. %>
-<% content_for :title, @group.name_was.presence || "Group" %>
+<%# Editing a group: the form, then -- for a custom group the viewer can
+    manage -- the delete zone and the confirm dialog that names the active
+    tokens `Groups::Destroy` revokes, both outside the form (forms don't
+    nest). A built-in group shows its note in the zone's place; a group the
+    viewer can only view shows neither. %>
+<% content_for :title, @group.name_was.presence || t(".title") %>
 <h1 class="mb-4 text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
 
 <% if @stale_form %>

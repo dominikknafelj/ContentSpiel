@@ -4,7 +4,7 @@
     <%= tag.div class: "flex min-h-full flex-col", data: { controller: "admin--editor--publish-dialog", admin__editor__publish_dialog_url_value: changes_url,
           action: "admin--ui--dialog:opening@window->admin--editor--publish-dialog#opening" } do %>
       <% if error %>
-        <p id="<%= error_id %>" role="alert" class="mb-3 rounded-cs bg-danger-tint px-3 py-2 text-[13px] text-danger-ink"><%= error %></p>
+        <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: error_id, class: "mb-3").with_content(error) %>
       <% end %>
       <%# Filled when the dialog opens (see the script): never a form, never an id from the editor. %>
       <p class="text-sm text-dim" data-admin--editor--publish-dialog-target="loading"><%= t(".loading") %></p>

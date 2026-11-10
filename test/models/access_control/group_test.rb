@@ -1,6 +1,12 @@
 require "test_helper"
 
 class AccessControl::GroupTest < ActiveSupport::TestCase
+  test "a blank description is stored as nil, and a description is stripped" do
+    assert_nil AccessControl::Group.new(description: "  ").description
+    assert_nil AccessControl::Group.new(description: "").description
+    assert_equal "Writes posts", AccessControl::Group.new(description: " Writes posts ").description
+  end
+
   test "name must be unique, case-insensitively" do
     AccessControl::Group.create!(name: "Reviewers")
 

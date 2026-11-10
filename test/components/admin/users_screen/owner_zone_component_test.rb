@@ -11,7 +11,7 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
     zone(users(:two))
 
     assert_text "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner."
-    assert_selector ".admin-owner-zone[data-controller='admin--saving--pending-lock']"
+    assert_selector "section.admin-action-zone.mt-6[data-zone=owner][aria-labelledby=owner-zone-title][data-controller='admin--saving--pending-lock']"
     assert_selector "button[data-action='admin--ui--dialog#open'][data-admin--ui--dialog-id-param='owner-user-#{users(:two).id}'][data-admin--saving--pending-lock-target=control]", text: "Make owner…"
     assert_selector "dialog#owner-user-#{users(:two).id}", visible: :all do
       assert_selector "dialog", text: "Make two@example.com an owner?", visible: :all
@@ -20,6 +20,16 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
       assert_selector "form input[name=owner][value='1']", visible: :all
       assert_selector "button.bg-accent[type=submit]", text: "Make owner", visible: :all
     end
+    assert_no_selector "dialog button.bg-danger", visible: :all
+  end
+
+  test "the owner zone's trigger is secondary and its confirm primary" do
+    zone(users(:two))
+
+    trigger = page.find("section[data-zone=owner] > button", text: "Make owner…")
+    Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split.each { |utility| assert_includes trigger[:class].split, utility }
+    assert_selector "section[data-zone=owner] h2#owner-zone-title.text-h3", text: "Owner"
+    assert_selector "section[data-zone=owner] ~ dialog#owner-user-#{users(:two).id} button.bg-accent[type=submit]", text: "Make owner", visible: :all
     assert_no_selector "dialog button.bg-danger", visible: :all
   end
 
@@ -36,11 +46,20 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "removing your own owner rights is said to you" do
+    other = User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
+    Current.session = other.sessions.create!
+    zone(other)
+    assert_selector "dialog", text: "You keep your groups and the permissions those give.", visible: :all
+  ensure
+    Current.reset
+  end
+
   test "for the last owner the button is disabled with the reason, and there is no dialog" do
     zone(users(:one), last_owner: true)
 
     assert_selector "button[disabled]", text: "Remove owner rights…"
-    assert_text "one@example.com is the only owner, so their owner rights can't be removed."
+    assert_selector "[data-zone=owner] p[data-action-zone-reason]", text: "one@example.com is the only owner, so their owner rights can't be removed."
     assert_no_selector "dialog", visible: :all
   end
 

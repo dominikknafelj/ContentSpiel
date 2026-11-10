@@ -28,7 +28,8 @@ class Admin::Ui::AvatarComponentTest < ViewComponent::TestCase
     assert_no_selector ".bg-people-tint, .bg-people, .text-people"
 
     render_inline(Admin::Ui::AvatarComponent.new(initials: "+3", size: :md, tone: :more))
-    assert_selector "span.bg-sunken.text-ink[aria-hidden=true]", text: "+3"
+    assert_selector "span.border.border-meta.bg-surface.text-ink[aria-hidden=true]", text: "+3"
+    assert_no_selector ".bg-sunken"
 
     render_inline(Admin::Ui::AvatarComponent.new(initials: "", size: :md, tone: :empty))
     assert_selector "span.border.border-field-line.bg-surface"

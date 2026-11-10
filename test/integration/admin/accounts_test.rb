@@ -34,7 +34,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     # In the Password card, where the form is, not above the cards.
     assert_select "#password .admin-error-summary[role=alert] li", text: "That's not your current password."
     assert_select ".admin-error-summary", count: 1
-    assert_select "#current_password-errors", text: "That's not your current password."
+    assert_select "#current_password-errors", text: /That's not your current password\./
     assert_select "#current_password[aria-invalid=true][aria-describedby~='current_password-errors']"
     assert users(:reader).reload.authenticate("password")
   end
@@ -60,11 +60,10 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     # sessions stands directly under the Password card's title.
     assert_select "title", text: "Your account"
     assert_select "h1", text: "Your account", count: 1
-    assert_select "turbo-frame#content h2", count: 0
-    assert_equal %w[Profile Notes Password], css_select("turbo-frame#content section h3").map { |heading| heading.text.strip }
+    assert_equal %w[Profile Notes Password], css_select("turbo-frame#content section h2").map { |heading| heading.text.strip }
     assert_select "form#profile-form section", count: 2
     assert_select "form#password-form section[aria-labelledby=account-password]" do
-      assert_select "h3#account-password + p", text: "You'll stay signed in here. Other sessions are signed out."
+      assert_select ".admin-settings-card__head:has(h2#account-password) > p", text: "You'll stay signed in here. Other sessions are signed out."
       assert_select "input[type=password]", count: 3
     end
     # The Password card's footer is the card's own and sits inside it, under
@@ -160,6 +159,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_equal "Ada", user.reload.name
   end
 
+  test "Your account saved as rendered writes nothing and audits nothing" do
+    user = users(:reader)
+    sign_in_as(user)
+    stored_at = user.reload.updated_at
+
+    assert_no_difference -> { Audit::Event.where(action: "user.updated").count } do
+      patch "/cs-studio/account/profile", params: {
+        name: "", notes_sound: user.notes_sound ? "1" : "0", notes_desktop: user.notes_desktop ? "1" : "0"
+      }
+    end
+
+    assert_redirected_to "/cs-studio/account"
+    assert_equal stored_at, user.reload.updated_at
+  end
+
   # The account screen has a second form: Turbo gets a stream that keeps the
   # screen (and what the password form holds) instead of a redirect.
   test "saving a name answers Turbo with a stream: the sidebar's account block and a toast" do
@@ -211,11 +225,11 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--saving--save-bar']" do
       # "Your account", then two cards of one width, Profile and Notes, and
       # one footer under both, whose button is "Save changes".
-      assert_select "section.max-w-\\[560px\\]", count: 2
-      assert_select "section[aria-labelledby=account-profile] h3#account-profile", text: "Profile"
+      assert_select "section.admin-settings-card", count: 2
+      assert_select "section[aria-labelledby=account-profile] h2#account-profile", text: "Profile"
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
       assert_select "section[aria-labelledby=account-profile] input[name=name]"
-      assert_select "section[aria-labelledby=account-notes] h3#account-notes", text: "Notes"
+      assert_select "section[aria-labelledby=account-notes] h2#account-notes", text: "Notes"
       assert_select "section ~ [data-admin--saving--save-bar-target=bar] button[type=submit]", text: "Save changes"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
@@ -325,11 +339,67 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "[id=password]", count: 1
     assert_select "input#new_password[name=password]"
     assert_select "section#password[aria-labelledby=account-password]" do
-      assert_select "h3#account-password", text: "Password"
+      assert_select "h2#account-password", text: "Password"
       assert_select "input[name=current_password]"
     end
     assert_select "form#password-form[action='/cs-studio/account/password'] input[name=_method][value=patch]"
     assert_select "form#profile-form[action='/cs-studio/account/profile']"
+  end
+
+  test "the three cards are card frames, the password card anchored at #password" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/account"
+
+    assert_select "turbo-frame#content .max-w-\\[560px\\] > h1", text: "Your account"
+    cards = css_select("turbo-frame#content section.admin-settings-card")
+    assert_equal %w[account-profile account-notes account-password], cards.map { |card| card["aria-labelledby"] }
+    # Profile and Notes are the person's, in the people pair; Password is neutral, its own key.
+    assert_select "section.admin-settings-card[aria-labelledby=account-profile] .admin-settings-card__head" do
+      assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M19 21v-2']"
+      assert_select "h2#account-profile", text: "Profile"
+      assert_select "p", count: 0
+    end
+    assert_select "section.admin-settings-card[aria-labelledby=account-notes] .admin-settings-card__head" do
+      assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M21 15a2 2']"
+      assert_select "h2#account-notes", text: "Notes"
+      assert_select "p.text-small", text: "What happens in this browser when someone mentions you in a note."
+    end
+    assert_select "section#password.admin-settings-card.scroll-mt-6[aria-labelledby=account-password]" do
+      assert_select ".admin-settings-card__head span.bg-sunken[aria-hidden=true] svg path[d^='M2.586 17.414']"
+      assert_select ".admin-settings-card__head h2#account-password", text: "Password"
+      assert_select ".admin-settings-card__head p.text-small", text: "You'll stay signed in here. Other sessions are signed out."
+    end
+    # The password form's words are keys of `admin.accounts.password`.
+    assert_select "label[for=current_password]", text: "Current password"
+    assert_select "label[for=new_password]", text: "New password"
+    assert_select "label[for=password_confirmation]", text: "Confirm new password"
+    assert_select "#password-form .admin-save-bar button[type=submit][data-password-submit]", text: "Change password"
+  end
+
+  test "a saved password is the compact ok notice and a blocked permission the warn notice" do
+    put_mail_state(:working)
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/account"
+
+    # Inside the permission's status region, so the notice speaks through it and has no role of its own.
+    blocked = css_select("[data-controller='admin--notes--permission'] [role=status] > div[data-admin--notes--permission-target=blocked][hidden]:not([role])").sole
+    assert_equal "Blocked in this browser. Change it in the site settings of your browser.", blocked.text.strip
+    assert_empty Admin::Ui::NoticeComponent.classes(:warn, size: :compact).split - blocked["class"].split
+    assert_select "[data-admin--notes--permission-target=ask].rounded-card.bg-accent-tint.text-small.text-ink[hidden]", text: /This browser has not been allowed/
+    allow = css_select("[data-admin--notes--permission-target=ask] button[type=button]").sole
+    assert_equal "Allow in this browser", allow.text.strip
+    assert_empty Admin::Ui::ButtonComponent.classes(:secondary, size: :small).split - allow["class"].split
+    tertiary = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
+    assert_equal tertiary.split.sort, css_select("#password-form .admin-save-bar a[href='/cs-studio/password/new']").first["class"].split.sort
+
+    patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
+    follow_redirect!
+
+    saved = css_select("#password div[role=status][tabindex='-1'][data-password-saved]").sole
+    assert_equal "Password changed. Your other sessions were signed out.", saved.text.strip
+    assert_empty Admin::Ui::NoticeComponent.classes(:ok, size: :compact).split - saved["class"].split
   end
 
   test "⌘K's Your account leads to /account" do

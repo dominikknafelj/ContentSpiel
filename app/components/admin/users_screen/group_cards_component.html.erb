@@ -1,21 +1,28 @@
-<div class="admin-user-groups" role="group" aria-labelledby="user-groups-title">
-  <div class="mb-2.5 flex items-baseline justify-between gap-3">
-    <h2 id="user-groups-title" class="text-h2 text-ink">Groups</h2>
-    <% if manage_groups %><%= link_to "Manage groups →", helpers.admin_groups_path(**url_options), data: { turbo_frame: "content" }, class: "text-sm" %><% end %>
-  </div>
+<% tiles = capture do %>
   <%= hidden_field_tag "user[group_ids][]", "", id: nil %>
   <div class="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-2.5">
     <% groups.each do |group| %>
-      <label for="<%= input_id(group) %>" class="<%= card_class(group) %>" data-group-card="<%= group.id %>" <%= "data-locked" if locked?(group) %>>
+      <label for="<%= input_id(group) %>" class="<%= tile_class(group) %>" data-group-card="<%= group.id %>" <%= "data-locked" if locked?(group) %>>
         <%# A disabled box sends nothing, so a ticked locked one keeps its membership through a hidden input. %>
         <% if locked?(group) && checked?(group) %><%= hidden_field_tag "user[group_ids][]", group.id, id: nil %><% end %>
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="text-sm font-medium"><%= group.name %></span>
-          <% if group.description.present? %><span class="text-xs leading-snug text-dim"><%= group.description %></span><% end %>
-          <% if locked?(group) %><span class="text-xs text-meta">You can't grant this group.</span><% end %>
+          <% if group.description.present? %><span class="<%= class_names("text-small leading-snug", "text-dim": !locked?(group)) %>"><%= group.description %></span><% end %>
+          <% if locked?(group) %><span class="text-small"><%= t(".locked") %></span><% end %>
         </span>
         <%= render Admin::Ui::CheckboxComponent.new(name: "user[group_ids][]", value: group.id, checked: checked?(group), id: input_id(group), disabled: locked?(group), class: "col-start-2 row-start-1 mt-0.5") %>
       </label>
     <% end %>
   </div>
-</div>
+<% end %>
+<% if frame %>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: HEADING_ID, heading: t(".title"), icon: :groups, family: :people, class: "admin-user-groups") do |card| %>
+    <% card.with_head_end { manage_link } if manage_groups %>
+    <div class="p-4"><%= tiles %></div>
+  <% end %>
+<% else %>
+  <fieldset class="admin-user-groups m-0 min-w-0 border-0 p-0">
+    <legend class="text-label text-meta mb-1"><%= t(".title") %></legend>
+    <%= tiles %>
+  </fieldset>
+<% end %>

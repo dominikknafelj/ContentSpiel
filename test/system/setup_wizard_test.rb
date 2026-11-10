@@ -59,6 +59,16 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     assert_selector "h1", text: "Your token"
     assert_selector "#mcp-token", text: /\A.+\z/
+    # The reveal is the AI assistant page's: Copy copies the box's text, and
+    # `pagehide` blanks it. No line here prints the token: each check is a
+    # yes or no with its own words.
+    await_admin_controllers
+    page.execute_script("window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (text) => { window.__copied = text; return Promise.resolve() } }, configurable: true })")
+    press "Copy"
+    assert_selector "button", text: "Copied"
+    assert page.evaluate_script("window.__copied === document.getElementById('mcp-token').textContent && window.__copied.length > 0"), "Copy did not copy the box's text"
+    page.execute_script("window.__copied = null; window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))")
+    assert page.evaluate_script("document.getElementById('mcp-token').textContent === ''"), "the token was not blanked at pagehide"
     press "Continue"
 
     assert_selector "h1", text: "Starter content"

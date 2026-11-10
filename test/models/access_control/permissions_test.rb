@@ -58,7 +58,7 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     assert AccessControl::Permissions.fetch("forms.manage").grantable
     assert_equal AccessControl::Permissions.keys - %w[forms.submit], AccessControl::Permissions.grantable.map(&:key)
 
-    toggles = Admin::GroupsScreen::ToggleListComponent.new(grants: {}).send(:cards).flat_map(&:last).map(&:key)
+    toggles = Admin::GroupsScreen::ToggleListComponent.new(grants: {}).send(:bands).flat_map(&:last).map(&:key)
     assert_includes toggles, "forms.manage"
     assert_not_includes toggles, "forms.submit"
 

@@ -629,7 +629,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    themes, and the radius and focus ring come from tokens too. */
 .cs-checkbox { accent-color: var(--cs-accent); border-radius: var(--cs-radius); width: 1rem; height: 1rem; flex: none; cursor: pointer; }
 .cs-checkbox:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
-.cs-checkbox:disabled { cursor: not-allowed; opacity: 0.5; }
+/* A box nobody may change (a group the viewer can't grant, a locked
+   permission) keeps its full colour, so its tick reads at the browser's own
+   3:1 on the card; the cursor and the label's meta words say it is fixed. */
+.cs-checkbox:disabled { cursor: not-allowed; opacity: 1; }
+.cs-checkbox:disabled + label, label:has(> .cs-checkbox:disabled) { color: var(--cs-meta); }
 
 /* Toggle switch (Admin::Fields::BooleanField): still a
    checkbox, so the form posts and autosaves it like one, drawn as a pill
@@ -667,7 +671,17 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .cs-toggle:checked { background: var(--cs-accent); border-color: var(--cs-accent); }
 .cs-toggle:checked::before { transform: translateX(calc(2.25rem - 2px - var(--cs-toggle-knob) - 2 * var(--cs-toggle-gap))); background: var(--cs-surface); }
 .cs-toggle:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
-.cs-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
+/* A switch nobody may change keeps its full colour, never faded: off, the
+   sunken track and field-line outline of rest with the meta knob; on, a meta
+   track (the accent says it can be pressed) with the surface knob, each part
+   3:1 on a card and on the rail (admin_contrast_test). The cursor and the
+   label's meta words say it is fixed. */
+.cs-toggle:disabled { cursor: not-allowed; opacity: 1; }
+.cs-toggle:disabled:not(:checked) { background: var(--cs-sunken); border-color: var(--cs-field-line); }
+.cs-toggle:disabled:not(:checked)::before { background: var(--cs-meta); }
+.cs-toggle:disabled:checked { background: var(--cs-meta); border-color: var(--cs-meta); }
+.cs-toggle:disabled:checked::before { background: var(--cs-surface); }
+.cs-toggle:disabled + label, label:has(> .cs-toggle:disabled) { color: var(--cs-meta); }
 @media (prefers-reduced-motion: reduce) { .cs-toggle, .cs-toggle::before { transition: none; } }
 
 /* Invalid field border, derived from the error slot's content. Autosave streams replace a field's error slot but never its input,
@@ -735,6 +749,13 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
 .admin-prefix-input:focus-within { background-color: var(--cs-surface); }
+/* A refused password (`Admin::Ui::PasswordFieldComponent`): the field is
+   drawn whole with its errors and no autosave replaces its slot, so its
+   root carries the class at render time. Its well is `setup_input_class`
+   wherever it stands, inside a wrapper or not, so the bottom edge takes the
+   property itself; the focus ring is an outline and leaves it red. */
+.admin-password-field--invalid { --cs-field-invalid-border: var(--cs-danger); }
+.admin-password-field--invalid input { border-bottom-color: var(--cs-field-invalid-border); }
 /* The Media panel's Alt field while the default-language alt is empty: the
    warn colour, drawn only while the input is empty (it carries a placeholder)
    so it clears as soon as the editor types, and never over an error, whose
@@ -866,16 +887,31 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-draft-tile__link::after { content: ""; position: absolute; inset: 0; border-radius: var(--cs-radius-tile); }
 .admin-draft-tile__link:focus-visible { outline: none; }
 .admin-draft-tile__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* A list row that opens one thing (a user, a group, an audit event) is
+   pressed anywhere: its one link, `.admin-row-link`, stretches its
+   `::after` over the row, and the focus ring is drawn on that cover, inside
+   the row's edge. Anything else pressable in the row stands above the cover
+   at `relative z-(--cs-z-raised)`. A link that is the li's direct child
+   is not matched here, so its row carries its own `relative`, as the audit
+   row does. */
+tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
+.admin-row-link::after { content: ""; position: absolute; inset: 0; }
+.admin-row-link:focus-visible { outline: none; }
+.admin-row-link:focus-visible::after { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row, the draft tile and a Translations row around
-   their stretched links, the Notes for you row that is the link). */
+   (the Waiting for you row, the draft tile, a Translations row and a
+   table row of one link around their stretched links, the Notes for you
+   row that is the link). In a table row the verb stands in a cell of its
+   own, outside the link, so the row lights it. */
 .admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
 .admin-waiting-row:hover .admin-row-verb,
 .admin-waiting-row:focus-within .admin-row-verb,
 .admin-translation-row:hover .admin-row-verb,
 .admin-translation-row:focus-within .admin-row-verb,
+tr:has(.admin-row-link):hover .admin-row-verb,
+tr:has(.admin-row-link):focus-within .admin-row-verb,
 .admin-draft-tile:hover .admin-row-verb,
 .admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
@@ -1494,29 +1530,40 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 /* A tile in a grid of tiles: the media library's and the picker's
    (`Admin::MediaLibrary::TileComponent`), an upload's while it sends
    (`media/upload_tiles.js`), a language's summary in Translations
-   (`Admin::TranslationScreen::SummaryCardComponent`) and a draft on the
-   Dashboard (`Admin::DashboardScreen::DraftTileComponent`). Its states are
-   elevations, with no border: the first at rest, the second under a pointer
-   that can hover, and never moved, so nothing shifts under a click. Selected
-   (`aria-current`) or pressed (`aria-pressed`) it is a selection: the 2px
-   accent outline 2px outside its edge, 3:1 on the surface and the page
+   (`Admin::TranslationScreen::SummaryCardComponent`), a draft on the
+   Dashboard (`Admin::DashboardScreen::DraftTileComponent`) and a group in
+   the user editor (`Admin::UsersScreen::GroupCardsComponent`). Its states
+   are elevations, with no border: the first at rest, the second under a
+   pointer that can hover, and never moved, so nothing shifts under a click.
+   Selected (`aria-current`), pressed (`aria-pressed`) or ticked (a label
+   tile whose own checkbox is checked) it is a selection: the 2px accent
+   outline 2px outside its edge, 3:1 on the surface and the page
    (`test/lib/admin_contrast_test.rb`), at rest's elevation, written after
-   the pointer's so a selected tile keeps its look under the pointer. */
+   the pointer's so a selected tile keeps its look under the pointer.
+   A LOCKED tile (`data-locked`: a group the viewer can't grant) is sunken,
+   with no shadow at rest or under the pointer, and its words meta. Its
+   second selector is the ticked locked tile: the ticked rule's `:has(>
+   input:checked)` outweighs `[data-locked]` alone, and the locked tile
+   keeps the ticked outline but never the shadow. */
 .admin-tile { border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
 @media (hover: hover) {
   .admin-tile:hover { box-shadow: var(--cs-shadow-2); }
 }
-.admin-tile:is([aria-current="true"], [aria-pressed="true"]) { outline: 2px solid var(--cs-accent); outline-offset: 2px; box-shadow: var(--cs-shadow-1); }
+.admin-tile:is([aria-current="true"], [aria-pressed="true"]), .admin-tile:has(> input:checked) { outline: 2px solid var(--cs-accent); outline-offset: 2px; box-shadow: var(--cs-shadow-1); }
+.admin-tile[data-locked], .admin-tile[data-locked]:has(> input:checked) { background: var(--cs-sunken); box-shadow: none; color: var(--cs-meta); }
 
 /* A table in its card that scrolls inside itself, so the page never scrolls
    sideways. `.admin-table-scroll` is Translations' matrix: the card is at
    most the window's height under the top bar, and its head row sticks to
    the card's top (a sticky element inside a scrolling box sticks to that
    box, never to the window), on the surface over the rows, at the raised
-   layer. `.admin-table-scroll--x` is Trash's table, the forms list's and a
-   form's submissions': the sideways scroll alone, with no height of its
+   layer. `.admin-table-scroll--x` is Trash's table, the forms list's, a
+   form's submissions' and the AI assistant's tokens: the sideways scroll alone, with no height of its
    own, so its rows scroll with the page. In
-   both the first column sticks at the left as the card scrolls sideways.
+   both the first column sticks at the left as the card scrolls sideways,
+   but in a table whose row is one link (`.admin-row-link`: Users, Groups), which
+   scrolls sideways whole: a sticky cell is the containing block of
+   the link's cover, which would then cover the name cell alone.
    `.admin-table-scroll` is a stacking context of its own, so its local
    layers stay under the shell's top bar. In it the head's corner stands at
    `raised-top`, over the rest of the head (which slides under it sideways)
@@ -1529,7 +1576,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    cell's own shadow travels with the sticky head. */
 .admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); box-shadow: inset 0 -1px 0 var(--cs-line-strong); }
 .admin-table-scroll--x { overflow-x: auto; }
-:is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
+:is(.admin-table-scroll, .admin-table-scroll--x) :where(table:not(:has(.admin-row-link))) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
 .admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
 .admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }
 /* A Translations row, a Forms row and a submission's row under the pointer

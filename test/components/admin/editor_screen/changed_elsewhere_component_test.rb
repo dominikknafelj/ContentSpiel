@@ -13,7 +13,7 @@ class Admin::EditorScreen::ChangedElsewhereComponentTest < ViewComponent::TestCa
 
     render_bar(page, since: base)
 
-    assert_selector "div#changed-elsewhere.bg-warn-tint[role=alert]"
+    assert_selector "div#changed-elsewhere[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink.text-small"
     assert_text "Changed by two@example.com just now."
     assert_text "Your text is still here so you can copy it; reloading shows the latest version."
     assert_selector "a[href='/cs-studio/pages/1'][data-turbo-frame='_top']", text: "Reload"

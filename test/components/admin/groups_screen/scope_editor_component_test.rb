@@ -1,9 +1,10 @@
 require "test_helper"
 
-# `Admin::GroupsScreen::ScopeEditorComponent` on its own (round 3, Task 10):
-# the scope controls of one permission row. What it must get right is what the
-# form SUBMITS as rendered -- "a form saved as rendered changes nothing" -- so
-# most assertions here are about which inputs are enabled, ticked or carried.
+# `Admin::GroupsScreen::ScopeEditorComponent` on its own: the scope
+# controls of one permission row. What it must get right is what the form
+# SUBMITS as rendered -- "a form saved as rendered changes nothing" -- so
+# most assertions here are about which inputs are enabled, ticked or
+# carried.
 class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -64,6 +65,19 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_no_selector "input[type=checkbox][value='retired_type']"
   end
 
+  test "the panel is paper, indented to the label column; a removed type is a warn badge with a small tertiary Remove beside it" do
+    editor("posts.edit", scope: { "content_types" => %w[blog retired_type] })
+
+    panel = page.find("#scope-probe")
+    assert_includes panel[:class].split, "bg-paper"
+    assert_includes panel[:class].split, "pl-[calc(1.25rem+0.75rem+1rem)]"
+    badge = page.find("[data-removed-type='retired_type'] > span:first-child")
+    assert_equal [ Admin::Ui::BadgeComponent::CLASS, Admin::Ui::BadgeComponent::TONES.fetch(:warn) ].join(" "), badge[:class]
+    assert_equal "! retired_type · this type no longer exists", badge.text
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), page.find("[data-removed-type='retired_type'] button", text: "Remove")[:class]
+    assert_no_selector "[class*='rounded-cs border border-warn']"
+  end
+
   test "pages, three levels deep: the chosen page is ticked, everything below it a disabled tick, every ancestor partial" do
     home, about, team, member = family
     editor("pages.edit", scope: { "page_ids" => [ team.id ] }, tree: tree_for([ home, about, team, member ]))
@@ -116,7 +130,10 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_no_text "Team"
     assert_selector "#{carried("pages.edit", team)}[data-admin--groups--branch-picker-target=kept]:not([disabled])", visible: :all
     assert_selector "p", text: "A page you can't open (kept)", count: 1
-    assert_selector "p.admin-unreadable-branches", text: "Some of these branches are pages you can't open. Only someone who can open them can change this permission."
+    warning = page.find(".admin-unreadable-branches")
+    assert_equal "#{Admin::Ui::NoticeComponent.classes(:warn, size: :compact)} admin-unreadable-branches", warning[:class]
+    assert_nil warning[:role], "a standing warning is read where it stands"
+    assert_equal "Some of these branches are pages you can't open. Only someone who can open them can change this permission.", warning.text
     # Nothing above it reads partial: the tree doesn't know where it was.
     assert_no_selector "input[data-partial]"
     assert_selector "#{page_box("pages.edit", about)}:not([checked])"

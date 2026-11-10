@@ -5,6 +5,7 @@
 @source "../../views/setup";
 @source "../../views/admin";
 @source "../../views/shared";
+@source "../../views/invitations";
 @source "../../views/layouts/setup.html.erb";
 @source "../../views/layouts/product.html.erb";
 @source "../../views/layouts/admin.html.erb";

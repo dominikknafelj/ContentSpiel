@@ -1,8 +1,8 @@
 require "test_helper"
 
-# One of the editor's eleven rows (Task 10): checkbox, short label, key in
-# mono, scope chips, Edit scope, and the row's own scope editor. The posted
-# names are the ones `Admin::GroupsController#grants_from` has always read.
+# One of the editor's eleven rows: checkbox, short label, key in mono, scope
+# chips, Edit scope, and the row's own scope editor. The posted names are the
+# ones `Admin::GroupsController#grants_from` reads.
 class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -161,6 +161,47 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     ids = a.css("[id]").map { |node| node["id"] }
     assert_equal ids.uniq, ids
     assert(ids.all? { |id| id.include?("posts-read") })
+  end
+
+  test "a scope chip is a badge, a type's with its dot as the mark, a removed type's warn" do
+    row("posts.edit", scope: { "content_types" => %w[blog retired_type], "own" => true })
+
+    neutral = [ Admin::Ui::BadgeComponent::CLASS, Admin::Ui::BadgeComponent::TONES.fetch(:neutral), "admin-scope-chip" ].join(" ")
+    warn = [ Admin::Ui::BadgeComponent::CLASS, Admin::Ui::BadgeComponent::TONES.fetch(:warn), "admin-scope-chip" ].join(" ")
+    blog = page.find("[data-chips] > span", text: "Blog")
+    assert_equal neutral, blog[:class]
+    assert_selector "[data-chips] > span[class='#{neutral}'] > span.inline-flex[aria-hidden=true] > span.h-\\[7px\\].w-\\[7px\\].rounded-full", count: 1, visible: :all
+    assert_equal neutral, page.find("[data-chips] > span", text: "Own only")[:class]
+    assert_empty page.find("[data-chips] > span", text: "Own only").all("[aria-hidden]", visible: :all)
+    assert_equal warn, page.find("[data-chips] > span", text: "! retired_type · type removed")[:class]
+
+    row("pages.edit", scope: {})
+    assert_equal "admin-scope-chip text-small text-dim", page.find("[data-chips] > span", text: "All pages")[:class]
+
+    # The script redraws the chips after every change, with these strings.
+    assert_equal({ neutral_chip: neutral, warn_chip: warn, all_chip: "admin-scope-chip text-small text-dim", mark: Admin::Ui::BadgeComponent::MARK_CLASS, dot: "h-[7px] w-[7px] shrink-0 rounded-full" },
+      Admin::GroupsScreen::PermissionRowComponent.chip_classes)
+  end
+
+  test "a locked tick has no opacity class and its note is meta" do
+    locked_row("posts.edit", { "content_types" => %w[blog] })
+
+    box = page.find("input[type=checkbox][name='group[grants][posts.edit][enabled]'][disabled]")
+    assert_equal "cs-checkbox", box[:class]
+    # The label follows the box, so the disabled look's `+ label` reaches it.
+    assert_selector "input.cs-checkbox[disabled] + label[for='#{box[:id]}']"
+    assert_selector "label .admin-locked-note.text-small.text-meta", text: "You can't grant this"
+    assert_no_selector "[class*=opacity]"
+    assert_no_selector "label span.text-dim"
+    assert_no_selector "[class='']"
+  end
+
+  test "the scope toggle is a small tertiary button whose words the script reads from its data" do
+    row("posts.read", scope: {})
+
+    button = page.find("button[aria-controls='scope-editor-posts-read']")
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), button[:class]
+    assert_equal [ "Done", "Edit scope" ], [ button["data-open-label"], button["data-closed-label"] ]
   end
 
   def locked_row(key, scope, tree: nil)

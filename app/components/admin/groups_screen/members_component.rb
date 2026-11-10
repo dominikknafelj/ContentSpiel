@@ -11,18 +11,16 @@ module Admin
     # counts adding or removing a member and nothing else: typing in the search box
     # is swallowed by the chip input and has no name.
     #
-    # OWNERS. The suggestions never offer one ("Owners aren't listed: they already
-    # have every permission"), but an owner who is ALREADY a member is drawn as a
-    # chip like anyone else and stays until someone removes it, so an untouched save
-    # keeps them (`Groups::Save` replaces the list wholesale; leaving a stored member
+    # OWNERS. The suggestions never offer one (the help line says why), but
+    # an owner who is ALREADY a member is drawn as a chip like anyone else and
+    # stays until someone removes it, so an untouched save keeps them
+    # (`Groups::Save` replaces the list wholesale; leaving a stored member
     # out would silently remove them). Whether the viewer may add or remove a given
     # member is `Groups::Save`'s call -- a refusal is the 403 page -- and is not
     # second-guessed here.
     #
     # `users`: the members to show as chips, in the order given.
     class MembersComponent < AdminComponent
-      HELP = "Owners aren't listed: they already have every permission.".freeze
-
       def initialize(users:, search_url:, errors: [])
         @users = users
         @search_url = search_url
@@ -37,7 +35,7 @@ module Admin
       # is already shown by their email, so nothing is repeated. An owner says so.
       def chips
         users.map do |user|
-          hint = [ ("Owner" if user.owner?), (user.email_address if user.name.present?) ].compact.join(" · ").presence
+          hint = [ (t(".owner") if user.owner?), (user.email_address if user.name.present?) ].compact.join(" · ").presence
           { value: user.id.to_s, label: user.name_or_email, hint: hint }
         end
       end

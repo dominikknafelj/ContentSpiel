@@ -5,15 +5,15 @@ module Admin
     # without the Copy button.
     class SystemCheckRowComponentPreview < ViewComponent::Preview
       def ok
-        render Admin::Ui::SystemCheckRowComponent.new(result: Setup::SystemCheck::Result.new(label: "File storage", status: :ok, message: "Uploads can be stored and read back."))
+        render Admin::Ui::SystemCheckRowComponent.new(index: 0, result: Setup::SystemCheck::Result.new(label: "File storage", status: :ok, message: "Uploads can be stored and read back."))
       end
 
       def warning
-        render Admin::Ui::SystemCheckRowComponent.new(result: mail_warning)
+        render Admin::Ui::SystemCheckRowComponent.new(index: 0, result: mail_warning)
       end
 
       def in_the_setup_wizard
-        render Admin::Ui::SystemCheckRowComponent.new(result: mail_warning, copyable: false)
+        render Admin::Ui::SystemCheckRowComponent.new(index: 0, result: mail_warning, copyable: false)
       end
 
       private

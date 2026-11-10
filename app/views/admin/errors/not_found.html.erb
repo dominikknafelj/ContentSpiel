@@ -1,16 +1,17 @@
-<%# The Studio 404 (design pass spec §4): a record that doesn't exist and one
-    outside the viewer's scope render this same page, word for word -- one
-    sentence that never confirms which (access-control design spec §3.3, "not
-    found, not forbidden"). Inside the admin layout so the sidebar is the
-    way on. Handoff "Studio States v3". %>
-<% content_for :title, "Not found · CS Studio" %>
+<%# The CS Studio 404: a record that doesn't exist and one outside the
+    viewer's scope render this same page, word for word -- one sentence that
+    never confirms which ("not found, not forbidden"). Inside the admin
+    layout so the sidebar is the way on. A message on the canvas, centred
+    and with no card, as the 403 is. %>
+<% content_for :title, t(".title") %>
 
 <section class="admin-not-found mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
-  <p class="text-label text-meta">404</p>
-  <h1 class="text-h1 text-ink">Not found</h1>
-  <p class="text-ink">This doesn't exist, or you don't have access to it.</p>
+  <%= render Admin::Ui::IconChipComponent.new(icon: :circle_alert, family: :neutral) %>
+  <p class="text-label text-meta"><%= t(".code") %></p>
+  <h1 class="text-h1 text-ink"><%= t(".heading") %></h1>
+  <p class="text-ink"><%= t(".sentence") %></p>
   <%# A screen that knows a nearer way on says so (`@not_found_back`: the
       Media library for a `?selected=` that names nothing). %>
-  <% back = @not_found_back || { label: "Back to the dashboard", url: admin_root_path(**admin_url_options) } %>
+  <% back = @not_found_back || { label: t(".back"), url: admin_root_path(**admin_url_options) } %>
   <%= link_to back[:label], back[:url], class: Admin::Ui::ButtonComponent.classes(:secondary) %>
 </section>
