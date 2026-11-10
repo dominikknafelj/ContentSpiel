@@ -34,7 +34,7 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A section named by its heading, holding the caller's one trigger; with pending_lock the trigger stays disabled while any explicit-save form on the page holds unsaved changes, with the hint in words.",
+        accessibility: "A section named by its heading, or by its label when it has none, holding the caller's one trigger; with pending_lock the trigger stays disabled while any explicit-save form on the page holds unsaved changes, with the hint in words.",
         motion: :none,
         content_edges: %i[short long],
         widths: :from_container,
