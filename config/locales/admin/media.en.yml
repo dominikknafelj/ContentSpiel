@@ -14,6 +14,9 @@ en:
         rail_label: "Image details"
         image_tab: "Image"
         close: "Close panel"
+      # The not-found page's link back to the library, when a chosen image is
+      # gone (`Admin::MediaController#selected_asset`).
+      not_found_back: "Back to Media"
       # `Media::PickerComponent`, the Media screen's dialog that every image
       # field opens (outside `app/components/admin/`, so read with full keys),
       # and its grid view (`admin/media/picker`). `none` and `selected` are
