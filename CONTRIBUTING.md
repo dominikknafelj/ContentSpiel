@@ -30,13 +30,13 @@ about to change.
 
 ## Checking it
 
-Run `bin/ci` before you open a pull request. It runs what CI runs, one step
-after another (`config/ci.rb`): setup, RuboCop, the changelog guard, the gem,
-import map and Brakeman scans, the unit tests, the browser tests, the seeds
-and the theme build check. The changelog guard compares with `origin/main`, so
+Run `bin/ci` before you open a pull request. It runs what CI runs, and the seed,
+which CI does not, one step after another (`config/ci.rb`): setup, RuboCop,
+the changelog guard, the gem, import map and Brakeman scans, the unit tests,
+the browser tests, the seed and the theme build check. The changelog guard compares with `origin/main`, so
 fetch it first. The browser tests need a quiet machine; on a laptop cap them
-with `PARALLEL_WORKERS=6 bin/ci`. CI runs all of it again for every pull
-request.
+with `PARALLEL_WORKERS=6 bin/ci`. CI runs all of it but the seed again for
+every pull request.
 
 ## The pull request
 

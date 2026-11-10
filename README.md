@@ -39,7 +39,7 @@ block type in every layout and band.
 - Admin (CS Studio, behind the same sign-in): <http://localhost:3000/cs-studio> (`ContentSpiel::ADMIN_PATH`, configurable via `ADMIN_PATH`)
 
 Run the test suite with `bin/rails test`, the browser tests with
-`bin/rails test:system`, and everything CI runs with `bin/ci`.
+`bin/rails test:system`, and everything CI runs (and the seed) with `bin/ci`.
 
 ## Learning the code
 

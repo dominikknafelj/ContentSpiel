@@ -1,5 +1,5 @@
 # Run using bin/ci: what CI runs for a pull request (.github/workflows/ci.yml),
-# one step after another on this machine. The browser tests want a quiet
+# and the seed, which CI does not run, one step after another on this machine. The browser tests want a quiet
 # machine and, on a laptop, a cap on their workers (`PARALLEL_WORKERS=6
 # bin/ci`, docs/reference/writing-tests.md). The changelog guard compares
 # with origin/main, so fetch it first.
