@@ -194,9 +194,13 @@ en:
           delivery: "Delivery"
           mail_to: "Mail to %{recipients}"
           removed_destination: "A destination that's been removed"
-          sent: "Sent"
-          waiting: "Waiting"
-          failed: "Failed"
+          # A delivery's state, in a state chip: Sent (ok), Waiting and
+          # Sending (off), Not delivered (warn).
+          states:
+            sent: "Sent"
+            waiting: "Waiting"
+            sending: "Sending"
+            not_delivered: "Not delivered"
           # Why a delivery failed, by its stored key (`Forms::DeliveryJob`,
           # `Forms::Destinations::Mail`): never the other side's line, a
           # secret or an answer. A mail's own keys are said in Settings →

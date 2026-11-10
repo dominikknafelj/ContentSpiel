@@ -2,7 +2,7 @@
   <h1 class="text-h1 text-ink"><%= form.name %></h1>
   <%= render Admin::FormsScreen::TabsComponent.new(form: form, current: :submissions, url_options: url_options) %>
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <p class="text-meta"><%= keeping_line %></p>
+    <p class="text-small text-meta"><%= keeping_line %></p>
     <% if manage? && total.positive? %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_all"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
     <% end %>
@@ -13,45 +13,49 @@
   <% if submissions.empty? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".#{empty_key}.title"), description: t(".#{empty_key}.description")) %>
   <% else %>
-    <table class="admin-form-submissions-table admin-card-table w-full border-collapse text-sm">
-      <thead>
-        <tr class="border-b border-line-strong text-left text-label text-meta">
-          <th class="py-2 pr-4"><%= t(".columns.received") %></th>
-          <th class="py-2 pr-4"><%= t(".columns.summary") %></th>
-          <th class="py-2 pr-4"><%= t(".columns.language") %></th>
-          <th class="py-2 pr-4"><%= t(".columns.page") %></th>
-          <th class="py-2"><span class="sr-only"><%= t(".columns.state") %></span></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% submissions.each do |submission| %>
-          <tr id="<%= helpers.dom_id(submission) %>" class="relative border-b border-line align-middle last:border-b-0 hover:bg-paper">
-            <td class="py-2.5 pr-4 whitespace-nowrap">
-              <%= link_to submission_path(submission), class: ROW_LINK_CLASS, data: { turbo_frame: "content" } do %><%= render Admin::Ui::TimeAgoComponent.new(time: submission.created_at) %><% end %>
-            </td>
-            <td class="max-w-0 w-full py-2.5 pr-4">
-              <% if !readable?(submission) %>
-                <span class="text-meta"><%= t(".unreadable") %></span>
-              <% elsif (text = summary(submission)) %>
-                <span class="block truncate text-ink"><%= text %></span>
-              <% else %>
-                <span class="text-meta">—</span>
-              <% end %>
-            </td>
-            <td class="py-2.5 pr-4"><%= render Admin::Ui::BadgeComponent.new(label: language(submission)) %></td>
-            <td class="py-2.5 pr-4 whitespace-nowrap">
-              <% words, title = page_text(submission) %>
-              <span class="<%= title ? "text-dim" : "text-meta" %>"><%= words %></span>
-            </td>
-            <td class="py-2.5 text-right whitespace-nowrap">
-              <% if undelivered?(submission) %>
-                <%= render Admin::Ui::BadgeComponent.new(label: t(".not_delivered"), tone: :warn) %>
-              <% end %>
-            </td>
+    <%# Rounded as the card is, so the sticky Received column's ground keeps the card's corners. %>
+    <div class="admin-table-scroll--x rounded-card">
+      <table class="admin-form-submissions-table admin-card-table w-full border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-line-strong text-left text-label text-meta">
+            <th class="py-2 pr-4"><%= t(".columns.received") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.summary") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.language") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.page") %></th>
+            <th class="py-2"><span class="sr-only"><%= t(".columns.state") %></span></th>
           </tr>
-        <% end %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% submissions.each do |submission| %>
+            <tr id="<%= helpers.dom_id(submission) %>" class="relative border-b border-line align-middle last:border-b-0">
+              <td class="z-(--cs-z-raised) py-2.5 pr-4 whitespace-nowrap">
+                <%= link_to submission_path(submission), class: TIME_LINK_CLASS, data: { turbo_frame: "content" } do %><%= render Admin::Ui::TimeAgoComponent.new(time: submission.created_at) %><% end %>
+              </td>
+              <td class="max-w-0 w-full py-2.5 pr-4">
+                <% if !readable?(submission) %>
+                  <span class="text-meta"><%= t(".unreadable") %></span>
+                <% elsif (text = summary(submission)) %>
+                  <span class="block truncate text-ink"><%= text %></span>
+                <% else %>
+                  <span class="text-meta">—</span>
+                <% end %>
+              </td>
+              <td class="py-2.5 pr-4"><%= render Admin::Ui::BadgeComponent.new(label: language(submission)) %></td>
+              <td class="py-2.5 pr-4 whitespace-nowrap">
+                <% words, title = page_text(submission) %>
+                <span class="<%= title ? "text-dim" : "text-meta" %>"><%= words %></span>
+              </td>
+              <td class="py-2.5 text-right whitespace-nowrap">
+                <%= link_to "", submission_path(submission), tabindex: -1, aria: { hidden: true }, class: "absolute inset-0", data: { turbo_frame: "content" } %>
+                <% if undelivered?(submission) %>
+                  <%= render Admin::Ui::StateChipComponent.new(tone: :warn, label: t(".not_delivered")) %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
   <% end %>
 </div>
 <%= render Admin::Ui::PaginationComponent.new(pagination: pagination, url: page_url) %>

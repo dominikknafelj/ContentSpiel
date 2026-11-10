@@ -5,15 +5,14 @@
     <p class="text-meta"><%= meta %></p>
   </div>
 
-  <section class="<%= CARD_CLASS %>" aria-labelledby="submission-answers">
-    <div class="<%= CARD_HEAD_CLASS %>"><h2 id="submission-answers" class="text-h2 text-ink"><%= t(".answers") %></h2></div>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-answers", heading: t(".answers"), icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
     <div class="p-4">
       <% if readable? %>
         <dl class="flex flex-col gap-3.5">
           <% answers.each do |row| %>
             <div class="flex flex-col gap-1">
               <dt class="text-label text-meta"><%= label(row) %></dt>
-              <dd class="whitespace-pre-wrap break-words text-[15px] text-ink">
+              <dd class="whitespace-pre-wrap break-words text-body text-ink">
                 <% if text(row).blank? %><span class="text-meta"><%= t(".not_answered") %></span><% elsif address?(row) %><%= mail_to text(row), text(row), class: "text-accent hover:text-accent-hover hover:underline" %><% else %><%= text(row) %><% end %>
               </dd>
             </div>
@@ -23,25 +22,19 @@
         <p class="text-dim"><%= t(".unreadable") %></p>
       <% end %>
     </div>
-  </section>
+  <% end %>
 
-  <section class="<%= CARD_CLASS %>" aria-labelledby="submission-delivery">
-    <div class="<%= CARD_HEAD_CLASS %>"><h2 id="submission-delivery" class="text-h2 text-ink"><%= t(".delivery") %></h2></div>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "submission-delivery", heading: t(".delivery"), icon: Admin::FormsScreen::BuilderComponent::CARD_ICON, family: Admin::FormsScreen::BuilderComponent::CARD_FAMILY) do %>
     <ul class="divide-y divide-line px-4">
       <% deliveries.each do |delivery| %>
-        <li class="flex flex-col gap-1.5 py-2.5" data-delivery-state="<%= delivery.state %>">
+        <li class="flex flex-col gap-1.5 py-2.5" data-delivery-state="<%= delivery.state %>" data-delivery-id="<%= delivery.id %>">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span class="min-w-0 break-words text-ink"><%= what(delivery) %></span>
-            <span class="flex items-center gap-2">
-              <span class="<%= CHIP_CLASS %> <%= chip_border(delivery) %>">
-                <% if delivery.sent? %><span aria-hidden="true" class="size-2 rounded-full bg-ok"></span><% elsif delivery.failed? %><span aria-hidden="true" class="size-2 rounded-full bg-warn"></span><% end %><%= state_word(delivery) %>
-              </span>
-              <% if delivery.sent? && sent_at(delivery) %><span class="text-sm text-meta"><%= sent_at(delivery) %></span><% end %>
-            </span>
+            <%= render state_chip(delivery) %>
           </div>
           <% if delivery.failed? %>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-[13px] text-warn-ink" data-failure><%= reason(delivery) %></p>
+              <p class="text-small text-warn-ink" data-failure><%= reason(delivery) %></p>
               <% if resendable?(delivery) %>
                 <%= form_with url: resend_path(delivery), method: :post, data: { turbo_frame: "_top" } do %>
                   <%= render Admin::Ui::ButtonComponent.new(label: t(".send_again"), variant: :secondary, size: :small, type: "submit") %>
@@ -49,19 +42,19 @@
               <% end %>
             </div>
             <% if mail_settings_hint?(delivery) %>
-              <p class="text-[13px]"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium text-warn-ink underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
+              <p class="text-small"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium text-warn-ink underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
             <% end %>
           <% end %>
         </li>
       <% end %>
     </ul>
-  </section>
+  <% end %>
 
   <% if manage? %>
-    <section class="admin-delete-zone flex flex-wrap items-center justify-between gap-3 rounded-cs border border-line px-3.5 py-3" aria-labelledby="submission-delete-title">
+    <section class="admin-delete-zone mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4" aria-labelledby="submission-delete-title">
       <div class="flex min-w-0 flex-col gap-0.5">
-        <h2 id="submission-delete-title" class="text-base font-medium text-ink"><%= t(".delete_title") %></h2>
-        <p class="text-sm text-dim"><%= t(".delete_body") %></p>
+        <h2 id="submission-delete-title" class="text-h3 text-ink"><%= t(".delete_title") %></h2>
+        <p class="text-small text-dim"><%= t(".delete_body") %></p>
       </div>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
     </section>

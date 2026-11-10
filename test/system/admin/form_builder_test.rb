@@ -5,7 +5,9 @@ require "application_system_test_case"
 # explicitly through the save bar; a choice field's choices added and
 # removed; and leaving with unsaved changes asks, as on every save-bar
 # screen. Nothing is written until Save. On the forms list, a row's ⋯ menu
-# opens whole over the page, lifted out of the table's sideways scroll.
+# opens whole over the page, lifted out of the table's sideways scroll. On
+# the Submissions tab a row opens from any cell, its sticky first cell
+# included, and the whole row takes the paper under the pointer.
 class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -131,5 +133,39 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     assert boxes["hit"], "the item is the topmost thing at its own centre: nothing clips or covers it"
     assert_equal 0, boxes["scrollTop"]
     assert boxes["scrollHeight"] <= boxes["clientHeight"], "the open menu does not lengthen the table box's scroll: #{boxes.inspect}"
+  end
+
+  test "a submission's row opens from any cell, its time link takes the pointer in the sticky first cell, and the whole row is on paper under the pointer" do
+    form = forms(:contact)
+    record = Forms::Submission.create!(form: form, locale: "en", answers: [
+      { "key" => "f_name0001", "type" => "short_text", "label" => "Your name", "value" => "Ada Lovelace", "display" => "Ada Lovelace" }
+    ])
+    visit_screen admin_form_submissions_path(form)
+    row = "tr##{ActionView::RecordIdentifier.dom_id(record)}"
+    assert_selector "#{row} td:nth-child(2)", text: "Ada Lovelace"
+
+    find("#{row} td:nth-child(2)").hover
+    looks = page.evaluate_script(<<~JS)
+      (() => {
+        const row = document.querySelector("#{row}")
+        const centre = (box) => { const r = box.getBoundingClientRect(); return [ (r.left + r.right) / 2, (r.top + r.bottom) / 2 ] }
+        const time = row.querySelector("td:first-child a")
+        const summary = row.querySelector("td:nth-child(2)")
+        return { grounds: [ ...row.cells ].map((cell) => getComputedStyle(cell).backgroundColor),
+          timeHit: document.elementFromPoint(...centre(time)) === time || time.contains(document.elementFromPoint(...centre(time))),
+          summaryHit: document.elementFromPoint(...centre(summary)).matches("a[aria-hidden=true][tabindex='-1']") }
+      })()
+    JS
+    assert_equal 1, looks["grounds"].uniq.size, "every cell of the row, the sticky first one too, takes one ground: #{looks.inspect}"
+    assert_not_equal "rgba(0, 0, 0, 0)", looks["grounds"].first, "the row's ground is the paper's, not none: #{looks.inspect}"
+    assert looks["timeHit"], "the first cell's own link is over the row's stretched link: #{looks.inspect}"
+    assert looks["summaryHit"], "the summary is under the row's stretched link: #{looks.inspect}"
+
+    # A press where the summary is, at the pointer's place: whatever is
+    # topmost there takes it, as it would a person's.
+    x, y = page.evaluate_script(%(((r) => [ (r.left + r.right) / 2, (r.top + r.bottom) / 2 ])(document.querySelector("#{row} td:nth-child(2)").getBoundingClientRect())))
+    page.driver.browser.mouse.click(x: x, y: y)
+    assert_current_path admin_form_submission_path(form, record)
+    assert_selector "section.admin-settings-card[aria-labelledby=submission-answers] dd", text: "Ada Lovelace"
   end
 end

@@ -34,8 +34,8 @@ module Admin
     # `.admin-field` wrapper, whose error slot is its direct child.
     class BuilderComponent < Admin::AdminComponent
       FORM_ID = "form-builder".freeze
-      # Every card of a form (the builder's, Where submissions go and Placed
-      # on) wears the Forms module's chip, the sidebar's icon and family.
+      # Every card of a form (the builder's, Where submissions go, Placed on
+      # and a submission's) wears the Forms module's chip, the sidebar's icon and family.
       CARD_ICON = :clipboard_list
       CARD_FAMILY = :form
 

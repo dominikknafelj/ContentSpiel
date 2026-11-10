@@ -777,8 +777,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/translation_screen/matrix_component.*
     app/components/admin/translation_screen/summary_card_component.*
     app/views/admin/translations/*
-    app/components/admin/forms_screen/{list,new_form_dialog,builder,field_row,choice_row,destinations,placements,trash_zone,tabs}_component.*
+    app/components/admin/forms_screen/*
     app/views/admin/forms/*
+    app/views/admin/form_submissions/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -1869,7 +1870,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/table_controls_component.html.erb
     app/components/admin/forms_screen/list_component.rb
     app/components/admin/forms_screen/new_form_dialog_component.html.erb
-    app/components/admin/forms_screen/submission_component.html.erb
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
     app/components/admin/notes_screen/thread_component.rb

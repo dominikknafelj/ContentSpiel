@@ -2,12 +2,21 @@ module Admin
   module FormsScreen
     # One submission: "← All submissions",
     # the heading and when, in which language and from which page it came,
-    # then two cards in the form column: ANSWERS, a definition list of every
-    # answer under its label as it was sent (`Forms::Answers`' stored shape:
-    # the default language's words at the send, so a later edit of the form
-    # changes no old one), and DELIVERY, one row per destination with its
-    # state; then, for `forms.manage`, the delete zone and its confirmation.
-    # A placeholder look until the Design System's pass.
+    # then two cards in the form column, each the shared settings frame with
+    # the Forms chip (`Admin::Ui::SettingsCardComponent`, as the builder's
+    # cards are): ANSWERS, a definition list of every answer under its label
+    # as it was sent (`Forms::Answers`' stored shape: the default language's
+    # words at the send, so a later edit of the form changes no old one), and
+    # DELIVERY, one row per destination with its state; then, for
+    # `forms.manage`, the delete zone (a line rule, then its words and
+    # button: no box) and its confirmation.
+    #
+    # A DELIVERY'S STATE is a system's, so it is `Admin::Ui::StateChipComponent`
+    # in its word, never red: Sent (ok) with the time it went, Waiting (off)
+    # until the job has tried it, Sending (off) once the job has tried and
+    # not finished (`attempts` counted, still `waiting`: in flight or
+    # between retries), Not delivered (warn) when it failed. Send again sets
+    # the attempts back to none, so it reads Waiting again.
     #
     # AN ANSWER IS TEXT. Every label and answer is drawn through ERB's
     # escaping (nothing here is `raw` or `html_safe`), in
@@ -24,24 +33,21 @@ module Admin
     # could quote anything; then Send again (`Forms::Resend`), for a holder
     # of `form_submissions.view`, unless the destination is gone
     # (`no_destination`, `unknown_destination`), where it would only fail
-    # again. Failed is warn, not danger: the submission
+    # again. Not delivered is warn, not danger: the submission
     # is kept and nothing typed is lost.
     #
     # "Mail to …" lists the destination's recipients as they are NOW: a
     # delivery stores no address (an open question, `docs/roadmap.md`).
     class SubmissionComponent < Admin::AdminComponent
-      CARD_CLASS = "admin-settings-card rounded-card bg-surface shadow-1".freeze
-      CARD_HEAD_CLASS = "border-b border-line px-4 py-3.5".freeze
       DIALOG_ID = "delete-submission-dialog".freeze
       # The keys `Forms::DeliveryJob` and the built-in destination store
       # beside a mail's own (`MailFailure::KEYS`); anything else (a gem's
       # destination's own key) reads as `unknown`.
       REASONS = %w[not_ready gave_up no_destination unknown_destination error].freeze
       # Send again would fail the same way at once for a delivery whose
-      # destination was removed or whose type is no longer registered, so
+      # destination was removed or whose type is not registered, so
       # it is not offered for those two.
       NOT_RESENDABLE = %w[no_destination unknown_destination].freeze
-      CHIP_CLASS = "inline-flex items-center gap-1.5 rounded-cs border px-2 py-0.5 text-label text-ink".freeze
 
       def initialize(submission:, url_options: {})
         @submission = submission
@@ -110,11 +116,24 @@ module Admin
         destination.destination_type&.label || delivery.kind
       end
 
-      def chip_border(delivery) = delivery.failed? ? "border-warn" : "border-line-strong"
+      def state_chip(delivery)
+        if delivery.sent? then Admin::Ui::StateChipComponent.new(tone: :ok, label: t(".states.sent"), detail: sent_at(delivery))
+        elsif delivery.failed? then Admin::Ui::StateChipComponent.new(tone: :warn, label: t(".states.not_delivered"))
+        elsif delivery.attempts.positive? then Admin::Ui::StateChipComponent.new(tone: :off, label: t(".states.sending"))
+        else Admin::Ui::StateChipComponent.new(tone: :off, label: t(".states.waiting"))
+        end
+      end
 
-      def state_word(delivery) = t(".#{delivery.state}")
+      # The clock alone on the day the submission came in, which the meta
+      # line above already says; the day with it when it went later (a Send
+      # again days after), so a time never reads as the wrong day's.
+      def sent_at(delivery)
+        at = delivery.sent_at
+        return nil unless at
 
-      def sent_at(delivery) = delivery.sent_at && I18n.l(delivery.sent_at, format: :"admin.short_datetime")
+        same_day = at.in_time_zone.to_date == submission.created_at.in_time_zone.to_date
+        I18n.l(at, format: same_day ? :"admin.time" : :"admin.short_datetime")
+      end
 
       def failure_key(delivery) = delivery.failure.is_a?(Hash) ? delivery.failure["key"].to_s : ""
 

@@ -780,6 +780,19 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A submission's delivery says Sent and Not delivered in a state chip, its
+  # word on the role's tint, held at the figures they measure: ok 7.0 / 8.0
+  # and warn 6.5 / 8.3, so a change of either pair cannot quietly take them
+  # back toward the chip's 4.5 floor.
+  test "a delivery's Sent and Not delivered read on their tints at their measured figures, in both schemes" do
+    figures = { ok: { light: 7.0, dark: 8.0 }, warn: { light: 6.5, dark: 8.3 } }
+    each_scheme do |scheme, colour|
+      figures.each do |role, floors|
+        assert_ratio(floor(floors.fetch(scheme)), colour.("--cs-#{role}-ink"), colour.("--cs-#{role}-tint"), "a delivery's #{role} chip's word (#{scheme})")
+      end
+    end
+  end
+
   # The changed-field mark: a well's 2px accent edge on the well's own fill,
   # and the accent dot after a label on the card. On the card the edge is
   # held at the figure it measures, 6.9 / 7.1:1, so a change of the accent

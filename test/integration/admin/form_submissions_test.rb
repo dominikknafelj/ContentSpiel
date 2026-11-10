@@ -158,8 +158,8 @@ class Admin::FormSubmissionsTest < ActionDispatch::IntegrationTest
     assert_select "dl dt", text: "Your name"
     assert_select "dl dd", text: ANSWER
     assert_select "dl dd a[href='mailto:#{ADDRESS}']", text: ADDRESS
-    assert_select "[data-delivery-state='sent']", text: /#{t("submission.sent")}/i
-    assert_select "[data-delivery-state='waiting']", text: /#{t("submission.waiting")}/i
+    assert_select "[data-delivery-state='sent']", text: /#{t("submission.states.sent")}/i
+    assert_select "[data-delivery-state='waiting']", text: /#{t("submission.states.waiting")}/i
     assert_select "[data-delivery-state='failed'] [data-failure]", text: t("submission.reasons.not_ready")
     assert_select "[data-delivery-state]", text: /#{Regexp.escape(t("submission.mail_to", recipients: "office@example.com"))}/, count: 3
     assert_select "button", text: t("submission.delete_button"), count: 0
