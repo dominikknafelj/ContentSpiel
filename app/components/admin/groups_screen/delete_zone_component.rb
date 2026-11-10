@@ -38,22 +38,41 @@ module Admin
       def shown_tokens = tokens.first(MAX_TOKENS_SHOWN)
       def hidden_tokens = token_count - shown_tokens.size
 
-      # Two sentences, each whole: what happens to the members, then to the
-      # tokens.
-      def effect = "#{t(".members", count: member_count)} #{t(".tokens", count: token_count)}"
+      # What deleting costs, whole in each shape. A key is pluralised on one
+      # count, so the words with both counts are nested: the outer level is
+      # the members' plural category, the inner one the tokens', which `t`
+      # pluralises.
+      def effect
+        t(".effect.#{members_category("effect")}", count: token_count, members: member_count)
+      end
 
-      # One whole sentence per shape. A key is pluralised on one count, so
-      # for the sentence with both this method picks the members' category
-      # by hand (`one` for 1, `other` otherwise) and I18n pluralises on the
-      # tokens'. HAZARD: that is right only under Rails' own one/other rule
-      # (docs/reference/i18n.md); once CLDR plural rules are added (the
-      # rails-i18n gem), a language with `few` or `many` is handed the wrong
-      # sentence here, and this choice must go through the plural rules.
+      # One whole sentence per shape, nested as `effect` is where it names both.
       def dialog_body
         return t(".dialog_body.no_members", count: token_count) if member_count.zero?
         return t(".dialog_body.members_only", count: member_count) if token_count.zero?
 
-        t(".dialog_body.members_and_tokens.#{member_count == 1 ? 'one' : 'other'}", count: token_count, members: member_count)
+        t(".dialog_body.members_and_tokens.#{members_category("dialog_body.members_and_tokens")}", count: token_count, members: member_count)
+      end
+
+      # The members' category of the nested key at `path` is the I18n
+      # backend's own choice, made by asking it to pluralise the outer level
+      # on the members' count and reading back which branch it answered:
+      # whatever rule the backend applies to every other `count` (Rails'
+      # one/other, or a locale's `i18n.plural.rule` under
+      # `I18n::Backend::Pluralization`, with its `few` and `many`) applies
+      # here too, and a language's file decides which branches it has.
+      #
+      # A language without the key raises in the test environment (the
+      # exception handler of `raise_on_missing_translations`); elsewhere the
+      # lookup answers a "translation missing" String, and the category is
+      # `other`, so the sentence's own lookup draws the usual missing span
+      # rather than the screen answering 500.
+      def members_category(path)
+        key = "admin.components.#{self.class.translation_scope}.#{path}"
+        branches = I18n.t(key)
+        return :other unless branches.is_a?(Hash)
+
+        branches.key(I18n.t(key, count: member_count))
       end
     end
   end

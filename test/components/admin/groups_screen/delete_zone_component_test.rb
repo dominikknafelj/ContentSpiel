@@ -42,6 +42,49 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
 
     zone(group, members: 0)
     assert_selector "dialog p", exact_text: "It has no members. Users themselves are not deleted.", visible: :all
+    assert_selector "section[data-zone=delete] p", exact_text: "It has no members. It has no AI tokens."
+  end
+
+  # A language with a `few` category (CLDR's, under `I18n::Backend::Pluralization`)
+  # is handed its `few` sentence for the members, not `one` or `other` picked by
+  # comparing with 1. A throwaway backend loads the app's locale files, takes a
+  # plural rule with `few` for 3 and a `few` branch of the sentence, and is put
+  # back afterwards. The zone's `effect` has no `few` branch, so it takes
+  # `other`, as Pluralization falls back.
+  test "the members' sentence follows the locale's plural rule, a few category included" do
+    backend = Class.new(I18n::Backend::Simple) { include I18n::Backend::Pluralization }.new
+    backend.store_translations(:en, i18n: { plural: { rule: ->(count) { count == 1 ? :one : (2..4).cover?(count) ? :few : :other } } })
+    backend.store_translations(:en, admin: { components: { groups_screen: { delete_zone: { dialog_body: { members_and_tokens: { few: {
+      one: "Its %{members} members (few) lose these permissions, and its 1 AI token is revoked.",
+      other: "Its %{members} members (few) lose these permissions, and its %{count} AI tokens are revoked."
+    } } } } } } })
+    original = I18n.backend
+    I18n.backend = backend
+    group = AccessControl::Group.create!(name: "Bots")
+
+    zone(group, members: 3, tokens: [ token("Sync", users(:reader)) ])
+    assert_selector "section[data-zone=delete] p", exact_text: "3 members lose its permissions. 1 AI token is revoked.", count: 1
+    assert_selector "dialog p", exact_text: "Its 3 members (few) lose these permissions, and its 1 AI token is revoked.", visible: :all
+
+    zone(group, members: 5, tokens: [ token("Deploy", users(:reader)) ])
+    assert_selector "dialog p", text: "Its 5 members lose these permissions, and its 1 AI token is revoked.", visible: :all
+  ensure
+    I18n.backend = original if original
+  end
+
+  # A language without the nested key: the test environment raises on the
+  # missing key, and anywhere else (I18n's own handler, which answers a
+  # "translation missing" String) the category is `other`, so the screen draws
+  # the missing span instead of answering 500.
+  test "a missing nested key raises in tests and is the other category elsewhere" do
+    component = Admin::GroupsScreen::DeleteZoneComponent.new(group: AccessControl::Group.create!(name: "Bots"), member_count: 3, tokens: [])
+    assert_raises(I18n::MissingTranslationData) { component.send(:members_category, "no_such_key") }
+
+    handler = I18n.exception_handler
+    I18n.exception_handler = I18n::ExceptionHandler.new
+    assert_equal :other, component.send(:members_category, "no_such_key")
+  ensure
+    I18n.exception_handler = handler if handler
   end
 
   test "a custom group: the effect in words, a danger-text trigger, and the dialog with the solid danger confirm" do

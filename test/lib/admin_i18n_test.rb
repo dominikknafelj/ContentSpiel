@@ -210,6 +210,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/groups/_form.html.erb
     app/views/admin/groups/edit.html.erb
     app/views/admin/groups/new.html.erb
+    app/views/admin/shared/_stale_banner.html.erb
+    app/controllers/admin/users_controller.rb
+    app/controllers/admin/groups_controller.rb
     app/javascript/controllers/admin/groups/permission_matrix_controller.js
     app/javascript/controllers/admin/groups/branch_picker_controller.js
     app/controllers/admin/invites_controller.rb
@@ -233,6 +236,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb
     app/components/admin/editor_screen/new_post_dialog_component.rb
+    app/components/admin/editor_screen/changed_elsewhere_component.rb
+    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/new_post_dialog_component.html.erb
     app/components/admin/editor_screen/new_post_form_component.rb
     app/components/admin/editor_screen/new_post_form_component.html.erb
@@ -781,6 +786,47 @@ class AdminI18nTest < ActiveSupport::TestCase
       pagination time_ago empty_state error_summary chip_input menu save_status]
     sixteen.each do |name|
       assert CONVERTED.any? { |path| path == "app/components/admin/ui/#{name}_component.rb" }, "#{name}_component.rb is not in CONVERTED"
+    end
+  end
+
+  # `Array#to_sentence` joins with the locale's `support.array` and falls back
+  # to English's, which Active Support ships, so a language without its own
+  # reads "A, B, and C" in English. An admin language is one a file under
+  # `config/locales/admin/` (a subfolder included, as Rails' own glob loads it)
+  # is written in; its words are looked for in the app's own YAML locale files
+  # (never Active Support's), in any file of that language. A `.rb` locale
+  # file is not read on either side: the app has none.
+  SUPPORT_ARRAY_KEYS = %w[words_connector two_words_connector last_word_connector].freeze
+
+  def self.admin_languages(root = Rails.root)
+    Dir[Pathname(root).join("config/locales/admin/**/*.yml")].map { |path| File.basename(path, ".yml").split(".", 2).last }.uniq.sort
+  end
+
+  def self.app_locale_tree(language, root = Rails.root)
+    Dir[Pathname(root).join("config/locales/**/*.yml")]
+      .select { |path| File.basename(path, ".yml").split(".").last == language }
+      .map { |path| YAML.load_file(path)[language] || {} }
+      .reduce({}) { |tree, file| tree.deep_merge(file) }
+  end
+
+  test "an admin language is found in a subfolder too, and only the app's YAML is read" do
+    assert_empty Dir[Rails.root.join("config/locales/**/*.rb")], "a .rb locale file: teach admin_languages and app_locale_tree to read it"
+    Dir.mktmpdir do |root|
+      folder = File.join(root, "config/locales/admin/zz")
+      FileUtils.mkdir_p(folder)
+      File.write(File.join(folder, "groups.zz.yml"), { "zz" => { "admin" => {} } }.to_yaml)
+      assert_equal [ "zz" ], self.class.admin_languages(root)
+      assert_nil self.class.app_locale_tree("zz", root).dig("support", "array")
+    end
+  end
+
+  test "every admin language defines the words a list is joined with" do
+    languages = self.class.admin_languages
+    assert_includes languages, "en"
+    languages.each do |language|
+      array = self.class.app_locale_tree(language).dig("support", "array") || {}
+      missing = SUPPORT_ARRAY_KEYS.reject { |key| array[key].is_a?(String) }
+      assert_empty missing, "#{language}: CS Studio is written in this language, so a joined list needs its own support.array (docs/reference/i18n.md)"
     end
   end
 
