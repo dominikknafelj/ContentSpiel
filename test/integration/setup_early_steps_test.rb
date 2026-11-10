@@ -86,7 +86,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
         get setup_step_path(step)
 
         assert_response :success
-        assert_select "main p#insecure-notice[role=alert]", text: notice, count: 1
+        assert_select "main div#insecure-notice[role=alert]", text: notice, count: 1
       end
 
       https!

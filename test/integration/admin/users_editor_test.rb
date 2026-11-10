@@ -1,10 +1,10 @@
 require "test_helper"
 
-# The Users list and the user editor (round 3 Task 12): the list's columns and
+# The Users list and the user editor: the list's columns and
 # its one last-sign-in query, the group cards, the owner endpoint, the delete
 # zone, the two read-only states (a forged write against either is still
-# refused, with one `access.denied`) and Review Focus 3 -- the form submitted
-# exactly as rendered changes nothing.
+# refused, with one `access.denied`), the stale save's banner, and the form
+# submitted exactly as rendered changing nothing.
 class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -76,7 +76,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "dialog[id^=delete-user]", count: 0
   end
 
-  # Final fix wave (Task 12): end to end. Every other test here writes the
+  # End to end. Every other test here writes the
   # event by hand; this one signs in through the real form and reads what the
   # list reads.
   test "signing in through the sign-in form is what the list's last sign-in shows" do
@@ -271,6 +271,26 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "details.admin-set-password", count: 0
   end
 
+  # The 409 banner is the shared warn notice: announced at once, and its Reload
+  # a way out the leave guard lets through (`data-save-bar-cancel`) into the
+  # content frame.
+  test "a stale save's banner is the warn notice, with Reload as its way out" do
+    user = users(:author)
+    get "/cs-studio/users/#{user.id}/edit"
+    stale = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+    travel 1.minute
+    user.update!(name: "Renamed elsewhere")
+
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name", email_address: user.email_address, group_ids: [ "" ] }, base_updated_at: stale }
+
+    assert_response :conflict
+    assert_select "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", count: 1 do |banner|
+      assert_includes banner.text.squish, "This user was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
+      assert_select "a[href='/cs-studio/users/#{user.id}/edit'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
+    end
+    assert_select "[role=alert].rounded-cs", count: 0
+  end
+
   # --- The owner endpoint ---------------------------------------------------------
 
   test "make owner and remove owner rights: 303 back to the editor with a toast, recorded as user.owner_changed" do
@@ -389,7 +409,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert Audit::Event.exists?(action: "token.revoked")
   end
 
-  # --- The read-only states (B28) --------------------------------------------------
+  # --- The read-only states --------------------------------------------------------
 
   test "a non-owner viewing an owner sees a read-only form with the reason, no footer and no zones; a forged write is refused" do
     sign_in_manager
@@ -439,7 +459,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_difference -> { denied_events_for(users(:two)).count }, 1 do
       delete "/cs-studio/users/#{users(:two).id}"
     end
-    # A forged owner PATCH too (final fix wave, Task 12): refused, and nobody
+    # A forged owner PATCH too: refused, and nobody
     # becomes an owner. Which rule answers (outranked, or owner-only) is the
     # service's; here it must be a refusal that writes nothing.
     assert_difference -> { denied_events_for(users(:two)).count }, 1 do
@@ -459,7 +479,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "#user-form .admin-save-bar"
   end
 
-  # --- Review Focus 3: the form submitted exactly as rendered changes nothing -------
+  # --- The form submitted exactly as rendered changes nothing ----------------------
 
   test "as a non-owner, the edit form submitted as rendered changes nothing: groups, password, sessions, audit" do
     sign_in_manager
@@ -517,7 +537,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal 0, target.sessions.count
   end
 
-  # --- Fix round 1 ---------------------------------------------------------------
+  # --- The owner PATCH, a refusal's password fields, and where a save lands ---------
 
   test "a no-op owner PATCH by a non-owner is not a change, so the service has nothing to refuse" do
     sign_in_manager

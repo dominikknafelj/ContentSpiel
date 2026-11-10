@@ -22,7 +22,7 @@
           <p class="<%= INDENT %> mt-1.5 text-sm font-medium text-warn-ink" data-when-unchecked data-forms-warning="unkeep" <%= "hidden" if draft.keep_submissions %>><%= t(".unkeep") %></p>
         <% end %>
       <% else %>
-        <div class="<%= WARN_CLASS %>" data-forms-warning="keys"><p><%= t(".no_keys") %></p></div>
+        <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, data: { forms_warning: "keys" }) do %><p><%= t(".no_keys") %></p><% end %>
       <% end %>
     </div>
 
@@ -36,12 +36,12 @@
         <div class="<%= INDENT %> mt-2 flex flex-col gap-3" data-when-checked <%= "hidden" unless current.enabled %>>
           <% if mail?(type) %>
             <% if mail_warning? %>
-              <div class="<%= WARN_CLASS %>" data-forms-warning="mail">
+              <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, data: { forms_warning: "mail" }) do %>
                 <p><%= t(".mail_not_ready") %><span data-unless-kept <%= "hidden" if keeping? %>> <%= t(".wait_unkept") %></span></p>
                 <% if settings_link? %>
                   <p class="mt-1"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
                 <% end %>
-              </div>
+              <% end %>
             <% end %>
             <div class="admin-field" data-field-name="recipients">
               <%= label_tag RECIPIENTS_ID, t(".recipients"), class: "#{setup_label_class} mb-1" %>
@@ -73,7 +73,7 @@
       <%# A destination of a type no longer registered (a gem taken out): its stored kind, why it does nothing, and a box that removes it at the Save (`Draft#dormant`). %>
       <div id="form-destination-dormant-<%= dormant.id %>" data-forms-section="dormant">
         <p class="text-sm font-semibold text-ink"><%= dormant.kind %></p>
-        <div class="<%= WARN_CLASS %> mt-2" data-forms-warning="dormant"><p><%= t(".dormant") %></p></div>
+        <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "mt-2", data: { forms_warning: "dormant" }) do %><p><%= t(".dormant") %></p><% end %>
         <div class="mt-2">
           <%= render Admin::Ui::CheckboxComponent.new(name: "form[remove_destinations][]", value: dormant.id, checked: dormant.removed,
                 id: "form-destination-dormant-#{dormant.id}-remove", label: t(".remove_dormant")) %>

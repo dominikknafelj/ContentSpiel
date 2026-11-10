@@ -20,10 +20,11 @@ module Admin
     # production nobody is told, since a development server is plain HTTP on
     # purpose.
     #
-    # A warn alert, never danger (docs/reference/design-system.md: the hold
-    # strip's notices): nothing has failed, something is unsafe. `role=alert`
-    # because it is not read out otherwise and the next thing a person does
-    # here is type a password.
+    # The warn notice (`Admin::Ui::NoticeComponent`), compact, never danger
+    # (docs/reference/design-system.md: the hold strip's notices): nothing has
+    # failed, something is unsafe. Its role is the warn tone's alert, because
+    # it is not read out otherwise and the next thing a person does here is
+    # type a password.
     class InsecureNoticeComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -43,10 +44,8 @@ module Admin
         controller: nil
       )
 
-      BASE_CLASS = "rounded-card border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
-
       # `class:` places the notice in its host (a margin) and is added to the
-      # component's own classes, never in place of them.
+      # notice's own classes, never in place of them.
       def initialize(request:, production: Rails.env.production?, **html)
         @request = request
         @production = production
@@ -54,10 +53,6 @@ module Admin
       end
 
       def render? = @production && !@request.ssl?
-
-      private
-
-      def attributes = @html.merge(id: "insecure-notice", role: "alert", class: [ BASE_CLASS, @html[:class] ].compact.join(" "))
     end
   end
 end

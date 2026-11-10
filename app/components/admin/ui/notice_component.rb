@@ -48,12 +48,19 @@ module Admin
       SIZES = { regular: "px-3 py-2 text-sm", compact: "px-3 py-2.5 text-small leading-normal" }.freeze
       ROLES = { warn: "alert", danger: "alert", ok: "status", neutral: "note" }.freeze
 
-      def initialize(tone:, size: :regular, role: :default, **html)
+      # The box's classes alone, for a box that must stand empty and hidden
+      # until a script fills it (a dialog's notes warning): the component
+      # draws nothing without words, and such a box gives its role, if any,
+      # itself.
+      def self.classes(tone, size: :regular)
         raise ArgumentError, "unknown notice tone #{tone.inspect}" unless TONES.key?(tone)
         raise ArgumentError, "unknown notice size #{size.inspect}" unless SIZES.key?(size)
 
-        @tone = tone
-        @size = size
+        [ CLASS, TONES.fetch(tone), SIZES.fetch(size) ].join(" ")
+      end
+
+      def initialize(tone:, size: :regular, role: :default, **html)
+        @classes = self.class.classes(tone, size: size)
         @role = role == :default ? ROLES.fetch(tone) : role
         @html = html
       end
@@ -63,7 +70,7 @@ module Admin
       def render? = content.present?
 
       def call
-        tag.div(content, **@html, role: @role, class: [ CLASS, TONES.fetch(@tone), SIZES.fetch(@size), @html[:class] ].compact.join(" "))
+        tag.div(content, **@html, role: @role, class: [ @classes, @html[:class] ].compact.join(" "))
       end
     end
   end

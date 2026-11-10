@@ -1839,8 +1839,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # the thing: an alert's tint and an error's outline, a drop zone's dashes.
   CARD_BORDER_ALLOWED = {
     "app/components/admin/ui/error_summary_component.html.erb" => "an alert keeps its tinted edge",
-    "app/components/admin/ui/insecure_notice_component.rb" => "an alert keeps its tinted edge",
-    "app/components/admin/ui/mail_failed_notice_component.rb" => "an alert keeps its tinted edge",
     "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
   }.freeze
 
@@ -1878,32 +1876,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/editor_screen/changed_elsewhere_component.html.erb
-    app/components/admin/editor_screen/changes_overview_component.html.erb
-    app/components/admin/editor_screen/delete_block_dialog_component.rb
     app/components/admin/editor_screen/hold_strip_component.html.erb
-    app/components/admin/editor_screen/live_region_component.html.erb
     app/components/admin/editor_screen/no_address_chip_component.html.erb
-    app/components/admin/editor_screen/publish_changes_dialog_component.html.erb
     app/components/admin/editor_screen/table_controls_component.html.erb
-    app/components/admin/forms_screen/list_component.rb
-    app/components/admin/forms_screen/new_form_dialog_component.html.erb
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
     app/components/admin/notes_screen/thread_component.rb
     app/components/admin/pages_screen/tree_state_mark_component.rb
-    app/components/admin/settings_screen/language_dialogs_component.html.erb
-    app/components/admin/settings_screen/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
-    app/components/admin/ui/insecure_notice_component.rb
     app/components/admin/ui/language_progress_component.html.erb
     app/components/admin/ui/language_tabs_component.html.erb
-    app/components/admin/ui/mail_failed_notice_component.rb
     app/components/admin/ui/notice_component.rb
     app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb
@@ -1916,9 +1902,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/passwords/edit.html.erb
     app/views/admin/passwords/new.html.erb
     app/views/admin/sessions/new.html.erb
-    app/views/admin/shared/_stale_banner.html.erb
     app/views/invitations/show.html.erb
-    app/views/setup/_flash.html.erb
     app/views/setup/_steps.html.erb
   ].freeze
 
@@ -1945,6 +1929,66 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     [ "bg-live-ness", "text-delivered", "live-region", "bg-sunken" ].each { |sample| assert_no_match LIVE_SCHEDULED_FILL, sample }
     [ "bg-ok", "bg-warn-tint", "md:bg-danger", "bg-danger-tint" ].each { |sample| assert_match STATUS_FILL, sample }
     [ "bg-okay", "text-warn-ink", "bg-warning", "border-danger" ].each { |sample| assert_no_match STATUS_FILL, sample }
+  end
+
+  # An alert box is `Admin::Ui::NoticeComponent`: a status tint on a radius,
+  # in one quoted class string (a constant the file spells is read in place
+  # of its interpolation), is a box of words drawn by hand. A chip or a badge
+  # has a tint but no card radius in its string, a fill that is a state's mark
+  # no radius at all. What may keep a box of its own, with the reason:
+  HAND_NOTICE_ALLOWED = {
+    "app/components/admin/ui/error_summary_component.html.erb" => "the error summary is its own component, focused on arrival",
+    "app/components/admin/editor_screen/table_controls_component.html.erb" => "the table's warning is a line of its controls that their script fills",
+    "app/components/admin/notes_screen/thread_component.rb" => "a note's refusal stands in its thread, drawn by the thread's script too"
+  }.freeze
+  # Screens whose boxes are drawn by hand still, each to move onto the notice
+  # with the rest of its screen's look; the list only shrinks.
+  NOTICE_NOT_YET = %w[
+    app/components/admin/groups_screen/permission_matrix_component.html.erb
+    app/components/admin/groups_screen/scope_editor_component.html.erb
+    app/components/admin/tokens_screen/create_step_component.html.erb
+    app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/views/admin/accounts/edit.html.erb
+    app/views/admin/passwords/edit.html.erb
+    app/views/admin/passwords/new.html.erb
+    app/views/admin/sessions/new.html.erb
+    app/views/invitations/show.html.erb
+  ].freeze
+  NOTICE_TINT = /\A(?:[\w-]+:)*bg-(?:warn|ok|danger)-tint\z/
+  NOTICE_RADII = %w[rounded-cs rounded-card].freeze
+
+  # `[line number, class string]` for each hand-drawn box in `source`.
+  def self.hand_notices(source)
+    constants = source.scan(STRING_CONSTANT).to_h { |name, value| [ name, value.gsub(CONTINUED, " ") ] }
+    source = source.gsub(/#\{([A-Z][A-Z0-9_]*)\}/) { constants.fetch(Regexp.last_match(1), Regexp.last_match(0)) }
+    source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if classes.intersect?(NOTICE_RADII) && classes.any? { |name| name.match?(NOTICE_TINT) }
+    end
+  end
+
+  test "an alert box is NoticeComponent: no file outside it draws a box of bg-warn-tint, bg-ok-tint or bg-danger-tint beside rounded-cs or rounded-card" do
+    skipped = [ "app/components/admin/ui/notice_component.rb", *HAND_NOTICE_ALLOWED.keys, *NOTICE_NOT_YET ]
+    offences = (relative_sources - skipped).flat_map do |path|
+      self.class.hand_notices(Rails.root.join(path).read).map { |line, box| "#{path}:#{line}: #{box}" }
+    end
+    assert_empty offences, "a box of words is Admin::Ui::NoticeComponent (or its classes, for a box a script fills)"
+    (HAND_NOTICE_ALLOWED.keys + NOTICE_NOT_YET).each do |path|
+      assert self.class.hand_notices(Rails.root.join(path).read).any?, "#{path} draws no box of its own: drop it from the list"
+    end
+  end
+
+  test "the hand-drawn notice pattern matches the stale banner's old box and the sign-in's, and not a state chip or the badge's warn tone" do
+    [ %(<div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">),
+      %(<p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert">),
+      %(BOX = "rounded-card px-3".freeze\ntag.p(class: "\#{BOX} bg-ok-tint text-ok-ink")) ].each do |sample|
+      assert_not_empty self.class.hand_notices(sample), sample
+    end
+    [ Admin::Ui::StateChipComponent::GROUNDS.fetch(:warn), %(CLASS = "admin-state-chip rounded-cs border px-2".freeze),
+      %(class="#{Admin::Ui::BadgeComponent::TONES.fetch(:warn)}"), %(class="rounded-full bg-ok-tint text-ok-ink") ].each do |sample|
+      assert_empty self.class.hand_notices(sample), sample
+    end
   end
 
   # The page tree's width state on <html>: the chosen width

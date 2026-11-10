@@ -12,15 +12,15 @@
 <% if mail_warning? || !keys %>
   <div class="mb-4 flex flex-col gap-2">
     <% if mail_warning? %>
-      <div class="<%= WARN_CLASS %>" data-forms-warning="mail">
+      <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, data: { forms_warning: "mail" }) do %>
         <p><%= t(".mail_not_ready") %></p>
         <% if settings_link? %>
           <p class="mt-1"><%= link_to t(".open_mail_settings"), mail_settings_path, class: "font-medium underline hover:no-underline", data: { turbo_frame: "_top" } %></p>
         <% end %>
-      </div>
+      <% end %>
     <% end %>
     <% unless keys %>
-      <div class="<%= WARN_CLASS %>" data-forms-warning="keys"><p><%= t(".no_keys") %></p></div>
+      <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, data: { forms_warning: "keys" }) do %><p><%= t(".no_keys") %></p><% end %>
     <% end %>
   </div>
 <% end %>

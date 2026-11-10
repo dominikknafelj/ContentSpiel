@@ -55,4 +55,24 @@ class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::NoticeComponent.new(tone: :warn)) { "  " }
     assert_equal "", rendered_content.strip
   end
+
+  # A notice inside a region that speaks for it says nothing of its own, so
+  # it is heard once; the stale banner is a notice of its own role, and its
+  # Reload stays the leave guard's way out into the content frame.
+  test "a notice inside a live region adds no role of its own, and the stale banner keeps its Reload way out" do
+    render_inline(Admin::SettingsScreen::MailTestOutcomeComponent.new(address: "ada@example.com", sent: true))
+    assert_selector "div[role=status] > div.rounded-card.bg-ok-tint.text-ok-ink:not([role])", text: "Test mail sent to ada@example.com. Check your inbox.", count: 1
+
+    render_in_view_context do
+      render "admin/shared/stale_banner", message: "This was changed elsewhere.", lead: "This was changed", change: nil, reload_path: "/cs-studio/settings"
+    end
+    assert_selector "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", text: "This was changed elsewhere.", count: 1
+    assert_selector "div[role=alert] a[href='/cs-studio/settings'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
+  end
+
+  test "its classes are the box's own for a script-filled box that must stand empty" do
+    assert_equal "rounded-card border border-warn bg-warn-tint text-warn-ink px-3 py-2 text-sm", Admin::Ui::NoticeComponent.classes(:warn)
+    assert_equal "rounded-card bg-ok-tint text-ok-ink px-3 py-2.5 text-small leading-normal", Admin::Ui::NoticeComponent.classes(:ok, size: :compact)
+    assert_raises(ArgumentError) { Admin::Ui::NoticeComponent.classes(:loud) }
+  end
 end

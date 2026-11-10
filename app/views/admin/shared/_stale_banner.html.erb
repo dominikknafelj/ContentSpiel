@@ -3,9 +3,10 @@
     since the form loaded (`Audit::ChangeSince`, nil when the audit log names
     nobody): "<lead> by <name> <time ago>." for someone else, "<lead> in another
     tab or window <time ago>." for the viewer's own, and the screen's plain
-    `message` otherwise. Reload is a way out like Cancel: it discards what is in
-    the form on purpose, so the leave guard doesn't ask. %>
-<div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">
+    `message` otherwise. The warn notice, an alert: the save was refused. Reload
+    is a way out like Cancel: it discards what is in the form on purpose, so the
+    leave guard doesn't ask. %>
+<%= render Admin::Ui::NoticeComponent.new(tone: :warn) do %>
   <% if change %>
     <%= lead %>
     <% if change.own %>in another tab or window<% else %>by <%= render Admin::Ui::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id) %><% end %>
@@ -15,4 +16,4 @@
     <%= message %>
   <% end %>
   <%= link_to local_assigns.fetch(:reload_label, "Reload"), reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
-</div>
+<% end %>

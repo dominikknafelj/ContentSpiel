@@ -33,12 +33,15 @@
   <% end %>
 
   <% if own_lost %>
-    <%= tag.p t(".own_address.#{type}", path: own_lost.path, languages: lost_languages(own_lost)), role: "alert",
-          class: "mt-4 rounded-cs bg-danger-tint px-3 py-2 text-[13px] text-danger-ink", data: { publishing_own_address: "" } %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, class: "mt-4", data: { publishing_own_address: "" })
+          .with_content(t(".own_address.#{type}", path: own_lost.path, languages: lost_languages(own_lost))) %>
   <% end %>
-  <%# One box, one heading: who loses an address, then who moves to another. %>
+  <%# One box, one heading: who loses an address, then who moves to another. The
+      warn notice with no role of its own, as the held lines below: the dialog's
+      overview is a polite live region and speaks for them. The own address's
+      loss keeps its alert. %>
   <% if addresses? %>
-    <%= tag.section class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_addresses: "" } do %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "mt-4", data: { publishing_addresses: "" }) do %>
       <h3 class="font-medium"><%= t(".lost_addresses.heading") %></h3>
       <% if others_lost.any? || hidden_lost.to_i.positive? %>
         <%= tag.div data: { publishing_lost_addresses: "" } do %>
@@ -83,7 +86,8 @@
   <% end %>
 
   <% holders.each do |user| %>
-    <%= tag.p t(".held.#{type}", name: ::PersonName.of(user)), class: "mt-4 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink", data: { publishing_held: "" } %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "mt-4", data: { publishing_held: "" })
+          .with_content(t(".held.#{type}", name: ::PersonName.of(user))) %>
   <% end %>
 <% end %>
 <% end %>

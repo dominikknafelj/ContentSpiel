@@ -22,10 +22,9 @@ module Admin
     # THE WARNINGS, once above the table: mail that is not set
     # up, only when a listed form has a mail destination (`MailSettings
     # #complete?`: a form mail is tried in every other state);
-    # no encryption keys, for every form. They are warn boxes with no live
-    # role: they are there when the page arrives.
+    # no encryption keys, for every form. They are compact warn notices with
+    # no role: they are there when the page arrives, read where they stand.
     class ListComponent < Admin::AdminComponent
-      WARN_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-small leading-normal text-warn-ink".freeze
       LINK_CLASS = "font-medium text-ink hover:underline".freeze
 
       def initialize(forms:, pagination:, page_url:, mail_settings:, keys:, viewer:, url_options: {})

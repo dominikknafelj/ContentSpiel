@@ -7,12 +7,11 @@ module Admin
     # ONE COMPONENT, DRAWN WHERE THE BLOCK'S OWN ELEMENT IS: inside the card
     # of a block of the page's list (`Admin::EditorScreen::BlockCardComponent`), and inside
     # the TILE of a block in a section's column (`BlockTileComponent`) --
-    # not in that block's form panel, where it used to be. A panel is `hidden`
-    # until its tile is pressed, and a `<dialog>` inside a hidden element is
-    # not drawn when it is opened: "Delete block…" in the tile's menu would
-    # have done nothing while the form was closed. Opening the form first to
-    # delete the block would close whichever form was open, for a block that
-    # is about to go.
+    # never in that block's form panel. A panel is `hidden` until its tile is
+    # pressed, and a `<dialog>` inside a hidden element is not drawn when it
+    # is opened: "Delete block…" in the tile's menu would do nothing while
+    # the form was closed. Opening the form first to delete the block would
+    # close whichever form was open, for a block that is about to go.
     #
     # In the element that stands for the block, the dialog can never be left
     # behind: every answer that removes or redraws that element -- a delete
@@ -40,10 +39,13 @@ module Admin
       # block's own.
       def within_id = ActionView::RecordIdentifier.dom_id(block)
 
-      # The dialog's warning about open notes (notes spec D12), for this
+      # The dialog's warning about open notes, for this
       # dialog and for a section's: an empty, hidden paragraph that
       # `admin--notes--drawer` fills and shows while what `within` names has open
-      # threads. The look is the warn alert's (`border-warn bg-warn-tint`).
+      # threads. The look is the warn notice's (`Admin::Ui::NoticeComponent`),
+      # by its classes, since the box stands empty until the script fills it,
+      # and with no role: the script writes its words again at every paint
+      # while the dialog is open, and an alert would be heard each time.
       # The server writes no number into it, for the reason a marker holds
       # none (`Admin::NotesScreen::MarkerComponent`).
       # `spacing:` is for a dialog that says something else above it (a
@@ -52,14 +54,13 @@ module Admin
       # the layout while the warning is hidden, so a block without notes has
       # no empty room in its dialog. The mark is on the warning, and the rule
       # asks for it by name, so no other dialog's box can be hidden by it.
-      NOTES_WARNING_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-ink".freeze
+      NOTES_WARNING_CLASS = Admin::Ui::NoticeComponent.classes(:warn)
 
-      #
       # `kind:` picks the sentence: a block's ("This block has 2 open notes.
       # They will be deleted with it."), or `:section` for a section deleted
       # with its blocks ("This section and its blocks have 3 open notes. They
       # will be deleted too."), whose number is the open notes on the blocks
-      # inside it: a section takes none of its own (the handoff's decision 10).
+      # inside it: a section takes none of its own.
       def self.notes_warning_attributes(within, spacing: nil, alone: false, kind: :block)
         { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ],
           data: { "admin--notes--drawer-target": "warning", notes_within: within, notes_warning: kind, **(alone ? { notes_alone: "" } : {}) } }
@@ -72,8 +73,7 @@ module Admin
       # the changes are published and "Discard changes…" creates it again
       # (`Publishing::DiscardChanges`), so "This can't be undone" would be
       # untrue there. What does not come back is its notes, which are
-      # deleted now (`ContentBlocks::Destroy`): the dialog says both
-      # (drafts spec §9).
+      # deleted now (`ContentBlocks::Destroy`): the dialog says both.
       def body = page.published_at.present? ? t(".published_body") : t(".body")
 
       private
