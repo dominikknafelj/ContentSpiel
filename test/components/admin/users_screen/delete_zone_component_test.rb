@@ -23,7 +23,7 @@ class Admin::UsersScreen::DeleteZoneComponentTest < ViewComponent::TestCase
   test "the delete zone is the shared zone with the danger_text trigger, and its dialog stands after it" do
     zone(users(:two))
 
-    assert_selector "section.admin-action-zone[data-zone=delete][aria-labelledby=delete-user-title][data-controller='admin--saving--pending-lock']"
+    assert_selector "section.admin-action-zone.mt-6[data-zone=delete][aria-labelledby=delete-user-title][data-controller='admin--saving--pending-lock']"
     assert_selector "section[data-zone=delete] h2#delete-user-title.text-h3", text: "Delete user"
     assert_selector "section[data-zone=delete] p.text-small.text-dim", text: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working."
     assert_selector "section[data-zone=delete] [data-admin--saving--pending-lock-target=hint][hidden]", visible: :all

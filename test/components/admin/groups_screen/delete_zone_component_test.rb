@@ -16,7 +16,7 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
   test "a custom group is the shared zone, with no pending lock" do
     zone(AccessControl::Group.create!(name: "Bots"))
 
-    assert_selector "section.admin-action-zone[data-zone=delete][aria-labelledby=delete-zone-title]:not([data-controller])"
+    assert_selector "section.admin-action-zone.mt-6[data-zone=delete][aria-labelledby=delete-zone-title]:not([data-controller])"
     assert_selector "section[data-zone=delete] h2#delete-zone-title.text-h3", text: "Delete this group"
     assert_selector "section[data-zone=delete] > button.text-danger-ink", text: "Delete group…"
   end

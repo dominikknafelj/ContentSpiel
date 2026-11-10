@@ -15,7 +15,8 @@ class Admin::Ui::ActionZoneComponentTest < ViewComponent::TestCase
 
     section = page.find("section[aria-labelledby=zone-title][data-zone=delete]")
     classes = section[:class].split
-    %w[admin-action-zone mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4].each { |utility| assert_includes classes, utility }
+    %w[admin-action-zone flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4].each { |utility| assert_includes classes, utility }
+    assert_empty classes.grep(/\A-?m[tyb]?-/), "the space above the zone is the caller's"
     assert_empty classes & %w[border border-dashed rounded-cs rounded-card shadow-1 bg-surface bg-sunken], "the zone is a rule above its words, not a box"
     assert_selector "section h2#zone-title.text-h3.text-ink", text: "Delete this group"
     assert_selector "section p.text-small.text-dim", text: "3 members lose its permissions."
@@ -34,8 +35,9 @@ class Admin::Ui::ActionZoneComponentTest < ViewComponent::TestCase
   end
 
   test "a caller's class is added to the zone's own" do
-    render_inline(Admin::Ui::ActionZoneComponent.new(heading_id: "z", heading: "H", body: "B", class: "max-w-[1000px]"))
+    render_inline(Admin::Ui::ActionZoneComponent.new(heading_id: "z", heading: "H", body: "B", class: "mt-6 max-w-[1000px]"))
     assert_includes page.find("section")[:class].split, "max-w-[1000px]"
+    assert_includes page.find("section")[:class].split, "mt-6"
     assert_includes page.find("section")[:class].split, "border-t"
   end
 end

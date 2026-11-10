@@ -1,5 +1,5 @@
 <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "owner-zone-title", heading: t(".heading"), body: t(".body"),
-      reason: reason, pending_lock: true, data: { zone: "owner" }) do |zone| %>
+      reason: reason, pending_lock: true, class: "mt-6", data: { zone: "owner" }) do |zone| %>
   <% zone.with_trigger do %>
     <%= render Admin::Ui::ButtonComponent.new(label: trigger_label, variant: :secondary, size: :small, disabled: last_owner? || nil,
           data: dialog_trigger(dialog_id).merge("admin--saving--pending-lock-target": "control")) %>

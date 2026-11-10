@@ -1,5 +1,5 @@
 <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "delete-user-title", heading: t(".heading"), body: t(".body"),
-      reason: (t(".reason", name: name) if last_owner), pending_lock: true, data: { zone: "delete" }) do |zone| %>
+      reason: (t(".reason", name: name) if last_owner), pending_lock: true, class: "mt-6", data: { zone: "delete" }) do |zone| %>
   <% zone.with_trigger do %>
     <%= render Admin::Ui::ButtonComponent.new(label: t(".trigger"), variant: :danger_text, size: :small, disabled: last_owner || nil,
           data: dialog_trigger(dialog_id).merge("admin--saving--pending-lock-target": "control")) %>

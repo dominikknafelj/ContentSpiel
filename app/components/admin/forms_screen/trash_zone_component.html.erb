@@ -1,5 +1,5 @@
 <% if zone? %>
-  <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "form-trash-zone-title", heading: t(".title"), body: t(".body"), data: { zone: "trash" }) do |zone| %>
+  <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "form-trash-zone-title", heading: t(".title"), body: t(".body"), class: "mt-2", data: { zone: "trash" }) do |zone| %>
     <% zone.with_trigger do %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
     <% end %>

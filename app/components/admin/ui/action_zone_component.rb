@@ -15,6 +15,9 @@ module Admin
     #   controller's `control` target) is disabled and the hint says why: the
     #   action answers by drawing the screen again, which would throw the
     #   typed changes away.
+    # - It draws no outer margin: the space above it is the caller's (a
+    #   margin at the call or its column's gap), so the zone looks the same
+    #   wherever it stands.
     # - It decides nothing of who may act: the caller draws it or not, and
     #   the service asks again on the request.
     # - Anything else the caller hands it (`data: { zone: … }`, the hook a
@@ -23,7 +26,7 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A section named by its heading, holding the caller's one trigger; with pending_lock the trigger is disabled while the form above has unsaved changes, with the hint in words.",
+        accessibility: "A section named by its heading, holding the caller's one trigger; with pending_lock the trigger stays disabled while any explicit-save form on the page holds unsaved changes, with the hint in words.",
         motion: :none,
         content_edges: %i[short long],
         widths: :from_container,
@@ -39,7 +42,7 @@ module Admin
         keyboard: [ "test/system/admin/users_test.rb", "with a typed change the owner and delete buttons are disabled with the hint, and come back when it is undone" ]
       )
 
-      CLASS = "admin-action-zone mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4".freeze
+      CLASS = "admin-action-zone flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4".freeze
 
       renders_one :trigger
 

@@ -51,7 +51,7 @@
   <% end %>
 
   <% if manage? %>
-    <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "submission-delete-title", heading: t(".delete_title"), body: t(".delete_body"), data: { zone: "delete" }) do |zone| %>
+    <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "submission-delete-title", heading: t(".delete_title"), body: t(".delete_body"), class: "mt-2", data: { zone: "delete" }) do |zone| %>
       <% zone.with_trigger do %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
       <% end %>

@@ -43,9 +43,12 @@ module Admin
       def effect = "#{t(".members", count: member_count)} #{t(".tokens", count: token_count)}"
 
       # One whole sentence per shape. A key is pluralised on one count, so
-      # the sentence with both is chosen by the members' category here and
-      # pluralised on the tokens' by I18n; the server's categories are `one`
-      # and `other` alone (docs/reference/i18n.md).
+      # for the sentence with both this method picks the members' category
+      # by hand (`one` for 1, `other` otherwise) and I18n pluralises on the
+      # tokens'. HAZARD: that is right only under Rails' own one/other rule
+      # (docs/reference/i18n.md); once CLDR plural rules are added (the
+      # rails-i18n gem), a language with `few` or `many` is handed the wrong
+      # sentence here, and this choice must go through the plural rules.
       def dialog_body
         return t(".dialog_body.no_members", count: token_count) if member_count.zero?
         return t(".dialog_body.members_only", count: member_count) if token_count.zero?

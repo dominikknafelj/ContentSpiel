@@ -24,7 +24,7 @@ class Admin::FormsScreen::TrashZoneComponentTest < ViewComponent::TestCase
 
   test "the builder's zone is the shared action zone; the list's dialog comes alone" do
     render_inline Admin::FormsScreen::TrashZoneComponent.new(form: forms(:contact), placements: Placed.new([], 0))
-    assert_selector "section.admin-action-zone[data-zone=trash][aria-labelledby=form-trash-zone-title] > button.text-danger-ink", text: t("button")
+    assert_selector "section.admin-action-zone.mt-2[data-zone=trash][aria-labelledby=form-trash-zone-title] > button.text-danger-ink", text: t("button")
     assert_selector "section[data-zone=trash] h2#form-trash-zone-title", text: t("title")
 
     render_inline Admin::FormsScreen::TrashZoneComponent.new(form: forms(:contact), placements: Placed.new([], 0), zone: false)

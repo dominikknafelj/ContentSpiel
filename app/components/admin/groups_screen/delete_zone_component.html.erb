@@ -2,7 +2,7 @@
   <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, class: "mt-6 max-w-[1000px]", data: { zone: "built_in" }).with_content(t(".built_in")) %>
 <% else %>
   <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "delete-zone-title", heading: t(".heading"), body: effect,
-        class: "max-w-[1000px]", data: { zone: "delete" }) do |zone| %>
+        class: "mt-6 max-w-[1000px]", data: { zone: "delete" }) do |zone| %>
     <% zone.with_trigger do %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".trigger"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
     <% end %>

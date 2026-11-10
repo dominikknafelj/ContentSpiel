@@ -5,8 +5,11 @@
 #
 # The dialog's body is one whole sentence per shape (no members; members
 # only; members and tokens), so a language can order the counts its own
-# way: `members_and_tokens` is pluralised on the members' count first, then
-# on the tokens'.
+# way. `members_and_tokens` is keyed first by the members' category, which
+# `Admin::GroupsScreen::DeleteZoneComponent#dialog_body` picks by hand
+# (`one` for 1, `other` otherwise), not I18n; then I18n pluralises it on
+# the tokens' count. HAZARD: the hand choice holds only under Rails' own
+# one/other rule, and breaks once CLDR plural rules (few, many) are added.
 en:
   admin:
     components:
