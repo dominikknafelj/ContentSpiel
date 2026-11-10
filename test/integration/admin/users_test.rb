@@ -164,12 +164,12 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
 
   test "an owner sees the owner zone; a non-owner neither sees it nor changes the flag" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select ".admin-owner-zone button", text: "Make owner…"
+    assert_select "[data-zone=owner] button", text: "Make owner…"
     assert_select "#user-form input[name='user[owner]']", count: 0
 
     sign_in_as(users(:two))
     get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select ".admin-owner-zone", count: 0
+    assert_select "[data-zone=owner]", count: 0
     assert_select "input[name='user[owner]']", count: 0
 
     # A forged owner field on the ordinary form is no part of it: the save is an ordinary one.
@@ -183,10 +183,10 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
 
   test "the owner zone and the delete zone are disabled for the last owner, with the reason; demoting them is refused" do
     get "/cs-studio/users/#{users(:one).id}/edit"
-    assert_select ".admin-owner-zone button[disabled]", text: "Remove owner rights…"
-    assert_select ".admin-owner-zone", text: /one@example.com is the only owner, so their owner rights can't be removed\./
-    assert_select ".admin-delete-zone button[disabled]", text: "Delete user…"
-    assert_select ".admin-delete-zone", text: /one@example.com is the only owner, so they can't be deleted\./
+    assert_select "[data-zone=owner] button[disabled]", text: "Remove owner rights…"
+    assert_select "[data-zone=owner]", text: /one@example.com is the only owner, so their owner rights can't be removed\./
+    assert_select "[data-zone=delete] button[disabled]", text: "Delete user…"
+    assert_select "[data-zone=delete]", text: /one@example.com is the only owner, so they can't be deleted\./
     assert_select "dialog#owner-user-#{users(:one).id}", count: 0
     assert_select "#user-form input[name='user[owner]']", count: 0
   end

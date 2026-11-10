@@ -198,7 +198,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_select "[data-locked]", count: 0
     assert_select ".admin-save-bar", count: 0
     assert_select "form#group-form button[type=submit]", count: 0
-    assert_select ".admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     page = Nokogiri::HTML(response.body)
     enabled = page.css("form#group-form input[name], form#group-form select[name], form#group-form textarea[name], form#group-form button").reject { |field| field.ancestors("fieldset[disabled]").any? || field["type"] == "hidden" && field["name"] == "_method" }
     assert_empty enabled.map { |field| field["name"] || field.text.strip }, "nothing in the form may be enabled, Remove included"
@@ -528,7 +528,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     end
     assert_select ".admin-save-bar", count: 0
     assert_select "form#group-form button[type=submit]", count: 0
-    assert_select ".admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "dialog[id^=delete-group]", count: 0
     assert_select "button", text: "Edit scope", count: 0
     # The scope toggle is a link, which a disabled fieldset leaves alone.
@@ -564,14 +564,14 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
   test "a built-in group the viewer can manage shows its note, not the delete zone; one they can't is read-only" do
     sign_in_as(users(:one))
     get "/cs-studio/groups/#{access_control_groups(:read_only).id}/edit"
-    assert_select ".admin-delete-zone", text: "A built-in group can be changed but not deleted."
+    assert_select "[data-zone=built_in]", text: "A built-in group can be changed but not deleted."
     assert_select "button", text: /Delete group/, count: 0
     assert_select "dialog[id^=delete-group]", count: 0
 
     sign_in_as(manager_user(grants: { "groups.manage" => {} }))
     get "/cs-studio/groups/#{access_control_groups(:admin).id}/edit"
     assert_select "p.admin-view-only-notice"
-    assert_select ".admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
   end
 
   # --- The delete zone -----------------------------------------------------------
@@ -587,7 +587,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/groups/#{group.id}/edit"
 
-    assert_select ".admin-delete-zone" do
+    assert_select "[data-zone=delete]" do
       assert_select "h2", text: "Delete this group"
       assert_select "p", text: "2 members lose its permissions. 1 AI token is revoked."
       assert_select "button.text-danger, button[class*='danger']", text: "Delete group…"
@@ -621,11 +621,11 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     assert_select "dialog#delete-group-#{group.id} li", count: Admin::GroupsScreen::DeleteZoneComponent::MAX_TOKENS_SHOWN
     assert_select "dialog#delete-group-#{group.id}", text: /and 3 more/
-    assert_select ".admin-delete-zone p", text: "It has no members. 13 AI tokens are revoked."
+    assert_select "[data-zone=delete] p", text: "It has no members. 13 AI tokens are revoked."
 
     empty = AccessControl::Group.create!(name: "Empty")
     get "/cs-studio/groups/#{empty.id}/edit"
-    assert_select ".admin-delete-zone p", text: "It has no members. It has no AI tokens."
+    assert_select "[data-zone=delete] p", text: "It has no members. It has no AI tokens."
     assert_select "dialog#delete-group-#{empty.id} p", text: "It has no members. Users themselves are not deleted."
   end
 

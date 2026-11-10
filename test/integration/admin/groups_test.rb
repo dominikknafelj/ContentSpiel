@@ -145,7 +145,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "button", text: /Delete group/, count: 0
-    assert_select ".admin-delete-zone", text: "A built-in group can be changed but not deleted."
+    assert_select "[data-zone=built_in]", text: "A built-in group can be changed but not deleted."
 
     delete "/cs-studio/groups/#{group.id}"
     assert_redirected_to "/cs-studio/groups/#{group.id}/edit"

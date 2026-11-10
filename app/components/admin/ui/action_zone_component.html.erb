@@ -1,0 +1,9 @@
+<%= tag.section(**section_attributes) do %>
+  <div class="flex min-w-0 flex-col gap-0.5">
+    <h2 id="<%= heading_id %>" class="text-h3 text-ink"><%= heading %></h2>
+    <p class="text-small text-dim"><%= body %></p>
+    <% if reason.present? %><p class="text-small text-dim" data-action-zone-reason><%= reason %></p><% end %>
+    <% if pending_lock %><p class="text-small text-meta" data-admin--saving--pending-lock-target="hint" hidden></p><% end %>
+  </div>
+  <%= trigger %>
+<% end %>

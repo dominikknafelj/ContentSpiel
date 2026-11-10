@@ -48,7 +48,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
 
     assert_current_path edit_admin_user_path(@target)
     assert_text "reader@example.com is now an owner"
-    assert_selector ".admin-owner-zone button", text: "Remove owner rights…"
+    assert_selector "[data-zone=owner] button", text: "Remove owner rights…"
     assert @target.reload.owner?
 
     visit admin_users_path
@@ -58,18 +58,18 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   test "with a typed change the owner and delete buttons are disabled with the hint, and come back when it is undone" do
     visit_screen edit_admin_user_path(@target)
 
-    assert_selector ".admin-owner-zone button:not([disabled])", text: "Make owner…"
-    assert_selector ".admin-delete-zone button:not([disabled])", text: "Delete user…"
+    assert_selector "[data-zone=owner] button:not([disabled])", text: "Make owner…"
+    assert_selector "[data-zone=delete] button:not([disabled])", text: "Delete user…"
 
     fill_in "Name", with: "Typed"
-    assert_selector ".admin-owner-zone button[disabled]", text: "Make owner…"
-    assert_selector ".admin-delete-zone button[disabled]", text: "Delete user…"
-    assert_selector ".admin-owner-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
-    assert_selector ".admin-delete-zone [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
+    assert_selector "[data-zone=owner] button[disabled]", text: "Make owner…"
+    assert_selector "[data-zone=delete] button[disabled]", text: "Delete user…"
+    assert_selector "[data-zone=owner] [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
+    assert_selector "[data-zone=delete] [data-admin--saving--pending-lock-target=hint]", text: "Save or discard your changes first.", visible: :visible
 
     fill_in "Name", with: ""
-    assert_selector ".admin-owner-zone button:not([disabled])", text: "Make owner…"
-    assert_selector ".admin-delete-zone button:not([disabled])", text: "Delete user…"
+    assert_selector "[data-zone=owner] button:not([disabled])", text: "Make owner…"
+    assert_selector "[data-zone=delete] button:not([disabled])", text: "Delete user…"
   end
 
   test "Set a new password… counts nothing until something is typed, and closing it forgets what was typed" do

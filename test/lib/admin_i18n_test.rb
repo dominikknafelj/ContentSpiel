@@ -122,6 +122,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/forms/builder_controller.js
     app/components/admin/ui/settings_card_component.rb
     app/components/admin/ui/settings_card_component.html.erb
+    app/components/admin/ui/action_zone_component.rb
+    app/components/admin/ui/action_zone_component.html.erb
     app/components/admin/settings_screen/section_card.rb
     app/components/admin/settings_screen/nav_component.rb
     app/components/admin/settings_screen/nav_component.html.erb
@@ -174,6 +176,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/list_component.html.erb
     app/components/admin/users_screen/invite_dialog_component.rb
     app/components/admin/users_screen/invite_dialog_component.html.erb
+    app/components/admin/users_screen/delete_zone_component.rb
+    app/components/admin/users_screen/delete_zone_component.html.erb
+    app/components/admin/users_screen/owner_zone_component.rb
+    app/components/admin/users_screen/owner_zone_component.html.erb
+    app/components/admin/groups_screen/delete_zone_component.rb
+    app/components/admin/groups_screen/delete_zone_component.html.erb
     app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb

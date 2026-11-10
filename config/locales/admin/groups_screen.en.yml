@@ -1,0 +1,45 @@
+# The Groups screen's components (docs/reference/i18n.md):
+# `admin.components.groups_screen.*`. Only the delete zone's words are keys
+# so far; the list, the members, the matrix and the scope editor still hold
+# theirs as literals.
+#
+# The dialog's body is one whole sentence per shape (no members; members
+# only; members and tokens), so a language can order the counts its own
+# way: `members_and_tokens` is pluralised on the members' count first, then
+# on the tokens'.
+en:
+  admin:
+    components:
+      groups_screen:
+        delete_zone:
+          heading: "Delete this group"
+          members:
+            zero: "It has no members."
+            one: "1 member loses its permissions."
+            other: "%{count} members lose its permissions."
+          tokens:
+            zero: "It has no AI tokens."
+            one: "1 AI token is revoked."
+            other: "%{count} AI tokens are revoked."
+          trigger: "Delete group…"
+          built_in: "A built-in group can be changed but not deleted."
+          dialog_title: "Delete “%{name}”?"
+          dialog_body:
+            no_members:
+              zero: "It has no members. Users themselves are not deleted."
+              one: "It has no members, and its 1 AI token is revoked. Users themselves are not deleted."
+              other: "It has no members, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+            members_only:
+              one: "Its 1 member loses these permissions. Users themselves are not deleted."
+              other: "Its %{count} members lose these permissions. Users themselves are not deleted."
+            members_and_tokens:
+              one:
+                one: "Its 1 member loses these permissions, and its 1 AI token is revoked. Users themselves are not deleted."
+                other: "Its 1 member loses these permissions, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+              other:
+                one: "Its %{members} members lose these permissions, and its 1 AI token is revoked. Users themselves are not deleted."
+                other: "Its %{members} members lose these permissions, and its %{count} AI tokens are revoked. Users themselves are not deleted."
+          more:
+            one: "and %{count} more"
+            other: "and %{count} more"
+          confirm: "Delete group"

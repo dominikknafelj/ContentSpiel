@@ -1,7 +1,8 @@
 module Admin
   module UsersScreen
-    # The user editor's owner zone: a dashed card below the form -- for a
-    # viewer who is an owner, and only on an existing user -- saying what an owner is and offering the one action:
+    # The user editor's owner zone: the shared action zone after the form --
+    # for a viewer who is an owner, and only on an existing user -- saying
+    # what an owner is and offering the one action:
     #
     # - a non-owner: "Make owner…";
     # - an owner: "Remove owner rights…";
@@ -38,15 +39,21 @@ module Admin
       def name = (user.persisted? ? user.name_in_database.presence || user.email_address_in_database : user.name_or_email)
       def dialog_id = self.class.dialog_id(user)
       def url = helpers.owner_admin_user_path(user, **url_options)
-      def reason = "#{name} is the only owner, so their owner rights can't be removed."
+      def last_owner? = owner? && last_owner
+      def reason = (t(".reason", name: name) if last_owner?)
 
-      def trigger_label = owner? ? "Remove owner rights…" : "Make owner…"
-      def dialog_title = owner? ? "Remove owner rights from #{name}?" : "Make #{name} an owner?"
+      def trigger_label = owner? ? t(".remove") : t(".make")
+      def dialog_title = owner? ? t(".remove_title", name: name) : t(".make_title", name: name)
       # Removing your OWN owner rights is said to you, not about you.
       def own_account? = user.persisted? && user == ::Current.user
 
-      def dialog_body = owner? ? (own_account? ? "You keep your groups and the permissions those give." : "They keep their groups and the permissions those give.") : "Owners have every permission, including managing other owners and removing your owner rights."
-      def confirm_label = owner? ? "Remove owner rights" : "Make owner"
+      def dialog_body
+        return t(".make_body") unless owner?
+
+        own_account? ? t(".remove_body_own") : t(".remove_body")
+      end
+
+      def confirm_label = owner? ? t(".remove_confirm") : t(".make_confirm")
       def requested_value = owner? ? "0" : "1"
     end
   end

@@ -1,11 +1,8 @@
 # The Users screen (docs/reference/i18n.md): `admin.components.users_screen.*`
-# are its components' keys (the list and the invite dialog; the group cards,
-# the owner and delete zones still hold their words as literals);
+# are its components' keys (the list, the invite dialog, the owner and
+# delete zones; the group cards still hold their words as literals);
 # `admin.users.index` is the list page's lazy-lookup scope (only the invite
 # strings so far); `admin.invites` what `Admin::InvitesController` answers.
-#
-# The invite words are the mail spec's and design answer M4's; the toasts
-# and the dialog's Name help are this build's (a design question each).
 en:
   admin:
     components:
@@ -38,6 +35,28 @@ en:
           resend: "Resend"
           cancel: "Cancel"
           submit: "Send invite"
+        delete_zone:
+          heading: "Delete user"
+          body: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working."
+          reason: "%{name} is the only owner, so they can't be deleted."
+          trigger: "Delete user…"
+          dialog_title: "Delete %{name}?"
+          dialog_body: "They can't sign in any more and their AI tokens stop working. Their pages, posts and media stay; posts they wrote are left without an author."
+          dialog_body_own: "This is your own account — deleting it signs you out."
+          confirm: "Delete user"
+        owner_zone:
+          heading: "Owner"
+          body: "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner."
+          reason: "%{name} is the only owner, so their owner rights can't be removed."
+          make: "Make owner…"
+          remove: "Remove owner rights…"
+          make_title: "Make %{name} an owner?"
+          remove_title: "Remove owner rights from %{name}?"
+          make_body: "Owners have every permission, including managing other owners and removing your owner rights."
+          remove_body: "They keep their groups and the permissions those give."
+          remove_body_own: "You keep your groups and the permissions those give."
+          make_confirm: "Make owner"
+          remove_confirm: "Remove owner rights"
     users:
       index:
         invite: "Invite person…"

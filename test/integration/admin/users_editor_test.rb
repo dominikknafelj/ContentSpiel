@@ -267,7 +267,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "input[type=password][name='user[password]']"
     assert_select "[data-password-field-target=bar]", minimum: 1
     assert_select "#user-form .admin-save-bar button[type=submit]", text: "Create user"
-    assert_select ".admin-owner-zone, .admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "details.admin-set-password", count: 0
   end
 
@@ -308,7 +308,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal({ "owner" => [ false, true ] }, Audit::Event.find_by!(action: "user.owner_changed", subject: users(:reader)).field_changes)
 
     get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select ".admin-owner-zone button", text: "Remove owner rights…"
+    assert_select "[data-zone=owner] button", text: "Remove owner rights…"
     assert_select "dialog#owner-user-#{users(:reader).id}", text: /Remove owner rights from reader@example.com\?.*They keep their groups and the permissions those give\./m
     assert_select "dialog#owner-user-#{users(:reader).id} button[type=submit]", text: "Remove owner rights"
 
@@ -375,17 +375,17 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   test "the owner and delete buttons wait for unsaved changes, outside the form" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
 
-    assert_select ".admin-owner-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Make owner…"
-    assert_select ".admin-delete-zone[data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
-    assert_select "#user-form .admin-owner-zone, #user-form .admin-delete-zone, #user-form dialog", count: 0
-    assert_select ".admin-delete-zone [data-admin--saving--pending-lock-target=hint][hidden]"
+    assert_select "[data-zone=owner][data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Make owner…"
+    assert_select "[data-zone=delete][data-controller='admin--saving--pending-lock'] button[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
+    assert_select "#user-form [data-zone], #user-form dialog", count: 0
+    assert_select "[data-zone=delete] [data-admin--saving--pending-lock-target=hint][hidden]"
   end
 
   # --- The delete zone -------------------------------------------------------------
 
   test "the delete dialog names the user and says what stays; for your own account it says it signs you out" do
     get "/cs-studio/users/#{users(:two).id}/edit"
-    assert_select ".admin-delete-zone button.text-danger-ink", text: "Delete user…"
+    assert_select "[data-zone=delete] button.text-danger-ink", text: "Delete user…"
     assert_select "dialog#delete-user-#{users(:two).id}", text: /Delete two@example.com\?.*They can't sign in any more and their AI tokens stop working\. Their pages, posts and media stay; posts they wrote are left without an author\./m
     assert_select "dialog#delete-user-#{users(:two).id} form[action='/cs-studio/users/#{users(:two).id}'] button.bg-danger", text: "Delete user"
 
@@ -420,7 +420,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
     assert_select "#user-form[data-controller]", count: 0
-    assert_select ".admin-owner-zone, .admin-delete-zone, details.admin-set-password", count: 0
+    assert_select "[data-zone], details.admin-set-password", count: 0
 
     digest = users(:one).password_digest
     assert_difference -> { denied_events_for(users(:one)).count }, 1 do
@@ -446,7 +446,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select ".admin-view-only-notice", text: "This user has permissions you don't have, so you can't change them."
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
-    assert_select ".admin-owner-zone, .admin-delete-zone", count: 0
+    assert_select "[data-zone]", count: 0
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'][data-locked]", text: /You can't grant this group\./
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'] input[type=checkbox][checked][disabled]"
     assert_select "label[data-group-card='#{access_control_groups(:admin).id}'] input[type=hidden][name='user[group_ids][]'][value='#{access_control_groups(:admin).id}']"

@@ -51,13 +51,11 @@
   <% end %>
 
   <% if manage? %>
-    <section class="admin-delete-zone mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4" aria-labelledby="submission-delete-title">
-      <div class="flex min-w-0 flex-col gap-0.5">
-        <h2 id="submission-delete-title" class="text-h3 text-ink"><%= t(".delete_title") %></h2>
-        <p class="text-small text-dim"><%= t(".delete_body") %></p>
-      </div>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
-    </section>
+    <%= render Admin::Ui::ActionZoneComponent.new(heading_id: "submission-delete-title", heading: t(".delete_title"), body: t(".delete_body"), data: { zone: "delete" }) do |zone| %>
+      <% zone.with_trigger do %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".delete_button"), variant: :danger_text, size: :small, type: "button", data: dialog_trigger(DIALOG_ID)) %>
+      <% end %>
+    <% end %>
 
     <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: DIALOG_ID, title: t(".dialog_title"), body: t(".dialog_body")) do |dialog| %>
       <% dialog.with_confirm_action do %>

@@ -136,7 +136,7 @@ class Admin::FormsScreen::SubmissionComponentTest < ViewComponent::TestCase
     assert_selector ".admin-settings-card", count: 2
     assert_selector "section[aria-labelledby=submission-answers] dl dd.text-body", text: "Ada"
 
-    zone = page.find("section.admin-delete-zone[aria-labelledby=submission-delete-title]")
+    zone = page.find("section.admin-action-zone[data-zone=delete][aria-labelledby=submission-delete-title]")
     classes = zone[:class].split
     assert_includes classes, "border-t"
     assert_includes classes, "border-line"

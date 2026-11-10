@@ -1,0 +1,5 @@
+<%= render Admin::Ui::ActionZoneComponent.new(heading_id: "preview-zone", heading: "Delete this group", body: "3 members lose its permissions. 1 AI token is revoked.") do |zone| %>
+  <% zone.with_trigger do %>
+    <%= render Admin::Ui::ButtonComponent.new(label: "Delete group…", variant: :danger_text, size: :small) %>
+  <% end %>
+<% end %>

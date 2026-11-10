@@ -20,6 +20,18 @@ class Admin::UsersScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "the delete zone is the shared zone with the danger_text trigger, and its dialog stands after it" do
+    zone(users(:two))
+
+    assert_selector "section.admin-action-zone[data-zone=delete][aria-labelledby=delete-user-title][data-controller='admin--saving--pending-lock']"
+    assert_selector "section[data-zone=delete] h2#delete-user-title.text-h3", text: "Delete user"
+    assert_selector "section[data-zone=delete] p.text-small.text-dim", text: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working."
+    assert_selector "section[data-zone=delete] [data-admin--saving--pending-lock-target=hint][hidden]", visible: :all
+    assert_selector "section[data-zone=delete] > button.text-danger-ink[data-admin--saving--pending-lock-target=control]", text: "Delete user…"
+    assert_no_selector "section[data-zone=delete] dialog", visible: :all
+    assert_selector "section[data-zone=delete] ~ dialog#delete-user-#{users(:two).id}", visible: :all
+  end
+
   test "your own account: the dialog says it signs you out" do
     zone(users(:two), own: true)
     assert_selector "dialog p", text: "This is your own account — deleting it signs you out.", visible: :all
@@ -38,7 +50,7 @@ class Admin::UsersScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     zone(users(:one), last_owner: true)
 
     assert_selector "button[disabled]", text: "Delete user…"
-    assert_text "one@example.com is the only owner, so they can't be deleted."
+    assert_selector "[data-zone=delete] p[data-action-zone-reason]", text: "one@example.com is the only owner, so they can't be deleted."
     assert_no_selector "dialog", visible: :all
   end
 end
