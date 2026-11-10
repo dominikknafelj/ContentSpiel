@@ -211,6 +211,20 @@ class InvitationsTest < ActionDispatch::IntegrationTest
     assert @dana.reload.open?
   end
 
+  # Only a forged post passes the field's maxlength, but the answer is the
+  # password's: the message under Name, with the refused edge, tied to it.
+  test "a refused name draws its message and the invalid edge on the Name field" do
+    accept(name: "x" * 121)
+    assert_response :unprocessable_entity
+
+    assert_select "#alert > p", text: /Name is too long/
+    assert_select "input#name[aria-invalid=true][aria-describedby~='name-errors']"
+    assert_select "#name-errors p", text: /Name is too long/
+    assert_select "#name-errors[role], #name-errors[aria-live]", count: 0
+    assert_select "input#password[aria-invalid]", count: 0
+    assert @dana.reload.open?
+  end
+
   test "a refused password draws the form again with the token, the address and the typed name, and the next try takes it" do
     accept(name: "Dana D", password: "short", confirmation: "short")
     assert_response :unprocessable_entity

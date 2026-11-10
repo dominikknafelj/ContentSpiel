@@ -15,8 +15,8 @@
     `@token` is set only on the 422 of a refused password, where the form
     comes back open with the token it was sent with, the address and the
     typed name, and nothing is asked again; its alert is one line per
-    message the service gave, and each password field says its own under it
-    with the refused edge (`@field_errors`, by field), with no live role of
+    message the service gave, and each field (Name and the two passwords)
+    says its own under it with the refused edge (`@field_errors`, by field), with no live role of
     its own: the alert is the one that is announced. `@state` is set when the form's
     own request found the link no good: that state alone is drawn, with no
     form and no script.
@@ -47,7 +47,9 @@
       <div class="admin-field">
         <%= label_tag "name", t(".name"), class: setup_label_class %>
         <%= text_field_tag "name", name_value, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class,
+              aria: { invalid: ("true" if field_errors[:name].present?), describedby: ("name-errors" if field_errors[:name].present?) }.compact,
               data: { invitation_token_target: "name" } %>
+        <%= render "admin/shared/field_errors", id: "name-errors", messages: Array(field_errors[:name]) %>
       </div>
       <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), meter: true, autofocus: true,
             errors: field_errors[:password]) %>
