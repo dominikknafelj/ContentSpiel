@@ -115,7 +115,7 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     assert_response :conflict
     assert_equal "Contact us", form.reload.name
     # The audit log names the viewer's own save from another tab.
-    assert_select "[role=alert]", text: /\A\s*#{Regexp.escape(t("builder.stale_lead"))}\s+in another tab or window/
+    assert_select "[role=alert]", text: /\A\s*This form was changed in another tab or window .+\. Reload to see the latest/
     assert_select "input[name='form[name]'][value='Stale name']", 1, "the typed value stays in the form"
   end
 
@@ -128,8 +128,8 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
 
     patch admin_form_path(form), params: { base_updated_at: base, form: contact_params(form, name: "Stale name") }
     assert_response :conflict
-    assert_select "[role=alert]", text: /\A\s*#{Regexp.escape(t("builder.stale"))}/
-    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))}/, count: 0
+    assert_select "[role=alert]", text: /\A\s*#{Regexp.escape(t("builder.stale.message"))}/
+    assert_select "[role=alert]", text: /This form was changed/, count: 0
     assert_equal "Contact", form.reload.name
   end
 
@@ -326,7 +326,7 @@ class Admin::FormsTest < ActionDispatch::IntegrationTest
     end
     assert_response :conflict
     assert_equal [ "second@example.com" ], form.reload.destinations.map(&:recipients).flatten, "the older copy undid nothing"
-    assert_select "[role=alert]", text: /#{Regexp.escape(t("builder.stale_lead"))}/
-    assert_select "[role=alert] a", text: t("builder.reload")
+    assert_select "[role=alert]", text: /\A\s*This form was changed (by|in another tab or window) /
+    assert_select "[role=alert] a", text: t("builder.stale.reload")
   end
 end

@@ -210,6 +210,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/groups/_form.html.erb
     app/views/admin/groups/edit.html.erb
     app/views/admin/groups/new.html.erb
+    app/views/admin/shared/_stale_banner.html.erb
+    app/controllers/admin/users_controller.rb
+    app/controllers/admin/groups_controller.rb
     app/javascript/controllers/admin/groups/permission_matrix_controller.js
     app/javascript/controllers/admin/groups/branch_picker_controller.js
     app/controllers/admin/invites_controller.rb

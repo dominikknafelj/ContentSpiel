@@ -58,9 +58,13 @@ en:
             email: "Email"
             message: "Message"
         builder:
-          stale: "Someone changed this form since you opened it. Your changes are not saved."
-          stale_lead: "This form was changed"
-          reload: "Reload"
+          # The 409 banner (`admin/shared/_stale_banner`), whole in each shape:
+          # someone else's change, the viewer's own other tab, and nobody named.
+          stale:
+            by_html: "This form was changed by %{name} %{time}. Reload to see the latest — your changes are still in the form."
+            own_html: "This form was changed in another tab or window %{time}. Reload to see the latest — your changes are still in the form."
+            message: "Someone changed this form since you opened it. Your changes are not saved."
+            reload: "Reload"
           form_card: "Form"
           name: "Name"
           name_help: "Only editors see it."

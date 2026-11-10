@@ -1,8 +1,7 @@
 # The Groups views and `Admin::GroupsController` (docs/reference/i18n.md):
 # `admin.groups.index`, `edit`, `new` and `form` are the list's, the
 # editor's, New group's and the shared form's lazy-lookup scopes, and the
-# flashes are `admin.groups.*`. The stale banner's glued sentence stays the
-# controller's English (`STALE_LEAD`, `STALE_MESSAGE`).
+# flashes are `admin.groups.*`.
 en:
   admin:
     groups:
@@ -14,6 +13,13 @@ en:
         new_group: "New group"
       edit:
         title: "Group"
+        # The 409 banner (`admin/shared/_stale_banner`), whole in each shape:
+        # someone else's change, the viewer's own other tab, and nobody named.
+        stale:
+          by_html: "This group was changed by %{name} %{time}. Reload to see the latest — your changes are still in the form."
+          own_html: "This group was changed in another tab or window %{time}. Reload to see the latest — your changes are still in the form."
+          message: "This group was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
+          reload: "Reload"
       new:
         title: "New group"
       form:
