@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 (2026-11-10)
+
 ### Theme contract
 
 - Added `theme.yml` at a theme folder's top, the one file beside its four folders: the lists `section_styles`, `page_templates` and `icons`, each entry a `name` (lowercase letters, digits and underscores, a letter first, at most 40) and a `label` (a text, or a mapping of language codes to texts), a page template also its `fields` (today only `hero`), an icon its `file` (an SVG under `assets/images`). A list the file does not declare is the default theme's; `page_templates: []` is refused. Any other list, any other key, and `settings` ("Appearance settings are not built yet.") stop the boot.
