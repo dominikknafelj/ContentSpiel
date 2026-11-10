@@ -38,7 +38,7 @@ module Admin
         keys: [],
         slots: [],
         controller: nil,
-        keyboard: [ "test/system/admin/users_test.rb", "a user the viewer can't change says why in a note, and the keyboard passes over it from the breadcrumb to Activity" ]
+        keyboard: [ "test/system/admin/users_test.rb", "a user the viewer can't change says why in a note, which takes no Tab stop" ]
       )
 
       CLASS = "rounded-card".freeze

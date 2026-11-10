@@ -530,10 +530,13 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
   # on yourself is never outranked) while holding a group they could not hand
   # on: its tile is locked and ticked, and its disabled box posts nothing, so
   # the hidden input is what keeps the membership. Without it the save would
-  # read as taking them out of the group, which `Users::Save` refuses. A
-  # group its own member can't hand on is one that stores a right nobody may
-  # hand on (`forms.submit`); the grant's validation refuses that, so the test
-  # writes it past the validation, as only a console could.
+  # read as taking them out of the group, which `Users::Save` refuses. Under
+  # today's hand-on rule (`AccessControl.can_assign_group?`) this state can't
+  # be reached: a member can always hand on a group they hold, save one that
+  # stores a right nobody may hand on (`forms.submit`), which the grant's
+  # validation refuses, so the test writes it past the validation, as only a
+  # console could. It guards how `Users::Save` reads a carried group should
+  # that rule ever tighten.
   test "a user saved as rendered with a group the viewer can't grant keeps the membership" do
     managers = sign_in_manager
     me = users(:editor_branch)

@@ -22,8 +22,10 @@ module Admin
     # unticking every tile still submits `group_ids` (an empty list, not "leave
     # alone"). On the editor (`frame: true`) the tiles stand in the Groups
     # card, with "Manage groups →" at its head's end for a `groups.manage`
-    # holder; in a dialog (`frame: false`) there is no card, only the heading
-    # and the tiles, since a dialog is a surface of its own.
+    # holder; in a dialog (`frame: false`) there is no card, since a dialog
+    # is a surface of its own: the tiles stand in a fieldset whose legend,
+    # in the label voice of the dialog's other fields, names them. Manage
+    # groups is the card's alone.
     class GroupCardsComponent < AdminComponent
       HEADING_ID = "user-groups-title".freeze
 

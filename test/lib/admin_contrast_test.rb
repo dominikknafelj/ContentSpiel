@@ -294,9 +294,10 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  # A selected or pressed tile in a grid (`.admin-tile`) is told by its
-  # accent outline alone, 2px outside its edge, so the outline stands on the
-  # card it is in (surface) or on the page (paper), and is held at the
+  # A selected, pressed or ticked tile in a grid (`.admin-tile`; a ticked
+  # one is the user editor's group tile, inside the Groups card) is told by
+  # its accent outline alone, 2px outside its edge, so the outline stands on
+  # the card it is in (surface) or on the page (paper), and is held at the
   # figures it reaches, which are well above 3:1.
   test "a selected tile's accent outline is 3:1 on surface and on paper" do
     floors = { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-paper" => { light: 6.2, dark: 7.8 } }

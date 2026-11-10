@@ -69,8 +69,9 @@ class Admin::UsersScreen::GroupCardsComponentTest < ViewComponent::TestCase
     cards(selected: [], assignable: ids, frame: false)
 
     assert_no_selector ".admin-settings-card"
-    assert_selector "[role=group][aria-labelledby='user-groups-title']" do
-      assert_selector "#user-groups-title", text: "Groups"
+    assert_no_selector "h2"
+    assert_selector "fieldset.admin-user-groups.m-0.min-w-0.border-0.p-0" do
+      assert_selector "legend.text-label.text-meta.mb-1:first-child", text: "Groups"
       assert_selector "label.admin-tile", count: AccessControl::Group.count
     end
     assert_selector "input[type=hidden][name='user[group_ids][]'][value='']", visible: :all, count: 1

@@ -95,7 +95,7 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
   # The read-only reason is a note (`Admin::Ui::NoticeComponent`): read where
   # it stands and never a Tab stop, so the keyboard goes from the breadcrumb
   # to Activity and on through the page without landing in it.
-  test "a user the viewer can't change says why in a note, and the keyboard passes over it from the breadcrumb to Activity" do
+  test "a user the viewer can't change says why in a note, which takes no Tab stop" do
     managers = AccessControl::Group.create!(name: "User managers")
     %w[users.manage audit.view posts.read pages.read].each { |key| AccessControl::Grant.create!(group: managers, permission: key, scope: {}) }
     AccessControl::Membership.create!(user: users(:editor_branch), group: managers)

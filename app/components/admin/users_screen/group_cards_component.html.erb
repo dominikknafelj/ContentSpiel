@@ -21,11 +21,8 @@
     <div class="p-4"><%= tiles %></div>
   <% end %>
 <% else %>
-  <div class="admin-user-groups" role="group" aria-labelledby="<%= HEADING_ID %>">
-    <div class="mb-2.5 flex items-baseline justify-between gap-3">
-      <h2 id="<%= HEADING_ID %>" class="text-h2 text-ink"><%= t(".title") %></h2>
-      <%= manage_link if manage_groups %>
-    </div>
+  <fieldset class="admin-user-groups m-0 min-w-0 border-0 p-0">
+    <legend class="text-label text-meta mb-1"><%= t(".title") %></legend>
     <%= tiles %>
-  </div>
+  </fieldset>
 <% end %>
