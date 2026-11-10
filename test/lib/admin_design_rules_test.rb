@@ -2212,7 +2212,13 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/outline-offset:\s*-2px;/, ring)
 
     named = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?("admin-row-link") } }
-    assert_equal 4, named.size, "the row link is four rules, written once: #{named.map(&:first).inspect}"
+    sticky, link = named.partition { |selectors, _| selectors.any? { |selector| selector.include?(":first-child") } }
+    assert_equal 4, link.size, "the row link is four rules, written once: #{link.map(&:first).inspect}"
+    # A sticky cell is the containing block of the cover, which would then
+    # cover that cell alone: a table whose row is one link has no sticky first column.
+    assert_equal 1, sticky.size, "the sticky first column is one rule: #{sticky.map(&:first).inspect}"
+    assert_match(/:where\(table:not\(:has\(\.admin-row-link\)\)\)/, sticky.first.first.join(","))
+    assert_match(/position:\s*sticky;/, sticky.first.last)
   end
 
   # A box that cannot be changed keeps its full colour, so its tick reads at

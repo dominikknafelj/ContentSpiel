@@ -127,8 +127,15 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     assert_no_selector row(dana)
     assert_not Invitation.exists?(dana.id)
 
-    # A user's row is pressed anywhere: its link's cover reaches the whole row.
-    find(row(users(:two))).click
+    # A user's row is pressed anywhere: its link's cover reaches the whole
+    # row, its Edit at the far end too. A press on the point where Edit stands.
+    verb = page.evaluate_script(<<~JS)
+      (() => { const box = document.querySelector("#{row(users(:two))} .admin-row-verb").getBoundingClientRect()
+        return [ box.left + box.width / 2, box.top + box.height / 2 ] })()
+    JS
+    assert page.evaluate_script("document.elementFromPoint(#{verb.join(', ')}).matches('#{row(users(:two))} a.admin-row-link')"),
+      "the row link's cover does not reach Edit"
+    page.driver.browser.mouse.click(x: verb.first, y: verb.last)
     assert_selector "h1", text: users(:two).name_or_email
   end
 end

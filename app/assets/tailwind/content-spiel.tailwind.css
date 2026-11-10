@@ -1531,7 +1531,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    layer. `.admin-table-scroll--x` is Trash's table, the forms list's and a
    form's submissions': the sideways scroll alone, with no height of its
    own, so its rows scroll with the page. In
-   both the first column sticks at the left as the card scrolls sideways.
+   both the first column sticks at the left as the card scrolls sideways,
+   but in a table whose row is one link (`.admin-row-link`: Users, Groups),
+   which scrolls sideways whole: a sticky cell is the containing block of
+   the link's cover, which would then cover the name cell alone.
    `.admin-table-scroll` is a stacking context of its own, so its local
    layers stay under the shell's top bar. In it the head's corner stands at
    `raised-top`, over the rest of the head (which slides under it sideways)
@@ -1544,7 +1547,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    cell's own shadow travels with the sticky head. */
 .admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); box-shadow: inset 0 -1px 0 var(--cs-line-strong); }
 .admin-table-scroll--x { overflow-x: auto; }
-:is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
+:is(.admin-table-scroll, .admin-table-scroll--x) :where(table:not(:has(.admin-row-link))) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
 .admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
 .admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }
 /* A Translations row, a Forms row and a submission's row under the pointer
