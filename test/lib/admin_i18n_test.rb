@@ -186,6 +186,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/delete_zone_component.html.erb
     app/components/admin/users_screen/owner_zone_component.rb
     app/components/admin/users_screen/owner_zone_component.html.erb
+    app/views/admin/users/index.html.erb
     app/components/admin/groups_screen/delete_zone_component.rb
     app/components/admin/groups_screen/delete_zone_component.html.erb
     app/controllers/admin/invites_controller.rb

@@ -61,17 +61,18 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "a[href='/cs-studio/users/new']", text: "New user"
     assert_select "#{row(users(:two))} a[href='/cs-studio/users/#{users(:two).id}/edit']", text: "Tara Two"
     assert_select "#{row(users(:two))} span", text: "two@example.com"
-    assert_select "#{row(users(:two))} [aria-hidden=true]", text: "T"
+    assert_select "#{row(users(:two))} [aria-hidden=true]", text: "TT"
     assert_select "#{row(users(:two))} [data-column=groups]", text: /Admin/
     assert_select "#{row(users(:two))} [data-column=last-sign-in] time", text: "just now"
     assert_select "#{row(users(:one))}", text: /\(you\)/
     assert_select "#{row(users(:one))}", text: /Owner/
     assert_select "#{row(users(:one))} [data-column=groups]", text: "No groups"
-    # Each row says what its time is (the heading is not a table header).
-    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: /\ALast sign-in:\s*Never\z/
-    assert_select "#{row(users(:one))} [data-column=last-sign-in] .sr-only", text: /Last sign-in:/
+    # The column's header names each row's time.
+    assert_select ".admin-users-list thead th[scope=col]", text: "Last sign-in"
+    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: /\A\s*Never\s*\z/
     assert_select "#{row(users(:reader))} [data-column=groups]", text: "Read only"
     assert_select ".admin-users-list a", text: /\A(Edit|Delete)\z/, count: 0
+    assert_select "#{row(users(:two))} .admin-row-verb", text: "Edit"
     assert_select ".admin-users-list button", count: 0
     assert_select "dialog[id^=delete-user]", count: 0
   end
@@ -140,7 +141,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     end
     many = count_for.call
 
-    assert_select ".admin-users-list li", count: User.count
+    assert_select ".admin-users-list tbody tr", count: User.count
     assert_equal 1, many.count { |sql| sql.match?(/MAX\("audit_events"\."occurred_at"\)/) }
     assert_equal few.size, many.size, "the list must not query per user:\n#{(many - few).first(5).join("\n")}"
   end

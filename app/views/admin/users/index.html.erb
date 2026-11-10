@@ -1,31 +1,33 @@
-<%# The Users module (cs-studio spec §6.1; round 3 Task 12, handoff `Studio Users`): every
-    user as a row that opens their editor, with their groups and last sign-in
-    (`Users::LastSignIn`, one grouped query), and the open invitations among
-    them. Delete lives in the editor.
+<%# The Users screen: every user as a row that opens their editor, with their
+    groups and last sign-in (`Users::LastSignIn`, one grouped query), and the
+    open invitations among them (`Admin::UsersScreen::ListComponent`). Delete
+    lives in the editor.
 
-    INVITES (mail spec "Invites", design answer M4): "Invite person" beside
-    "New user" while mail works (`invites_offered?`), opening the invite
-    dialog; otherwise an owner reads "Invites need mail. Set up mail →" under
-    the heading (only an owner: mail is set up in Settings). Also drawn by
-    `Admin::InvitesController#create` for a refused invite, with the dialog
-    open: `@invite` and its companions are set only there. %>
-<% content_for :title, "Users" %>
-<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-  <div class="flex flex-col gap-1">
-    <h1 class="text-h1 text-ink">Users</h1>
-    <% if !invites_offered? && Current.user&.owner? %>
-      <p class="text-sm text-meta" data-invites-need-mail>
-        <%= t(".invites_need_mail") %>
-        <%= link_to t(".set_up_mail"), admin_settings_path(anchor: "mail", **admin_url_options), data: { turbo_frame: "_top" } %>
-      </p>
-    <% end %>
+    The heading row is "Users" with "Invite person…" (secondary) and "New
+    user" (the one primary) at its end, the actions wrapping under the
+    heading below 640px. "Invite person…" is offered while mail works
+    (`invites_offered?`), opening the invite dialog; otherwise an owner reads
+    "Invites need mail. Set up mail →" under the heading (only an owner: mail
+    is set up in Settings). Also drawn by `Admin::InvitesController#create`
+    for a refused invite, with the dialog open: `@invite` and its companions
+    are set only there. %>
+<% content_for :title, t(".title") %>
+<div class="mb-4">
+  <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    <div class="flex flex-wrap items-center gap-2">
+      <% if invites_offered? %>
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".invite"), variant: :secondary, data: dialog_trigger(Admin::UsersScreen::InviteDialogComponent::DIALOG_ID)) %>
+      <% end %>
+      <%= link_to t(".new_user"), new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: Admin::Ui::ButtonComponent.classes(:primary) %>
+    </div>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <% if invites_offered? %>
-      <%= render Admin::Ui::ButtonComponent.new(label: t(".invite"), variant: :secondary, data: dialog_trigger(Admin::UsersScreen::InviteDialogComponent::DIALOG_ID)) %>
-    <% end %>
-    <%= link_to "New user", new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
-  </div>
+  <% if !invites_offered? && Current.user&.owner? %>
+    <p class="mt-1 text-small text-meta" data-invites-need-mail>
+      <%= t(".invites_need_mail") %>
+      <%= link_to t(".set_up_mail"), admin_settings_path(anchor: "mail", **admin_url_options), data: { turbo_frame: "_top" } %>
+    </p>
+  <% end %>
 </div>
 
 <% if invites_offered? || @invite %>

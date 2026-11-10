@@ -799,6 +799,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/form_submissions/*
     app/components/admin/audit_screen/*
     app/views/admin/audit_events/*
+    app/components/admin/users_screen/*
+    app/views/admin/users/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -808,7 +810,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
   HAND_BOX_ALLOWED = {
-    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
+    "app/components/admin/users_screen/group_cards_component.rb" => "the group cards' hand-drawn boxes, redrawn as the user editor's tiles",
+    "app/components/admin/users_screen/group_cards_component.html.erb" => "the group cards' small words, redrawn with the user editor's tiles",
+    "app/views/admin/users/_form.html.erb" => "the user form's important danger edges, redrawn with the user editor",
+    "app/views/admin/users/edit.html.erb" => "the user editor's small words, redrawn with the user editor",
+    "app/views/admin/users/new.html.erb" => "New user's small words, redrawn with the user editor"
   }.freeze
 
   def self.type_scale_sources = TYPE_SCALE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
@@ -1625,7 +1632,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # The circles still drawn by hand, each with the reason it is not the
   # component yet. The list may only shrink.
   HAND_BUILT_AVATAR_ALLOWED = {
-    "app/components/admin/users_screen/list_component.html.erb" => "the users list's one-letter circle, redrawn with the list",
     # The one script that builds a circle in the browser from the letters the
     # server sends, with the component's own classes.
     "app/javascript/ui/avatar.js" => "the scripts' circle, held to the component's classes"
@@ -1892,7 +1898,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/translation_chip_component.rb
     app/components/admin/ui/unpublished_chip_component.html.erb
     app/components/admin/ui/word_diff_component.rb
-    app/components/admin/users_screen/invite_dialog_component.html.erb
     app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/password_field_controller.js
     app/views/admin/accounts/edit.html.erb
@@ -1943,7 +1948,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   NOTICE_NOT_YET = %w[
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
-    app/components/admin/users_screen/invite_dialog_component.html.erb
     app/views/admin/accounts/edit.html.erb
     app/views/admin/passwords/edit.html.erb
     app/views/admin/passwords/new.html.erb

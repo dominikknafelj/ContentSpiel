@@ -1,7 +1,8 @@
 module Admin
   module UsersScreen
-    # `Admin::UsersScreen::ListComponent`: avatar, name over email, (you), the OWNER tag,
-    # group chips ("No groups") and the last sign-in ("Never").
+    # `Admin::UsersScreen::ListComponent`: the table of users, each row the
+    # shared avatar, the name over the email, (you), the Owner badge, a badge
+    # per group ("No groups") and the last sign-in ("Never"), ending in Edit.
     class ListComponentPreview < ViewComponent::Preview
       def default
         users = User.includes(:groups).order(:email_address).limit(8).to_a

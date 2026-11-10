@@ -42,7 +42,7 @@ module Admin
       result = Users::Save.call(User.new, attributes: user_params)
 
       if result.ok?
-        redirect_to edit_admin_user_path(result.record, **admin_url_options), status: :see_other, notice: "User created"
+        redirect_to edit_admin_user_path(result.record, **admin_url_options), status: :see_other, notice: t("admin.users.created")
       else
         forbidden_or(result) do
           @user = result.record
@@ -74,7 +74,7 @@ module Admin
       result = Users::Save.call(@user, attributes: user_params)
 
       if result.ok?
-        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: "User saved"
+        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: t("admin.users.saved")
       else
         forbidden_or(result) do
           @user = result.record
@@ -124,9 +124,9 @@ module Admin
         redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence
       elsif deleting_self
         terminate_session
-        redirect_to admin_sign_in_path, status: :see_other, notice: "Your account was deleted"
+        redirect_to admin_sign_in_path, status: :see_other, notice: t("admin.users.deleted_own")
       else
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User deleted"
+        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: t("admin.users.deleted")
       end
     end
 

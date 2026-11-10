@@ -82,8 +82,10 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
         assert_select "[data-invite-dates]", "Invited #{sent} · expires #{expires}"
         assert_select "[data-invite-menu] button", text: "Resend invite"
         assert_select "[data-invite-menu] button", text: "Withdraw invite…"
-        assert_select "dialog#withdraw-invite-#{dana.id}", text: /Withdraw the invite to dana@example\.com\? The link stops working\./
       end
+      # The confirmation stands outside the table's rows.
+      assert_select "tr dialog", count: 0
+      assert_select "dialog#withdraw-invite-#{dana.id}", text: /Withdraw the invite to dana@example\.com\? The link stops working\./
     end
   end
 
@@ -100,7 +102,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     end
     assert_select "##{ActionView::RecordIdentifier.dom_id(accepted)}", count: 0
     expected = (User.all.to_a + [ fresh, lapsed ]).sort_by(&:email_address).map { |row| ActionView::RecordIdentifier.dom_id(row) }
-    assert_equal expected, css_select(".admin-users-list li").map { |row| row["id"] }, "the invitations stand among the users in the order of the address"
+    assert_equal expected, css_select(".admin-users-list tbody tr").map { |row| row["id"] }, "the invitations stand among the users in the order of the address"
     assert_select "##{ActionView::RecordIdentifier.dom_id(lapsed)}" do
       assert_select "[data-invite-state=expired]", "Invite expired"
       assert_select "[data-invite-dates]", count: 0
@@ -122,7 +124,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
       end
       assert_response :unprocessable_entity
       assert_select "#{DIALOG}[data-admin--ui--dialog-open-on-load]" do
-        assert_select "#invite_email_address_error", /\ASomeone with this address already has an account\.\s*\z/
+        assert_select ".admin-field > #invite_email_address-errors > p > span:last-child", /\ASomeone with this address already has an account\.\s*\z/
         assert_select "input#invite_email_address[aria-invalid=true]"
         assert_select "input#invite_name[value=?]", "Someone"
         assert_select "#invite-person-resend", count: 0
@@ -131,7 +133,7 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
       post "/cs-studio/invites", params: { user: { email_address: "DANA@example.com", group_ids: [ access_control_groups(:editor).id ] } }
       assert_response :unprocessable_entity
       assert_select "#{DIALOG}[data-admin--ui--dialog-open-on-load]" do
-        assert_select "#invite_email_address_error", /This address is already invited\./ do
+        assert_select "#invite_email_address-errors", /This address is already invited\./ do
           assert_select "button[type=submit][form=invite-person-resend]", "Resend"
         end
         assert_select "form#invite-person-resend[action=?]", "/cs-studio/invites/#{invited.id}/resend"
@@ -143,13 +145,13 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
 
       post "/cs-studio/invites", params: { user: { email_address: "" } }
       assert_response :unprocessable_entity
-      assert_select "#invite_email_address_error", /Email address can't be blank/
+      assert_select "#invite_email_address-errors", /Email address can't be blank/
     end
 
     # Mail stopped working since the page was drawn: one line at the top.
     post "/cs-studio/invites", params: { user: { email_address: "new@example.com" } }
     assert_response :unprocessable_entity
-    assert_select "#{DIALOG}[data-admin--ui--dialog-open-on-load] p[role=alert]", "Invites need mail."
+    assert_select "#{DIALOG}[data-admin--ui--dialog-open-on-load] div.bg-danger-tint[role=alert]", "Invites need mail."
     assert_not Invitation.exists?(email_address: "new@example.com")
   end
 
