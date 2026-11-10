@@ -13,10 +13,11 @@
     </span>
   </div>
 
-  <%# The warning line: the warn alert at its small size, advice and never a refusal (decision 7).
-      Polite, as a sentence that comes while someone is working. %>
+  <%# The warning line: the warn notice's classes, advice and never a refusal, since the script
+      writes its words and hides it when it has none. No role of its own: the polite region around
+      it speaks, as a sentence that comes while someone is working. %>
   <div aria-live="polite">
-    <%= tag.p warning, hidden: warning.empty?, class: "mb-2 rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-warn-ink",
+    <%= tag.p warning, hidden: warning.empty?, class: "mb-2 #{Admin::Ui::NoticeComponent.classes(:warn)}",
           data: { "admin--editor--table-target": "warning" } %>
   </div>
 

@@ -7,9 +7,11 @@ module Admin
     #
     # Its role follows the tone: warn and danger are an alert, read out at
     # once; ok is a status, read out when the reader is free; neutral is a
-    # note, read where it stands. `role: nil` writes none, for a notice
-    # inside a live region: the region speaks, and a role of the notice's own
-    # would have it heard twice. Any other role a caller names is written as
+    # note, read where it stands. `role: nil` writes none: for a notice
+    # inside a live region, where the region speaks and a role of the
+    # notice's own would have it heard twice, and for a box with no live
+    # role that is read where it stands (a dialog's line, a list's standing
+    # warning). Any other role a caller names is written as
     # given.
     #
     # Warn alone keeps an edge: the tint and its edge are the thing on
@@ -23,7 +25,7 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A box of the caller's words whose role follows its tone (alert, status or note), or none inside a live region; it takes no focus.",
+        accessibility: "A box of the caller's words whose role follows its tone (alert, status or note), or none inside a live region or for a box read where it stands; it takes no focus.",
         motion: :none,
         content_edges: %i[short long],
         widths: :from_container,

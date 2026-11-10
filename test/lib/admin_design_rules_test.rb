@@ -1878,10 +1878,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   STATUS_FILL_FILES = %w[
     app/components/admin/editor_screen/hold_strip_component.html.erb
     app/components/admin/editor_screen/no_address_chip_component.html.erb
-    app/components/admin/editor_screen/table_controls_component.html.erb
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
-    app/components/admin/notes_screen/thread_component.rb
     app/components/admin/pages_screen/tree_state_mark_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/ui/badge_component.rb
@@ -1935,11 +1933,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # in one quoted class string (a constant the file spells is read in place
   # of its interpolation), is a box of words drawn by hand. A chip or a badge
   # has a tint but no card radius in its string, a fill that is a state's mark
-  # no radius at all. What may keep a box of its own, with the reason:
+  # no radius at all. Not seen: a radius and a tint written in separate
+  # strings (`class: [ "rounded-cs", "bg-warn-tint" ]`), and a script's
+  # `classList.add(...)`. What may keep a box of its own, with the reason:
   HAND_NOTICE_ALLOWED = {
-    "app/components/admin/ui/error_summary_component.html.erb" => "the error summary is its own component, focused on arrival",
-    "app/components/admin/editor_screen/table_controls_component.html.erb" => "the table's warning is a line of its controls that their script fills",
-    "app/components/admin/notes_screen/thread_component.rb" => "a note's refusal stands in its thread, drawn by the thread's script too"
+    "app/components/admin/ui/error_summary_component.html.erb" => "the error summary is its own component, focused on arrival"
   }.freeze
   # Screens whose boxes are drawn by hand still, each to move onto the notice
   # with the rest of its screen's look; the list only shrinks.

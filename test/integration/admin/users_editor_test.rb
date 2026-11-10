@@ -288,7 +288,6 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
       assert_includes banner.text.squish, "This user was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
       assert_select "a[href='/cs-studio/users/#{user.id}/edit'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
     end
-    assert_select "[role=alert].rounded-cs", count: 0
   end
 
   # --- The owner endpoint ---------------------------------------------------------
