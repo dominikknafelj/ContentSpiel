@@ -64,7 +64,7 @@ module Admin
         keys: %w[title upload close file none selected cancel use],
         slots: [],
         controller: "admin--media--picker",
-        keyboard: [ "test/system/admin/media_picker_test.rb", "Escape clears the search first, a second Escape closes the dialog and focus goes back to the opener" ]
+        keyboard: [ "test/system/admin/media_picker_test.rb", "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" ]
       )
 
       DIALOG_ID = "media-picker".freeze

@@ -120,18 +120,6 @@ class Admin::KeyboardNavigationSystemTest < ApplicationSystemTestCase
 
   private
 
-  def focused_text = page.evaluate_script("document.activeElement.textContent.trim()")
-
-  # Tab until `selector` holds the focus, from wherever Tab starts now, and
-  # fail if it is not reached within `limit` stops.
-  def stop_on(selector, limit: 40)
-    limit.times do
-      page.send_keys(:tab)
-      return if page.evaluate_script("document.activeElement.matches(#{selector.to_json})")
-    end
-    flunk "Tab never reached #{selector}"
-  end
-
   # The posts list's page size, for a list short enough to make: the server
   # runs in this process, so the controller reads the constant set here.
   def with_posts_per_page(size)

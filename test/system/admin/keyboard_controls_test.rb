@@ -24,13 +24,13 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
 
     page.send_keys(:enter)
     assert_selector "dialog#media-picker[open]"
-    find("dialog[open]").send_keys(:escape)
+    page.send_keys(:escape)
     assert_no_selector "dialog[open]"
     assert_selector "#{card} button:focus", text: "Choose image"
 
     page.send_keys(:space)
     assert_selector "dialog#media-picker[open]"
-    find("dialog[open]").send_keys(:escape)
+    page.send_keys(:escape)
     assert_selector "#{card} button:focus", text: "Choose image"
   end
 
@@ -51,7 +51,7 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
 
     page.send_keys(:enter)
     assert_selector "dialog#new-form-dialog[open]"
-    find("dialog[open]").send_keys(:escape)
+    page.send_keys(:escape)
     assert_no_selector "dialog[open]"
     assert_match(/New form\z/, focused_text)
   end
@@ -197,19 +197,5 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
     assert_equal "#user_email_address", page.evaluate_script("document.activeElement.getAttribute('href')")
     page.send_keys(:enter)
     assert_eventually(message: "focus never reached the field") { page.evaluate_script("document.activeElement.id") == "user_email_address" }
-  end
-
-  private
-
-  def focused_text = page.evaluate_script("document.activeElement.textContent.trim()")
-
-  # Tab until `selector` holds the focus, from wherever Tab starts now, and
-  # fail if it is not reached within `limit` stops.
-  def stop_on(selector, limit: 30)
-    limit.times do
-      page.send_keys(:tab)
-      return if page.evaluate_script("document.activeElement.matches(#{selector.to_json})")
-    end
-    flunk "Tab never reached #{selector}"
   end
 end

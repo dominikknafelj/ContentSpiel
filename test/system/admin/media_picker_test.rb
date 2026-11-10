@@ -209,18 +209,26 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
   end
 
-  test "the keyboard selects a tile with Enter or Space and a second Enter on the selected tile confirms" do
+  # Keys go to the page, so they reach whatever holds the focus: the tile is
+  # reached by Tab from the search field and never clicked.
+  test "the keyboard reaches a tile by Tab from the search field, Space selects it and a second Enter on it confirms" do
     visit_editor(@landing)
 
     within("#page-hero-image-section") { click_on "Choose image" }
-    tile = nil
-    within("dialog[open]") { tile = find("button", text: @asset.title) }
-    tile.send_keys(:space)
+    within("dialog[open]") { assert_button @asset.title }
+    # The search field takes the focus as the picker opens.
+    search = find_field("Search images")[:id]
+    assert_eventually(message: "the search field never took the focus") { page.evaluate_script("document.activeElement.id") == search }
+    stop_on("dialog[open] button[aria-pressed]")
+    assert_match(/\A#{Regexp.escape(@asset.title)}\b/, focused_text)
+    assert_selector "dialog[open] button[aria-pressed=false]", text: @asset.title
+
+    page.send_keys(:space)
     assert_selector "dialog[open] [role=status]", text: "1 selected"
     assert_selector "dialog[open] button[aria-pressed=true]", text: @asset.title
     assert_selector "dialog[open]"
 
-    tile.send_keys(:enter)
+    page.send_keys(:enter)
     refute_selector "dialog[open]"
     assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
   end
@@ -294,13 +302,13 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_button @asset.title
       fill_in "Search images", with: "zzz-nothing"
       assert_text "No matches"
-      find_field("Search images").send_keys(:escape)
+      page.send_keys(:escape)
       assert_field "Search images", with: ""
       assert_button @asset.title
     end
     assert_selector "dialog[open]"
 
-    find("dialog[open]").send_keys(:escape)
+    page.send_keys(:escape)
     refute_selector "dialog[open]"
     assert_selector "#page-hero-image-section button:focus", text: "Choose image"
   end
@@ -382,7 +390,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     within("#page-hero-image-section") { click_on "Choose image" }
     assert_selector "dialog[open]"
 
-    find("dialog[open]").send_keys(:escape)
+    page.send_keys(:escape)
 
     refute_selector "dialog[open]"
     assert_selector "#page-hero-image-section button:focus", text: "Choose image"

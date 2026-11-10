@@ -22,18 +22,15 @@ class Admin::KeyboardFeedbackSystemTest < ApplicationSystemTestCase
     press "Move to trash…"
     within("dialog[open]") { press "Move to trash" }
     toast = "#toasts .admin-toast"
-    assert_selector toast, text: /trash/i, wait: 10
-    assert post.reload.trashed?
-
+    # A success toast hides after a few seconds unless the pointer or the
+    # focus is on it: its words are pressed as soon as it is there.
     find(toast, text: /trash/i).find("span", match: :first).click
+    assert post.reload.trashed?
     page.send_keys(:tab)
     assert_equal "Undo", focused_text
     page.send_keys(:enter)
-    assert_selector toast, text: "Restored", wait: 10
+    find(toast, text: "Restored", wait: 10).find("span", text: "Restored").click
     assert_not post.reload.trashed?
-
-    restored = find(toast, text: "Restored")
-    restored.find("span", text: "Restored").click
     page.send_keys(:tab)
     assert_equal "Dismiss", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
     page.send_keys(:enter)
@@ -99,20 +96,5 @@ class Admin::KeyboardFeedbackSystemTest < ApplicationSystemTestCase
     page.send_keys(:enter)
     within(row) { assert_selector "button", text: "Copied" }
     assert_equal Setup::SystemCheck::SITE_ADDRESS_COMMAND, page.evaluate_script("window.__copied")
-  end
-
-  private
-
-  def focused_text = page.evaluate_script("document.activeElement.textContent.trim()")
-
-  # Tab (or `keys`, Shift+Tab) until `selector` holds the focus, from
-  # wherever Tab starts now, and fail if it is not reached within `limit`
-  # stops.
-  def stop_on(selector, keys: :tab, limit: 40)
-    limit.times do
-      page.send_keys(keys)
-      return if page.evaluate_script("document.activeElement.matches(#{selector.to_json})")
-    end
-    flunk "Tab never reached #{selector}"
   end
 end
