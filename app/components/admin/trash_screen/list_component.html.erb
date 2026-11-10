@@ -2,22 +2,25 @@
 <% if items.empty? %>
   <%= render Admin::Ui::EmptyStateComponent.new(title: empty_title, description: empty_description) %>
 <% else %>
-  <table class="admin-trash-table admin-card-table w-full border-collapse text-sm">
-    <thead>
-      <tr class="border-b border-line-strong text-left text-label text-meta">
-        <th class="py-2 pr-4">Item</th>
-        <th class="py-2 pr-4">Type</th>
-        <th class="py-2 pr-4">Trashed</th>
-        <th class="py-2 pr-4">Deletes</th>
-        <th class="py-2"><span class="sr-only">Actions</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% items.each do |item| %>
-        <%= render row_for(item) %>
-      <% end %>
-    </tbody>
-  </table>
+  <%# Rounded as the card is, so the sticky Item column's ground keeps the card's corners. %>
+  <div class="admin-table-scroll--x rounded-card">
+    <table class="admin-trash-table admin-card-table w-full border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-line-strong text-left text-label text-meta">
+          <th class="py-2 pr-4"><%= t(".columns.item") %></th>
+          <th class="py-2 pr-4"><%= t(".columns.type") %></th>
+          <th class="py-2 pr-4"><%= t(".columns.trashed") %></th>
+          <th class="py-2 pr-4"><%= t(".columns.deletes") %></th>
+          <th class="py-2"><span class="sr-only"><%= t(".columns.actions") %></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% items.each do |item| %>
+          <%= render row_for(item) %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
 <% end %>
   <%= footer %>
 </div>

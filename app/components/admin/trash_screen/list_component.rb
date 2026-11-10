@@ -5,15 +5,18 @@ module Admin
   # -- the same trap `Admin::MediaLibrary`'s own comment describes for
   # `Media`. `test/lib/admin_namespace_shadow_test.rb` guards it.
   module TrashScreen
-    # The Trash screen's list (trash spec §7): one table row per trashed item,
-    # newest first, as `Admin::TrashController#index` loaded them (the Empty
-    # trash button is the screen header's, `EmptyTrashComponent`). Everything
+    # The Trash screen's list: one table row per trashed item, newest first,
+    # as `Admin::TrashController#index` loaded them (the Empty trash button is
+    # the screen header's, `EmptyTrashComponent`), in one card whose table
+    # scrolls sideways inside it with the Item column sticky
+    # (`.admin-table-scroll--x`), so the page never scrolls sideways. Everything
     # a row needs beyond its own record is looked up here ONCE for the whole
     # page, in a number of queries that doesn't grow with the rows:
     # - each page root's branch members (`#subpages_by_root`), which of them
     #   the viewer may read (`#readable_member_ids`) and how many pages its
     #   purge would take (`#descendant_counts`);
-    # - who trashed each item (`#who_label`): the user the row names, and the
+    # - who trashed each item (`#who_label`, and `#who_actor` for the row's
+    #   avatar): the user the row names, and the
     #   newest `*.trashed` audit event of every row (`#recorded_trashings`,
     #   one query) for a token's name and for a user who is gone;
     # - which images something in the trash still uses, and by how many items
@@ -24,34 +27,24 @@ module Admin
       # The page-number footer (`Admin::Ui::PaginationComponent`), inside the card.
       renders_one :footer
 
-      YOU = "You".freeze
-
       # How many names the "Includes N subpages: …" line gives before "and N more".
       NAMED_SUBPAGES = 3
 
       # The audit action each kind's trashing records (`#recorded_trashings`).
-      TRASHED_ACTIONS = { "Page" => "page.trashed", "Post" => "post.trashed", "Media::Asset" => "media.trashed", "Forms::Form" => "form.trashed" }.freeze
+      TRASHED_ACTIONS = { "Page" => "page.trashed", "Post" => "post.trashed", "Media::Asset" => "media.trashed", "Forms::Form" => "form.trashed" }.freeze # i18n-ok: class names, matched against an event's subject_type
 
-      EMPTY_STATES = {
-        nil => [ "The trash is empty.", "Deleted pages, posts and images show up here until they're deleted for good." ],
-        "pages" => [ "No pages in the trash.", "Deleted pages show up here until they're deleted for good." ],
-        "posts" => [ "No posts in the trash.", "Deleted posts show up here until they're deleted for good." ],
-        "images" => [ "No images in the trash.", "Deleted images show up here until they're deleted for good." ],
-        "forms" => [ "No forms in the trash.", "Deleted forms show up here, with their submissions, until they're deleted for good." ]
-      }.freeze
-
-      # The empty state of a list that is empty only FOR THIS VIEWER: the
-      # trash (or this tab's kind) holds items, none of which they may restore
-      # or delete one by one. Only a `trash.empty` holder is ever told so --
-      # they are the one viewer who is shown what the whole trash holds (the
-      # Empty trash dialog's sentence), and "The trash is empty" beside "Empty
-      # trash… deletes 1 page" was a contradiction on one screen.
-      HIDDEN_ITEMS = [ "Nothing here you can restore.", "The trash holds items you can't restore or delete one by one. Empty trash deletes them." ].freeze
+      # The empty state's words of each tab (`list.empty.<key>`), nil being All.
+      EMPTY_STATES = { nil => "all", "pages" => "pages", "posts" => "posts", "images" => "images", "forms" => "forms" }.freeze
 
       # `tab` is the active tab's key ("pages", ... or nil for All): the empty
       # state's wording, and the tab a restore or delete comes back to.
       # `hidden_items` says the list's kind is in the trash but out of this
-      # viewer's reach (see `HIDDEN_ITEMS`).
+      # viewer's reach: the list is empty only FOR THIS VIEWER, none of what it
+      # holds being theirs to restore or delete one by one (`list.hidden`).
+      # Only a `trash.empty` holder is ever told so: they are the one viewer
+      # shown what the whole trash holds (the Empty trash dialog's sentence),
+      # and "The trash is empty" beside "Empty trash… deletes 1 page" would
+      # contradict it on one screen.
       def initialize(items:, retention_days:, tab: nil, hidden_items: false, url_options: {})
         @items = items
         @retention_days = retention_days
@@ -65,6 +58,7 @@ module Admin
           item:,
           retention_days:,
           who: who_label(item),
+          actor: who_actor(item),
           subpage_sentence: subpage_sentence(item),
           purge_subpage_count: item.is_a?(Page) ? descendant_counts.fetch(item.id, 0) : 0,
           used_by: used_by_counts[[ item.class.name, item.id ]],
@@ -74,15 +68,15 @@ module Admin
         )
       end
 
-      def empty_title = empty_state.first
+      def empty_title = t(".#{empty_state}.title")
 
-      def empty_description = empty_state.last
+      def empty_description = t(".#{empty_state}.description")
 
       private
 
       attr_reader :items, :retention_days, :tab, :url_options
 
-      def empty_state = @hidden_items ? HIDDEN_ITEMS : EMPTY_STATES.fetch(tab)
+      def empty_state = @hidden_items ? "hidden" : "empty.#{EMPTY_STATES.fetch(tab)}"
 
       def pages = items.grep(Page)
 
@@ -98,12 +92,13 @@ module Admin
         members = subpages_by_root.fetch(item.id, [])
         return if members.empty?
 
-        named = members.select { |member| readable_member_ids.include?(member.id) }.first(NAMED_SUBPAGES).map { |m| m.title.presence || "(untitled)" }
-        sentence = "Includes #{helpers.pluralize(members.size, "subpage")}"
-        return sentence if named.empty?
+        named = members.select { |member| readable_member_ids.include?(member.id) }.first(NAMED_SUBPAGES).map { |m| m.title.presence || t(".untitled") }
+        count = members.size
+        return t(".subpages.bare", count:) if named.empty?
 
-        rest = members.size - named.size
-        "#{sentence}: #{named.join(", ")}#{" and #{rest} more" if rest.positive?}"
+        names = named.join(t(".name_separator"))
+        rest = count - named.size
+        rest.positive? ? t(".subpages.named_more", count:, names:, rest:) : t(".subpages.named", count:, names:)
       end
 
       # The members the viewer may read, in one query over all of them
@@ -128,8 +123,8 @@ module Admin
       # nullifies it when the user is deleted).
       #
       # - a row that names its user: that user;
-      # - else the event's user (`user_id` may name a user who no longer
-      #   exists: "a deleted user");
+      # - else the event's user (`user_id` may name a user who has been
+      #   deleted since: "a deleted user");
       # - else, for a token's event with no user at all, "a deleted user" too
       #   (a token always acts for a user; the log reads the same,
       #   `Audit::Sentence`). The token's id is never passed off as a user id;
@@ -148,16 +143,35 @@ module Admin
 
         # "You, via <token>" with the comma, "<name> via <token>" without: the
         # audit log's own two forms (`Admin::AuditScreen::SentenceComponent`).
-        "#{label}#{"," if label == YOU} via #{event.via_label}"
+        who_actor(item).you ? t(".you_via", token: event.via_label) : t(".via", name: label, token: event.via_label)
+      end
+
+      # Who trashed the item as the audit log's actor facts, for the row's
+      # avatar (`Admin::Ui::ActorAvatarComponent`): read from the same two
+      # sources, in the same order, as `#who_label`, so the circle and the
+      # name beside it are one person. A token's event with no user stands
+      # for a deleted user by the token's id, as `Audit::Sentence` does, and
+      # nobody recorded is System (no user, no id).
+      def who_actor(item)
+        event = trashing_event(item)
+        user, user_id =
+          if item.trashed_by then [ item.trashed_by, item.trashed_by.id ]
+          elsif event&.user_id then [ event.user, event.user_id ]
+          elsif event&.via_label then [ nil, event.actor_id ]
+          else [ nil, nil ]
+          end
+        Audit::Sentence::Actor.new(you: you?(user), user:, user_id:, via_label: event&.via_label, none: false)
       end
 
       # A user who was there: "You", their name, or -- gone since -- "a deleted
       # user" (`Admin::Ui::UserNameComponent`, the one place a user is named).
       def label_for(user)
-        return YOU if user && Current.actor.is_a?(User) && Current.actor.id == user.id
+        return t(".you") if you?(user)
 
         user ? Admin::Ui::UserNameComponent.new(user:).label : Admin::Ui::UserNameComponent::DELETED_USER
       end
+
+      def you?(user) = user.present? && Current.actor.is_a?(User) && Current.actor.id == user.id
 
       # The `*.trashed` event of THIS trashing, or nil. `recorded_trashings`
       # holds each item's newest one; an event from before the item's current
@@ -223,7 +237,7 @@ module Admin
       end
 
       # `[label, id]` pairs of the kept pages the viewer may create pages
-      # under (trash spec corrections, "Parent picker"), labelled with the
+      # under, labelled with the
       # page's own path of titles ("Home / About / Team") so two pages that
       # share a title can be told apart. Every ancestor of a kept page is
       # kept (`Trash::Move` takes a page's whole branch), so the titles are
@@ -238,10 +252,10 @@ module Admin
       def path_label(page, kept)
         chain = []
         while page
-          chain.unshift(page.title.presence || "(untitled)")
+          chain.unshift(page.title.presence || t(".untitled"))
           page = kept[page.parent_id]
         end
-        chain.join(" / ")
+        chain.join(t(".path_separator"))
       end
     end
   end

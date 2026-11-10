@@ -1,8 +1,9 @@
 module Admin
   module TrashScreen
-    # When the retention job will delete a trashed item, as a small tag
-    # (handoff §4.9): "In 30 days", "In 1 day", "Today", or "Never" while
-    # retention is 0. Never red -- it is a schedule, not a failure.
+    # When the retention job will delete a trashed item, as a small tag:
+    # "In 30 days", then "Tomorrow" and "Today" in warn ink, always as words,
+    # or "Never" while retention is 0. Never red: it is a schedule, not a
+    # failure, and the warn ink is not the only cue, the word is.
     #
     # Counted in CALENDAR days of the request's time zone (the site zone,
     # `Admin::BaseController#use_site_time_zone`): the due moment is
@@ -15,16 +16,18 @@ module Admin
     # after": the date is the first day the item CAN go (`Trash::
     # PurgeExpiredJob` takes what was trashed more than the retention period
     # ago), not the day it will. A daily sweep that runs before the due moment
-    # that day takes it the day after. One known gap: this date counts
-    # calendar days in the site's zone, the job's cutoff is days × 24 hours,
-    # so across a clock change the two can differ by the hour that was added
-    # or dropped -- an item trashed in the first hour of a day can become
-    # purgeable an hour before the date shown (a roadmap row). The wording is deliberately not tied to the sweep's hour
-    # (`config/recurring.yml`), which can change without this component.
-    # `test/jobs/trash/purge_expired_job_test.rb` runs the job around the
-    # boundary against this component's own date.
+    # that day takes it the day after. A known gap: this date counts calendar
+    # days in the site's zone, the job's cutoff is days × 24 hours, so across
+    # a clock change the two can differ by the hour that was added or dropped
+    # -- an item trashed in the first hour of a day can become purgeable an
+    # hour before the date shown (a roadmap row). The wording is not tied to
+    # the sweep's hour (`config/recurring.yml`), which can change without this
+    # component. `test/jobs/trash/purge_expired_job_test.rb` runs the job
+    # around the boundary against this component's own date.
     class RetentionTagComponent < Admin::AdminComponent
       TAG_CLASS = "text-label text-meta".freeze
+      # Today and tomorrow: the last two days, which a person acts on.
+      SOON_CLASS = "text-label text-warn-ink".freeze
 
       def initialize(trashed_at:, retention_days:)
         @trashed_at = trashed_at.in_time_zone
@@ -37,18 +40,24 @@ module Admin
 
       def days_left = [ (due_on - Time.zone.today).to_i, 0 ].max
 
-      def label
-        return "Never" if never?
+      def soon? = !never? && days_left <= 1
 
-        days_left.zero? ? "Today" : "In #{days_left} #{days_left == 1 ? "day" : "days"}"
+      def label
+        return t(".never") if never?
+
+        case days_left
+        when 0 then t(".today")
+        when 1 then t(".tomorrow")
+        else t(".in_days", count: days_left)
+        end
       end
 
       def explanation
-        never? ? "Kept until someone deletes it for good" : "Deleted for good on or after #{due_on.strftime("%-d %b %Y")}"
+        never? ? t(".kept") : t(".deleted_on", date: I18n.l(due_on, format: :"admin.short_with_year"))
       end
 
       def call
-        tag.span(data: { retention: "" }, title: explanation, class: TAG_CLASS) do
+        tag.span(data: { retention: "" }, title: explanation, class: soon? ? SOON_CLASS : TAG_CLASS) do
           safe_join([ label, tag.span(". #{explanation}", class: "sr-only") ])
         end
       end

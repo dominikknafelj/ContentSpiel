@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The trash in a real browser (trash spec §7, §9): every confirm is
+# The trash in a real browser: every confirm is
 # `Admin::Ui::ConfirmDialogComponent`'s native `<dialog>` (never a browser
 # `confirm()`), Restore is a one-click POST, and a "Move to trash" flash
 # carries an Undo button that restores in one click.
@@ -26,7 +26,7 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     # (branch flagged, subtree's URLs and listed posts resynced, redirect to
     # the shell) can outlast it on a cold test server.
     assert_selector "[role=status]", text: "Moved “Section” and 1 subpage to the trash", wait: 10
-    # The page tree (`li[data-page-id]`) no longer lists either page.
+    # The page tree (`li[data-page-id]`) lists neither page.
     assert_no_selector "li[data-page-id='#{@section.id}']"
     assert_no_selector "li[data-page-id='#{@child.id}']"
 
@@ -139,7 +139,50 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+1/
   end
 
+  # The type is a chip and a word, never a control: from a row's Restore the
+  # keyboard goes to its Delete now…, and from there to the next row's
+  # Restore, past that row's type.
+  test "a trash row's type is its chip and its word, and the keyboard passes from the row's Restore to its Delete now… with no stop on the type" do
+    Current.set(actor: users(:one)) do
+      @first = create_post(title: "First post")
+      @second = create_post(title: "Second post")
+      Trash::Move.call(@second)
+      Trash::Move.call(@first)
+    end
+    sign_in_via_form(users(:one))
+    visit_screen admin_trash_path
+
+    first = "#trash-post-#{@first.id}"
+    second = "#trash-post-#{@second.id}"
+    assert_selector "#{first} td[data-trash-type]", text: "Post"
+    assert_selector "#{first} td[data-trash-type] span[aria-hidden=true].rounded-chip"
+    assert_equal [ first, second ], page.all("tbody tr").map { |row| "##{row[:id]}" }
+
+    page.execute_script(<<~JS)
+      [ ...document.querySelectorAll("#{first} button") ].find((button) => button.textContent.trim() === "Restore").focus()
+    JS
+    assert_equal "#{first} Restore", focused_in_row
+    page.send_keys(:tab)
+    assert_equal "#{first} Delete now…", focused_in_row
+    page.send_keys(:tab)
+    assert_equal "#{second} Restore", focused_in_row
+    assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('td[data-trash-type] *') ].filter((each) => each.tabIndex >= 0).length")
+  end
+
   private
+
+  # The focused element as its row's id and its words, or what else holds the focus.
+  def focused_in_row
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.activeElement
+        const row = element.closest("tr[id^=trash-]")
+        if (!row) return element.outerHTML
+        if (element.closest("td[data-trash-type]")) return `#${row.id} type`
+        return `#${row.id} ${element.textContent.trim()}`
+      })()
+    JS
+  end
 
   # A tab is a link into the `content` frame, so the tests here that go on to
   # read the new rows wait for the whole navigation (`click_frame_link`, which

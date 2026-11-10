@@ -772,6 +772,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/media_library/*
     app/views/admin/media/*
     app/components/media/picker_component.*
+    app/components/admin/trash_screen/*
+    app/views/admin/trash/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/

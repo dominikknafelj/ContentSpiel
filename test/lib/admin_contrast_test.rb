@@ -293,6 +293,17 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # Trash's retention words for today and tomorrow (`Admin::TrashScreen::
+  # RetentionTagComponent`) are warn ink, told by their words, in the row on
+  # the card (surface) and on the page (paper); held at the figures they
+  # reach.
+  test "a retention of today or tomorrow is warn ink at 4.5:1 on surface and on paper" do
+    floors = { "--cs-surface" => { light: 7.6, dark: 9.8 }, "--cs-paper" => { light: 6.9, dark: 10.9 } }
+    each_scheme do |scheme, colour|
+      floors.each { |ground, figures| assert_ratio(figures.fetch(scheme), colour.("--cs-warn-ink"), colour.(ground), "today's and tomorrow's retention on #{ground} (#{scheme})") }
+    end
+  end
+
   # A word diff's removed words (`Admin::Ui::WordDiffComponent`) are struck
   # through in ink on sunken: words a person reads, held at the figures they
   # reach.

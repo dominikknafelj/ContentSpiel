@@ -1,0 +1,118 @@
+# The Trash screen's components (`app/components/admin/trash_screen/`):
+# `admin.components.trash_screen.*` are their keys (docs/reference/i18n.md:
+# one file per component folder).
+en:
+  admin:
+    components:
+      trash_screen:
+        list:
+          columns:
+            item: "Item"
+            type: "Type"
+            trashed: "Trashed"
+            deletes: "Deletes"
+            actions: "Actions"
+          # A title nobody has written yet: in a row, in a subpage's name and
+          # in a parent's path. Read by full key where no component renders.
+          untitled: "(untitled)"
+          # Who trashed it. A user is named by `Admin::Ui::UserNameComponent`;
+          # a token's name follows in the audit log's two forms.
+          you: "You"
+          you_via: "You, via %{token}"
+          via: "%{name} via %{token}"
+          # What comes back with a page: every member counted, the readable
+          # ones named (at most three), the rest folded into a count.
+          subpages:
+            bare:
+              one: "Includes %{count} subpage"
+              other: "Includes %{count} subpages"
+            named:
+              one: "Includes %{count} subpage: %{names}"
+              other: "Includes %{count} subpages: %{names}"
+            named_more:
+              one: "Includes %{count} subpage: %{names} and %{rest} more"
+              other: "Includes %{count} subpages: %{names} and %{rest} more"
+          name_separator: ", "
+          # A parent's path of titles in the Restore under select.
+          path_separator: " / "
+          empty:
+            all:
+              title: "The trash is empty."
+              description: "Deleted pages, posts and images show up here until they're deleted for good."
+            pages:
+              title: "No pages in the trash."
+              description: "Deleted pages show up here until they're deleted for good."
+            posts:
+              title: "No posts in the trash."
+              description: "Deleted posts show up here until they're deleted for good."
+            images:
+              title: "No images in the trash."
+              description: "Deleted images show up here until they're deleted for good."
+            forms:
+              title: "No forms in the trash."
+              description: "Deleted forms show up here, with their submissions, until they're deleted for good."
+          # A list empty only for this viewer: the trash holds what they may not act on.
+          hidden:
+            title: "Nothing here you can restore."
+            description: "The trash holds items you can't restore or delete one by one. Empty trash deletes them."
+        row:
+          types:
+            page: "Page"
+            post: "Post"
+            media: "Image"
+            form: "Form"
+          restore: "Restore"
+          restore_under: "Restore under"
+          no_parent: "No page you can restore it under."
+          delete_now: "Delete now…"
+          in_use:
+            one: "Still used by %{count} item in the trash"
+            other: "Still used by %{count} items in the trash"
+          purge:
+            title: "Delete “%{title}”?"
+            body: "It will be deleted for good, with all its translations. This can't be undone."
+            body_with_subpages:
+              one: "It will be deleted for good, with all its translations. %{count} subpage under it is deleted too. This can't be undone."
+              other: "It will be deleted for good, with all its translations. %{count} subpages under it are deleted too. This can't be undone."
+            confirm: "Delete permanently"
+        retention_tag:
+          never: "Never"
+          today: "Today"
+          tomorrow: "Tomorrow"
+          in_days:
+            one: "In %{count} day"
+            other: "In %{count} days"
+          kept: "Kept until someone deletes it for good"
+          deleted_on: "Deleted for good on or after %{date}"
+        empty_trash:
+          trigger: "Empty trash…"
+          title: "Empty the trash?"
+          confirm: "Empty trash"
+          body: "This deletes %{items} for good. It can't be undone."
+          # The kinds the sentence names, only those present.
+          pages:
+            one: "%{count} page"
+            other: "%{count} pages"
+          pages_with_subpages: "%{pages} (with %{subpages})"
+          subpages:
+            one: "%{count} subpage"
+            other: "%{count} subpages"
+          posts:
+            one: "%{count} post"
+            other: "%{count} posts"
+          images:
+            one: "%{count} image"
+            other: "%{count} images"
+          forms:
+            one: "%{count} form"
+            other: "%{count} forms"
+          # How the kinds join: "1 page", "1 page and 1 post", "1 page, 1 post and 1 image".
+          list_separator: ", "
+          list_last: "%{rest} and %{last}"
+        tabs:
+          label: "Filter by type"
+          all: "All"
+          pages: "Pages"
+          posts: "Posts"
+          images: "Images"
+          forms: "Forms"

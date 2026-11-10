@@ -13,20 +13,28 @@ class Admin::TrashScreen::RetentionTagComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "the day before the last day is In 1 day, the last day and an overdue item are Today" do
-    travel_to Time.zone.local(2026, 10, 30, 0, 5) do # due 31 Oct; one calendar day to go though under 24 h
+  test "today and tomorrow are words in warn ink, a later day In N days in meta, and never is Never" do
+    travel_to Time.zone.local(2026, 10, 29, 9, 0) do # due 31 Oct: two days to go
       render_inline tag(30)
-      assert_selector "[data-retention]", text: "In 1 day"
+      assert_selector "[data-retention].text-label.text-meta", text: "In 2 days"
+      assert_no_selector "[data-retention].text-warn-ink"
+    end
+    travel_to Time.zone.local(2026, 10, 30, 0, 5) do # one calendar day to go though under 24 h
+      render_inline tag(30)
+      assert_selector "[data-retention].text-label.text-warn-ink", text: "Tomorrow"
+      assert_no_selector "[data-retention].text-meta"
     end
     travel_to Time.zone.local(2026, 10, 31, 0, 5) do # due today, though the exact moment is 23:30 tonight
       render_inline tag(30)
-      assert_selector "[data-retention]", text: "Today"
+      assert_selector "[data-retention].text-label.text-warn-ink", text: "Today"
     end
-    travel_to Time.zone.local(2026, 12, 25, 9, 0) do
+    travel_to Time.zone.local(2026, 12, 25, 9, 0) do # overdue: the sweep has not reached it yet
       render_inline tag(30)
-      assert_selector "[data-retention]", text: "Today"
+      assert_selector "[data-retention].text-warn-ink", text: "Today"
       assert_no_text "-"
     end
+    render_inline tag(0)
+    assert_selector "[data-retention].text-label.text-meta", text: "Never"
   end
 
   test "is read in the site zone" do
