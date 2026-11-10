@@ -159,6 +159,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_equal "Ada", user.reload.name
   end
 
+  test "Your account saved as rendered writes nothing and audits nothing" do
+    user = users(:reader)
+    sign_in_as(user)
+    stored_at = user.reload.updated_at
+
+    assert_no_difference -> { Audit::Event.where(action: "user.updated").count } do
+      patch "/cs-studio/account/profile", params: {
+        name: "", notes_sound: user.notes_sound ? "1" : "0", notes_desktop: user.notes_desktop ? "1" : "0"
+      }
+    end
+
+    assert_redirected_to "/cs-studio/account"
+    assert_equal stored_at, user.reload.updated_at
+  end
+
   # The account screen has a second form: Turbo gets a stream that keeps the
   # screen (and what the password form holds) instead of a redirect.
   test "saving a name answers Turbo with a stream: the sidebar's account block and a toast" do

@@ -43,6 +43,10 @@ module Users
       @user.name = @name
       @user.notes_sound = (@notes_sound == true) unless @notes_sound.nil?
       @user.notes_desktop = (@notes_desktop == true) unless @notes_desktop.nil?
+      # A form saved as rendered changes nothing, so it writes no row and
+      # records no event: the log says only what changed.
+      return success(@user) unless @user.changed?
+
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
         record_event("user.updated", subject: @user, field_changes: user_field_changes(@user))
