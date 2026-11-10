@@ -30,7 +30,7 @@ module Admin
         keys: [],
         slots: [],
         controller: nil,
-        keyboard: [ "test/system/admin/trash_test.rb", "a trash row's type is its chip and its word, and the keyboard passes from the row's Restore to its Delete now… with no stop on the type" ]
+        keyboard: [ "test/system/admin/trash_test.rb", "a trash row's type is its chip and its word: from a row's title the keyboard stops on its Restore, its Delete now… and the next row's Restore, and never on a type" ]
       )
 
       # A kind of record, as the lists name it, to its module's name in

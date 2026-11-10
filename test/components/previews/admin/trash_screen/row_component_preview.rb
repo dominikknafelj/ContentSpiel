@@ -1,13 +1,12 @@
 module Admin
   module TrashScreen
     # `RowComponent`: a post row, a page row with its subpage sentence, and an
-    # image that is still used (Delete now… disabled
-    # with its reason as text) -- built from unsaved records -- and the three
-    # ways a page's Restore is drawn, built from real pages (rolled back with
-    # the preview request): one click for a root whose parent is still there,
-    # an inline "Restore under" with its parent select when the parent is in
-    # the trash too, and the same disabled with its reason when the viewer has
-    # no page to restore it under.
+    # image that is still used (Delete now… disabled with its reason as text) --
+    # built from unsaved records -- and the three ways a page's Restore is
+    # drawn, built from real pages (rolled back with the preview request): one
+    # click for a root whose parent is still there, an inline "Restore under"
+    # with its parent select when the parent is in the trash too, and the same
+    # disabled with its reason when the viewer has no page to restore it under.
     class RowComponentPreview < ViewComponent::Preview
       def post_row = table(row(post, who: "You"))
 

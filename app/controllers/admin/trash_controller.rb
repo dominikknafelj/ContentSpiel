@@ -229,7 +229,7 @@ module Admin
     end
 
     # Whether the tab's kind is in the trash at all while this viewer's list
-    # of it is empty (`Admin::TrashScreen::ListComponent::HIDDEN_ITEMS`). Known
+    # of it is empty (`Admin::TrashScreen::ListComponent`'s `hidden_items:`). Known
     # only for a `trash.empty` holder -- `@everything` is computed for nobody
     # else, so no other viewer learns that the trash holds what they can't see.
     def hidden_items?

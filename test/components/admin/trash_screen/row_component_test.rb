@@ -1,10 +1,10 @@
 require "test_helper"
 
-# `Admin::TrashScreen::RowComponent`: the parts of a
-# row the integration tests don't pin down -- the who/when cell, the delete
-# dialog's subpage count, the disabled "Delete now…" with its reason as
-# visible text, and the inline "Restore under" for a page that can't go back
-# where it was. (Who is worked out by `ListComponent`; a row only shows it.)
+# `Admin::TrashScreen::RowComponent`: the parts of a row the integration tests
+# don't pin down -- the who/when cell, the delete dialog's subpage count, the
+# disabled "Delete now…" with its reason as visible text, and the inline
+# "Restore under" for a page that can't go back where it was. (Who is worked out
+# by `ListComponent`; a row only shows it.)
 class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   include ContentHelper
 

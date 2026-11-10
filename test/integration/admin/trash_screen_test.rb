@@ -1,9 +1,9 @@
 require "test_helper"
 
-# The Trash screen: counted tabs, who and when,
-# the retention tag, the subpage sentence, inline "Restore under", the
-# disabled "Delete now…" with its reason and the Empty trash dialog. The
-# list itself, restore, purge and visibility stay in `trash_test.rb`.
+# The Trash screen: counted tabs, who and when, the retention tag, the subpage
+# sentence, inline "Restore under", the disabled "Delete now…" with its reason
+# and the Empty trash dialog. The list itself, restore, purge and visibility
+# stay in `trash_test.rb`.
 class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
   setup do
     # Midday: the retention tag counts calendar days, so a run that crossed
@@ -189,10 +189,10 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{by_token.id}", text: /two@example\.com via Deploy bot · /
   end
 
-  # The event that names the trasher must be the event of
-  # THIS trashing. An item trashed, restored and then trashed again by a path
-  # that records no event of its own (a branch member going with its root)
-  # would otherwise show whoever trashed it the first time.
+  # The event that names the trasher must be the event of THIS trashing. An item
+  # trashed, restored and then trashed again by a path that records no event of
+  # its own (a branch member going with its root) would otherwise show whoever
+  # trashed it the first time.
   test "who: an older trashing's event doesn't name who trashed it this time" do
     Current.set(actor: users(:two)) { assert Trash::Restore.call(@post.reload).ok? }
     later = @now + 2.hours

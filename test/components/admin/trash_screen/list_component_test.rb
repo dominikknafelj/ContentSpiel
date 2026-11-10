@@ -1,11 +1,10 @@
 require "test_helper"
 
-# `Admin::TrashScreen::ListComponent` what the list
-# works out ONCE for the whole page and hands to its rows -- who trashed each
-# item, a branch root's subpage sentence and purge count, an image's "still
-# used by", the parent choices -- and the three empty states. The rows' own
-# markup is `RowComponentTest`'s; the screen as a whole is the integration
-# tests'.
+# `Admin::TrashScreen::ListComponent`: what the list works out ONCE for the
+# whole page and hands to its rows -- who trashed each item, a branch root's
+# subpage sentence and purge count, an image's "still used by", the parent
+# choices -- and the three empty states. The rows' own markup is
+# `RowComponentTest`'s; the screen as a whole is the integration tests'.
 class Admin::TrashScreen::ListComponentTest < ViewComponent::TestCase
   include ContentHelper
 

@@ -18,7 +18,7 @@
           navigation drops the `#publishing` fragment, so the link would land
           at the top of Settings instead of on the retention field. %>
       <%= link_to t(".change"), admin_settings_path(**admin_url_options, anchor: "publishing"), data: { turbo_frame: "_top" },
-            class: "ms-1 #{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)}" %>
+            class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
     <% end %>
   </p>
 </div>

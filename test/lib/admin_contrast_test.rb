@@ -294,9 +294,9 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # Trash's retention words for today and tomorrow (`Admin::TrashScreen::
-  # RetentionTagComponent`) are warn ink, told by their words, in the row on
-  # the card (surface) and on the page (paper); held at the figures they
-  # reach.
+  # RetentionTagComponent`) are warn ink, told by their words, in a row on
+  # the card (surface). Paper is held too, at the figure it reaches, should
+  # the tag ever stand on the page outside a card.
   test "a retention of today or tomorrow is warn ink at 4.5:1 on surface and on paper" do
     floors = { "--cs-surface" => { light: 7.6, dark: 9.8 }, "--cs-paper" => { light: 6.9, dark: 10.9 } }
     each_scheme do |scheme, colour|

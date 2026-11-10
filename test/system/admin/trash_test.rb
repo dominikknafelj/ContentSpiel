@@ -2,8 +2,8 @@ require "application_system_test_case"
 
 # The trash in a real browser: every confirm is
 # `Admin::Ui::ConfirmDialogComponent`'s native `<dialog>` (never a browser
-# `confirm()`), Restore is a one-click POST, and a "Move to trash" flash
-# carries an Undo button that restores in one click.
+# `confirm()`), Restore is a one-click POST, and a "Move to trash" flash carries
+# an Undo button that restores in one click.
 class Admin::TrashSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -139,10 +139,11 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+1/
   end
 
-  # The type is a chip and a word, never a control: from a row's Restore the
-  # keyboard goes to its Delete now…, and from there to the next row's
-  # Restore, past that row's type.
-  test "a trash row's type is its chip and its word, and the keyboard passes from the row's Restore to its Delete now… with no stop on the type" do
+  # The type is a chip and a word, never a control. A press on a row's title
+  # (no control) puts the sequential focus starting point there, so each Tab
+  # after it goes on to the row's own Restore, past its type, then to its
+  # Delete now…, then past the next row's title and type to its Restore.
+  test "a trash row's type is its chip and its word: from a row's title the keyboard stops on its Restore, its Delete now… and the next row's Restore, and never on a type" do
     Current.set(actor: users(:one)) do
       @first = create_post(title: "First post")
       @second = create_post(title: "Second post")
@@ -158,14 +159,12 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     assert_selector "#{first} td[data-trash-type] span[aria-hidden=true].rounded-chip"
     assert_equal [ first, second ], page.all("tbody tr").map { |row| "##{row[:id]}" }
 
-    page.execute_script(<<~JS)
-      [ ...document.querySelectorAll("#{first} button") ].find((button) => button.textContent.trim() === "Restore").focus()
-    JS
-    assert_equal "#{first} Restore", focused_in_row
-    page.send_keys(:tab)
-    assert_equal "#{first} Delete now…", focused_in_row
-    page.send_keys(:tab)
-    assert_equal "#{second} Restore", focused_in_row
+    find("#{first} td:first-child span.font-medium", text: "First post").click
+    stops = Array.new(3) do
+      page.send_keys(:tab)
+      focused_in_row
+    end
+    assert_equal [ "#{first} Restore", "#{first} Delete now…", "#{second} Restore" ], stops
     assert_equal 0, page.evaluate_script("[ ...document.querySelectorAll('td[data-trash-type] *') ].filter((each) => each.tabIndex >= 0).length")
   end
 

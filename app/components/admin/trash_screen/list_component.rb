@@ -16,9 +16,9 @@ module Admin
     #   the viewer may read (`#readable_member_ids`) and how many pages its
     #   purge would take (`#descendant_counts`);
     # - who trashed each item (`#who_label`, and `#who_actor` for the row's
-    #   avatar): the user the row names, and the
-    #   newest `*.trashed` audit event of every row (`#recorded_trashings`,
-    #   one query) for a token's name and for a user who is gone;
+    #   avatar): the user the row names, and the newest `*.trashed` audit event
+    #   of every row (`#recorded_trashings`, one query) for a token's name and
+    #   for a user who is gone;
     # - which images something in the trash still uses, and by how many items
     #   (`#used_by_counts`);
     # - the restore form's parent choices (`#parent_choices`), only when a
@@ -236,12 +236,11 @@ module Admin
         end
       end
 
-      # `[label, id]` pairs of the kept pages the viewer may create pages
-      # under, labelled with the
-      # page's own path of titles ("Home / About / Team") so two pages that
-      # share a title can be told apart. Every ancestor of a kept page is
-      # kept (`Trash::Move` takes a page's whole branch), so the titles are
-      # read off one load of the kept pages rather than per candidate.
+      # `[label, id]` pairs of the kept pages the viewer may create pages under,
+      # labelled with the page's own path of titles ("Home / About / Team") so
+      # two pages that share a title can be told apart. Every ancestor of a kept
+      # page is kept (`Trash::Move` takes a page's whole branch), so the titles
+      # are read off one load of the kept pages rather than per candidate.
       def parent_choices
         @parent_choices ||= begin
           kept = Page.kept.select(:id, :parent_id, :title).index_by(&:id)
