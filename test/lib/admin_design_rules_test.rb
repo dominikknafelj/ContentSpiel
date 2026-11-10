@@ -1841,7 +1841,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/error_summary_component.html.erb" => "an alert keeps its tinted edge",
     "app/components/admin/ui/insecure_notice_component.rb" => "an alert keeps its tinted edge",
     "app/components/admin/ui/mail_failed_notice_component.rb" => "an alert keeps its tinted edge",
-    "app/components/admin/ui/notice_component.rb" => "the warn notice keeps its edge",
     "app/components/admin/ui/file_drop_component.html.erb" => "the drop zone's dashed edge"
   }.freeze
 
@@ -2131,12 +2130,32 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # drawn on that cover. The rule is the stylesheet's alone, so a row never
   # spells the stretch in utilities of its own, and its other controls stand
   # above the cover at `--cs-z-raised`.
-  ROW_LINK_HAND = /(?<![\w-])after:absolute\s+after:inset-0(?![\w-])/
+  ROW_LINK_PARTS = [ /\A(?:[\w-]+:)*after:absolute\z/, /\A(?:[\w-]+:)*after:inset-0\z/ ].freeze
+
+  # `[line number, the string]` for each quoted class string in `source` that
+  # holds both an `after:absolute` and an `after:inset-0`, in either order
+  # and whatever stands between them.
+  def self.hand_row_links(source)
+    source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if ROW_LINK_PARTS.all? { |part| classes.any? { |name| name.match?(part) } }
+    end
+  end
 
   test "a row's stretched link is .admin-row-link, written once" do
-    assert_empty design_offences(ROW_LINK_HAND), "a row's stretched link takes .admin-row-link, never after:absolute after:inset-0 of its own"
-    assert_match ROW_LINK_HAND, %(class="font-medium after:absolute after:inset-0 after:content-['']")
-    assert_no_match ROW_LINK_HAND, %(class="admin-row-link font-medium after:absolute-ish")
+    offences = ADMIN_SOURCES.flat_map do |path|
+      self.class.hand_row_links(File.read(path)).map { |line, string| "#{Pathname(path).relative_path_from(Rails.root)}:#{line}: #{string}" }
+    end
+    assert_empty offences, "a row's stretched link takes .admin-row-link, never after:absolute and after:inset-0 of its own"
+    [ %(class="font-medium after:absolute after:inset-0 after:content-['']"), %(class="after:inset-0 text-ink after:absolute"),
+      %(class: "after:absolute font-medium focus-visible:after:outline-2 after:inset-0") ].each do |sample|
+      assert_not_empty self.class.hand_row_links(sample), sample
+    end
+    [ %(class="admin-row-link font-medium after:absolute-ish after:inset-0"), %(class="after:absolute" title="after:inset-0"),
+      %(class="after:absolute after:top-0") ].each do |sample|
+      assert_empty self.class.hand_row_links(sample), sample
+    end
 
     assert_match(/position:\s*relative;/, rule_for([ "tr:has(.admin-row-link)", "li:has(> * .admin-row-link)" ]))
     cover = single_rule(".admin-row-link::after")

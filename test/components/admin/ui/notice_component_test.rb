@@ -47,4 +47,12 @@ class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
     assert_selector "div#why-not[data-notice][data-reason=owner]", text: "Only the owner can change this."
     %w[mt-4 rounded-card bg-sunken text-dim].each { |utility| assert_includes notice_classes, utility }
   end
+
+  test "a notice with no words draws nothing" do
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :warn))
+    assert_equal "", rendered_content.strip
+
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :warn)) { "  " }
+    assert_equal "", rendered_content.strip
+  end
 end

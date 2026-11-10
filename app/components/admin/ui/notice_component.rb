@@ -58,6 +58,10 @@ module Admin
         @html = html
       end
 
+      # A notice with no words would be an empty alert a screen reader still
+      # announces, so it draws nothing.
+      def render? = content.present?
+
       def call
         tag.div(content, **@html, role: @role, class: [ CLASS, TONES.fetch(@tone), SIZES.fetch(@size), @html[:class] ].compact.join(" "))
       end

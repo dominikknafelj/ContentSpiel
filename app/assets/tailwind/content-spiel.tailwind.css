@@ -874,7 +874,9 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    pressed anywhere: its one link, `.admin-row-link`, stretches its
    `::after` over the row, and the focus ring is drawn on that cover, inside
    the row's edge. Anything else pressable in the row stands above the cover
-   at `relative z-(--cs-z-raised)`. */
+   at `relative z-(--cs-z-raised)`. A link that is the li's direct child
+   is not matched here, so its row carries its own `relative`, as the audit
+   row does. */
 tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
 .admin-row-link::after { content: ""; position: absolute; inset: 0; }
 .admin-row-link:focus-visible { outline: none; }
