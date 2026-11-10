@@ -33,7 +33,7 @@ Each list is a heading and one card holding a real table. Every configuration fo
 - "Stage 7", the bullet 7b and "Mails, a reduced E4";
 - "Architecture-review findings", "The guard after E4" and "Constraints".
 
-The drawing is the Design System artifact (https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT) at version `1794290753-3cf0` (v177). The design agent answered Q1–Q11 on 2026-11-10 (answers: `/private/tmp/claude-501/-Users-dknafelj-src-ContentSpiel/dd7bb8f3-e1e2-40d2-a449-0b6c377c5f48/scratchpad/design-answers-7b.md`): every recommendation accepted, except Q2's invitation circle (below). It drew the 7b screens as Decided, not built: StudioUsers, StudioGroups, StudioTokens, StudioAccount, StudioSystemStatus, StudioSignIn, StudioErrors, with ActionZone and CopyValue, and redrew PatternDestructiveActions (no box), Mails (decision 5) and Alerts (the sweep reaches the editor's boxes). Where this plan says "recommended answer assumed", the answer is now decided. What it decides for 7b is also on these cards:
+The drawing is the Design System artifact (https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT) at version `1794290753-3cf0` (v177). The design agent answered Q1–Q11 on 2026-11-10 (answers: `/private/tmp/claude-501/-Users-dknafelj-src-ContentSpiel/dd7bb8f3-e1e2-40d2-a449-0b6c377c5f48/scratchpad/design-answers-7b.md`): every recommendation accepted, except Q2's invitation circle (below). It drew the 7b screens as Decided, not built: StudioUsers, StudioGroups, StudioTokens, StudioAccount, StudioSystemStatus, StudioSignIn, StudioErrors, with ActionZone and CopyValue, and redrew PatternDestructiveActions (no box), Mails (decision 5) and Alerts (the sweep reaches the editor's boxes). What it decides for 7b is also on these cards:
 - `Alerts` (Gaps 1 and 2);
 - `PasswordField` (Gaps 1 and 2);
 - `StudioListTable` (the users list's gaps);
@@ -50,7 +50,7 @@ Every look the artifact does not decide is a question in `.superpowers/7b-design
 
 ## Design answers (decided by the design agent, 2026-11-10)
 
-The questions file holds Q1–Q11, each with a recommended answer. **Until the owner answers, each step that depends on a question is marked "(per Qn, recommended answer assumed)".** An answer that differs from the recommendation is written back into this section, and into each step it changes, before that task starts. In short:
+The questions file holds Q1–Q11, each with a recommended answer. **Until the owner answers, each step that depends on a question is marked "(per Qn, decided)".** An answer that differs from the recommendation is written back into this section, and into each step it changes, before that task starts. In short:
 
 - **Q1, the lists.**
   - No filter bar.
@@ -307,7 +307,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 3: One action zone (per Q3, recommended answer assumed)
+### Task 3: One action zone (per Q3, decided)
 
 **Files:**
 - Create `app/components/admin/ui/action_zone_component.{rb,html.erb}` (decisions table). Contract:
@@ -350,7 +350,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 4: One copy box and one copy script (per Q5, recommended answer assumed)
+### Task 4: One copy box and one copy script (per Q5, decided)
 
 **Files:**
 - Create `app/components/admin/ui/copy_value_component.{rb,html.erb}` (decisions table). Contract:
@@ -390,7 +390,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 5: Users and invites (per Q1, Q2, recommended answers assumed)
+### Task 5: Users and invites (per Q1, Q2, decided)
 
 **Files:**
 - Modify `app/components/admin/users_screen/list_component.{rb,html.erb}`:
@@ -430,7 +430,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 6: The user editor and New user (per Q7, recommended answer assumed)
+### Task 6: The user editor and New user (per Q7, decided)
 
 **Files:**
 - Modify `app/views/admin/users/_form.html.erb`:
@@ -470,7 +470,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 7: Groups and the permission matrix (per Q1, Q6, recommended answers assumed)
+### Task 7: Groups and the permission matrix (per Q1, Q6, decided)
 
 **Files:**
 - Modify `app/components/admin/groups_screen/list_component.{rb,html.erb}`: Q1's table (Group, Members, Tokens, `sr-only` Actions). The name is `.admin-row-link`, then the Built-in badge, the description in `text-small dim`, the counts in `text-small` (`meta` at zero), and the row ends in "Edit". `COLUMNS` goes. Every literal is a key, the counts' `sr-only` words with `count:` (`.members`, `.tokens`).
@@ -522,7 +522,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 8: The AI assistant (per Q1, Q5, recommended answers assumed)
+### Task 8: The AI assistant (per Q1, Q5, decided)
 
 **Files:**
 - Modify `app/views/admin/api_tokens/{_screen,index,create}.html.erb`:
@@ -563,7 +563,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 9: Sign-in, the reset, the invitation, and the password field (per Q4, recommended answer assumed)
+### Task 9: Sign-in, the reset, the invitation, and the password field (per Q4, decided)
 
 **Files:**
 - Modify `app/views/layouts/product.html.erb`:
@@ -611,7 +611,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 10: Your account (per Q8, recommended answer assumed)
+### Task 10: Your account (per Q8, decided)
 
 **Files:**
 - Modify `app/views/admin/shared/_icon.html.erb`: add `key_round` (Lucide's path, 24-box, stroke 1.5 as the others).
@@ -641,7 +641,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 11: System status, the 403 and the 404 (per Q9, Q10, recommended answers assumed)
+### Task 11: System status, the 403 and the 404 (per Q9, Q10, decided)
 
 **Files:**
 - Modify `app/views/admin/system_status/show.html.erb`:
