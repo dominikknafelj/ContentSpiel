@@ -18,7 +18,7 @@
       <p id="invite_name_help" class="mt-1 text-small text-meta"><%= t(".name_help") %></p>
       <%= render "admin/shared/field_errors", id: "invite_name-errors", messages: name_errors %>
     </div>
-    <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: groups, selected_ids: group_ids, assignable_ids: assignable_ids) %>
+    <%= render Admin::UsersScreen::GroupCardsComponent.new(groups: groups, selected_ids: group_ids, assignable_ids: assignable_ids, frame: false) %>
   <% end %>
 
   <% if resend_invitation %>

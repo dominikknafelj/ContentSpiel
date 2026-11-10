@@ -346,12 +346,17 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A tile in a grid (`.admin-tile`: the media tiles, the upload tiles,
-  # Translations' language tiles, the Dashboard's draft tiles) is drawn by one rule set, its states
-  # elevations and the selection's accent outline. A transform would move
+  # Translations' language tiles, the Dashboard's draft tiles, the user
+  # editor's group tiles) is drawn by one rule set, its states elevations
+  # and the selection's accent outline, which a ticked label tile takes too.
+  # A locked tile is sunken with no shadow, after the selection so a ticked
+  # locked one keeps the outline and not the shadow. A transform would move
   # it under the pointer, and a border is an edge drawn for depth.
   TILE = '.admin-tile:is([aria-current="true"], [aria-pressed="true"])'.freeze
+  TICKED_TILE = ".admin-tile:has(> input:checked)".freeze
+  LOCKED_TILES = [ ".admin-tile[data-locked]", ".admin-tile[data-locked]:has(> input:checked)" ].freeze
 
-  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, and the accent outline when selected or pressed; never a transform" do
+  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, the accent outline when selected, pressed or ticked, sunken when locked; never a transform" do
     rest = single_rule(".admin-tile")
     [ "border-radius: var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes rest, declaration }
 
@@ -360,12 +365,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tile:hover\s*\{\s*box-shadow:\s*var\(--cs-shadow-2\);\s*\}/, hovers.first)
     assert_includes single_rule(".admin-tile:hover"), "box-shadow: var(--cs-shadow-2)"
 
-    selected = single_rule(TILE)
+    selected = rule_for([ TILE, TICKED_TILE ])
     [ "outline: 2px solid var(--cs-accent)", "outline-offset: 2px", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes selected, declaration }
+    locked = rule_for(LOCKED_TILES)
+    [ "background: var(--cs-sunken)", "box-shadow: none", "color: var(--cs-meta)" ].each { |declaration| assert_includes locked, declaration }
+    assert_no_match(/outline/, locked, "a ticked locked tile keeps the selection's outline")
 
     rules = self.class.css_rules("content-spiel.tailwind.css")
-    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE ] ].map { |selectors| rules.index { |found, _| found == selectors } }
-    assert_equal order.sort, order, "rest, the pointer, then the selection: the selection wins under the pointer"
+    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE, TICKED_TILE ], LOCKED_TILES ].map { |selectors| rules.index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, the selection, then the lock: the selection wins under the pointer, and the lock over both"
     tile_rules = rules.select { |selectors, _| selectors.any? { |selector| selector.match?(/\.admin-tile(?![\w-])/) } }
     tile_rules.each do |selectors, body|
       assert_no_match(/(?<![\w-])(?:transform|translate|scale|rotate):/, body, "#{selectors.join(", ")} moves the tile")
@@ -810,12 +818,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
   HAND_BOX_ALLOWED = {
-    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
-    "app/components/admin/users_screen/group_cards_component.rb" => "the group cards' hand-drawn boxes, redrawn as the user editor's tiles",
-    "app/components/admin/users_screen/group_cards_component.html.erb" => "the group cards' small words, redrawn with the user editor's tiles",
-    "app/views/admin/users/_form.html.erb" => "the user form's !border-danger edges, redrawn with the user editor",
-    "app/views/admin/users/edit.html.erb" => "the user editor's small words, redrawn with the user editor",
-    "app/views/admin/users/new.html.erb" => "New user's small words, redrawn with the user editor"
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
   }.freeze
 
   def self.type_scale_sources = TYPE_SCALE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq

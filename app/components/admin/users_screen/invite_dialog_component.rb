@@ -2,9 +2,10 @@ module Admin
   module UsersScreen
     # "Invite a person": the Users screen's dialog behind "Invite person".
     # Email (required), Name (optional: the person can change it on their
-    # page), and Groups, the user editor's own group cards
+    # page), and Groups, the user editor's own group tiles
     # (`GroupCardsComponent`, with the same `user[group_ids][]` names, so the
-    # dialog posts what the editor would). "Send invite" and Cancel.
+    # dialog posts what the editor would), drawn with no card frame, since
+    # the dialog is the surface. "Send invite" and Cancel.
     #
     # REFUSED, the Users page is drawn again (`Admin::InvitesController#
     # create`) with this dialog open (`open_on_load`), what was typed and the

@@ -417,7 +417,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users/#{users(:one).id}/edit"
 
     assert_response :success
-    assert_select ".admin-view-only-notice", text: "Only owners can change other owners."
+    assert_select "div.admin-view-only-notice[role=note].rounded-card.bg-sunken.text-dim", text: "Only owners can change other owners."
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
     assert_select "#user-form[data-controller]", count: 0
@@ -444,7 +444,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users/#{users(:two).id}/edit"
 
     assert_response :success
-    assert_select ".admin-view-only-notice", text: "This user has permissions you don't have, so you can't change them."
+    assert_select "div.admin-view-only-notice[role=note].rounded-card.bg-sunken.text-dim", text: "This user has permissions you don't have, so you can't change them."
     assert_select "#user-form fieldset[disabled].admin-view-only"
     assert_select "#user-form .admin-save-bar", count: 0
     assert_select "[data-zone]", count: 0
@@ -524,6 +524,78 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal digest, target.reload.password_digest
     assert_equal 1, target.sessions.count
     assert_equal [ access_control_groups(:admin).id ], target.group_ids
+  end
+
+  # A non-owner may change their own account (`Users::Manageability`: acting
+  # on yourself is never outranked) while holding a group they could not hand
+  # on: its tile is locked and ticked, and its disabled box posts nothing, so
+  # the hidden input is what keeps the membership. Without it the save would
+  # read as taking them out of the group, which `Users::Save` refuses. A
+  # group its own member can't hand on is one that stores a right nobody may
+  # hand on (`forms.submit`); the grant's validation refuses that, so the test
+  # writes it past the validation, as only a console could.
+  test "a user saved as rendered with a group the viewer can't grant keeps the membership" do
+    managers = sign_in_manager
+    me = users(:editor_branch)
+    locked = AccessControl::Group.create!(name: "Visitors' right")
+    AccessControl::Grant.new(group: locked, permission: "forms.submit", scope: {}).save!(validate: false)
+    AccessControl::Membership.create!(user: me, group: locked)
+    groups_before = me.reload.group_ids.sort
+
+    get "/cs-studio/users/#{me.id}/edit"
+    assert_response :success
+    assert_select "#user-form fieldset[disabled]", count: 0
+    assert_select "label[data-group-card='#{locked.id}'][data-locked] > input[type=checkbox][checked][disabled]"
+    assert_select "label[data-group-card='#{managers.id}']:not([data-locked]) > input[type=checkbox][checked]:not([disabled])"
+    params = rendered_params
+    assert_equal groups_before.map(&:to_s).sort, params.dig("user", "group_ids").compact_blank.sort
+
+    events_before = Audit::Event.count
+    patch "/cs-studio/users/#{me.id}", params: params
+
+    assert_response :see_other
+    assert_equal events_before, Audit::Event.count, "an untouched save writes no event"
+    assert_equal groups_before, me.reload.group_ids.sort
+  end
+
+  # --- The editor's frame ------------------------------------------------------------
+
+  test "the editor is a Details card and a Groups card, under a label-sized breadcrumb, a small Activity link and the last sign-in in small words" do
+    get "/cs-studio/users/#{users(:two).id}/edit"
+
+    assert_select "p.text-label.text-meta a[href='/cs-studio/users']", text: "Users"
+    assert_select "a[href^='/cs-studio/audit'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary, size: :small), text: "Activity"
+    assert_select "[data-last-sign-in].text-small.text-dim", text: "Never signed in."
+    assert_select "#user-form section.admin-settings-card[aria-labelledby=user-details]" do
+      assert_select "h2#user-details", text: "Details"
+      assert_select ".admin-field input#user_name[aria-describedby='user_name_help user_name-errors']"
+      assert_select ".admin-field input#user_email_address[aria-describedby='user_email_address-errors']"
+      assert_select ".admin-field > #user_name-errors", count: 1
+      assert_select ".admin-field > #user_email_address-errors", count: 1
+      assert_select "details.admin-set-password > summary.admin-disclosure", text: "Set a new password…" do |summary|
+        assert_empty Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split - summary.first["class"].split
+      end
+    end
+    assert_select "#user-form section.admin-settings-card.admin-user-groups[aria-labelledby=user-groups-title] h2", text: "Groups"
+  end
+
+  test "a refused field is drawn on the shared invalid edge: its message in its own slot, and no important danger border" do
+    patch "/cs-studio/users/#{users(:two).id}", params: { user: { email_address: users(:one).email_address } }
+
+    assert_response :unprocessable_entity
+    assert_select ".admin-field > #user_email_address-errors p", text: /Email address has already been taken/
+    assert_select "input#user_email_address[aria-invalid=true]"
+    assert_not_includes response.body, "!border-danger"
+  end
+
+  test "New user's title, heading and breadcrumb, and its two password fields in the Details card" do
+    get "/cs-studio/users/new"
+
+    assert_select "title", text: /New user/
+    assert_select "p.text-label.text-meta a[href='/cs-studio/users']", text: "Users"
+    assert_select "h1", text: "New user"
+    assert_select "section.admin-settings-card[aria-labelledby=user-details] input[type=password]", count: 2
+    assert_select "#user-form .admin-save-bar button[type=submit]", text: "Create user"
   end
 
   test "a typed password changes it and ends the user's sessions, still one service rule" do

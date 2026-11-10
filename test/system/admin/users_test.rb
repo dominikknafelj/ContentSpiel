@@ -3,8 +3,8 @@ require "application_system_test_case"
 # The Users list and the user editor in a real browser: a row opens
 # the editor, a ticked group card is one unsaved change, Make owner… confirms and
 # the list shows the Owner tag, the owner and delete buttons wait for unsaved
-# changes, and the password disclosure counts nothing until something is typed and
-# forgets what was typed when closed.
+# changes, the password disclosure counts nothing until something is typed and
+# forgets what was typed when closed, and a read-only reason takes no Tab stop.
 class Admin::UsersSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -90,6 +90,29 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar button[type=submit][disabled]"
     find("summary", text: "Set a new password…").click
     assert_equal "", find_field("New password").value
+  end
+
+  # The read-only reason is a note (`Admin::Ui::NoticeComponent`): read where
+  # it stands and never a Tab stop, so the keyboard goes from the breadcrumb
+  # to Activity and on through the page without landing in it.
+  test "a user the viewer can't change says why in a note, and the keyboard passes over it from the breadcrumb to Activity" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage audit.view posts.read pages.read].each { |key| AccessControl::Grant.create!(group: managers, permission: key, scope: {}) }
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    Capybara.reset_sessions!
+    sign_in_via_form(users(:editor_branch))
+
+    visit_screen edit_admin_user_path(users(:one))
+    assert_selector "[role=note]", text: "Only owners can change other owners."
+
+    page.execute_script("document.querySelector(\"main a[href='#{admin_users_path}']\").focus()")
+    page.driver.browser.keyboard.type(:tab)
+    assert_equal "Activity", page.evaluate_script("document.activeElement.textContent.trim()")
+    stops = Array.new(12) do
+      page.driver.browser.keyboard.type(:tab)
+      page.evaluate_script("document.activeElement.closest('[role=note]') ? 'note' : 'outside'")
+    end
+    assert_not_includes stops, "note"
   end
 
   test "Delete user… asks, then removes the user and lands on the list" do

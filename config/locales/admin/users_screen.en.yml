@@ -1,7 +1,7 @@
 # The Users screen's components (docs/reference/i18n.md):
-# `admin.components.users_screen.*` are the list's, the invite dialog's and
-# the owner and delete zones' keys (the group cards still hold their words
-# as literals); `admin.invites` what `Admin::InvitesController` answers. The
+# `admin.components.users_screen.*` are the list's, the invite dialog's,
+# the group tiles' and the owner and delete zones' keys; `admin.invites`
+# what `Admin::InvitesController` answers. The
 # Users views' own keys and the controller's flashes are `users.en.yml`.
 en:
   admin:
@@ -36,6 +36,10 @@ en:
           resend: "Resend"
           cancel: "Cancel"
           submit: "Send invite"
+        group_cards:
+          title: "Groups"
+          manage: "Manage groups →"
+          locked: "You can't grant this group."
         delete_zone:
           heading: "Delete user"
           body: "Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working."

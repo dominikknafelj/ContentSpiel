@@ -1,6 +1,7 @@
 # The Users views and `Admin::UsersController` (docs/reference/i18n.md):
-# `admin.users.index` is the list page's lazy-lookup scope, and the flashes
-# are `admin.users.*`.
+# `admin.users.index`, `edit`, `new` and `form` are the list's, the
+# editor's, New user's and the shared form's lazy-lookup scopes, and the
+# flashes are `admin.users.*`.
 en:
   admin:
     users:
@@ -14,3 +15,28 @@ en:
         new_user: "New user"
         invites_need_mail: "Invites need mail."
         set_up_mail: "Set up mail →"
+      edit:
+        breadcrumb: "Users"
+        activity: "Activity"
+        last_signed_in_html: "Last signed in %{time}."
+        never_signed_in: "Never signed in."
+        owner_protected: "Only owners can change other owners."
+        outranked: "This user has permissions you don't have, so you can't change them."
+      new:
+        title: "New user"
+        breadcrumb: "Users"
+      form:
+        details: "Details"
+        name: "Name"
+        name_placeholder: "Shown instead of the email"
+        name_help: "Optional. Shown instead of the email."
+        email: "Email address"
+        email_placeholder: "name@example.com"
+        password: "Password"
+        password_confirmation: "Confirm password"
+        set_password: "Set a new password…"
+        new_password: "New password"
+        new_password_confirmation: "Confirm new password"
+        keep_password: "Leave this closed to keep the current password."
+        create: "Create user"
+        save: "Save user"
