@@ -29,13 +29,15 @@ module Admin
     # nearer `data-messages` reads them. Keys are relative to `admin`.
     # `notes.script.*` are `admin--notes--drawer`', `admin--notes--live`'s and `admin--notes--inbox`'s: those
     # controllers are on <body> itself, so <body> is the only place their
-    # messages can be.
+    # messages can be. `components.ui.copy_value.*` are `admin--ui--clipboard`'s,
+    # whose button in the editor header carries no `data-messages` of its own.
     SCRIPT_MESSAGES = %w[
       components.ui.save_status.saving components.ui.save_status.saving_live components.ui.save_status.retrying
       components.ui.save_status.offline components.ui.save_status.signed_out components.ui.save_status.retry
       components.ui.save_bar.changes components.ui.save_bar.names components.ui.save_bar.more components.ui.save_bar.separator
       components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
       components.ui.toast.order_failed components.ui.toast.dropped
+      components.ui.copy_value.copy components.ui.copy_value.copied components.ui.copy_value.failed components.ui.copy_value.selected
       layout.leave_dialog.body layout.leave_dialog.body_with_count shell.nav.unread_count
       notes.script.marker.add notes.script.marker.open notes.script.marker.open_unread notes.script.marker.new notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
       notes.script.toast.on notes.script.toast.many notes.script.live.new_divider notes.script.live.new_messages notes.script.live.gone

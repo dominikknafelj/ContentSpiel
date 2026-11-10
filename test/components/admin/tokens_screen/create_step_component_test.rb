@@ -30,11 +30,17 @@ class Admin::TokensScreen::CreateStepComponentTest < ViewComponent::TestCase
     assert_selector "#token-group-error", text: "Choose a group for the token"
   end
 
-  test "with a raw token it shows the warn box, the token and Copy token" do
-    render_inline Admin::TokensScreen::CreateStepComponent.new(groups: @groups, form_url: "/x", raw_token: "a" * 64)
+  test "the reveal is a warn notice holding the token's copy box, a secret target, and nothing else holds the token" do
+    token = "a" * 64
+    render_inline Admin::TokensScreen::CreateStepComponent.new(groups: @groups, form_url: "/x", raw_token: token)
 
-    assert_text "Copy this token now. It won't be shown again."
-    assert_selector "pre#api-token-value[data-admin--tokens--reveal-target=secret]", text: "a" * 64
-    assert_selector "button[data-admin--tokens--reveal-source-param=api-token-value]", text: "Copy token"
+    notice = page.find("div[role=alert]", text: "Copy this token now. It won't be shown again.")
+    assert_includes notice[:class].split, "bg-warn-tint"
+    assert notice.has_selector?("div[data-controller='admin--ui--clipboard'] pre#api-token-value[data-admin--ui--clipboard-target=source][data-admin--tokens--reveal-target=secret]",
+      exact_text: token), "the notice holds the token's copy box, a secret target"
+    assert notice.has_selector?("button[aria-label='Copy token'][data-action='click->admin--ui--clipboard#copy']", exact_text: "Copy")
+    assert_equal 1, rendered_content.scan(token).size, "the token is written once, as the copy box's text"
+    assert_no_selector "[data-admin--tokens--reveal-target=status]", visible: :all
+    assert_no_selector "[data-action*='admin--tokens--reveal']"
   end
 end

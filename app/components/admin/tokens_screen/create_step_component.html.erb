@@ -3,17 +3,13 @@
 
   <% if raw_token %>
     <%# The one-time reveal: only the response of the POST that created the
-        token ever renders this. %>
-    <div class="mt-3 rounded-cs border border-warn bg-warn-tint p-3">
-      <p role="status" class="font-semibold text-warn-ink">Copy this token now. It won't be shown again.</p>
-      <div class="mt-2 flex flex-wrap items-start gap-2">
-        <pre id="api-token-value" data-admin--tokens--reveal-target="secret"
-          class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= raw_token %></pre>
-        <%= render Admin::Ui::ButtonComponent.new(label: "Copy token", variant: :secondary,
-              data: { action: "admin--tokens--reveal#copy", "admin--tokens--reveal-source-param": "api-token-value" }) %>
-      </div>
-      <p data-admin--tokens--reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
-    </div>
+        token ever renders this, and the token stands once, as the copy
+        box's text, a `secret` target blanked at `pagehide`. %>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, class: "mt-3") do %>
+      <p class="font-semibold">Copy this token now. It won't be shown again.</p>
+      <%= render Admin::Ui::CopyValueComponent.new(id: "api-token-value", value: raw_token, copy_label: "Copy token", layout: :block,
+            source_data: { "admin--tokens--reveal-target": "secret" }, class: "mt-2") %>
+    <% end %>
   <% end %>
 
   <%= form_with url: form_url, method: :post, data: { turbo: false }, class: "mt-3 flex max-w-[560px] flex-col gap-4" do %>

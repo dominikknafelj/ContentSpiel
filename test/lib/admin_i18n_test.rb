@@ -124,6 +124,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/settings_card_component.html.erb
     app/components/admin/ui/action_zone_component.rb
     app/components/admin/ui/action_zone_component.html.erb
+    app/components/admin/ui/copy_value_component.rb
+    app/components/admin/ui/copy_value_component.html.erb
+    app/components/admin/ui/system_check_row_component.rb
+    app/components/admin/ui/system_check_row_component.html.erb
+    app/javascript/controllers/admin/ui/clipboard_controller.js
+    app/javascript/controllers/admin/tokens/reveal_controller.js
     app/components/admin/settings_screen/section_card.rb
     app/components/admin/settings_screen/nav_component.rb
     app/components/admin/settings_screen/nav_component.html.erb

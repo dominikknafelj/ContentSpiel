@@ -42,13 +42,25 @@ en:
         mail_failed_notice:
           open_settings: "Open Mail settings →"
 
-        # System status's Mail row.
+        # A system check's row, on System status and in the setup wizard.
         system_check_row:
           ok: "OK"
           warning: "Warning"
+          copy_label: "Copy command for %{label}"
           open_mail_settings: "Open Mail settings →"
           open_image_settings: "Open Image settings →"
           open_forms: "Open Forms →"
+          learn_more: "Learn more →"
+
+        # The copy box's button, and what `admin--ui--clipboard` says after a
+        # press (`copied`, or `failed` on the button and `selected` in the
+        # status when the clipboard refused). All four are on
+        # <body> too (`SCRIPT_MESSAGES`), for the editor header's Copy.
+        copy_value:
+          copy: "Copy"
+          copied: "Copied"
+          failed: "Copy failed"
+          selected: "Couldn't copy automatically — the text is selected, press Ctrl+C (⌘C on a Mac)."
 
         toast:
           dismiss: "Dismiss"

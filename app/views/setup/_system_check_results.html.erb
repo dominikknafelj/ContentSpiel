@@ -8,8 +8,8 @@
 <% image_settings_href = local_assigns[:image_settings_href] %>
 <% forms_href = local_assigns[:forms_href] %>
 <ul class="mt-6 divide-y divide-line border-y border-line">
-  <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each do |result| %>
-    <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: copyable, mail_settings_href: mail_settings_href,
+  <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each_with_index do |result, index| %>
+    <%= render Admin::Ui::SystemCheckRowComponent.new(result: result, index: index, copyable: copyable, mail_settings_href: mail_settings_href,
       image_settings_href: image_settings_href, forms_href: forms_href) %>
   <% end %>
 </ul>

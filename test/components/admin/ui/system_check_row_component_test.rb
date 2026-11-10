@@ -35,23 +35,33 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     I18n.backend.store_translations(:en, admin: { components: { ui: { system_check_row: { ok: "OK", warning: "Warning" } } } })
   end
 
-  test "the command is escaped text and the Copy button copies it from the text value" do
+  test "the command's Copy is the copy box, named for its check, and Learn more is a key" do
     command = %(echo "<b>&" 'x')
-    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result(command: command)))
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result(command: command, docs: "https://example.org/site"), index: 2))
 
-    assert_selector "code", text: command
+    assert_selector "li div[data-controller='admin--ui--clipboard'] code#check-command-2[data-admin--ui--clipboard-target=source]", exact_text: command
     assert_no_selector "code b"
-    assert_equal command, page.find("[data-controller='admin--ui--clipboard']")["data-admin--ui--clipboard-text-value"]
-    assert_selector "button[data-action='click->admin--ui--clipboard#copy']", text: "Copy"
+    assert_no_selector "[data-admin--ui--clipboard-text-value]"
+    assert_selector "button[aria-label='Copy command for Site address'][data-action='click->admin--ui--clipboard#copy']", exact_text: "Copy"
     assert_selector "[data-admin--ui--clipboard-target=status][aria-live=polite]", visible: :all
+    assert_equal "Copy command for Site address", I18n.t("admin.components.ui.system_check_row.copy_label", label: "Site address")
+
+    link = page.find("a[href='https://example.org/site']", exact_text: "Learn more →")
+    assert_includes link[:class], Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
+    I18n.backend.store_translations(:en, admin: { components: { ui: { system_check_row: { learn_more: "Read on" } } } })
+    render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result(docs: "https://example.org/site")))
+    assert_selector "a[href='https://example.org/site']", exact_text: "Read on"
+  ensure
+    I18n.backend.store_translations(:en, admin: { components: { ui: { system_check_row: { learn_more: "Learn more →" } } } })
   end
 
   test "not copyable (the setup wizard): the command shows but there is no Copy button or controller" do
     render_inline(Admin::Ui::SystemCheckRowComponent.new(result: result, copyable: false))
 
-    assert_selector "code", text: Setup::SystemCheck::SITE_ADDRESS_COMMAND
+    assert_selector "code", exact_text: Setup::SystemCheck::SITE_ADDRESS_COMMAND
     assert_no_selector "button"
     assert_no_selector "[data-controller]"
+    assert_no_selector "[data-admin--ui--clipboard-target]"
   end
 
   test "a docs link shows only when there is one" do
@@ -66,7 +76,8 @@ class Admin::Ui::SystemCheckRowComponentTest < ViewComponent::TestCase
     mail = result(label: "Mail", command: nil, link: :mail_settings)
 
     render_inline(Admin::Ui::SystemCheckRowComponent.new(result: mail, mail_settings_href: "/cs-studio/settings#mail"))
-    assert_selector "a[href='/cs-studio/settings#mail']", text: "Open Mail settings →"
+    link = page.find("a[href='/cs-studio/settings#mail']", text: "Open Mail settings →")
+    assert_includes link[:class], Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
 
     render_inline(Admin::Ui::SystemCheckRowComponent.new(result: mail))
     assert_no_selector "a"

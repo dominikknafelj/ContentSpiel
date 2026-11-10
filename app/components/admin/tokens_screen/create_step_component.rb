@@ -1,7 +1,7 @@
 module Admin
   module TokensScreen
     # Step 1 of the AI assistant page, "Create a token": a Name (required,
-    # 1-60 characters, round 3 decision D2), a Group select with the selected
+    # 1-60 characters), a Group select with the selected
     # group's description on one line beneath (every option carries it in
     # `data-description`, `admin--tokens--group-hint` swaps the text, so no request),
     # and Create token.
@@ -10,9 +10,10 @@ module Admin
     # a successful create is a rendered document holding the raw token, which
     # a Turbo form submission would refuse (it demands a redirect) and a
     # redirect must never carry. With `raw_token:` -- only ever the
-    # create response -- this step also shows the warn box, the token itself
-    # (`#api-token-value`, blanked on `pagehide` by `admin--tokens--reveal`) and
-    # Copy token; the form stays below it so another can be made.
+    # create response -- this step also shows the warn notice holding the
+    # token's copy box (`#api-token-value`, a `secret` target blanked on
+    # `pagehide` by `admin--tokens--reveal`, and the token's one place on the
+    # page); the form stays below it so another can be made.
     #
     # `name_errors:` / `group_errors:` print under their own field (a failed
     # create re-renders at 422 with the typed `name:` kept); `selected_id:`

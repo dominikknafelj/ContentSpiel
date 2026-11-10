@@ -96,8 +96,8 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_equal access_control_groups(:read_only), token.group
     assert_equal "claude-desktop", token.name
     assert_equal token, ApiToken.authenticate(raw)
-    assert_select "[role=status]", text: /Copy this token now\. It won't be shown again\./
-    assert_select "button", text: "Copy token"
+    assert_select "[role=alert]", text: /Copy this token now\. It won't be shown again\./
+    assert_select "button[aria-label='Copy token']", text: "Copy"
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
     assert_select "pre#api-token-config", text: /Bearer #{raw}/
     assert_select "table", text: /claude-desktop/

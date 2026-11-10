@@ -666,7 +666,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/editor_screen/tile_summary_component.rb" => "the Code block's tile shows its source as the mono look",
     "app/components/admin/fields/code_field.rb" => "the Code block's source field is code",
     "app/views/setup/token.html.erb" => "the setup token's input holds a key value, and the log's commands are code",
-    "app/components/admin/tokens_screen/create_step_component.html.erb" => "a token's value, shown once",
+    "app/components/admin/ui/copy_value_component.html.erb" => "a value a person copies exactly: a token, an address, a command",
     "app/components/admin/audit_screen/row_component.html.erb" => "the event's action key (`event.action`)",
     "app/components/admin/audit_screen/changes_component.html.erb" => "a changed field's key",
     "app/components/admin/audit_screen/event_header_component.html.erb" => "the event header's values (action, subject key)",
@@ -1881,7 +1881,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
     app/components/admin/pages_screen/tree_state_mark_component.rb
-    app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/ui/chip_input_component.rb
@@ -1944,7 +1943,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   NOTICE_NOT_YET = %w[
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
-    app/components/admin/tokens_screen/create_step_component.html.erb
     app/components/admin/users_screen/invite_dialog_component.html.erb
     app/views/admin/accounts/edit.html.erb
     app/views/admin/passwords/edit.html.erb

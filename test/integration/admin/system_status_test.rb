@@ -103,7 +103,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     with_mail_state(:untested) do
       get "/cs-studio/system_status"
 
-      assert_select "[data-controller='admin--ui--clipboard'][data-admin--ui--clipboard-text-value=?]", Setup::SystemCheck::MAIL_FALLBACK_COMMAND
+      assert_select "[data-controller='admin--ui--clipboard'] code[data-admin--ui--clipboard-target=source]", text: Setup::SystemCheck::MAIL_FALLBACK_COMMAND
     end
     [ :working, :failed ].each do |state|
       with_mail_state(state) do
