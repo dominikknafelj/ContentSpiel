@@ -37,7 +37,8 @@ module Admin
         states: %i[empty success undo warning error relay],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a toast's action and its Dismiss are Tab stops after its words: Enter on Undo undoes, and Enter on Dismiss closes it" ]
       )
 
       def initialize(flash:, relay: false)

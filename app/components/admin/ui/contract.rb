@@ -19,8 +19,13 @@ module Admin
     #   (`data-controller` on its own markup), or nil. A component that is only
     #   a target or an action of a controller someone else attaches declares
     #   nil and says whose in its `limits:`.
-    # - `keyboard:` the `[file, test name]` of its keyboard browser test, or
-    #   nil for a component made before the contract.
+    # - `keyboard:` the `[file, test name]` of its keyboard browser test, or,
+    #   for a component that takes no focus, the sentence that says so and why
+    #   (a chip is words beside a control, a slot draws what others hand it).
+    #   A test can only hold that the keyboard passes over something on a
+    #   screen, and a part that takes no focus anywhere has nothing to hold,
+    #   so its sentence is a person's reading, checked at review. nil only
+    #   while `UiContract::KEYBOARD_NOT_YET` lets it through.
     module Contract
       STATES_NOT_PREVIEWED = %i[hover focus pressed].freeze
       STUDIO = %i[states keys slots controller script_states keyboard].freeze
@@ -53,7 +58,10 @@ module Admin
           end
           both = Array(values[:states]) & script_states.keys
           refuse_contract(:script_states, "names #{both.join(', ')}, which states: names too: a state is drawn statically or held by a script, not both") if both.any?
-          refuse_contract(:keyboard, "is the [file, test name] of a browser test, or nil") unless values[:keyboard].nil? || test_ref.(values[:keyboard])
+          keyboard = values[:keyboard]
+          unless keyboard.nil? || test_ref.(keyboard) || keyboard.is_a?(String) && keyboard.strip.present?
+            refuse_contract(:keyboard, "is the [file, test name] of a browser test, the sentence that says it takes no focus, or nil")
+          end
 
           ComponentContract.declare(self, Declaration, declared, defaults: DEFAULTS)
         end

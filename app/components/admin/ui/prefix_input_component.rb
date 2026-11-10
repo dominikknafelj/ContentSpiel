@@ -27,7 +27,8 @@ module Admin
         states: %i[rest invalid focus],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a prefixed input: the prefix takes no focus, and Tab from it lands in the input" ]
       )
 
       def initialize(name:, id:, value:, prefix:, errors: [], **html)

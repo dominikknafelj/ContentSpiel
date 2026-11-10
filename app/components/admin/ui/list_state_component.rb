@@ -23,7 +23,8 @@ module Admin
         states: %i[draft scheduled live live_with_changes scheduled_with_changes],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: it draws only chips, which are words beside the row's own link."
       )
 
       def initialize(record:)

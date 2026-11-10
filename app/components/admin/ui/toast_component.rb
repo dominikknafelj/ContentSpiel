@@ -47,7 +47,8 @@ module Admin
         states: %i[success undo warning error hover focus],
         keys: %w[dismiss save_failed order_failed dropped],
         slots: [],
-        controller: "admin--ui--toast"
+        controller: "admin--ui--toast",
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a toast's action and its Dismiss are Tab stops after its words: Enter on Undo undoes, and Enter on Dismiss closes it" ]
       )
 
       KINDS = %i[success undo warning error].freeze

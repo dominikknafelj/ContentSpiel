@@ -27,7 +27,8 @@ module Admin
         states: %i[unchecked checked disabled focus],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a checkbox is a Tab stop that Space checks and unchecks: a posts row's Select" ]
       )
 
       def initialize(name:, value: "1", checked: false, id: nil, label: nil, disabled: false, **html)

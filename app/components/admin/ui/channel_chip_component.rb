@@ -22,7 +22,8 @@ module Admin
         states: %i[admin mcp setup console system unknown],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a word in a row whose own link or button the keyboard stops on."
       )
 
       CHANNELS = %w[admin mcp setup console system].freeze

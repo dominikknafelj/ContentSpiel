@@ -34,7 +34,8 @@ module Admin
         script_states: { open: [ "test/system/dialog_test.rb", "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" ] },
         keys: %w[close],
         slots: %i[footer],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a dialog starts on its first field, its Close is a Tab stop inside it, and Escape or Close gives the focus back to its trigger" ]
       )
 
       WIDTHS = { confirm: 420, form_narrow: 460, form: 560, picker: 880 }.freeze

@@ -38,7 +38,8 @@ module Admin
         },
         keys: %w[cancel],
         slots: %i[confirm_action details],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a destructive confirm starts on Cancel, Enter there backs out, and Tab then Enter on the confirm deletes" ]
       )
 
       renders_one :confirm_action

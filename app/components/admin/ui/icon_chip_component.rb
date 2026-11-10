@@ -29,7 +29,8 @@ module Admin
         states: %i[regular small xsmall],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a chip hidden from a screen reader beside its type's or module's name, inside whatever link or row holds it."
       )
 
       FAMILIES = {

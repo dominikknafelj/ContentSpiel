@@ -45,7 +45,8 @@ module Admin
         states: %i[ok warning hover focus],
         keys: %w[ok warning copy_label open_mail_settings open_image_settings open_forms learn_more],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a system check's Copy is the Tab stop after its command, and Enter on it copies the command and says so" ]
       )
 
       LINK_CLASS = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)

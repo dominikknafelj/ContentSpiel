@@ -176,6 +176,9 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: "") }
     assert_match "controller", failure.message
 
+    # One of two controllers a `controller:` key attaches is attached.
+    assert_contract(UiContractSampleComponent, source: 'data: { controller: "admin--ui--dialog admin--media--select" }')
+
     # A target and an action of the controller are not its attachment.
     serves = 'data-admin--ui--dialog-target="panel" data-action="click->admin--ui--dialog#open"'
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: serves) }
@@ -247,6 +250,113 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     both = ->(first, second) { Class.new(ViewComponent::Base) { include first; include second } }
     assert_raises(ArgumentError) { both.(Admin::Ui::Contract, Blocks::Contract) }
     assert_raises(ArgumentError) { both.(Blocks::Contract, Admin::Ui::Contract) }
+  end
+
+  # A component that takes no focus says so in a sentence, which names no
+  # test; anything but a test's [file, name], a sentence or nil is refused.
+  test "a keyboard is a browser test or the sentence that it takes no focus, and anything else is refused when the class declares" do
+    declare = lambda do |keyboard|
+      Class.new(Admin::AdminComponent) do
+        def self.name = "UiContractKeyboardComponent"
+        include Admin::Ui::Contract
+        contract(states: %i[rest], keys: [], slots: [], controller: nil, interface: [], keyboard: keyboard, **UiContractSampleComponent::COMMON)
+      end
+    end
+
+    sentence = declare.("It takes no focus: a word beside its row's link.")
+    assert_equal "It takes no focus: a word beside its row's link.", sentence.contract.keyboard
+    assert_contract_keyboard(sentence)
+
+    [ "", "  ", [ "test/system/dialog_test.rb" ], :none ].each do |keyboard|
+      error = assert_raises(ArgumentError) { declare.(keyboard) }
+      assert_match "UiContractKeyboardComponent's contract: keyboard", error.message
+    end
+
+    missing = declare.([ "test/system/dialog_test.rb", "a test this file does not hold" ])
+    failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(missing) }
+    assert_match "a test this file does not hold", failure.message
+  end
+
+  # A sentence is allowed only to a component whose markup draws nothing that
+  # can take the focus: the check reads its own files, the components it
+  # renders by name, and refuses what it cannot read but a slot its sentence
+  # names. The samples are written to files, as the check reads a file.
+  test "a keyboard sentence is refused on a component that draws what can take the focus, or that the check cannot read" do
+    Dir.mktmpdir do |dir|
+      write = lambda do |name, body, sentence|
+        File.write(File.join(dir, "#{name.underscore}.rb"), <<~RUBY)
+          class #{name} < Admin::AdminComponent
+            include Admin::Ui::Contract
+
+            #{body}
+
+            contract(states: %i[rest], keys: [], slots: [], controller: nil, interface: [],
+              keyboard: #{sentence.inspect}, **UiContractSampleComponent::COMMON)
+
+            def call = ""
+          end
+        RUBY
+        load File.join(dir, "#{name.underscore}.rb")
+        name.constantize
+      end
+
+      quiet = write.("UiContractQuietComponent", "def drawn = tag.span(\"x\")", "It takes no focus: a word.")
+      assert_contract_keyboard(quiet)
+
+      button = write.("UiContractButtonComponent", "def drawn = tag.button(\"x\")", "It takes no focus: a word.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(button) }
+      assert_match "UiContractButtonComponent draws a control", failure.message
+
+      toasts = write.("UiContractToastsComponent", "def drawn = render(Admin::Ui::ToastComponent.new(message: \"x\"))", "It takes no focus: a region.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(toasts) }
+      assert_match "Admin::Ui::ToastComponent draws a control", failure.message
+
+      entries = write.("UiContractEntriesComponent", "def drawn = render(entry.component.new)", "It takes no focus: a slot.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(entries) }
+      assert_match "a render of entry.component.new", failure.message
+
+      unnamed = write.("UiContractUnnamedSlotComponent", "renders_one :aside", "It takes no focus: a word.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(unnamed) }
+      assert_match "the slot aside", failure.message
+
+      named = write.("UiContractNamedSlotComponent", "renders_one :aside", "It takes no focus: a word, and the `aside` a caller hands it is a word too.")
+      assert_contract_keyboard(named)
+
+      # A slot is named as a word: "beside" does not name `aside`.
+      inside = write.("UiContractInsideWordComponent", "renders_one :aside", "It takes no focus: a word beside a link.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(inside) }
+      assert_match "the slot aside", failure.message
+
+      # The string "content" (the CS Studio frame's name) is no block handed over.
+      frame = write.("UiContractFrameNameComponent", "def drawn = tag.span(\"x\", data: { turbo_frame: \"content\" })", "It takes no focus: a word.")
+      assert_contract_keyboard(frame)
+
+      # A component it renders by name passes up what that one cannot read.
+      slot = write.("UiContractRendersSlotComponent", "def drawn = render(Admin::Ui::SlotComponent.new(name: \"x\", record: nil, viewer: nil))", "It takes no focus: a word.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(slot) }
+      assert_match "Admin::Ui::SlotComponent's a render of entry.component.new", failure.message
+
+      # Each of HTML's other focusable shapes is refused.
+      {
+        "Summary" => [ "def drawn = tag.details(tag.summary(\"x\"))", "draws a summary" ],
+        "EmailField" => [ "def drawn = email_field_tag(:x)", "draws a control" ],
+        "SearchField" => [ "def drawn = search_field_tag(:x)", "draws a control" ],
+        "FormBuilder" => [ "def drawn = form_with(url: \"/x\") { |f| f.text_field(:x) }", "draws a form" ],
+        "Frame" => [ "def drawn = tag.iframe(src: \"/x\")", "draws a frame" ],
+        "Video" => [ "def drawn = tag.video(src: \"/x\", controls: true)", "draws a media control" ],
+        "Area" => [ "def drawn = tag.area(href: \"/x\")", "draws a link" ]
+      }.each do |part, (body, said)|
+        component = write.("UiContract#{part}ShapeComponent", body, "It takes no focus: a word.")
+        failure = assert_raises(Minitest::Assertion, part) { assert_contract_keyboard(component) }
+        assert_match "UiContract#{part}ShapeComponent #{said}", failure.message
+      end
+    ensure
+      %w[Quiet Button Toasts Entries UnnamedSlot NamedSlot InsideWord FrameName RendersSlot
+         SummaryShape EmailFieldShape SearchFieldShape FormBuilderShape FrameShape VideoShape AreaShape].each do |part|
+        name = "UiContract#{part}Component"
+        Object.send(:remove_const, name) if Object.const_defined?(name, false)
+      end
+    end
   end
 
   test "a state both drawn and held by a script is refused when the class declares" do

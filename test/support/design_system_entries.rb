@@ -9,13 +9,13 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794314638-99fe".freeze
+  VERSION = "1794323670-cff3".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
     ActionZone ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FormControls
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
-    GroupFields IconChip ImageField ImageLoading ListState Mails Menu NoteMarker PasswordField PresenceMarker
+    GroupFields IconChip ImageField ImageLoading ListState Mails MediaPicker Menu NoteMarker PasswordField PresenceMarker
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome

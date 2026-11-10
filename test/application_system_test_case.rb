@@ -282,6 +282,24 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     JS
   end
 
+  # The words of the element that holds the focus, for a keyboard test.
+  def focused_text = page.evaluate_script("document.activeElement.textContent.trim()")
+
+  # Presses `keys` (Tab, or `[ :shift, :tab ]`) on the page until `selector`
+  # holds the focus, from wherever the focus or the sequential starting point
+  # is now, and fails if it is not reached within `limit` stops: the keyboard
+  # tests' one way to a control (`docs/reference/design-system.md`, "The
+  # keyboard rule"). Keys go to the page, so they reach the focused element:
+  # Cuprite's `element.send_keys` clicks the element first when it does not
+  # hold the focus, which is a pointer, not the keyboard.
+  def stop_on(selector, keys: :tab, limit: 40)
+    limit.times do
+      page.send_keys(keys)
+      return if page.evaluate_script("document.activeElement.matches(#{selector.to_json})")
+    end
+    flunk "#{keys.inspect} never reached #{selector} in #{limit} stops"
+  end
+
   # Presses the mouse at (from_x, from_y) and walks it down to `to_y` in six
   # steps, for a SortableJS drag (the page tree, the block list). SortableJS
   # only looks at what is under the pointer on its own 50 ms timer, so a pointer

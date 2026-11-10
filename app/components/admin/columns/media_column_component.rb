@@ -3,7 +3,7 @@ module Admin
     # A library image field (media library design spec §6): a
     # page's hero (`hero_media_asset_id`) and an image block's image
     # (`media_asset_id`). Shows the chosen image's thumbnail and title,
-    # **Choose image**/**Change image** (opens `Media::PickerComponent`)
+    # **Choose image**/**Change image** (opens `Admin::Ui::MediaPickerComponent`)
     # and **Remove image**, around one hidden input named `html_name` that
     # holds the asset id -- the one thing that's saved.
     #

@@ -28,7 +28,8 @@ module Admin
         states: %i[rest],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/editor_rail_test.rb", "Page and Section are tabs: arrows move between them, Home and End go to the ends" ]
       )
 
       KEY = /\A[a-z]+\z/

@@ -1,12 +1,12 @@
 require "test_helper"
 
-# `Media::PickerComponent` (media library design spec §6, Task 8; round 3 Task 9):
+# `Admin::Ui::MediaPickerComponent` (media library design spec §6, Task 8; round 3 Task 9):
 # one modal that is the Media grid in miniature -- search and segments in its own
 # frame, selectable tiles, a header Upload and a footer "N selected · Cancel ·
 # Use image" -- wired to the picker and select controllers on one element.
-class Media::PickerComponentTest < ViewComponent::TestCase
+class Admin::Ui::MediaPickerComponentTest < ViewComponent::TestCase
   test "renders one dialog wired to the picker and select controllers, with its own grid frame" do
-    as(users(:one)) { render_inline Media::PickerComponent.new }
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     dialog = page.find("dialog#media-picker", visible: :all)
     assert_equal "admin--media--picker admin--media--select", dialog["data-controller"]
@@ -23,7 +23,7 @@ class Media::PickerComponentTest < ViewComponent::TestCase
   end
 
   test "the header has Upload and a close ×, the footer the selection, Cancel and a disabled Use image" do
-    as(users(:one)) { render_inline Media::PickerComponent.new }
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     assert_selector "h2", text: "Choose an image", visible: :all
     assert_selector "button[data-action='admin--media--picker#browse']", text: "Upload", visible: :all
@@ -34,7 +34,7 @@ class Media::PickerComponentTest < ViewComponent::TestCase
   end
 
   test "the file input is labelled, multiple, typed, and never part of a form's own data" do
-    as(users(:one)) { render_inline Media::PickerComponent.new }
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     file = page.find("input[type=file]", visible: :all)
     assert_nil file["name"]
@@ -45,7 +45,7 @@ class Media::PickerComponentTest < ViewComponent::TestCase
   end
 
   test "keeps the editing language on the grid's URL" do
-    as(users(:one)) { render_inline Media::PickerComponent.new(url_options: { locale: "de" }) }
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new(url_options: { locale: "de" }) }
 
     assert_equal "/#{ContentSpiel::ADMIN_PATH}/media?locale=de&picker=1",
       page.find("dialog", visible: :all)["data-admin--media--picker-grid-url-value"]
@@ -54,7 +54,7 @@ class Media::PickerComponentTest < ViewComponent::TestCase
   # Browsing and choosing need `media.upload` (design spec §5.1); without
   # it no field offers Choose, so there's nothing to render.
   test "renders nothing without media.upload" do
-    as(users(:reader)) { render_inline Media::PickerComponent.new }
+    as(users(:reader)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     assert_no_selector "dialog", visible: :all
   end
@@ -63,7 +63,7 @@ class Media::PickerComponentTest < ViewComponent::TestCase
   # (the fix merged as PR #38); a rule that quietly goes would bring back the
   # jump, so it is pinned next to the New page and New post dialogs' own.
   test "the dialog carries the fixed-top-edge class, and the stylesheet still defines it" do
-    as(users(:one)) { render_inline Media::PickerComponent.new }
+    as(users(:one)) { render_inline Admin::Ui::MediaPickerComponent.new }
 
     assert_selector "dialog.admin-media-picker", visible: :all
     assert_match(/\.admin-media-picker \{ margin-top: 7\.5vh; \}/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)

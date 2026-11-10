@@ -113,7 +113,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{unrelated.id}", count: 0
   end
 
-  # `Media::PickerComponent`'s grid is this
+  # `Admin::Ui::MediaPickerComponent`'s grid is this
   # same listing with `picker=1` -- no layout, just the picker's frame,
   # each card a pick button carrying the asset's id, thumbnail, title and
   # its own alt/caption defaults in the editing language.

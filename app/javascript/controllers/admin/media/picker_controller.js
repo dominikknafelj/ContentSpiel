@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { UploadTiles, updateCounts, uploadWords } from "media/upload_tiles"
 
-// The one media picker, on `Media::PickerComponent`'s `<dialog>` -- rendered
+// The one media picker, on `Admin::Ui::MediaPickerComponent`'s `<dialog>` -- rendered
 // once per CS Studio page by
 // the admin layout. See that component's comment for where it's used and how it
 // is built; `admin--media--select` (the same element) owns choosing a tile.
