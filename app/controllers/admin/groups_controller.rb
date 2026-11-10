@@ -13,12 +13,6 @@ module Admin
   class GroupsController < BaseController
     include StaleForm
 
-    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
-    # changed it and when where the audit log says, and the message is the whole
-    # banner where it doesn't.
-    STALE_LEAD = "This group was changed".freeze
-    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
-
     before_action -> { require_permission("groups.manage") }
     before_action :set_group, only: %i[edit update destroy]
 
@@ -69,7 +63,7 @@ module Admin
         redirect_to admin_groups_path(**admin_url_options), status: :see_other, notice: t("admin.groups.deleted")
       else
         forbidden_or(result) do
-          redirect_to edit_admin_group_path(@group, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
+          redirect_to edit_admin_group_path(@group, **admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: a service's refusals, joined with the locale's support.array words
         end
       end
     end

@@ -1,19 +1,21 @@
-<%# locals: message, lead, change, reload_path, and optionally reload_label (a converted screen's own word) -- the 409 banner of an
-    explicit-save screen (`Admin::StaleForm`). `change` is who changed the record
-    since the form loaded (`Audit::ChangeSince`, nil when the audit log names
-    nobody): "<lead> by <name> <time ago>." for someone else, "<lead> in another
-    tab or window <time ago>." for the viewer's own, and the screen's plain
-    `message` otherwise. The warn notice, an alert: the save was refused. Reload
-    is a way out like Cancel: it discards what is in the form on purpose, so the
-    leave guard doesn't ask. %>
+<%# locals: words, change, reload_path -- the 409 banner of an explicit-save
+    screen (`Admin::StaleForm`). `words` is the screen's absolute key scope,
+    which holds the banner whole in each of its shapes, so a translator can
+    reorder every sentence: `by_html` (someone else changed the record:
+    `%{name}` and `%{time}`), `own_html` (the viewer's own other tab:
+    `%{time}`), `message` (the audit log names nobody) and `reload`, the way
+    out's word. `change` is who changed the record since the form loaded
+    (`Audit::ChangeSince`, nil when the audit log names nobody). The warn
+    notice, an alert: the save was refused. Reload is a way out like Cancel: it
+    discards what is in the form on purpose, so the leave guard doesn't ask. %>
 <%= render Admin::Ui::NoticeComponent.new(tone: :warn) do %>
-  <% if change %>
-    <%= lead %>
-    <% if change.own %>in another tab or window<% else %>by <%= render Admin::Ui::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id) %><% end %>
-    <%= render Admin::Ui::TimeAgoComponent.new(time: change.event.last_occurred_at) %>.
-    <%= Admin::StaleForm::STALE_ADVICE %>
+  <% if change.nil? %>
+    <%= t("#{words}.message") %>
+  <% elsif change.own %>
+    <%= t("#{words}.own_html", time: render(Admin::Ui::TimeAgoComponent.new(time: change.event.last_occurred_at))) %>
   <% else %>
-    <%= message %>
+    <%= t("#{words}.by_html", name: render(Admin::Ui::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id)),
+          time: render(Admin::Ui::TimeAgoComponent.new(time: change.event.last_occurred_at))) %>
   <% end %>
-  <%= link_to local_assigns.fetch(:reload_label, "Reload"), reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
+  <%= link_to t("#{words}.reload"), reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
 <% end %>

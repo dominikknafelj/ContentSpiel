@@ -7,8 +7,8 @@
   <% end %>
 
   <% if stale? %>
-    <%= helpers.render "admin/shared/stale_banner", message: t(".stale"), lead: t(".stale_lead"), change: stale_change,
-          reload_path: update_path, reload_label: t(".reload") %>
+    <%= helpers.render "admin/shared/stale_banner", words: "admin.components.#{self.class.translation_scope}.stale",
+          change: stale_change, reload_path: update_path %>
   <% end %>
 
   <%= render Admin::Ui::ErrorSummaryComponent.new(errors: error_places, field_ids: summary_ids) %>

@@ -98,12 +98,17 @@ module Groups
         # race -- (user, group) on the memberships and lower(name) on the groups
         # -- for which "changed elsewhere" is the right advice too, if less exact
         # for a name taken by another group in the same moment.
-        return failure(@group, [ "This group was changed elsewhere. Reload and try again." ])
+        return failure(@group, [ self.class.changed_elsewhere ])
       end
       return failure(@group) unless saved
 
       success(@group)
     end
+
+    # The refusal of a save a unique index caught in a race. Looked up at each
+    # call, so a later locale switch applies; `raise: true` so a missing key
+    # never becomes a "translation missing" sentence.
+    def self.changed_elsewhere = I18n.t("admin.groups.save.changed_elsewhere", raise: true)
 
     private
 
