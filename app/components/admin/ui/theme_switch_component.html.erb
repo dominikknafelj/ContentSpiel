@@ -1,8 +1,9 @@
-<div role="radiogroup" aria-label="Theme" data-controller="theme"
+<div role="radiogroup" aria-label="<%= t(".label") %>" data-controller="theme"
      class="admin-theme-switch inline-flex rounded-button border border-field-line p-0.5">
-  <% Admin::Ui::ThemeSwitchComponent::CHOICES.each do |choice, label| %>
-    <%= tag.button label, type: "button", role: "radio", aria: { checked: "false" },
-          data: { action: "theme#choose", theme_choice_param: choice, theme_target: "choice" },
+  <% Admin::Ui::ThemeSwitchComponent::CHOICES.each do |choice| %>
+    <%= tag.button t(".#{choice}"), type: "button", role: "radio", aria: { checked: "false" },
+          data: { action: "theme#choose keydown.left->theme#previous keydown.up->theme#previous keydown.right->theme#next keydown.down->theme#next",
+                  theme_choice_param: choice, theme_target: "choice" },
           class: "admin-theme-switch__choice cursor-pointer rounded-field px-2 py-0.5 text-label text-meta hover:text-ink" %>
   <% end %>
 </div>
