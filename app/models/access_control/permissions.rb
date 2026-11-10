@@ -1,8 +1,11 @@
 # The registry of permissions (design spec §3.1) that `AccessControl
 # .allowed?`/`.scope` (a later task) check grants against, and CS Studio's
 # group editor lists grouped by `area`. Built-ins register here from
-# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`;
-# plugins will call the same `.register`, under a prefixed `owner/name` key.
+# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`.
+# A gem cannot register here: no hook replays an outside registration after
+# that `reset!` (`ContentSpiel::Plugins` has none for permissions), so a
+# key a gem registers is wiped at boot and on every reload. An outside key
+# would be `owner/key.action` (`KEY_FORMAT`), the shape a hook will take.
 #
 # Mirrors `ContentModel::Registry` in spirit -- register/fetch-by-key/
 # reset!, a duplicate raises, a malformed key is rejected -- but doesn't

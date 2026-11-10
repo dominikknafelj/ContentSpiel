@@ -1,6 +1,8 @@
 # Registers every built-in permission (design spec §3.1 / Global
-# Constraints) against `AccessControl::Permissions`, the same `.register`
-# call a plugin will use later under a prefixed `owner/name` key. Called
+# Constraints) against `AccessControl::Permissions`, through `.register`,
+# which an outside key would take under a prefixed `owner/name` once a hook
+# reaches this registry (none does yet:
+# docs/reference/content-blocks-and-types.md, "Registries with no hook"). Called
 # from `config/initializers/types.rb`'s `to_prepare`, right after
 # `AccessControl::Permissions.reset!` -- see that initializer for why (a
 # code reload in development must re-register cleanly, not raise

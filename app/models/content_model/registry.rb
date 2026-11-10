@@ -1,6 +1,9 @@
 # The shared shape of BlockTypes, ContentTypes and FieldGroups (open-types
-# spec §3.2): a name => definition map filled from code at boot (and, later,
-# by plugins through the same calls). Reset at the start of every
+# spec §3.2): a name => definition map filled from code at boot. A gem
+# reaches `BlockTypes` through its hook (`ContentSpiel::Plugins.block_types`,
+# replayed after the built-ins); `ContentTypes` and `FieldGroups` have no
+# hook, so an entry a gem registers there is wiped by the next `reset!`.
+# Reset at the start of every
 # `to_prepare` run (config/initializers/types.rb) so a code reload in
 # development re-registers cleanly instead of keeping definitions that point
 # at stale, unloaded classes.
@@ -14,11 +17,12 @@
 module ContentModel
   module Registry
     # Bare names (`image`, `blog`) are reserved for built-ins. Every other
-    # name (plugins now, admin-defined types later, spec §3.2a) must be
+    # name (a gem's block type now, admin-defined types later, spec §3.2a) must be
     # prefixed with its owner, e.g. `gallery/album` -- one `/`, lowercase
-    # segments on both sides. Enforcing "plugins must actually prefix
-    # themselves" is a job for the plugin DSL (out of scope here); this only
-    # accepts or rejects the *shape* of a name.
+    # segments on both sides. This only accepts or rejects the *shape* of a
+    # name; the owner rules (an `owner/name` from a gem, one owner per hook,
+    # no owner named like a constant of the CMS's) are
+    # `ContentSpiel::Plugins::Registrar`'s, for the registries a hook reaches.
     NAME_FORMAT = /\A[a-z][a-z0-9_]*(\/[a-z][a-z0-9_]*)?\z/
 
     # `&block` receives the new definition to fill in via its DSL (`label`,

@@ -85,6 +85,17 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
     assert_equal "/about", about.full_path("fr")
   end
 
+  # A new site has English alone on (the column's default), so the step
+  # offers every other language unchosen: Continue as it stands keeps one.
+  test "on a new site the languages step preselects no additional language" do
+    SiteSetting.instance.update_columns(locales: SiteSetting.column_defaults["locales"])
+
+    get setup_step_path("languages")
+
+    assert_select "select[name='site_setting[extra_locales][]'] option[selected]", count: 0
+    assert_select "select[name='site_setting[default_locale]'] option[selected][value='en']"
+  end
+
   test "an unsupported language is rejected" do
     patch setup_step_path("languages"), params: { site_setting: { default_locale: "xx" } }
 

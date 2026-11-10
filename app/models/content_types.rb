@@ -1,7 +1,7 @@
-# Registry of content types (spec §3.1: `blog`, `resume_entry`, `now_update`,
-# and whatever a plugin or, later, an admin-defined type adds). Filled from
-# `config/initializers/types.rb`; nothing but that initializer and tests
-# should call `register`/`reset!` directly.
+# Registry of content types (spec §3.1: `blog`, `resume_entry`, `now_update`).
+# Filled from `config/initializers/types.rb`; nothing but that initializer
+# and tests should call `register`/`reset!` directly. A gem cannot add one:
+# there is no hook replaying an outside content type after the `reset!`.
 module ContentTypes
   extend ContentModel::Registry
 

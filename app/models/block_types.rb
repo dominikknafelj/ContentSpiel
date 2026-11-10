@@ -1,7 +1,8 @@
 # Registry of block types (spec §3.1: `rich_text`, `image`, `post_list`, and
-# whatever a plugin or, later, an admin-defined type adds). Filled from
-# `config/initializers/types.rb`; nothing but that initializer and tests
-# should call `register`/`reset!` directly.
+# whatever a gem adds through `ContentSpiel::Plugins.block_types`). Filled
+# from `config/initializers/types.rb`, which replays the gems' hooks after
+# the built-ins; nothing but that initializer and tests should call
+# `register`/`reset!` directly.
 module BlockTypes
   extend ContentModel::Registry
 

@@ -5,6 +5,10 @@ default:
   # Translated (Mobility jsonb, translation helpers spec §5).
   title: { en: Test Site }
   default_locale: en
+  # The suite's site has three languages on, so every test meets a default
+  # language and two others; a new site starts with English alone (the
+  # column's default, test/models/site_setting_test.rb).
+  locales: [ { code: en }, { code: de }, { code: es } ]
   setup_completed_at: <%= Time.current.to_fs(:db) %>
   # A sender address and nothing else of mail: with the test environment's
   # stand-in (`:test`, plan Ruling 1) the settings are complete and untested,

@@ -27,6 +27,8 @@ class FieldTypeBranchesTest < ActiveSupport::TestCase
       reason: "`coerce_directive_value` compares a rich-text node attribute's type with `:integer`; it is no field type and never a field's" },
     { path: "app/models/rich_text/content_expression.rb", pattern: :name_compare,
       reason: "`inline?` compares a ProseMirror content-expression term's name with \"text\", the name of a rich-text node; it is no field type's and never a field's" },
+    { path: "app/models/content_model/sample_block.rb", pattern: :compare,
+      reason: "a sample's `form: true` is declared as \"name the made form in the type's `:form` field\" (`BlockTypeDefinition#sample`), so building the sample asks for that field by its type's name; nothing branches on what a field does" },
     { path: "app/components/admin/ui/field_component.rb", pattern: :constant,
       reason: "`TRANSLATABLE_TYPES` is read by its name from outside (a component test); its value is derived from the registry, never written as a list, and nothing in app branches on it" }
   ].freeze

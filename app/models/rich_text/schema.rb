@@ -1,9 +1,11 @@
 # The registry of Tiptap/ProseMirror node and mark types (design spec §3.2)
 # that `RichText::Document#validate` and, from Task 2 on, the HTML and
 # Markdown renderers walk. Built-ins register here from
-# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`;
-# plugins will call the same `register_node`/`register_mark` later, under a
-# prefixed `owner/name`.
+# `config/initializers/types.rb`'s `to_prepare` block, after a `reset!`.
+# A gem cannot register here: no hook replays an outside node or mark after
+# that `reset!` (`ContentSpiel::Plugins` has none for the schema), so one a
+# gem registers is wiped at boot and on every reload. An outside name would
+# be a prefixed `owner/name` (`NAME_FORMAT`).
 #
 # This mirrors `ContentModel::Registry` (open-types spec §3.2) in spirit --
 # register/fetch-by-name/reset!, a duplicate raises, a malformed name is
@@ -20,11 +22,12 @@ module RichText
   module Schema
     # Bare camelCase names (`bulletList`, `internalLink`) are reserved for
     # built-ins, matching Tiptap's own node-name casing. Every other name
-    # (plugins, later admin-defined node types) must be prefixed with its
-    # owner, e.g. `gallery/carousel` -- one `/`, a camelCase-shaped segment
-    # on each side. As with `ContentModel::Registry::NAME_FORMAT`, this only
-    # checks the *shape* of a name; enforcing that plugins actually prefix
-    # themselves is the plugin DSL's job, out of scope here.
+    # (a gem's, once a hook reaches this registry; later admin-defined node
+    # types) must be prefixed with its owner, e.g. `gallery/carousel` -- one
+    # `/`, a camelCase-shaped segment on each side. As with
+    # `ContentModel::Registry::NAME_FORMAT`, this only checks the *shape* of
+    # a name; the owner rules are `ContentSpiel::Plugins::Registrar`'s, for
+    # the registries a hook reaches, and this one has none yet.
     NAME_FORMAT = /\A[a-z][A-Za-z0-9]*(\/[a-z][A-Za-z0-9_]*)?\z/
 
     # One declared attribute rule on a node or mark type (`attribute` below).

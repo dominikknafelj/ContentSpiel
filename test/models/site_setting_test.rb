@@ -16,6 +16,17 @@ class SiteSettingTest < ActiveSupport::TestCase
     end
   end
 
+  # A site that is not the owner's starts with one language, so nothing is
+  # marked as needing translation into a language nobody asked for; the
+  # wizard's languages step and Settings add the others.
+  test "a new site starts with English alone" do
+    SiteSetting.delete_all
+
+    site = SiteSetting.instance
+    assert_equal [ "en" ], site.locale_codes
+    assert_equal "en", site.default_locale
+  end
+
   test "instance returns the existing record on subsequent access" do
     assert_equal site_settings(:default), SiteSetting.instance
   end

@@ -30,21 +30,13 @@ about to change.
 
 ## Checking it
 
-Run all of these before you open a pull request:
-
-```sh
-bin/rubocop
-bin/brakeman
-bin/bundler-audit
-bin/importmap audit
-bin/rails test
-bin/rails tailwindcss:build && bin/rails test:system
-```
-
-On macOS put `PGGSSENCMODE=disable` in front of every test command. The
-browser tests (`test:system`) need a quiet machine; on a laptop cap them with
-`PARALLEL_WORKERS=6`. Pull requests run the lint, the scans and the unit tests
-on CI. Say in the pull request that you ran the browser tests locally.
+Run `bin/ci` before you open a pull request. It runs what CI runs, and the seed,
+which CI does not, one step after another (`config/ci.rb`): setup, RuboCop,
+the changelog guard, the gem, import map and Brakeman scans, the unit tests,
+the browser tests, the seed and the theme build check. The changelog guard compares with `origin/main`, so
+fetch it first. The browser tests need a quiet machine; on a laptop cap them
+with `PARALLEL_WORKERS=6 bin/ci`. CI runs all of it but the seed again for
+every pull request.
 
 ## The pull request
 

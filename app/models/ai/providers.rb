@@ -1,9 +1,11 @@
 module AI
   # The AI provider registry (translation helpers spec §6.1): a name =>
-  # class map, filled from code at boot -- the built-in `anthropic`, and
-  # later plugins through the same `register` call. Reset and re-registered
-  # in `config/initializers/types.rb`'s `to_prepare`, alongside the other
-  # registries, so a development reload never keeps a class from before it.
+  # class map, filled from code at boot with the built-in `anthropic`. Reset
+  # and re-registered in `config/initializers/types.rb`'s `to_prepare`,
+  # alongside the other registries, so a development reload never keeps a
+  # class from before it. A gem cannot register here: no hook replays an
+  # outside provider after that reset (`ContentSpiel::Plugins` has none for
+  # providers), so one a gem registers is wiped at boot and on every reload.
   #
   # The naming rule is `ContentModel::Registry`'s (shared, not copied):
   # bare names (`anthropic`) for built-ins, `owner/name` for everything

@@ -23,43 +23,21 @@ require "test_helper"
 # `Admin::PostsScreen::`, `Admin::EditorScreen::` -- never after the domain
 # module.
 #
-# The names are DERIVED, not listed: everything at the top of `app/models`,
-# `app/services`, `app/queries`, `app/values` and `app/constraints` -- a directory is a namespace (`media/` ->
-# `Media`), a file a class or module (`page.rb` -> `Page`, `audit.rb` ->
-# `Audit`) -- so a new domain is guarded the day its directory appears. Each
-# is taken both as Zeitwerk inflects it (`ai` -> `AI`) and as a plain camelize
-# would (`Ai`, what an `admin/ai/` directory would become without the
-# inflection). It replaces the four per-namespace guards (Media, Trash,
-# Translations/AI, Audit), and covers what they did: nothing defines the name
-# under `Admin`, and a bare reference from inside `Admin` still reaches the
-# top-level constant.
+# The names are DERIVED, not listed, by `TopLevelNames` (app/values/
+# top_level_names.rb), which says what it reads and is the same list a gem's
+# owner is refused by (`ContentSpiel::Plugins::Registrar`): a new domain is
+# guarded the day its directory appears. It replaces the four per-namespace
+# guards (Media, Trash, Translations/AI, Audit), and covers what they did:
+# nothing defines the name under `Admin`, and a bare reference from inside
+# `Admin` still reaches the top-level constant.
 class AdminNamespaceShadowTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/services app/queries app/values app/constraints lib].freeze
-
-  # Not a domain name: `concerns` is no namespace (Rails collapses it:
-  # `concerns/trashable.rb` is `Trashable`). There is no `admin` here on purpose:
-  # none of the roots has an `admin/` directory (the admin's classes are
-  # controllers, components and helpers), and a future one would be a domain
-  # named `Admin` that this guard should look at, not skip.
-  SKIPPED_ENTRIES = %w[concerns].freeze
-
   # A domain name that legitimately exists under `Admin`, with the reason it is
   # safe. EMPTY today, and it should stay that way: an entry here means every
   # bare reference to that top-level constant inside `module Admin` must be
   # written `::Name`, for ever. Add one only with that reason written beside it.
   ALLOWED = {}.freeze
 
-  def self.domain_names
-    inflector = Rails.autoloaders.main.inflector
-    ROOTS.flat_map do |root|
-      Dir[Rails.root.join(root, "*")].flat_map do |path|
-        base = File.basename(path, ".rb")
-        next [] if SKIPPED_ENTRIES.include?(base)
-
-        [ inflector.camelize(base, path), base.camelize ]
-      end
-    end.uniq.sort
-  end
+  def self.domain_names = TopLevelNames.all
 
   setup { Rails.application.eager_load! }
 
