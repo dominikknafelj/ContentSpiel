@@ -1,4 +1,4 @@
-# The development site's showcase (issue #137): pages under `/showcase` that
+# The development site's showcase: pages under `/showcase` that
 # draw every registered block type, so a theme's templates and a public
 # change are seen where they break: every type at the top level; every type
 # in a section of every layout, in each of the three bands, and a band at
