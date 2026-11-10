@@ -72,6 +72,21 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     I18n.backend = original if original
   end
 
+  # A language without the nested key: the test environment raises on the
+  # missing key, and anywhere else (I18n's own handler, which answers a
+  # "translation missing" String) the category is `other`, so the screen draws
+  # the missing span instead of answering 500.
+  test "a missing nested key raises in tests and is the other category elsewhere" do
+    component = Admin::GroupsScreen::DeleteZoneComponent.new(group: AccessControl::Group.create!(name: "Bots"), member_count: 3, tokens: [])
+    assert_raises(I18n::MissingTranslationData) { component.send(:members_category, "no_such_key") }
+
+    handler = I18n.exception_handler
+    I18n.exception_handler = I18n::ExceptionHandler.new
+    assert_equal :other, component.send(:members_category, "no_such_key")
+  ensure
+    I18n.exception_handler = handler if handler
+  end
+
   test "a custom group: the effect in words, a danger-text trigger, and the dialog with the solid danger confirm" do
     group = AccessControl::Group.create!(name: "Bots")
     zone(group, members: 2, tokens: [ token("Deploy", users(:reader)) ])

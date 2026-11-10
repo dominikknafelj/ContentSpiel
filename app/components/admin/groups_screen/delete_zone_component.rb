@@ -55,14 +55,24 @@ module Admin
       end
 
       # The members' category of the nested key at `path` is the I18n
-      # backend's own choice, made by asking it to pluralise the outer level on
-      # the members' count and reading back which branch it answered: whatever rule the backend applies to every
-      # other `count` (Rails' one/other, or a locale's `i18n.plural.rule` under
-      # `I18n::Backend::Pluralization`, with its `few` and `many`) applies here
-      # too, and a language's file decides which branches it has.
+      # backend's own choice, made by asking it to pluralise the outer level
+      # on the members' count and reading back which branch it answered:
+      # whatever rule the backend applies to every other `count` (Rails'
+      # one/other, or a locale's `i18n.plural.rule` under
+      # `I18n::Backend::Pluralization`, with its `few` and `many`) applies
+      # here too, and a language's file decides which branches it has.
+      #
+      # A language without the key raises in the test environment (the
+      # exception handler of `raise_on_missing_translations`); elsewhere the
+      # lookup answers a "translation missing" String, and the category is
+      # `other`, so the sentence's own lookup draws the usual missing span
+      # rather than the screen answering 500.
       def members_category(path)
         key = "admin.components.#{self.class.translation_scope}.#{path}"
-        I18n.t(key).key(I18n.t(key, count: member_count))
+        branches = I18n.t(key)
+        return :other unless branches.is_a?(Hash)
+
+        branches.key(I18n.t(key, count: member_count))
       end
     end
   end

@@ -791,20 +791,33 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   # `Array#to_sentence` joins with the locale's `support.array` and falls back
   # to English's, which Active Support ships, so a language without its own
-  # reads "A, B, and C" in English. An admin language is one a file of
-  # `config/locales/admin/` is written in; its words are looked for in the app's
-  # own locale files (never Active Support's), in any file of that language.
+  # reads "A, B, and C" in English. An admin language is one a file under
+  # `config/locales/admin/` (a subfolder included, as Rails' own glob loads it)
+  # is written in; its words are looked for in the app's own YAML locale files
+  # (never Active Support's), in any file of that language. A `.rb` locale
+  # file is not read on either side: the app has none.
   SUPPORT_ARRAY_KEYS = %w[words_connector two_words_connector last_word_connector].freeze
 
-  def self.admin_languages
-    Dir[Rails.root.join("config/locales/admin/*.yml")].map { |path| File.basename(path, ".yml").split(".", 2).last }.uniq.sort
+  def self.admin_languages(root = Rails.root)
+    Dir[Pathname(root).join("config/locales/admin/**/*.yml")].map { |path| File.basename(path, ".yml").split(".", 2).last }.uniq.sort
   end
 
-  def self.app_locale_tree(language)
-    Dir[Rails.root.join("config/locales/**/*.yml")]
+  def self.app_locale_tree(language, root = Rails.root)
+    Dir[Pathname(root).join("config/locales/**/*.yml")]
       .select { |path| File.basename(path, ".yml").split(".").last == language }
       .map { |path| YAML.load_file(path)[language] || {} }
       .reduce({}) { |tree, file| tree.deep_merge(file) }
+  end
+
+  test "an admin language is found in a subfolder too, and only the app's YAML is read" do
+    assert_empty Dir[Rails.root.join("config/locales/**/*.rb")], "a .rb locale file: teach admin_languages and app_locale_tree to read it"
+    Dir.mktmpdir do |root|
+      folder = File.join(root, "config/locales/admin/zz")
+      FileUtils.mkdir_p(folder)
+      File.write(File.join(folder, "groups.zz.yml"), { "zz" => { "admin" => {} } }.to_yaml)
+      assert_equal [ "zz" ], self.class.admin_languages(root)
+      assert_nil self.class.app_locale_tree("zz", root).dig("support", "array")
+    end
   end
 
   test "every admin language defines the words a list is joined with" do

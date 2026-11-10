@@ -5,13 +5,14 @@
 # change, from the same keys (`permission_row.chips`,
 # `scope_editor.notes`), which the matrix hands it as `data-messages`.
 #
-# The dialog's body is one whole sentence per shape (no members; members
-# only; members and tokens), so a language can order the counts its own
-# way. `members_and_tokens` is keyed first by the members' category, which
-# `Admin::GroupsScreen::DeleteZoneComponent#dialog_body` picks by hand
-# (`one` for 1, `other` otherwise), not I18n; then I18n pluralises it on
-# the tokens' count. HAZARD: the hand choice holds only under Rails' own
-# one/other rule, and breaks once CLDR plural rules (few, many) are added.
+# The delete zone's words are one whole sentence per shape, so a language
+# can order the counts its own way. `delete_zone.effect` and
+# `delete_zone.dialog_body.members_and_tokens` name both counts: each is
+# keyed first by the members' plural category, which the I18n backend picks
+# (`Admin::GroupsScreen::DeleteZoneComponent#members_category`), then by the
+# tokens', which `t` pluralises. A language writes the categories its own
+# rule has (`few`, `many`); under the CLDR rules a missing one falls back to
+# `other`.
 en:
   admin:
     components:
