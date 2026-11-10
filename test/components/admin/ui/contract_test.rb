@@ -249,6 +249,31 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { both.(Blocks::Contract, Admin::Ui::Contract) }
   end
 
+  # A component that takes no focus says so in a sentence, which names no
+  # test; anything but a test's [file, name], a sentence or nil is refused.
+  test "a keyboard is a browser test or the sentence that it takes no focus, and anything else is refused when the class declares" do
+    declare = lambda do |keyboard|
+      Class.new(Admin::AdminComponent) do
+        def self.name = "UiContractKeyboardComponent"
+        include Admin::Ui::Contract
+        contract(states: %i[rest], keys: [], slots: [], controller: nil, interface: [], keyboard: keyboard, **UiContractSampleComponent::COMMON)
+      end
+    end
+
+    sentence = declare.("It takes no focus: a word beside its row's link.")
+    assert_equal "It takes no focus: a word beside its row's link.", sentence.contract.keyboard
+    assert_contract_keyboard(sentence)
+
+    [ "", "  ", [ "test/system/dialog_test.rb" ], :none ].each do |keyboard|
+      error = assert_raises(ArgumentError) { declare.(keyboard) }
+      assert_match "UiContractKeyboardComponent's contract: keyboard", error.message
+    end
+
+    missing = declare.([ "test/system/dialog_test.rb", "a test this file does not hold" ])
+    failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(missing) }
+    assert_match "a test this file does not hold", failure.message
+  end
+
   test "a state both drawn and held by a script is refused when the class declares" do
     error = assert_raises(ArgumentError) do
       Class.new(Admin::AdminComponent) do

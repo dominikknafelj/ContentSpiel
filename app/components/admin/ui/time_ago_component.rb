@@ -30,7 +30,8 @@ module Admin
         states: %i[just_now minutes hours yesterday days this_year last_year scheduled],
         keys: %w[just_now minutes_ago hours_ago yesterday days_ago],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a time element in a row whose own link the keyboard stops on; its title is for a pointer."
       )
 
       # `title:` replaces the tooltip (the dashboard's coalesced edit burst

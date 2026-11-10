@@ -49,7 +49,8 @@ module Admin
         states: %i[other own away more empty here],
         keys: %w[more many],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a circle hidden from a screen reader, drawn beside the name or control that says who it is."
       )
 
       SIZES = { lg: "size-7", md: "size-[26px]", sm: "size-[22px]" }.freeze

@@ -28,7 +28,8 @@ module Admin
         states: %i[rest],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus of its own: each entry's tab is a RailTab, held by RailTabs' keyboard test, and its panel a RailPanel, and what the panel holds brings its own keyboard."
       )
 
       KEY = /\A[a-z]+\z/

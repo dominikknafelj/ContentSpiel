@@ -49,7 +49,8 @@ module Admin
         states: %i[title_only with_description_and_action],
         keys: [],
         slots: %i[action],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: one line of text, and the action a caller hands its slot is a button or link with its own keyboard."
       )
 
       renders_one :action

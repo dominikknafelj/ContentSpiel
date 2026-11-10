@@ -22,7 +22,8 @@ module Admin
         states: %i[rest],
         keys: %w[label],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a word in a row or a header whose own links and buttons the keyboard stops on."
       )
     end
   end

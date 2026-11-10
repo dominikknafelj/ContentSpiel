@@ -19,21 +19,12 @@ module UiContract
   # component on it declares its keyboard test or is deleted, and nothing is
   # ever added (test/lib/component_parts_test.rb).
   MADE_BEFORE_CONTRACT = %w[
-    Admin::Ui::ActorAvatarComponent Admin::Ui::AvatarComponent Admin::Ui::BadgeComponent Admin::Ui::ButtonComponent
-    Admin::Ui::ChannelChipComponent Admin::Ui::CheckboxComponent
-    Admin::Ui::ConfirmDialogComponent Admin::Ui::ContentTypeDotComponent Admin::Ui::DialogComponent
-    Admin::Ui::EmptyStateComponent Admin::Ui::ErrorSummaryComponent Admin::Ui::FieldComponent
-    Admin::Ui::FileDropComponent Admin::Ui::IconChipComponent Admin::Ui::InsecureNoticeComponent
-    Admin::Ui::LanguageTabsComponent Admin::Ui::LibraryImageComponent Admin::Ui::ListStateComponent
-    Admin::Ui::MailFailedNoticeComponent Admin::Ui::PaginationComponent
-    Admin::Ui::PasswordFieldComponent Admin::Ui::PrefixInputComponent Admin::Ui::RailPanelComponent
-    Admin::Ui::RailSlotComponent Admin::Ui::RailTabComponent
-    Admin::Ui::SaveBarComponent Admin::Ui::SaveStatusComponent Admin::Ui::ScheduledDateComponent
-    Admin::Ui::SlotComponent Admin::Ui::StatusChipComponent Admin::Ui::SystemCheckRowComponent
-    Admin::Ui::TabLinksComponent Admin::Ui::ThemeSwitchComponent Admin::Ui::TimeAgoComponent
-    Admin::Ui::ToastComponent Admin::Ui::ToastRegionComponent
-    Admin::Ui::TranslationChipComponent Admin::Ui::UnpublishedChipComponent Admin::Ui::UserNameComponent
-    Admin::Ui::WordDiffComponent
+    Admin::Ui::ButtonComponent Admin::Ui::CheckboxComponent Admin::Ui::ConfirmDialogComponent Admin::Ui::DialogComponent
+    Admin::Ui::ErrorSummaryComponent Admin::Ui::FieldComponent Admin::Ui::FileDropComponent Admin::Ui::LanguageTabsComponent
+    Admin::Ui::MailFailedNoticeComponent Admin::Ui::PaginationComponent Admin::Ui::PasswordFieldComponent
+    Admin::Ui::PrefixInputComponent Admin::Ui::RailPanelComponent Admin::Ui::RailTabComponent Admin::Ui::SaveBarComponent
+    Admin::Ui::SaveStatusComponent Admin::Ui::SystemCheckRowComponent Admin::Ui::TabLinksComponent
+    Admin::Ui::ThemeSwitchComponent Admin::Ui::ToastComponent
   ].freeze
 
   # A new component whose keyboard browser test comes in a later task of the
@@ -159,9 +150,10 @@ module UiContract
     end
   end
 
+  # A sentence (a component that takes no focus) names no test to look for.
   def assert_contract_keyboard(klass)
-    file, name = declared_contract(klass).keyboard
-    assert_browser_test(file, name, "#{klass.name}'s contract keyboard") if file
+    keyboard = declared_contract(klass).keyboard
+    assert_browser_test(*keyboard, "#{klass.name}'s contract keyboard") if keyboard.is_a?(Array)
   end
 
   private

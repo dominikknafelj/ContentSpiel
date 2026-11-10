@@ -26,7 +26,8 @@ module Admin
         states: %i[width preview empty],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: an image or an empty box, and the tile, link or button around it is what the keyboard stops on."
       )
 
       def initialize(asset:, min_width:, css_class: nil, loading: "lazy", **attributes)

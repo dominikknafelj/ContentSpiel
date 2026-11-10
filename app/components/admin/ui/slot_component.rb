@@ -31,7 +31,8 @@ module Admin
         states: %i[rest],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus of its own and draws no wrapper: each registered entry's component brings its own keyboard."
       )
 
       def initialize(name:, record:, viewer:, loaded: nil, **context)

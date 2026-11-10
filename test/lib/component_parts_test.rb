@@ -33,7 +33,7 @@ class ComponentPartsTest < ActiveSupport::TestCase
   # here. The made-before list only shrinks: its figure is lowered by hand
   # when it does, and never raised. The keyboard not-yet list's figure is 0 on
   # main: a component names its keyboard test when it is made.
-  LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 40, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
+  LIST_LIMITS = { "UiContract::MADE_BEFORE_CONTRACT" => 20, "UiContract::KEYBOARD_NOT_YET" => 0 }.freeze
 
   # What a list holds over its limit, as a sentence, or nil.
   def self.over_limit(name, listed, limit)
@@ -177,8 +177,9 @@ class ComponentPartsTest < ActiveSupport::TestCase
     assert_equal [ "#{missing} is not a component in app/components/admin/ui/", "Admin::Ui::MenuComponent declares its keyboard test" ],
       self.class.stale_keyboard_list([ missing, "Admin::Ui::MenuComponent", "Admin::Ui::ButtonComponent" ], names)
 
-    assert_equal "UiContract::MADE_BEFORE_CONTRACT holds 41, over its 40: it only shrinks",
-      self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT + [ missing ], 40)
-    assert_nil self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT, 40)
+    size = MADE_BEFORE_CONTRACT.size
+    assert_equal "UiContract::MADE_BEFORE_CONTRACT holds #{size + 1}, over its #{size}: it only shrinks",
+      self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT + [ missing ], size)
+    assert_nil self.class.over_limit("UiContract::MADE_BEFORE_CONTRACT", MADE_BEFORE_CONTRACT, size)
   end
 end

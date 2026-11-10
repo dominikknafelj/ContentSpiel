@@ -25,7 +25,8 @@ module Admin
         states: %i[rest],
         keys: %w[removed added],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: words in the line whose removed and added words are read in place."
       )
 
       def initialize(segments:)

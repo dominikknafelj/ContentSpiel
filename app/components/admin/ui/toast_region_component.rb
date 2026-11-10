@@ -37,7 +37,8 @@ module Admin
         states: %i[empty success undo warning error relay],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus of its own: it is the live region the toasts land in, and each toast's Dismiss and action are held by Toast's keyboard test."
       )
 
       def initialize(flash:, relay: false)
