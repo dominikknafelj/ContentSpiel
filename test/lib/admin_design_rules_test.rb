@@ -780,6 +780,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/forms_screen/*
     app/views/admin/forms/*
     app/views/admin/form_submissions/*
+    app/components/admin/audit_screen/*
+    app/views/admin/audit_events/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/

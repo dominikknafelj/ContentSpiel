@@ -1,0 +1,94 @@
+# The audit log's components (`app/components/admin/audit_screen/`):
+# `admin.components.audit_screen.*` are their keys (docs/reference/i18n.md:
+# one file per component folder). The sentences themselves are
+# `Audit::Sentence`'s, English by design until they are converted whole.
+en:
+  admin:
+    components:
+      audit_screen:
+        toolbar:
+          # Each select's name, for a screen reader (the bar shows no labels),
+          # and its blank choice, which is "all".
+          user: "User"
+          anyone: "Anyone"
+          # The chosen user, who is gone: `audit_events.user_id` has no FK.
+          deleted_user: "A deleted user"
+          action: "Action"
+          any_action: "Any action"
+          type: "Type"
+          any_content: "Any content"
+          channel: "Channel"
+          all_channels: "All channels"
+          date: "Date"
+          any_time: "Any time"
+          from: "From"
+          to: "To"
+          filter: "Filter"
+          clear: "Clear"
+          channels:
+            admin: "Admin"
+            mcp: "MCP"
+            other: "Other"
+          dates:
+            today: "Today"
+            last_7: "Last 7 days"
+            last_30: "Last 30 days"
+            last_90: "Last 90 days"
+            custom: "Custom…"
+          # The Action select's groups, by the key's first part; "other" holds
+          # what the catalogue does not know (a plugin's actions).
+          groups:
+            page: "Pages"
+            post: "Posts"
+            block: "Blocks"
+            media: "Media"
+            tag: "Tags"
+            user: "Users"
+            group: "Groups"
+            token: "API tokens"
+            language: "Languages"
+            settings: "Settings"
+            session: "Sign-in"
+            access: "Access"
+            trash: "Trash"
+            ai: "AI translation"
+            starter_content: "Starter content"
+            other: "Other"
+          # The one record a record's "Activity" link filters to, as a chip;
+          # `type` is the record's kind in lower case.
+          subject: "About this %{type} #%{id}"
+          remove_subject: "Remove the %{type} filter"
+        day_list:
+          today: "Today"
+          yesterday: "Yesterday"
+        row:
+          # The time link's name: it still begins with the time it shows.
+          details: "%{time}, details of this change"
+          security: "Security"
+        event_header:
+          breadcrumb: "Audit log"
+          via: "%{name} via %{token}"
+          security: "Security"
+          cells:
+            when: "When"
+            who: "Who"
+            action: "Action"
+            object: "Object"
+            request: "Request"
+            ip: "IP"
+            channel: "Channel"
+        changes:
+          heading: "Changes"
+          none: "No field changes recorded."
+          field: "Field"
+          before: "Before"
+          after: "After"
+          changed: "Changed"
+          empty: "Empty"
+          too_long: "The text is too long to compare word by word."
+          # A group's heading: its count of fields, then its language when it
+          # is a language's ("2 fields · Deutsch").
+          fields:
+            one: "%{count} field"
+            other: "%{count} fields"
+          in_language: "%{fields} · %{language}"

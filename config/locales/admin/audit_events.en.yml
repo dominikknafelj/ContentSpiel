@@ -1,0 +1,24 @@
+# The audit log's own keys (docs/reference/i18n.md): `admin.audit_events.index`
+# and `.show` are the views' lazy-lookup scopes (`app/views/admin/audit_events/`).
+# The toolbar, the day bands, the rows and the event page's parts say theirs
+# as `admin.components.audit_screen`; the sentences are `Audit::Sentence`'s.
+en:
+  admin:
+    audit_events:
+      index:
+        title: "Audit log"
+        empty:
+          title: "No events."
+          description: "Nothing has been recorded yet."
+        no_matches:
+          title: "No matches."
+          description: "No events match these filters."
+          clear: "Clear filters"
+        # The pager under the card: the log is unbounded, so it pages by offset.
+        newer: "Newer"
+        older: "Load older"
+      show:
+        snapshot: "Snapshot"
+        neighbours: "Neighbouring events"
+        older: "‹ Older event"
+        newer: "Newer event ›"

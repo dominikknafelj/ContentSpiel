@@ -1,7 +1,6 @@
 module Admin
   module AuditScreen
-    # An audit event's field changes (design pass round 3, Task 15; replaces
-    # `Admin::AuditChangesComponent`). `field_changes` is
+    # An audit event's field changes. `field_changes` is
     # `Audit::Event#field_changes`: `{ "de title" => [old, new] }` for a
     # translated column (the locale and the field in one key),
     # `{ "title" => [old, new] }` for a plain one, `{ "en body" =>
@@ -29,10 +28,9 @@ module Admin
     # ERB escapes -- never `html_safe` -- so a title of literal `<script>` shows
     # as text.
     class ChangesComponent < Admin::AdminComponent
-      LOCALE_KEY = /\A([a-z]{2,3}(?:-[A-Za-z0-9]+)?) ([a-z_]+)\z/
+      LOCALE_KEY = /\A([a-z]{2,3}(?:-[A-Za-z0-9]+)?) ([a-z_]+)\z/ # i18n-ok: a stored key's pattern, never shown
       TEXT_LIMIT = 20_000
       SHOWN_LIMIT = 2_000
-      TOO_LONG = "The text is too long to compare word by word.".freeze
 
       Group = Data.define(:code, :heading, :rows)
       Row = Data.define(:field, :kind, :before, :after)
@@ -61,7 +59,7 @@ module Admin
         when :diff then render(Admin::Ui::WordDiffComponent.new(segments: row.before))
         when :added then empty
         when :removed then render(Admin::Ui::WordDiffComponent.new(segments: [ [ :delete, row.before ] ]))
-        when :too_long then safe_join([ row.before, tag.p(TOO_LONG, class: "mt-1 text-meta") ])
+        when :too_long then safe_join([ row.before, tag.p(t(".too_long"), class: "mt-1 text-meta") ])
         else row.before.nil? ? empty : row.before
         end
       end
@@ -77,7 +75,7 @@ module Admin
 
       private
 
-      def empty = content_tag(:span, "Empty", class: "text-meta")
+      def empty = content_tag(:span, t(".empty"), class: "text-meta")
 
       # `[locale or nil, Row]` for every shown change.
       def rows
@@ -104,11 +102,10 @@ module Admin
       end
 
       def heading_for(code, count)
-        text = "#{count} #{count == 1 ? "field" : "fields"}"
-        return text if code.nil?
+        fields = t(".fields", count:)
+        return fields if code.nil?
 
-        name = ::Locales.enabled?(code) ? ::Locales.name(code, native: true) : code.upcase
-        "#{text} · #{name}"
+        t(".in_language", fields:, language: ::Locales.enabled?(code) ? ::Locales.name(code, native: true) : code.upcase)
       end
 
       def build_row(field, value)

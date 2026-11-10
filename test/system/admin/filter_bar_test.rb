@@ -78,11 +78,12 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
 
   test "the audit log's bar: its selects, the subject chip and Clear are one height" do
     post = create_post(title: "Chip")
-    visit admin_audit_events_path(subject_type: "Post", subject_id: post.id, range: "7")
-    await_admin_controllers
+    visit_screen admin_audit_events_path(subject_type: "Post", subject_id: post.id, range: "7")
     assert_one_height(%w[select#user_id select#event_action chip select#channel select#range link\ Clear])
+    # The chip's × is the chip input's own 20px button inside the chip, not a control of the row.
+    assert_equal 20, page.evaluate_script("Math.round(document.querySelector('#{BAR} [data-subject-chip] a').getBoundingClientRect().height)")
 
-    visit admin_audit_events_path(range: "custom")
+    visit_screen admin_audit_events_path(range: "custom")
     assert_one_height(%w[select#user_id select#subject_type input#from input#to])
   end
 

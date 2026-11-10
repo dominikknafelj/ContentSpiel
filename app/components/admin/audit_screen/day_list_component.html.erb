@@ -1,10 +1,18 @@
-<% days.each do |day| %>
-  <section class="mb-4" aria-labelledby="audit-day-<%= day.entries.first.first.id %>">
-    <h2 id="audit-day-<%= day.entries.first.first.id %>" class="py-2 text-label text-meta"><%= day.label %></h2>
-    <ul class="m-0 list-none rounded-card bg-surface shadow-1 p-0">
-      <% day.entries.each do |event, sentence| %>
-        <%= render Admin::AuditScreen::RowComponent.new(event: event, sentence: sentence, event_path: path_for(event)) %>
-      <% end %>
-    </ul>
-  </section>
-<% end %>
+<%# One card for every day. It clips nothing (no `overflow`), so each band
+    sticks to the window under the top bar, held inside its own section: the
+    next day's band takes over where the section ends. The card is a stacking
+    context of its own, so a band stands over the rows' raised subject links
+    and the whole card stays under the shell's top bar. The first band and the
+    last row take the card's corners, since the card clips nothing. %>
+<div class="<%= CARD_CLASS %>" data-audit-days>
+  <% days.each_with_index do |day, index| %>
+    <section aria-labelledby="audit-day-<%= day.entries.first.first.id %>">
+      <h2 id="audit-day-<%= day.entries.first.first.id %>" class="<%= band_class(index) %>"><%= day.label %></h2>
+      <ul class="m-0 list-none p-0">
+        <% day.entries.each do |event, sentence| %>
+          <%= render Admin::AuditScreen::RowComponent.new(event: event, sentence: sentence, event_path: path_for(event)) %>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+</div>

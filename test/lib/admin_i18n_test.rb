@@ -469,6 +469,18 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/translation_screen/summary_card_component.rb
     app/components/admin/translation_screen/summary_card_component.html.erb
     app/views/admin/translations/index.html.erb
+    app/components/admin/audit_screen/toolbar_component.rb
+    app/components/admin/audit_screen/toolbar_component.html.erb
+    app/components/admin/audit_screen/day_list_component.rb
+    app/components/admin/audit_screen/day_list_component.html.erb
+    app/components/admin/audit_screen/row_component.rb
+    app/components/admin/audit_screen/row_component.html.erb
+    app/components/admin/audit_screen/event_header_component.rb
+    app/components/admin/audit_screen/event_header_component.html.erb
+    app/components/admin/audit_screen/changes_component.rb
+    app/components/admin/audit_screen/changes_component.html.erb
+    app/views/admin/audit_events/index.html.erb
+    app/views/admin/audit_events/show.html.erb
   ].freeze
 
   PLACEHOLDER = "".freeze

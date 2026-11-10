@@ -1,13 +1,13 @@
 module Admin
   module AuditScreen
-    # The head of an audit event's page (design pass round 3, Task 15): a
-    # breadcrumb back to the log (the filters kept), the sentence as the title
-    # ("You edited “Welcome to our new site”", the subject linked only when the
-    # viewer may open it), and a meta grid -- WHEN ("Fri 2 Oct 2026, 16:05–16:31
-    # · 12 saves", `occurrences` is the saves a coalesced row stands for), WHO,
-    # CHANNEL, ACTION (mono, warn ink for a security key), OBJECT and REQUEST --
-    # plus the IP, in mono as before. A blank value reads "—". Every value is
-    # escaped text.
+    # The head of an audit event's page: a breadcrumb back to the log (the
+    # filters kept), the sentence as the title ("You edited “Welcome to our new
+    # site”", the subject linked only when the viewer may open it), and one
+    # facts card -- WHEN ("Fri 2 Oct 2026, 16:05–16:31 · 12 saves",
+    # `occurrences` is the saves a coalesced row stands for), WHO, ACTION (the
+    # key in mono, after a warn "Security" state chip for a security event),
+    # OBJECT, REQUEST and the IP in mono, then CHANNEL. A blank value reads
+    # "—". Every value is escaped text.
     class EventHeaderComponent < Admin::AdminComponent
       def initialize(event:, sentence:, back_path:)
         @event = event
@@ -19,15 +19,13 @@ module Admin
 
       def when_text = TimeSpan.long(event)
 
-      def action_class = sentence.security ? "text-warn-ink" : "text-ink"
-
       # `nil` for an event nobody made (a failed sign-in): no invented person.
       def who
         actor = sentence.actor
         return if actor.none
 
         name = Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label
-        actor.via_label.present? ? "#{name} via #{actor.via_label}" : name
+        actor.via_label.present? ? t(".via", name:, token: actor.via_label) : name
       end
 
       def object
@@ -37,14 +35,15 @@ module Admin
         [ "#{type} ##{event.subject_id}", event.subject_label.presence ].compact.join(" · ")
       end
 
+      # `[key, value, mono]` per cell; the key names its label under `cells`.
       def cells
         [
-          [ "When", when_text, false ],
-          [ "Who", who || "—", false ],
-          [ "Action", event.action, true ],
-          [ "Object", object || "—", false ],
-          [ "Request", event.request_id.presence || "—", true ],
-          [ "IP", event.ip.presence || "—", true ]
+          [ :when, when_text, false ],
+          [ :who, who || "—", false ],
+          [ :action, event.action, true ],
+          [ :object, object || "—", false ],
+          [ :request, event.request_id.presence || "—", true ],
+          [ :ip, event.ip.presence || "—", true ]
         ]
       end
     end

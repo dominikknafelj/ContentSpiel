@@ -1,8 +1,8 @@
-<%# The audit log (design pass round 3, Task 15): a row of filters, then the
-    events under day headers, newest first -- every event `audit.view` holders
-    may see (`Admin::AuditEventsController`'s own comment: this module is never
+<%# The audit log: a row of filters, then the events in one card under day
+    bands, newest first -- every event `audit.view` holders may see
+    (`Admin::AuditEventsController`'s own comment: this module is never
     content-scoped), a subject linked only where the viewer can open it. %>
-<h1 class="mb-4 text-h1 text-ink">Audit log</h1>
+<h1 class="mb-4 text-h1 text-ink"><%= t(".title") %></h1>
 
 <%= render Admin::AuditScreen::ToolbarComponent.new(filter: @filter, users: @users, other_actions: @other_actions,
       url_options: admin_url_options, locale: admin_locale) %>
@@ -12,29 +12,30 @@
 <% if @entries.empty? %>
   <div class="rounded-card bg-surface shadow-1">
     <% if @filter.active? %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No matches.", description: "No events match these filters.") do |empty_state| %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".no_matches.title"), description: t(".no_matches.description")) do |empty_state| %>
         <% empty_state.with_action do %>
-          <%= link_to "Clear filters", admin_audit_events_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+          <%= link_to t(".no_matches.clear"), admin_audit_events_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
         <% end %>
       <% end %>
     <% else %>
-      <%= render Admin::Ui::EmptyStateComponent.new(title: "No events.", description: "Nothing has been recorded yet.") %>
+      <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) %>
     <% end %>
   </div>
 <% else %>
   <%= render Admin::AuditScreen::DayListComponent.new(entries: @entries, event_path: event_path) %>
 
   <%# Newer / Load older keep the filters (`Audit::Filter#to_params`: only valid
-      values, never the raw query string) and set their own `offset`. %>
+      values, never the raw query string) and set their own `offset`. The log
+      is unbounded, so it pages by offset, in a row under the card. %>
   <% if @offset.positive? || @has_next %>
-    <div class="flex items-center justify-center gap-3 py-3">
+    <div class="mt-3 flex items-center justify-center gap-3" data-audit-pager>
       <% if @offset.positive? %>
-        <%= link_to "Newer", admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max),
-              class: setup_secondary_link_class %>
+        <%= link_to t(".newer"), admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max),
+              class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
       <% end %>
       <% if @has_next %>
-        <%= link_to "Load older", admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: @offset + Admin::AuditEventsController::PER_PAGE),
-              class: setup_secondary_link_class %>
+        <%= link_to t(".older"), admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: @offset + Admin::AuditEventsController::PER_PAGE),
+              class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
       <% end %>
     </div>
   <% end %>

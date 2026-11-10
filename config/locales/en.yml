@@ -39,6 +39,9 @@ en:
       admin:
         short: "%-d %b"
         short_with_year: "%-d %b %Y"
+        # A day with its weekday ("Mon 5 Oct"): the audit log's day bands.
+        day: "%a %-d %b"
+        day_with_year: "%a %-d %b %Y"
   time:
     formats:
       admin:

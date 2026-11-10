@@ -314,6 +314,15 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A day band's date in the audit log (`Admin::AuditScreen::DayListComponent`)
+  # is meta on the band's paper ground: words a person reads, held at the
+  # figures they reach.
+  test "a day band's date is meta at 4.5:1 on paper" do
+    each_scheme do |scheme, colour|
+      assert_ratio({ light: 5.7, dark: 7.0 }.fetch(scheme), colour.("--cs-meta"), colour.("--cs-paper"), "a day band's date on paper (#{scheme})")
+    end
+  end
+
   # A word diff's removed words (`Admin::Ui::WordDiffComponent`) are struck
   # through in ink on sunken: words a person reads, held at the figures they
   # reach.

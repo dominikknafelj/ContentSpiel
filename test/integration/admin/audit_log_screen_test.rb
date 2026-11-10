@@ -90,7 +90,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
 
   # --- sentences -----------------------------------------------------------------
 
-  test "rows read as sentences, with the raw key and the channel chip, security keys in warn ink" do
+  test "rows read as sentences, with the raw key and the channel chip, a security event saying Security before its meta key" do
     post = as(@me) { create_post(title: "Hello world", published: false) }
     created = Audit::Event.find_by!(action: "post.created", subject: post)
     failed = event(Time.current, action: "session.failed", user_id: nil, ip: "203.0.113.4", metadata: { "email_address" => "who@example.com" })
@@ -105,11 +105,12 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(created)} span.text-label", text: "post.created"
     assert_select "##{dom_id(created)} .admin-channel-chip", text: "Admin"
     assert_select "##{dom_id(failed)} p", text: "Failed sign-in attempt"
-    assert_select "##{dom_id(failed)} span.text-warn-ink", text: "session.failed"
+    assert_select "##{dom_id(failed)} .admin-state-chip.text-warn-ink + span.font-cs-mono.text-meta", text: "session.failed"
+    assert_select "##{dom_id(failed)} .admin-state-chip", text: "Security"
     assert_no_match(/who@example\.com/, response.body)
     assert_select "##{dom_id(mcp)} p", text: /#{Regexp.escape(users(:two).name_or_email)} via claude-desktop created “From MCP”/
     assert_select "##{dom_id(mcp)} .admin-channel-chip[data-channel=mcp]", text: "MCP"
-    assert_select "##{dom_id(created)} span.text-warn-ink", count: 0
+    assert_select "##{dom_id(created)} .admin-state-chip", count: 0
   end
 
   test "a stored block verb nothing knows renders as the generic sentence, list and event page" do
