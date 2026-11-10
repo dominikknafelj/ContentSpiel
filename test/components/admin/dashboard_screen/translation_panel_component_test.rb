@@ -45,14 +45,14 @@ class Admin::DashboardScreen::TranslationPanelComponentTest < ViewComponent::Tes
   end
 
   # A language's progress is the Translations tiles' (`Admin::Ui::LanguageProgressComponent`):
-  # the bar on its sunken track, then outdated before missing.
-  test "a language's progress is the shared one: the sunken track, then outdated before missing" do
+  # the bar on its line track, then outdated before missing.
+  test "a language's progress is the shared one: the line track, then outdated before missing" do
     render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
       Dashboard::TranslationNeeds::Entry.new(locale: "de", name: "Deutsch", total: 20, complete: 7, missing: 12, outdated: 1, item: nil)
     ])
 
-    assert_selector "[data-locale=de] [role=progressbar].bg-sunken[aria-label='Deutsch translated'][aria-valuenow='35'] > .bg-ok"
-    assert_no_selector ".bg-line"
+    assert_selector "[data-locale=de] [role=progressbar].bg-line[aria-label='Deutsch translated'][aria-valuenow='35'] > .bg-ok"
+    assert_no_selector ".bg-sunken"
     assert_equal "↻ 1 outdated · 12 missing", page.find("[data-locale=de] [role=progressbar] + span").text.squish
   end
 

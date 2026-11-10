@@ -294,12 +294,16 @@ class AdminContrastTest < ActiveSupport::TestCase
   end
 
   # A language's progress bar (`Admin::Ui::LanguageProgressComponent`, on
-  # the Translations tiles and the Dashboard's "Languages behind") says how
-  # much is done by its ok fill alone on its sunken track: a graphic's 3:1,
-  # held at the figures it reaches.
-  test "a language tile's ok bar is 3:1 on its sunken track" do
+  # the Translations tiles and the Dashboard's "Languages behind", which docks
+  # on the rail) says how much is done by its ok fill alone on its `line`
+  # track: a graphic's 3:1, held at the figures it reaches. `line` is
+  # translucent, so it is painted over each ground before it is measured.
+  test "a language's ok bar is 3:1 or better on its line track, on the surface and on the rail" do
+    floors = { "--cs-surface" => { light: 4.2, dark: 5.0 }, "--cs-rail" => { light: 3.7, dark: 4.4 } }
     each_scheme do |scheme, colour|
-      assert_ratio({ light: 4.2, dark: 5.7 }.fetch(scheme), colour.("--cs-ok"), colour.("--cs-sunken"), "the language tile's bar on its track (#{scheme})")
+      floors.each do |ground, figures|
+        assert_ratio(figures.fetch(scheme), colour.("--cs-ok"), colour.("--cs-line", under: ground), "the language progress bar on its track over #{ground} (#{scheme})")
+      end
     end
   end
 

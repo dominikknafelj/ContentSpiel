@@ -37,11 +37,11 @@ class Admin::TranslationScreen::SummaryCardComponentTest < ViewComponent::TestCa
     assert_selector "a.admin-tile[aria-current=true][aria-label='Deutsch: show all languages'][href='/x']"
   end
 
-  test "the bar is ok on a sunken track, and outdated says ↻ with its count in warn ink, missing its count in meta" do
+  test "the bar is ok on a line track, and outdated says ↻ with its count in warn ink, missing its count in meta" do
     card(total: 20, complete: 7, missing: 12, outdated: 3)
 
-    assert_selector "[role=progressbar].h-1.rounded-full.bg-sunken > .bg-ok"
-    assert_no_selector ".bg-line"
+    assert_selector "[role=progressbar].h-1.rounded-full.bg-line > .bg-ok"
+    assert_no_selector ".bg-sunken"
     assert_selector ".text-warn-ink", text: "↻ 3 outdated"
     assert_selector ".text-warn-ink [aria-hidden=true]", text: "↻"
     assert_selector ".text-meta", text: "12 missing"

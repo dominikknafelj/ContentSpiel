@@ -1,7 +1,9 @@
 module Admin
   module Ui
     # One target language's translation progress: a 4px bar of complete over
-    # total, `ok` on a `sunken` track (3:1, `test/lib/admin_contrast_test.rb`),
+    # total, `ok` on a `line` track (translucent, so it shows on the surface
+    # and on the Dashboard's docked rail alike; the fill is 3:1 over both,
+    # `test/lib/admin_contrast_test.rb`),
     # and under it the counts, outdated first ("↻ 1 outdated", in warn ink,
     # since an outdated item is already on the site), then missing ("12
     # missing", in meta), or "All translated". The Dashboard's "Languages

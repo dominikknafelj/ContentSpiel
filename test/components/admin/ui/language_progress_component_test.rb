@@ -7,11 +7,11 @@ class Admin::Ui::LanguageProgressComponentTest < ViewComponent::TestCase
     render_inline(Admin::Ui::LanguageProgressComponent.new(language:, counts_id:, **figures))
   end
 
-  test "the bar is ok on a sunken track, named for the language, at its percentage in 5% steps" do
+  test "the bar is ok on a line track, named for the language, at its percentage in 5% steps" do
     progress(complete: 7, total: 20, outdated: 1, missing: 12)
 
-    assert_selector "[role=progressbar].h-1.rounded-full.bg-sunken[aria-label='Deutsch translated'][aria-valuemin='0'][aria-valuemax='100'][aria-valuenow='35'] > .bg-ok.w-\\[35\\%\\]"
-    assert_no_selector ".bg-line"
+    assert_selector "[role=progressbar].h-1.rounded-full.bg-line[aria-label='Deutsch translated'][aria-valuemin='0'][aria-valuemax='100'][aria-valuenow='35'] > .bg-ok.w-\\[35\\%\\]"
+    assert_no_selector ".bg-sunken"
 
     progress(complete: 1, total: 3, outdated: 0, missing: 2)
     assert_selector "[role=progressbar][aria-valuenow='33'] > .w-\\[35\\%\\]"

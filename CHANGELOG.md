@@ -84,7 +84,7 @@
 - The sidebar's unread count stays on the Dashboard item, and its link is named "Dashboard, 2 new".
 - The media library's panel is a rail with Image and Notes tabs where the library is wide enough, and its tiles rise under the pointer and show the chosen one with an outline.
 - Trash, Translations, Forms and the audit log take CS Studio's new look: a record's kind is shown by its icon, every state in words and none in red, Translations has a tile per language, and the audit log is one list with its days as headings.
-- The dashboard's "Languages behind" panel draws a language's progress as Translations' tiles do: the bar on the sunken track, then "↻ 1 outdated" before "12 missing". Its draft tiles are CS Studio's one tile, and a Translations row's closing verb is the lists' one verb, at their size.
+- The dashboard's "Languages behind" panel draws a language's progress as Translations' tiles do: the bar on the `line` track, then "↻ 1 outdated" before "12 missing". Its draft tiles are CS Studio's one tile, and a Translations row's closing verb is the lists' one verb, at their size.
 - People's circles in a stack stand side by side, and a page's title in a narrow tree keeps its room.
 
 ### Removed
