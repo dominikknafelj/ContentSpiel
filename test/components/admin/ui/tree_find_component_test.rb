@@ -36,14 +36,23 @@ class Admin::Ui::TreeFindComponentTest < ViewComponent::TestCase
     assert_raises(ArgumentError) { Admin::Ui::TreeFindComponent.new(controls: "") }
   end
 
-  test "Clear the search to move pages is offered only where the tree moves" do
+  test "Clear the search to move pages is drawn only where the tree moves, hidden, outside the live region" do
     render_inline(Admin::Ui::TreeFindComponent.new(controls: "tree-list", moving: true))
-    assert_equal "Clear the search to move pages", messages["components.ui.tree_find.no_moving"]
-    assert_equal "true", page.find("[role=search]")["data-admin--tree--find-moving-value"]
+    assert_selector "p[role=status] + p#tree-list-find-moving[hidden][data-admin--tree--find-target=moving]", text: "Clear the search to move pages", exact_text: true, visible: :hidden
+    assert_no_selector "#tree-list-find-moving[role], #tree-list-find-moving[aria-live]", visible: :all
+    assert_nil page.find("#tree-list-find")["aria-describedby"], "the field names the sentence only while the script shows it"
+    assert_not messages.key?("components.ui.tree_find.no_moving"), "the sentence is the server's, not the script's"
 
     render_inline(Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes))
-    assert_not messages.key?("components.ui.tree_find.no_moving")
-    assert_equal "false", page.find("[role=search]")["data-admin--tree--find-moving-value"]
+    assert_no_selector "[data-admin--tree--find-target=moving]", visible: :all
+  end
+
+  test "the status line keeps one line of room while the field holds a query, where the tree moves or not" do
+    render_inline(Admin::Ui::TreeFindComponent.new(controls: "tree-list", moving: true))
+    assert_equal "min-h-[1lh]", page.find("[role=search]")["data-admin--tree--find-reserve-class"]
+
+    render_inline(Admin::Ui::TreeFindComponent.new(controls: "mind-graph-tree", noun: :nodes))
+    assert_equal "min-h-[1lh]", page.find("[role=search]")["data-admin--tree--find-reserve-class"]
   end
 
   test "a field that keeps its query across the content frame's navigation says so to its script" do

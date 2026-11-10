@@ -13,7 +13,7 @@
 - Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
 - A post list reads its posts' addresses in one statement, and the shown page's or post's addresses in every language (the head's `hreflang` alternates, the language switcher) are one statement, not one per language (#122).
 - A post list reads no post body, from the rows or the copies, until its template asks for one, and then the whole list's in at most two statements (one when every listed post has a copy): the default blog and resume lists read none (#122). What a list template may call is unchanged: `rich_text(post)` draws the published body as before.
-- The find field of the page tree and of the mind graph's list keeps its status line's room from the first keystroke while it holds a query (two lines on Pages, one in the mind graph), so the count written once the typing stops no longer moves the rows under the pointer.
+- The find field of the page tree and of the mind graph's list keeps its status line's one line of room from the first keystroke while it holds a query, and on Pages shows "Clear the search to move pages" with that keystroke under the line rather than inside it, so the count written once the typing stops no longer moves the rows under the pointer. A screen reader hears the count alone; the sentence is the field's description.
 
 ### Migrations
 
