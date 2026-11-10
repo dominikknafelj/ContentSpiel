@@ -36,9 +36,9 @@ module ContentSpiel
 
     # What a hook's block is handed: `register` with the registry's own
     # signature, refusing a bare name (the built-ins'), an owner named like
-    # one of the CMS's own top-level constants (`TopLevelNames`: a gem's
-    # code lives in a module named after its owner, so `media/…` would have
-    # it reopen `Media`), a second owner in one call, and an owner another
+    # one of the CMS's own top-level constants (`TopLevelNames.owners`: a
+    # gem's code lives in a module named after its owner, so `media/…` would
+    # have it reopen `Media`), a second owner in one call, and an owner another
     # hook has registered under in this replay (`owners`: owner => the place
     # of the hook that took it), since an owner's prefix is what keeps two
     # gems' tokens apart.

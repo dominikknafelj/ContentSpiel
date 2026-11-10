@@ -160,11 +160,12 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
 
   # A gem's code lives in a module named after its owner (`Gallery::` for
   # `gallery/album`), so an owner named like one of the CMS's own top-level
-  # constants would reopen that domain (`Media`, `Notes`, `Publishing`), as
-  # `Admin::Media` once shadowed `Media` (test/lib/admin_namespace_shadow_test.rb).
-  # Each hook refuses one, both camelizations taken (`ai`: `AI` and `Ai`).
+  # constants would reopen that domain (`Media`, `Notes`, `Publishing`, the
+  # public components' `Blocks`, CS Studio's `Admin`), as `Admin::Media` once
+  # shadowed `Media` (test/lib/admin_namespace_shadow_test.rb). Each hook
+  # refuses one (`TopLevelNames.owners`).
   test "an owner named like a top-level constant of the CMS is refused by every hook, naming the constant and the place of the call" do
-    %w[media notes publishing access_control ai content_spiel].each do |owner|
+    %w[media notes publishing access_control ai content_spiel blocks admin].each do |owner|
       line = __LINE__ + 1
       hook = ContentSpiel::Plugins.block_types { |types| types.register("#{owner}/album") { |t| TestTypes.declare(t) } }
       error = refusal_of(hook)
@@ -190,7 +191,10 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     Rails.application.reloader.prepare!
   end
 
-  test "an owner of the gem's own passes every hook" do
+  # A folder the autoloader ignores defines no constant, so its name is no
+  # owner of the CMS's (`lib/tasks`, `lib/generators`, `lib/site_template`).
+  test "an owner of the gem's own passes every hook, and so does the name of a folder that defines no constant" do
+    assert_equal [ nil, nil, nil ], %w[tasks generators site_template].map { |word| TopLevelNames.matching(word) }
     blocks = ContentSpiel::Plugins.block_types { |types| types.register("acme/album") { |t| TestTypes.declare(t) } }
     fields = ContentSpiel::Plugins.form_field_types { |types| types.register("acme/rating", **rating_type) }
     destinations = ContentSpiel::Plugins.form_destinations { |list| list.register("acme/crm", label: "CRM", deliverer: OwnerDeliverer) }
