@@ -209,6 +209,11 @@ if root.hero_media_asset_id.blank?
   raise "seeds: #{hero_result.errors.to_sentence}" unless hero_result.ok?
 end
 
+# Every block type, in every layout and band, under /showcase
+# (db/seeds/showcase.rb), drawn with the library image the hero above uses.
+require_relative "seeds/showcase"
+DevelopmentShowcase.call(root: root, image: root.reload.hero_media_asset)
+
 # The public site draws a page's or post's published copy, and a page's copy
 # was taken when it was published, before its blocks and hero were added
 # above: publish what the seed built. Only a record whose one copy is the
