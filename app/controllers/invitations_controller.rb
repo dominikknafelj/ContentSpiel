@@ -93,9 +93,12 @@ class InvitationsController < ApplicationController
     else
       # Rendered, not redirected: the form needs the token again, and a
       # redirect could carry it only in an address or in the session. The
-      # service's messages are whole sentences, each drawn on a line of its own.
+      # service's messages are whole sentences: the alert above the form says
+      # them all, a line each, and each field says its own under it (the
+      # invitation's `errors`, by field: `Invitations::Accept`).
       @token = token_param
       @invitation = result.record
+      @field_errors = @invitation.errors.to_hash
       flash.now[:alert] = result.errors
       render :show, status: :unprocessable_entity
     end

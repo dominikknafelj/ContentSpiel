@@ -132,6 +132,13 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     press "Set password"
 
     assert_selector "#alert[role=alert]", text: "Password confirmation doesn't match Password"
+    # The refused field says it under itself with the danger edge; the one
+    # it accepted keeps the field line.
+    assert_selector "#password_confirmation-errors", text: "Password confirmation doesn't match Password"
+    edge = ->(id) { page.evaluate_script("getComputedStyle(document.getElementById(#{id.to_json})).borderBottomColor") }
+    danger = page.evaluate_script("(() => { const probe = document.createElement('i'); probe.style.color = 'var(--cs-danger)'; document.body.append(probe); const colour = getComputedStyle(probe).color; probe.remove(); return colour })()")
+    assert_equal danger, edge.call("password_confirmation")
+    assert_not_equal danger, edge.call("password")
     assert_equal 1, checks.size, "the form that came back was not asked about again"
     assert_selector OPEN
     assert_no_text INCOMPLETE

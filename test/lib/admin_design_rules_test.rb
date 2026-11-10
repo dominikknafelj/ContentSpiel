@@ -815,6 +815,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/api_tokens/*
     app/views/layouts/product.html.erb
     app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/shared/_product_wordmark.html.erb
     app/views/admin/sessions/*
     app/views/admin/passwords/*
     app/views/invitations/*
@@ -828,7 +829,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # the reason.
   HAND_BOX_ALLOWED = {
     "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
-    "app/views/layouts/product.html.erb" => "the wordmark's 12px capitals, the product's mark as every layout's header draws it"
+    "app/views/admin/shared/_product_wordmark.html.erb" => "the wordmark's 12px capitals, the product's mark as every layout's header draws it"
   }.freeze
 
   def self.type_scale_sources = TYPE_SCALE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq

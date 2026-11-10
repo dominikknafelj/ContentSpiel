@@ -14,14 +14,14 @@
       product stylesheet, no public header/footer. The header is the
       wordmark (a link home to sign-in) and the theme switch, with no rule
       under it. Below it, in a centred 420px column, the page stands on one
-      panel, the setup wizard's: a surface at elevation 2, `rounded-rail`,
-      24px of padding on a phone and 32px from 480px. The words are read by
+      panel: `surface` at elevation 2 (`shadow-2`), `rounded-rail`, 24px of
+      padding (`p-6`) below 480px and 32px (`p-8`) from there. The words are read by
       full key (`admin.layout.product.*`): a lazy lookup from a layout lands
       in `layouts.product.*`.
       color-scheme stays scoped to this body. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %><%# i18n-ok: the product's wordmark, never translated %>
+      <%= render "admin/shared/product_wordmark" %>
       <%= render Admin::Ui::ThemeSwitchComponent.new %>
     </header>
     <main class="px-[22px] pb-16 pt-16">

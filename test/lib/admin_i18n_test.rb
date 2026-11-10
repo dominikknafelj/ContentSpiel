@@ -538,6 +538,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/audit_events/show.html.erb
     app/views/layouts/product.html.erb
     app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/shared/_product_wordmark.html.erb
     app/views/admin/sessions/new.html.erb
     app/views/admin/passwords/new.html.erb
     app/views/admin/passwords/edit.html.erb

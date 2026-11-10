@@ -98,8 +98,10 @@ module Admin
         # just sent it (and it is the token `set_user_by_token` verified, so
         # a String). `no_store` (Rails' own, the `before_action` above)
         # keeps the response out of every cache. The service's messages are
-        # whole sentences, each drawn on a line of its own.
+        # whole sentences: the alert above the form says them all, a line
+        # each, and each field says its own under it (`@field_errors`).
         @token = params[:token]
+        @field_errors = result.record.errors.to_hash(true)
         flash.now[:alert] = result.errors
         render :edit, status: :unprocessable_entity
       end

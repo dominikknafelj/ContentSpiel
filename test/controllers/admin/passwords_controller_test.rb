@@ -364,8 +364,9 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   # Two refusals are two lines of the one alert, each the service's own
-  # sentence: nothing glues them into one.
-  test "a password refused twice over is one alert with a line per message" do
+  # sentence: nothing glues them into one. Each field says its own under it
+  # with the refused edge, tied to its input, with no live role of its own.
+  test "a password refused twice over is one alert with a line per message, and each field draws its own" do
     patch admin_update_password_path, params: { token: @user.password_reset_token, password: "short", password_confirmation: "other" }
 
     assert_response :unprocessable_entity
@@ -373,6 +374,11 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "#alert > p", text: "Use at least 12 characters."
     assert_select "#alert > p", text: "Password confirmation doesn't match Password"
     assert_select "#alert", text: /\band\b/, count: 0
+    { "password" => "Use at least 12 characters.", "password_confirmation" => "Password confirmation doesn't match Password" }.each do |id, message|
+      assert_select ".admin-password-field.admin-password-field--invalid input##{id}[aria-invalid=true][aria-describedby~='#{id}-errors']"
+      assert_select "##{id}-errors", text: /#{Regexp.escape(message)}/
+      assert_select "##{id}-errors[role], ##{id}-errors[aria-live]", count: 0
+    end
   end
 
   # The token the form came back with is still the one that was mailed: the
