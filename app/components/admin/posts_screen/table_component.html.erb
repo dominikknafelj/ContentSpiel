@@ -2,8 +2,9 @@
     (`admin--presence--list`, which reads the markers again when presence
     changes and touches nothing else). `data-live-part`: the list holds a
     cable subscription, and says here whether it has been answered
-    (`live/state`). %>
-<%= tag.div class: "overflow-x-auto rounded-card bg-surface shadow-1",
+    (`live/state`). `admin-posts-scroll` names the box to `ui/float`, which
+    lifts a row's "⋯" menu out of its sideways scroll while it is open. %>
+<%= tag.div class: "admin-posts-scroll overflow-x-auto rounded-card bg-surface shadow-1",
       data: { controller: "admin--presence--list", live_part: "waiting", "admin--presence--list-kind-value": "post", "admin--presence--list-chunk-value": Presence::HERE_IDS,
               "admin--presence--list-url-value": helpers.admin_presence_here_path(kind: "post") } do %>
   <table class="admin-posts-table w-full min-w-[880px] border-collapse text-sm">

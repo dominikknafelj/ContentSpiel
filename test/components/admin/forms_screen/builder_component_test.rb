@@ -99,7 +99,7 @@ class Admin::FormsScreen::BuilderComponentTest < ViewComponent::TestCase
       assert_selector "#{card} > span[aria-hidden=true].bg-ic-form-bg", count: 1
     end
     assert_selector "section.admin-settings-card", count: 5
-    assert_selector "section.admin-settings-card > div.border-b", count: 0
+    assert_selector "section.admin-settings-card div.border-b", count: 0, visible: :all
     assert_not Admin::FormsScreen::BuilderComponent.const_defined?(:CARD_CLASS, false)
     assert_not Admin::FormsScreen::BuilderComponent.const_defined?(:CARD_HEAD_CLASS, false)
   end

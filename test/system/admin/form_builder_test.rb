@@ -4,7 +4,8 @@ require "application_system_test_case"
 # the up and down icon buttons (found by their names), removed, and saved
 # explicitly through the save bar; a choice field's choices added and
 # removed; and leaving with unsaved changes asks, as on every save-bar
-# screen. Nothing is written until Save.
+# screen. Nothing is written until Save. On the forms list, a row's ⋯ menu
+# opens whole over the page, lifted out of the table's sideways scroll.
 class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -104,5 +105,31 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     assert_current_path admin_form_path(form)
     assert_equal [ "Email address", "Your name", "Message" ], labels
     assert_equal %w[f_name0001 f_mail0001 f_text0001], form.reload.fields.map(&:key), "nothing was written"
+  end
+
+  test "a row's ⋯ menu on a list of one form opens whole over the page, and the table box does not scroll" do
+    forms(:newsletter).update_columns(trashed_at: Time.current) # version: none (a test's row)
+    visit_screen admin_forms_path
+    assert_selector ".admin-forms-table tbody tr", count: 1
+
+    find("button[aria-label='Actions for Contact']").click
+    item = find("tr##{ActionView::RecordIdentifier.dom_id(forms(:contact))} [role=menu] button", text: "Move to trash…")
+    boxes = page.evaluate_script(<<~JS)
+      (() => {
+        const item = [...document.querySelectorAll(".admin-forms-table [role=menu] button")].find((button) => button.textContent.includes("Move to trash"))
+        const scroller = document.querySelector(".admin-table-scroll--x")
+        const rect = (box) => { const r = box.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+        return { item: rect(item), scroller: rect(scroller), viewport: { width: window.innerWidth, height: window.innerHeight },
+          scrollTop: scroller.scrollTop, scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight,
+          hit: document.elementFromPoint((rect(item).left + rect(item).right) / 2, (rect(item).top + rect(item).bottom) / 2) === item }
+      })()
+    JS
+    assert item.visible?
+    assert boxes["item"]["top"] >= 0 && boxes["item"]["bottom"] <= boxes["viewport"]["height"], "the item is inside the window: #{boxes.inspect}"
+    assert boxes["item"]["left"] >= 0 && boxes["item"]["right"] <= boxes["viewport"]["width"], "the item is inside the window: #{boxes.inspect}"
+    assert boxes["item"]["bottom"] > boxes["scroller"]["bottom"], "the menu hangs past the table box, over the page: #{boxes.inspect}"
+    assert boxes["hit"], "the item is the topmost thing at its own centre: nothing clips or covers it"
+    assert_equal 0, boxes["scrollTop"]
+    assert boxes["scrollHeight"] <= boxes["clientHeight"], "the open menu does not lengthen the table box's scroll: #{boxes.inspect}"
   end
 end

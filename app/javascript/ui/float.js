@@ -1,37 +1,46 @@
-// A popover that opens inside a docked rail panel. The panel scrolls inside
-// itself (`overflow-y: auto`, `.admin-rail__panel` in
-// content-spiel.tailwind.css), so a popover that stands in it as an
-// absolute box would be cut at the panel's edge, or would lengthen the
-// panel's scroll instead of hanging over what is below. `float` lifts it out
-// of the panel's clip: it is drawn `position: fixed` under its anchor, its own
-// top margin under the anchor's bottom (the gap it has as an absolute box), at
-// the anchor's left (or right) edge, and placed again on every scroll and
-// resize while it is open, since the page and the panel both scroll under it.
-// Where the window has no room for it below the anchor and has room above, it
-// hangs above the anchor instead, the same gap away.
+// A popover that opens inside a box that clips it: a docked rail panel,
+// which scrolls inside itself (`overflow-y: auto`, `.admin-rail__panel` in
+// content-spiel.tailwind.css), or a table's scroll box (`.admin-table-scroll`
+// and `.admin-table-scroll--x`, Translations', Trash's and the Forms list's;
+// `.admin-posts-scroll`, the posts list's), which scrolls sideways and so
+// clips upright too (`overflow-x: auto` makes `overflow-y` auto). A popover
+// that stands in one as an absolute box would be cut at the box's edge, or
+// would lengthen the box's scroll instead of hanging over what is below: a
+// row's "⋯" menu on a list of one row. `CLIPS` names them all, and the one
+// path below serves each. `float` lifts the popover out of the box's clip:
+// it is drawn `position: fixed` under its anchor, its own top margin under
+// the anchor's bottom (the gap it has as an absolute box), at the anchor's
+// left (or right) edge, and placed again on every scroll and resize while it
+// is open, since the page and the box both scroll under it. Where the window
+// has no room for it below the anchor and has room above, it hangs above the
+// anchor instead, the same gap away.
 //
 // A fixed box is laid out against its containing block, which here is not
-// the window: the editor area is a size container (`container-type`), and a
-// container contains its layout, fixed boxes included. So the corner is not
-// assumed but measured: the popover is put at 0,0 first and where its border
-// box lands, less its top margin, is that corner. Its layer is unchanged,
-// the popover's own (`--cs-z-popover`), inside the panel's stacking context.
+// always the window: the editor area is a size container (`container-type`),
+// and a container contains its layout, fixed boxes included. So the corner is
+// not assumed but measured: the popover is put at 0,0 first and where its
+// border box lands, less its top margin, is that corner. Its layer is
+// unchanged, the popover's own (`--cs-z-popover`), inside the box's stacking
+// context.
 //
-// When the anchor leaves the panel's visible area (the panel or the page
-// scrolled it away) the popover would hang from nothing, so `leave` is
-// called and the caller closes it.
+// When the anchor leaves the box's visible area (the box or the page
+// scrolled it away, up and down or sideways) the popover would hang from
+// nothing, so `leave` is called and the caller closes it. The caller closes
+// a lifted popover before Turbo caches the page, too.
 //
-// Outside a scrolling panel (below the rail's threshold, a translation tab,
-// every other screen) it does nothing, and the popover stays the absolute
-// box its classes draw. It returns what puts the popover back, called when
-// the popover closes, with `floated` saying whether it lifted anything.
+// Outside such a box (below the rail's threshold, a translation tab, every
+// other screen) it does nothing, and the popover stays the absolute box its
+// classes draw. It returns what puts the popover back, called when the
+// popover closes, with `floated` saying whether it lifted anything.
+const CLIPS = ".admin-rail__panel, .admin-table-scroll, .admin-table-scroll--x, .admin-posts-scroll"
+
 export function float(popover, anchor, { align = "left", width = false, leave = () => {} } = {}) {
-  const panel = anchor.closest(".admin-rail__panel")
+  const panel = anchor.closest(CLIPS)
   if (!panel || !["auto", "scroll"].includes(getComputedStyle(panel).overflowY)) return Object.assign(() => {}, { floated: false })
 
   const outside = (box) => {
     const visible = panel.getBoundingClientRect()
-    return box.bottom <= visible.top || box.top >= visible.bottom
+    return box.bottom <= visible.top || box.top >= visible.bottom || box.right <= visible.left || box.left >= visible.right
   }
 
   // Whether the anchor left is asked on a scroll or a resize, never as the
