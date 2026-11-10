@@ -103,6 +103,15 @@ SiteSetting.instance.tap do |settings|
   settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end
 
+# A new site starts with English alone (the column's default); the
+# development site has German and Spanish on too, so a change is seen with a
+# default language and two others. Turned on before any content is written,
+# through the service Settings uses; a language already on is left alone.
+%w[de es].each do |code|
+  enabled = Locales::Enable.call(code)
+  raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
+end
+
 # Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of
 # JSON"), written here as Markdown and converted the same way MCP's `body`
 # is -- a `::youtube{id="..."}` directive becomes a `youtube` node, which

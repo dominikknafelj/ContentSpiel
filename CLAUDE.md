@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-ContentSpiel is a Rails 8.1 CMS: a page-tree-driven public website plus CS Studio, its own admin. Content editors build pages out of ordered content blocks (rich text, images, post listings), organize them in a tree, and the same tree drives navigation, routing, and the sitemap. Rich text is Tiptap/ProseMirror JSON. Everything is translated via Mobility into the languages switched on in Settings (three by default, en/de/es, out of the 38 in `config/supported_locales.rb`).
+ContentSpiel is a Rails 8.1 CMS: a page-tree-driven public website plus CS Studio, its own admin. Content editors build pages out of ordered content blocks (rich text, images, post listings), organize them in a tree, and the same tree drives navigation, routing, and the sitemap. Rich text is Tiptap/ProseMirror JSON. Everything is translated via Mobility into the languages switched on in Settings (out of the 38 in `config/supported_locales.rb`: a new site starts with English alone, the development seed and the test fixtures turn on en/de/es).
 
 ## Setup & Commands
 

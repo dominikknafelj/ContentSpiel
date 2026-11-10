@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
+
+### Migrations
+
+- `20261110090000_default_site_locales_to_english`: the default of `site_settings.locales` becomes English alone; no row is changed.
+
 ## 0.1.0 (2026-11-10)
 
 ### Theme contract
