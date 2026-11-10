@@ -133,10 +133,12 @@ module Admin
     private
 
     def owner_notice(user, was_owner)
-      name = user.name_or_email
-      return (user.owner? ? "#{name} is already an owner" : "#{name} is not an owner") if user.owner? == was_owner
-
-      user.owner? ? "#{name} is now an owner" : "#{name} is no longer an owner"
+      key = if user.owner? == was_owner
+        user.owner? ? "already" : "not"
+      else
+        user.owner? ? "now" : "no_longer"
+      end
+      t("admin.users.owner.#{key}", name: user.name_or_email)
     end
 
     def set_user

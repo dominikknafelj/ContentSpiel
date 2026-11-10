@@ -319,6 +319,17 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_equal 2, Audit::Event.where(action: "user.owner_changed", subject: users(:reader)).count
   end
 
+  test "the four owner toasts are admin.users.owner keys, each naming the person" do
+    reader = users(:reader)
+    { "now" => [ "1", "is now an owner" ], "already" => [ "1", "is already an owner" ],
+      "no_longer" => [ "0", "is no longer an owner" ], "not" => [ "0", "is not an owner" ] }.each do |key, (owner, words)|
+      assert_equal "reader@example.com #{words}", I18n.t("admin.users.owner.#{key}", name: "reader@example.com")
+
+      patch "/cs-studio/users/#{reader.id}/owner", params: { owner: owner }
+      assert_equal "reader@example.com #{words}", flash[:notice]
+    end
+  end
+
   test "the owner endpoint is Users::Save: a non-owner's forged PATCH is refused with one access.denied" do
     sign_in_manager
 

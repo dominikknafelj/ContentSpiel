@@ -9,6 +9,11 @@ en:
       saved: "User saved"
       deleted: "User deleted"
       deleted_own: "Your account was deleted"
+      owner:
+        now: "%{name} is now an owner"
+        no_longer: "%{name} is no longer an owner"
+        already: "%{name} is already an owner"
+        not: "%{name} is not an owner"
       index:
         title: "Users"
         invite: "Invite person…"
