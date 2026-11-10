@@ -19,7 +19,9 @@ module Admin
     # added 2 Oct"), to a screen reader and in the page's text alike. A flex
     # wrapper would read them as separate lines. Anything else the caller
     # hands it (`data`, `id`, a class) goes on the root: the wrapper with a
-    # detail, the chip without.
+    # detail, the chip without. A detail may be markup (a revoked token's
+    # time is `TimeAgoComponent`'s `<time>`): `safe_join` keeps safe markup
+    # and escapes a plain string.
     class StateChipComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -69,7 +71,7 @@ module Admin
         return chip(**@html) if @detail.blank?
 
         tag.span(**@html, class: [ WRAPPER, @html[:class] ].compact.join(" ")) do
-          safe_join([ chip, " ", tag.span("· #{@detail}", class: DETAIL) ])
+          safe_join([ chip, " ", tag.span(safe_join([ "· ", @detail ]), class: DETAIL) ])
         end
       end
 

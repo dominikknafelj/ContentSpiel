@@ -1,0 +1,46 @@
+# The AI assistant page's components (docs/reference/i18n.md):
+# `admin.components.tokens_screen.*`. No key takes the token: on the reveal
+# it is the copy box's text, written once, and the configuration's.
+# `connect_step.intro` and `with_token` are whole sentences, one for the
+# list and one for the reveal, whose configuration already holds the token.
+en:
+  admin:
+    components:
+      tokens_screen:
+        create_step:
+          title: "1 · Create a token"
+          reveal: "Copy this token now. It won't be shown again."
+          copy_token: "Copy token"
+          name: "Name"
+          name_placeholder: "claude-desktop"
+          group: "Group"
+          create: "Create token"
+        connect_step:
+          title: "2 · Add it to your assistant"
+          intro: "Point your assistant at this URL and send the token as a bearer token."
+          with_token: "Point your assistant at this URL and send the token as a bearer token (this configuration already holds the token above)."
+          mcp_url: "MCP URL"
+          copy_mcp_url: "Copy the MCP URL"
+          configuration: "Client configuration"
+          copy_configuration: "Copy the client configuration"
+        table:
+          title: "Tokens"
+          columns:
+            name: "Name"
+            acts_as: "Acts as"
+            group: "Group"
+            created: "Created"
+            last_used: "Last used"
+            status: "Status"
+            actions: "Actions"
+          never: "Never"
+          active: "Active"
+          revoked: "Revoked"
+          revoke: "Revoke…"
+          dialog:
+            title: "Revoke “%{name}”?"
+            body: "The assistant acting as %{user} through this token loses access at once. The token stays listed as revoked, and its past changes stay in the audit log."
+            confirm: "Revoke token"
+          empty:
+            title: "No tokens yet."
+            description: "Create a token to connect an assistant."

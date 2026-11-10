@@ -1,48 +1,43 @@
 <section class="rounded-card bg-surface shadow-1 p-4" data-controller="admin--tokens--group-hint">
-  <h2 class="text-h2 text-ink">1 · Create a token</h2>
+  <h2 class="text-h2 text-ink"><%= t(".title") %></h2>
 
   <% if raw_token %>
     <%# The one-time reveal: only the response of the POST that created the
         token ever renders this, and the token stands once, as the copy
         box's text, a `secret` target blanked at `pagehide`. %>
     <%= render Admin::Ui::NoticeComponent.new(tone: :warn, class: "mt-3") do %>
-      <p class="font-semibold">Copy this token now. It won't be shown again.</p>
-      <%= render Admin::Ui::CopyValueComponent.new(id: "api-token-value", value: raw_token, copy_label: "Copy token", layout: :block,
+      <p class="font-semibold"><%= t(".reveal") %></p>
+      <%= render Admin::Ui::CopyValueComponent.new(id: "api-token-value", value: raw_token, copy_label: t(".copy_token"), layout: :block,
             source_data: { "admin--tokens--reveal-target": "secret" }, class: "mt-2") %>
     <% end %>
   <% end %>
 
   <%= form_with url: form_url, method: :post, data: { turbo: false }, class: "mt-3 flex max-w-[560px] flex-col gap-4" do %>
-    <div>
-      <%= label_tag "token-name", "Name", class: setup_label_class %>
+    <div class="admin-field">
+      <%= label_tag "token-name", t(".name"), class: setup_label_class %>
       <%= text_field_tag "name", name, id: "token-name", required: true, maxlength: ApiToken::MAX_NAME_LENGTH,
-            placeholder: "claude-desktop", autocomplete: "off", class: setup_input_class,
+            placeholder: t(".name_placeholder"), autocomplete: "off", class: setup_input_class,
             aria: { invalid: name_errors.any? ? "true" : nil, describedby: name_described_by } %>
-      <% if name_errors.any? %>
-        <p id="<%= NAME_ERROR_ID %>" class="mt-1 text-sm text-danger-ink"><%= name_errors.to_sentence %></p>
-      <% end %>
+      <%= render "admin/shared/field_errors", id: NAME_ERROR_ID, messages: name_errors %>
     </div>
 
     <%# The token's group bounds what an assistant using it may do, within the
-        user's own rights (access-control design spec §3.3 "Tokens"): only
-        groups the user may assign are offered. %>
-    <div>
-      <%= label_tag "group_id", "Group", class: setup_label_class %>
+        user's own rights: only groups the user may assign are offered. %>
+    <div class="admin-field">
+      <%= label_tag "group_id", t(".group"), class: setup_label_class %>
       <select name="group_id" id="group_id" required class="<%= setup_select_class %>"
         data-admin--tokens--group-hint-target="select" data-action="change->admin--tokens--group-hint#show"
-        aria-describedby="token-group-description <%= GROUP_ERROR_ID if group_errors.any? %>">
+        <%= tag.attributes(aria: { invalid: ("true" if group_errors.any?), describedby: group_described_by }) %>>
         <% groups.each do |group| %>
           <option value="<%= group.id %>" data-description="<%= group.description %>" <%= "selected" if group == selected_group %>><%= group.name %></option>
         <% end %>
       </select>
-      <p id="token-group-description" data-admin--tokens--group-hint-target="text" class="mt-1 text-sm text-meta"><%= selected_description %></p>
-      <% if group_errors.any? %>
-        <p id="<%= GROUP_ERROR_ID %>" class="mt-1 text-sm text-danger-ink"><%= group_errors.to_sentence %></p>
-      <% end %>
+      <p id="<%= GROUP_DESCRIPTION_ID %>" data-admin--tokens--group-hint-target="text" class="mt-1 text-small text-meta"><%= selected_description %></p>
+      <%= render "admin/shared/field_errors", id: GROUP_ERROR_ID, messages: group_errors %>
     </div>
 
     <div>
-      <%= render Admin::Ui::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".create"), variant: :primary, type: "submit") %>
     </div>
   <% end %>
 </section>

@@ -4,7 +4,7 @@ module Admin
     # 1-60 characters), a Group select with the selected group's description
     # on one line beneath (every option carries it in `data-description`,
     # `admin--tokens--group-hint` swaps the text, so no request), and Create
-    # token.
+    # token, the page's one primary.
     #
     # The form is a plain, non-Turbo POST (`data-turbo="false"`): the answer to
     # a successful create is a rendered document holding the raw token, which
@@ -15,12 +15,17 @@ module Admin
     # `pagehide` by `admin--tokens--reveal`, and the token's one place on the
     # page); the form stays below it so another can be made.
     #
-    # `name_errors:` / `group_errors:` print under their own field (a failed
-    # create re-renders at 422 with the typed `name:` kept); `selected_id:`
-    # keeps the chosen group across that re-render.
+    # Name and Group are `.admin-field`s, each with its error slot
+    # (`admin/shared/_field_errors`) as a direct child, so a refused field is
+    # drawn on the shared invalid edge; the slot's id ends in `-errors`, which
+    # is what that edge's rule reads. `name_errors:` / `group_errors:` fill
+    # their own field's slot (a failed create re-renders at 422 with the typed
+    # `name:` kept); `selected_id:` keeps the chosen group across that
+    # re-render.
     class CreateStepComponent < Admin::AdminComponent
-      NAME_ERROR_ID = "token-name-error".freeze
-      GROUP_ERROR_ID = "token-group-error".freeze
+      NAME_ERROR_ID = "token-name-errors".freeze
+      GROUP_ERROR_ID = "token-group-errors".freeze
+      GROUP_DESCRIPTION_ID = "token-group-description".freeze
 
       def initialize(groups:, form_url:, selected_id: nil, name: "", name_errors: [], group_errors: [], raw_token: nil)
         @groups = groups
@@ -41,6 +46,8 @@ module Admin
       def selected_description = selected_group&.description.to_s
 
       def name_described_by = name_errors.any? ? NAME_ERROR_ID : nil
+
+      def group_described_by = [ GROUP_DESCRIPTION_ID, (GROUP_ERROR_ID if group_errors.any?) ].compact.join(" ")
     end
   end
 end

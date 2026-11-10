@@ -1550,8 +1550,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    most the window's height under the top bar, and its head row sticks to
    the card's top (a sticky element inside a scrolling box sticks to that
    box, never to the window), on the surface over the rows, at the raised
-   layer. `.admin-table-scroll--x` is Trash's table, the forms list's and a
-   form's submissions': the sideways scroll alone, with no height of its
+   layer. `.admin-table-scroll--x` is Trash's table, the forms list's, a
+   form's submissions' and the AI assistant's tokens: the sideways scroll alone, with no height of its
    own, so its rows scroll with the page. In
    both the first column sticks at the left as the card scrolls sideways,
    but in a table whose row is one link (`.admin-row-link`: Users, Groups), which

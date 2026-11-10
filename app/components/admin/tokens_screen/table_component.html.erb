@@ -1,61 +1,58 @@
 <section class="rounded-card bg-surface shadow-1">
-  <h2 class="px-4 pt-4 text-h2 text-ink">Tokens</h2>
+  <h2 class="px-4 pt-4 text-h2 text-ink"><%= t(".title") %></h2>
   <% if tokens.empty? %>
-    <%= render Admin::Ui::EmptyStateComponent.new(title: "No tokens yet.", description: "Create a token to connect an assistant.") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) %>
   <% else %>
-    <table class="admin-api-tokens-table admin-card-table mt-2 w-full border-collapse text-sm">
-      <thead>
-        <tr class="border-b border-line-strong text-left text-label text-meta">
-          <th class="py-2 pr-4">Name</th>
-          <th class="py-2 pr-4">Acts as</th>
-          <th class="py-2 pr-4">Group</th>
-          <th class="py-2 pr-4">Created</th>
-          <th class="py-2 pr-4">Last used</th>
-          <th class="py-2 pr-4">Status</th>
-          <th class="py-2"><span class="sr-only">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% tokens.each do |token| %>
-          <tr id="<%= helpers.dom_id(token) %>" class="<%= row_class(token) %>">
-            <td class="py-2 pr-4 font-semibold text-ink"><%= token.name %></td>
-            <td class="py-2 pr-4 text-ink"><%= render Admin::Ui::UserNameComponent.new(user: token.user, user_id: token.user_id) %></td>
-            <td class="py-2 pr-4 text-ink"><%= token.group.name %></td>
-            <td class="py-2 pr-4 text-ink"><%= render Admin::Ui::TimeAgoComponent.new(time: token.created_at) %></td>
-            <td class="py-2 pr-4 text-ink">
-              <% if token.last_used_at %>
-                <%= render Admin::Ui::TimeAgoComponent.new(time: token.last_used_at) %>
-                <% if token.last_used_ip.present? %>
-                  <span class="block text-meta"><%= token.last_used_ip %></span>
+    <%# Rounded as the card is, so the sticky Name column's ground keeps the card's corners. %>
+    <div class="admin-table-scroll--x rounded-card mt-2">
+      <table class="admin-api-tokens-table admin-card-table w-full border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-line-strong text-left text-label text-meta">
+            <th class="py-2 pr-4"><%= t(".columns.name") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.acts_as") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.group") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.created") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.last_used") %></th>
+            <th class="py-2 pr-4"><%= t(".columns.status") %></th>
+            <th class="py-2"><span class="sr-only"><%= t(".columns.actions") %></span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tokens.each do |token| %>
+            <tr id="<%= helpers.dom_id(token) %>" class="border-b border-line align-top last:border-b-0">
+              <td class="py-2.5 pr-4 font-semibold <%= words_class(token) %>"><%= token.name %></td>
+              <td class="py-2.5 pr-4 <%= words_class(token) %>"><%= render Admin::Ui::UserNameComponent.new(user: token.user, user_id: token.user_id) %></td>
+              <td class="py-2.5 pr-4 <%= words_class(token) %>"><%= token.group.name %></td>
+              <td class="py-2.5 pr-4 <%= words_class(token) %>"><%= render Admin::Ui::TimeAgoComponent.new(time: token.created_at) %></td>
+              <td class="py-2.5 pr-4 <%= words_class(token) %>">
+                <% if token.last_used_at %>
+                  <%= render Admin::Ui::TimeAgoComponent.new(time: token.last_used_at) %>
+                  <% if token.last_used_ip.present? %>
+                    <span class="block text-small text-meta"><%= token.last_used_ip %></span>
+                  <% end %>
+                <% else %>
+                  <%= t(".never") %>
                 <% end %>
-              <% else %>
-                Never
-              <% end %>
-            </td>
-            <td class="py-2 pr-4">
-              <% if token.revoked_at %>
-                <span class="text-meta">Revoked <%= render Admin::Ui::TimeAgoComponent.new(time: token.revoked_at) %></span>
-              <% else %>
-                <span class="text-ok-ink">Active</span>
-              <% end %>
-            </td>
-            <td class="py-2 pr-4 text-right">
-              <% unless token.revoked_at %>
-                <%= render Admin::Ui::ButtonComponent.new(label: "Revoke…", variant: :danger_text, data: dialog_trigger(dialog_id(token))) %>
+              </td>
+              <td class="py-2.5 pr-4"><%= render state_chip(token) %></td>
+              <td class="py-2.5 text-right">
+                <% unless token.revoked_at %>
+                  <%= render Admin::Ui::ButtonComponent.new(label: t(".revoke"), variant: :danger_text, size: :small, data: dialog_trigger(dialog_id(token))) %>
 
-                <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id(token), title: "Revoke “#{token.name}”?",
-                      body: revoke_body(token)) do |dialog| %>
-                  <% dialog.with_confirm_action do %>
-                    <%= form_with url: revoke_path(token), method: :delete do %>
-                      <%= render Admin::Ui::ButtonComponent.new(label: "Revoke token", variant: :danger, type: "submit") %>
+                  <%= render Admin::Ui::ConfirmDialogComponent.new(destructive: true, id: dialog_id(token), title: t(".dialog.title", name: token.name),
+                        body: t(".dialog.body", user: user_label(token))) do |dialog| %>
+                    <% dialog.with_confirm_action do %>
+                      <%= form_with url: revoke_path(token), method: :delete do %>
+                        <%= render Admin::Ui::ButtonComponent.new(label: t(".dialog.confirm"), variant: :danger, type: "submit") %>
+                      <% end %>
                     <% end %>
                   <% end %>
                 <% end %>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
   <% end %>
 </section>

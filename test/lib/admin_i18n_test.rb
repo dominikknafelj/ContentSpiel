@@ -213,6 +213,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/groups/permission_matrix_controller.js
     app/javascript/controllers/admin/groups/branch_picker_controller.js
     app/controllers/admin/invites_controller.rb
+    app/components/admin/tokens_screen/create_step_component.rb
+    app/components/admin/tokens_screen/create_step_component.html.erb
+    app/components/admin/tokens_screen/connect_step_component.rb
+    app/components/admin/tokens_screen/connect_step_component.html.erb
+    app/components/admin/tokens_screen/table_component.rb
+    app/components/admin/tokens_screen/table_component.html.erb
+    app/views/admin/api_tokens/_screen.html.erb
+    app/views/admin/api_tokens/index.html.erb
+    app/views/admin/api_tokens/create.html.erb
+    app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb
     app/views/admin/posts/index.html.erb

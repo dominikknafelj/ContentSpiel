@@ -811,6 +811,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/users/*
     app/components/admin/groups_screen/*
     app/views/admin/groups/*
+    app/components/admin/tokens_screen/*
+    app/views/admin/api_tokens/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/

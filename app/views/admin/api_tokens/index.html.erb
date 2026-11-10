@@ -1,11 +1,11 @@
-<%# "Connect an AI assistant" (design spec §6.1, round 3): see `_screen`. The
-    create form is a plain, non-Turbo POST (`data-turbo="false"`): the one-time
-    reveal is a rendered (200) response -- a Drive form submission must
-    redirect, and a frame submission leaves Turbo's snapshot cache free to
-    keep the reveal for Back -- so it arrives as its own document whose head
-    opts out of Turbo's cache (see admin/api_tokens/create). A refused create
-    re-renders this very page at 422 (no token exists, so nothing secret).
-    Revoke is gated behind `Admin::Ui::ConfirmDialogComponent`, like every other
-    destructive action in CS Studio. %>
-<% content_for :title, "AI assistant" %>
+<%# "Connect an AI assistant": see `_screen`. The create form is a plain,
+    non-Turbo POST (`data-turbo="false"`): the one-time reveal is a rendered
+    (200) response -- a Drive form submission must redirect, and a frame
+    submission leaves Turbo's snapshot cache free to keep the reveal for
+    Back -- so it arrives as its own document whose head opts out of Turbo's
+    cache (see admin/api_tokens/create). A refused create re-renders this
+    very page at 422 (no token exists, so nothing secret). Revoke is gated
+    behind `Admin::Ui::ConfirmDialogComponent`, like every other destructive
+    action in CS Studio. %>
+<% content_for :title, t(".title") %>
 <%= render "admin/api_tokens/screen", raw_token: nil %>
