@@ -12,7 +12,7 @@ class Admin::KeyboardNavigationSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
-  test "the language tabs' links are Tab stops after the current language, and Enter on one opens that language, which becomes the current" do
+  test "the language tabs: in links mode each language is a Tab stop that Enter opens, and in buttons mode the tablist is one Tab stop the arrows, Home and End move along" do
     page_record = create_page(title: "About")
     visit_editor(page_record)
 
@@ -25,6 +25,29 @@ class Admin::KeyboardNavigationSystemTest < ApplicationSystemTestCase
     assert_selector "#{tabs} [aria-current=true]", text: "Deutsch"
     assert_current_path(/locale=de/)
     await_admin_controllers
+
+    # Buttons mode: Settings' Site card, whose tabs `admin--settings--tabs` drives.
+    visit_screen admin_settings_path
+    selected = "#{tabs} [role=tab][aria-selected=true]"
+    find("h1").click
+    stop_on("#{tabs} [role=tab]")
+    assert_equal "English", focused_text
+    assert_equal 1, page.evaluate_script("[ ...document.querySelectorAll(#{"#{tabs} [role=tab]".to_json}) ].filter((tab) => tab.tabIndex === 0).length")
+
+    page.send_keys(:right)
+    assert_selector selected, text: "Deutsch"
+    assert_equal "Deutsch", focused_text
+    assert_selector "#settings-de-title", visible: :visible
+    page.send_keys(:end)
+    assert_equal "Español", focused_text
+    page.send_keys(:home)
+    assert_selector selected, text: "English"
+    assert_equal "English", focused_text
+    assert_selector "#settings-en-title", visible: :visible
+
+    # The next Tab leaves the tablist.
+    page.send_keys(:tab)
+    assert_not page.evaluate_script("document.activeElement.matches(#{"#{tabs} [role=tab]".to_json})"), "Tab stayed in the tablist"
   end
 
   test "a tab link is a Tab stop, and Enter on it goes to its tab, which the links mark current" do
