@@ -592,8 +592,8 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    inside the group's 1px frame, hence two pixels less. A list's filter panel
    (`.admin-filter-panel`, below) is part of its bar's form, so its selects
    take the bar's height wherever the panel stands. The audit log's subject
-   chip is a control of the row and takes the height; the × inside it is the
-   chip's own 20px button, not a control of the row. */
+   chip is the chip input's pill, not a control of the row: neither it nor
+   its 20px × takes the height. */
 .admin-filter-bar > div,
 .admin-filter-bar > fieldset { display: flex; }
 .admin-filter-bar input:not(.sr-only),
@@ -601,8 +601,7 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-filter-panel select,
 .admin-filter-bar a.inline-block,
 .admin-filter-bar a.inline-flex:not(.admin-chip__remove),
-.admin-filter-bar button,
-.admin-filter-bar [data-subject-chip] {
+.admin-filter-bar button {
   min-height: var(--cs-control-compact);
   padding-block: 0;
 }
