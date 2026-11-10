@@ -1,0 +1,25 @@
+# The Groups views and `Admin::GroupsController` (docs/reference/i18n.md):
+# `admin.groups.index`, `edit`, `new` and `form` are the list's, the
+# editor's, New group's and the shared form's lazy-lookup scopes, and the
+# flashes are `admin.groups.*`. The stale banner's glued sentence stays the
+# controller's English (`STALE_LEAD`, `STALE_MESSAGE`).
+en:
+  admin:
+    groups:
+      saved: "Group saved"
+      deleted: "Group deleted"
+      index:
+        title: "Groups"
+        intro: "A group is a set of permissions. People and AI tokens get what their groups allow; owners always have everything."
+        new_group: "New group"
+      edit:
+        title: "Group"
+      new:
+        title: "New group"
+      form:
+        group: "Group"
+        name: "Name"
+        description: "Description"
+        view_only: "This group has permissions you can't hand out, so you can only view it."
+        create: "Create group"
+        save: "Save group"

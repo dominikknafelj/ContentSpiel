@@ -1544,7 +1544,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    form's submissions': the sideways scroll alone, with no height of its
    own, so its rows scroll with the page. In
    both the first column sticks at the left as the card scrolls sideways,
-   but in a table whose row is one link (`.admin-row-link`: Users), which
+   but in a table whose row is one link (`.admin-row-link`: Users, Groups), which
    scrolls sideways whole: a sticky cell is the containing block of
    the link's cover, which would then cover the name cell alone.
    `.admin-table-scroll` is a stacking context of its own, so its local

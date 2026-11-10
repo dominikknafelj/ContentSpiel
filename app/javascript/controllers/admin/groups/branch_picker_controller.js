@@ -1,7 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
 // The page-branch tree of a `pages.*` row's scope editor
-// (`Admin::GroupsScreen::ScopeEditorComponent`, round 3 Task 10): a checkbox
+// (`Admin::GroupsScreen::ScopeEditorComponent`): a checkbox
 // per page whose ticked boxes are submitted as the grant's `page_ids` --
 // branch ROOTS. Tri-state:
 //
@@ -26,6 +27,9 @@ import { Controller } from "@hotwired/stimulus"
 // editor, whose `admin--groups--permission-matrix` rewrites the chips from the state
 // this has just settled (the box's own action runs first); the form's footer
 // reads the same event.
+//
+// A node's note is the scope editor's words (`notes.*`), read from the
+// matrix's `data-messages`.
 export default class extends Controller {
   static targets = ["node", "kept"]
 
@@ -71,12 +75,17 @@ export default class extends Controller {
       if (mark) mark.textContent = implied || chosen ? "✓" : partial ? "–" : ""
 
       const note = node.querySelector(":scope > div:first-child > [data-admin--groups--branch-picker-target='note']")
-      if (note) note.textContent = implied ? "included" : partial ? "contains a chosen page" : chosen ? this.includes(below.length) : ""
+      if (note) note.textContent = this.note(implied, partial, chosen, below.length)
     })
   }
 
-  includes(count) {
-    return count === 0 ? "" : `includes ${count} ${count === 1 ? "subpage" : "subpages"}`
+  // A node's note: `ScopeEditorComponent#note_for`'s words for its state.
+  note(implied, partial, chosen, below) {
+    const t = (key, vars) => messages(this.element).t(key, vars)
+    if (implied) return t("components.groups_screen.scope_editor.notes.included")
+    if (partial) return t("components.groups_screen.scope_editor.notes.partial")
+    if (chosen && below > 0) return t("components.groups_screen.scope_editor.notes.includes", { count: below })
+    return ""
   }
 
   // The `node`s enclosing this one, nearest first.

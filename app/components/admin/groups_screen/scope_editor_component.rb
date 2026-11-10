@@ -1,8 +1,7 @@
 module Admin
   module GroupsScreen
     # The scope controls of one permission row, opened in place by "Edit scope"
-    # (round 3 Task 10): what the old matrix showed under a ticked permission,
-    # redrawn --
+    # on paper, indented to the row's label column:
     #
     # - posts: the content types as a multi-select (none ticked = all) and an
     #   "Own only" toggle ("Only posts the user wrote." -- the rule that exists:
@@ -14,9 +13,8 @@ module Admin
     # scope of an unticked permission -- so opening, closing or never opening an
     # editor changes nothing that is submitted.
     #
-    # WHAT IT CARRIES (Review Focus 3, "a form submitted as rendered changes
-    # nothing"):
-    # - a removed content type: a warn chip with Remove and a hidden input
+    # WHAT IT CARRIES ("a form submitted as rendered changes nothing"):
+    # - a removed content type: a warn badge, a hidden input and Remove beside it
     #   (`data-save-bar-track`, so pressing Remove is a counted change) -- the
     #   value is submitted until Remove, and `Groups::Save` reads it as a dead
     #   scope value, not a change;
@@ -27,9 +25,6 @@ module Admin
     # - neither a partial ancestor nor an implied descendant is ever submitted:
     #   one is unchecked, the other disabled.
     class ScopeEditorComponent < AdminComponent
-      NOTE_INCLUDED = "included".freeze
-      NOTE_PARTIAL = "contains a chosen page".freeze
-
       def initialize(permission:, scope:, tree:, id:, open: false, form_name: "group[grants]")
         @permission = permission
         @scope = scope.to_h.stringify_keys
@@ -55,7 +50,10 @@ module Admin
       def registered_types = AccessControl::Permissions.content_type_choices
       def chosen_types = Array(scope["content_types"])
       def removed_types = chosen_types - registered_types
-      def content_type_label(name) = ContentTypes.find(name)&.label || name.to_s.humanize
+      def content_type_label(name) = ContentTypes.find(name)&.label || name.to_s.humanize # i18n-ok: a registered type with no definition shows its name, humanised
+
+      # The "!" is a sign beside the words, which say it; a screen reader skips it.
+      def removed_label(name) = safe_join([ tag.span("!", aria: { hidden: true }), " ", t(".removed_type", name: name) ])
 
       def dot_class(name)
         definition = ContentTypes.find(name)
@@ -68,11 +66,13 @@ module Admin
       def states = @states ||= tree.states(selected_page_ids)
       def kept_page_ids = tree.unreadable(selected_page_ids)
 
+      # The branch's note, in the words `admin--groups--branch-picker` writes
+      # after a change (`notes.*`, handed to it by the matrix).
       def note_for(state)
         case state.state
-        when :implied then NOTE_INCLUDED
-        when :chosen then state.descendants.positive? ? "includes #{helpers.pluralize(state.descendants, "subpage")}" : ""
-        when :partial then NOTE_PARTIAL
+        when :implied then t(".notes.included")
+        when :chosen then state.descendants.positive? ? t(".notes.includes", count: state.descendants) : ""
+        when :partial then t(".notes.partial")
         else ""
         end
       end
@@ -102,8 +102,8 @@ module Admin
                   data: { admin__groups__branch_picker_target: "box", action: "admin--groups--branch-picker#change", chip_label: node.title, partial: (state.state == :partial || nil) })) + node.title
               end
             else
-              tag.span(class: "flex min-w-0 items-center gap-2.5 text-dim", title: "You can't open this page") do
-                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-field-line text-xs", aria: { hidden: true }, data: { admin__groups__branch_picker_target: "mark" }) + node.title
+              tag.span(class: "flex min-w-0 items-center gap-2.5 text-dim", title: t(".cant_open")) do
+                tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-field-line text-label", aria: { hidden: true }, data: { admin__groups__branch_picker_target: "mark" }) + node.title
               end
             end
             # A root that is chosen AND below another chosen root (a stored state the
@@ -114,7 +114,7 @@ module Admin
             # (the box takes over once the ancestor is unticked, never both). Untracked:
             # a hidden input never counts towards the footer, so nothing here is a change.
             carried = node.readable && state.chosen ? hidden_field_tag(field_name("page_ids") + "[]", page_id, id: nil, disabled: state.state != :implied) : "".html_safe
-            control + carried + tag.span(note_for(state), class: "ml-auto text-xs text-meta", data: { admin__groups__branch_picker_target: "note" })
+            control + carried + tag.span(note_for(state), class: "ml-auto text-small text-meta", data: { admin__groups__branch_picker_target: "note" })
           end
           row + tag.div(branch_list(node.child_ids), class: "ml-5")
         end

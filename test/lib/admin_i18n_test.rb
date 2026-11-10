@@ -194,6 +194,24 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/users/new.html.erb
     app/components/admin/groups_screen/delete_zone_component.rb
     app/components/admin/groups_screen/delete_zone_component.html.erb
+    app/components/admin/groups_screen/list_component.rb
+    app/components/admin/groups_screen/list_component.html.erb
+    app/components/admin/groups_screen/members_component.rb
+    app/components/admin/groups_screen/members_component.html.erb
+    app/components/admin/groups_screen/permission_matrix_component.rb
+    app/components/admin/groups_screen/permission_matrix_component.html.erb
+    app/components/admin/groups_screen/permission_row_component.rb
+    app/components/admin/groups_screen/permission_row_component.html.erb
+    app/components/admin/groups_screen/scope_editor_component.rb
+    app/components/admin/groups_screen/scope_editor_component.html.erb
+    app/components/admin/groups_screen/toggle_list_component.rb
+    app/components/admin/groups_screen/toggle_list_component.html.erb
+    app/views/admin/groups/index.html.erb
+    app/views/admin/groups/_form.html.erb
+    app/views/admin/groups/edit.html.erb
+    app/views/admin/groups/new.html.erb
+    app/javascript/controllers/admin/groups/permission_matrix_controller.js
+    app/javascript/controllers/admin/groups/branch_picker_controller.js
     app/controllers/admin/invites_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb

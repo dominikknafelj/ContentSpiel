@@ -1,7 +1,9 @@
 # The Groups screen's components (docs/reference/i18n.md):
-# `admin.components.groups_screen.*`. Only the delete zone's words are keys
-# so far; the list, the members, the matrix and the scope editor still hold
-# theirs as literals.
+# `admin.components.groups_screen.*`.
+#
+# The matrix's script redraws a row's chips and a branch's note after every
+# change, from the same keys (`permission_row.chips`,
+# `scope_editor.notes`), which the matrix hands it as `data-messages`.
 #
 # The dialog's body is one whole sentence per shape (no members; members
 # only; members and tokens), so a language can order the counts its own
@@ -14,6 +16,76 @@ en:
   admin:
     components:
       groups_screen:
+        list:
+          group: "Group"
+          members_column: "Members"
+          tokens_column: "Tokens"
+          actions: "Actions"
+          built_in: "Built-in"
+          members:
+            one: "member"
+            other: "members"
+          tokens:
+            one: "token"
+            other: "tokens"
+          edit: "Edit"
+          footnote: "Built-in groups can be changed but not deleted. Deleting a custom group removes its permissions from its members and revokes its AI tokens."
+        members:
+          label: "Members"
+          placeholder: "Add a user…"
+          help: "Owners aren't listed: they already have every permission."
+          owner: "Owner"
+        permission_matrix:
+          content: "Content permissions"
+          content_intro: "Each permission has its own scope. No scope means everything."
+          other: "Other permissions"
+          locked_hint: "A greyed tick is a permission you can't hand out yourself. It stays as it is; ask an owner to change it."
+          removed_value: "%{value}: removed when you save."
+          dead: "This permission was limited to %{what}, so it matched nothing. It stays off unless you tick it again."
+          dead_nothing: "nothing"
+          dormant: "Limited to a content type that no longer exists (%{names}). Saving removes it; until then only someone who could grant that type can manage this group."
+          unregistered: "The permission “%{key}” no longer exists and will be removed when you save."
+        permission_row:
+          short:
+            read: "Read"
+            create: "Create"
+            edit: "Edit"
+            publish: "Publish"
+            move: "Move"
+            delete: "Move to trash"
+          accessible_label: "%{short}: %{label}"
+          locked: "You can't grant this"
+          edit_scope: "Edit scope"
+          done: "Done"
+          view_scope: "View scope"
+          hide_scope: "Hide scope"
+          chips:
+            all_pages: "All pages"
+            all_types: "All content types"
+            own_only: "Own only"
+            more: "+%{count}"
+            removed_type: "! %{name} · type removed"
+            under: "Under %{title}"
+            unreadable: "A page you can't open"
+        scope_editor:
+          types: "Content types · none ticked = all"
+          removed_type: "%{name} · this type no longer exists"
+          remove: "Remove"
+          own_only: "Own only"
+          own_hint: "· Only posts the user wrote."
+          branches: "Page branches · ticking a page includes everything under it · none = all"
+          kept: "A page you can't open (kept)"
+          unreadable_branches: "Some of these branches are pages you can't open. Only someone who can open them can change this permission."
+          cant_open: "You can't open this page"
+          notes:
+            included: "included"
+            partial: "contains a chosen page"
+            includes:
+              one: "includes %{count} subpage"
+              other: "includes %{count} subpages"
+        toggle_list:
+          oversight: "Oversight"
+          locked: "You can't grant this"
         delete_zone:
           heading: "Delete this group"
           members:

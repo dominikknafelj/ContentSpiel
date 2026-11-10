@@ -1,18 +1,20 @@
 module Admin
   module GroupsScreen
-    # The Groups list: a card of rows -- name (with its "Built-in" tag and
-    # description), members, tokens -- where the WHOLE row is the link to the
-    # group's editor. The name is the one anchor, `.admin-row-link`, whose
-    # cover stretches over the row, so there is no Edit button and nothing
-    # interactive nested inside another.
+    # The Groups list: one card holding a table of every group, with its
+    # members and its tokens. A group's row is pressed anywhere: the name is
+    # the row's one link (`.admin-row-link`, whose cover reaches the whole
+    # row), with the Built-in badge beside it and the description beneath,
+    # and the row ends in the verb "Edit", words describing that link. There
+    # is no Delete: it lives in the editor's own zone.
+    #
+    # A count reads as a number, in meta at zero, with its noun for a screen
+    # reader alone ("3 members").
     #
     # `member_counts` and `token_counts` are `{ group_id => n }` from ONE grouped
     # query each (`Admin::GroupsController#index`): no per-row count. Tokens
     # counts the ACTIVE tokens bound to the group (a revoked one is not a thing
     # the group's delete still has to revoke).
     class ListComponent < AdminComponent
-      COLUMNS = "grid grid-cols-[minmax(0,1fr)_5rem_5rem_1rem] items-center gap-3 px-4".freeze
-
       def initialize(groups:, member_counts:, token_counts:)
         @groups = groups
         @member_counts = member_counts

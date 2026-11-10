@@ -1,30 +1,31 @@
-<div class="admin-permission-matrix flex flex-col gap-6" data-controller="admin--groups--permission-matrix">
+<%= tag.div class: "admin-permission-matrix flex flex-col gap-6", data: { controller: "admin--groups--permission-matrix", messages: script_messages, **script_values } do %>
   <% unregistered_notes.each do |note| %>
-    <p class="admin-stale-grant rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-warn-ink"><%= note %></p>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :warn, role: nil, class: "admin-stale-grant") do %><%= note %><% end %>
   <% end %>
 
-  <section class="rounded-card bg-surface shadow-1">
-    <div class="flex flex-col gap-1 border-b border-line px-4 py-3.5">
-      <h2 class="text-h2 text-ink">Content permissions</h2>
-      <p class="text-sm text-dim">Each permission has its own scope. No scope means everything.</p>
-    </div>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "group-content-permissions", heading: t(".content"), icon: :pages, family: :structure, intro: t(".content_intro")) do %>
     <% sections.each do |area, permissions| %>
       <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 text-label text-meta"><%= area %></div>
       <% permissions.each do |permission| %>
         <%= render row_for(permission) %>
-        <% stale_notes(permission).each do |note| %>
-          <p class="admin-stale-grant border-b border-line px-4 py-1.5 pl-12 text-sm text-warn-ink"><%= note %></p>
+        <% notes = stale_notes(permission) %>
+        <% if notes.any? %>
+          <%# Indented like the scope editor: the tick column, the gap and the row's padding. %>
+          <div class="flex flex-col gap-2 border-b border-line py-2 pr-4 pl-[calc(1.25rem+0.75rem+1rem)]">
+            <% notes.each do |note| %>
+              <%= render Admin::Ui::NoticeComponent.new(tone: :warn, size: :compact, role: nil, class: "admin-stale-grant") do %><%= note %><% end %>
+            <% end %>
+          </div>
         <% end %>
       <% end %>
     <% end %>
-  </section>
+  <% end %>
 
-  <div class="flex flex-col gap-3">
-    <h2 class="text-h2 text-ink">Other permissions</h2>
+  <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "group-other-permissions", heading: t(".other"), icon: :settings, family: :neutral) do %>
     <%= render Admin::GroupsScreen::ToggleListComponent.new(grants: toggle_grants, form_name: form_name, locked: locked_toggle_keys) %>
-  </div>
+  <% end %>
 
   <% if any_locked? %>
-    <p class="admin-locked-hint text-sm text-meta">A greyed tick is a permission you can't hand out yourself. It stays as it is; ask an owner to change it.</p>
+    <p class="admin-locked-hint text-small text-meta"><%= t(".locked_hint") %></p>
   <% end %>
-</div>
+<% end %>

@@ -1,7 +1,6 @@
 require "test_helper"
 
-# `Admin::GroupsScreen::ScopeEditorComponent` on its own (round 3, Task 10):
-# the scope controls of one permission row. What it must get right is what the
+# `Admin::GroupsScreen::ScopeEditorComponent` on its own: the scope controls of one permission row. What it must get right is what the
 # form SUBMITS as rendered -- "a form saved as rendered changes nothing" -- so
 # most assertions here are about which inputs are enabled, ticked or carried.
 class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
@@ -62,6 +61,19 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_selector "[data-removed-type='retired_type'] button[type=button][data-action='click->admin--groups--permission-matrix#removeType']", text: "Remove"
     # It is no box: nothing offers the gone type as a choice.
     assert_no_selector "input[type=checkbox][value='retired_type']"
+  end
+
+  test "the panel is paper, indented to the label column; a removed type is a warn badge with a small tertiary Remove beside it" do
+    editor("posts.edit", scope: { "content_types" => %w[blog retired_type] })
+
+    panel = page.find("#scope-probe")
+    assert_includes panel[:class].split, "bg-paper"
+    assert_includes panel[:class].split, "pl-[calc(1.25rem+0.75rem+1rem)]"
+    badge = page.find("[data-removed-type='retired_type'] > span:first-child")
+    assert_equal [ Admin::Ui::BadgeComponent::CLASS, Admin::Ui::BadgeComponent::TONES.fetch(:warn) ].join(" "), badge[:class]
+    assert_equal "! retired_type · this type no longer exists", badge.text
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small), page.find("[data-removed-type='retired_type'] button", text: "Remove")[:class]
+    assert_no_selector "[class*='rounded-cs border border-warn']"
   end
 
   test "pages, three levels deep: the chosen page is ticked, everything below it a disabled tick, every ancestor partial" do

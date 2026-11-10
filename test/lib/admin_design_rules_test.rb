@@ -809,6 +809,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/audit_events/*
     app/components/admin/users_screen/*
     app/views/admin/users/*
+    app/components/admin/groups_screen/*
+    app/views/admin/groups/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -1887,8 +1889,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   STATUS_FILL_FILES = %w[
     app/components/admin/editor_screen/hold_strip_component.html.erb
     app/components/admin/editor_screen/no_address_chip_component.html.erb
-    app/components/admin/groups_screen/permission_matrix_component.html.erb
-    app/components/admin/groups_screen/scope_editor_component.html.erb
     app/components/admin/pages_screen/tree_state_mark_component.rb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
@@ -1949,8 +1949,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # Screens whose boxes are drawn by hand still, each to move onto the notice
   # with the rest of its screen's look; the list only shrinks.
   NOTICE_NOT_YET = %w[
-    app/components/admin/groups_screen/permission_matrix_component.html.erb
-    app/components/admin/groups_screen/scope_editor_component.html.erb
     app/views/admin/accounts/edit.html.erb
     app/views/admin/passwords/edit.html.erb
     app/views/admin/passwords/new.html.erb

@@ -1,13 +1,12 @@
 module Admin
-  # The Groups module (access-control design spec §5): the list with member
-  # counts, the editor (name, description, members, the permission matrix
-  # -- `Admin::GroupsScreen::PermissionMatrixComponent`), and delete behind the confirm
+  # The Groups module: the list with member counts, the editor (name,
+  # description, members, the permission matrix --
+  # `Admin::GroupsScreen::PermissionMatrixComponent`), and delete behind the confirm
   # dialog, which names the tokens `Groups::Destroy` will revoke.
   #
   # `groups.manage` opens the module; `Groups::Save`/`Groups::Destroy`
   # decide every write again, including the no-escalation rules for
-  # non-owners (Review Focus 1) -- a refusal there is the 403 page with the
-  # service's reason. A deliberate "Save group" submit rather than autosave,
+  # non-owners -- a refusal there is the 403 page with the service's reason. A deliberate "Save group" submit rather than autosave,
   # like the Users module: a half-ticked permission matrix must never be
   # saved on its own.
   class GroupsController < BaseController
@@ -66,7 +65,7 @@ module Admin
       result = Groups::Destroy.call(@group)
 
       if result.ok?
-        redirect_to admin_groups_path(**admin_url_options), status: :see_other, notice: "Group deleted"
+        redirect_to admin_groups_path(**admin_url_options), status: :see_other, notice: t("admin.groups.deleted")
       else
         forbidden_or(result) do
           redirect_to edit_admin_group_path(@group, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
@@ -98,7 +97,7 @@ module Admin
       result = Groups::Save.call(group, attributes: attributes)
 
       if result.ok?
-        redirect_to edit_admin_group_path(result.record, **admin_url_options), status: :see_other, notice: "Group saved"
+        redirect_to edit_admin_group_path(result.record, **admin_url_options), status: :see_other, notice: t("admin.groups.saved")
       else
         forbidden_or(result) do
           @group = result.record
@@ -112,7 +111,7 @@ module Admin
       end
     end
 
-    # What the editor screens share (round 3 Task 11):
+    # What the editor screens share:
     #
     # - `@view_only`: a stored group the viewer can't manage as it stands
     #   (`AccessControl.can_manage_group?`: every grant it stores is one they could hand
