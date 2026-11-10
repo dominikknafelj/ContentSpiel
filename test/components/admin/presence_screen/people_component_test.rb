@@ -108,7 +108,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
 
     3.times { |index| mark(person("Extra #{index}"), arrived: NOW - (8 - index).minutes) }
     render_people
-    assert_selector "[data-presence-more=wide] > span.bg-sunken.text-ink", text: "+2", visible: :all
+    assert_selector "[data-presence-more=wide] > span.border-meta.bg-surface.text-ink", text: "+2", visible: :all
   end
 
   test "away is just now under a minute, then whole minutes rounded down, and over an hour from sixty" do
@@ -164,7 +164,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_equal others.map { |user| user.id.to_s }, page.all("#{group} > [data-presence-user]").map { |each| each["data-presence-user"] }
     more = page.find("#{group} > span:last-child")
     assert_equal %w[flex flex-none], more[:class].split.sort
-    more.assert_selector "[data-presence-more=wide] > span.size-\\[26px\\].bg-sunken.text-ink", text: "+1", exact_text: true, visible: :all
+    more.assert_selector "[data-presence-more=wide] > span.size-\\[26px\\].border-meta.bg-surface.text-ink", text: "+1", exact_text: true, visible: :all
     # A summary for the eye inside the one control: the name has everyone (29).
     assert_equal "true", more["aria-hidden"]
     # Hovering it shows the list; it is no button of its own.
@@ -232,7 +232,7 @@ class Admin::PresenceScreen::PeopleComponentTest < ViewComponent::TestCase
     assert_selector "#{button} > span[aria-hidden=true] > [data-presence-more=wide]", visible: :all
     assert_selector "#{button} > [data-presence-user] > span.size-\\[22px\\].text-count[aria-hidden=true]", count: 2
     assert_no_selector "[class*='ring-2']", visible: :all
-    assert_selector "#{button} > span > [data-presence-more=wide] > span.size-\\[22px\\].bg-sunken.text-ink", text: "+1", exact_text: true, visible: :all
+    assert_selector "#{button} > span > [data-presence-more=wide] > span.size-\\[22px\\].border-meta.bg-surface.text-ink", text: "+1", exact_text: true, visible: :all
     assert_no_selector "[data-presence-more=narrow]", visible: :all
     assert_no_selector "[class~='lg:hidden'], [class~='max-lg:hidden']", visible: :all
     # The list hangs from the right there, and from the left in the header (19).

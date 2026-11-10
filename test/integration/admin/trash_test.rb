@@ -54,7 +54,7 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     get admin_trash_path
     assert_select "tbody tr", count: 50
     assert_select "nav[aria-label='Pagination'] a[rel=next]", text: "Next"
-    assert_select "nav[aria-label='Pagination']", text: /1–50 OF 54/
+    assert_select "nav[aria-label='Pagination']", text: /1–50 of 54/
 
     get admin_trash_path(page: 2)
     assert_select "tbody tr", count: 4

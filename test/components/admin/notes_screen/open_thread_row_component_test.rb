@@ -27,7 +27,7 @@ class Admin::NotesScreen::OpenThreadRowComponentTest < ViewComponent::TestCase
     assert_selector "a .text-meta time"
     assert_selector "a [aria-hidden=true].rounded-full", count: 3
     assert_selector "a span.rounded-full.size-\\[22px\\]", count: 3
-    assert_selector "a span.bg-sunken", exact_text: "+1"
+    assert_selector "a span.border-meta", exact_text: "+1"
     assert_selector "a span.bg-people", exact_text: "DW"
     assert_selector "a > span.flex.flex-none.items-center.gap-0\\.5", count: 1
     assert_no_selector "a [class*='-ml-'], a [class*='ring-2'], a[class*='avatar-ground']"

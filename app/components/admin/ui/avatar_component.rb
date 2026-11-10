@@ -19,8 +19,10 @@ module Admin
     # `:own` is the viewer (the solid people fill, surface letters); `:away`
     # is someone whose tab is hidden or idle (the surface, meta letters and a
     # dashed edge -- the shape says it, never a lower opacity, which would
-    # take the letters below contrast); `:more` is the "+N" circle (sunken,
-    # ink letters); `:empty` is nobody to name, a deleted user or the system
+    # take the letters below contrast); `:more` is the "+N" circle (the surface
+    # inside a solid 1px `meta` edge, ink letters: a hovered or selected tree
+    # row is `sunken`, so a sunken fill would vanish into it, and the edge
+    # clears 5:1 on every ground a stack meets); `:empty` is nobody to name, a deleted user or the system
     # (a solid hairline on the surface, no letters and no hue: the dashed edge
     # means only away).
     # `here`: a 1.5px people ring inside the circle, for someone who has the
@@ -55,7 +57,7 @@ module Admin
         other: "bg-people-tint text-people",
         own: "bg-people text-surface",
         away: "border-[1.5px] border-dashed border-field-line bg-surface text-meta",
-        more: "bg-sunken text-ink",
+        more: "border border-meta bg-surface text-ink",
         empty: "border border-field-line bg-surface"
       }.freeze
       HERE = "inset-ring-[1.5px] inset-ring-people"

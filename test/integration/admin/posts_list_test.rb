@@ -132,7 +132,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_equal 50, row_titles.size
     assert_equal "Bulk 051", row_titles.first
     assert_equal "Bulk 100", row_titles.last
-    assert_select "nav[aria-label=Pagination] p", text: /51–100 OF 120/
+    assert_select "nav[aria-label=Pagination] p", text: /51–100 of 120/
     assert_select "nav[aria-label=Pagination] a[href=?]", "/cs-studio/posts?page=3&q=Bulk&type=blog"
     assert_select "nav[aria-label=Pagination] a[href=?]", "/cs-studio/posts?page=1&q=Bulk&type=blog"
   end

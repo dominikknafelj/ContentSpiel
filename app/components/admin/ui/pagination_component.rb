@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # "51–100 OF 312" on the left, Previous / page numbers / Next on the right
+    # "51–100 of 312" on the left, Previous / page numbers / Next on the right
     # at the foot of a list's card. The
     # arithmetic is `Pagination`'s; `url:` is the caller's `->(page) { path }`,
     # which keeps the list's own filters (callers merge `page` into

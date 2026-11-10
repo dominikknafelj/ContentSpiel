@@ -173,6 +173,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The count circle ("+N", `AvatarComponent`'s `:more`) is the surface inside
+  # a 1px `meta` edge: a hovered or selected tree row is `sunken`, so the
+  # edge, not the fill, draws the circle on every ground a stack meets.
+  test "the count circle's edge is 5:1 or better on every ground a stack meets, and its number on its fill, in both schemes" do
+    each_scheme do |scheme, colour|
+      %w[--cs-chrome --cs-sunken --cs-paper --cs-rail --cs-accent-tint].each do |ground|
+        assert_ratio(5.0, colour.("--cs-meta"), colour.(ground), "the count circle's edge on #{ground} (#{scheme})")
+      end
+      assert_ratio(7.0, colour.("--cs-ink"), colour.("--cs-surface"), "the count circle's number on its fill (#{scheme})")
+    end
+  end
+
   # The held strip (`Admin::EditorScreen::HoldStripComponent`) is the people
   # tint: its sentence in ink, the status in meta, and Take over, the small
   # secondary, with its accent words (read on the tint, and on the button's

@@ -170,7 +170,7 @@ en:
 
         pagination:
           nav_label: "Pagination"
-          range: "%{first}–%{last} OF %{total}"
+          range: "%{first}–%{last} of %{total}"
           previous: "Previous"
           next: "Next"
 
