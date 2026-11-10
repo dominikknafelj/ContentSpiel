@@ -35,6 +35,7 @@ module Admin
           "It cannot be pressed and takes no focus.",
           "It draws four tones; the word, never the colour, says the state.",
           "A detail is small meta text after the chip, never inside it.",
+          "A detail may be safe markup (a time element), kept as markup; a plain string is escaped.",
           "Anything else the caller hands it (data, id, a class) goes on its root: the wrapper with a detail, the chip without."
         ],
         states: %i[ok warn danger off],

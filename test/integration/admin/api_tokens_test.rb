@@ -207,8 +207,32 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "#token-name-errors", text: /Name can't be blank/
     assert_select "#api-token-value", count: 0
-    assert_select "[role=status]", text: /Copy this token now/, count: 0
+    # The reveal is a warn notice, `role=alert`; a refusal draws none of it.
+    assert_select "[role=alert]", text: /Copy this token now/, count: 0
+    assert_select "[data-admin--tokens--reveal-target=secret]", count: 0
     assert_select "select[name=group_id] option[selected][value=?]", access_control_groups(:read_only).id.to_s
+  end
+
+  # The service's refusal is placed by attribute: the race's "name taken",
+  # which no validation of the form's record raised, still reaches Name.
+  test "a name error reaches the name slot by its attribute, and nothing reaches Group" do
+    sign_in_as(users(:one))
+    original = ApiToken.method(:generate!)
+    ApiToken.define_singleton_method(:generate!) do |user, **options|
+      ApiToken.new(user:, group: options[:group], name: options[:name], lookup_digest: "forced-duplicate").save!(validate: false)
+      original.call(user, **options)
+    end
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens", params: { name: "raced", group_id: access_control_groups(:read_only).id }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#token-name-errors > p > span:not([aria-hidden])", text: "Name #{ApiToken::NAME_TAKEN}", count: 1
+    assert_select "input#token-name[aria-invalid=true]"
+    assert_select "#token-group-errors > p", count: 0
+  ensure
+    ApiToken.define_singleton_method(:generate!, original)
   end
 
   test "a missing name field is the blank-name error too" do

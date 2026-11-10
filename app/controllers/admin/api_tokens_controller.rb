@@ -63,8 +63,14 @@ module Admin
           # A refusal that named no group (or one that is gone) offers the
           # default again rather than an empty select.
           @selected_group_id = group&.id || default_group&.id
-          messages = result.errors.presence || [ t("admin.api_tokens.not_created") ]
-          @name_errors, @group_errors = messages.partition { |message| message.start_with?("Name ") } # i18n-ok: sorts the service's own messages by the field they open with, not copy
+          # The refused record carries its errors by attribute
+          # (`ApiTokens::Issue`), so Name takes the record's `:name` errors and
+          # Group every other message: the group's own ("Choose a group for
+          # the token", "Group must exist") and any about no field, which
+          # stands beside the field nearest Create token rather than being
+          # dropped. The service's messages are whole sentences, shown as given.
+          @name_errors = result.record.errors.full_messages_for(:name)
+          @group_errors = result.errors - @name_errors
           render :index, status: :unprocessable_entity
         end
         return
@@ -89,12 +95,11 @@ module Admin
       end
 
       result = ApiTokens::Revoke.call(api_token)
+      # `ApiTokens::Revoke` refuses only by denial (a missing right), which
+      # is the 403 page; it has no failure of its own to put in a flash.
+      return forbidden!(result.errors.first) if result.denied?
 
-      if result.ok?
-        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: t("admin.api_tokens.revoked")
-      else
-        forbidden_or(result) { redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence } # i18n-ok: to_sentence joins with the locale's support.array words
-      end
+      redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: t("admin.api_tokens.revoked")
     end
 
     private

@@ -45,7 +45,9 @@ module ApiTokens
       unless own_token?
         return denied("tokens.manage", @user) unless authorize!("tokens.manage", @user)
       end
-      return failure(ApiToken.new(user: @user), [ "Choose a group for the token" ]) if @group.nil?
+      # The message is whole as written ("Group Choose a…" is not), so it is
+      # handed over as it stands, and the record carries it on `:group`.
+      return failure(refused(:group, "Choose a group for the token"), [ "Choose a group for the token" ]) if @group.nil?
       unless assignable_group?
         # "that group", never its name: `Admin::ApiTokensController#create` is
         # open to every signed-in user and finds the group by the raw id they
@@ -71,7 +73,7 @@ module ApiTokens
           # Lost a race with another create of the same name (the pre-check
           # above is check-then-insert; the partial unique index is the
           # backstop): the same ordinary failure the validation gives.
-          return failure(ApiToken.new(user: @user, group: @group, name: @name), [ "Name #{ApiToken::NAME_TAKEN}" ])
+          return failure(refused(:name, ApiToken::NAME_TAKEN))
         end
         # Anything else is NOT a name clash and must not be reported as one: a
         # row that fails validation says what is wrong with it, and a unique
@@ -85,6 +87,13 @@ module ApiTokens
     end
 
     private
+
+    # A token that was not made, carrying the refusal on the attribute it is
+    # about, so a caller places each message by attribute
+    # (`errors.full_messages_for(:name)`), never by reading its words.
+    def refused(attribute, message)
+      ApiToken.new(user: @user, group: @group, name: @name).tap { |token| token.errors.add(attribute, message) }
+    end
 
     def own_token? = actor.is_a?(User) && actor == @user
 

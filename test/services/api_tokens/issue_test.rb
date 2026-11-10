@@ -39,6 +39,8 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert_equal [ "Choose a group for the token" ], result.errors
+    assert_equal [ "Choose a group for the token" ], result.record.errors.messages_for(:group), "the refusal is on the attribute it is about"
+    assert_empty result.record.errors.full_messages_for(:name)
   end
   # Final fix wave (Minor 2): issuing for someone else, the group must be
   # within the *actor's* rights too, not only the token user's.
@@ -169,6 +171,8 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
         result = ApiTokens::Issue.call(users(:one), group:, name: "Claude")
         assert_not result.ok?
         assert_includes result.errors.to_sentence, "already the name of one of this user's active tokens"
+        assert_equal [ "Name #{ApiToken::NAME_TAKEN}" ], result.record.errors.full_messages_for(:name), "the race's refusal is on name"
+        assert_equal result.record.errors.full_messages_for(:name), result.errors
       end
     end
   ensure
