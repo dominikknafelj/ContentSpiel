@@ -1,8 +1,8 @@
 module Admin
   module FormsScreen
-    # Moving a form to the trash: the zone after the
-    # builder's save bar, in the group editor's delete zone shape, and the
-    # confirmation it opens, which names the pages the form is placed on
+    # Moving a form to the trash: the zone at the end of the builder's
+    # column, after its form and set off by a line rule (no box of its own),
+    # and the confirmation it opens, which names the pages the form is placed on
     # (`Forms::Placements`: the readable ones by title, the others as a
     # number), because those pages show nothing in its place until it is
     # restored. The list's ⋯ menu opens the same dialog (`zone: false`

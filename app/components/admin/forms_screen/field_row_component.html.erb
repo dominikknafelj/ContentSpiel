@@ -1,15 +1,15 @@
-<%= tag.div id: id("row"), class: "admin-form-field-row rounded-card bg-surface shadow-1",
+<%= tag.div id: id("row"), class: "admin-form-field-row rounded-tile bg-paper",
       data: { "admin--forms--builder-target": "row", row: row.row, key: row.key.presence } do %>
-  <div class="flex flex-wrap items-center gap-2 border-b border-line p-3">
+  <div class="flex flex-wrap items-center gap-2 p-3">
     <%= render Admin::Ui::BadgeComponent.new(label: type_label) %>
     <%= tag.button type: "button", class: "min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-semibold text-ink",
           aria: { expanded: "true", controls: body_id }, data: { action: "admin--forms--builder#fold", "admin--forms--builder-target": "heading" } do %><% if head_label %><%= head_label %><% else %><span class="font-normal text-meta"><%= t(".no_label") %></span><% end %><% end %>
-    <span class="text-xs text-meta" data-admin--forms--builder-target="requiredMark" <%= "hidden" unless row.required %>><%= t(".required") %></span>
+    <span class="text-label text-meta" data-admin--forms--builder-target="requiredMark" <%= "hidden" unless row.required %>><%= t(".required") %></span>
     <% if structure? %>
       <span class="ml-auto flex items-center gap-1">
-        <%= render Admin::Ui::ButtonComponent.new(label: "↑", variant: :tertiary, size: BUTTON_SIZE, disabled: first?, aria: { label: t(".up", label: spoken_label) },
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".up", label: spoken_label), icon: :arrow_up, variant: :tertiary, size: BUTTON_SIZE, disabled: first?,
               data: { action: "admin--forms--builder#up", "admin--forms--builder-target": "up" }) %>
-        <%= render Admin::Ui::ButtonComponent.new(label: "↓", variant: :tertiary, size: BUTTON_SIZE, disabled: last?, aria: { label: t(".down", label: spoken_label) },
+        <%= render Admin::Ui::ButtonComponent.new(label: t(".down", label: spoken_label), icon: :arrow_down, variant: :tertiary, size: BUTTON_SIZE, disabled: last?,
               data: { action: "admin--forms--builder#down", "admin--forms--builder-target": "down" }) %>
         <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: BUTTON_SIZE, aria: { label: t(".remove_label", label: spoken_label) },
               data: { action: "admin--forms--builder#remove" }) %>
@@ -23,19 +23,19 @@
       <%= hidden_field_tag name(:type), row.type, id: nil %>
     <% end %>
 
-    <div>
+    <div class="admin-field">
       <%= label_tag id("label"), t(".label"), class: "#{setup_label_class} mb-1" %>
-      <% if (line = reference(row.label)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+      <% if (line = reference(row.label)) %><p class="mb-1 text-small text-meta"><%= line %></p><% end %>
       <%= text_field_tag name(:label, locale), row.label[locale], id: id("label"), autocomplete: "off",
-            aria: { describedby: id("errors"), invalid: ("true" if errors.any?) }.compact,
+            aria: { describedby: id("errors"), invalid: (true if errors.any?) }.compact,
             data: { action: "input->admin--forms--builder#relabel" },
-            class: [ setup_input_class, ("!border-danger" if errors.any?) ] %>
+            class: setup_input_class %>
       <%= helpers.render "admin/shared/field_errors", id: id("errors"), messages: errors %>
     </div>
 
     <div>
       <%= label_tag id("help"), t(".help"), class: "#{setup_label_class} mb-1" %>
-      <% if (line = reference(row.help)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+      <% if (line = reference(row.help)) %><p class="mb-1 text-small text-meta"><%= line %></p><% end %>
       <%= text_field_tag name(:help, locale), row.help[locale], id: id("help"), autocomplete: "off",
             aria: { describedby: id("help-help") }, class: setup_input_class %>
       <p id="<%= id("help-help") %>" class="mt-1 text-sm text-meta"><%= t(".help_help") %></p>
@@ -77,7 +77,7 @@
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <%= render Admin::Ui::ButtonComponent.new(label: t(".add_choice"), variant: :secondary, size: BUTTON_SIZE, disabled: full_choices?,
                   data: { action: "admin--forms--builder#addChoice", "admin--forms--builder-target": "addChoice" }) %>
-            <p class="text-[13px] text-meta" data-admin--forms--builder-target="choicesFull" <%= "hidden" unless full_choices? %>><%= t(".max_choices") %></p>
+            <p class="text-small text-meta" data-admin--forms--builder-target="choicesFull" <%= "hidden" unless full_choices? %>><%= t(".max_choices") %></p>
           </div>
         <% end %>
       </fieldset>

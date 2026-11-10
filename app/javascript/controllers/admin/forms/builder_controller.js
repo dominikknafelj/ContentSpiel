@@ -231,7 +231,7 @@ export default class extends Controller {
 
   nameButtons(row) {
     const label = this.labelOf(row)
-    const name = (selector, key) => row.querySelector(selector)?.setAttribute("aria-label", this.text.t(key, { label }))
+    const name = (selector, key) => this.nameButton(row.querySelector(selector), this.text.t(key, { label }))
     name(":scope > div > span > [data-admin--forms--builder-target='up']", "components.forms_screen.field_row.up")
     name(":scope > div > span > [data-admin--forms--builder-target='down']", "components.forms_screen.field_row.down")
     name(":scope > div > span > [data-action~='admin--forms--builder#remove']", "components.forms_screen.field_row.remove_label")
@@ -259,10 +259,19 @@ export default class extends Controller {
 
   nameChoiceButtons(choice) {
     const label = this.choiceLabelOf(choice)
-    const name = (selector, key) => choice.querySelector(selector)?.setAttribute("aria-label", this.text.t(key, { label }))
+    const name = (selector, key) => this.nameButton(choice.querySelector(selector), this.text.t(key, { label }))
     name("[data-admin--forms--builder-target='choiceUp']", "components.forms_screen.choice_row.up")
     name("[data-admin--forms--builder-target='choiceDown']", "components.forms_screen.choice_row.down")
     name("[data-action~='admin--forms--builder#removeChoice']", "components.forms_screen.choice_row.remove_label")
+  }
+
+  // A button's name, and an icon button's tooltip (`[data-tooltip]`), which
+  // says the same words as its name.
+  nameButton(button, words) {
+    if (!button) return
+    button.setAttribute("aria-label", words)
+    const tooltip = button.querySelector("[data-tooltip]")
+    if (tooltip) tooltip.textContent = words
   }
 
   writeOrder() {

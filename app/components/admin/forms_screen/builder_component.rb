@@ -1,14 +1,16 @@
 module Admin
   module FormsScreen
-    # The builder: one column of cards in
-    # the Settings card shape, ONE form with ONE explicit Save
-    # (`Admin::Ui::SaveBarComponent`), then the trash zone outside it.
+    # The builder: one column of cards in Settings' card frame
+    # (`Admin::Ui::SettingsCardComponent`, each with the Forms chip), ONE form
+    # with ONE explicit Save (`Admin::Ui::SaveBarComponent`), then the trash
+    # zone after the form, at the column's end.
     #
     #   1. "Form": the name (the default language's tab only: it is no text a
     #      visitor reads, and it is not translated).
     #   2. "Fields": a row per field (`FieldRowComponent`), and the picker,
-    #      one button per registered type, each appending a row from its
-    #      `<template>` (`admin--forms--builder`).
+    #      a paper well titled "Add a field" holding one button per registered
+    #      type, each appending a row from its `<template>`
+    #      (`admin--forms--builder`).
     #   3. "After sending": the submit label and the thank-you.
     #   4. "Where submissions go" (`DestinationsComponent`).
     #   Then "Placed on" (`PlacementsComponent`), which holds no input, and the
@@ -27,11 +29,15 @@ module Admin
     # REFUSALS are `Forms::Save`'s sentences, which name no field: the ones
     # this screen can place (the name, a field's label, a choice field, the
     # mail's recipients, "somewhere to send") link to their field from the
-    # summary and stand in that field's slot as well (`error_places`).
+    # summary and stand in that field's slot as well (`error_places`). Such
+    # a field is `aria-invalid` and takes the shared invalid edge from its
+    # `.admin-field` wrapper, whose error slot is its direct child.
     class BuilderComponent < Admin::AdminComponent
       FORM_ID = "form-builder".freeze
-      CARD_CLASS = "admin-settings-card rounded-card bg-surface shadow-1".freeze
-      CARD_HEAD_CLASS = "border-b border-line px-4 py-3.5".freeze
+      # Every card of a form (the builder's, Where submissions go and Placed
+      # on) wears the Forms module's chip, the sidebar's icon and family.
+      CARD_ICON = :clipboard_list
+      CARD_FAMILY = :form
 
       def initialize(form:, draft:, locale:, placements:, errors: [], mail_settings: nil, keys: nil, dirty: false,
         stale: false, stale_change: nil, base: nil, url_options: {})

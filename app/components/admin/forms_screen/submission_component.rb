@@ -30,8 +30,8 @@ module Admin
     # "Mail to …" lists the destination's recipients as they are NOW: a
     # delivery stores no address (an open question, `docs/roadmap.md`).
     class SubmissionComponent < Admin::AdminComponent
-      CARD_CLASS = BuilderComponent::CARD_CLASS
-      CARD_HEAD_CLASS = BuilderComponent::CARD_HEAD_CLASS
+      CARD_CLASS = "admin-settings-card rounded-card bg-surface shadow-1".freeze
+      CARD_HEAD_CLASS = "border-b border-line px-4 py-3.5".freeze
       DIALOG_ID = "delete-submission-dialog".freeze
       # The keys `Forms::DeliveryJob` and the built-in destination store
       # beside a mail's own (`MailFailure::KEYS`); anything else (a gem's

@@ -65,7 +65,7 @@ en:
           name: "Name"
           name_help: "Only editors see it."
           fields_card: "Fields"
-          add_field: "+ Add field"
+          add_field: "Add a field"
           max_fields: "A form holds at most 30 fields."
           no_fields: "No fields yet. Add the first one below."
           structure_elsewhere: "Fields are added, ordered and removed on the %{language} tab."

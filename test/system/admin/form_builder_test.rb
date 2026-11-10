@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
-# The form builder in a browser:
-# fields added from the picker, moved with ↑ and ↓, removed, and saved
+# The form builder in a browser: fields added from the picker, moved with
+# the up and down icon buttons (found by their names), removed, and saved
 # explicitly through the save bar; a choice field's choices added and
 # removed; and leaving with unsaved changes asks, as on every save-bar
 # screen. Nothing is written until Save.
@@ -19,8 +19,7 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
   def labels = rows.map { |row| row.find("input[name$='[label][en]']").value }
 
   def open_builder(form)
-    visit admin_form_path(form)
-    await_admin_controllers
+    visit_screen admin_form_path(form)
     assert_selector footer, text: /No unsaved changes/i
   end
 
@@ -40,6 +39,9 @@ class Admin::FormBuilderSystemTest < ApplicationSystemTestCase
     add_field "Email address", "Second address"
     add_field "Long text", "Notes"
     assert_equal [ "Your name", "Email address", "Message", "Company", "Second address", "Notes" ], labels
+
+    # An icon button's tooltip says its name, which follows the label typed.
+    assert_equal "Move “Notes” up", find("button[aria-label='Move “Notes” up'] [data-tooltip]", visible: :all).text(:all)
 
     # Found again for every press: a row moved in the document is a new node to the driver.
     5.times { |moves| find("button[aria-label='Move “Notes” up']").click; assert_equal 5 - moves, labels.index("Notes") + 1 }

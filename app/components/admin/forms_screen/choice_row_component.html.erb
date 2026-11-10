@@ -1,5 +1,5 @@
 <%= tag.li class: "flex flex-col gap-1", data: { "admin--forms--builder-target": "choice", row: choice.row, key: choice.key.presence } do %>
-  <% if (line = reference) %><p class="pl-7 text-[13px] text-meta"><%= line %></p><% end %>
+  <% if (line = reference) %><p class="pl-7 text-small text-meta"><%= line %></p><% end %>
   <div class="flex items-center gap-2">
     <span class="w-5 shrink-0 text-right text-label text-meta" aria-hidden="true" data-admin--forms--builder-target="choiceNumber"><%= number %></span>
     <%= label_tag input_id, t(".number", number: number), class: "sr-only", data: { "admin--forms--builder-target": "choiceLabel" } %>
@@ -7,9 +7,9 @@
     <%= text_field_tag name(:label, locale), choice.label[locale], id: input_id, autocomplete: "off", class: "#{setup_input_class} !mt-0 min-w-0 flex-1",
           data: { action: "input->admin--forms--builder#relabelChoice" } %>
     <% if structure? %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "↑", variant: :tertiary, size: :small, disabled: @first, aria: { label: t(".up", label: spoken_label) },
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".up", label: spoken_label), icon: :arrow_up, variant: :tertiary, size: :small, disabled: @first,
             data: { action: "admin--forms--builder#choiceUp", "admin--forms--builder-target": "choiceUp" }) %>
-      <%= render Admin::Ui::ButtonComponent.new(label: "↓", variant: :tertiary, size: :small, disabled: @last, aria: { label: t(".down", label: spoken_label) },
+      <%= render Admin::Ui::ButtonComponent.new(label: t(".down", label: spoken_label), icon: :arrow_down, variant: :tertiary, size: :small, disabled: @last,
             data: { action: "admin--forms--builder#choiceDown", "admin--forms--builder-target": "choiceDown" }) %>
       <%= render Admin::Ui::ButtonComponent.new(label: t(".remove"), variant: :danger_text, size: :small, aria: { label: t(".remove_label", label: spoken_label) },
             data: { action: "admin--forms--builder#removeChoice" }) %>

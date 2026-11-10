@@ -19,21 +19,19 @@
     <%= hidden_field_tag "form[tab]", locale, id: nil %>
 
     <% if default_tab? %>
-      <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-form">
-        <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-form" class="text-h2 text-ink"><%= t(".form_card") %></h2></div>
-        <div class="p-4" data-field-name="name">
+      <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-form", heading: t(".form_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
+        <div class="admin-field p-4" data-field-name="name">
           <%= label_tag name_id, t(".name"), class: "#{setup_label_class} mb-1" %>
           <%= text_field_tag "form[name]", draft.name, id: name_id, maxlength: Forms::Form::NAME_MAX, autocomplete: "off",
-                aria: { describedby: "#{name_id}-help #{name_id}-errors", invalid: ("true" if errors_at("name").any?) }.compact,
-                class: [ setup_input_class, ("!border-danger" if errors_at("name").any?) ] %>
+                aria: { describedby: "#{name_id}-help #{name_id}-errors", invalid: (true if errors_at("name").any?) }.compact,
+                class: setup_input_class %>
           <p id="<%= name_id %>-help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
           <%= helpers.render "admin/shared/field_errors", id: "#{name_id}-errors", messages: errors_at("name") %>
         </div>
-      </section>
+      <% end %>
     <% end %>
 
-    <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-fields">
-      <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-fields" class="text-h2 text-ink"><%= t(".fields_card") %></h2></div>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-fields", heading: t(".fields_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
       <div class="flex flex-col gap-2 p-4">
         <% if default_tab? %>
           <%= hidden_field_tag "form[field_order]", draft.rows.map(&:row).join(" "), id: "form-field-order",
@@ -52,13 +50,15 @@
         </div>
 
         <% if default_tab? %>
-          <div class="admin-block-picker flex flex-wrap items-center gap-2 rounded-cs border border-dashed border-line-strong px-3 py-2.5">
-            <span class="font-medium text-ink"><%= t(".add_field") %></span>
-            <% field_types.each do |type| %>
-              <%= render Admin::Ui::ButtonComponent.new(label: type.label, variant: :secondary, size: :small, disabled: full?,
-                    data: { action: "admin--forms--builder#add", "admin--forms--builder-type-param": type.name, "admin--forms--builder-target": "picker" }) %>
-            <% end %>
-            <p class="w-full text-[13px] text-meta" data-admin--forms--builder-target="full" <%= "hidden" unless full? %>><%= t(".max_fields") %></p>
+          <div class="admin-block-picker mt-2 rounded-tile bg-paper p-3" role="group" aria-labelledby="form-add-field-title">
+            <p id="form-add-field-title" class="text-label text-meta"><%= t(".add_field") %></p>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <% field_types.each do |type| %>
+                <%= render Admin::Ui::ButtonComponent.new(label: type.label, variant: :secondary, size: :small, disabled: full?,
+                      data: { action: "admin--forms--builder#add", "admin--forms--builder-type-param": type.name, "admin--forms--builder-target": "picker" }) %>
+              <% end %>
+            </div>
+            <p class="mt-2 text-small text-meta" data-admin--forms--builder-target="full" <%= "hidden" unless full? %>><%= t(".max_fields") %></p>
           </div>
 
           <% field_types.each do |type| %>
@@ -71,28 +71,27 @@
           </template>
         <% end %>
       </div>
-    </section>
+    <% end %>
 
-    <section class="<%= CARD_CLASS %>" aria-labelledby="form-card-after">
-      <div class="<%= CARD_HEAD_CLASS %>"><h2 id="form-card-after" class="text-h2 text-ink"><%= t(".after_card") %></h2></div>
+    <%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-card-after", heading: t(".after_card"), icon: CARD_ICON, family: CARD_FAMILY) do %>
       <div class="flex flex-col gap-4 p-4">
         <% unless default_tab? %><p class="text-sm text-meta"><%= t(".falls_back", language: default_language) %></p><% end %>
         <div>
           <%= label_tag text_id(:submit_label), t(".submit_label"), class: "#{setup_label_class} mb-1" %>
-          <% if (line = reference(:submit_label)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+          <% if (line = reference(:submit_label)) %><p class="mb-1 text-small text-meta"><%= line %></p><% end %>
           <%= text_field_tag "form[submit_label][#{locale}]", text_value(:submit_label), id: text_id(:submit_label), autocomplete: "off",
                 placeholder: t(".submit_label_placeholder"), aria: { describedby: "#{text_id(:submit_label)}-help" }, class: setup_input_class %>
           <p id="<%= text_id(:submit_label) %>-help" class="mt-1 text-sm text-meta"><%= t(".submit_label_help") %></p>
         </div>
         <div>
           <%= label_tag text_id(:thank_you), t(".thank_you"), class: "#{setup_label_class} mb-1" %>
-          <% if (line = reference(:thank_you)) %><p class="mb-1 text-[13px] text-meta"><%= line %></p><% end %>
+          <% if (line = reference(:thank_you)) %><p class="mb-1 text-small text-meta"><%= line %></p><% end %>
           <%= text_area_tag "form[thank_you][#{locale}]", text_value(:thank_you), id: text_id(:thank_you), rows: 3,
                 placeholder: t(".thank_you_placeholder"), aria: { describedby: "#{text_id(:thank_you)}-help" }, class: setup_input_class %>
           <p id="<%= text_id(:thank_you) %>-help" class="mt-1 text-sm text-meta"><%= t(".thank_you_help") %></p>
         </div>
       </div>
-    </section>
+    <% end %>
 
     <% if default_tab? %>
       <%= render Admin::FormsScreen::DestinationsComponent.new(draft: draft, locale: locale, keys: keys?, mail_settings: mail_settings,
@@ -105,6 +104,7 @@
   <% end %>
 
   <p class="sr-only" aria-live="polite" data-admin--forms--builder-target="status"></p>
-<% end %>
 
-<%= render Admin::FormsScreen::TrashZoneComponent.new(form: form, placements: placements, url_options: url_options) %>
+  <%# After the form, never inside it: the zone's button opens a dialog whose own form sends the DELETE. %>
+  <%= render Admin::FormsScreen::TrashZoneComponent.new(form: form, placements: placements, url_options: url_options) %>
+<% end %>

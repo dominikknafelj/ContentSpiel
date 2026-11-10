@@ -1526,11 +1526,13 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 :is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
 .admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
 .admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }
-/* A Translations row under the pointer is on paper, every cell of it: the
-   sticky Item cell's own surface ground is written above, so the row's
-   tint is written on its cells, after it and with the weight to win. */
+/* A Translations row and a Forms row under the pointer are on paper, every
+   cell of them: the sticky first cell's own surface ground is written above,
+   so the row's tint is written on its cells, after it and with the weight to
+   win. */
 @media (hover: hover) {
-  .admin-table-scroll .admin-translation-row:hover > :is(th, td) { background: var(--cs-paper); }
+  .admin-table-scroll .admin-translation-row:hover > :is(th, td),
+  .admin-table-scroll--x .admin-forms-table tbody tr:hover > td { background: var(--cs-paper); }
 }
 
 /* A picture in a note or a still GIF's tile
