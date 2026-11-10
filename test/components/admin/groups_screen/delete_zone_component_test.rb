@@ -44,6 +44,31 @@ class Admin::GroupsScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     assert_selector "dialog p", exact_text: "It has no members. Users themselves are not deleted.", visible: :all
   end
 
+  # A language with a `few` category (CLDR's, under `I18n::Backend::Pluralization`)
+  # is handed its `few` sentence for the members, not `one` or `other` picked by
+  # comparing with 1. A throwaway backend loads the app's locale files, takes a
+  # plural rule with `few` for 3 and a `few` branch of the sentence, and is put
+  # back afterwards.
+  test "the members' sentence follows the locale's plural rule, a few category included" do
+    backend = Class.new(I18n::Backend::Simple) { include I18n::Backend::Pluralization }.new
+    backend.store_translations(:en, i18n: { plural: { rule: ->(count) { count == 1 ? :one : (2..4).cover?(count) ? :few : :other } } })
+    backend.store_translations(:en, admin: { components: { groups_screen: { delete_zone: { dialog_body: { members_and_tokens: { few: {
+      one: "Its %{members} members (few) lose these permissions, and its 1 AI token is revoked.",
+      other: "Its %{members} members (few) lose these permissions, and its %{count} AI tokens are revoked."
+    } } } } } } })
+    original = I18n.backend
+    I18n.backend = backend
+    group = AccessControl::Group.create!(name: "Bots")
+
+    zone(group, members: 3, tokens: [ token("Sync", users(:reader)) ])
+    assert_selector "dialog p", exact_text: "Its 3 members (few) lose these permissions, and its 1 AI token is revoked.", visible: :all
+
+    zone(group, members: 5, tokens: [ token("Deploy", users(:reader)) ])
+    assert_selector "dialog p", text: "Its 5 members lose these permissions, and its 1 AI token is revoked.", visible: :all
+  ensure
+    I18n.backend = original if original
+  end
+
   test "a custom group: the effect in words, a danger-text trigger, and the dialog with the solid danger confirm" do
     group = AccessControl::Group.create!(name: "Bots")
     zone(group, members: 2, tokens: [ token("Deploy", users(:reader)) ])

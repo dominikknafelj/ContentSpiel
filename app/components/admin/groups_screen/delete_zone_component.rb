@@ -42,18 +42,25 @@ module Admin
       # tokens.
       def effect = "#{t(".members", count: member_count)} #{t(".tokens", count: token_count)}"
 
-      # One whole sentence per shape. A key is pluralised on one count, so
-      # for the sentence with both this method picks the members' category
-      # by hand (`one` for 1, `other` otherwise) and I18n pluralises on the
-      # tokens'. HAZARD: that is right only under Rails' own one/other rule
-      # (docs/reference/i18n.md); once CLDR plural rules are added (the
-      # rails-i18n gem), a language with `few` or `many` is handed the wrong
-      # sentence here, and this choice must go through the plural rules.
+      # One whole sentence per shape. A key is pluralised on one count, so the
+      # sentence with both is nested: its outer level is the members' plural
+      # category, its inner one the tokens', which `t` pluralises.
       def dialog_body
         return t(".dialog_body.no_members", count: token_count) if member_count.zero?
         return t(".dialog_body.members_only", count: member_count) if token_count.zero?
 
-        t(".dialog_body.members_and_tokens.#{member_count == 1 ? 'one' : 'other'}", count: token_count, members: member_count)
+        t(".dialog_body.members_and_tokens.#{members_category}", count: token_count, members: member_count)
+      end
+
+      # The members' category is the I18n backend's own choice, made by asking
+      # it to pluralise the outer level on the members' count and reading back
+      # which branch it answered: whatever rule the backend applies to every
+      # other `count` (Rails' one/other, or a locale's `i18n.plural.rule` under
+      # `I18n::Backend::Pluralization`, with its `few` and `many`) applies here
+      # too, and a language's file decides which branches it has.
+      def members_category
+        key = "admin.components.#{self.class.translation_scope}.dialog_body.members_and_tokens"
+        I18n.t(key).key(I18n.t(key, count: member_count))
       end
     end
   end
