@@ -48,7 +48,7 @@ Every look the artifact does not decide is a question in `.superpowers/7b-design
 
 ---
 
-## Design answers (assumed, pending the owner)
+## Design answers (decided by the design agent, 2026-11-10)
 
 The questions file holds Q1–Q11, each with a recommended answer. **Until the owner answers, each step that depends on a question is marked "(per Qn, recommended answer assumed)".** An answer that differs from the recommendation is written back into this section, and into each step it changes, before that task starts. In short:
 
@@ -676,7 +676,7 @@ The artifact's decisions, taken without a question (listed in the questions file
 
 ---
 
-### Task 12: The mails, a reduced E4 (decision 5; Q11, recommended answer assumed)
+### Task 12: The mails, a reduced E4 (decision 5; Q11, decided)
 
 **Files:**
 - Modify `app/views/mails/_button.html.erb`: the link's style is `display:inline-block;padding:12px 20px;background:#6236d9;color:white;text-decoration:none;border-radius:8px;font-weight:600;`. Nothing else changes, and the address line under it stays `dimgray`.
