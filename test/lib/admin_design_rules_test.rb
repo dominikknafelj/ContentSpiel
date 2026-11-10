@@ -30,22 +30,18 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # - `rgb(` / `rgba(` / `hsl(` / `hsla(`.
   RAW_COLOUR = /(?<![\w#&\/-])#(?:\h{8}|\h{6}|\h{3,4})(?![\w-])|\b(?:rgb|hsl)a?\(/
 
-  # Any `dark:` variant -- `dark:bg-…`, an arbitrary `dark:[…]`, a stacked
-  # `dark:hover:bg-…` or `hover:dark:bg-…` -- except `dark:scheme-dark`, the
-  # one place the theme is handed to the browser's own controls. Tokens
-  # already switch with the theme, so a `dark:` class is always a second,
-  # diverging source of colour. A variant is followed by a utility; prose
-  # about the rule ("no `dark:` variants") is not.
-  # The mails: the layout, the button and each mailer's views. A mail has no
+  # The mails: the mailer layout, the button and every mailer's views
+  # (`app/views/*_mailer`, so a new mailer's are read too). A mail has no
   # tokens and a client reads no stylesheet, so its colours are named CSS
   # colours written inline, with one exception: the button's violet,
   # `MAIL_ACCENT`, which is `--cs-accent`'s light value (a mail has no dark
   # scheme). The exception admits that spelling and no other, in a mail
   # source alone.
-  MAIL_SOURCES = %w[
-    app/views/layouts/mailer.html.erb app/views/mails app/views/forms_mailer app/views/invites_mailer app/views/passwords_mailer app/views/system_mailer
-  ].freeze
+  MAIL_SOURCES = (Dir[Rails.root.join("app/views/layouts/mailer.*")] + Dir[Rails.root.join("app/views/{mails,*_mailer}")].select { |path| File.directory?(path) })
+    .map { |path| Pathname(path).relative_path_from(Rails.root).to_s }.sort.freeze
   MAIL_ACCENT = "#6236d9".freeze
+  # The violet as a whole literal: `#6236d9ff` is another colour, and stays caught.
+  MAIL_ACCENT_LITERAL = /#{MAIL_ACCENT}(?!\h)/
   MAIL_FILES = MAIL_SOURCES.flat_map do |source|
     path = Rails.root.join(source)
     path.file? ? [ path.to_s ] : Dir[path.join("**/*.erb")]
@@ -54,10 +50,16 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A line's raw colour literals, after a mail source's one admitted value
   # is taken out of it.
   def raw_colours(line, mail:)
-    line = line.gsub(MAIL_ACCENT, "") if mail
+    line = line.gsub(MAIL_ACCENT_LITERAL, "") if mail
     line.scan(RAW_COLOUR)
   end
 
+  # Any `dark:` variant -- `dark:bg-…`, an arbitrary `dark:[…]`, a stacked
+  # `dark:hover:bg-…` or `hover:dark:bg-…` -- except `dark:scheme-dark`, the
+  # one place the theme is handed to the browser's own controls. Tokens
+  # already switch with the theme, so a `dark:` class is always a second,
+  # diverging source of colour. A variant is followed by a utility; prose
+  # about the rule ("no `dark:` variants") is not.
   DARK_VARIANT = /(?<![\w-])dark:(?!scheme-dark(?![\w-]))[a-z\[!-]/
 
   # The one file allowed a `dark:` variant: the public site's footer toggle
@@ -89,6 +91,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       root = Rails.root.join("app", directory).to_s
       assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
+    mailers = Dir[Rails.root.join("app/mailers/*_mailer.rb")].map { |path| File.basename(path, ".rb") } - %w[application_mailer]
+    mailers.each { |mailer| assert_includes MAIL_SOURCES, "app/views/#{mailer}", "#{mailer}'s views are read by the colour rule" }
+    assert_includes MAIL_SOURCES, "app/views/mails"
+    assert_includes MAIL_SOURCES, "app/views/layouts/mailer.html.erb"
     MAIL_SOURCES.each do |source|
       root = Rails.root.join(source).to_s
       assert MAIL_FILES.any? { |path| path == root || path.start_with?("#{root}/") }, "#{source} has no .erb file: the colour rule looks at nothing there"
@@ -106,7 +112,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     assert_empty raw_colours("background:#{MAIL_ACCENT};", mail: true), "the violet is admitted in a mail source"
     assert_equal [ MAIL_ACCENT ], raw_colours("background:#{MAIL_ACCENT};", mail: false), "and refused in CS Studio's"
-    [ "background:#6236DA;", "color:#000;" ].each do |sample|
+    [ "background:#6236DA;", "color:#000;", "background:#6236d9ff;" ].each do |sample|
       assert_not_empty raw_colours(sample, mail: true), "#{sample} is refused in a mail source"
     end
   end

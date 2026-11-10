@@ -14,7 +14,6 @@ module MailButton
     assert_equal 1, link.size, "one link in the mail"
     link = link.first
     assert_equal BUTTON_STYLE, link["style"], "the button is the violet with white words and an 8px radius"
-    assert_not_includes link["style"], "shadow"
 
     address = link.parent.next_element
     assert_equal "p", address&.name, "the address is the paragraph after the button"
