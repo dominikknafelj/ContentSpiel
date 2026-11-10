@@ -40,4 +40,37 @@ class Admin::Ui::ActionZoneComponentTest < ViewComponent::TestCase
     assert_includes page.find("section")[:class].split, "mt-6"
     assert_includes page.find("section")[:class].split, "border-t"
   end
+
+  # The media panel's zone: a narrow column with no heading, so the section
+  # is named by the trigger's words, the cost line stands first and the
+  # trigger wraps under it at the start.
+  test "with no heading the section is named by its label, the cost line comes first and the trigger stands under it at the start" do
+    render_inline(Admin::Ui::ActionZoneComponent.new(label: "Move to trash", body: "Kept in the trash for 30 days.", body_id: "zone-help")) do |zone|
+      zone.with_trigger { "<button type=\"button\" aria-describedby=\"zone-help\">Move to trash…</button>".html_safe }
+    end
+
+    section = page.find("section[aria-label='Move to trash']")
+    assert_nil section[:"aria-labelledby"]
+    assert_no_selector "h2, h3"
+    classes = section[:class].split
+    %w[admin-action-zone flex flex-col items-start border-t border-line pt-4].each { |utility| assert_includes classes, utility }
+    assert_not_includes classes, "justify-between"
+    assert_selector "section p#zone-help.text-small.text-dim", text: "Kept in the trash for 30 days."
+    assert page.find("section > :first-child").matches_css?("div"), "the cost line stands before the trigger"
+    assert_selector "section > button:last-child", text: "Move to trash…"
+  end
+
+  test "with no cost line the zone is the rule and the trigger" do
+    render_inline(Admin::Ui::ActionZoneComponent.new(label: "Move to trash")) do |zone|
+      zone.with_trigger { "<button type=\"button\">Move to trash…</button>".html_safe }
+    end
+
+    assert_selector "section[aria-label='Move to trash'].border-t > button", text: "Move to trash…"
+    assert_no_selector "section p"
+  end
+
+  test "a zone is named by a heading or a label, never by neither" do
+    assert_raises(ArgumentError) { Admin::Ui::ActionZoneComponent.new(body: "B") }
+    assert_raises(ArgumentError) { Admin::Ui::ActionZoneComponent.new(heading: "H", body: "B") }
+  end
 end

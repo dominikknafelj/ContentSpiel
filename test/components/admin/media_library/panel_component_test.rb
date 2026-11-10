@@ -85,7 +85,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
       assert_equal "true", row.find(:xpath, "./span")["aria-hidden"], "the chip is hidden from a screen reader: the row's words name the kind"
       assert_selector "#media-panel li[data-used-on='#{kind}'] > a", text: title
     end
-    trash = page.find("#media-panel > div:last-child")
+    trash = page.find("#media-panel > section.admin-action-zone:last-child")
     assert_equal %w[border-line border-t], trash[:class].split.grep(/\Aborder/).sort
 
     html = rendered_content
@@ -210,6 +210,26 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_selector "#media-trash-help.text-dim", text: "In use on 1 page. Remove it there first."
     assert_selector "#media-trash-help a[href='#media-used-on']", text: "See where it's used"
     assert_selector "#media-used-on"
+  end
+
+  # The shared zone with no heading: named by the trigger's words, the cost
+  # line first in `text-small text-dim`, the trigger under it, and the
+  # confirm dialog after the zone, outside it.
+  test "Move to trash is the shared action zone with no heading, in use and not" do
+    asset = create_media_asset
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en")
+
+    assert_selector "section.admin-action-zone[aria-label='Move to trash'][data-zone=trash] > div > p#media-trash-help.text-small.text-dim"
+    assert_selector "section[data-zone=trash] > button[aria-describedby='media-trash-help']", text: "Move to trash…"
+    assert_no_selector "section[data-zone=trash] h2, section[data-zone=trash] h3"
+    assert_no_selector "section[data-zone=trash] dialog", visible: :all
+    assert_selector "section[data-zone=trash] + dialog", visible: :all
+
+    Pages::Save.call(create_page(title: "Hero page"), attributes: { hero_media_asset_id: asset.id })
+    render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en")
+
+    assert_selector "section[data-zone=trash] > div > p#media-trash-help.text-small.text-dim a[href='#media-used-on']", text: "See where it's used"
+    assert_selector "section[data-zone=trash] > button[disabled][aria-describedby='media-trash-help']", text: "Move to trash…"
   end
 
   test "an image used in several places counts them" do
