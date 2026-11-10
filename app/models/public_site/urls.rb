@@ -133,17 +133,34 @@ module PublicSite
       self
     end
 
-    # Reads the current paths of `records` in `locale` in one statement and
-    # keeps them for `path_for` (nil for a record that has none), so a list
-    # drawn as links costs one read for its addresses and not one per link.
-    # Records of several types are read type by type. Answers self.
+    # Reads the current paths of `records` in one statement and keeps them for
+    # `path_for` (nil for a record that has none), so a list drawn as links
+    # costs one read for its addresses and not one per link. Records of
+    # several types are read type by type. Answers self.
+    #
+    # The statement answers every language's path at once, so all are kept:
+    # `locale` and every enabled language. A list prefetched for the language
+    # shown then also answers `paths_by_language` of any record in it without
+    # a read of its own.
     def prefetch(records, locale = I18n.locale)
+      codes = [ locale.to_s ] | Locales.enabled
       records.group_by { |record| record.class.polymorphic_name }.each do |type, group|
         ids = group.map(&:id)
         paths = PublicSite::Paths.current_paths(type, ids)
-        ids.each { |id| @paths[[ group.first.class.name, id, locale.to_s ]] = paths.dig(id, locale.to_s) }
+        ids.each { |id| codes.each { |code| @paths[[ group.first.class.name, id, code ]] = paths.dig(id, code) } }
       end
       self
+    end
+
+    # `{ locale => address }` of `record` in each enabled language that gives
+    # it one, in the enabled languages' order: the head's alternates and the
+    # language switcher. One statement for all the languages (`prefetch`), and
+    # none when they are known already.
+    def paths_by_language(record)
+      return {} if record.nil?
+
+      prefetch([ record ]) unless Locales.enabled.all? { |code| @paths.key?([ record.class.name, record.id, code ]) }
+      Locales.enabled.filter_map { |code| (path = path_for(record, code)) && [ code, path ] }.to_h
     end
 
     # The address made of a path ALREADY READ from `public_paths` (several
@@ -159,7 +176,7 @@ module PublicSite
     end
 
     def alternates(record)
-      Locales.enabled.filter_map { |locale| (url = url_for(record, locale)) && [ locale, url ] }.to_h
+      paths_by_language(record).transform_values { |path| "#{@host}#{path}" }
     end
 
     # An explicit prefix naming the current default language: that URL has an

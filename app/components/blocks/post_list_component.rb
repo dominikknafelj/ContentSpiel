@@ -53,12 +53,20 @@ module Blocks
     # A visitor's list is what is published (`Publishing::Listing`): posts
     # rebuilt from their copies, chosen by their published tags. The preview
     # lists the rows, as it always did. Either way the list components get
-    # something they can walk and take the first of.
+    # an array they can walk and take the first of.
+    #
+    # The posts' addresses are read here, all at once
+    # (`PublicSite::Urls#prefetch`): every list template links its posts
+    # through `post_url_path`, which would otherwise read one address per post.
     def posts(settings)
+      listed(settings).tap { |posts| helpers.public_urls.prefetch(posts) }
+    end
+
+    def listed(settings)
       return Publishing::Listing.posts(block, limit: settings.limit) unless helpers.public_urls.preview? # public: rows (the list is chosen by Publishing::Listing; the line only names that call)
 
       rows = block.listed_posts.order(published_at: :desc).includes(:tags) # public: rows (the preview shows the working version)
-      settings.limit.present? ? rows.limit(settings.limit) : rows
+      (settings.limit.present? ? rows.limit(settings.limit) : rows).to_a
     end
   end
 end

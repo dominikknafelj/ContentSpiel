@@ -298,8 +298,7 @@ module ThemeHelper
   def language_links(record)
     return [] if record.nil?
 
-    ::Locales.enabled.filter_map do |code|
-      path = public_urls.path_for(record, code) or next
+    public_urls.paths_by_language(record).map do |code, path|
       LanguageLink.new(code:, name: ::Locales.name(code, native: true), path:, current: code == I18n.locale.to_s)
     end
   end
