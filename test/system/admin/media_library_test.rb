@@ -492,7 +492,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_no_text "Content missing"
   end
 
-  # Review Focus 1: Escape belongs to the innermost thing that takes it.
+  # Escape belongs to the innermost thing that takes it.
   test "Escape closes the rail and puts the focus on the tile; Escape in the alt field, in the notes' composer or in the trash dialog does not, and the alt text typed is saved" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset.tap { |record| record.update!(title: "Escape image") }
@@ -525,7 +525,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_alt_eventually(asset, :en, "Kept while Escape is pressed")
   end
 
-  # Review Focus 2: the library's own width decides, not the window's.
+  # The library's own width decides, not the window's.
   test "the library docks the rail at 1200px of its own width, keeps the 340px card from 760px and stacks under the grid below; the notes frame is in the page once" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     asset = create_media_asset.tap { |record| record.update!(title: "Wide image") }
