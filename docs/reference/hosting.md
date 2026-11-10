@@ -6,7 +6,7 @@ Spec: `docs/superpowers/specs/2026-10-12-safe-on-a-public-address-design.md` (it
 
 ## What a host sets
 
-Eight variables, and seven more for outgoing mail. None is required for the application to start outside production; in production `SECRET_KEY_BASE` (or a secret in the credentials) is.
+The variables below say what the site is and where it is; outgoing mail takes seven more, and the encryption keys, the database's password and the log level are in "Every variable the code reads", below, which lists every variable the code reads with who sets it, its default and whether it is a secret. None is required for the application to start outside production; in production `SECRET_KEY_BASE` (or a secret in the credentials) is.
 
 | Variable | What it does | Without it |
 |---|---|---|
@@ -28,6 +28,50 @@ Eight variables, and seven more for outgoing mail. None is required for the appl
 `config/deploy.yml` holds `PUBLIC_HOST` as a commented line under `env.clear`, with a placeholder address, and the comment at its proxy section says to uncomment it: a Kamal deploy from the file as it stands still answers any host and forces nothing (the final review found the comment pointing at an entry that was not there; the roadmap lists what is left).
 
 **Why the address is a variable and not a setting.** Which hosts are refused and whether HTTPS is forced are decided while the application starts, before the database is read, and a wrong value typed into a Settings screen would refuse every request with no screen left to correct it on. A wrong variable is corrected where it was set, and the boot stops on a value that is not an address. The wizard (part four) will show the value read-only and say where it comes from.
+
+## Every variable the code reads
+
+Every variable read under `app`, `config` and `lib`, and nothing else; `db/` is left out on purpose, because a migration's switch (`FORCE_DROP_ACTION_TEXT` for `DropActionText`) is for the person running that one migration and never something a host sets. **Who** is who sets it: the host (the site's environment, `config/deploy.yml`'s `env`), the image's build, a tool, or a person running a task. A **secret** is never printed, logged or rendered. `test/lib/environment_variables_test.rb` reads the code for every name read from `ENV` (by `[]`, `fetch`, `key?`, `include?`, `has_key?`, `member?`, `values_at` or `slice`, with or without parentheses) or from an `env` handed in for tests, and fails on a name this table does not list, and on a row nothing reads ("every variable the code reads is listed in the hosting reference, and every listed one is read"); a read through a name held in a constant is named by its line in that test's `INDIRECT`, and any other method called on `ENV` fails ("ENV is read only in the forms this test sees").
+
+| Variable | Who | Default, and what it does | Secret |
+|---|---|---|---|
+| `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` | host | With the two below, the Active Record encryption keys (`config/application.rb`), which seal the AI key, the mail login and form answers. Without them, the credentials' `active_record_encryption.*`; with neither, a save of a key or a login answers that the site has no encryption keys, and forms take no answers. **An env var that is set wins for that key alone, so keep all three in one place**, and keep them once set: losing them makes what they sealed unreadable (`docs/reference/translations.md`, "Active Record encryption keys"). Development and test set fixed keys of their own. | yes |
+| `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` | host | As above. | yes |
+| `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | host | As above. | yes |
+| `ADMIN_PATH` | host | `cs-studio`. Where CS Studio and the sign-in are (`config/initializers/admin_path.rb`), read when the application starts. | no |
+| `ASSUME_SSL` | host | Unset. `1`, and no other value, counts every request as HTTPS ("What a host sets"). | no |
+| `BUNDLE_GEMFILE` | Bundler | The application's `Gemfile` (`config/boot.rb` sets it when unset). | no |
+| `CI` | the CI runner | Unset. Set, the test environment eager-loads the application, as production does. | no |
+| `CONFIRM` | a person | Unset. `CONFIRM=1 bin/rails media:orphans` purges the blobs it otherwise only lists. | no |
+| `CONTENT_SPIEL_DATABASE_PASSWORD` | host | None. The password of the production role `content_spiel` for all four databases (`config/database.yml`). Production names no database host: libpq's `PGHOST` (below) says where they are. | yes |
+| `JOB_CONCURRENCY` | host | `1`. Processes of the `default` job worker (`config/queue.yml`; "Jobs and images", above). | no |
+| `KAMAL_VERSION` | Kamal | Set by Kamal in every container it starts, to the deployed git revision. Names the code's revision in the public render cache's keys (`RichText.code_revision`), so a deploy draws again; without it the `REVISION` file, and without that a value of the boot's own. | no |
+| `MAIL_SENDER_ADDRESS` | host | Unset. Overrides Settings → Mail's sender address ("Outgoing mail", above; `docs/reference/mail.md`). | no |
+| `MAIL_SENDER_NAME` | host | Unset. Overrides the sender name. | no |
+| `MAIL_SMTP_PASSWORD` | host | Unset. Overrides the mail login's password. | yes |
+| `MAIL_SMTP_PORT` | host | Unset. Overrides the server's port. | no |
+| `MAIL_SMTP_SECURITY` | host | Unset. `starttls`, `tls`, or `none` for a relay without a login. | no |
+| `MAIL_SMTP_SERVER` | host | Unset. Overrides the mail server. | no |
+| `MAIL_SMTP_USERNAME` | host | Unset. Overrides the mail login's user name. | yes |
+| `OTEL_CONSOLE` | host, a developer | Unset. `1` prints every span ("Telemetry"). | no |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | host | Unset. Where spans are sent. | no |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | host | Unset. The traces' own endpoint, ahead of the one above. | no |
+| `OTEL_LOG_LEVEL` | host | `WARN`. The OpenTelemetry SDK's own log. | no |
+| `OTEL_SERVICE_NAME` | host | `contentspiel`. The service's name on every span. | no |
+| `PIDFILE` | host | Unset: Puma writes no pid file. | no |
+| `PORT` | host | `3000`. The port Puma listens on (the image's Thruster sits in front of it). | no |
+| `PUBLIC_HOST` | host | Unset. The site's address ("What a host sets", "The site's address"). | no |
+| `RAILS_ENV` | host, Rails | Rails' own. The image sets `production`; read here too, so the test environment ignores `THEME_PATH`. | no |
+| `RAILS_LOG_LEVEL` | host | `info` in production. **Keep it at `info` or above**: at `debug` Rails logs every mail whole, a reset or invite link with its token included, and the boot warns so (`HostSettings.log_level_warning`). | no |
+| `RAILS_MAX_THREADS` | host | Puma's threads per process, `3` (`config/puma.rb`), and each database's pool, `5` (`config/database.yml`); set, both are the value. | no |
+| `SECRET_KEY_BASE` | host | None: production does not start without it or a secret in the credentials. Signs sessions and tokens. | yes |
+| `SECRET_KEY_BASE_DUMMY` | the image's build | Unset. Set by a build's `assets:precompile` and `theme:check`, it starts production without the secret and without the stylesheet's stamp. Never on a running site. | no |
+| `SETUP_TOKEN` | host | Derived from `secret_key_base`, and printed to the boot log while setup is not complete. The code `/setup` asks for. | yes |
+| `SOLID_QUEUE_IN_PUMA` | host | Unset: no job runs unless `bin/jobs` runs somewhere. Any value runs the jobs inside Puma ("Jobs and images"). | no |
+| `THEME_NEW_PATH` | a person | Unset. The folder `theme:new` writes to when the path cannot go in the task's brackets (`docs/reference/theming.md`). | no |
+| `THEME_PATH` | host, the image's build | Unset: the default theme. The site's theme folder ("The theme"). | no |
+
+**Read by Rails, a gem or the image, not by this code**, and so not held by the test: `RAILS_MASTER_KEY` (opens the credentials, where the secret and the encryption keys may live instead); `DATABASE_URL` and `CACHE_DATABASE_URL`, `QUEUE_DATABASE_URL`, `CABLE_DATABASE_URL` (Rails merges each over its database's entry; `DATABASE_URL` moves the primary alone); libpq's `PGHOST`, `PGPORT` and the rest of `PG*` (production's entries name no host, so `PGHOST` is how a site reaches its four databases, and `PGGSSENCMODE`, which development and test set as `gssencmode` in `config/database.yml`); `WEB_CONCURRENCY` (Puma's worker processes, default one); Thruster's `MAX_REQUEST_BODY`, `CACHE_SIZE`, `MAX_CACHE_ITEM_SIZE` and `X_SENDFILE_ENABLED` ("Images and the proxies in front of the site"); and `BOOTSNAP_READONLY` and `CONTENTSPIEL_UPGRADE_VERSION`, which are `bin/contentspiel`'s.
 
 ## The site's address: `SiteAddress`
 

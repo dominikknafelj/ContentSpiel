@@ -103,6 +103,21 @@ SiteSetting.instance.tap do |settings|
   settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end
 
+# A new site starts with English alone (the column's default); the
+# development site has German and Spanish on too, so a change is seen with a
+# default language and two others. Only on a database with no content yet,
+# which is the one this run builds the demo on: a site that already has pages
+# or posts keeps the languages it has, so a seed run again (for the showcase,
+# or by `contentspiel dev`) never turns back on a language someone turned
+# off. Turned on before any content is written, through the service Settings
+# uses.
+if Page.none? && Post.none?
+  %w[de es].each do |code|
+    enabled = Locales::Enable.call(code)
+    raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
+  end
+end
+
 # Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of
 # JSON"), written here as Markdown and converted the same way MCP's `body`
 # is -- a `::youtube{id="..."}` directive becomes a `youtube` node, which
@@ -199,6 +214,11 @@ if root.hero_media_asset_id.blank?
   hero_result = Pages::Save.call(root, attributes: { hero_media_asset_id: upload_result.record.id })
   raise "seeds: #{hero_result.errors.to_sentence}" unless hero_result.ok?
 end
+
+# Every block type, in every layout and band, under /showcase
+# (db/seeds/showcase.rb), drawn with the library image the hero above uses.
+require_relative "seeds/showcase"
+DevelopmentShowcase.call(root: root, image: root.reload.hero_media_asset)
 
 # The public site draws a page's or post's published copy, and a page's copy
 # was taken when it was published, before its blocks and hero were added
