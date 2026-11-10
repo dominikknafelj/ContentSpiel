@@ -9,13 +9,13 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794314638-99fe".freeze
+  VERSION = "1794323670-cff3".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
     ActionZone ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FormControls
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
-    GroupFields IconChip ImageField ImageLoading ListState Mails Menu NoteMarker PasswordField PresenceMarker
+    GroupFields IconChip ImageField ImageLoading ListState Mails MediaPicker Menu NoteMarker PasswordField PresenceMarker
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
@@ -71,10 +71,7 @@ module DesignSystemEntries
   }.freeze
 
   # A component no card's "Code" section names yet, with the reason.
-  NOT_YET = {
-    "Admin::Ui::MediaPickerComponent" => "No card draws the picker's dialog (its title, Upload and Close, the library in miniature, " \
-      "and the footer's selection, Cancel and Use image): StudioMediaGrid describes its tiles and Dialog names it as a use, and neither card's Code names it."
-  }.freeze
+  NOT_YET = {}.freeze
 
   # The card of a component (a class or its name): its `COVERED_BY` card,
   # else its own name less `Component` when that is a card, else nil.
