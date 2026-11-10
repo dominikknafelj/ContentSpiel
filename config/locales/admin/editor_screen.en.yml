@@ -6,6 +6,14 @@ en:
   admin:
     components:
       editor_screen:
+        # The bar of a refused autosave (`ChangedElsewhereComponent`), whole in
+        # each shape: someone else's change, the viewer's own other tab, and
+        # nobody named.
+        changed_elsewhere:
+          by_html: "Changed by %{name} %{time}. Your text is still here so you can copy it; reloading shows the latest version."
+          own_html: "Changed in another tab or window %{time}. Your text is still here so you can copy it; reloading shows the latest version."
+          message: "Changed elsewhere. Your text is still here so you can copy it; reloading shows the latest version."
+          reload: "Reload"
         # A block's form drawn as the open panel of a section. The rest of the
         # block card is not converted yet. The panel's heading is
         # `editor_screen.panel_title`. `move_into` is the one item of a

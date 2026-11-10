@@ -9,12 +9,13 @@ en:
       show:
         title: "Settings"
         heading: "Settings"
-        # The 409 banner (`admin/shared/_stale_banner`): `lead` is followed by
-        # who changed the settings and when; `message` is the whole banner
-        # when the audit log names nobody.
+        # The 409 banner (`admin/shared/_stale_banner`), whole in each shape:
+        # someone else's change, the viewer's own other tab, and nobody named.
         stale:
-          lead: "Settings were changed"
+          by_html: "Settings were changed by %{name} %{time}. Reload to see the latest — your changes are still in the form."
+          own_html: "Settings were changed in another tab or window %{time}. Reload to see the latest — your changes are still in the form."
           message: "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form."
+          reload: "Reload"
       saved: "Settings saved"
       # The Remove dialog of the AI card's key (`_ai_key_forms`).
       ai_key_forms:

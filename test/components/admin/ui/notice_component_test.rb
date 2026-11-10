@@ -64,9 +64,9 @@ class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
     assert_selector "div[role=status] > div.rounded-card.bg-ok-tint.text-ok-ink:not([role])", text: "Test mail sent to ada@example.com. Check your inbox.", count: 1
 
     render_in_view_context do
-      render "admin/shared/stale_banner", message: "This was changed elsewhere.", lead: "This was changed", change: nil, reload_path: "/cs-studio/settings"
+      render "admin/shared/stale_banner", words: "admin.settings.show.stale", change: nil, reload_path: "/cs-studio/settings"
     end
-    assert_selector "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", text: "This was changed elsewhere.", count: 1
+    assert_selector "div[role=alert].rounded-card.border-warn.bg-warn-tint.text-warn-ink", text: "Settings were changed elsewhere since you opened this screen.", count: 1
     assert_selector "div[role=alert] a[href='/cs-studio/settings'][data-save-bar-cancel][data-turbo-frame=content]", text: "Reload"
   end
 

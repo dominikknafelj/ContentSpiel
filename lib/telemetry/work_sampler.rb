@@ -4,7 +4,7 @@ module Telemetry
   #
   # Production runs Solid Cable on Postgres and Solid Queue inside Puma, and
   # both poll their tables from threads of their own. Solid Cable's listener
-  # asks for new messages every 0.1 seconds (`polling_interval` in
+  # asks for new messages every 0.25 seconds (`polling_interval` in
   # config/cable.yml), Solid Queue's worker asks for ready jobs and its
   # processes write a heartbeat, and every one of those statements is a span
   # of the Active Record instrumentation, which makes a span whether or not

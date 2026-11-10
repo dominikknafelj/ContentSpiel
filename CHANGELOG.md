@@ -6,6 +6,7 @@
 
 - A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
 - The development seed (`contentspiel dev`, `bin/rails db:seed`) builds `/showcase`, a new top-level page of the development site: every block type at the top level and in a section of every layout and band, every Note kind, a long table, every list and a link to the 404 page. On a database with no content yet it also turns German and Spanish on; a seed run again leaves the site's languages as they are.
+- Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
 
 ### Migrations
 

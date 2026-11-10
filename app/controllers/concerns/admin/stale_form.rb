@@ -24,9 +24,6 @@ module Admin
   # services' job (`Groups::Save` touches its members, `Users::Save` its groups,
   # and so on), not this concern's.
   module StaleForm
-    # The second sentence of every stale banner, named or not.
-    STALE_ADVICE = "Reload to see the latest — your changes are still in the form.".freeze
-
     private
 
     def stale_form?(record, base)
@@ -48,7 +45,7 @@ module Admin
     # banner to name: `Audit::ChangeSince`, the rule the autosaving editors' bar
     # uses (someone else's newest change preferred, the viewer's own other tab
     # said as such, nil when no event after the base names this record -- then
-    # the banner is the screen's plain `STALE_MESSAGE`). Call it only after
+    # the banner is the screen's plain `message`). Call it only after
     # `stale_form?` answered true: the base is parseable then.
     def render_stale(template, record)
       @stale_form = true
