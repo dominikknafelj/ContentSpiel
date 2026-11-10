@@ -19,9 +19,14 @@ class SeedsTest < ActiveSupport::TestCase
       Rails.singleton_class.alias_method :_original_env, :env
       Rails.singleton_class.define_method(:env) { development_env }
 
+      # A new site has English alone; the seed of an empty database turns
+      # German and Spanish on before it writes the demo.
+      site_settings(:default).update_columns(locales: [ { "code" => "en" } ])
       assert_difference "User.count", 1 do
         TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
+      assert_equal %w[en de es], SiteSetting.instance.reload.locale_codes
+      assert_equal "about", Page.i18n.where(slug: "about").first.slug(locale: "de")
       # The homepage, four pages of the demo, and the showcase with its seven.
       assert_equal 13, Page.count
       assert_equal 5, Post.count
@@ -46,9 +51,12 @@ class SeedsTest < ActiveSupport::TestCase
       integration.get PublicSite::Urls.new.path_for(post, :en)
       assert_includes Nokogiri::HTML(integration.response.body).at_css("main").text, "Widgets Inc's customer-facing API"
 
+      # A site with content keeps its languages: Spanish, turned off, stays off.
+      site_settings(:default).reload.update_columns(locales: [ { "code" => "en" }, { "code" => "de" } ])
       assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count", "ContentBlock.count" ] do
         TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
+      assert_equal %w[en de], SiteSetting.instance.reload.locale_codes
     ensure
       Rails.singleton_class.remove_method :env
       Rails.singleton_class.alias_method :env, :_original_env

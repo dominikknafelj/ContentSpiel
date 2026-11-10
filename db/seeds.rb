@@ -105,11 +105,17 @@ end
 
 # A new site starts with English alone (the column's default); the
 # development site has German and Spanish on too, so a change is seen with a
-# default language and two others. Turned on before any content is written,
-# through the service Settings uses; a language already on is left alone.
-%w[de es].each do |code|
-  enabled = Locales::Enable.call(code)
-  raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
+# default language and two others. Only on a database with no content yet,
+# which is the one this run builds the demo on: a site that already has pages
+# or posts keeps the languages it has, so a seed run again (for the showcase,
+# or by `contentspiel dev`) never turns back on a language someone turned
+# off. Turned on before any content is written, through the service Settings
+# uses.
+if Page.none? && Post.none?
+  %w[de es].each do |code|
+    enabled = Locales::Enable.call(code)
+    raise "seeds: #{enabled.errors.to_sentence}" unless enabled.ok?
+  end
 end
 
 # Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of
