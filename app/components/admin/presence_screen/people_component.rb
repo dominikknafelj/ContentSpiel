@@ -64,8 +64,8 @@ module Admin
       # circle's too;
       # `wrapper`: the element's place in its row -- the header's action row
       # has a gap of 8px and the people stand 12px before the saved status;
-      # in the panel's file-name row they never give way
-      # and `mt-[3px]` centres their 22px on the name's first line
+      # in the Image panel's title row they never give way
+      # and `mt-[3px]` centres their 22px on the title's first line
       # of 28px in a row that is aligned to its top; `hang`: the
       # edge the list hangs from.
       Size = Data.define(:shown, :narrow, :avatar, :wrapper, :hang)

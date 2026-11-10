@@ -772,6 +772,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/media_library/*
     app/views/admin/media/*
     app/components/media/picker_component.*
+    app/components/admin/notes_screen/media_section_component.*
     app/components/admin/trash_screen/*
     app/views/admin/trash/*
     app/components/admin/translation_screen/matrix_component.*
