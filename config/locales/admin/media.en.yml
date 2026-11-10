@@ -9,7 +9,9 @@ en:
         upload: "Upload images"
         hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
         drop: "Drop images to upload"
-        # The rail of the chosen image: its own tab, and its Close's name and tooltip.
+        # The rail of the chosen image: its tablist's name, its own tab, and its
+        # Close's name and tooltip.
+        rail_label: "Image details"
         image_tab: "Image"
         close: "Close panel"
       # `Media::PickerComponent`, the Media screen's dialog that every image

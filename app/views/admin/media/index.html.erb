@@ -108,7 +108,7 @@
     <% tooltip = Admin::Ui::TooltipComponent.host_data %>
     <%= tag.div id: rail_id, class: "admin-media-rail", data: { controller: "admin--ui--rail", action: "keydown.esc->admin--media--panel#escape admin--ui--rail:reveal->admin--ui--rail#reveal" } do %>
       <%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, tabs: [ Admin::Ui::RailTabsComponent::Tab.new(key: "image", label: t(".image_tab")) ],
-            slot_tabs: rail_slot.tabs, current: current) %>
+            slot_tabs: rail_slot.tabs, current: current, label: t(".rail_label")) %>
       <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "image", current: current == "image") do %>
         <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
       <% end %>

@@ -23,6 +23,15 @@ class Admin::Ui::RailTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "h2", wait: 0
   end
 
+  test "the tablist is named by its host's label, and Settings without one" do
+    tabs = [ tab(key: "image", label: "Image"), tab(key: "notes", label: "Notes") ]
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "media-rail", current: "image", tabs:, label: "Image details")
+    assert_selector "div.admin-rail__tabs[role=tablist][aria-label='Image details']"
+
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "media-rail", current: "image", tabs:)
+    assert_selector "div.admin-rail__tabs[role=tablist][aria-label='Settings']"
+  end
+
   test "a current that names no tab is the first tab, so one tab is in the tab order" do
     render_inline Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "gone",
       tabs: [ tab(key: "page", label: "Page"), tab(key: "section", label: "Section") ])
