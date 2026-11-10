@@ -14,7 +14,8 @@
 # outside entries again against freshly loaded classes, as it does the
 # built-ins. An engine's own `to_prepare` would not do: it runs before the
 # application's, whose first line is `reset!`. Every hook names what it
-# registers `owner/name`, under the same owner rules (`Registrar`).
+# registers `owner/name`, under the same owner rules (`Registrar`), and an
+# owner named like one of the CMS's own top-level constants is refused.
 #
 # These four are the only registries a gem can reach. Every other one is
 # emptied and refilled with the built-ins on every `to_prepare` and replays
@@ -34,10 +35,19 @@ module ContentSpiel
     Hook = Data.define(:block, :location)
 
     # What a hook's block is handed: `register` with the registry's own
-    # signature, refusing a bare name (the built-ins'), a second owner in
-    # one call, and an owner another hook has registered under in this
-    # replay (`owners`: owner => the place of the hook that took it), since
-    # an owner's prefix is what keeps two gems' tokens apart.
+    # signature, refusing a bare name (the built-ins'), an owner named like
+    # one of the CMS's own top-level constants (`TopLevelNames`: a gem's
+    # code lives in a module named after its owner, so `media/…` would have
+    # it reopen `Media`), a second owner in one call, and an owner another
+    # hook has registered under in this replay (`owners`: owner => the place
+    # of the hook that took it), since an owner's prefix is what keeps two
+    # gems' tokens apart.
+    #
+    # The constant check is made here, when the hook is replayed, and not
+    # when the hook is called: the owner is known only once the block runs,
+    # and the hook is called from a gem's initializer, before the
+    # application's directories can be read through its autoloader. A replay
+    # runs in `to_prepare`, when they can.
     #
     # `kind` says what is being registered, for the message ("a block type
     # from outside"), and `build` how one is made of a name and what the hook
@@ -63,6 +73,11 @@ module ContentSpiel
         name = name.to_s
         owner, rest = name.split("/", 2)
         raise ArgumentError, "#{name.inspect}: a #{@kind} from outside is named owner/name (gallery/album); a bare name is a built-in's" if rest.nil?
+
+        if (constant = TopLevelNames.matching(owner))
+          raise ArgumentError, "#{name.inspect}: the owner #{owner.inspect} is named like the CMS's own #{constant}, " \
+            "which a gem's module of that name would reopen; name the owner after the gem"
+        end
 
         @owner ||= owner
         raise ArgumentError, "#{name.inspect}: one call of the hook registers the types of one owner, and #{@owner.inspect} came first" unless owner == @owner

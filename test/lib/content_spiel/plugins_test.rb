@@ -152,6 +152,60 @@ class ContentSpiel::PluginsTest < ActionDispatch::IntegrationTest
     Rails.application.reloader.prepare!
   end
 
+  # A deliverer for the form destination hook below: the contract is
+  # `deliver(delivery, final_attempt:)`.
+  module OwnerDeliverer
+    def self.deliver(_delivery, final_attempt:) = nil
+  end
+
+  # A gem's code lives in a module named after its owner (`Gallery::` for
+  # `gallery/album`), so an owner named like one of the CMS's own top-level
+  # constants would reopen that domain (`Media`, `Notes`, `Publishing`), as
+  # `Admin::Media` once shadowed `Media` (test/lib/admin_namespace_shadow_test.rb).
+  # Each hook refuses one, both camelizations taken (`ai`: `AI` and `Ai`).
+  test "an owner named like a top-level constant of the CMS is refused by every hook, naming the constant and the place of the call" do
+    %w[media notes publishing access_control ai content_spiel].each do |owner|
+      line = __LINE__ + 1
+      hook = ContentSpiel::Plugins.block_types { |types| types.register("#{owner}/album") { |t| TestTypes.declare(t) } }
+      error = refusal_of(hook)
+      assert_kind_of ArgumentError, error
+      assert_includes error.message, "#{owner}/album"
+      assert_includes error.message, "the CMS's own #{TopLevelNames.matching(owner)}"
+      assert_includes error.message, "#{__FILE__}:#{line}"
+    end
+    assert_equal BUILT_INS, BlockTypes.names
+
+    fields = ContentSpiel::Plugins.form_field_types { |types| types.register("notes/rating", **rating_type) }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_form_field_types(Forms::FieldTypes) }.message, "the CMS's own Notes"
+    ContentSpiel::Plugins.remove(fields)
+
+    destinations = ContentSpiel::Plugins.form_destinations { |list| list.register("publishing/crm", label: "CRM", deliverer: OwnerDeliverer) }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_form_destinations(Forms::DestinationTypes) }.message, "the CMS's own Publishing"
+    ContentSpiel::Plugins.remove(destinations)
+
+    modules = ContentSpiel::Plugins.studio_modules { |list| reports_module(list, "audit/reports") }
+    assert_includes assert_raises(ArgumentError) { ContentSpiel::Plugins.register_studio_modules(StudioModules) }.message, "the CMS's own Audit"
+  ensure
+    [ fields, destinations, modules ].compact.each { |hook| ContentSpiel::Plugins.remove(hook) }
+    Rails.application.reloader.prepare!
+  end
+
+  test "an owner of the gem's own passes every hook" do
+    blocks = ContentSpiel::Plugins.block_types { |types| types.register("acme/album") { |t| TestTypes.declare(t) } }
+    fields = ContentSpiel::Plugins.form_field_types { |types| types.register("acme/rating", **rating_type) }
+    destinations = ContentSpiel::Plugins.form_destinations { |list| list.register("acme/crm", label: "CRM", deliverer: OwnerDeliverer) }
+    modules = ContentSpiel::Plugins.studio_modules { |list| reports_module(list, "acme/reports") }
+    Rails.application.reloader.prepare!
+    assert_nil Theme.current.refusal
+    assert_includes BlockTypes.names, "acme/album"
+    assert_includes Forms::FieldTypes.names, "acme/rating"
+    assert_includes Forms::DestinationTypes.names, "acme/crm"
+    assert_includes module_names, :"acme/reports"
+  ensure
+    [ blocks, fields, destinations, modules ].compact.each { |hook| ContentSpiel::Plugins.remove(hook) }
+    Rails.application.reloader.prepare!
+  end
+
   # Final review I1: the held form's allow-list is one list for every form
   # of the site, and an outside type brings no editor script until step 2,
   # so an action it named would be one of the CMS's, alive in every held form.
