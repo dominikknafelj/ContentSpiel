@@ -61,6 +61,43 @@ class PublishingTest < ActiveSupport::TestCase
     assert_raises(ActiveModel::MissingAttributeError) { @views.first.published_version.blocks }
   end
 
+  # A view rebuilt without its body must never fall back to the body of the
+  # row it was rebuilt over, which is the working version: it has none until
+  # asked, and then the copy's. A post served from its rows keeps the body it
+  # was read with.
+  test "published_all without_body: a rebuilt post has the copy's body when asked, never its rows', and a row keeps its own" do
+    copied = create_post(title: "Copied")
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Published") } })
+    publish_changes(copied)
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Draft") } })
+    draft = create_post(title: "Draft", published: false)
+    Posts::Save.call(draft, translations: { "en" => { body: rich_doc("Rows") } })
+
+    view, row = Publishing.published_all([ copied.reload, draft.reload ], without_body: true)
+
+    assert_not view.has_attribute?(:body)
+    assert_same draft, row
+    assert_equal "Published", view.body_document(locale: "en").to_markdown.strip
+    assert_equal 0, count_statements { assert_equal "Rows", row.body_document(locale: "en").to_markdown.strip }
+  end
+
+  # A page has no body: asked `without_body:` among posts, it is handed back as
+  # it is, never deferred, and reading the posts' bodies reads nothing of it.
+  test "published_all without_body leaves a record with no body column alone" do
+    page = create_page(title: "Page")
+    post = create_post(title: "Post")
+    Posts::Save.call(post, translations: { "en" => { body: rich_doc("Words") } })
+    publish_changes(post)
+    bare = create_post(title: "Bare")
+    Publishing::Version.where(record_type: "Post", record_id: bare.id).delete_all
+
+    page_view, post_view, bare_view = Publishing.published_all([ page.reload, Post.without_body.find(post.id), Post.without_body.find(bare.id) ], without_body: true)
+
+    assert_not page_view.singleton_class.include?(Publishing::DeferredBodies::Deferred)
+    assert_equal "Words", post_view.body_document(locale: "en").to_markdown.strip
+    assert bare_view.has_attribute?(:body)
+  end
+
   test "what is published is judged at the time asked: a pending copy is not it before its time and is after" do
     page = create_page(title: "Now")
     assert Pages::Save.call(page, translations: { "en" => { title: "Later" } }).ok?

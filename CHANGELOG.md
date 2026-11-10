@@ -11,6 +11,12 @@
 - A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
 - The development seed (`contentspiel dev`, `bin/rails db:seed`) builds `/showcase`, a new top-level page of the development site: every block type at the top level and in a section of every layout and band, every Note kind, a long table, every list and a link to the 404 page. On a database with no content yet it also turns German and Spanish on; a seed run again leaves the site's languages as they are.
 - Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
+- A post list reads its posts' addresses in one statement, and the shown page's or post's addresses in every language (the head's `hreflang` alternates, the language switcher) are one statement, not one per language (#122).
+- A post list reads no post body, from the rows or the copies, until its template asks for one, and then the whole list's in at most two statements (one when every listed post has a copy): the default blog and resume lists read none (#122). What a list template may call is unchanged: `rich_text(post)` draws the published body as before.
+
+### For a gem or an outside caller
+
+- A content type's `list_component` (a gem's too) is handed posts read without their body, which they read on demand: `body`, `post[:body]`, `read_attribute(:body)`, `attributes` and `as_json` answer as for a post read whole. Only `has_attribute?(:body)` is false until one of them has asked (#122).
 
 ### Migrations
 

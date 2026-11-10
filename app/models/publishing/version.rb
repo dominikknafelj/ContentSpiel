@@ -47,6 +47,15 @@ module Publishing
       unscoped.where(id: newest).select(*(columns || column_names)).index_by { |version| [ version.record_type, version.record_id ] }
     end
 
+    # The snapshot with one of its record's fields taken out, read under the
+    # column's own name: a list that draws no body reads its posts' copies
+    # without theirs (`Publishing.published_all(..., without_body: true)`).
+    def self.snapshot_without_field(name) = SqlNodes.json_without(arel_table[:snapshot], "fields", name).as("snapshot")
+
+    # One field of a copy's snapshot, NULL when the copy holds no such field
+    # (a column added since the copy was taken).
+    def self.snapshot_field(name) = SqlNodes.json_at(arel_table[:snapshot], "fields", name)
+
     # Takes a copy of `record`, from its ROWS as they are at this moment: the
     # first statement locks the record's row (the page's row first, the same
     # first lock every block write takes, `ContentBlocks::Structure#lock_owner`;
