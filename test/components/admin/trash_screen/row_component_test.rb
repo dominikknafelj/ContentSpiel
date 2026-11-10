@@ -1,10 +1,10 @@
 require "test_helper"
 
-# `Admin::TrashScreen::RowComponent` (trash spec §7): the parts of a
-# row the integration tests don't pin down -- the who/when cell, the delete
-# dialog's subpage count, the disabled "Delete now…" with its reason as
-# visible text, and the inline "Restore under" for a page that can't go back
-# where it was. (Who is worked out by `ListComponent`; a row only shows it.)
+# `Admin::TrashScreen::RowComponent`: the parts of a row the integration tests
+# don't pin down -- the who/when cell, the delete dialog's subpage count, the
+# disabled "Delete now…" with its reason as visible text, and the inline
+# "Restore under" for a page that can't go back where it was. (Who is worked out
+# by `ListComponent`; a row only shows it.)
 class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -111,6 +111,41 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "form[action='/cs-studio/trash/page/#{section.id}/restore'] button", text: "Restore"
   end
 
+  test "the type is the kind's chip and its word, the trasher a small avatar beside the name" do
+    users(:two).update!(name: "Ada Lovelace")
+    post = create_post(title: "Old post")
+    Trash::Move.call(post)
+
+    render_inline row(post.reload, who: "Ada Lovelace", actor: actor(users(:two)))
+
+    type = page.find("td[data-trash-type]")
+    assert type.has_selector?("span.inline-flex > span.rounded-chip.size-5[aria-hidden=true] + span.text-small", text: "Post")
+    assert_not_includes type[:class].to_s.split, "text-meta"
+    trashed = page.find("td[data-trash-who]")
+    assert trashed.has_selector?("span.size-\\[22px\\][aria-hidden=true]", text: "AL")
+    assert trashed.has_selector?("span.text-ink", text: "Ada Lovelace")
+    assert_match(/Ada Lovelace\s*· /, trashed.text)
+    assert trashed.has_selector?("time")
+    assert_selector "td span.font-medium.text-ink", text: "Old post"
+    assert_no_selector "td:first-child .font-semibold"
+    assert_selector "button.rounded-button-sm", text: "Restore"
+
+    render_inline row(post.reload, who: "System", actor: actor(nil))
+    assert_selector "td[data-trash-who] span.rounded-chip.size-5"
+    assert_no_selector "td[data-trash-who] span.size-\\[22px\\]", text: /\w/
+  end
+
+  test "an image's thumbnail is 40px on the tile radius" do
+    asset = create_media_asset
+    Trash::Move.call(asset)
+
+    render_inline row(asset.reload)
+
+    assert_selector "td span.block.size-10.shrink-0.overflow-hidden.rounded-tile.bg-sunken [data-image-empty], td span.block.size-10.rounded-tile img"
+    assert_no_selector "td:first-child .size-12"
+    assert_no_selector "td:first-child .rounded-cs"
+  end
+
   test "an image row shows a width, the preview or a box, never the original" do
     asset = create_media_asset
     asset.update_columns(width: 1600, height: 1200, preview: nil, renditions: {}) # version: none (a test's own state)
@@ -124,7 +159,12 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
   private
 
-  def row(item, who: "You", retention_days: 30, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil)
-    Admin::TrashScreen::RowComponent.new(item:, retention_days:, who:, subpage_sentence:, purge_subpage_count:, used_by:, parent_choices:, tab:)
+  def row(item, who: "You", actor: actor(users(:one), you: true), retention_days: 30, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil)
+    Admin::TrashScreen::RowComponent.new(item:, retention_days:, who:, actor:, subpage_sentence:, purge_subpage_count:, used_by:, parent_choices:, tab:)
+  end
+
+  # Who trashed it, as the audit log's actor facts; nil is System.
+  def actor(user, you: false)
+    Audit::Sentence::Actor.new(you:, user:, user_id: user&.id, via_label: nil, none: false)
   end
 end

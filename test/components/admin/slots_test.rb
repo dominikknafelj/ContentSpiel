@@ -29,7 +29,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
   def entry(component, loader: nil, **options) = Admin::Slots::Entry.new(component:, loader:, options:)
 
   test "the names a screen may put a slot at" do
-    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers editor.rail.tabs], Admin::Slots::NAMES
+    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers editor.rail.tabs media.rail.tabs], Admin::Slots::NAMES
   end
 
   test "editor.rail.tabs is a name a screen may put a slot at" do
@@ -165,7 +165,8 @@ class Admin::SlotsTest < ViewComponent::TestCase
 
   test "the real registry holds notes' components, and presence's people in the header at its size and in the panel at its" do
     assert_equal [ Admin::NotesScreen::HeaderButtonComponent ], Admin::Slots.entries("editor.header.actions").map(&:component)
-    assert_equal [ Admin::NotesScreen::MediaSectionComponent ], Admin::Slots.entries("media.panel.sections").map(&:component)
+    assert_equal [ Admin::NotesScreen::MediaSectionComponent ], Admin::Slots.entries("media.rail.tabs").map(&:component)
+    assert_empty Admin::Slots.entries("media.panel.sections")
     assert_equal [ Admin::PresenceScreen::RowMarkerComponent, Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("tree.row.markers").map(&:component)
     assert_equal [ Admin::NotesScreen::RowPillComponent ], Admin::Slots.entries("posts.row.markers").map(&:component)
     assert_equal [ [ Admin::PresenceScreen::RowMarkerComponent, { joined: true, shown: 3 } ] ], Admin::Slots.entries("posts.row.title").map { |entry| [ entry.component, entry.options ] }

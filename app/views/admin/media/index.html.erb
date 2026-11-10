@@ -3,34 +3,42 @@
     Turbo's page cache, and a hover-prefetched tile answer older than a save is
     never used for a click. %>
 <%# The tab's title names the chosen image (the panel is a URL of its own). %>
-<% content_for :title, [ @selected&.title.presence, "Media", "CS Studio" ].compact.join(" · ") %>
+<% content_for :title, [ @selected&.title.presence, t(".title"), t("admin.layout.title") ].compact.join(" · ") %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
   <meta name="turbo-prefetch" content="false">
 <% end %>
-<%# The Media module (media library design spec §6, handoff §4.6):
-    the header with "Upload images", the drop zone, the toolbar (search and
-    segments with counts) and the grid, with the chosen image's side panel
-    (`Admin::MediaLibrary::PanelComponent`) at the right -- 340px; with nothing
-    chosen the grid takes the width. Choosing a tile is a link into the `content`
-    frame that keeps the search, the segment, the page and the language, so Back
+<%# The Media module: the header with "Upload images", the drop zone, the
+    toolbar (search and segments with counts) and the grid, with the chosen
+    image's rail beside it. Choosing a tile is a link into the `content` frame
+    that keeps the search, the segment, the page and the language, so Back
     returns to the previous choice. No tree column (a library image has no tree
-    position of its own, the same reason Tags/Posts render plain content frames). %>
+    position of its own, the same reason Tags/Posts render plain content frames).
+
+    `#media-library` is a container (`admin-media`), so the rail is laid out by
+    the room the library has, never the window's
+    (content-spiel.tailwind.css, "THE MEDIA RAIL"). %>
+<div id="media-library" class="admin-media-library">
+<div class="admin-media-library__head">
 <%# Uploading: the wrapper carries `admin--media--drop` (a file drag
     anywhere on the screen shows the overlay below and a drop hands its files to
     `admin--media--upload`) and `admin--media--upload` itself (the queue: a progress
     tile per file at the start of the grid, one at a time, nothing reloads). The
     Ui::FileDropComponent inside is the visible zone and the labelled file input; it
     stops its own drops from reaching the document-level handler twice
-    (file_drop_controller.js). The header's button opens the same input. %>
+    (file_drop_controller.js). The header's button opens the same input. A
+    progress tile takes the finished tile's box (`tile-class`), and its words are
+    the `data-messages` here. %>
 <div class="mb-4 flex flex-col gap-4"
      data-controller="admin--media--drop admin--media--upload"
      data-admin--media--upload-url-value="<%= admin_media_path(**admin_url_options) %>"
+     data-admin--media--upload-tile-class-value="<%= Admin::MediaLibrary::TileComponent::CARD %>"
      data-admin--media--upload-button-class-value="<%= Admin::Ui::ButtonComponent.classes(:secondary, size: :small) %>"
+     data-messages="<%= messages_data(*Admin::MediaLibrary::TileComponent::UPLOAD_MESSAGES) %>"
      data-action="admin--media--drop:dropped->admin--media--upload#dropped">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-h1 text-ink">Media</h1>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
+    <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".upload"), variant: :primary, type: "button", data: { action: "admin--media--upload#browse" }) %>
   </div>
   <%# The zone is the empty library's invitation: once the library holds a kept
       image (whatever the search shows) the wrapper is hidden. The file input
@@ -38,8 +46,8 @@
       target (`admin--media--upload-target="input"`). The status line is
       outside it, for a screen reader. %>
   <%= tag.div hidden: @library_has_images, data: { media_drop_zone: "" } do %>
-    <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
-          hint: t("admin.components.media_library.upload_hint", mb: ImageSettings.current.max_upload_mb),
+    <%= render Admin::Ui::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: t(".upload"),
+          hint: t(".hint", mb: ImageSettings.current.max_upload_mb),
           data: { "admin--media--upload-target": "input", action: "change->admin--media--upload#filesSelected" }) %>
   <% end %>
   <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
@@ -49,19 +57,20 @@
       itself (`pointer-events-none`: the drag keeps its real target). %>
   <div hidden data-admin--media--drop-target="overlay" aria-hidden="true"
        class="pointer-events-none fixed inset-0 z-(--cs-z-drop) flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint/85">
-    <p class="rounded-card bg-popover px-6 py-4 text-h2 text-ink shadow-3">Drop images to upload</p>
+    <p class="rounded-card bg-popover px-6 py-4 text-h2 text-ink shadow-3"><%= t(".drop") %></p>
   </div>
 </div>
 
 <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options) %>
+</div>
 
 <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
-<%# DOM order is visual order at every width (grid, then panel; the panel stacks
-    below the grid under 1024px): no `order-*` swap, so tab order never contradicts
-    what is drawn. `admin--media--panel` moves focus into the panel when a tile was
-    chosen, and back to the tile when the panel is closed. %>
-<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>" data-controller="admin--media--panel">
-  <div class="min-w-0">
+<%# DOM order is visual order at every width (grid, then rail; the rail stacks
+    under the grid in a narrow library): no `order-*` swap, so tab order never
+    contradicts what is drawn. `admin--media--panel` moves focus into the
+    panel when a tile was chosen, and back to the tile when the rail is closed. %>
+<div class="admin-media-library__grid" data-controller="admin--media--panel">
+  <div class="admin-media-library__main">
     <% if @pagination.out_of_range? %>
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
     <% else %>
@@ -75,11 +84,44 @@
   </div>
 
   <% if @selected %>
-    <%# A plain box: the panel inside is the one landmark (a `section` named by
-        the image's title, and the focus target). An `aside` around it was a
-        second landmark for the same thing. %>
-    <div class="min-w-0 rounded-card bg-surface shadow-1 p-4 lg:sticky lg:top-[calc(var(--admin-top-offset)+1.5rem)] lg:max-h-[calc(100vh-var(--admin-top-offset)-3rem)] lg:overflow-y-auto">
-      <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
-    </div>
+    <%# The chosen image's rail: the editors' rail parts and script
+        (`admin--ui--rail`), its tabs Image and what is registered at
+        `media.rail.tabs` (`Admin::Slots`), which this view draws without
+        knowing. Where the library docks the rail the tabs choose the panel;
+        below that there are no tabs and every panel stands in the page, one
+        under the other. Each panel is drawn once and never moved or cloned.
+
+        It is a plain box: the Image panel inside is the one landmark (a
+        `section` named by the image's title, and the focus target).
+
+        Close is the rail's last child, over its top-right corner: a link, so
+        it advances the address and works without script, back to the grid
+        as the editor left it, with the focus on the tile
+        (`admin--media--panel#close`). Escape inside the rail does the same
+        unless something inside takes it (`#escape`). A choice of another
+        tile keeps the tab that was current (`admin--media--panel`, through
+        `admin--ui--rail:reveal`). %>
+    <% rail_id = "media-rail" %>
+    <% rail_slot = Admin::Ui::RailSlotComponent.new(slot: "media.rail.tabs", rail_id: rail_id, record: @selected, viewer: Current.actor, reserved: %w[image],
+                                                    locale: admin_locale, url_options: admin_url_options, query: request.query_parameters) %>
+    <% current = rail_slot.current_key || "image" %>
+    <% tooltip = Admin::Ui::TooltipComponent.host_data %>
+    <%= tag.div id: rail_id, class: "admin-media-rail", data: { controller: "admin--ui--rail", action: "keydown.esc->admin--media--panel#escape admin--ui--rail:reveal->admin--ui--rail#reveal" } do %>
+      <%= render Admin::Ui::RailTabsComponent.new(rail_id: rail_id, tabs: [ Admin::Ui::RailTabsComponent::Tab.new(key: "image", label: t(".image_tab")) ],
+            slot_tabs: rail_slot.tabs, current: current, label: t(".rail_label")) %>
+      <%= render Admin::Ui::RailPanelComponent.new(rail_id: rail_id, key: "image", current: current == "image") do %>
+        <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
+      <% end %>
+      <%= render rail_slot %>
+      <%= link_to admin_media_path(**@link_params, **admin_url_options),
+            class: "admin-media-rail__close #{Admin::Ui::TooltipComponent::HOST} #{Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)}",
+            aria: { label: t(".close") },
+            data: { controller: tooltip[:controller], action: "#{tooltip[:action]} click->admin--media--panel#close",
+                    turbo_frame: "content", turbo_action: "advance",
+                    "admin--media--panel-target": "close", "admin--media--panel-tile-id-param": @selected.id } do %>
+        <%= render "admin/shared/icon", name: :x, size: "size-4" %><%= render Admin::Ui::TooltipComponent.new(text: t(".close")) %>
+      <% end %>
+    <% end %>
   <% end %>
+</div>
 </div>

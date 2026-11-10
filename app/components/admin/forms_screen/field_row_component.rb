@@ -1,9 +1,13 @@
 module Admin
   module FormsScreen
-    # One field of the builder, in the block card's anatomy:
-    # a head (the type's badge, the label as the button that folds the body,
-    # "Required", and ↑, ↓ and Remove) and a body (the label, the help line,
-    # Required, and for a type that offers them "Shown as" and the choices).
+    # One field of the builder, a row on paper at the tile's radius with no
+    # edge or shadow of its own, as a group field's row is: a head (the
+    # type's badge, the label as the button that folds the body, "Required",
+    # up and down as icon buttons, and Remove) and a body (the label, the
+    # help line, Required, and for a type that offers them "Shown as" and the
+    # choices). An icon button's one name is its label, which names the row
+    # ("Move “Email” up"); the script names it again when the label changes,
+    # its tooltip with it.
     # The type is fixed once the field is added, so it is a hidden input
     # beside the key, which is never shown either.
     #

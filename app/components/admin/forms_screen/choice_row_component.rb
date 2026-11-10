@@ -1,11 +1,12 @@
 module Admin
   module FormsScreen
-    # One choice of a choice field: its number, visible in
-    # mono before the input (so the list reads as numbered), the input,
-    # labelled "Choice N" for a screen reader, and ↑, ↓ and Remove as on a
-    # field's row. Named by the field's row and the choice's own row
-    # (`form[fields][<row>][choices][<choice>][...]`), its key a hidden
-    # input, so a move is one change of the field's tracked choice order.
+    # One choice of a choice field: its number, visible in mono before the
+    # input (so the list reads as numbered), the input, labelled "Choice N"
+    # for a screen reader, and up, down (icon buttons named by the choice)
+    # and Remove as on a field's row. Named by the field's row and the
+    # choice's own row (`form[fields][<row>][choices][<choice>][...]`), its
+    # key a hidden input, so a move is one change of the field's tracked
+    # choice order.
     class ChoiceRowComponent < Admin::AdminComponent
       def initialize(field_row:, choice:, number:, locale:, structure:, first:, last:)
         @field_row = field_row

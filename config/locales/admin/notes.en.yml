@@ -295,6 +295,9 @@ en:
           loading: "Loading notes…"
           back: "Back to %{title}"
           untitled: "(untitled)"
+          # An image's notes with no thread, over the field for a new note
+          # (`Admin::NotesScreen::ListComponent`).
+          empty_image: "No notes on this image yet."
         list:
           pinned: "Pinned"
           open:

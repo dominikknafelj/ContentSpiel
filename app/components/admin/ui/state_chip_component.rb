@@ -1,7 +1,8 @@
 module Admin
   module Ui
     # A system's state, in a dot and a word: mail, the AI key, Test
-    # connection's result, a system check. Not a record's state: a page's or
+    # connection's result, a system check, a form delivery's state (a job's),
+    # the audit log's Security mark. Not a record's state: a page's or
     # a post's is `StatusChipComponent`, whose Live and Scheduled fills belong
     # to publishing.
     #

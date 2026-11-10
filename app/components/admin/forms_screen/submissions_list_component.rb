@@ -2,25 +2,37 @@ module Admin
   module FormsScreen
     # A form's submissions: the form's
     # heading and tabs, one line on what happens to its submissions, "Delete
-    # all…" for `forms.manage`, then the card table, newest first, 50 a page.
-    # A placeholder look until the Design System's pass.
+    # all…" for `forms.manage`, then one card holding the table, newest
+    # first, 50 a page. The table scrolls sideways inside its card
+    # (`.admin-table-scroll--x`), its Received column sticky at the left, so
+    # the page never scrolls sideways.
     #
-    # EACH ROW is its received time (a link to the submission stretched over
-    # the row, the users list's), its summary (`Forms::Summary.of`, computed
-    # from the decrypted answers of this page's rows alone), its
-    # language's code, the page it came from (the page's title from its rows;
-    # "A page in the trash"; "—" when none was stored or the page was purged)
-    # and "Not delivered" when a delivery failed. A row whose answers the
-    # site's keys can't read says "Can't be read" and still opens, to be
-    # deleted. The rows' deliveries and pages are loaded with them by the
-    # controller: nothing is read per row.
+    # EACH ROW is its received time (the link to the submission), its
+    # summary (`Forms::Summary.of`, computed from the decrypted answers of
+    # this page's rows alone), its language's code in a neutral badge, the
+    # page it came from (the page's title from its rows; "A page in the
+    # trash"; "—" when none was stored or the page was purged) and, when a
+    # delivery failed, "Not delivered" in a warn state chip: a delivery's
+    # state is a system's, never red. A row whose answers the site's keys
+    # can't read says "Can't be read" and still opens, to be deleted. The
+    # rows' deliveries and pages are loaded with them by the controller:
+    # nothing is read per row.
+    #
+    # THE ROW OPENS FROM ANY CELL through a second link to the submission,
+    # stretched over the row from its LAST cell, with no Tab stop and
+    # nothing for a screen reader (the time link is both). It cannot stretch
+    # from the first cell: a sticky cell is the containing block of what is
+    # absolute inside it, so the link would cover that cell alone. The first
+    # cell stands at the raised layer, over the stretched link, so its own
+    # link takes the pointer and draws its focus ring; the cell itself lets
+    # the pointer through (`pointer-events-none`, the link `-auto`), so its
+    # padding opens the row as every other cell does.
     #
     # DELETE ALL counts the form's whole count, not the page's, because that
     # is what it deletes (`Forms::DeleteSubmissions`, `all: true`).
     class SubmissionsListComponent < Admin::AdminComponent
       DIALOG_ID = "delete-all-submissions-dialog".freeze
-      ROW_LINK_CLASS = "text-xs text-ink after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none " \
-                       "focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent".freeze
+      TIME_LINK_CLASS = "pointer-events-auto text-small text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent".freeze
 
       def initialize(form:, submissions:, pagination:, total:, page_url:, url_options: {})
         @form = form

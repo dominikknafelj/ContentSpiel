@@ -1,10 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
-// Select-then-use for the media picker (round 3, Task 9, D14), on the same
+// Select-then-use for the media picker, on the same
 // `<dialog>` as `admin--media--picker` (`Media::PickerComponent`).
 //
-// - A click on a tile SELECTS it (one at a time): `aria-pressed` draws the accent
-//   ring and the footer says "1 selected" -- announced, it is a live region --
+// - A click on a tile SELECTS it (one at a time): `aria-pressed` is what the stylesheet
+//   draws the accent outline from (`.admin-tile`), and the footer says "1 selected" -- announced, it is a live region --
 //   with the title after it for a screen reader ("say what you chose").
 // - **Use image** confirms; so does a double click (which also selects), and so
 //   does Enter on a tile that is already selected. A tile is a real `<button>`, so
@@ -16,13 +17,12 @@ import { Controller } from "@hotwired/stimulus"
 // The selection is the payload held HERE, not a mark in the DOM: searching or
 // choosing a segment replaces the grid inside its frame, and the choice has to
 // survive that (a selected image the new search no longer lists is still
-// selected, still usable). After each frame render `reapply` draws the ring on
-// whichever tile is that image again. Nothing here is in a form: the dialog is
+// selected, still usable). After each frame render `reapply` sets `aria-pressed`
+// on whichever tile is that image again. Nothing here is in a form: the dialog is
 // outside `#content` and every autosave form, and the tiles are plain buttons.
+// The footer's words are the dialog's `data-messages` (`media.picker.*`).
 export default class extends Controller {
   static targets = [ "status", "use" ]
-
-  static texts = { none: "No image selected", selected: "1 selected" }
 
   connect() {
     this.selected = null
@@ -88,11 +88,11 @@ export default class extends Controller {
     if (!this.hasStatusTarget) return
 
     if (!this.selected) {
-      this.statusTarget.textContent = this.constructor.texts.none
+      this.statusTarget.textContent = messages(this.element).t("media.picker.none")
       return
     }
 
-    this.statusTarget.textContent = this.constructor.texts.selected
+    this.statusTarget.textContent = messages(this.element).t("media.picker.selected")
     const title = document.createElement("span")
     title.className = "sr-only"
     title.textContent = `: ${this.selected.title}`

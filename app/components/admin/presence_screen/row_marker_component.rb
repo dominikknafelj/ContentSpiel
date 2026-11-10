@@ -18,7 +18,8 @@ module Admin
     # THE ELEMENT IS ALWAYS RENDERED, `hidden` where nobody is, so the list's
     # script (`admin--presence--list`) changes it in place and never redraws
     # a row: `span[data-presence-marker="<kind>-<id>"]`, with the record's id
-    # (`data-presence-id`) and the count it shows (`data-presence-count`).
+    # (`data-presence-id`); the count it shows (`data-presence-count`) is the
+    # marker's own.
     # The script writes the circles' letters, the "+N" and the one text
     # (twice), all of them as text.
     #
@@ -98,7 +99,7 @@ module Admin
       attr_reader :shown
 
       def marker_data
-        { presence_marker: "#{kind.name}-#{@record.id}", presence_id: @record.id, presence_count: count,
+        { presence_marker: "#{kind.name}-#{@record.id}", presence_id: @record.id,
           "admin--presence--list-target": "marker", **Admin::Ui::TooltipComponent.host_data }
       end
     end

@@ -240,7 +240,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    what it holds, so from 1024px the divider is fixed to the window, on the
    column's right edge (the sidebar's 15rem from 1280px, then the column's
    track; the same tokens the grid is laid out by). */
-.admin-shell__tree { container: admin-tree-column / inline-size; position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
+.admin-shell__tree { position: relative; box-shadow: var(--cs-shadow-1); background: var(--cs-chrome); padding: 1rem; }
 @media (min-width: 1024px) {
   .admin-shell__tree { position: sticky; top: var(--admin-top-offset); align-self: start; height: calc(100dvh - var(--admin-top-offset)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 }
@@ -259,11 +259,6 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root:not([data-tree-folded]) .admin-shell__tree--fill { display: flex; flex-direction: column; }
   :root:not([data-tree-folded]) .admin-shell__tree--fill > .admin-shell__tree-region { flex: 1; }
 }
-/* The Translations row's action word sits under the row's stretched link, so it
-   is shown by opacity, never visibility. */
-.admin-translation-row__action { opacity: 0; }
-.admin-translation-row:hover .admin-translation-row__action,
-.admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
 
 /* The divider (`Admin::Shell::TreeDividerComponent`). AT REST it is
    nothing but the column's own 1px line: this element is the 8px HIT AREA,
@@ -356,9 +351,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    its count, never by a heavier title. On a leaf the disclosure is an empty
    box of the same width, so the marks line up across siblings; a flat row
    (the graph's posts and pills) has none. `position: relative`
-   holds the drag handle, which stands in the gutter left of the row. */
-.admin-tree-row { --admin-avatar-ground: var(--cs-chrome); position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
-.admin-tree-row:hover { --admin-avatar-ground: var(--cs-sunken); background: var(--cs-sunken); }
+   holds the drag handle, which stands in the gutter left of the row. The
+   row is a size container on its inline axis (`admin-tree-row`), which
+   changes none of its measures: its width is the column's, never its
+   content's, and its height is its content's. */
+.admin-tree-row { container: admin-tree-row / inline-size; position: relative; display: flex; align-items: center; min-height: var(--cs-tree-row); padding-inline: 4px 8px; border-radius: var(--cs-radius); }
+.admin-tree-row:hover { background: var(--cs-sunken); }
 /* A heading drawn on the row's geometry (a group of the whole site's
    results, `mind_graph/search_results.js`) is pressed by nobody: no hover. */
 h3.admin-tree-row:hover { background: none; }
@@ -390,6 +388,11 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-tree-row__state { flex: none; display: inline-flex; align-items: center; margin-inline-start: 6px; }
 .admin-tree-row__title + .admin-tree-row__trailing, .admin-tree-row__title + .admin-tree-row__add,
 .admin-tree-row__state + .admin-tree-row__trailing, .admin-tree-row__state + .admin-tree-row__add { margin-inline-start: auto; }
+/* The auto margin is 0 on a full row, so the 6px before that first part is
+   the title's (or the state's) own end margin: a cut title's ellipsis never
+   touches the markers after it. */
+.admin-tree-row__title:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)),
+.admin-tree-row__state:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)) { margin-inline-end: 6px; }
 .admin-tree-row__trailing { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; }
 /* The row's "+", last: a 20px box with a 12px glyph, meta and ink under
    the pointer. */
@@ -456,7 +459,7 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    title does not move. It is a SELECTION and not a marker: accent as a
    marker means "unread and addressed to you", and this bar says only where
    you are. */
-.admin-tree-row--selected { --admin-avatar-ground: var(--cs-sunken); background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
+.admin-tree-row--selected { background: var(--cs-sunken); box-shadow: inset 3px 0 0 var(--cs-accent); }
 .admin-tree-row--selected .admin-tree-row__title { font-weight: 600; }
 .admin-tree-row--selected .admin-tree-row__mark { color: var(--cs-ink); }
 /* A folded parent a drag opened (`admin--pages--tree`), while the pointer
@@ -588,16 +591,17 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    control (`py-1.5`, `py-2`): those are dead inside a bar. The segments sit
    inside the group's 1px frame, hence two pixels less. A list's filter panel
    (`.admin-filter-panel`, below) is part of its bar's form, so its selects
-   take the bar's height wherever the panel stands. */
+   take the bar's height wherever the panel stands. The audit log's subject
+   chip is the chip input's pill, not a control of the row: neither it nor
+   its 20px × takes the height. */
 .admin-filter-bar > div,
 .admin-filter-bar > fieldset { display: flex; }
 .admin-filter-bar input:not(.sr-only),
 .admin-filter-bar select,
 .admin-filter-panel select,
 .admin-filter-bar a.inline-block,
-.admin-filter-bar a.inline-flex,
-.admin-filter-bar button,
-.admin-filter-bar [data-subject-chip] {
+.admin-filter-bar a.inline-flex:not(.admin-chip__remove),
+.admin-filter-bar button {
   min-height: var(--cs-control-compact);
   padding-block: 0;
 }
@@ -854,7 +858,8 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-waiting-row__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
 /* Pick up where you left off's tiles (`Admin::DashboardScreen::DraftTileComponent`),
    one column below the main column's 32rem (the dashboard's layout,
-   below). A tile presses as one: its title link's `::after` covers the
+   below). Each is an `.admin-tile` (below), which draws its look; this
+   rule is how it presses as one: its title link's `::after` covers the
    tile, rounded with it, and the focus ring is drawn on it. */
 .admin-draft-tiles { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); }
 .admin-draft-tile { position: relative; }
@@ -864,11 +869,13 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row and the draft tile around their stretched
-   links, the Notes for you row that is the link). */
+   (the Waiting for you row, the draft tile and a Translations row around
+   their stretched links, the Notes for you row that is the link). */
 .admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
 .admin-waiting-row:hover .admin-row-verb,
 .admin-waiting-row:focus-within .admin-row-verb,
+.admin-translation-row:hover .admin-row-verb,
+.admin-translation-row:focus-within .admin-row-verb,
 .admin-draft-tile:hover .admin-row-verb,
 .admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
@@ -997,10 +1004,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-tag-detail { margin-bottom: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
 .admin-tag-detail:has([data-tag-detail-empty]) { display: none; }
 /* The Notes screen's rail of open threads: below the threshold a card after
-   the list, on the surface, so its avatars' rings read `--admin-avatar-ground`
-   in that colour; docked it takes the rail's ground and sits at the grid's
-   top. Written before the docked block, so the rail's rules win on order. */
-.admin-notes-threads { --admin-avatar-ground: var(--cs-surface); margin-top: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
+   the list, on the surface; docked it takes the rail's ground and sits at
+   the grid's top. Written before the docked block, so the rail's rules win
+   on order. */
+.admin-notes-threads { margin-top: 1rem; border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); padding: var(--cs-sp-3) var(--cs-sp-4); min-width: 0; }
 /* With no tag at all there is nothing to choose: the rail takes no room at
    any width, on the screen's first draw and after the last delete's answer
    replaces the list with its empty state. The id outweighs the docked rule
@@ -1014,7 +1021,7 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
   .admin-filter-panel { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0; }
   .admin-filter-panel > legend { position: static; float: left; width: auto; height: auto; margin: 0 0 0.25rem; overflow: visible; clip-path: none; white-space: normal; }
   .admin-tag-detail { margin-bottom: 0; }
-  .admin-notes-threads { --admin-avatar-ground: var(--cs-rail); margin-top: 0; }
+  .admin-notes-threads { margin-top: 0; }
   .admin-tag-detail:has([data-tag-detail-empty]) { display: block; }
 }
 /* Settings' layout and its "At a glance" rail
@@ -1149,6 +1156,12 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    (`admin_contrast_test`). */
 .admin-rail__tab[aria-selected="true"] { color: var(--cs-ink); font-weight: 500; box-shadow: inset 0 -2px 0 var(--cs-accent); }
 .admin-rail__tab:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+/* A tab's count is its bubble, the notes marker's pill at a tab's size:
+   the people tint, and the accent with "2 new" while something in it is
+   unread for the viewer (`data-unread`, which the feature's script keeps;
+   the word is the script's too, so the colour is not the only cue). */
+.admin-rail__tab [data-tab-count] { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--cs-radius-pill); background: var(--cs-people-tint); color: var(--cs-people); font-weight: 600; }
+.admin-rail__tab [data-tab-count][data-unread] { background: var(--cs-accent); color: var(--cs-on-accent); }
 @container admin-editor (min-width: 1200px) {
   .admin-rail-grid { --admin-rail-docked: 1; grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); grid-template-rows: auto auto 1fr; column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
   .admin-rail-grid::before { content: ""; grid-column: 2; grid-row: 1 / 3; position: sticky; top: var(--admin-rail-top); background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
@@ -1272,6 +1285,56 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    stands outside the container, so the mark is the one shared answer. */
 .admin-editor-header:has(~ .admin-editor-area [data-rail-docked]) > *,
 .admin-editor-area:has([data-rail-docked]) .admin-editor-header > * { max-width: var(--cs-content-max); margin-inline: auto; }
+/* THE MEDIA RAIL (`app/views/admin/media/index.html.erb`, `#media-rail`):
+   the chosen image's rail, drawn with the editors' rail parts and script
+   (`admin--ui--rail`). `#media-library` is the container (`admin-media`),
+   so the rail is laid out by the room the library has, never the window's
+   (the sidebar takes room the window does not show); no `@media` rule
+   names it (`admin_design_rules_test`).
+
+   `.admin-media-library__grid` holds the grid's column
+   (`.admin-media-library__main`) and, with a tile chosen, the rail, in
+   that order at every width: the focus goes grid, rail.
+   - Below 760px of the library, one column: the rail is a card under the
+     grid, its tabs hidden and every panel shown, one under the other.
+   - From 760px it is the same card, 340px beside the grid, sticky under
+     the top bar and scrolling inside itself.
+   - From 1200px, the editors' threshold, written here again because a
+     container query cannot read a custom property, it docks: the grid
+     takes what the rail leaves, the rail `--cs-rail-width` wide and
+     `--cs-rail-gap` right of it, on the rail's ground at elevation 2, the
+     whole stopping at `--cs-content-max` and centred past it with the head
+     above it. The tabs stand at the rail's top and only the current panel
+     is shown, scrolling inside itself under them. `--admin-rail-docked` is
+     the docked state `admin--ui--rail` reads.
+   Close is the rail's last child, over its top-right corner at every
+   width. The panels are not raised here, as the editors' are over their
+   canvas: nothing in the rail drops onto the grid, and a raised panel
+   would stand over Close. */
+.admin-media-library { container: admin-media / inline-size; }
+.admin-media-library__grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--cs-sp-6); }
+.admin-media-library__main { min-width: 0; }
+.admin-media-library__main:only-child { grid-column: 1 / -1; }
+.admin-media-rail { position: relative; display: flex; flex-direction: column; gap: var(--cs-sp-4); min-width: 0; padding: var(--cs-sp-4);
+  border-radius: var(--cs-radius-card); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+.admin-media-rail .admin-rail__panel { position: static; z-index: auto; }
+.admin-media-rail__close { position: absolute; top: var(--cs-sp-3); right: var(--cs-sp-3); }
+@container admin-media (min-width: 760px) {
+  .admin-media-library__grid { grid-template-columns: minmax(0, 1fr) 340px; }
+  .admin-media-rail { position: sticky; top: calc(var(--admin-top-offset) + var(--cs-sp-6)); max-height: calc(100dvh - var(--admin-top-offset) - 2 * var(--cs-sp-6));
+    overflow-y: auto; overscroll-behavior: contain; }
+}
+@container admin-media (min-width: 1200px) {
+  .admin-media-library__head { max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-media-library__grid { grid-template-columns: minmax(0, 1fr) var(--cs-rail-width); column-gap: var(--cs-rail-gap); max-width: var(--cs-content-max); margin-inline: auto; }
+  .admin-media-rail { --admin-rail-docked: 1; gap: 0; padding: 0; overflow: hidden; background: var(--cs-rail); box-shadow: var(--cs-shadow-2); border-radius: var(--cs-radius-rail); }
+  .admin-media-rail .admin-rail__tabs { display: flex; flex: none; align-items: flex-end; gap: var(--cs-sp-4); height: 3rem; box-sizing: border-box; padding: 0 3.5rem 0 var(--cs-sp-4); }
+  .admin-media-rail .admin-rail__heading { align-items: center; gap: 0.375rem; }
+  .admin-media-rail .admin-rail__panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--cs-sp-3) var(--cs-sp-4) var(--cs-sp-4); }
+  .admin-media-rail .admin-rail__panel:not([data-current]) { display: none; }
+  .admin-media-rail__section { border-top-width: 0; }
+  .admin-media-rail__section-heading { display: none; }
+}
 /* THE NOTES PANEL (`Admin::NotesScreen::RailPanelComponent`, `#notes-drawer`,
    the content of the rail's Notes tab). One element at every width, never
    moved or cloned, so a note being typed keeps its text and its focus when
@@ -1427,6 +1490,56 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 /* The tile of the block whose thread is open in the notes
    (`admin--notes--drawer#markActive`) takes the people frame, in the rule
    above. */
+
+/* A tile in a grid of tiles: the media library's and the picker's
+   (`Admin::MediaLibrary::TileComponent`), an upload's while it sends
+   (`media/upload_tiles.js`), a language's summary in Translations
+   (`Admin::TranslationScreen::SummaryCardComponent`) and a draft on the
+   Dashboard (`Admin::DashboardScreen::DraftTileComponent`). Its states are
+   elevations, with no border: the first at rest, the second under a pointer
+   that can hover, and never moved, so nothing shifts under a click. Selected
+   (`aria-current`) or pressed (`aria-pressed`) it is a selection: the 2px
+   accent outline 2px outside its edge, 3:1 on the surface and the page
+   (`test/lib/admin_contrast_test.rb`), at rest's elevation, written after
+   the pointer's so a selected tile keeps its look under the pointer. */
+.admin-tile { border-radius: var(--cs-radius-tile); background: var(--cs-surface); box-shadow: var(--cs-shadow-1); }
+@media (hover: hover) {
+  .admin-tile:hover { box-shadow: var(--cs-shadow-2); }
+}
+.admin-tile:is([aria-current="true"], [aria-pressed="true"]) { outline: 2px solid var(--cs-accent); outline-offset: 2px; box-shadow: var(--cs-shadow-1); }
+
+/* A table in its card that scrolls inside itself, so the page never scrolls
+   sideways. `.admin-table-scroll` is Translations' matrix: the card is at
+   most the window's height under the top bar, and its head row sticks to
+   the card's top (a sticky element inside a scrolling box sticks to that
+   box, never to the window), on the surface over the rows, at the raised
+   layer. `.admin-table-scroll--x` is Trash's table, the forms list's and a
+   form's submissions': the sideways scroll alone, with no height of its
+   own, so its rows scroll with the page. In
+   both the first column sticks at the left as the card scrolls sideways.
+   `.admin-table-scroll` is a stacking context of its own, so its local
+   layers stay under the shell's top bar. In it the head's corner stands at
+   `raised-top`, over the rest of the head (which slides under it sideways)
+   and over the Item column (which slides under it as the rows scroll); the
+   head and the Item column stand at `raised`, over a row's links at `lift`
+   and its stretched link at none. */
+.admin-table-scroll { isolation: isolate; overflow: auto; max-height: calc(100dvh - var(--admin-top-offset) - var(--cs-sp-4) * 2); overscroll-behavior: auto; }
+/* The head's bottom line is each head cell's inset shadow, not the row's
+   border: a border of a collapsed table stays where the row was, while the
+   cell's own shadow travels with the sticky head. */
+.admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); box-shadow: inset 0 -1px 0 var(--cs-line-strong); }
+.admin-table-scroll--x { overflow-x: auto; }
+:is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
+.admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
+.admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }
+/* A Translations row, a Forms row and a submission's row under the pointer
+   are on paper, every cell of them: the sticky first cell's own surface
+   ground is written above, so the row's tint is written on its cells, after
+   it and with the weight to win. */
+@media (hover: hover) {
+  .admin-table-scroll .admin-translation-row:hover > :is(th, td),
+  .admin-table-scroll--x :is(.admin-forms-table, .admin-form-submissions-table) tbody tr:hover > td { background: var(--cs-paper); }
+}
 
 /* A picture in a note or a still GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows
@@ -1689,27 +1802,29 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .form-send-page .form-field__error::before { content: "!"; content: "!" / ""; font-family: var(--cs-mono); margin-right: 0.375rem; }
 
 /* The people on a row (`Admin::Ui::PresenceMarkerComponent`): circles that
-   overlap by 6px, the wide "+N" at rest and the narrow one, which counts
-   everyone past the first circle, hidden. The ring around a circle is the
-   colour of the row it stands on (`--admin-avatar-ground`, which the tree
-   row sets, on hover and selected too, and the circle falls back to the
-   surface from). Where the width is short a row keeps the first circle and
-   swaps the wide "+N" for the narrow one. In the tree the width asked is the
-   COLUMN's (`.admin-shell__tree`, a size container whose width the grid or
-   the drawer gives it, never its content), so every row of one tree shows
-   the same number of people whatever its depth: 260px of the column, less
-   its 2rem of padding and a classic scrollbar's 15px, which a container
-   query does not count (the 220px minimum is below that width and the
-   default 272px above, with or without the scrollbar). The posts list asks its
-   own container, never the window: the list is as narrow at any window
-   width. */
-.admin-presence-marker > [data-presence-avatar] ~ :is([data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { margin-inline-start: -6px; }
-.admin-presence-marker > [data-presence-more-narrow] { display: none; }
-@container admin-tree-column (max-width: 212.98px) {
-  .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
-  .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
-}
+   stand 2px apart and never overlap (two letters reach about 19px into a
+   22px circle, so a circle over the one before would cover its second
+   letter), then the wide "+N"; hidden are the narrow "+N", which counts
+   everyone past the first circle, and the count circle, which counts
+   everyone.
+   A TREE ROW decides by its own width (`admin-tree-row`, the shared row of
+   the Pages tree, its drawer and the mind graph's list), whatever its
+   depth or column: from 240px its two circles and "+N"; under 240px there
+   is no room for circles beside the title, so one person is their own
+   circle and two or more are the count circle, never nothing, with the
+   words and tooltip unchanged. The marker's `data-presence-count` (the
+   component's, kept by `admin--presence--list`) tells one from more.
+   THE POSTS LIST asks its own container, never the window, since the list
+   is as narrow at any window width: under 640px one circle and the narrow
+   "+N". */
+.admin-presence-marker > :is([data-presence-more-narrow], [data-presence-total]) { display: none; }
 @container admin-list (max-width: 639px) {
   .admin-presence-marker > [data-presence-avatar] ~ [data-presence-avatar], .admin-presence-marker > [data-presence-more] { display: none; }
   .admin-presence-marker > [data-presence-more-narrow] { display: flex; }
 }
+@container admin-tree-row (max-width: 239.98px) {
+  .admin-presence-marker > :is([data-presence-avatar] ~ [data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }
+  .admin-presence-marker:not([data-presence-count="1"]) > [data-presence-avatar] { display: none; }
+  .admin-presence-marker:not([data-presence-count="1"]) > [data-presence-total] { display: flex; }
+}
+

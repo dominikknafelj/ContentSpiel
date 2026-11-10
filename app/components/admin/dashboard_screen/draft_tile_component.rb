@@ -1,8 +1,8 @@
 module Admin
   module DashboardScreen
     # One of the viewer's drafts in "Pick up where you left off", as a tile
-    # (`rounded-tile bg-surface shadow-1`, raised to `shadow-2` under the
-    # pointer): the record's kind (a post's content-type dot with its name,
+    # (`.admin-tile`: elevation 1 at rest, 2 under the pointer; it is never
+    # selected): the record's kind (a post's content-type dot with its name,
     # or "Page"), its title, a post's excerpt clamped to two lines, when it
     # was last edited, and the verb "Continue".
     #

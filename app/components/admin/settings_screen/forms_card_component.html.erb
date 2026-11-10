@@ -1,4 +1,4 @@
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("forms"), id: "settings-forms-card") do %>
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("forms"), self), id: "settings-forms-card") do %>
   <div class="admin-column p-4" data-field-name="form_keep_days" <%= tag.attributes(data: { save_bar_changed: values.saved_change("form_keep_days") }) %>>
     <div class="flex flex-wrap items-center gap-2 text-ink">
       <label for="<%= field_id %>"><%= t(".keep_label") %></label>

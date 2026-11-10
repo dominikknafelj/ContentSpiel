@@ -1,0 +1,15 @@
+# The Trash screen's own keys (docs/reference/i18n.md): `admin.trash.index` is
+# the view's lazy-lookup scope (`app/views/admin/trash/index.html.erb`). Its
+# list, rows, tabs and Empty trash say theirs as `admin.components.trash_screen`.
+en:
+  admin:
+    trash:
+      index:
+        title: "Trash"
+        # The retention line under the heading, and its link into Settings.
+        retention:
+          never: "Items stay in the trash until someone deletes them for good."
+          days:
+            one: "Items are deleted for good after %{count} day."
+            other: "Items are deleted for good after %{count} days."
+        change: "Change"

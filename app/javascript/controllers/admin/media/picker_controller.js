@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
-import { UploadTiles, updateCounts } from "media/upload_tiles"
+import { UploadTiles, updateCounts, uploadWords } from "media/upload_tiles"
 
-// The one media picker (media library design spec §6, Task 8; round 3, Task 9),
-// on `Media::PickerComponent`'s `<dialog>` -- rendered once per CS Studio page by
+// The one media picker, on `Media::PickerComponent`'s `<dialog>` -- rendered
+// once per CS Studio page by
 // the admin layout. See that component's comment for where it's used and how it
 // is built; `admin--media--select` (the same element) owns choosing a tile.
 //
@@ -35,7 +35,7 @@ import { UploadTiles, updateCounts } from "media/upload_tiles"
 // tile with the server's reason. No browser dialogs anywhere.
 export default class extends Controller {
   static targets = [ "frame", "file", "status" ]
-  static values = { gridUrl: String, uploadUrl: String, buttonClass: String }
+  static values = { gridUrl: String, uploadUrl: String, tileClass: String, buttonClass: String }
 
   connect() {
     this.opener = null
@@ -47,7 +47,9 @@ export default class extends Controller {
       fields: () => this.searchValue ? { q: this.searchValue } : {},
       onUploaded: (done) => this.uploaded(done),
       announce: (text) => { this.statusTarget.textContent = text },
-      buttonClass: this.buttonClassValue
+      tileClass: this.tileClassValue,
+      buttonClass: this.buttonClassValue,
+      words: uploadWords(this.element)
     })
   }
 
@@ -187,7 +189,7 @@ export default class extends Controller {
   }
 
   // A finished upload: the counts follow it, and the first of the batch is the
-  // selection (handoff C36b) -- selected, not chosen: the editor confirms.
+  // selection -- selected, not chosen: the editor confirms.
   uploaded({ json, tile }) {
     updateCounts(json.counts, { picker: true })
     if (!this.selectNextUpload || !tile) return

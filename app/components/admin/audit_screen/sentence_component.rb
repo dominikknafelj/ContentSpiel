@@ -1,8 +1,9 @@
 module Admin
   module AuditScreen
-    # One `Audit::Sentence` as markup (design pass round 3, Task 15): the log's
-    # rows, the event page's title and the dashboard's "Recent activity" all
-    # draw a sentence here, so the wording AND the look agree. The sentence is
+    # One `Audit::Sentence` as markup: the log's rows, the event page's title
+    # and the dashboard's "Recent activity" all draw a sentence here, so the
+    # wording AND the look agree. The names (the actor, the subject, a strong
+    # part) are at weight 500 in the sentence's own colour. The sentence is
     # plain data (the model knows no components); this is where it becomes
     # HTML: the actor named through `Admin::Ui::UserNameComponent` ("You" for the
     # viewer, "You, via <token>" for the viewer's own token, nothing at all for
@@ -38,7 +39,7 @@ module Admin
 
         name = actor.you ? "You" : render(Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id))
         via = actor.via_label.present? ? (actor.you ? ", via #{actor.via_label}" : " via #{actor.via_label}") : ""
-        safe_join([ content_tag(:span, name, class: "font-semibold"), via, " " ])
+        safe_join([ content_tag(:span, name, class: "font-medium"), via, " " ])
       end
 
       def part_html
@@ -46,7 +47,7 @@ module Admin
           case part.kind
           when :subject then subject_html(part.text)
           when :collection then collection_html(part.text)
-          when :strong then content_tag(:span, part.text, class: "font-semibold")
+          when :strong then content_tag(:span, part.text, class: "font-medium")
           else part.text
           end
         end
@@ -61,9 +62,9 @@ module Admin
         route = sentence.subject_route
         if route && ROUTES.include?(route.name)
           link_to(label, helpers.public_send(route.name, *route.args, **route.params, **url_options),
-            class: "relative z-(--cs-z-raised) font-semibold hover:underline", data: { turbo_frame: "_top" })
+            class: "relative z-(--cs-z-raised) font-medium hover:underline", data: { turbo_frame: "_top" })
         else
-          content_tag(:span, label, class: "font-semibold")
+          content_tag(:span, label, class: "font-medium")
         end
       end
 

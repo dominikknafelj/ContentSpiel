@@ -16,7 +16,7 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
   end
 
   # Every control under `root` as [description, height]: the fields and
-  # selects, the Clear link, the subject chip, and each segmented group's
+  # selects, the Clear link, and each segmented group's
   # frame (its labels are the frame less its two border pixels). A filter
   # panel's fieldset is no segmented group: its selects are measured as
   # selects.
@@ -28,7 +28,6 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
         const add = (el, name) => out.push([name, Math.round(el.getBoundingClientRect().height * 100) / 100])
         bar.querySelectorAll("input:not(.sr-only):not([type=hidden]), select").forEach((el) => add(el, el.tagName.toLowerCase() + "#" + el.id))
         bar.querySelectorAll("a[data-turbo-frame]:not([aria-label])").forEach((el) => add(el, "link " + el.textContent.trim()))
-        bar.querySelectorAll("[data-subject-chip]").forEach((el) => add(el, "chip"))
         bar.querySelectorAll("fieldset:not(.admin-filter-panel) > div").forEach((el) => add(el, "segments"))
         return out
       })()
@@ -76,13 +75,22 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "the audit log's bar: its selects, the subject chip and Clear are one height" do
-    post = create_post(title: "Chip")
-    visit admin_audit_events_path(subject_type: "Post", subject_id: post.id, range: "7")
-    await_admin_controllers
-    assert_one_height(%w[select#user_id select#event_action chip select#channel select#range link\ Clear])
+  # The subject chip is the chip input's pill, not a control of the row: it
+  # is as tall as a tag chip in the post editor, and its × is the pill's own
+  # 20px button.
+  test "the audit log's bar: its selects and Clear are one height, and the subject chip is the chip input's pill" do
+    post = create_post(title: "Chip", tags: [ "ruby" ])
+    visit_editor post
+    pill = page.evaluate_script("document.querySelector('.admin-chip-field li.admin-chip').getBoundingClientRect().height")
 
-    visit admin_audit_events_path(range: "custom")
+    visit_screen admin_audit_events_path(subject_type: "Post", subject_id: post.id, range: "7")
+    assert_one_height(%w[select#user_id select#event_action select#channel select#range link\ Clear])
+    chip = page.evaluate_script("document.querySelector('#{BAR} [data-subject-chip]').getBoundingClientRect().height")
+    assert_in_delta pill, chip, 0.5, "the subject chip is #{chip}px, a chip input's pill is #{pill}px"
+    assert_operator chip, :<, HEIGHT - 4, "the subject chip is not stretched to the bar's height"
+    assert_equal 20, page.evaluate_script("Math.round(document.querySelector('#{BAR} [data-subject-chip] a').getBoundingClientRect().height)")
+
+    visit_screen admin_audit_events_path(range: "custom")
     assert_one_height(%w[select#user_id select#subject_type input#from input#to])
   end
 

@@ -1,13 +1,12 @@
 module Admin
   module TrashScreen
-    # `RowComponent`: a post row, a page row with its
-    # subpage sentence, and an image that is still used (Delete now… disabled
-    # with its reason as text) -- built from unsaved records -- and the three
-    # ways a page's Restore is drawn, built from real pages (rolled back with
-    # the preview request): one click for a root whose parent is still there,
-    # an inline "Restore under" with its parent select when the parent is in
-    # the trash too, and the same disabled with its reason when the viewer has
-    # no page to restore it under.
+    # `RowComponent`: a post row, a page row with its subpage sentence, and an
+    # image that is still used (Delete now… disabled with its reason as text) --
+    # built from unsaved records -- and the three ways a page's Restore is
+    # drawn, built from real pages (rolled back with the preview request): one
+    # click for a root whose parent is still there, an inline "Restore under"
+    # with its parent select when the parent is in the trash too, and the same
+    # disabled with its reason when the viewer has no page to restore it under.
     class RowComponentPreview < ViewComponent::Preview
       def post_row = table(row(post, who: "You"))
 
@@ -51,8 +50,15 @@ module Admin
 
       def post = Post.new(id: 9000, title: "Retired announcement", trashed_at: 1.day.ago)
 
-      def row(item, **opts)
-        Admin::TrashScreen::RowComponent.new(item:, retention_days: 30, **opts)
+      def row(item, who:, **opts)
+        Admin::TrashScreen::RowComponent.new(item:, retention_days: 30, who:, actor: actor(who), **opts)
+      end
+
+      # The trasher as the audit log's actor facts: the viewer, a named user
+      # (unsaved), or System.
+      def actor(who)
+        user = { "You" => User.new(id: 9100, name: "Dana Weiss"), "Ada Lovelace" => User.new(id: 9101, name: "Ada Lovelace") }[who]
+        Audit::Sentence::Actor.new(you: who == "You", user:, user_id: user&.id, via_label: nil, none: false)
       end
 
       def table(row) = render_with_template(template: "admin/trash_screen/row_component_preview/row", locals: { row: })

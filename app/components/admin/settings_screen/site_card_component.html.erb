@@ -1,4 +1,4 @@
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("site"), id: "settings-site-card",
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("site"), self), id: "settings-site-card",
       data: { controller: "admin--settings--tabs", action: "click@document->admin--settings--tabs#reveal", "admin--settings--tabs-current-value": locale }) do |card| %>
   <% if codes.size > 1 %>
     <% card.with_head_end do %>

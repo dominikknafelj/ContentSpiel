@@ -1,0 +1,29 @@
+# The Media screen's own keys (docs/reference/i18n.md): `admin.media.index` is
+# the view's lazy-lookup scope (`app/views/admin/media/index.html.erb`). Its
+# toolbar, grid and tiles say theirs as `admin.components.media_library`.
+en:
+  admin:
+    media:
+      index:
+        title: "Media"
+        upload: "Upload images"
+        hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
+        drop: "Drop images to upload"
+        # The rail of the chosen image: its tablist's name, its own tab, and its
+        # Close's name and tooltip.
+        rail_label: "Image details"
+        image_tab: "Image"
+        close: "Close panel"
+      # `Media::PickerComponent`, the Media screen's dialog that every image
+      # field opens (outside `app/components/admin/`, so read with full keys),
+      # and its grid view (`admin/media/picker`). `none` and `selected` are
+      # also `admin--media--select`'s, from the dialog's `data-messages`.
+      picker:
+        title: "Choose an image"
+        upload: "Upload"
+        close: "Close"
+        file: "Image file"
+        none: "No image selected"
+        selected: "1 selected"
+        cancel: "Cancel"
+        use: "Use image"

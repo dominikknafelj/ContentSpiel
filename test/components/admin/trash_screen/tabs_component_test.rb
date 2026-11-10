@@ -19,8 +19,8 @@ class Admin::TrashScreen::TabsComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=page]", text: "Posts"
   end
 
-  # Contrast and buttons spec (Ruling 14): the current tab is the same
-  # control as a selected pill, ink with paper words, its count undimmed.
+  # The current tab is the same control as a selected pill, ink with paper
+  # words, its count undimmed.
   test "the current tab is ink with paper words and its count carries no opacity" do
     render_inline tabs(current: "posts")
 

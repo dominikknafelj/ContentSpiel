@@ -1,6 +1,6 @@
 module Admin
   module NotesScreen
-    # The Notes tab of an editor's rail (notes spec §4.1), registered at the
+    # The Notes tab of an editor's rail, registered at the
     # panel slot `editor.rail.tabs` (`config/initializers/admin_slots.rb`):
     # the rail draws its tab after its own and this as the content of its
     # panel (`Admin::Ui::RailSlotComponent`), so the editors and the rail do
@@ -66,8 +66,9 @@ module Admin
       # the counts this tab already holds, as it fills a marker a stream drew.
       def tab_count = counts ? counts.fetch("total").to_i : 0
 
-      # The tab's number is a `total` of `admin--notes--drawer`.
-      def tab_count_data = { "admin--notes--drawer-target": "total" }
+      # The tab's number is a `total` of `admin--notes--drawer`, one that says
+      # "2 new" while something is unread for the viewer (`notes_total_words`).
+      def tab_count_data = { "admin--notes--drawer-target": "total", notes_total_words: true }
 
       # `?notes=open` in the request: the Notes tab is drawn current, so the
       # first paint shows the notes and not the host's own tab first.

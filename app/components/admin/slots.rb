@@ -1,6 +1,6 @@
 module Admin
   # Named places on CS Studio's screens where a feature puts a part of its
-  # own (presence spec §4.1). A screen draws `Admin::Ui::SlotComponent` at the
+  # own. A screen draws `Admin::Ui::SlotComponent` at the
   # place and does not know what stands there; a feature registers a
   # component for the name in `config/initializers/admin_slots.rb`. That is
   # what keeps the editors' header and the media panel free of the features
@@ -32,14 +32,15 @@ module Admin
   #   size: :panel)`), merged after the context, so they win on a clash.
   # `render?` decides whether it draws; one that says no leaves no markup.
   #
-  # A PANEL slot, `editor.rail.tabs`, is drawn by `Admin::Ui::RailSlotComponent`
-  # and `Admin::Ui::RailTabsComponent`, not by `SlotComponent`: each entry is a
+  # A PANEL slot, `editor.rail.tabs` (the editors' rail) or `media.rail.tabs`
+  # (the Media screen's), is drawn by `Admin::Ui::RailSlotComponent` and
+  # `Admin::Ui::RailTabsComponent`, not by `SlotComponent`: each entry is a
   # tab AND its panel. Beside the slot component's arguments it answers
   # `tab_key` (a String of lowercase letters), `tab_label`, `tab_count` (an
   # Integer, or nil for none), optionally `tab_count_data` (the figure's
   # `data-` attributes) and `tab_current?` (the request asks for this tab to
   # be the one shown as the page is drawn), and `render?`; drawn, it is the panel's content.
-  # The editors hand it `query:` (the request's query parameters), so a panel
+  # Both hosts hand it `query:` (the request's query parameters), so a panel
   # reads its own parameters without the host naming them. The tab's contents
   # are drawn again by a save's answer (`Admin::Answers::RailTabStreams`), the
   # panel never, since it may hold typed text.
@@ -68,7 +69,7 @@ module Admin
       editor.header.people editor.header.actions
       media.panel.header media.panel.sections
       tree.row.markers posts.row.markers posts.row.title
-      editor.block.markers editor.rail.tabs
+      editor.block.markers editor.rail.tabs media.rail.tabs
     ].freeze
 
     # The slot's own constructor arguments: an option of these names would replace

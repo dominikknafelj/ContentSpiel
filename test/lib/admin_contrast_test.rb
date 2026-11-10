@@ -282,6 +282,60 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A selected or pressed tile in a grid (`.admin-tile`) is told by its
+  # accent outline alone, 2px outside its edge, so the outline stands on the
+  # card it is in (surface) or on the page (paper), and is held at the
+  # figures it reaches, which are well above 3:1.
+  test "a selected tile's accent outline is 3:1 on surface and on paper" do
+    floors = { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-paper" => { light: 6.2, dark: 7.8 } }
+    each_scheme do |scheme, colour|
+      floors.each { |ground, figures| assert_ratio(figures.fetch(scheme), colour.("--cs-accent"), colour.(ground), "the selected tile's outline on #{ground} (#{scheme})") }
+    end
+  end
+
+  # A language's progress bar (`Admin::Ui::LanguageProgressComponent`, on
+  # the Translations tiles and the Dashboard's "Languages behind", which docks
+  # on the rail) says how much is done by its ok fill alone on its `line`
+  # track: a graphic's 3:1, held at the figures it reaches. `line` is
+  # translucent, so it is painted over each ground before it is measured.
+  test "a language's ok bar is 3:1 or better on its line track, on the surface and on the rail" do
+    floors = { "--cs-surface" => { light: 4.2, dark: 5.0 }, "--cs-rail" => { light: 3.7, dark: 4.4 } }
+    each_scheme do |scheme, colour|
+      floors.each do |ground, figures|
+        assert_ratio(figures.fetch(scheme), colour.("--cs-ok"), colour.("--cs-line", under: ground), "the language progress bar on its track over #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # Trash's retention words for today and tomorrow (`Admin::TrashScreen::
+  # RetentionTagComponent`) are warn ink, told by their words, in a row on
+  # the card (surface). Paper is held too, at the figure it reaches, should
+  # the tag ever stand on the page outside a card.
+  test "a retention of today or tomorrow is warn ink at 4.5:1 on surface and on paper" do
+    floors = { "--cs-surface" => { light: 7.6, dark: 9.8 }, "--cs-paper" => { light: 6.9, dark: 10.9 } }
+    each_scheme do |scheme, colour|
+      floors.each { |ground, figures| assert_ratio(figures.fetch(scheme), colour.("--cs-warn-ink"), colour.(ground), "today's and tomorrow's retention on #{ground} (#{scheme})") }
+    end
+  end
+
+  # A day band's date in the audit log (`Admin::AuditScreen::DayListComponent`)
+  # is meta on the band's paper ground: words a person reads, held at the
+  # figures they reach.
+  test "a day band's date is meta at 4.5:1 on paper" do
+    each_scheme do |scheme, colour|
+      assert_ratio({ light: 5.7, dark: 7.0 }.fetch(scheme), colour.("--cs-meta"), colour.("--cs-paper"), "a day band's date on paper (#{scheme})")
+    end
+  end
+
+  # A word diff's removed words (`Admin::Ui::WordDiffComponent`) are struck
+  # through in ink on sunken: words a person reads, held at the figures they
+  # reach.
+  test "removed words are ink on sunken at 4.5:1" do
+    each_scheme do |scheme, colour|
+      assert_ratio({ light: 14.4, dark: 11.5 }.fetch(scheme), colour.("--cs-ink"), colour.("--cs-sunken"), "removed words on sunken (#{scheme})")
+    end
+  end
+
   # The drop place (`.admin-drag-ghost`, a tile's, a block card's and a tree
   # row's) is a dashed edge with nothing inside it: the edge alone says where
   # the drag lands, so it is a state's 3:1 on the grounds it stands on.
@@ -735,6 +789,19 @@ class AdminContrastTest < ActiveSupport::TestCase
       %w[--cs-surface --cs-rail].each do |ground|
         assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the off chip's edge and ring on #{ground} (#{scheme})")
         assert_ratio(4.5, colour.("--cs-dim"), colour.(ground), "the off chip's word on #{ground} (#{scheme})")
+      end
+    end
+  end
+
+  # A submission's delivery says Sent and Not delivered in a state chip, its
+  # word on the role's tint, held at the figures they measure: ok 7.0 / 8.0
+  # and warn 6.5 / 8.3, so a change of either pair cannot quietly take them
+  # back toward the chip's 4.5 floor.
+  test "a delivery's Sent and Not delivered read on their tints at their measured figures, in both schemes" do
+    figures = { ok: { light: 7.0, dark: 8.0 }, warn: { light: 6.5, dark: 8.3 } }
+    each_scheme do |scheme, colour|
+      figures.each do |role, floors|
+        assert_ratio(floor(floors.fetch(scheme)), colour.("--cs-#{role}-ink"), colour.("--cs-#{role}-tint"), "a delivery's #{role} chip's word (#{scheme})")
       end
     end
   end

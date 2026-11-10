@@ -1,6 +1,6 @@
 module Admin
   module Answers
-    # The rail's registered tabs (`editor.rail.tabs`), as streams, for an answer
+    # A rail's registered tabs (`slot:`, the editors' `editor.rail.tabs`), as streams, for an answer
     # to a save: each tab's contents, its label and its number, are drawn again
     # into the tab by id, so its count follows the change.
     #
@@ -16,9 +16,9 @@ module Admin
     # that was not drawn at page load is not added by a stream (replacing a
     # missing id does nothing); it appears at the next page load.
     module RailTabStreams
-      def self.for(record, view:, viewer:, rail_id: "editor-grid", **context)
+      def self.for(record, view:, viewer:, slot:, rail_id: "editor-grid", **context)
         builder = Answers.stream_builder(view)
-        Admin::Ui::RailSlotComponent.new(rail_id:, record:, viewer:, **context).tabs.map do |tab|
+        Admin::Ui::RailSlotComponent.new(slot:, rail_id:, record:, viewer:, **context).tabs.map do |tab|
           builder.update(Admin::Ui::RailTabsComponent.tab_id(rail_id, tab.key), Admin::Ui::RailTabComponent.new(rail_id:, tab:, contents: true))
         end
       end

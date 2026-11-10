@@ -15,7 +15,7 @@ class Admin::NotesScreen::RailPanelComponentTest < ViewComponent::TestCase
     assert_equal "notes", component.tab_key
     assert_equal "Notes", component.tab_label
     assert_equal 2, component.tab_count
-    assert_equal({ "admin--notes--drawer-target": "total" }, component.tab_count_data)
+    assert_equal({ "admin--notes--drawer-target": "total", notes_total_words: true }, component.tab_count_data)
     assert component.render?
     assert panel(create_post(title: "Hello")).render?
     assert_not panel(Page.new).render?

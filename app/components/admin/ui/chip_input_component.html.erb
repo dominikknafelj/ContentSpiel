@@ -27,7 +27,7 @@
           <% if chip[:invalid] %><span class="sr-only" data-chip-invalid-note> <%= t(".invalid") %></span><% end %>
           <% if chip[:hint].present? %><span class="shrink-0 text-meta" data-chip-hint>· <%= chip[:hint] %></span><% end %>
           <%= tag.input type: "hidden", name: name, value: chip[:value], autocomplete: "off", data: track_data %>
-          <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          <button type="button" class="<%= REMOVE_CLASS %>"
                   aria-label="<%= remove_label(chip) %>"
                   data-action="click->admin--ui--chip-input#remove keydown->admin--ui--chip-input#chipKeydown"><span aria-hidden="true">×</span></button>
         <% end %>
@@ -63,7 +63,7 @@
       <span class="min-w-0 truncate" data-chip-label></span>
       <span class="shrink-0 text-meta" data-chip-hint hidden></span>
       <%= tag.input type: "hidden", name: name, autocomplete: "off", data: track_data %>
-      <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+      <button type="button" class="<%= REMOVE_CLASS %>"
               data-action="click->admin--ui--chip-input#remove keydown->admin--ui--chip-input#chipKeydown"><span aria-hidden="true">×</span></button>
     <% end %>
   </template>

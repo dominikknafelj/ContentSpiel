@@ -1,7 +1,5 @@
-<section class="admin-settings-card rounded-card bg-surface shadow-1" aria-labelledby="form-placements">
-  <div class="border-b border-line px-4 py-3.5">
-    <h2 id="form-placements" class="text-h2 text-ink"><%= t(".title") %></h2>
-  </div>
+<%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-placements", heading: t(".title"),
+      **Admin::FormsScreen::BuilderComponent.card_chip) do %>
   <div class="p-4 text-sm">
     <% if pages.empty? && hidden.zero? %>
       <p class="text-dim"><%= t(".none") %></p>
@@ -18,4 +16,4 @@
       <% end %>
     <% end %>
   </div>
-</section>
+<% end %>

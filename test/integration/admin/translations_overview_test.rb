@@ -67,7 +67,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "#{row("page", outdated_page)} .admin-translation-row__action", text: "Review changes →"
     assert_select "#{row("post", stale_post)} a[href='/cs-studio/posts/#{stale_post.id}?locale=de'] [data-translation-state=outdated]"
     assert_select "#{row("media", image)} a[href='/cs-studio/media?locale=es&selected=#{image.id}']"
-    # One card per target language, none for the original.
+    # One tile per target language, none for the original.
     assert_select "[data-translation-summary] [data-locale]", count: 2
     assert_select "[data-translation-summary] [data-locale=en]", count: 0
   end
@@ -213,7 +213,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "#{row("post", post)} th[scope=row] a[href='/cs-studio/posts/#{post.id}?locale=es']"
   end
 
-  test "summary cards count items over what the viewer can read" do
+  test "language tiles count items over what the viewer can read" do
     complete_post("Done")
     create_post(title: "Not done")
     outdated_post("Stale")
@@ -253,14 +253,14 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "label", text: /Posts\s*1/
   end
 
-  test "a summary card links to the matrix narrowed to its language, keeping the type filter" do
+  test "a language tile links to the matrix narrowed to its language, keeping the type filter" do
     both = create_post(title: "Needs both")
     only_es = create_post(title: "Only Spanish left")
     assert Posts::Save.call(only_es, translations: { "de" => { title: "Nur Spanisch" } }).ok?
 
     get "/cs-studio/translations", params: { type: "post" }
-    assert_select "[data-translation-summary] [data-locale=de] a[href='/cs-studio/translations?language=de&type=post']", text: "Deutsch"
-    assert_select "[data-translation-summary] [data-locale=de] a[aria-label='Deutsch: show items to translate']"
+    assert_select "[data-translation-summary] a[data-locale=de][href='/cs-studio/translations?language=de&type=post']", text: /Deutsch/
+    assert_select "[data-translation-summary] a.admin-tile[data-locale=de][aria-label='Deutsch: show items to translate']"
 
     get "/cs-studio/translations", params: { type: "post", language: "de" }
     assert_response :success
@@ -268,7 +268,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select row("post", only_es), count: 0
     assert_select "tbody th[scope=col]", count: 0
     assert_select "thead th[scope=col]", text: "Español" # every column stays
-    assert_select "[data-translation-summary] [data-locale=de] a[aria-current=true][href='/cs-studio/translations?type=post']"
+    assert_select "[data-translation-summary] a[data-locale=de][aria-current=true][href='/cs-studio/translations?type=post']"
     assert_select "input[type=hidden][name=language][value=de]"
     assert_select "a", text: "Clear"
 

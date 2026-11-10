@@ -461,15 +461,13 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     page.current_window.resize_to(*original)
   end
 
-  test "the media panel shows who has the image open, between the name and the close, and nobody once they close it" do
+  test "the media panel shows who has the image open, after the name, and nobody once they close it" do
     asset = create_media_asset
     asset.update_columns(title: "a-very-long-file-name-that-would-have-wrapped-over-several-lines-of-the-panel.png") # version: none (a system test's own image)
     visit "/cs-studio/media?selected=#{asset.id}"
     await_notes_live
     assert_selector "#media-panel turbo-frame#presence-media-#{asset.id}", visible: :all
     assert_no_selector "#media-panel .admin-presence button"
-    alone = page.evaluate_script("document.querySelector('#media-panel a[aria-label=\"Close panel\"]').getBoundingClientRect().left - document.querySelector('#media-panel-title').getBoundingClientRect().right")
-    assert_equal 12, alone, "with nobody else the close is not 12px after the name"
 
     join(:dana, @dana, path: "/cs-studio/media?selected=#{asset.id}") { assert_selector "#media-panel [data-presence-user='#{@me.id}']", wait: LIVE }
 
@@ -477,21 +475,26 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     row = page.evaluate_script(<<~JS)
       (() => {
         const box = (selector) => document.querySelector(`#media-panel ${selector}`).getBoundingClientRect()
-        const [ name, people, circle, close ] = [ box("#media-panel-title"), box("[data-controller~='admin--presence--record']"), box("[data-presence-user] > span"), box("a[aria-label='Close panel']") ]
+        const [ name, people, circle ] = [ box("#media-panel-title"), box("[data-controller~='admin--presence--record']"), box("[data-presence-user] > span") ]
+        const rail = document.getElementById("media-rail")
+        const closer = rail.lastElementChild
+        const close = closer.getBoundingClientRect()
         const title = document.querySelector("#media-panel-title")
         const ring = getComputedStyle(document.querySelector("#media-panel [data-presence-user] > span")).boxShadow
-        const surface = getComputedStyle(document.querySelector("#media-panel").parentElement.closest(".bg-surface")).backgroundColor
-        return { circle: circle.width, afterName: people.left - name.right, beforeClose: close.left - people.right, cut: title.scrollWidth > title.clientWidth,
-                 oneLine: name.height, centred: (circle.top + circle.height / 2) - (name.top + name.height / 2), closeLast: close.right > people.right,
-                 whole: title.firstElementChild.title, ringOnSurface: ring.includes(surface) }
+        return { circle: circle.width, afterName: people.left - name.right, cut: title.scrollWidth > title.clientWidth,
+                 oneLine: name.height, centred: (circle.top + circle.height / 2) - (name.top + name.height / 2),
+                 closeLast: closer.matches("a[aria-label='Close panel']") && close.left >= people.right && close.top <= name.top,
+                 whole: title.firstElementChild.title, outerRing: /0px 0px 0px 2px(,|$)/.test(ring) }
       })()
     JS
-    # 22px circles, centred on the name's one line of 28px.
-    assert_equal({ "circle" => 22, "afterName" => 8, "beforeClose" => 12, "cut" => true, "oneLine" => 28, "centred" => 0, "closeLast" => true, "whole" => asset.title, "ringOnSurface" => true }, row)
+    # 22px circles, centred on the name's one line of 28px, with no ring
+    # outside them: they stand apart and never overlap. Close is the rail's
+    # last child, over its top-right corner, right of the people.
+    assert_equal({ "circle" => 22, "afterName" => 8, "cut" => true, "oneLine" => 28, "centred" => 0, "closeLast" => true, "whole" => asset.title, "outerRing" => false }, row)
 
     # Closing the panel takes its element out of the page: that is leaving.
     using_session(:dana) do
-      click_frame_link { find("#media-panel a[aria-label='Close panel']").click }
+      click_frame_link { find("#media-rail a[aria-label='Close panel']").click }
       assert_no_selector "#media-panel"
     end
     assert_no_selector "#media-panel [data-presence-user]", wait: LIVE
@@ -505,9 +508,11 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
     assert_selector circle(@dana), wait: LIVE
     join(:reader, @reader)
     assert_selector circle(@reader), wait: LIVE
-    # Wide: both, and no "+N".
+    # Wide: both, 2px apart, and no "+N".
     assert_selector "#{group} > [data-presence-user]", count: 2
     assert_no_selector "#{group} [data-presence-more]"
+    gap = page.evaluate_script("(() => { const [ a, b ] = [ ...document.querySelectorAll(#{"#{group} > [data-presence-user] > span:first-child".to_json}) ].map((each) => each.getBoundingClientRect()); return Math.round(b.left - a.right) })()")
+    assert_equal 2, gap, "the second circle stands 2px after the first"
 
     page.current_window.resize_to(900, 900)
     assert_selector "#{group} > [data-presence-user]", count: 1
@@ -525,8 +530,8 @@ class Admin::PresenceSystemTest < ApplicationSystemTestCase
         return { width: b.width, height: b.height, after: b.left - a.right, sunken: getComputedStyle(count).backgroundColor === sunken }
       })()
     JS
-    # A sunken circle of the same size, over the last person by 6px like the others.
-    assert_equal({ "width" => 26, "height" => 26, "after" => -6, "sunken" => true }, more)
+    # A sunken circle of the same size, 2px after the last person like the others.
+    assert_equal({ "width" => 26, "height" => 26, "after" => 2, "sunken" => true }, more)
 
     # Hovering "+N" shows the list of everyone, in the same order (6), and
     # leaves the focus where it was; a redraw under the open list leaves it

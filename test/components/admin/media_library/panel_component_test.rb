@@ -1,11 +1,11 @@
 require "test_helper"
 
-# `Admin::MediaLibrary::PanelComponent`'s trash-aware "Used on" panel (trash
-# spec §4.1/§5.1): a trashed owner is never listed as a place the image
-# is used, and an asset used only by trashed owners says so (naming only the
-# ones the viewer may read) instead of the ordinary "Not used anywhere yet".
-# These tests set `trashed_at` directly the same way
-# `test/models/media/usage_test.rb` does.
+# `Admin::MediaLibrary::PanelComponent`, the Media rail's Image tab: its
+# parts in order, the view-only reader's facts, and the trash-aware "Used on":
+# a trashed owner is never listed as a place the image is used, and an asset
+# used only by trashed owners says so (naming only the ones the viewer may
+# read) instead of the ordinary "Not used anywhere yet". These tests set
+# `trashed_at` directly the same way `test/models/media/usage_test.rb` does.
 class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -22,7 +22,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     refute_text "Secret page"
   end
 
-  test "view only: plain text, the B19 sentence, no form, no trash" do
+  test "view only: plain text, the sentence naming who may edit, no form, no trash" do
     asset = create_media_asset
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand dunes" } }).ok?
     viewer = media_only_viewer
@@ -49,13 +49,50 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_selector "p.text-sm.text-meta", text: "Only editors can download the original."
   end
 
-  test "the panel is a focusable region and its close link tells admin--media--panel which tile to return to" do
+  test "the panel draws no close of its own; the rail does" do
     asset = create_media_asset
 
     render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en")
 
     assert_selector "section#media-panel[tabindex='-1'][data-admin--media--panel-target='panel']"
-    assert_selector "a[aria-label='Close panel'][data-action='click->admin--media--panel#close'][data-admin--media--panel-tile-id-param='#{asset.id}']"
+    assert_no_selector "a[aria-label='Close panel'], [data-action*='admin--media--panel#close']", wait: 0
+    assert_not_respond_to Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en"), :close_path
+  end
+
+  test "the Image tab: the title in text-h2, a borderless preview, the facts, Download original, the tabs, the wells, Used on with each record's chip, the sections slot, then the trash after a rule" do
+    asset = create_media_asset
+    kept_page = create_page(title: "Kept page")
+    Pages::Save.call(kept_page, attributes: { hero_media_asset_id: asset.id })
+    post = create_post(title: "A post")
+    Posts::Save.call(post, translations: { Locales.default => { body: rich_doc(%(::image{asset="#{asset.id}" alt="x"})) } })
+    asset.reload
+
+    Admin::Slots.with("media.panel.header" => [], "media.panel.sections" => [ SectionsProbeComponent ]) do
+      as(users(:one)) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en") }
+    end
+
+    assert_selector "#media-panel > div:first-child h2#media-panel-title.text-h2.text-ink"
+    preview = page.find("#media-panel > span:has(img, [data-image-empty])")
+    assert_equal %w[bg-sunken block overflow-hidden rounded-tile], preview[:class].split.sort
+    assert_selector "#media-panel dl dt", text: "Type"
+    page.all("#media-panel dl.text-label > dd").each { |value| assert_includes value[:class].split, "text-ink" }
+    download = page.find("#media-panel a[download]", text: "Download original")
+    assert_equal Admin::Ui::ButtonComponent.classes(:tertiary, size: :small).split.sort, (download[:class].split - %w[self-start]).sort
+    assert_selector "#media-panel h3#media-used-on.text-h3.text-ink", text: "Used on"
+    { "page" => "Kept page", "post" => "A post" }.each do |kind, title|
+      row = page.find("#media-panel li[data-used-on='#{kind}']")
+      assert_equal %w[span a], row.all(:xpath, "./*").map(&:tag_name)
+      assert_equal "true", row.find(:xpath, "./span")["aria-hidden"], "the chip is hidden from a screen reader: the row's words name the kind"
+      assert_selector "#media-panel li[data-used-on='#{kind}'] > a", text: title
+    end
+    trash = page.find("#media-panel > div:last-child")
+    assert_equal %w[border-line border-t], trash[:class].split.grep(/\Aborder/).sort
+
+    html = rendered_content
+    order = [ "media-panel-title", "<img", "Download original", "admin-language-tabs", "media_asset[title]", "media_asset[alt]", "media_asset[caption]",
+              "Used on", 'data-slot-probe="sections"', "Move to trash" ].map { |needle| html.index(needle) }
+    assert_not_includes order, nil
+    assert_equal order.sort, order
   end
 
   test "an editable panel carries the autosave form, the retention help and the warn hook while the alt is empty" do
@@ -93,7 +130,7 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset, locale: "en", link_params: { q: "sun", filter: "unused", page: "2" })
 
     assert_selector "form[action='/cs-studio/media/#{asset.id}?filter=unused&page=2&q=sun']"
-    assert_selector "a[aria-label='Close panel'][href='/cs-studio/media?filter=unused&page=2&q=sun']"
+    assert_selector ".admin-language-tabs a[href*='filter=unused'][href*='page=2'][href*='q=sun']", minimum: 1
   end
 
   test "an asset used only by a trashed owner shows the trash-only message, not the usage list" do
@@ -209,11 +246,11 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     assert_equal order.sort, order
   end
 
-  # Presence handoff 13: the people stand between the file name and the "×".
-  # The name takes the room that is left and is cut on ONE line (the whole
-  # name is its `title`, and is in full in the fields below); what the slot
-  # draws never gives way; the "×" stays last.
-  test "the file-name row: the name is cut on one line with the whole name as its title, the slot follows 8px after it and the close 12px after that" do
+  # The people stand after the title. The name takes the room that is left
+  # and is cut on ONE line (the whole name is its `title`, and is in full in
+  # the fields below); what the slot draws never gives way; the row keeps
+  # clear of the rail's Close, which stands over its right end.
+  test "the title row: the name is cut on one line with the whole name as its title, the slot follows 8px after it, and the row keeps room for the rail's close" do
     asset = create_media_asset
     asset.update_columns(title: "a-very-long-file-name-that-would-have-wrapped-over-three-lines.png") # version: none (a component test's own image)
 
@@ -222,28 +259,25 @@ class Admin::MediaLibrary::PanelComponentTest < ViewComponent::TestCase
     end
 
     row = page.find("#media-panel > div:first-child")
-    assert_equal %w[flex gap-2 items-start], row[:class].split.sort
-    assert_equal [ "h2", "b", "a" ], row.all(:xpath, "./*").map(&:tag_name)
+    assert_equal %w[flex gap-2 items-start pr-10], row[:class].split.sort
+    assert_equal [ "h2", "b" ], row.all(:xpath, "./*").map(&:tag_name)
     heading = row.find("h2#media-panel-title")
-    assert_equal %w[flex-1 font-semibold min-w-0 text-ink text-lg truncate], heading[:class].split.sort
+    assert_equal %w[flex-1 leading-7 min-w-0 text-h2 text-ink truncate], heading[:class].split.sort
     assert_selector "h2#media-panel-title > span[title='#{asset.title}']", text: asset.title, exact_text: true
-    close = row.find("a[aria-label='Close panel']")
-    assert_includes close[:class].split, "ml-1"
-    assert_includes close[:class].split, "shrink-0"
   end
 
-  test "with nobody else on the image the row is the name and the close, and presence's element is there without a group" do
+  test "with nobody else on the image the row is the name, and presence's element is there without a group" do
     asset = create_media_asset
 
     as(users(:one)) { render_inline Admin::MediaLibrary::PanelComponent.new(asset: asset.reload, locale: "en") }
 
     row = page.find("#media-panel > div:first-child")
-    assert_equal [ "h2", "div", "a" ], row.all(:xpath, "./*", visible: :all).map(&:tag_name)
+    assert_equal [ "h2", "div" ], row.all(:xpath, "./*", visible: :all).map(&:tag_name)
     row.assert_selector "div.hidden.flex-none.ml-auto[data-controller='admin--presence--record'] turbo-frame#presence-media-#{asset.id}", visible: :all
     row.assert_no_selector "button", visible: :all
   end
 
-  test "with nothing registered at its slots the panel is the panel without the notes section" do
+  test "with nothing registered at its slots the panel is the panel alone" do
     Admin::Slots.with("media.panel.header" => [], "media.panel.sections" => []) do
       render_inline Admin::MediaLibrary::PanelComponent.new(asset: create_media_asset, locale: "en")
     end

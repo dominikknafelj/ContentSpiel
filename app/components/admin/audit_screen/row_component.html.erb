@@ -1,10 +1,13 @@
-<li id="<%= dom_id %>" class="relative flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5 last:border-b-0 hover:bg-paper">
+<li id="<%= dom_id %>" class="<%= ROW_CLASS %>">
   <%# The link covers the whole row but shows only the time: its name says what
       it opens (and still begins with the words shown), and the row's sentence
       describes it, so a list of links is not a list of bare times. %>
-  <%= link_to time_text, event_path, aria: { label: "#{time_text}, details of this change", describedby: "#{dom_id}-sentence" }, class: "w-28 shrink-0 text-xs text-meta after:absolute after:inset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent" %>
-  <%= render Admin::Ui::ActorAvatarComponent.new(actor: sentence.actor) %>
-  <p id="<%= dom_id %>-sentence" class="min-w-0 flex-1 basis-60 text-sm text-dim"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
+  <%= link_to time_text, event_path, aria: { label: t(".details", time: time_text), describedby: "#{dom_id}-sentence" }, class: "w-28 shrink-0 text-label text-meta tabular-nums after:absolute after:inset-0 hover:underline focus-visible:outline-2 focus-visible:outline-accent" %>
+  <%= render Admin::Ui::ActorAvatarComponent.new(actor: sentence.actor, size: :sm) %>
+  <p id="<%= dom_id %>-sentence" class="min-w-0 flex-1 basis-60 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
   <%= render Admin::Ui::ChannelChipComponent.new(channel: event.channel) %>
-  <span class="font-cs-mono text-label <%= key_class %>"><%= event.action %></span>
+  <% if sentence.security %>
+    <%= render Admin::Ui::StateChipComponent.new(tone: :warn, label: t(".security")) %>
+  <% end %>
+  <span class="font-cs-mono text-label text-meta"><%= event.action %></span>
 </li>

@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # The tabs of an editor's rail (`.admin-rail__tabs`, drawn only where the
+    # The tabs of a rail, an editor's or the Media screen's (`.admin-rail__tabs`, drawn only where the
     # rail docks): ARIA's tabs pattern on `<button>`s, which are not a
     # `ButtonComponent` variant. Each tab controls its panel
     # (`Admin::Ui::RailPanelComponent`) by id, and only the current one is in
@@ -11,12 +11,18 @@ module Admin
     # A rail of one tab has nothing to choose: it is an `h2` with the tab's
     # label and the tab's id, which the panel's `aria-labelledby` names.
     #
-    # `slot_tabs` are the tabs features registered at `editor.rail.tabs`
+    # `slot_tabs` are the tabs features registered at the rail's panel slot
     # (`Admin::Ui::RailSlotComponent`): they join the tablist after `tabs`, and
     # a rail of one tab of its own becomes a tablist with the first of them.
     #
+    # `label` names the tablist for a screen reader; without one it is the
+    # editors' "Settings", and a host whose tabs are not settings names its
+    # own (the Media screen's "Image details").
+    #
     # `count` is a figure beside the label (`text-count`), hidden at zero so
-    # a redraw of the tab can show it again; nil draws none. `count_data` are
+    # a redraw of the tab can show it again; nil draws none. It is the tab's
+    # bubble (`data-tab-count`, drawn by the stylesheet on the people tint,
+    # and on the accent while it carries `data-unread`). `count_data` are
     # the figure's own `data-` attributes, the entry's (`tab_count_data`), so
     # the feature's script can keep the figure current.
     #
@@ -27,11 +33,11 @@ module Admin
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A tablist named Settings of tab buttons, one of them in the tab order, walked with the arrow keys, Home and End; a rail of one tab is a heading instead.",
+        accessibility: "A tablist of tab buttons named by its label (Settings unless the host names it), one of them in the tab order, walked with the arrow keys, Home and End; a rail of one tab is a heading instead.",
         motion: :none,
         content_edges: %i[many short],
         widths: :from_container,
-        interface: %i[rail_id tabs current slot_tabs],
+        interface: %i[rail_id tabs current slot_tabs label],
         limits: [
           "It draws only where the rail docks, and the current tab is the server's only on the first draw.",
           "A current that names no tab is the first tab."
@@ -53,8 +59,9 @@ module Admin
       def self.tab_id(rail_id, key) = "#{rail_id}-tab-#{key}"
       def self.panel_id(rail_id, key) = "#{rail_id}-panel-#{key}"
 
-      def initialize(rail_id:, tabs:, current:, slot_tabs: [])
+      def initialize(rail_id:, tabs:, current:, slot_tabs: [], label: nil)
         @rail_id = rail_id
+        @label = label
         @tabs = tabs + slot_tabs
         # A `current` that names no tab is the first tab, so one tab is
         # always in the tab order. A slot's tab may be current
@@ -65,6 +72,9 @@ module Admin
       private
 
       attr_reader :tabs
+
+      # A default argument cannot ask `t`: nothing renders yet in `initialize`.
+      def label = @label || t(".label")
 
       def single? = tabs.one?
       def current?(tab) = tab.key.to_s == @current

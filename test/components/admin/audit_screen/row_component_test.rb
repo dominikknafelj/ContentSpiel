@@ -1,8 +1,10 @@
 require "test_helper"
 
 class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
-  # The shared avatar at its 28px size (`Admin::Ui::AvatarComponent`).
-  AVATAR = "span.rounded-full.uppercase.size-7.text-count[aria-hidden=true]".freeze
+  # The shared avatar at its 22px size (`Admin::Ui::AvatarComponent`).
+  AVATAR = "span.rounded-full.uppercase.size-\\[22px\\].text-count[aria-hidden=true]".freeze
+  # The small avatar's empty slot, for an event nobody made.
+  EMPTY_SLOT = "li > span.size-\\[22px\\].shrink-0[aria-hidden=true]:empty".freeze
 
   def row_for(action, viewer: users(:two), **attributes)
     at = Time.zone.local(2026, 10, 2, 16, 5)
@@ -35,13 +37,39 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "a", text: "16:05–16:31"
   end
 
-  test "a security key is in warn ink, and a failed sign-in has no circle and no name" do
+  test "a security event says Security in a warn state chip before its key, and the key is meta like any other" do
     row_for("session.failed", user_id: nil)
 
-    assert_selector "span.text-warn-ink", text: "session.failed"
-    assert_selector "li > span.size-7.shrink-0[aria-hidden=true]:empty"
-    assert_no_selector ".rounded-full, .rounded-chip"
+    chip = page.find("li > .admin-state-chip")
+    assert_equal "Security", chip.text.strip
+    assert_includes chip[:class].split, "text-warn-ink"
+    key = page.find("li > span.font-cs-mono")
+    assert_equal "session.failed", key.text
+    %w[text-label text-meta].each { |name| assert_includes key[:class].split, name }
+    assert_selector "li > .admin-state-chip + span.font-cs-mono"
+    assert_no_selector ".text-warn-ink", text: "session.failed"
+    assert_selector EMPTY_SLOT
+    assert_no_selector "li > .rounded-full"
     assert_selector "p", text: "Failed sign-in attempt"
+
+    row_for("post.published")
+    assert_no_selector ".admin-state-chip"
+    assert_selector "span.font-cs-mono.text-label.text-meta", text: "post.published"
+  end
+
+  test "the sentence is ink and the avatar the small circle" do
+    users(:one).update!(name: "Ada Lovelace")
+    row_for("post.published")
+
+    sentence = page.find("li > p")
+    %w[text-sm text-ink].each { |name| assert_includes sentence[:class].split, name }
+    assert_not_includes sentence[:class].split, "text-dim"
+    assert_selector "li > p span.font-medium", text: "Ada Lovelace"
+    assert_no_selector "li > p .font-semibold"
+    assert_selector "li > #{AVATAR}", exact_text: "AL"
+    assert_no_selector ".size-7"
+    time = page.find("li > a[href='/e/1']")
+    %w[w-28 shrink-0 text-label text-meta tabular-nums].each { |name| assert_includes time[:class].split, name }
   end
 
   test "a person is the shared avatar with two letters; the viewer's own is filled; the system is the neutral icon chip; an event nobody made draws no circle" do
@@ -53,7 +81,7 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "#{AVATAR}.bg-people.text-surface", exact_text: "AL"
 
     row_for("post.published", user_id: nil)
-    assert_selector "li > span.size-7[aria-hidden=true] > span.rounded-chip.size-6.bg-sunken.text-dim svg"
+    assert_selector "li > span.size-\\[22px\\][aria-hidden=true] > span.rounded-chip.bg-sunken.text-dim svg"
     assert_no_selector ".rounded-full"
     assert_selector "p", text: "System published"
 
@@ -62,25 +90,26 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "p", text: "a deleted user published"
 
     row_for("session.failed", user_id: nil)
-    assert_selector "li > span.size-7.shrink-0[aria-hidden=true]:empty"
-    assert_no_selector ".rounded-full, .rounded-chip"
+    assert_selector EMPTY_SLOT
+    assert_no_selector "li > .rounded-full, li > span > .rounded-chip"
   end
 
   # The audit log and the dashboard draw the actor through one component, so
-  # one person has one pair of letters in both, a name of one word or none.
-  test "the same user's circle is the same in the audit log and on the dashboard" do
+  # one person has one pair of letters and one tone in both, a name of one
+  # word or none; the log's dense rows draw it at the small size.
+  test "the same user's circle is the same in the audit log and on the dashboard, but for its size" do
     [ "Ada Lovelace", nil ].each_with_index do |name, index|
       users(:one).update!(name:, email_address: "a@example.com")
       post = Current.set(actor: users(:one), channel: :admin) { create_post(title: "Same #{index}", published: false) }
       dashboard = Dashboard::Activity.new(actor: users(:two), channel: :admin).rows.find { |row| row.record == post }
       render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: dashboard)
-      on_dashboard = page.find(AVATAR)
+      on_dashboard = page.find("span.rounded-full.uppercase.size-7.text-count[aria-hidden=true]")
 
       event = Audit::Event.find_by!(subject: post)
       render_inline Admin::AuditScreen::RowComponent.new(event:, sentence: Audit::Sentence.build(event, viewer: users(:two), target: nil), event_path: "/e/1")
       in_the_log = page.find(AVATAR)
 
-      assert_equal on_dashboard[:class], in_the_log[:class]
+      assert_equal on_dashboard[:class].sub("size-7", "size-[22px]"), in_the_log[:class]
       assert_equal on_dashboard.text, in_the_log.text
       assert_equal name ? "AL" : "a", in_the_log.text
     end

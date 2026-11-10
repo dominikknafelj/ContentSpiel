@@ -4,7 +4,7 @@
       <% group = capture do %>
         <% circles.each_with_index do |person, index| %>
           <%= tag.span class: circle_class(index), data: circle_data(person) do %>
-            <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: avatar_size, tone: tone(person), here: here?(person), ring: ground) %><%= render Admin::Ui::TooltipComponent.new(text: person.label) %>
+            <%= render Admin::Ui::AvatarComponent.new(initials: person.initials, size: avatar_size, tone: tone(person), here: here?(person)) %><%= render Admin::Ui::TooltipComponent.new(text: person.label) %>
           <% end %>
         <% end %>
         <% if more? %>

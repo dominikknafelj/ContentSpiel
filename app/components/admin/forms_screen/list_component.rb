@@ -5,7 +5,13 @@ module Admin
     # the forms as the card table of the Tags and Trash screens, by name, 50
     # a page. Every number on a row is read once for the whole page here
     # (`Forms::SubmissionCounts`, `Forms::Placements.for_forms`): nothing
-    # is counted per row, and no answer is read.
+    # is counted per row, and no answer is read. The table scrolls sideways
+    # inside its card (`.admin-table-scroll--x`), its Name column sticky, so
+    # the page never does.
+    #
+    # A FAILED DELIVERY is a system's state, not a record's: the count is
+    # followed by a warn `StateChipComponent` ("2 not delivered"), in words
+    # and never red.
     #
     # WHO SEES WHAT. Both rights open the screen (the controller's gate).
     # `forms.manage` gets "+ New form", the link to the builder and the ⋯
@@ -19,7 +25,7 @@ module Admin
     # no encryption keys, for every form. They are warn boxes with no live
     # role: they are there when the page arrives.
     class ListComponent < Admin::AdminComponent
-      WARN_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-[13px] leading-normal text-warn-ink".freeze
+      WARN_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2.5 text-small leading-normal text-warn-ink".freeze
       LINK_CLASS = "font-medium text-ink hover:underline".freeze
 
       def initialize(forms:, pagination:, page_url:, mail_settings:, keys:, viewer:, url_options: {})

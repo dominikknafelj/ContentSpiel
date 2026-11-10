@@ -1,9 +1,10 @@
-<%# The Translations matrix (design pass round 2, Task 18, handoff §4.4):
-    one summary card per target language, a type filter, then a matrix of
-    the items that need work in any language (`Admin::TranslationScreen::
-    MatrixComponent`), 50 per page (`Admin::TranslationsController`). %>
-<h1 class="mb-2 text-h1 text-ink">Translations</h1>
-<p class="mb-4 text-meta">Everything that isn't translated yet, or changed in <%= Locales.name(Translations.primary_locale, native: true) %> after it was. Outdated items are listed first because they're already visible on the site.</p>
+<%# The Translations screen: a tile per target language, a type filter, then
+    one card holding the matrix of the items that need work in any language
+    (`Admin::TranslationScreen::MatrixComponent`), 50 per page
+    (`Admin::TranslationsController`). A tile narrows the matrix to its
+    language, and the chosen one widens it back. %>
+<h1 class="mb-2 text-h1 text-ink"><%= t(".title") %></h1>
+<p class="mb-4 text-meta"><%= t(".intro", language: Locales.name(Translations.primary_locale, native: true)) %></p>
 
 <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3" data-translation-summary>
   <% @target_locales.each do |locale| %>
@@ -13,20 +14,19 @@
   <% end %>
 </div>
 
-<%# Spec §4: "Clear" only when a filter is active. The only other way back from
-    a language card was clicking the highlighted card again. It is a control of
-    the bar, so the bar is drawn for it too where there is one type and so no
-    segments: a language can be chosen with one type. %>
+<%# "Clear" stands only while a filter is on. It is a control of the bar, so
+    the bar is drawn for it too where there is one type and so no segments: a
+    language can be chosen with one type. %>
 <% filtered = @language || @type.present? %>
 <% if @types.size > 1 || filtered %>
   <%= form_with(**filter_form_options(admin_translations_path)) do %>
     <% if @language %><%= hidden_field_tag :language, @language, id: nil %><% end %>
     <% if @types.size > 1 %>
       <fieldset class="m-0 min-w-0 border-0 p-0">
-        <legend class="sr-only">Type</legend>
+        <legend class="sr-only"><%= t(".type") %></legend>
         <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
           <% all_count = @counts.values.sum %>
-          <% [ [ "", "All", all_count ] ].concat(@types.map { |type| [ type, Admin::TranslationsController::TYPES.dig(type, :label), @counts.fetch(type) ] }).each do |value, label, count| %>
+          <% [ [ "", t(".all"), all_count ] ].concat(@types.map { |type| [ type, t(".types.#{type}"), @counts.fetch(type) ] }).each do |value, label, count| %>
             <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
               <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
               <span><%= label %></span>
@@ -35,10 +35,10 @@
           <% end %>
         </div>
       </fieldset>
-      <noscript><%= render Admin::Ui::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+      <noscript><%= render Admin::Ui::ButtonComponent.new(label: t(".filter"), variant: :secondary, type: "submit") %></noscript>
     <% end %>
     <% if filtered %>
-      <%= link_to "Clear", admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+      <%= link_to t(".clear"), admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
     <% end %>
   <% end %>
 <% end %>

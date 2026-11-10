@@ -1,4 +1,4 @@
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("images"), id: "settings-images-card", intro: t(".intro"),
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("images"), self), id: "settings-images-card", intro: t(".intro"),
       data: { controller: "admin--saving--pending-lock" }) do %>
 
   <div class="flex flex-col gap-4 p-4">

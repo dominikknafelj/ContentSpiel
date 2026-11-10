@@ -4,7 +4,7 @@
     the dot after the card's heading (`data-save-bar-mark="heading"`), and
     each row's fallback is a field of its own inside it, keyed by its
     language (`data-save-bar-key`) so a move changes the order alone. %>
-<%= render Admin::SettingsScreen::CardComponent.new(section: SettingsSections.find("languages"), id: "settings-languages-card", intro: t(".intro"),
+<%= render Admin::Ui::SettingsCardComponent.new(**Admin::SettingsScreen::SectionCard.options(SettingsSections.find("languages"), self), id: "settings-languages-card", intro: t(".intro"),
       data: { controller: "admin--saving--pending-lock admin--settings--sortable-rows",
               field_name: "language_order", save_bar_name: t(".names.language_order"), save_bar_mark: "heading", save_bar_changed: values.saved_change("language_order") }) do |card| %>
   <% card.with_heading_mark do %>

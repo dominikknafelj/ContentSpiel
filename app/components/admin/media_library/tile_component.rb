@@ -2,28 +2,40 @@ module Admin
   # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
   # this namespace is `MediaLibrary`, not `Media`.
   module MediaLibrary
-    # One image in the Media grid (handoff §4.6): the
-    # thumbnail, the title, its size in mono and two chips -- `NO ALT` (warn)
-    # while the default-language alt is empty and `UNUSED` (meta) while nothing
-    # uses it. The tile is a link into the `content` frame that opens the panel
-    # (`/media?selected=ID`, the grid's own state kept), so Back returns to the
-    # previous selection; the selected one has an accent ring and
-    # `aria-current`. Each chip is words, not just a colour.
+    # One image in the Media grid: the thumbnail, the title, its size as a
+    # label and two chips -- "No alt" (warn) while the default-language alt is
+    # empty and "Unused" (meta) while nothing uses it. Each chip is words, not
+    # just a colour. The tile is a link into the `content` frame that opens
+    # the panel (`/media?selected=ID`, the grid's own state kept), so Back
+    # returns to the previous selection.
+    #
+    # Its box is `.admin-tile` (`content-spiel.tailwind.css`): elevation 1 at
+    # rest and 2 under the pointer, with no border, and the accent outline 2px
+    # out while it is chosen. The stylesheet draws the chosen look from
+    # `aria-current` (here) or `aria-pressed` (the picker's), so the state a
+    # screen reader hears and the look are one attribute. `CARD` is the one
+    # class string of both modes and of an upload's progress tile
+    # (`media/upload_tiles.js`, handed it by the view).
+    #
+    # While the made width loads, the face shows the image's ~24px preview
+    # under it, blurred and scaled past the face's clipped edge so the blur has
+    # no soft border; hidden from a screen reader, since the thumbnail is the
+    # picture. With no made width `LibraryImageComponent` draws the preview
+    # itself, and with no preview the face is the sunken ground.
     #
     # It renders its own `<li id="media-asset-ID">`: the autosave answer
     # replaces exactly that element (`Admin::MediaController#update`), so an
-    # alt text typed in the panel takes `NO ALT` off the tile without a reload.
+    # alt text typed in the panel takes "No alt" off the tile without a reload.
     #
     # `pick: true` is the same tile inside `Media::PickerComponent`: a button,
-    # not a link, because the picker is select-then-confirm (D14). A click
-    # selects it (`admin--media--select#select`, `aria-pressed` drawing
-    # the same accent ring the panel's selected tile has), a double click
-    # selects and confirms, Enter on a selected one confirms. Its whole
+    # not a link, because the picker is select-then-confirm. A click selects
+    # it (`admin--media--select#select`, which sets `aria-pressed`), a double
+    # click selects and confirms, Enter on a selected one confirms. Its whole
     # payload for the opener (`media-picker:picked`'s detail) is one JSON action
     # param (not one param per key: Stimulus JSON-parses each param value on its
     # own, so an alt text that reads "42" or "true" would arrive as a number or
-    # a boolean). `url` is the thumbnail -- only ever used to *show* the choice
-    # in CS Studio; what gets saved is `id`. `alt`/`caption` are the asset's own
+    # a boolean). `url` is the thumbnail -- only ever shown as the choice in
+    # CS Studio; what gets saved is `id`. `alt`/`caption` are the asset's own
     # defaults in the editing language (`locale`), resolved as the public page
     # would (`Media::Asset#alt_text` with no override), so a blank per-use
     # override field can show what will actually be used.
@@ -31,8 +43,8 @@ module Admin
     # `open_notes:` and `notes_unread:` are the caller's to say for the same
     # reason (`GridComponent#note_counts`, `#note_unread`): the image's open
     # notes as the notes pill on the image's top right corner, accent while
-    # something there is unread and addressed to the viewer, nothing at zero
-    # (notes spec §4.4, §4.5). Never in the picker, whose grid reads none.
+    # something there is unread and addressed to the viewer, nothing at zero.
+    # Never in the picker, whose grid reads none.
     #
     # `unused:` is the caller's to say, not read here: a grid answers it for a
     # whole page in one query (`GridComponent#used_ids`), which a per-tile
@@ -40,10 +52,16 @@ module Admin
     class TileComponent < Admin::AdminComponent
       def self.dom_id(asset) = "media-asset-#{asset.id}"
 
-      CARD = "group block w-full overflow-hidden rounded-cs border bg-surface text-left hover:border-line-strong " \
-             "focus:outline-2 focus:outline-accent".freeze
+      CARD = "admin-tile group block w-full overflow-hidden text-left " \
+             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent".freeze
 
-      PICK_CARD = "#{CARD} border-line aria-pressed:border-accent aria-pressed:ring-[3px] aria-pressed:ring-accent-tint".freeze
+      PICK_CARD = CARD
+
+      # What an upload's progress tile says (`media/upload_tiles.js`), served
+      # as `data-messages` by both hosts of the upload queue: the Media
+      # screen's upload wrapper and the picker's dialog.
+      UPLOAD_MESSAGES = %w[uploading progress failed offline dismiss status_done status_failed]
+                        .map { |key| "components.media_library.uploads.#{key}" }.freeze
 
       PICK_ACTIONS = "click->admin--media--select#select dblclick->admin--media--select#choose keydown->admin--media--select#key".freeze
 
@@ -92,9 +110,11 @@ module Admin
 
       def dimensions = (asset.width && asset.height ? "#{asset.width}×#{asset.height}" : nil)
 
-      def card_class = "#{CARD} #{selected? ? "border-accent ring-[3px] ring-accent-tint" : "border-line"}"
-
       def thumbnail_url = asset.thumbnail_url
+
+      # The preview to blur under a made width while it loads; nil while no
+      # width is made (the thumbnail is the preview then) or there is none.
+      def loading_preview_url = (asset.preview_data_url if asset.made?)
 
       private
 

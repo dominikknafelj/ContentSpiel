@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # One panel of an editor's rail: its content is rendered here once and
+    # One panel of a rail, an editor's or the Media screen's: its content is rendered here once and
     # never cloned, so a form inside keeps its ids and its wiring at every
     # width. Below the rail's threshold every panel stands in the page in
     # document order, but a `docked_only` one (the Section panel, whose
@@ -20,7 +20,7 @@ module Admin
         limits: [
           "Its content is drawn once and never cloned; which panel shows is the rail's script from the first draw on.",
           "A docked_only panel is not shown below the rail's threshold.",
-          "It is a target of admin--ui--rail, which the editor's rail attaches, not this panel."
+          "It is a target of admin--ui--rail, which the rail attaches, not this panel."
         ],
         states: %i[rest current docked_only],
         keys: [],

@@ -32,7 +32,7 @@
     column explicitly, so the order moves nothing on screen). %>
 <%# The rail's registered tabs, built before the form: the Post panel inside it is the
     current one unless a registered tab asks to be (`current_key`). %>
-<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
+<% rail_slot = Admin::Ui::RailSlotComponent.new(slot: "editor.rail.tabs", rail_id: RAIL_ID, record: post, viewer: Current.actor, reserved: %w[post],
                                                 **{ locale: locale, url_options: url_options, query: request.query_parameters, **@slot_context }) %>
 <% form = capture do %>
 <%= form_with url: form_url, method: :patch, id: "post-form", class: "admin-translation-form #{Admin::EditorScreen::FormColumn.classes(locale)} flex flex-col gap-4 rounded-card bg-surface shadow-1 p-4", data: form_data.merge(editing_unit: "", editing_subject: "record", editing_version: editing_version, **held_marks) do %>

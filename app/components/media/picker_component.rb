@@ -1,5 +1,5 @@
 module Media
-  # The one media picker (media library design spec §6, Task 8; round 3, Task 9):
+  # The one media picker:
   # a modal `<dialog>` that is the Media screen's own grid in miniature -- the
   # toolbar (an instant search and the segments), selectable tiles, a header
   # **Upload** and a footer "1 selected · Cancel · **Use image**" -- and hands
@@ -14,7 +14,7 @@ module Media
   # has, and nothing typed into its search box or file input can ever
   # bubble an `input` event into an autosaving form it happens to sit in.
   # Only for someone with `media.upload`, the permission that covers
-  # browsing, uploading and choosing (design spec §5.1) -- without it no
+  # browsing, uploading and choosing -- without it no
   # field offers Choose and the editor has no Image button, so nothing
   # would open it anyway.
   #
@@ -28,7 +28,7 @@ module Media
   # a `<turbo-frame id="media-picker-grid">` each time the picker opens -- the
   # same search, segments with counts, pagination and constant-query tiles the
   # Media module uses -- and navigated inside the frame, so searching never
-  # leaves the dialog. Choosing is select-then-use (D14): a click selects a
+  # leaves the dialog. Choosing is select-then-use: a click selects a
   # tile, **Use image** confirms, a double click does both (`admin--media--select`,
   # on this same element). Uploads (`Admin::MediaAssetsController#create`,
   # `Media::Upload`) show as progress tiles at the start of the grid; the first
@@ -43,6 +43,13 @@ module Media
   # and a centred dialog moved everything under the pointer.
   class PickerComponent < Admin::AdminComponent
     DIALOG_ID = "media-picker".freeze
+
+    # The footer's words `admin--media--select` says, served on the dialog
+    # beside the upload tiles'. The component sits outside
+    # `app/components/admin/`, so its words are the Media screen's own
+    # (`admin.media.picker.*`), read with full keys: a relative `t(".x")`
+    # would name `admin.components.media.picker`, a folder that cannot exist.
+    FOOTER_MESSAGES = %w[media.picker.none media.picker.selected].freeze
 
     # The picker's wiring, one place (all on the dialog element):
     # - `media-picker:open@window` / `close`: the opener contract above;

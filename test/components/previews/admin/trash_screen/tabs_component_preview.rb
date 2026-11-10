@@ -1,6 +1,6 @@
 module Admin
   module TrashScreen
-    # `TabsComponent` (round 3, Task 14): All is the sum; an empty type reads 0.
+    # `TabsComponent`: All is the sum; an empty type reads 0.
     class TabsComponentPreview < ViewComponent::Preview
       COUNTS = { "page" => 2, "post" => 12, "media" => 0 }.freeze
 

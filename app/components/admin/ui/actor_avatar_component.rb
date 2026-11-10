@@ -1,11 +1,12 @@
 module Admin
   module Ui
-    # The mark beside an audit sentence: who did it, in a 28px slot, the same
-    # in the audit log's rows and the dashboard's "What changed recently", so
-    # one person looks the same in both. It reads the sentence's actor facts
-    # (`Audit::Sentence::Actor`) and draws:
+    # The mark beside an audit sentence: who did it, the same in the audit
+    # log's rows, the dashboard's "What changed recently" and Trash's
+    # "Trashed" column, so one person looks the same in all three. It reads
+    # the sentence's actor facts (`Audit::Sentence::Actor`) and draws, in a
+    # 28px slot (`size: :lg`) or a 22px one (`:sm`, a dense row's):
     #
-    #   a user        `AvatarComponent` at `:lg`, two letters from
+    #   a user        `AvatarComponent` at the slot's size, two letters from
     #                 `PersonName.initials` of `PersonName.of(user)` (the rule
     #                 notes and presence use); the viewer's own in `:own`, as
     #                 notes draws it, anyone else in `:other`
@@ -27,9 +28,10 @@ module Admin
         motion: :none,
         content_edges: %i[none missing],
         widths: :fixed_width,
-        interface: %i[actor],
+        interface: %i[actor size],
         limits: [
-          "It draws one mark in a 28px slot and never the actor's name.",
+          "It draws one mark and never the actor's name.",
+          "It draws in a 28px or a 22px slot.",
           "A deleted user's circle is empty, because an event records no name to draw letters from."
         ],
         states: %i[user own deleted_user system nobody],
@@ -38,23 +40,35 @@ module Admin
         controller: nil
       )
 
-      SLOT = "flex size-7 shrink-0 items-center justify-center".freeze
+      # A size's slot, which the empty slot and the System chip stand in at
+      # the circle's own width, so the sentences beside them stay aligned.
+      SLOTS = {
+        lg: "flex size-7 shrink-0 items-center justify-center",
+        sm: "flex size-[22px] shrink-0 items-center justify-center"
+      }.freeze
+      # The System chip that fits each slot.
+      CHIP_SIZES = { lg: :regular, sm: :xsmall }.freeze
 
-      def initialize(actor:)
+      def initialize(actor:, size: :lg)
+        raise ArgumentError, "unknown actor avatar size #{size.inspect}" unless SLOTS.key?(size)
+
         @actor = actor
+        @size = size
       end
 
       def call
-        if actor.none then tag.span(class: SLOT, aria: { hidden: true })
-        elsif actor.user then render(AvatarComponent.new(initials: initials, size: :lg, tone: actor.you ? :own : :other))
-        elsif actor.user_id then render(AvatarComponent.new(initials: "", size: :lg, tone: :empty))
-        else tag.span(render(IconChipComponent.new(icon: :settings, family: :neutral)), class: SLOT, aria: { hidden: true })
+        if actor.none then tag.span(class: slot, aria: { hidden: true })
+        elsif actor.user then render(AvatarComponent.new(initials: initials, size: @size, tone: actor.you ? :own : :other))
+        elsif actor.user_id then render(AvatarComponent.new(initials: "", size: @size, tone: :empty))
+        else tag.span(render(IconChipComponent.new(icon: :settings, family: :neutral, size: CHIP_SIZES.fetch(@size))), class: slot, aria: { hidden: true })
         end
       end
 
       private
 
       attr_reader :actor
+
+      def slot = SLOTS.fetch(@size)
 
       # The two letters of a user's circle.
       def initials = ::PersonName.initials(::PersonName.of(actor.user))

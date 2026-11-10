@@ -23,7 +23,7 @@ module Admin
         limits: [
           "Its current is only the first draw's: from then on the rail's script decides it.",
           "With contents it draws only the label and the count, for a stream to put into the tab.",
-          "Its press and keys are actions of admin--ui--rail, which the editor's rail attaches, not this tab."
+          "Its press and keys are actions of admin--ui--rail, which the rail attaches, not this tab."
         ],
         states: %i[rest current count hover focus],
         keys: [],
@@ -51,7 +51,7 @@ module Admin
       private
 
       def contents
-        safe_join([ @tab.label, (tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?, data: @tab.count_data) unless @tab.count.nil?) ])
+        safe_join([ @tab.label, (tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?, data: { tab_count: "", **@tab.count_data.to_h }) unless @tab.count.nil?) ])
       end
     end
   end

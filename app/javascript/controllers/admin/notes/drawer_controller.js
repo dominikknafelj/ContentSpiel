@@ -575,9 +575,12 @@ export default class extends Controller {
     const unread = new Set(this.counts.unread)
 
     // The header button's number, the one beside the panel's title and the
-    // Notes tab's.
+    // Notes tab's. A total that opts in (`data-notes-total-words`, the Notes
+    // tabs' bubble) says "2 new" while something is unread, so the accent is
+    // not the only cue; the others stay a number.
     this.totalTargets.forEach((element) => {
-      element.textContent = String(total)
+      const words = unread.size > 0 && element.hasAttribute("data-notes-total-words")
+      element.textContent = words ? text.t("notes.script.marker.new", { count: total }) : String(total)
       element.hidden = total === 0
       element.toggleAttribute("data-unread", unread.size > 0)
       element.closest("[data-admin--notes--drawer-target~='opener']")?.setAttribute("aria-label", text.t("notes.script.total", { count: total }))

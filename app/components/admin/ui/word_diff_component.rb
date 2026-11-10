@@ -2,12 +2,13 @@ module Admin
   module Ui
     # The segments of a word diff (`Translations::SourceDiff#segments`) as
     # markup -- the one place the del/ins look lives, shared by the translation
-    # reference card and the audit event page. A removed word is struck through in
-    # the danger tint, an added one underlined in the ok tint (this is the
-    # diff style, not an error), and each carries a screen-reader-only cue inside
+    # reference card and the audit event page. A removed word is struck
+    # through in ink on the sunken ground, with a meta line, and is not red: a
+    # removal is no failure, and danger is kept for what destroys. An added
+    # word is underlined in the ok tint. Each carries a screen-reader-only cue inside
     # the element: `aria-label` on `del`/`ins` (name-prohibited roles) is
     # unreliable and may replace the word itself, so "Removed: " / "Added: " is
-    # real text. Every text is escaped (`content_tag`/`safe_join`), never
+    # real text (`admin.components.ui.word_diff`). Every text is escaped (`content_tag`/`safe_join`), never
     # `html_safe`.
     class WordDiffComponent < AdminComponent
       include Admin::Ui::Contract
@@ -19,11 +20,10 @@ module Admin
         widths: :fluid,
         interface: %i[segments],
         limits: [
-          "It draws the segments it is handed and computes no diff.",
-          "Its cues (Removed:, Added:) are English in the code, not keys."
+          "It draws the segments it is handed and computes no diff."
         ],
         states: %i[rest],
-        keys: [],
+        keys: %w[removed added],
         slots: [],
         controller: nil
       )
@@ -42,8 +42,8 @@ module Admin
 
       def segment_tag(kind, text)
         case kind
-        when :delete then content_tag(:del, safe_join([ cue("Removed: "), text ]), class: "text-danger-ink bg-danger-tint")
-        when :insert then content_tag(:ins, safe_join([ cue("Added: "), text ]), class: "text-ok-ink bg-ok-tint underline decoration-ok-ink")
+        when :delete then content_tag(:del, safe_join([ cue(t(".removed")), text ]), class: "text-ink bg-sunken line-through decoration-meta")
+        when :insert then content_tag(:ins, safe_join([ cue(t(".added")), text ]), class: "text-ok-ink bg-ok-tint underline decoration-ok-ink")
         else content_tag(:span, text)
         end
       end

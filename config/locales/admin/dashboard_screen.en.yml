@@ -18,17 +18,6 @@ en:
           empty: "Nothing to translate."
           # The head's "→" to the Translations matrix, named for a screen reader.
           overview: "Open the translations overview"
-          # A language's counts: "12 missing · 1 outdated", or "All translated".
-          missing:
-            one: "%{count} missing"
-            other: "%{count} missing"
-          outdated:
-            one: "%{count} outdated"
-            other: "%{count} outdated"
-          separator: " · "
-          all_translated: "All translated"
-          # The progress bar's name, after the language's own name.
-          translated: "%{language} translated"
           # The most recently changed outdated item; `%{link}` is its title,
           # a link to its editor in that language.
           outdated_item_html: "Outdated: %{link}"

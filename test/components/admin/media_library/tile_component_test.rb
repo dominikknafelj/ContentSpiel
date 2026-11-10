@@ -13,13 +13,13 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_text "Unused"
   end
 
-  test "the size shows in mono once the dimensions are known" do
+  test "the size shows as a label once the dimensions are known" do
     asset = create_media_asset
-    asset.update_columns(width: 1600, height: 1200)
+    asset.update_columns(width: 1600, height: 1200) # version: none (a test's own dimensions)
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
 
-    assert_text "1600×1200"
+    assert_selector "span.text-label.text-meta", text: "1600×1200"
   end
 
   test "an image with an alt text in the default language and a use has no chips" do
@@ -42,14 +42,25 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_text "No alt"
   end
 
-  test "the selected tile has aria-current and the accent ring; others have neither" do
+  # The look of rest, hover and chosen is `.admin-tile`'s, drawn from the
+  # attribute; the class string is the same for every tile.
+  test "every tile is .admin-tile with no border; the selected one has aria-current, and only it" do
     asset = create_media_asset
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false, selected: true)
-    assert_selector "a[aria-current='true'].ring-accent-tint"
+    assert_selector "a.admin-tile[aria-current='true']", count: 1
+    chosen = page.find("a")[:class]
 
     render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
-    assert_no_selector "a[aria-current]"
+    assert_selector "a.admin-tile:not([aria-current])"
+    assert_equal chosen, page.find("a")[:class]
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, unused: false, pick: true)
+    assert_selector "button.admin-tile[aria-pressed=false]:not([aria-current])"
+    assert_equal chosen, page.find("button")[:class]
+
+    assert_equal Admin::MediaLibrary::TileComponent::CARD, chosen
+    assert_no_match(/(?<![\w:-])(?:border|ring)(?:-|\b)|rounded-cs|aria-pressed:|shadow-/, chosen)
   end
 
   test "the link targets the content frame and advances the URL" do
@@ -76,14 +87,6 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
     assert_text "Unused"
   end
 
-  test "a pick tile draws its selection from aria-pressed, with the same ring the panel's tile has" do
-    asset = create_media_asset
-
-    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, unused: false, pick: true)
-
-    assert_selector "button.aria-pressed\\:ring-accent-tint.aria-pressed\\:border-accent"
-  end
-
   test "a tile of an image whose widths exist shows the 480 width with its size, never the original" do
     asset = create_media_asset
     asset.update_columns(width: 1600, height: 1200) # version: none (a test's own dimensions)
@@ -93,6 +96,31 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
 
     assert_selector "img[src='#{asset.display_url(min_width: 480)}'][width='1600'][height='1200']"
     assert_no_match %r{/blobs/}, rendered_content
+  end
+
+  test "a tile with a made width draws the blurred preview under its thumbnail, hidden from a screen reader; one with no preview draws none" do
+    asset = create_media_asset
+    asset.update_columns(width: 1600, height: 1200) # version: none (a test's own dimensions)
+    asset = make_renditions!(asset.reload, widths: [ 480, 960 ])
+    assert asset.preview.present?
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, url: "/x", unused: false)
+    preview = page.find("img[aria-hidden=true]")
+    assert_equal asset.preview_data_url, preview[:src]
+    assert_equal "", preview[:alt]
+    assert_equal %w[absolute blur-md inset-0 object-cover scale-110 size-full], preview[:class].split.sort
+    assert_selector "span.overflow-hidden > img[aria-hidden=true] + img[src='#{asset.display_url(min_width: 480)}'].relative"
+
+    # No width made: the thumbnail is the preview itself, drawn once.
+    bare = create_media_asset
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: bare, url: "/x", unused: false)
+    assert_selector "img", count: 1
+    assert_no_selector "img[aria-hidden]"
+
+    asset.update_columns(preview: nil) # version: none (a test's own state)
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, url: "/x", unused: false)
+    assert_selector "img", count: 1
+    assert_no_selector "img[aria-hidden]"
   end
 
   test "a tile of an image with neither a width nor a preview is a box, not the original" do

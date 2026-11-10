@@ -1,6 +1,6 @@
-<%# One audit event (design pass round 3, Task 15): the sentence, who/when/what
-    through which door, the field changes as word diffs, the raw snapshot, and
-    Older / Newer through the list's own order with the filters kept. %>
+<%# One audit event: the sentence, who/when/what through which door, the
+    field changes as word diffs, the raw snapshot, and Older / Newer through
+    the list's own order with the filters kept. %>
 <% filter_params = @filter.to_params.symbolize_keys %>
 <%= render Admin::AuditScreen::EventHeaderComponent.new(event: @event, sentence: @sentence,
       back_path: admin_audit_events_path(**filter_params, **admin_url_options)) %>
@@ -9,21 +9,21 @@
 
 <% if @event.snapshot.present? %>
   <details class="mt-4 rounded-card bg-surface shadow-1">
-    <summary class="admin-disclosure cursor-pointer px-4 py-3 text-label text-meta">Snapshot</summary>
+    <summary class="admin-disclosure cursor-pointer px-4 py-3 text-label text-meta"><%= t(".snapshot") %></summary>
     <%# `JSON.pretty_generate` returns a plain (not `html_safe`) String -- ERB's own
         output-tag escaping is what keeps a stored value that looks like markup (a
         title of literal `<script>`) rendering as text. The translation bookkeeping
         (`translation_sources`, kept in the stored snapshot as the version basis)
         is not shown: digests nobody reads. %>
-    <pre class="overflow-x-auto border-t border-line bg-paper px-4 py-3 font-cs-mono text-xs"><%= JSON.pretty_generate(@event.snapshot.is_a?(Hash) ? @event.snapshot.except("translation_sources", "translation_original_changed_at") : @event.snapshot) %></pre>
+    <pre class="overflow-x-auto border-t border-line bg-paper px-4 py-3 font-cs-mono text-label"><%= JSON.pretty_generate(@event.snapshot.is_a?(Hash) ? @event.snapshot.except("translation_sources", "translation_original_changed_at") : @event.snapshot) %></pre>
   </details>
 <% end %>
 
-<nav class="mt-4 flex justify-between text-sm" aria-label="Neighbouring events">
+<nav class="mt-4 flex justify-between text-sm" aria-label="<%= t(".neighbours") %>">
   <% if @older_id %>
-    <%= link_to "‹ Older event", admin_audit_event_path(@older_id, **filter_params, **admin_url_options), rel: "next", class: setup_secondary_link_class %>
+    <%= link_to t(".older"), admin_audit_event_path(@older_id, **filter_params, **admin_url_options), rel: "next", class: setup_secondary_link_class %>
   <% else %><span></span><% end %>
   <% if @newer_id %>
-    <%= link_to "Newer event ›", admin_audit_event_path(@newer_id, **filter_params, **admin_url_options), rel: "prev", class: setup_secondary_link_class %>
+    <%= link_to t(".newer"), admin_audit_event_path(@newer_id, **filter_params, **admin_url_options), rel: "prev", class: setup_secondary_link_class %>
   <% end %>
 </nav>

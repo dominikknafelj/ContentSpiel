@@ -1,10 +1,12 @@
 module Admin
   module TrashScreen
-    # One trashed item on the Trash screen (trash spec §7, handoff §4.9): its
-    # title (a thumbnail for an image) and, for a page, what comes back with
-    # it ("Includes 2 subpages: A, B"); its type; "<who> · <time ago>"; the
-    # retention tag (`RetentionTagComponent`); and its two actions -- Restore
-    # and "Delete now…".
+    # One trashed item on the Trash screen: its title (a 40px thumbnail for
+    # an image) and, for a page, what comes back with it ("Includes 2
+    # subpages: A, B"); its type as its kind's chip and word
+    # (`Admin::Ui::RecordChipComponent`); who trashed it, as their small
+    # avatar, their name and "· <time ago>"; the retention tag
+    # (`RetentionTagComponent`); and its two actions -- Restore and "Delete
+    # now…", both small.
     #
     # Restore is a one-click POST, except for a page that can't go back where
     # it was (`.needs_parent?`: a branch member whose root is gone, or a page
@@ -22,11 +24,10 @@ module Admin
     # by `ListComponent` and handed in: nothing here queries.
     class RowComponent < Admin::AdminComponent
       TYPE_KEYS = { Page => "page", Post => "post", Media::Asset => "media", Forms::Form => "form" }.freeze
-      TYPE_LABELS = { "page" => "Page", "post" => "Post", "media" => "Image", "form" => "Form" }.freeze
-
       # What an item is called on the screen: a form by its name (it has no
-      # title), anything else by its title.
-      def self.title_of(item) = (item.is_a?(Forms::Form) ? item.name : item.title).presence || "(untitled)"
+      # title), anything else by its title. Read by the controller's flashes
+      # too, where no component renders, so the key is a full one.
+      def self.title_of(item) = (item.is_a?(Forms::Form) ? item.name : item.title).presence || I18n.t("admin.components.trash_screen.list.untitled")
 
       # A page restores in place only when it's the root of its own trash
       # branch and its parent is a kept page; a member of another page's
@@ -45,13 +46,15 @@ module Admin
       # anything but a page with branch members); `purge_subpage_count` is
       # every page under it, a descendant trashed separately included -- what
       # a purge takes (`Trash::Purge#branch_deepest_first`), so the two can
-      # differ. `who` is the finished "You" / name / "System" label;
+      # differ. `who` is the finished "You" / name / "System" label, and
+      # `actor` the same person as the audit log's actor facts, for the avatar;
       # `used_by` the number of items in the trash still using an image (nil
       # when none does); `tab` the tab to come back to after an action.
-      def initialize(item:, retention_days:, who:, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil, url_options: {})
+      def initialize(item:, retention_days:, who:, actor:, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil, url_options: {})
         @item = item
         @retention_days = retention_days
         @who = who
+        @actor = actor
         @subpage_sentence = subpage_sentence
         @purge_subpage_count = purge_subpage_count
         @used_by = used_by
@@ -60,11 +63,11 @@ module Admin
         @url_options = url_options
       end
 
-      attr_reader :who, :subpage_sentence, :tab
+      attr_reader :who, :actor, :subpage_sentence, :tab
 
       def type_key = TYPE_KEYS.fetch(item.class)
 
-      def type_label = TYPE_LABELS.fetch(type_key)
+      def type_label = t(".types.#{type_key}")
 
       def row_id = "trash-#{type_key}-#{item.id}"
 
@@ -85,16 +88,14 @@ module Admin
 
       # Why "Delete now…" is disabled: a bare count, never names (an owner in
       # the trash may be one the viewer can't read).
-      def in_use_reason = "Still used by #{helpers.pluralize(@used_by, "item")} in the trash"
+      def in_use_reason = t(".in_use", count: @used_by)
 
       def reason_id = "#{row_id}-why"
 
-      def purge_dialog_title = "Delete “#{title}”?"
+      def purge_dialog_title = t(".purge.title", title:)
 
       def purge_dialog_body
-        body = +"It will be deleted for good, with all its translations."
-        body << " #{helpers.pluralize(@purge_subpage_count, "subpage")} under it #{@purge_subpage_count == 1 ? "is" : "are"} deleted too." if @purge_subpage_count.positive?
-        body << " This can't be undone."
+        @purge_subpage_count.positive? ? t(".purge.body_with_subpages", count: @purge_subpage_count) : t(".purge.body")
       end
 
       def restore_path = helpers.admin_restore_trash_item_path(type_key, item, **url_options)
@@ -104,11 +105,9 @@ module Admin
       def parent_select_id = "#{row_id}-parent"
 
       # A page that needs a new parent while there is none this viewer may
-      # create under: the select and Restore are disabled, and this says why
-      # as visible text (their `aria-describedby`), like the disabled "Delete
-      # now…" does.
-      NO_PARENT = "No page you can restore it under.".freeze
-
+      # create under: the select and Restore are disabled, and `row.no_parent`
+      # says why as visible text (their `aria-describedby`), like the disabled
+      # "Delete now…" does.
       def no_parent? = needs_parent? && parent_choices.blank?
 
       def no_parent_id = "#{row_id}-no-parent"

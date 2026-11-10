@@ -84,6 +84,13 @@ module Admin
         keyboard: [ "test/system/admin/chip_input_test.rb", "a chip's remove button is reachable by keyboard, and focus lands on a neighbour" ]
       )
 
+      # A chip's fixed look, which the audit log's subject chip draws too, and
+      # its two grounds. `REMOVE_CLASS` is the chip's own × button.
+      CHIP_CLASS = "admin-chip inline-flex max-w-full items-center gap-1.5 rounded-full py-0.5 pl-2.5 pr-1 text-sm".freeze
+      CHIP_GROUND = "bg-sunken text-ink".freeze
+      CHIP_INVALID = "bg-danger-tint text-danger-ink".freeze
+      REMOVE_CLASS = "admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
+
       def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil, track: false)
         @name = name
         @id = id
@@ -129,10 +136,7 @@ module Admin
       # The `data:` a hidden input carries so the explicit-save footer counts it.
       def track_data = track ? { save_bar_track: true } : {}
 
-      def chip_class(chip)
-        [ "admin-chip inline-flex max-w-full items-center gap-1.5 rounded-full py-0.5 pl-2.5 pr-1 text-sm",
-          chip[:invalid] ? "bg-danger-tint text-danger-ink" : "bg-sunken text-ink" ]
-      end
+      def chip_class(chip) = [ CHIP_CLASS, chip[:invalid] ? CHIP_INVALID : CHIP_GROUND ]
 
       # `aria-describedby` on the input: the help line, plus the error slot
       # when there are errors (the slot itself is always rendered, empty, so

@@ -1,9 +1,10 @@
 require "application_system_test_case"
 
-# The Media module's own grid and side panel: a real multi-file upload through the file
-# input (`admin--media--upload`), then opening one of the uploaded images and
-# setting its German alt text; and the panel's live effect on the tile and the
-# segment counts.
+# The Media module's own grid and the chosen image's rail: a real multi-file
+# upload through the file input (`admin--media--upload`), then opening one of
+# the uploaded images and setting its German alt text; the panel's live effect
+# on the tile and the segment counts; and the rail at the library's widths,
+# with its tabs, its Close and Escape.
 class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "uploading two files by the file input, opening one, and setting a German alt text persists" do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -105,6 +106,29 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     original_top = page.evaluate_script(%(document.querySelector("#media-panel [data-original-for='alt']").getBoundingClientRect().top))
     field_top = page.evaluate_script(%(document.querySelector("#media-alt").getBoundingClientRect().top))
     assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"
+  end
+
+  # A tile's look is `.admin-tile`'s: elevation 1 at rest, 2 under the
+  # pointer, and the chosen one keeps 1 with the accent outline 2px out. The
+  # figures are read against the tokens resolved in the same page.
+  test "a tile rises under the pointer, and the chosen one has the accent outline 2px out" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    chosen = create_media_asset(filename: "tiny.png")
+    other = create_media_asset(filename: "wide.png")
+    sign_in_via_form(users(:one))
+
+    visit_screen "/cs-studio/media?selected=#{chosen.id}"
+    find("h1").hover
+    shadow_1, shadow_2, accent = token_values("box-shadow: var(--cs-shadow-1)", "box-shadow: var(--cs-shadow-2)", "color: var(--cs-accent)")
+    assert_not_equal shadow_1, shadow_2, "the premise: the two elevations differ"
+
+    assert_equal [ shadow_1, "none" ], tile_look(other).values_at("shadow", "outlineStyle")
+    assert_equal({ "shadow" => shadow_1, "outlineStyle" => "solid", "outlineWidth" => "2px", "outlineOffset" => "2px", "outlineColor" => accent, "borderWidth" => "0px" },
+      tile_look(chosen))
+
+    find("#media-asset-#{other.id} a").hover
+    assert_eventually(message: -> { "the hovered tile's shadow is #{tile_look(other)["shadow"]}" }) { tile_look(other)["shadow"] == shadow_2 }
+    assert_equal "none", tile_look(other)["outlineStyle"]
   end
 
   # Drop images anywhere on the screen. A real OS drag cannot be
@@ -212,8 +236,8 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_title(/\AQuick one · Media/)
   end
 
-  # A language tab keeps the focus in the panel, and × falls back to the search.
-  test "a language tab in the panel keeps the focus at the panel; × with the tile not listed goes to the search" do
+  # A language tab keeps the focus in the panel, and Close falls back to the search.
+  test "a language tab in the panel keeps the focus at the panel; Close with the tile not listed goes to the search" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de], default: "en")
     asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Tabbed") }
@@ -227,7 +251,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     visit_screen "/cs-studio/media?q=no-such-image&selected=#{asset.id}"
     assert_no_selector "#media-asset-#{asset.id}"
-    find("#media-panel a[aria-label='Close panel']").click
+    find("#media-rail a[aria-label='Close panel']").click
     assert_no_selector "#media-panel"
     assert_eventually(message: "focus fell to the body") { page.evaluate_script("document.activeElement.name") == "q" }
   end
@@ -401,10 +425,10 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     visit_screen "/cs-studio/media"
     click_tile(asset)
 
-    assert_selector "#media-panel #media-notes #notes-list"
+    assert_selector "#media-rail #media-notes #notes-list"
     assert_no_selector "#media-notes [data-admin--notes--drawer-target=total]"
-    # A link inside the notes frame: never promoted to a visit, clicked plainly.
-    find("#media-notes a[data-note-new-link]").click
+    # With no thread the field for a note is ready under the empty line.
+    assert_selector "#media-notes #notes-new [data-notes-empty]", text: "No notes on this image yet."
     find("#media-notes #notes-new textarea[name=body]").send_keys("Crop the left edge")
     within("#media-notes #notes-new") { press "Add note" }
 
@@ -449,7 +473,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     visit_screen "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}"
 
-    assert_selector "#media-panel #media-notes #note-thread-#{thread.id}", text: "too dark"
+    assert_selector "#media-rail #media-notes #note-thread-#{thread.id}", text: "too dark"
   end
 
   test "a link to a thread that is gone opens the panel on the image's notes, with a sentence and no error" do
@@ -463,12 +487,197 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     visit_screen "/cs-studio/media?selected=#{asset.id}&thread=#{stale}"
 
     # The JavaScript error collector fails this test on "Content missing".
-    assert_selector "#media-panel #media-notes #notes-list [role=status]", text: "This note is gone"
+    assert_selector "#media-rail #media-notes #notes-list [role=status]", text: "This note is gone"
     assert_selector "#media-notes a#note-row-#{kept.id}", text: "Keep the sky"
     assert_no_text "Content missing"
   end
 
+  # Escape belongs to the innermost thing that takes it.
+  test "Escape closes the rail and puts the focus on the tile; Escape in the alt field, in the notes' composer or in the trash dialog does not, and the alt text typed is saved" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset.tap { |record| record.update!(title: "Escape image") }
+    sign_in_via_form(users(:one))
+    visit_screen "/cs-studio/media"
+    click_tile(asset)
+
+    find("#media-alt").send_keys("Kept while Escape is pressed", :escape)
+    assert_selector "#media-rail #media-panel"
+    assert_equal "Kept while Escape is pressed", find("#media-alt").value
+    assert_alt_eventually(asset, :en, "Kept while Escape is pressed")
+    assert_writes_settled
+
+    find("#media-notes #notes-new textarea[name=body]").send_keys("Half a note", :escape)
+    assert_selector "#media-rail #media-panel"
+
+    within("#media-panel") { press "Move to trash…" }
+    assert_selector "dialog#delete-media-#{asset.id}[open]"
+    keyboard.type(:escape)
+    assert_no_selector "dialog#delete-media-#{asset.id}[open]"
+    assert_selector "#media-rail #media-panel"
+
+    page.execute_script("document.getElementById('media-panel').focus()")
+    click_frame_link { keyboard.type(:escape) }
+    assert_no_selector "#media-rail", wait: 5
+    assert_current_path("/cs-studio/media")
+    assert_eventually(message: "focus never returned to the tile") do
+      page.evaluate_script("document.activeElement.closest('#media-asset-#{asset.id}') !== null")
+    end
+    assert_alt_eventually(asset, :en, "Kept while Escape is pressed")
+  end
+
+  # The library's own width decides, not the window's.
+  test "the library docks the rail at 1200px of its own width, keeps the 340px card from 760px and stacks under the grid below; the notes frame is in the page once" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset.tap { |record| record.update!(title: "Wide image") }
+    sign_in_via_form(users(:one))
+
+    at_library(1200, "/cs-studio/media?selected=#{asset.id}") do
+      assert_rail_docked
+      rail = box("#media-rail")
+      grid = box(".admin-media-library__main")
+      assert_in_delta 360, rail[2] - rail[0], 1, "docked, the rail is the rail's width"
+      assert_in_delta grid[2] + 28, rail[0], 1, "and stands the rail's gap right of the grid"
+      assert_selector "#media-rail [role=tablist]", visible: :visible
+      assert_selector "#media-rail-panel-image", visible: :visible
+      assert_selector "#media-rail-panel-notes", visible: :hidden
+      assert_equal 1, page.evaluate_script("document.querySelectorAll('turbo-frame#notes').length")
+      close = box("#media-rail > a[aria-label='Close panel']")
+      assert_operator rail[2] - close[2], :<=, 16, "Close stands at the rail's right"
+      assert_operator close[1] - rail[1], :<=, 16, "and at its top"
+      assert_equal rail_ground, page.evaluate_script("getComputedStyle(document.getElementById('media-rail')).backgroundColor")
+    end
+
+    at_library(1199, "/cs-studio/media?selected=#{asset.id}") do
+      assert_rail_docked(false)
+      rail = box("#media-rail")
+      assert_in_delta 340, rail[2] - rail[0], 1, "below the threshold the card is 340px"
+      assert_selector "#media-rail [role=tablist]", visible: :hidden
+      assert_selector "#media-rail-panel-image", visible: :visible
+      assert_selector "#media-rail-panel-notes #media-notes h3", visible: :visible, text: /NOTES/i
+      assert_equal 1, page.evaluate_script("document.querySelectorAll('turbo-frame#notes').length")
+      assert_operator box("#media-rail-panel-notes")[1], :>, box("#media-rail-panel-image")[3], "the notes stand under the image's panel"
+    end
+
+    at_window(760) do
+      visit_screen "/cs-studio/media?selected=#{asset.id}"
+      assert_operator library_width, :<, 760
+      assert_operator box("#media-rail")[1], :>=, box(".admin-media-library__main")[3], "a narrow library stacks the rail under the grid"
+      assert_equal 1, page.evaluate_script("document.querySelectorAll('turbo-frame#notes').length")
+    end
+  end
+
+  test "a thread link opens the Notes tab where the rail docks and the Notes section where it does not; choosing another tile keeps the tab" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset.tap { |record| record.update!(title: "Threaded") }
+    other = create_media_asset.tap { |record| record.update!(title: "Another") }
+    thread = as(users(:two)) { Notes::Start.call(asset, body: "Too dark here") }.record
+    sign_in_via_form(users(:one))
+
+    at_library(1200, "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}") do
+      assert_rail_docked
+      assert_selector "#media-rail-tab-notes[aria-selected=true]"
+      assert_selector "#media-rail-panel-notes #note-thread-#{thread.id}", visible: :visible, text: "Too dark here"
+      assert_selector "#media-rail-panel-image", visible: :hidden
+
+      click_frame_link { find("#media-asset-#{other.id} a").click }
+      assert_current_path(/selected=#{other.id}/)
+      assert_selector "#media-panel-title", visible: :all, text: "Another"
+      assert_selector "#media-rail-tab-notes[aria-selected=true]"
+      assert_selector "#media-rail-panel-notes", visible: :visible
+      assert_selector "#media-rail-panel-image", visible: :hidden
+      assert_eventually(message: "the focus fell to the body") { page.evaluate_script("document.activeElement.id") == "media-rail-tab-notes" }
+    end
+
+    at_library(1199, "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}") do
+      assert_rail_docked(false)
+      assert_selector "#media-rail-panel-notes #note-thread-#{thread.id}", visible: :visible, text: "Too dark here"
+      assert_selector "#media-rail-panel-image #media-panel", visible: :visible
+    end
+  end
+
+  test "Image and Notes are tabs where the rail docks: arrows move between them, Home and End go to the ends, and the Notes tab's bubble says 2 new while unread" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset.tap { |record| record.update!(title: "Tabbed rail") }
+    as(users(:two)) { 2.times { |i| Notes::Start.call(asset, body: "For @[#{users(:one).id}]: look #{i}") } }
+    sign_in_via_form(users(:one))
+
+    at_library(1300, "/cs-studio/media?selected=#{asset.id}") do
+      assert_rail_docked
+      image_tab, notes_tab = "#media-rail-tab-image", "#media-rail-tab-notes"
+      assert_selector "#{image_tab}[aria-selected=true][tabindex='0']", text: "Image"
+      assert_selector "#{notes_tab} [data-tab-count][data-unread]", text: "2 new", exact_text: true
+      bubble = page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector('#{notes_tab} [data-tab-count]')); return [ style.backgroundColor, style.color ] })()")
+      assert_equal token_colors("var(--cs-accent)", "var(--cs-on-accent)"), bubble, "unread, the bubble is the accent's"
+
+      page.execute_script("document.querySelector('#{image_tab}').focus()")
+      keyboard.type(:right)
+      assert_selector "#{notes_tab}[aria-selected=true][tabindex='0']"
+      assert focus_is_on(notes_tab)
+      assert_selector "#media-rail-panel-notes", visible: :visible
+      assert_selector "#media-rail-panel-image", visible: :hidden
+      keyboard.type(:right)
+      assert_selector "#{image_tab}[aria-selected=true]"
+      assert focus_is_on(image_tab)
+      keyboard.type(:end)
+      assert_selector "#{notes_tab}[aria-selected=true]"
+      assert focus_is_on(notes_tab)
+      keyboard.type(:home)
+      assert_selector "#{image_tab}[aria-selected=true]"
+      assert focus_is_on(image_tab)
+      keyboard.type(:left)
+      assert_selector "#{notes_tab}[aria-selected=true]"
+      assert focus_is_on(notes_tab)
+    end
+  end
+
   private
+
+  def keyboard = page.driver.browser.keyboard
+
+  def focus_is_on(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
+
+  # `[left, top, right, bottom]` of the first element the selector finds.
+  def box(selector)
+    page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return [ box.left, box.top, box.right, box.bottom ] })()")
+  end
+
+  def library_width = page.evaluate_script("document.getElementById('media-library').getBoundingClientRect().width")
+
+  def assert_rail_docked(docked = true)
+    assert_eventually(message: "the rail is #{docked ? "not " : ""}docked") { page.evaluate_script("document.getElementById('media-rail').hasAttribute('data-rail-docked')") == docked }
+  end
+
+  def rail_ground = token_colors("var(--cs-rail)").first
+
+  # Each colour's computed value on a probe inside the content frame.
+  def token_colors(*values)
+    page.evaluate_script(<<~JS)
+      #{values.to_json}.map((value) => {
+        const probe = document.createElement("div")
+        probe.style.color = value
+        document.querySelector("#content").append(probe)
+        const color = getComputedStyle(probe).color
+        probe.remove()
+        return color
+      })
+    JS
+  end
+
+  # The window sized so that the library (`#media-library`, the rail's
+  # container) is `width` wide, measured on the page itself: the sidebar,
+  # the content's padding and the scrollbar stand between the two.
+  def at_library(width, path)
+    at_window(width + 400) do
+      visit_screen path
+      2.times do
+        current = page.current_window.size
+        page.current_window.resize_to(current.first + (width - library_width).round, current.last)
+        await_frames
+      end
+      assert_in_delta width, library_width, 0.5, "the library is #{width}px wide"
+      yield
+    end
+  end
 
   def active_element_id = page.evaluate_script("document.activeElement && document.activeElement.id")
 
@@ -501,6 +710,31 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
   def dispatch_file_drop(*names)
     page.execute_script("#{files_script(*names)} document.querySelector('h1').dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))")
+  end
+
+  # Each declaration's computed value on a probe inside the content frame,
+  # where the screen's own tokens apply.
+  def token_values(*declarations)
+    page.evaluate_script(<<~JS)
+      #{declarations.to_json}.map((declaration) => {
+        const probe = document.createElement("div")
+        probe.style.cssText = declaration
+        document.querySelector("#content").append(probe)
+        const style = getComputedStyle(probe)
+        const value = declaration.startsWith("color") ? style.color : style.boxShadow
+        probe.remove()
+        return value
+      })
+    JS
+  end
+
+  def tile_look(asset)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const style = getComputedStyle(document.querySelector("#media-asset-#{asset.id} a"))
+        return { shadow: style.boxShadow, outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth, outlineOffset: style.outlineOffset, outlineColor: style.outlineColor, borderWidth: style.borderTopWidth }
+      })()
+    JS
   end
 
   # Enter, to whatever has the focus -- no click first (see the keyboard test).

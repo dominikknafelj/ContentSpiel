@@ -1,11 +1,11 @@
 <% count = ->(tab) do %>
-  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero?, data: tab.count_data %><% end %>
+  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero?, data: { tab_count: "", **tab.count_data.to_h } %><% end %>
 <% end %>
 <% if single? %>
   <% tab = tabs.first %>
   <%= tag.h2 id: tab_id(tab), class: "admin-rail__tabs admin-rail__heading text-sm font-medium text-ink" do %><%= tab.label %><% count.(tab) %><% end %>
 <% else %>
-  <div class="admin-rail__tabs" role="tablist" aria-label="<%= t(".label") %>">
+  <div class="admin-rail__tabs" role="tablist" aria-label="<%= label %>">
     <% tabs.each do |tab| %>
       <%= render Admin::Ui::RailTabComponent.new(rail_id: @rail_id, tab: tab, current: current?(tab)) %>
     <% end %>

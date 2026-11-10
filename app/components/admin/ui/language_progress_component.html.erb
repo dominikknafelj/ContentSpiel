@@ -1,0 +1,19 @@
+<span class="flex flex-col gap-2">
+  <span class="block h-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="<%= t(".progress_label", language: language) %>"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= percent %>">
+    <span class="block h-full rounded-full bg-ok <%= width_class %>"></span>
+  </span>
+  <%= tag.span(id: counts_id, class: "text-sm") do %>
+    <% if done? %>
+      <span class="text-meta"><%= t(".all_translated") %></span>
+    <% else %>
+      <% if outdated.positive? %>
+        <span class="text-warn-ink"><span aria-hidden="true">↻</span> <%= t(".outdated", count: outdated) %></span>
+      <% end %>
+      <% if outdated.positive? && missing.positive? %><span class="text-meta" aria-hidden="true">·</span><% end %>
+      <% if missing.positive? %>
+        <span class="text-meta"><%= t(".missing", count: missing) %></span>
+      <% end %>
+    <% end %>
+  <% end %>
+</span>

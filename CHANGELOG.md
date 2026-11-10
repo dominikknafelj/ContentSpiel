@@ -82,6 +82,10 @@
 - A block someone else is editing has a rose strip and outline, a block whose thread is open takes the same outline, and "Updated by" shows who, with their avatar.
 - The tabs of Waiting for you, Trash and the form builder mark the current tab as the filter bar does.
 - The sidebar's unread count stays on the Dashboard item, and its link is named "Dashboard, 2 new".
+- The media library's panel is a rail with Image and Notes tabs where the library is wide enough, and its tiles rise under the pointer and show the chosen one with an outline.
+- Trash, Translations, Forms and the audit log take CS Studio's new look: a record's kind is shown by its icon, every state in words and none in red, Translations has a tile per language, and the audit log is one list with its days as headings.
+- The dashboard's "Languages behind" panel draws a language's progress as Translations' tiles do: the bar on the `line` track, then "↻ 1 outdated" before "12 missing". Its draft tiles are CS Studio's one tile, and a Translations row's closing verb is the lists' one verb, at their size.
+- People's circles in a stack stand side by side, and a page's title in a narrow tree keeps its room.
 
 ### Removed
 
@@ -96,6 +100,9 @@
 - The comma-separated string for a post's `tag_names` in the post form's autosave (`post[tag_names]=a, b`): send an Array, `post[tag_names][]=a&post[tag_names][]=b`, as the chip input does. A string leaves the tags as they were.
 - The ActionText import: the `rich_text:migrate_from_action_text` task, `RichText::ActionTextImport`, `RichText::HtmlImport` and `RichText::Document.from_html`. A site converts nothing; bodies are Tiptap documents from the start. The migration that drops the ActionText tables (`20260928040000_drop_action_text`) stays, for a database that still has them, and refuses while a body in them was never converted, since nothing converts it any more: `FORCE_DROP_ACTION_TEXT=1` drops the tables and discards such bodies.
 - The posts list's `status` parameter and its `draft` spelling (`?status=draft`): an address that carries it lists every post, as with no filter. `scope` (`all`, `live`, `drafts`, `scheduled`) is the list's one name for it.
+- `Admin::Ui::AvatarComponent`'s `ring:` keyword and its rings: a stack's circles stand apart and need no ground ring. A caller that passes `ring:` gets an `ArgumentError`.
+- `Admin::SettingsScreen::CardComponent`: it is `Admin::Ui::SettingsCardComponent`, with no alias.
+- `Admin::DashboardScreen::TranslationPanelComponent::WIDTHS`: the progress bar's widths are `Admin::Ui::LanguageProgressComponent`'s.
 
 ### For a gem or an outside caller
 
@@ -117,3 +124,10 @@
 - Added the `contentspiel` command, for a machine with Docker and nothing else: `curl -fsSL https://github.com/dominikknafelj/ContentSpiel/releases/latest/download/install.sh | sh` installs it into `~/.local/bin`. `contentspiel new NAME` writes a site that builds on this release (theme, `Dockerfile`, Kamal's `config/deploy.yml` with three placeholders, the secrets' names, a README to follow); `generate section_style NAME "Label"` and `generate page_template NAME "Label"` add a theme choice; `check` is `theme:check` on the site's `theme/`; `dev` runs the site on the machine with its theme mounted and a database of its own; `upgrade` shows the notes since the pin, checks the theme against the newest release and only then moves the pin; `--version` and `help`. Inside a site every command runs the pinned image and pulls nothing by itself; outside one it pulls `stable` first, and runs the one on the machine, with a warning, when it can't.
 - Added `ContentSpiel::VERSION` and `ContentSpiel::IMAGE` (`lib/content_spiel/version.rb`).
 - For the CMS's own contributors: `bin/rails 'release:prepare[X.Y.Z]'` prepares a release's pull request, and a pull request that changes `test/support/contract_ledger.rb`, `lib/content_spiel/plugins.rb` or a file under `db/migrate/` fails CI until this file's "Unreleased" section changes too, and one that adds a migration until its version is named under "### Migrations" there (`bin/changelog-guard`).
+- `Admin::Ui::RailSlotComponent` takes `slot:`, the panel slot its host draws, and the slot `media.rail.tabs` exists: an entry registered there is a tab and its panel in the Media screen's rail, after Image, with the shape of `editor.rail.tabs`' entries (`docs/reference/slots.md`, "A panel slot"). A caller that builds `RailSlotComponent` without `slot:` gets Ruby's missing keyword. `Admin::Answers::RailTabStreams.for` takes `slot:` too, with no default: a caller without it gets Ruby's missing keyword.
+- `Admin::Ui::RailTabsComponent` takes `label:`, the tablist's name for a screen reader; without it the tablist is named "Settings".
+- `Admin::Ui::AvatarComponent` takes no `ring:`.
+- `Admin::SettingsScreen::CardComponent` is `Admin::Ui::SettingsCardComponent` (`heading_id:, heading:, icon:, family:, intro: nil, **html`, with the slots `head_end`, `head_note` and `heading_mark`), and a Settings section's keywords come from `Admin::SettingsScreen::SectionCard.options(section, view)`.
+- Added `Admin::Ui::RecordChipComponent(kind:, label: nil)`: a kind of record (`page`, `post`, `media`, `form`, `settings`) as its CS Studio module's chip, with an optional word beside it; any other kind is refused.
+- Added `Admin::Ui::LanguageProgressComponent(language:, complete:, total:, outdated:, missing:, counts_id: nil)`: one language's translation progress, the bar and its counts, as the Dashboard and Translations draw it; `LanguageProgressComponent.percent(complete:, total:)` is its percentage. `Admin::DashboardScreen::TranslationPanelComponent::WIDTHS` is gone: the bar's widths are the part's.
+- `ui/float` lifts an open menu or list of suggestions out of a table's scroll box (`.admin-table-scroll`, `.admin-table-scroll--x`, `.admin-posts-scroll`) as it does out of a docked rail panel: the boxes it lifts out of are one list, `CLIPS` in `app/javascript/ui/float.js`.

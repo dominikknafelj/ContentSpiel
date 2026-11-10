@@ -8,9 +8,8 @@ module Admin
     # list it (the screen's tabs count only what they may act on) -- so the
     # numbers are `Trash.roots`', handed in as `pages` (branch roots),
     # `subpages` (the pages that go with a root), `posts`, `images` and
-    # `forms`.
-    # Only the kinds present are named; subpages appear in brackets, as in
-    # the handoff's mock ("1 page (with 1 subpage), 1 post and 1 image").
+    # `forms`. Only the kinds present are named, the subpages in brackets
+    # after the pages ("1 page (with 1 subpage), 1 post and 1 image").
     class EmptyTrashComponent < Admin::AdminComponent
       DIALOG_ID = "empty-trash-dialog".freeze
 
@@ -25,17 +24,25 @@ module Admin
 
       def render? = can?("trash.empty") && (@pages + @posts + @images + @forms).positive?
 
-      def sentence
+      def sentence = t(".body", items: listed(kinds))
+
+      # Each kind present, counted in its own words.
+      def kinds
         parts = []
         if @pages.positive?
-          part = helpers.pluralize(@pages, "page")
-          part += " (with #{helpers.pluralize(@subpages, "subpage")})" if @subpages.positive?
-          parts << part
+          pages = t(".pages", count: @pages)
+          parts << (@subpages.positive? ? t(".pages_with_subpages", pages:, subpages: t(".subpages", count: @subpages)) : pages)
         end
-        parts << helpers.pluralize(@posts, "post") if @posts.positive?
-        parts << helpers.pluralize(@images, "image") if @images.positive?
-        parts << helpers.pluralize(@forms, "form") if @forms.positive?
-        "This deletes #{parts.to_sentence(last_word_connector: " and ")} for good. It can't be undone."
+        { posts: @posts, images: @images, forms: @forms }.each { |kind, count| parts << t(".#{kind}", count:) if count.positive? }
+        parts
+      end
+
+      # "a", "a and b", "a, b and c": the last two joined by `list_last`, the
+      # rest by `list_separator`.
+      def listed(parts)
+        return parts.first if parts.one?
+
+        t(".list_last", rest: parts[0...-1].join(t(".list_separator")), last: parts.last)
       end
 
       def empty_path = helpers.admin_empty_trash_path(**@url_options)

@@ -89,4 +89,38 @@ class Admin::FormsScreen::BuilderComponentTest < ViewComponent::TestCase
     assert_selector "input[value='#{markup}']"
     assert_selector "button", text: markup
   end
+
+  test "the builder's cards are the shared card frame with the form chip, and no card draws its own head" do
+    render_builder(forms(:newsletter))
+
+    %w[form-card-form form-card-fields form-card-after form-destinations form-placements].each do |heading_id|
+      card = "section.admin-settings-card[aria-labelledby='#{heading_id}'] > .admin-settings-card__head"
+      assert_selector "#{card} h2##{heading_id}.text-h2"
+      assert_selector "#{card} > span[aria-hidden=true].bg-ic-form-bg", count: 1
+    end
+    assert_selector "section.admin-settings-card", count: 5
+    assert_selector "section.admin-settings-card div.border-b", count: 0, visible: :all
+    assert_not Admin::FormsScreen::BuilderComponent.const_defined?(:CARD_CLASS, false)
+    assert_not Admin::FormsScreen::BuilderComponent.const_defined?(:CARD_HEAD_CLASS, false)
+  end
+
+  test "Add a field is a paper well titled in a label, its types secondary buttons, with no dashed edge" do
+    render_builder(forms(:newsletter))
+
+    well = "div.rounded-tile.bg-paper.p-3.admin-block-picker"
+    assert_selector "#{well} > p.text-label.text-meta", text: t("builder.add_field")
+    Forms::FieldTypes.all.each { |type| assert_selector "#{well} button", text: type.label }
+    assert_equal "Add a field", t("builder.add_field")
+    assert_selector ".border-dashed", count: 0
+  end
+
+  test "an invalid name is aria-invalid with the shared edge, never a danger border" do
+    form = forms(:newsletter)
+    render_inline Admin::FormsScreen::BuilderComponent.new(form: form, draft: Admin::FormsScreen::Draft.from_form(form), locale: "en",
+      placements: Forms::Placements.new(form, viewer: users(:one)), errors: [ Forms::Save.sentence(:name_blank) ])
+
+    assert_selector ".admin-field > input#form-name[aria-invalid=true]"
+    assert_selector ".admin-field > #form-name-errors > p", text: Forms::Save.sentence(:name_blank)
+    assert_no_match(/!border-danger/, page.native.to_html)
+  end
 end

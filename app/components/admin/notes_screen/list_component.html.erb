@@ -5,14 +5,29 @@
     <p role="status" class="mx-4 mt-3 rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"><%= t(".notices.#{notice}") %></p>
   <% end %>
 
+  <% composer = -> do %>
+    <%= render Admin::NotesScreen::QuoteComponent.new(quote: quote) %>
+    <%= render Admin::NotesScreen::ComposerComponent.new(url: threads_path, key: "new-#{key}-#{compose_key}", label: t(".new_label"), submit: t(".add"),
+          mentions_url: mentions_path, rows: 3, hidden: { subject: compose_key, quote: quote.to_s },
+          body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors), files_lost: failed_new&.dig(:files_lost)) %>
+  <% end %>
+
   <% if composing? %>
     <section id="notes-new" aria-labelledby="notes-new-title" class="flex flex-col gap-2 border-b border-line px-4 pb-4 pt-3">
       <h3 id="notes-new-title" class="text-label text-meta"><%= compose_title %></h3>
-      <%= render Admin::NotesScreen::QuoteComponent.new(quote: quote) %>
-      <%= render Admin::NotesScreen::ComposerComponent.new(url: threads_path, key: "new-#{key}-#{compose_key}", label: t(".new_label"), submit: t(".add"),
-            mentions_url: mentions_path, rows: 3, hidden: { subject: compose_key, quote: quote.to_s },
-            body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors), files_lost: failed_new&.dig(:files_lost)) %>
+      <% composer.() %>
     </section>
+  <% elsif empty_line? %>
+    <%# An image with no thread: its one line, and the field for a note on
+        it ready under it, since writing starts the thread. %>
+    <% if may_start? %>
+      <section id="notes-new" aria-labelledby="notes-new-title" class="flex flex-col gap-2 border-b border-line px-4 pb-4 pt-3">
+        <p id="notes-new-title" class="text-small text-meta" data-notes-empty><%= empty_line %></p>
+        <% composer.() %>
+      </section>
+    <% else %>
+      <p class="px-4 py-3.5 text-small text-meta" data-notes-empty><%= empty_line %></p>
+    <% end %>
   <% elsif !empty? %>
     <%# Not shown inside the editors' drawer, whose header has the one "New
         note" (`.admin-notes-drawer` in content-spiel.tailwind.css); the empty
@@ -20,7 +35,7 @@
     <p class="px-4 pt-3"><%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %></p>
   <% end %>
 
-  <% if empty? && !composing? %>
+  <% if empty? && !composing? && !empty_line? %>
     <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
       <% empty_state.with_action do %>
         <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %>

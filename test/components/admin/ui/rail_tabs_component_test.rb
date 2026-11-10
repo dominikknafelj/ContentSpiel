@@ -23,6 +23,15 @@ class Admin::Ui::RailTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "h2", wait: 0
   end
 
+  test "the tablist is named by its host's label, and Settings without one" do
+    tabs = [ tab(key: "image", label: "Image"), tab(key: "notes", label: "Notes") ]
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "media-rail", current: "image", tabs:, label: "Image details")
+    assert_selector "div.admin-rail__tabs[role=tablist][aria-label='Image details']"
+
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "media-rail", current: "image", tabs:)
+    assert_selector "div.admin-rail__tabs[role=tablist][aria-label='Settings']"
+  end
+
   test "a current that names no tab is the first tab, so one tab is in the tab order" do
     render_inline Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "gone",
       tabs: [ tab(key: "page", label: "Page"), tab(key: "section", label: "Section") ])
@@ -48,5 +57,17 @@ class Admin::Ui::RailTabsComponentTest < ViewComponent::TestCase
     assert_selector "#r-tab-files span.text-count[hidden]", text: "0", visible: :all
     assert_no_selector "#r-tab-page span", visible: :all, wait: 0
     assert_no_selector ".text-label", visible: :all, wait: 0
+  end
+
+  # The count is the tab's bubble: the stylesheet draws `[data-tab-count]`,
+  # and an entry's own `data-` attributes stand beside it.
+  test "a tab's count is its bubble, with the entry's own data beside it, in the tablist and in a stream's contents" do
+    notes = tab(key: "notes", label: "Notes", count: 2, count_data: { "admin--notes--drawer-target": "total", notes_total_words: true })
+    render_inline Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "page", tabs: [ tab(key: "page", label: "Page"), notes ])
+
+    assert_selector "#r-tab-notes span.text-count[data-tab-count][data-admin--notes--drawer-target=total][data-notes-total-words]", text: "2"
+
+    render_inline Admin::Ui::RailTabComponent.new(rail_id: "r", tab: notes, contents: true)
+    assert_selector "span.text-count[data-tab-count][data-notes-total-words]", text: "2"
   end
 end

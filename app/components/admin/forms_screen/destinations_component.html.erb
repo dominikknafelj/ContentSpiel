@@ -1,5 +1,5 @@
-<section class="admin-settings-card rounded-card bg-surface shadow-1" aria-labelledby="form-destinations">
-  <div class="border-b border-line px-4 py-3.5"><h2 id="form-destinations" class="text-h2 text-ink"><%= t(".title") %></h2></div>
+<%= render Admin::Ui::SettingsCardComponent.new(heading_id: "form-destinations", heading: t(".title"),
+      **Admin::FormsScreen::BuilderComponent.card_chip) do %>
   <div class="flex flex-col gap-5 p-4">
     <%= helpers.render "admin/shared/field_errors", id: "form-destinations-errors", messages: errors %>
 
@@ -43,11 +43,11 @@
                 <% end %>
               </div>
             <% end %>
-            <div data-field-name="recipients">
+            <div class="admin-field" data-field-name="recipients">
               <%= label_tag RECIPIENTS_ID, t(".recipients"), class: "#{setup_label_class} mb-1" %>
               <%= text_area_tag "#{prefix(index)}[settings][recipients]", recipients(current), id: RECIPIENTS_ID, rows: 3, autocomplete: "off",
-                    aria: { describedby: "#{RECIPIENTS_ID}-help #{RECIPIENTS_ID}-errors", invalid: ("true" if mail_errors.any?) }.compact,
-                    class: [ setup_input_class, ("!border-danger" if mail_errors.any?) ] %>
+                    aria: { describedby: "#{RECIPIENTS_ID}-help #{RECIPIENTS_ID}-errors", invalid: (true if mail_errors.any?) }.compact,
+                    class: setup_input_class %>
               <p id="<%= RECIPIENTS_ID %>-help" class="mt-1 text-sm text-meta"><%= t(".recipients_help") %></p>
               <%= helpers.render "admin/shared/field_errors", id: "#{RECIPIENTS_ID}-errors", messages: mail_errors %>
             </div>
@@ -81,4 +81,4 @@
       </div>
     <% end %>
   </div>
-</section>
+<% end %>

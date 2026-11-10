@@ -1,11 +1,10 @@
 require "test_helper"
 
-# `Admin::TrashScreen::ListComponent` (trash spec §7, round 3): what the list
-# works out ONCE for the whole page and hands to its rows -- who trashed each
-# item, a branch root's subpage sentence and purge count, an image's "still
-# used by", the parent choices -- and the three empty states. The rows' own
-# markup is `RowComponentTest`'s; the screen as a whole is the integration
-# tests'.
+# `Admin::TrashScreen::ListComponent`: what the list works out ONCE for the
+# whole page and hands to its rows -- who trashed each item, a branch root's
+# subpage sentence and purge count, an image's "still used by", the parent
+# choices -- and the three empty states. The rows' own markup is
+# `RowComponentTest`'s; the screen as a whole is the integration tests'.
 class Admin::TrashScreen::ListComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -59,6 +58,21 @@ class Admin::TrashScreen::ListComponentTest < ViewComponent::TestCase
     assert_selector "tbody tr#trash-post-#{post.id}"
     assert_selector "tbody tr#trash-media-#{asset.id}"
     assert_selector "div.rounded-card.bg-surface.shadow-1", text: "PAGE FOOTER"
+  end
+
+  test "the table scrolls sideways inside its card with the Item column sticky" do
+    post = trash(create_post(title: "Old post"))
+
+    list([ post ])
+
+    assert_selector "div.rounded-card.bg-surface.shadow-1 > div.admin-table-scroll--x > table"
+    assert_no_selector "div.admin-table-scroll"
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    rule = css[/^[^\n{]*\.admin-table-scroll--x[^{]*:is\(th, td\):first-child \{[^}]*\}/]
+    assert rule, "no rule makes the Item column sticky in .admin-table-scroll--x"
+    assert_includes rule, "position: sticky"
+    assert_includes rule, "left: 0"
+    assert_equal "Item", page.find("thead th:first-child").text.strip
   end
 
   test "who: You for the viewer's own trashing, the name for someone else's, System when nobody is recorded" do

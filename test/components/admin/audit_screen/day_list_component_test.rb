@@ -22,6 +22,26 @@ class Admin::AuditScreen::DayListComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "every day is a sticky paper band inside one card, never a card per day" do
+    Time.use_zone("Europe/Berlin") do
+      render_days([ entry(Time.zone.local(2026, 10, 4, 9)), entry(Time.zone.local(2026, 10, 4, 8)), entry(Time.zone.local(2026, 10, 3, 23)) ])
+
+      assert_selector ".rounded-card", count: 1
+      card = page.find("[data-audit-days]")
+      %w[isolate rounded-card bg-surface shadow-1].each { |name| assert_includes card[:class].split, name }
+      assert_selector "[data-audit-days] > section", count: 2
+      assert_no_selector "section.mb-4, ul.rounded-card, ul.shadow-1, section .rounded-card"
+      bands = page.all("[data-audit-days] > section > h2")
+      assert_equal [ "Today", "Yesterday" ], bands.map(&:text)
+      bands.each do |band|
+        %w[sticky top-(--admin-top-offset) z-(--cs-z-raised-top) bg-paper text-label text-meta].each { |name| assert_includes band[:class].split, name }
+      end
+      assert_includes bands.first[:class].split, "rounded-t-card"
+      assert_not_includes bands.last[:class].split, "rounded-t-card"
+      page.all("[data-audit-days] > section").each { |section| assert_equal "audit-day-#{section.find('h2')[:id].delete_prefix('audit-day-')}", section["aria-labelledby"] }
+    end
+  end
+
   test "an event sits under the day of its last moment" do
     Time.use_zone("Europe/Berlin") do
       render_days([ entry(Time.zone.local(2026, 10, 3, 23, 50), last: Time.zone.local(2026, 10, 4, 0, 10)) ])

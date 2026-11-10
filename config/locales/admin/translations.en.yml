@@ -1,0 +1,20 @@
+# The Translations screen's own keys (docs/reference/i18n.md):
+# `admin.translations.index` is the view's lazy-lookup scope
+# (`app/views/admin/translations/index.html.erb`). Its language tiles and its
+# matrix say theirs as `admin.components.translation_screen`.
+en:
+  admin:
+    translations:
+      index:
+        title: "Translations"
+        intro: "Everything that isn't translated yet, or changed in %{language} after it was. Outdated items are listed first because they're already visible on the site."
+        # The type filter's segments: its legend, the whole list, each type.
+        type: "Type"
+        all: "All"
+        types:
+          page: "Pages"
+          post: "Posts"
+          media: "Images"
+          settings: "Site settings"
+        filter: "Filter"
+        clear: "Clear"

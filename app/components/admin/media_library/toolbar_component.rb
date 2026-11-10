@@ -2,12 +2,14 @@ module Admin
   # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
   # this namespace is `MediaLibrary`, not `Media`.
   module MediaLibrary
-    # The Media grid's toolbar (round 3, Task 8, handoff §4.6): an instant
-    # search and the segments All / Unused / Missing alt / Untranslated / Mine,
-    # each with its count. One GET form that applies as it changes
+    # The Media grid's toolbar, the filter bar: an instant search and the
+    # segments All / Unused / Missing alt / Untranslated / Mine, each with its
+    # count, then Clear. One GET form that applies as it changes
     # (`admin--ui--auto-submit`, no Filter button, only the `content` frame
     # reloads), like the posts list's (`Admin::PostsScreen::ToolbarComponent`,
-    # whose radio-group shape this follows: one tab stop, arrows move it).
+    # whose radio-group shape this follows: one tab stop, arrows move it). Its
+    # words are `admin.components.media_library.toolbar.*`, a segment's under
+    # `segments.<key>`.
     #
     # The counts are `Media::Search#counts`: they respect the search but not the
     # segment ("Missing alt 3" is what choosing it would list), and "Untranslated"
@@ -18,15 +20,15 @@ module Admin
     # so searching or choosing a segment keeps the panel open.
     #
     # `picker: true` is the same toolbar inside `Media::PickerComponent`'s own
-    # frame (`media-picker-grid`, round 3 Task 9): the form targets that frame
-    # (no history, the dialog is not a page), carries `picker=1` so every later
-    # request is the picker's again, offers every segment but Untranslated
-    # (translating is not what picking an image is about), and its ids are the
-    # picker's own -- the dialog is in the layout of the Media screen too, and
-    # the grid's search box and count spans already own the plain ones.
+    # frame (`media-picker-grid`): the form targets that frame (no history, the
+    # dialog is not a page), carries `picker=1` so every later request is the
+    # picker's again, offers every segment but Untranslated (translating is
+    # not what picking an image is about), and its ids are the picker's own --
+    # the dialog is in the layout of the Media screen too, and the grid's
+    # search box and count spans already own the plain ones.
     class ToolbarComponent < Admin::AdminComponent
-      SEGMENTS = [ [ "", :all, "All" ], [ "unused", :unused, "Unused" ], [ "missing_alt", :missing_alt, "Missing alt" ],
-                   [ "untranslated", :untranslated, "Untranslated" ], [ "mine", :mine, "Mine" ] ].freeze
+      # `[filter value, key]`: the key names the count and the segment's word.
+      SEGMENTS = [ [ "", :all ], [ "unused", :unused ], [ "missing_alt", :missing_alt ], [ "untranslated", :untranslated ], [ "mine", :mine ] ].freeze
 
       SEGMENT_CLASS = Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS
 
@@ -57,7 +59,9 @@ module Admin
 
       # "Untranslated" needs a language to be untranslated in, and the picker
       # has no use for it.
-      def segments = SEGMENTS.reject { |value, _key, _label| value == "untranslated" && (picker? || ::Translations.target_locales.empty?) }
+      def segments = SEGMENTS.reject { |value, _key| value == "untranslated" && (picker? || ::Translations.target_locales.empty?) }
+
+      def segment_label(key) = t(".segments.#{key}")
 
       # `filter` is `Media::Search#filter`: already normalised, `all` or a segment's name.
       def checked?(value) = filter == (value.presence || "all")

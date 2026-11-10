@@ -1,14 +1,14 @@
 require "test_helper"
 
-# The Trash screen's round-3 design (Task 14): counted tabs, who and when,
-# the retention tag, the subpage sentence, inline "Restore under", the
-# disabled "Delete now…" with its reason and the Empty trash dialog. The
-# list itself, restore, purge and visibility stay in `trash_test.rb`.
+# The Trash screen: counted tabs, who and when, the retention tag, the subpage
+# sentence, inline "Restore under", the disabled "Delete now…" with its reason
+# and the Empty trash dialog. The list itself, restore, purge and visibility
+# stay in `trash_test.rb`.
 class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
   setup do
-    # Midday (final fix wave): the retention tag counts calendar days, so a
-    # run that crossed midnight between this setup and a request read "IN 29
-    # DAYS". Without a block, so each test may move on with `travel_to` again.
+    # Midday: the retention tag counts calendar days, so a run that crossed
+    # midnight between this setup and a request would read "In 29 days".
+    # Without a block, so each test may move on with `travel_to` again.
     @now = Time.current.change(hour: 12)
     travel_to @now
     Current.actor = users(:one)
@@ -76,11 +76,11 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Filter by type'] a:not([href*='page='])", count: 5
   end
 
-  # Final fix wave (I2): the list, the tabs and the badge are the page roots
-  # `Trash.roots` -- and so `Trash::Empty` and the retention job -- work on.
-  # A page left with no `trash_root_id` (its root's row deleted around the
-  # services; the FK nullifies) is not one of them: it was a row here that
-  # Empty trash and the sweep would never take.
+  # The list, the tabs and the badge are the page roots `Trash.roots` -- and
+  # so `Trash::Empty` and the retention job -- work on. A page left with no
+  # `trash_root_id` (its root's row deleted around the services; the FK
+  # nullifies) is not one of them: as a row here it would be one that Empty
+  # trash and the sweep never take.
   test "a trashed page with no trash root is not a row, a count or part of the badge: the screen lists what Trash.roots holds" do
     @child.reload.update_columns(trash_root_id: nil)
     sign_in_as users(:one)
@@ -92,8 +92,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_equal 3, Admin::TrashController.badge_count(users(:one))
   end
 
-  # Final fix wave (m2): the tabs' three counts ARE the sidebar badge's; the
-  # Trash page used to run them twice.
+  # The tabs' three counts ARE the sidebar badge's, counted once a request.
   test "the Trash page counts each type once: the badge reuses the tabs' counts" do
     group = access_control_groups(:branch_editors)
     %w[pages.delete posts.delete media.manage].each { |key| AccessControl::Grant.create!(group:, permission: key, scope: {}) }
@@ -163,9 +162,9 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{gone.id}", text: /a deleted user · /
   end
 
-  # Final fix wave (m4). A token's trash sets `trashed_by` to the token's
-  # USER, so the row named the user alone -- "via <token>" showed only once
-  # that user was gone and the event was read instead.
+  # A token's trash sets `trashed_by` to the token's USER, so the row must
+  # read the event as well to say "via <token>", whether or not that user is
+  # still there.
   test "who: an item an API token trashed names its user and the token, for that user and for anyone else" do
     token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name: "Deploy bot")
     by_token = Current.set(actor: users(:one)) { create_post(title: "Trashed by a token") }
@@ -190,10 +189,10 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{by_token.id}", text: /two@example\.com via Deploy bot · /
   end
 
-  # Final fix wave (m4): the event that names the trasher must be the event of
-  # THIS trashing. An item trashed, restored and then trashed again by a path
-  # that records no event of its own (a branch member going with its root)
-  # would otherwise show whoever trashed it the first time.
+  # The event that names the trasher must be the event of THIS trashing. An item
+  # trashed, restored and then trashed again by a path that records no event of
+  # its own (a branch member going with its root) would otherwise show whoever
+  # trashed it the first time.
   test "who: an older trashing's event doesn't name who trashed it this time" do
     Current.set(actor: users(:two)) { assert Trash::Restore.call(@post.reload).ok? }
     later = @now + 2.hours
@@ -226,7 +225,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
 
     travel_to @now + 29.days
     get admin_trash_path
-    assert_select "#trash-post-#{@post.id} [data-retention]", text: /In 1 day\b/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /Tomorrow/
 
     travel_to @now + 30.days
     get admin_trash_path
@@ -426,8 +425,8 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "dialog#empty-trash-dialog", text: /1 page \(with 1 subpage\), 1 post and 1 image/
   end
 
-  # Final fix wave (m3): "The trash is empty" beside "Empty trash… deletes 1
-  # page" was a contradiction on one screen.
+  # "The trash is empty" beside "Empty trash… deletes 1 page" would
+  # contradict itself on one screen.
   test "a trash.empty-only viewer's empty list says there is nothing they can restore, not that the trash is empty" do
     group = access_control_groups(:branch_editors)
     AccessControl::Grant.create!(group:, permission: "trash.empty", scope: {})

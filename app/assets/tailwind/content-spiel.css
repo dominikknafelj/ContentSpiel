@@ -312,11 +312,11 @@
      entry and its "+", the mind graph's card and tooltip) and an editor's
      rail panel over a canvas that follows it; `raised-top`, over `raised` in the same
      context (the matrix's sticky title cell, an open or focused strip
-     entry). Not every user of `lift` and `raised` makes a stacking context
+     entry, the audit log's sticky day band). Not every user of `lift` and `raised` makes a stacking context
      of its own (a row's second link meets the page's layers), so both stay
      under the lowest page layer. `raised-top` does not, and is used only
      inside a component's own stacking context (the matrix's `isolate`, the
-     canvas).
+     canvas, the audit log's `isolate` card).
 
      The rest are PAGE layers, lowest first, each over the one before it
      wherever the two meet: the save bar (`sticky`; a configuration screen

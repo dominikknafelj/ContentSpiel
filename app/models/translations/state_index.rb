@@ -143,7 +143,7 @@ module Translations
     # given language over the (already read-scoped) relations, items not
     # fields -- the same numbers as `summary`, but in two grouped queries per
     # relation however many languages there are (the translations matrix's
-    # summary cards). `complete` is what is left of the total, so a record
+    # language tiles). `complete` is what is left of the total, so a record
     # with no row for a language reads complete, as everywhere else.
     def summaries(locales, relations)
       locales = locales.map(&:to_s)

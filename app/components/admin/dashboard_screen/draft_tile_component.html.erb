@@ -1,5 +1,5 @@
 <%# Only the title is a link; the rest lies under its stretched `::after`. %>
-<article class="admin-draft-tile rounded-tile bg-surface shadow-1 p-4 hover:shadow-2">
+<article class="admin-draft-tile admin-tile p-4">
   <div class="text-sm text-meta">
     <% if post? %>
       <%= render Admin::Ui::ContentTypeDotComponent.new(content_type: record.content_type) %>

@@ -120,8 +120,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/forms/new.html.erb
     app/views/admin/forms/show.html.erb
     app/javascript/controllers/admin/forms/builder_controller.js
-    app/components/admin/settings_screen/card_component.rb
-    app/components/admin/settings_screen/card_component.html.erb
+    app/components/admin/ui/settings_card_component.rb
+    app/components/admin/ui/settings_card_component.html.erb
+    app/components/admin/settings_screen/section_card.rb
     app/components/admin/settings_screen/nav_component.rb
     app/components/admin/settings_screen/nav_component.html.erb
     app/components/admin/settings_screen/glance_component.rb
@@ -246,6 +247,13 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/translation_screen/state_cell_component.rb
     app/components/admin/ui/language_tabs_component.rb
     app/components/admin/ui/language_tabs_component.html.erb
+    app/components/admin/ui/language_progress_component.rb
+    app/components/admin/ui/language_progress_component.html.erb
+    app/components/admin/ui/record_chip_component.rb
+    app/components/admin/ui/actor_avatar_component.rb
+    app/components/admin/ui/word_diff_component.rb
+    app/components/admin/notes_screen/media_section_component.rb
+    app/components/admin/notes_screen/media_section_component.html.erb
     app/components/admin/ui/rail_tabs_component.rb
     app/components/admin/ui/rail_tabs_component.html.erb
     app/components/admin/ui/rail_panel_component.rb
@@ -439,6 +447,47 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/setup/review.html.erb
     app/views/setup/mail.html.erb
     app/controllers/setup_controller.rb
+    app/components/admin/media_library/grid_component.rb
+    app/components/admin/media_library/panel_component.rb
+    app/components/admin/media_library/panel_component.html.erb
+    app/components/admin/media_library/grid_component.html.erb
+    app/components/admin/media_library/tile_component.rb
+    app/components/admin/media_library/tile_component.html.erb
+    app/components/admin/media_library/toolbar_component.rb
+    app/components/admin/media_library/toolbar_component.html.erb
+    app/views/admin/media/index.html.erb
+    app/views/admin/media/picker.html.erb
+    app/javascript/media/upload_tiles.js
+    app/components/media/picker_component.rb
+    app/components/media/picker_component.html.erb
+    app/javascript/controllers/admin/media/select_controller.js
+    app/components/admin/trash_screen/list_component.rb
+    app/components/admin/trash_screen/list_component.html.erb
+    app/components/admin/trash_screen/row_component.rb
+    app/components/admin/trash_screen/row_component.html.erb
+    app/components/admin/trash_screen/retention_tag_component.rb
+    app/components/admin/trash_screen/empty_trash_component.rb
+    app/components/admin/trash_screen/empty_trash_component.html.erb
+    app/components/admin/trash_screen/tabs_component.rb
+    app/components/admin/trash_screen/tabs_component.html.erb
+    app/views/admin/trash/index.html.erb
+    app/components/admin/translation_screen/matrix_component.rb
+    app/components/admin/translation_screen/matrix_component.html.erb
+    app/components/admin/translation_screen/summary_card_component.rb
+    app/components/admin/translation_screen/summary_card_component.html.erb
+    app/views/admin/translations/index.html.erb
+    app/components/admin/audit_screen/toolbar_component.rb
+    app/components/admin/audit_screen/toolbar_component.html.erb
+    app/components/admin/audit_screen/day_list_component.rb
+    app/components/admin/audit_screen/day_list_component.html.erb
+    app/components/admin/audit_screen/row_component.rb
+    app/components/admin/audit_screen/row_component.html.erb
+    app/components/admin/audit_screen/event_header_component.rb
+    app/components/admin/audit_screen/event_header_component.html.erb
+    app/components/admin/audit_screen/changes_component.rb
+    app/components/admin/audit_screen/changes_component.html.erb
+    app/views/admin/audit_events/index.html.erb
+    app/views/admin/audit_events/show.html.erb
   ].freeze
 
   PLACEHOLDER = "".freeze

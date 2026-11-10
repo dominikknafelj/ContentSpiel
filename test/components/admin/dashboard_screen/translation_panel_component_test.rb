@@ -44,6 +44,18 @@ class Admin::DashboardScreen::TranslationPanelComponentTest < ViewComponent::Tes
     assert_selector "[data-locale=de] [role=progressbar][aria-valuenow='#{(summary[:complete] * 100.0 / summary[:total]).round}']"
   end
 
+  # A language's progress is the Translations tiles' (`Admin::Ui::LanguageProgressComponent`):
+  # the bar on its line track, then outdated before missing.
+  test "a language's progress is the shared one: the line track, then outdated before missing" do
+    render_inline Admin::DashboardScreen::TranslationPanelComponent.new(entries: [
+      Dashboard::TranslationNeeds::Entry.new(locale: "de", name: "Deutsch", total: 20, complete: 7, missing: 12, outdated: 1, item: nil)
+    ])
+
+    assert_selector "[data-locale=de] [role=progressbar].bg-line[aria-label='Deutsch translated'][aria-valuenow='35'] > .bg-ok"
+    assert_no_selector ".bg-sunken"
+    assert_equal "↻ 1 outdated · 12 missing", page.find("[data-locale=de] [role=progressbar] + span").text.squish
+  end
+
   # The shared panel caps its rows at five; a language is a row, so a sixth
   # and seventh must not disappear.
   test "every language gets its row, however many there are" do

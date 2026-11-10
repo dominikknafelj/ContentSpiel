@@ -110,6 +110,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
       app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
       app/components/admin/dashboard_screen/translation_panel_component.html.erb app/components/admin/dashboard_screen/translation_panel_component.rb
+      app/components/admin/ui/language_progress_component.html.erb app/components/admin/ui/language_progress_component.rb
     ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
@@ -205,8 +206,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     .reject { |path| path.start_with?(Rails.root.join("app/views/layouts/public").to_s) }
   CONTROL_STATE = /(?<![\w-])(?:hover|focus|focus-within|focus-visible|has-checked|has-\[:checked\]|placeholder):|\bcursor-pointer\b/
   STRONG_LINE_ALLOWED = {
-    "data-mind-graph-card" => "the graph's card is a panel that takes the focus; its outline is the focus ring",
-    'CARD = "group block w-full overflow-hidden' => "a media tile is told by its picture; its hover line only groups"
+    "data-mind-graph-card" => "the graph's card is a panel that takes the focus; its outline is the focus ring"
   }.freeze
 
   test "a control is identified by a field-line edge or a fill of its own, never border-line-strong" do
@@ -343,6 +343,48 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
     order = TILE_STATES.keys.map { |selectors| self.class.css_rules("content-spiel.tailwind.css").index { |found, _| found == selectors } }
     assert_equal order.sort, order, "rest, the pointer, open or focused, the thread, then the drop place and the lifted tile: the later state wins at one weight"
+  end
+
+  # A tile in a grid (`.admin-tile`: the media tiles, the upload tiles,
+  # Translations' language tiles, the Dashboard's draft tiles) is drawn by one rule set, its states
+  # elevations and the selection's accent outline. A transform would move
+  # it under the pointer, and a border is an edge drawn for depth.
+  TILE = '.admin-tile:is([aria-current="true"], [aria-pressed="true"])'.freeze
+
+  test "a tile is .admin-tile: elevation 1 at rest, 2 under a pointer, and the accent outline when selected or pressed; never a transform" do
+    rest = single_rule(".admin-tile")
+    [ "border-radius: var(--cs-radius-tile)", "background: var(--cs-surface)", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes rest, declaration }
+
+    hovers = self.class.css_blocks("content-spiel.tailwind.css", /@media \(hover: hover\)\s*\{/).select { |body| body.include?(".admin-tile:hover") }
+    assert_equal 1, hovers.size, "the pointer's elevation is drawn only where a pointer can hover"
+    assert_match(/\.admin-tile:hover\s*\{\s*box-shadow:\s*var\(--cs-shadow-2\);\s*\}/, hovers.first)
+    assert_includes single_rule(".admin-tile:hover"), "box-shadow: var(--cs-shadow-2)"
+
+    selected = single_rule(TILE)
+    [ "outline: 2px solid var(--cs-accent)", "outline-offset: 2px", "box-shadow: var(--cs-shadow-1)" ].each { |declaration| assert_includes selected, declaration }
+
+    rules = self.class.css_rules("content-spiel.tailwind.css")
+    order = [ [ ".admin-tile" ], [ ".admin-tile:hover" ], [ TILE ] ].map { |selectors| rules.index { |found, _| found == selectors } }
+    assert_equal order.sort, order, "rest, the pointer, then the selection: the selection wins under the pointer"
+    tile_rules = rules.select { |selectors, _| selectors.any? { |selector| selector.match?(/\.admin-tile(?![\w-])/) } }
+    tile_rules.each do |selectors, body|
+      assert_no_match(/(?<![\w-])(?:transform|translate|scale|rotate):/, body, "#{selectors.join(", ")} moves the tile")
+      assert_no_match(/(?<![\w-])border(?!-radius)[\w-]*:/, body, "#{selectors.join(", ")} draws a border")
+    end
+  end
+
+  # A tile's look written as utilities (the tile radius with an elevation of
+  # its own) is a second tile beside `.admin-tile`, which a restyle of the
+  # tile would miss. Read a line at a time.
+  HAND_TILE = /(?=.*(?<![\w-])rounded-tile(?![\w-]))(?=.*(?<![\w-])(?:[\w-]+:)*shadow-[1-4](?![\w-])).*/
+
+  test "no hand-drawn tile: the tile radius never stands with an elevation utility on one line" do
+    assert_empty design_offences(HAND_TILE), "a tile is .admin-tile, never rounded-tile with a shadow utility"
+  end
+
+  test "the hand-drawn tile pattern matches the tile radius with an elevation, and not either alone" do
+    [ 'class="rounded-tile bg-surface shadow-1 p-4"', '"shadow-1 rounded-tile"', "rounded-tile hover:shadow-2" ].each { |sample| assert_match HAND_TILE, sample }
+    [ 'class="rounded-tile bg-paper"', 'class="rounded-card shadow-1"', "admin-tile p-4", "rounded-tile shadow-menu", "rounded-tile-x shadow-1" ].each { |sample| assert_no_match HAND_TILE, sample }
   end
 
   test "the border pattern matches a border utility of the card's colours, and not a radius, an outline or a hover" do
@@ -726,6 +768,92 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty design_offences(/font-cs-mono[^"'`]*text-\[11px\]|text-\[11px\][^"'`]*font-cs-mono/)
   end
 
+  # The content-side screens (media, Trash, Translations, Forms, the audit
+  # log) speak in the type scale's tokens and draw no box of their own: a
+  # card is an elevation, a table's lines stay inside its card, and a
+  # control keeps its field-line frame. Each screen's folders join
+  # `CONTENT_SIDE_SCREENS` (globs from the root) as it is drawn on the scale.
+  # Refused there, line by line: an arbitrary pixel size, `text-xs` (the
+  # label is `text-label`), a dashed edge and an important danger edge. And,
+  # string by string: the hand-drawn box, `rounded-cs` with `border-line` (or
+  # `-strong`, under any variant) in one quoted class string, in whatever
+  # order. A Ruby literal continued on the next line (`"…" \` then `"…"`) is
+  # one string, and a `#{NAME}` of a string constant the same file assigns
+  # (`NAME = "…"`) is read as that constant's classes. Not seen: `+` or
+  # adjacent literals, a constant from another file, ERB or a ternary inside
+  # the attribute, `class_names(…)`, an array or `%w[…]` (the reference's
+  # "No guard" list, `docs/reference/design-system.md`).
+  CONTENT_SIDE_SCREENS = %w[
+    app/components/admin/media_library/*
+    app/views/admin/media/*
+    app/components/media/picker_component.*
+    app/components/admin/notes_screen/media_section_component.*
+    app/components/admin/trash_screen/*
+    app/views/admin/trash/*
+    app/components/admin/translation_screen/matrix_component.*
+    app/components/admin/translation_screen/summary_card_component.*
+    app/views/admin/translations/*
+    app/components/admin/forms_screen/*
+    app/views/admin/forms/*
+    app/views/admin/form_submissions/*
+    app/components/admin/audit_screen/*
+    app/views/admin/audit_events/*
+  ].freeze
+  OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
+  QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
+  BOX_EDGE = /\A(?:[\w-]+:)*border-line(?:-strong)?\z/
+  CONTINUED = /"[ \t]*\\\n[ \t]*"/
+  STRING_CONSTANT = /\b([A-Z][A-Z0-9_]*)\s*=\s*"((?:[^"\n]|#{CONTINUED.source})*)"/
+  # A file of those screens that may keep one of the refused looks, mapped to
+  # the reason.
+  HAND_BOX_ALLOWED = {
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
+  }.freeze
+
+  def self.content_side_sources = CONTENT_SIDE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
+
+  # `[line number, what was refused]` for each refused look in `source`.
+  def self.refused_looks(source)
+    constants = source.scan(STRING_CONSTANT).to_h { |name, value| [ name, value.gsub(CONTINUED, " ") ] }
+    source = source.gsub(/#\{([A-Z][A-Z0-9_]*)\}/) { constants.fetch(Regexp.last_match(1), Regexp.last_match(0)) }
+    lines = source.each_line.each_with_index.filter_map { |line, index| [ index + 1, line[OFF_SCALE] ] if line.match?(OFF_SCALE) }
+    boxes = source.to_enum(:scan, QUOTED).filter_map do
+      match = Regexp.last_match
+      classes = (match[1] || match[2]).gsub(CONTINUED, " ").split
+      [ source[0...match.begin(0)].count("\n") + 1, match[0] ] if classes.include?("rounded-cs") && classes.any? { |name| name.match?(BOX_EDGE) }
+    end
+    (lines + boxes).sort_by(&:first)
+  end
+
+  test "the content-side screens draw no off-scale size and no hand-drawn box" do
+    CONTENT_SIDE_SCREENS.each { |glob| assert Dir[Rails.root.join(glob)].any?, "#{glob} matches no file: the guard looks at nothing there" }
+    offences = self.class.content_side_sources.flat_map do |path|
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      next [] if HAND_BOX_ALLOWED.key?(relative)
+
+      self.class.refused_looks(File.read(path)).map { |line, look| "#{relative}:#{line}: #{look}" }
+    end
+    assert_empty offences, "a size is a type token (text-small, text-body, text-label) and a box is a card's elevation"
+    HAND_BOX_ALLOWED.each_key do |path|
+      assert_includes self.class.content_side_sources, Rails.root.join(path).to_s, "#{path} is allowed but is on no content-side screen"
+      assert self.class.refused_looks(Rails.root.join(path).read).any?, "#{path} draws none of the refused looks: drop it from HAND_BOX_ALLOWED"
+    end
+  end
+
+  test "the off-scale check finds a pixel size, text-xs, a hand-drawn box in any order, a dashed edge and an important danger edge, and not a token, a table's line or a control's frame" do
+    [ "text-[13px]", "text-xs", %(class="rounded-cs border border-line"), "border-dashed", "!border-danger",
+      %(class="border border-line bg-sunken rounded-cs"), %(class="rounded-cs border hover:border-line-strong"),
+      %(CARD = "block rounded-cs border " \\\n         "border-line".freeze),
+      %(BASE = "block rounded-cs".freeze\nPICK = "\#{BASE} border border-line".freeze) ].each do |sample|
+      assert_not_empty self.class.refused_looks(sample), sample
+    end
+    [ "text-small", %(class="border-b border-line"), "text-xs-foo", %(class="rounded-cs border border-field-line"),
+      %(class="rounded-cs px-2" title="border-line"),
+      %(BASE = "block rounded-cs".freeze\nPICK = "\#{OTHER} border border-line".freeze) ].each do |sample|
+      assert_empty self.class.refused_looks(sample), sample
+    end
+  end
+
   # A triangle glued to its words reads "▾PAGE SETTINGS". A mono-label
   # summary draws its own triangle, 6px from the words, that a screen reader skips.
   test "a disclosure's triangle is the stylesheet's, apart from its words, turned when open" do
@@ -766,7 +894,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-form-column\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
     assert_match(/\.admin-form-column--pair\s*\{\s*max-width:\s*var\(--cs-form-max-pair\);\s*\}/, css)
     assert_match(/@container admin-pair \(min-width: 824px\)\s*\{\s*\.admin-translation-pair\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 560px\)\);/m, css)
-    assert_no_match(/\b(?:760|1144)px/, css)
+    # The media library's middle range starts at 760px of the library: a
+    # container's width, not the form column's, and a container query cannot
+    # read the token.
+    assert_no_match(/\b(?:760|1144)px/, css.sub("@container admin-media (min-width: 760px)", ""))
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
 
     assert_no_match(/\b(?:1680|360|28)px|\b(?:72|100)ch\b/, css)
@@ -828,31 +959,66 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_empty medias.select { |body| body.include?("admin-rail") }, "no window media query lays out the rail"
   end
 
-  # A row's people narrow by the width of their column (the tree) or list (the
-  # posts), whatever the window's width and whatever the row's depth.
+  # A row's people narrow by the width of a container, never the window's:
+  # a tree row by its own (the next test), a posts row by its list's. The
+  # tree's column is no container: a column under 260px has every row under
+  # the row's rule, so a column rule could never show.
   test "a row's people narrow by the row's own width, never the window" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-shell__tree\s*\{\s*container:\s*admin-tree-column\s*\/\s*inline-size;/, css)
-    assert_no_match(/\.admin-tree-row\s*\{[^}]*container:/, css, "a row is no container: its depth would decide how many people it shows")
-    [ "admin-tree-column (max-width: 212.98px)", "admin-list (max-width: 639px)" ].each do |query|
-      blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container #{Regexp.escape(query)}\s*\{/)
-      assert_equal 1, blocks.size, "one @container #{query} block"
-      assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
-      assert_includes blocks.first, "[data-presence-more] { display: none; }"
-    end
+    assert_no_match(/container:\s*admin-tree-column|@container admin-tree-column/, css, "the tree's people are decided by the row alone")
+    blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-list \(max-width: 639px\)\s*\{/)
+    assert_equal 1, blocks.size, "one @container admin-list (max-width: 639px) block"
+    assert_includes blocks.first, "[data-presence-more-narrow] { display: flex; }"
+    assert_includes blocks.first, "[data-presence-more] { display: none; }"
     windowed = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/).select { |body| body.include?("admin-presence-marker") }
     assert_empty windowed, "a row's people are asked of a container, not an @media block"
   end
 
-  # The ring around a circle is the colour of the row under it, on hover too.
-  test "a row's circles take their ring from the row's ground, at rest, on hover and selected" do
+  # Two letters reach about 19px into a 22px circle, so a circle over the one
+  # before covers its second letter: a stack's circles stand apart, and with
+  # nothing overlapping no ring separates them.
+  test "an avatar stack never overlaps and draws no ground ring" do
+    # A file that renders a circle writes no negative start margin anywhere
+    # in it: the classes of a stack's slots are often built apart from the
+    # render (a `circle_class` method, a sibling component file).
+    stacks = Dir[Rails.root.join("app/components/**/*.{rb,erb}")].select { |path| File.read(path).include?("AvatarComponent.new") }
+    stacks = stacks.flat_map { |path| [ path, *Dir[path.sub(/\.(html\.erb|rb)\z/, ".{rb,html.erb}")] ] }.uniq
+    assert stacks.any? { |path| path.end_with?("people_component.rb") }, "the stacks' files are read"
+    overlapping = stacks.flat_map do |path|
+      self.class.without_comments(path).lines.each_with_index.filter_map do |line, index|
+        "#{path.delete_prefix("#{Rails.root}/")}:#{index + 1}" if line.match?(/(?<![\w-])-m[ls]-/)
+      end
+    end
+    assert_empty overlapping, "a circle never stands over the one before it (a negative start margin in a file that draws circles)"
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
-    assert_match(/\.admin-tree-row\s*\{[^}]*--admin-avatar-ground:\s*var\(--cs-chrome\);/, css)
-    assert_match(/\.admin-tree-row:hover\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);\s*background:\s*var\(--cs-sunken\);/, css)
-    assert_match(/\.admin-tree-row--selected\s*\{\s*--admin-avatar-ground:\s*var\(--cs-sunken\);/, css)
-    row = Rails.root.join("app/components/admin/posts_screen/table_component.html.erb").read
-    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]"
-    assert_includes row, "data-[selected]:bg-accent-tint data-[selected]:[--admin-avatar-ground:var(--cs-accent-tint)]"
+    marker_rules = css.scan(/[^{}]*\.admin-presence-marker[^{}]*\{[^}]*\}/)
+    assert marker_rules.any?, "the marker's rules are read"
+    assert_empty marker_rules.grep(/margin(?:-inline-start|-left|-inline)?:[^;]*-\d/), "a marker's circles never overlap"
+    grounds = Dir[Rails.root.join("app/**/*.{rb,erb,js,css}")].reject { |path| path.include?("/app/assets/builds/") }.select { |path| File.read(path).include?("--admin-avatar-ground") }
+    assert_empty grounds, "no ring in the colour of a stack's ground: nothing overlaps to be separated"
+    marker = Rails.root.join("app/components/admin/ui/presence_marker_component.html.erb").read
+    assert_includes marker, "inline-flex flex-none items-center gap-0.5", "the marker's parts stand 2px apart"
+  end
+
+  # The title is as wide as its words (the state mark stands 6px after them),
+  # and what keeps it from being cut by its markers is the presence marker
+  # stepping down to one circle where the row is short: one person's own, or
+  # the count from two. Presence never gives way to nothing.
+  test "a tree row's title keeps its words' width and the marker gives way to one circle under 240px of the row: one person's own, or the count from two" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-tree-row\s*\{[^}]*container:\s*admin-tree-row\s*\/\s*inline-size;/, css)
+    assert_match(/\.admin-tree-row__title\s*\{[^}]*flex:\s*0 1 auto;[^}]*min-width:\s*0;/, css)
+    assert_match(/\.admin-tree-row__trailing\s*\{[^}]*flex:\s*none;/, css, "the markers do not shrink")
+    assert_includes css, ".admin-tree-row__title:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)),\n.admin-tree-row__state:has(+ :is(.admin-tree-row__trailing, .admin-tree-row__add)) { margin-inline-end: 6px; }",
+      "on a full row the auto margin is 0, so the title's own 6px keeps its ellipsis off the markers"
+    assert_match(/\.admin-presence-marker > :is\(\[data-presence-more-narrow\], \[data-presence-total\]\)\s*\{\s*display:\s*none;\s*\}/, css, "the count circle rests hidden")
+    blocks = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-tree-row \(max-width: 239\.98px\)\s*\{/)
+    assert_equal 1, blocks.size, "one row rule"
+    assert_includes blocks.first, ".admin-presence-marker > :is([data-presence-avatar] ~ [data-presence-avatar], [data-presence-more], [data-presence-more-narrow]) { display: none; }"
+    assert_includes blocks.first, '.admin-presence-marker:not([data-presence-count="1"]) > [data-presence-avatar] { display: none; }', "one person keeps their first circle"
+    assert_includes blocks.first, '.admin-presence-marker:not([data-presence-count="1"]) > [data-presence-total] { display: flex; }', "two and more are the count circle"
+    assert_no_match(/data-presence-marker-label|data-tooltip|\.admin-presence-marker\s*\{/, blocks.first, "the words and the tooltip stay, and so does the marker")
+    assert_no_match(/admin-tree-row__title\s*\{[^}]*7rem/, css)
   end
 
   # The docked rail's ground is as tall as the tabs and the
@@ -966,12 +1132,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*block;\s*\}/, docked.first, "docked, the empty line is shown")
     assert_match(/\.admin-notes-threads\s*\{[^}]*margin-top:\s*0/, docked.first, "docked, the open threads' rail sits at the grid's top")
     row = Rails.root.join("app/components/admin/notes_screen/open_thread_row_component.html.erb").read
-    assert_includes row, "hover:bg-paper hover:[--admin-avatar-ground:var(--cs-paper)]", "the rail's row takes the paper hover and its avatars' ring follows it"
+    assert_includes row, "hover:bg-paper motion-reduce", "the rail's row takes the paper hover"
     assert_includes row, "-mx-2 flex min-w-0 items-center gap-2.5 rounded-tile px-2 py-1.5", "the fill is on the row's own padding"
     assert_includes row, "transition-colors duration-120 ease-(--cs-ease) hover:bg-paper"
     assert_includes row, "motion-reduce:transition-none"
-    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-surface\);/, css)
-    assert_match(/\.admin-notes-threads\s*\{\s*--admin-avatar-ground:\s*var\(--cs-rail\);/, docked.first, "docked, the rings stand on the rail's ground at rest")
     outside = css.sub(docked.first, "")
     assert_match(/\.admin-tag-detail:has\(\[data-tag-detail-empty\]\)\s*\{\s*display:\s*none;\s*\}/, outside, "below the threshold an unchosen rail takes no room")
     card = outside.index(/\.admin-tag-detail\s*\{[^}]*background:\s*var\(--cs-surface\)/)
@@ -1036,6 +1200,43 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:lg|xl|2xl):(?:grid|col|row)/, view, "the view leaves the grid to the stylesheet")
   end
 
+  # The Media screen's rail: laid out by the library's own width, never a
+  # window media query. Below 760px one column, the rail a card under the
+  # grid; from 760px the card beside it at 340px, sticky; docked at the one
+  # threshold on the rail's ground, with the tabs shown and one panel.
+  test "the Media screen's panel is laid out by the library's own width, never a window media query" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-media-library\s*\{\s*container:\s*admin-media\s*\/\s*inline-size;\s*\}/, css)
+    assert_match(/\.admin-media-library__grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column in a narrow library")
+    card = css[/\.admin-media-rail\s*\{([^}]*)\}/, 1]
+    %w[background:\s*var\(--cs-surface\) box-shadow:\s*var\(--cs-shadow-1\) border-radius:\s*var\(--cs-radius-card\)].each do |declaration|
+      assert_match(/#{declaration};/, card, "below the threshold the rail is a card")
+    end
+
+    middle = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-media \(min-width: 760px\)\s*\{/)
+    assert_equal 1, middle.size
+    assert_match(/\.admin-media-library__grid\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\) 340px;\s*\}/, middle.first, "from 760px the card stands 340px beside the grid")
+    assert_match(/\.admin-media-rail\s*\{[^}]*position:\s*sticky;[^}]*overflow-y:\s*auto;/, middle.first, "and sticks, scrolling inside itself")
+    assert_no_match(/admin-rail__tabs/, middle.first, "the card has no tabs")
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-media \(min-width: 1200px\)\s*\{/).first
+    rail = docked[/(?:\A|[};])\s*\.admin-media-rail\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds the rail"
+    [ '--admin-rail-docked:\s*1', 'background:\s*var\(--cs-rail\)', 'box-shadow:\s*var\(--cs-shadow-2\)', 'border-radius:\s*var\(--cs-radius-rail\)' ].each do |declaration|
+      assert_match(/#{declaration};/, rail, "docked, the rail is on the rail's ground and says it is docked")
+    end
+    assert_match(/\.admin-media-rail \.admin-rail__tabs\s*\{\s*display:\s*flex;/, docked, "docked, the tabs are shown")
+    assert_match(/\.admin-media-rail \.admin-rail__panel:not\(\[data-current\]\)\s*\{\s*display:\s*none;\s*\}/, docked, "docked, one panel is shown")
+    assert_match(/\.admin-media-rail__section-heading\s*\{\s*display:\s*none;\s*\}/, docked, "docked, the tab names the notes and their heading goes")
+    assert_match(/\.admin-media-rail__close\s*\{[^}]*position:\s*absolute;[^}]*top:[^}]*right:/, css, "Close stands over the rail's top-right corner")
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-media") }, "no window media query lays out the Media screen"
+    view = Rails.root.join("app/views/admin/media/index.html.erb").read
+    assert_no_match(/\blg:/, view, "the view leaves the layout to the library's container")
+  end
+
   # The Tags list's usage bar takes the structure hue through a token of its
   # own, as a tag's square on the canvas does, so it can change without
   # moving the icons; the bar is drawn in one place.
@@ -1080,7 +1281,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
       "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
-      "admin-settings" => [ ".admin-settings-layout__grid" ] }.each do |container, selectors|
+      "admin-settings" => [ ".admin-settings-layout__grid" ],
+      "admin-media" => [ ".admin-media-library__head", ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
@@ -1098,7 +1300,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     # Undocked nothing centres: no rule outside a docked block carries an
     # auto inline margin but the header's, which applies only while docked.
-    outside = %w[admin-editor admin-dashboard admin-list admin-settings].reduce(css) do |rest, container|
+    outside = %w[admin-editor admin-dashboard admin-list admin-settings admin-media].reduce(css) do |rest, container|
       self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
     end
     assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
@@ -1107,7 +1309,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every docked composition grows to --cs-content-max from the rail's tokens, at the one threshold" do
     { "admin-editor" => /\.admin-rail-grid\s*\{([^}]*)\}/,
       "admin-dashboard" => /\.admin-dashboard__grid\s*\{([^}]*)\}/,
-      "admin-list" => /\.admin-list-rail__grid\s*\{([^}]*)\}/ }.each do |container, rule|
+      "admin-list" => /\.admin-list-rail__grid\s*\{([^}]*)\}/,
+      "admin-media" => /\.admin-media-library__grid\s*\{([^}]*)\}/ }.each do |container, rule|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/)
       assert_equal 1, docked.size, "one block docks #{container}"
       grid = docked.first[rule, 1]
@@ -1227,7 +1430,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A container query cannot read a custom property, so the threshold is a
-  # number written in four places; this holds them to one.
+  # number written in five places (the media library's too); this holds them to one.
   test "the editors' rail, the dashboard's, the lists' and Settings' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     # The editor area asks one other width: 1244px, where a docked post's
@@ -1248,6 +1451,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
     assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
     assert_equal [ editor.first ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks the threshold alone"
+    # The media library asks the threshold and 760px, where its rail stands
+    # beside the grid as a card.
+    assert_equal [ "1200px", "760px" ].sort, css.scan(/@container admin-media \(min-width: ([^)]+)\)/).flatten.sort
 
     docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
     assert_equal 1, docked.size
@@ -1361,6 +1567,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # the tokens to utilities and is not a rule that draws.
   PEOPLE_RULES = [
     ".admin-notes-marker[data-has-notes]",
+    ".admin-rail__tab [data-tab-count]",
     PEOPLE_FRAME.join(", "),
     SECTION_FRAME.join(", "),
     ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])"
@@ -1670,7 +1877,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/scheduled_date_component.rb].freeze
   STATUS_FILL = /(?<![\w-])bg-(?:ok|warn|danger)(?:-tint)?(?![\w-])/
   STATUS_FILL_FILES = %w[
-    app/components/admin/dashboard_screen/translation_panel_component.html.erb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/editor_screen/changes_overview_component.html.erb
     app/components/admin/editor_screen/delete_block_dialog_component.rb
@@ -1681,7 +1887,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/table_controls_component.html.erb
     app/components/admin/forms_screen/list_component.rb
     app/components/admin/forms_screen/new_form_dialog_component.html.erb
-    app/components/admin/forms_screen/submission_component.html.erb
     app/components/admin/groups_screen/permission_matrix_component.html.erb
     app/components/admin/groups_screen/scope_editor_component.html.erb
     app/components/admin/notes_screen/thread_component.rb
@@ -1690,12 +1895,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/mail_alert_component.rb
     app/components/admin/settings_screen/mail_test_outcome_component.rb
     app/components/admin/tokens_screen/create_step_component.html.erb
-    app/components/admin/translation_screen/summary_card_component.html.erb
     app/components/admin/ui/badge_component.rb
     app/components/admin/ui/button_component.rb
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
     app/components/admin/ui/insecure_notice_component.rb
+    app/components/admin/ui/language_progress_component.html.erb
     app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/mail_failed_notice_component.rb
     app/components/admin/ui/state_chip_component.rb
@@ -1909,9 +2114,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row and the draft tile around their stretched
-    # links, and the Notes for you row that is the link, each on hover and focus.
+    # The Waiting for you row, the draft tile and a Translations row around
+    # their stretched links, and the Notes for you row that is the link, each
+    # on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
+                   ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end

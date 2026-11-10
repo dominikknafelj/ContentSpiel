@@ -1,14 +1,15 @@
 require "test_helper"
 require_relative "../../../support/rail_tab_probe"
 
-# The rail's tabs as a slot (`editor.rail.tabs`): each registered panel adds a
-# tab after the rail's own and draws its content in a panel of that tab.
+# A rail's tabs as a slot (`editor.rail.tabs`, `media.rail.tabs`): each
+# registered panel adds a tab after the rail's own and draws its content in a
+# panel of that tab.
 class Admin::Ui::RailSlotComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup { @about = create_page(title: "About") }
 
-  def slot(**context) = Admin::Ui::RailSlotComponent.new(rail_id: "editor-grid", record: @about, viewer: users(:one), **context)
+  def slot(name = "editor.rail.tabs", **context) = Admin::Ui::RailSlotComponent.new(slot: name, rail_id: "editor-grid", record: @about, viewer: users(:one), **context)
 
   test "a registered panel adds a tab after the rail's own and draws its panel" do
     Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe ]) do
@@ -22,6 +23,20 @@ class Admin::Ui::RailSlotComponentTest < ViewComponent::TestCase
       render_inline slot
       assert_selector "#editor-grid-panel-probe[role=tabpanel][aria-labelledby='editor-grid-tab-probe'] p[data-probe]"
     end
+  end
+
+  test "it draws the tabs registered at the slot it is told, and none of another slot's" do
+    Admin::Slots.with("editor.rail.tabs" => [ RailTabProbe ], "media.rail.tabs" => []) do
+      assert_equal %w[probe], slot("editor.rail.tabs").tabs.map(&:key)
+      assert_empty slot("media.rail.tabs").tabs
+      render_inline slot("media.rail.tabs")
+      assert_no_selector "[role=tabpanel]", wait: 0
+    end
+    Admin::Slots.with("editor.rail.tabs" => [], "media.rail.tabs" => [ RailTabProbe ]) do
+      assert_equal %w[probe], slot("media.rail.tabs").tabs.map(&:key)
+      assert_empty slot("editor.rail.tabs").tabs
+    end
+    assert_raises(ArgumentError) { slot("no.such.slot").tabs }
   end
 
   test "an entry whose render? is false adds no tab" do

@@ -61,7 +61,7 @@
     chosen on load, on the default tab only (`@chosen_section_id`). %>
 <% rail_id = "editor-grid" %>
 <%# What the rail's slot is handed: the record and viewer, and what this screen has read (`Admin::Slots`). %>
-<% rail_slot = Admin::Ui::RailSlotComponent.new(rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
+<% rail_slot = Admin::Ui::RailSlotComponent.new(slot: "editor.rail.tabs", rail_id: rail_id, record: @page, viewer: Current.actor, reserved: %w[page section], locale: admin_locale, url_options: admin_url_options,
                                                 query: request.query_parameters, **slot_context) %>
 <%= tag.div id: rail_id, class: "admin-rail-grid",
       data: { controller: "admin--ui--rail admin--editor--section-choice", "admin--editor--section-choice-chosen-value": @chosen_section_id,
