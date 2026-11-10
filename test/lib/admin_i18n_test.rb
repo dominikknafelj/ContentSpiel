@@ -784,6 +784,34 @@ class AdminI18nTest < ActiveSupport::TestCase
     end
   end
 
+  # `Array#to_sentence` joins with the locale's `support.array` and falls back
+  # to English's, which Active Support ships, so a language without its own
+  # reads "A, B, and C" in English. An admin language is one a file of
+  # `config/locales/admin/` is written in; its words are looked for in the app's
+  # own locale files (never Active Support's), in any file of that language.
+  SUPPORT_ARRAY_KEYS = %w[words_connector two_words_connector last_word_connector].freeze
+
+  def self.admin_languages
+    Dir[Rails.root.join("config/locales/admin/*.yml")].map { |path| File.basename(path, ".yml").split(".", 2).last }.uniq.sort
+  end
+
+  def self.app_locale_tree(language)
+    Dir[Rails.root.join("config/locales/**/*.yml")]
+      .select { |path| File.basename(path, ".yml").split(".").last == language }
+      .map { |path| YAML.load_file(path)[language] || {} }
+      .reduce({}) { |tree, file| tree.deep_merge(file) }
+  end
+
+  test "every admin language defines the words a list is joined with" do
+    languages = self.class.admin_languages
+    assert_includes languages, "en"
+    languages.each do |language|
+      array = self.class.app_locale_tree(language).dig("support", "array") || {}
+      missing = SUPPORT_ARRAY_KEYS.reject { |key| array[key].is_a?(String) }
+      assert_empty missing, "#{language}: CS Studio is written in this language, so a joined list needs its own support.array (docs/reference/i18n.md)"
+    end
+  end
+
   # --- The rules, pinned ------------------------------------------------------
 
   def erb(source)

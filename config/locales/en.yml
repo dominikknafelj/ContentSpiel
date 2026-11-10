@@ -51,6 +51,17 @@ en:
         short_datetime: "%-d %b, %H:%M"
         datetime: "%-d %b %Y, %H:%M"
 
+  # The words `Array#to_sentence` joins a list with ("A, B, and C"). Active
+  # Support ships English's and no other language's and falls back to them,
+  # so every admin language writes its own: `test/lib/admin_i18n_test.rb`
+  # refuses an admin language without them (docs/reference/i18n.md, "A list
+  # joined into a sentence"). English's are Active Support's values.
+  support:
+    array:
+      words_connector: ", "
+      two_words_connector: " and "
+      last_word_connector: ", and "
+
   # A `:code` field over its limit (the `:code` type's `validate`, `ContentModel::FieldTypes`):
   # Rails' own "is too long" sentence with the limit grouped for reading
   # ("20,000"), as the counter under the field says it. `%{limit}` arrives
