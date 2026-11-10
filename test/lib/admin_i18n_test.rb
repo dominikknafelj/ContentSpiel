@@ -222,6 +222,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/api_tokens/_screen.html.erb
     app/views/admin/api_tokens/index.html.erb
     app/views/admin/api_tokens/create.html.erb
+    app/views/admin/accounts/edit.html.erb
     app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb

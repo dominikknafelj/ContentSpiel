@@ -1,0 +1,30 @@
+# "Your account" (docs/reference/i18n.md): `admin/accounts/edit.html.erb` and
+# `Admin::AccountsController`, read with full keys; the sidebar's account
+# block reads `title` too. The Notes card's keys, `admin.accounts.notes`, are
+# notes' wording on this screen and stay in `notes.en.yml`.
+en:
+  admin:
+    accounts:
+      # The screen's heading, its title in the browser's tab and the
+      # sidebar's entry that leads to it: one name for the one place.
+      title: "Your account"
+      # The first form's toast: the app's own "Settings saved" (no full stop,
+      # as on the Settings screen).
+      saved: "Settings saved"
+      profile:
+        title: "Profile"
+        name: "Your name"
+      # The third card: the password form, with what a change does to the
+      # person's sessions under its title.
+      password:
+        title: "Password"
+        sessions: "You'll stay signed in here. Other sessions are signed out."
+        current: "Current password"
+        new: "New password"
+        confirmation: "Confirm new password"
+        # The card's own footer: its Save, and the reset flow's link.
+        submit: "Change password"
+        forgot: "Forgot your current password?"
+        # The form's answer, said in the card, where the form is.
+        changed: "Password changed. Your other sessions were signed out."
+        limited: "Try again later."

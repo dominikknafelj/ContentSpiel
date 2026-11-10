@@ -819,6 +819,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/sessions/*
     app/views/admin/passwords/*
     app/views/invitations/*
+    app/views/admin/accounts/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -1910,7 +1911,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/word_diff_component.rb
     app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/password_field_controller.js
-    app/views/admin/accounts/edit.html.erb
     app/views/setup/_steps.html.erb
   ].freeze
 
@@ -1949,11 +1949,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   HAND_NOTICE_ALLOWED = {
     "app/components/admin/ui/error_summary_component.html.erb" => "the error summary is its own component, focused on arrival"
   }.freeze
-  # Screens whose boxes are drawn by hand still, each to move onto the notice
-  # with the rest of its screen's look; the list only shrinks.
-  NOTICE_NOT_YET = %w[
-    app/views/admin/accounts/edit.html.erb
-  ].freeze
   NOTICE_TINT = /\A(?:[\w-]+:)*bg-(?:warn|ok|danger)-tint\z/
   NOTICE_RADII = %w[rounded-cs rounded-card].freeze
 
@@ -1969,12 +1964,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "an alert box is NoticeComponent: no file outside it draws a box of bg-warn-tint, bg-ok-tint or bg-danger-tint beside rounded-cs or rounded-card" do
-    skipped = [ "app/components/admin/ui/notice_component.rb", *HAND_NOTICE_ALLOWED.keys, *NOTICE_NOT_YET ]
+    skipped = [ "app/components/admin/ui/notice_component.rb", *HAND_NOTICE_ALLOWED.keys ]
     offences = (relative_sources - skipped).flat_map do |path|
       self.class.hand_notices(Rails.root.join(path).read).map { |line, box| "#{path}:#{line}: #{box}" }
     end
     assert_empty offences, "a box of words is Admin::Ui::NoticeComponent (or its classes, for a box a script fills)"
-    (HAND_NOTICE_ALLOWED.keys + NOTICE_NOT_YET).each do |path|
+    HAND_NOTICE_ALLOWED.each_key do |path|
       assert self.class.hand_notices(Rails.root.join(path).read).any?, "#{path} draws no box of its own: drop it from the list"
     end
   end
