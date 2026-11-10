@@ -37,7 +37,8 @@ module Admin
         },
         keys: [],
         slots: [],
-        controller: "file-drop"
+        controller: "file-drop",
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a file drop's input is a Tab stop, and its Choose file rings while the keyboard is on it" ]
       )
 
       def initialize(name:, id:, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","), multiple: false, hint: nil, label: nil, **input_html)

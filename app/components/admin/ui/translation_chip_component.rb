@@ -29,7 +29,8 @@ module Admin
           tooltip.outdated
         ],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: an image named by its words, in a row or cell whose own link the keyboard stops on."
       )
 
       # The mark after the language code: a

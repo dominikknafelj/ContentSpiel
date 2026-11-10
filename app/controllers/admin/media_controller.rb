@@ -57,7 +57,7 @@ module Admin
     # and a trashed image only ever opens from the Trash); it is NOT "the grid
     # without a panel", which would hide that a link has gone stale.
     #
-    # `picker=1` is the same listing for `Media::PickerComponent`: the
+    # `picker=1` is the same listing for `Admin::Ui::MediaPickerComponent`: the
     # toolbar, the grid and the pagination, rendered on their own
     # inside the picker's `<turbo-frame id="media-picker-grid">`
     # (`admin/media/picker`, no layout) with select buttons instead of panel

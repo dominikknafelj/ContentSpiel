@@ -27,7 +27,8 @@ module Admin
         states: %i[rest],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a block hidden from a screen reader beside the row's link, whose own words say the date."
       )
 
       def initialize(at:)

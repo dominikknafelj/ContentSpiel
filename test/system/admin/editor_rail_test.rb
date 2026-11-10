@@ -533,7 +533,9 @@ class Admin::EditorRailSystemTest < ApplicationSystemTestCase
       assert_selector "#{PAGE_TAB}[aria-selected=true][tabindex='0']"
       assert_selector "#{SECTION_TAB}[aria-selected=false][tabindex='-1']"
 
-      page.execute_script("document.querySelector(#{PAGE_TAB.to_json}).focus()")
+      # Into the tablist by Tab from the editor's title: the selected tab is its one stop.
+      find("header.admin-editor-header h1").click
+      stop_on(PAGE_TAB)
       keyboard.type(:right)
       assert_selector "#{SECTION_TAB}[aria-selected=true][tabindex='0']"
       assert focus_is_on(SECTION_TAB)

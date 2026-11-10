@@ -7,7 +7,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # Everything that draws CS Studio, or is drawn inside it: its views (the
   # invitation page `views/invitations`, a product-layout page, among them) and
   # components, the media components it shares with the public site
-  # (`components/media`: the picker and the picture tag), the public site's own
+  # (`components/media`: the picture tag), the public site's own
   # components (`components/public`: the preview bar, whose two colours are
   # theme tokens too), and every script -- the Stimulus controllers and the
   # modules beside them (`media/`, `saving/`, `search/`, `rich_text/`,
@@ -848,7 +848,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   TYPE_SCALE_SCREENS = %w[
     app/components/admin/media_library/*
     app/views/admin/media/*
-    app/components/media/picker_component.*
+    app/components/admin/ui/media_picker_component.*
     app/components/admin/notes_screen/media_section_component.*
     app/components/admin/trash_screen/*
     app/views/admin/trash/*

@@ -41,7 +41,8 @@ module Admin
         states: %i[rest],
         keys: %w[body],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: one sentence with no link or control, read as an alert when it is drawn."
       )
 
       # `class:` places the notice in its host (a margin) and is added to the

@@ -53,7 +53,8 @@ module Admin
         },
         keys: %w[show hide minimum strength.too_short strength.fair strength.good strength.strong],
         slots: %i[label_aside],
-        controller: "password-field"
+        controller: "password-field",
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a password field's Show is the Tab stop after its input: Enter shows the password, Space hides it, and the focus stays" ]
       )
 
       renders_one :label_aside

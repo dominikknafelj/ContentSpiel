@@ -32,6 +32,23 @@ module SqlNodes
   # `value` (an array column holding an object with these pairs, for one).
   def json_contains(column, value) = Arel::Nodes::InfixOperation.new("@>", column, cast(value.to_json, "jsonb"))
 
+  # `column #> CAST('{a,b}' AS text[])`: the jsonb value at a path of keys
+  # (NULL when any key on the way is absent).
+  def json_at(column, *keys) = Arel::Nodes::InfixOperation.new("#>", column, json_path(keys))
+
+  # `column #- CAST('{a,b}' AS text[])`: the jsonb value with the key at the
+  # end of the path taken out (the same value when it is absent).
+  def json_without(column, *keys) = Arel::Nodes::InfixOperation.new("#-", column, json_path(keys))
+
+  # A path of keys as a Postgres text array. The keys are names written in the
+  # code, never user text: anything but lowercase letters, digits and
+  # underscores is refused rather than escaped.
+  def json_path(keys)
+    raise ArgumentError, "a JSON path is made of plain keys: #{keys.inspect}" if keys.empty? || keys.any? { |key| !key.to_s.match?(/\A[a-z0-9_]+\z/) }
+
+    cast("{#{keys.join(",")}}", "text[]")
+  end
+
   # `COALESCE(a, b)`: the first that is not NULL.
   def coalesce(*values) = function("COALESCE", *values)
 

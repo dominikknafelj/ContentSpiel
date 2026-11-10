@@ -24,6 +24,20 @@ class PublicSite::UrlsTest < ActiveSupport::TestCase
     assert_equal %w[en de es], @urls.alternates(@about).keys
   end
 
+  # The head's alternates and the language switcher ask every language of the
+  # shown record: one statement for all of them, and none for a record a list
+  # has prefetched already (`prefetch` keeps every language it read).
+  test "a record's addresses in every language are one statement, and none after a prefetch" do
+    assert_equal 1, count_statements { @urls.paths_by_language(@about) }
+    assert_equal({ "en" => "/about", "de" => "/de/about", "es" => "/es/about" }, @urls.paths_by_language(@about))
+    assert_equal 0, count_statements { @urls.alternates(@about) }
+
+    urls = PublicSite::Urls.new
+    assert_equal 1, count_statements { urls.prefetch([ @root, @about ]) }
+    assert_equal 0, count_statements { urls.paths_by_language(@root) }
+    assert_equal({ "en" => "/", "de" => "/de/", "es" => "/es/" }, urls.paths_by_language(@root))
+  end
+
   test "switching the default language flips the prefixes" do
     site_settings(:default).update!(default_locale: "de")
     urls = PublicSite::Urls.new

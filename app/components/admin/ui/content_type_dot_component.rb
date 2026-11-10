@@ -21,7 +21,8 @@ module Admin
         states: %i[filled ring unregistered],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: the type's name and a dot in a row whose own link the keyboard stops on."
       )
 
       FILLED = %w[bg-cat-1 bg-cat-2 bg-cat-3 bg-cat-4 bg-cat-5 bg-cat-6].freeze

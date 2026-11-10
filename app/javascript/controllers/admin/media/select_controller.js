@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { messages } from "i18n/messages"
 
 // Select-then-use for the media picker, on the same
-// `<dialog>` as `admin--media--picker` (`Media::PickerComponent`).
+// `<dialog>` as `admin--media--picker` (`Admin::Ui::MediaPickerComponent`).
 //
 // - A click on a tile SELECTS it (one at a time): `aria-pressed` is what the stylesheet
 //   draws the accent outline from (`.admin-tile`), and the footer says "1 selected" -- announced, it is a live region --
@@ -20,7 +20,7 @@ import { messages } from "i18n/messages"
 // selected, still usable). After each frame render `reapply` sets `aria-pressed`
 // on whichever tile is that image again. Nothing here is in a form: the dialog is
 // outside `#content` and every autosave form, and the tiles are plain buttons.
-// The footer's words are the dialog's `data-messages` (`media.picker.*`).
+// The footer's words are the dialog's `data-messages` (`components.ui.media_picker.*`).
 export default class extends Controller {
   static targets = [ "status", "use" ]
 
@@ -88,11 +88,11 @@ export default class extends Controller {
     if (!this.hasStatusTarget) return
 
     if (!this.selected) {
-      this.statusTarget.textContent = messages(this.element).t("media.picker.none")
+      this.statusTarget.textContent = messages(this.element).t("components.ui.media_picker.none")
       return
     }
 
-    this.statusTarget.textContent = messages(this.element).t("media.picker.selected")
+    this.statusTarget.textContent = messages(this.element).t("components.ui.media_picker.selected")
     const title = document.createElement("span")
     title.className = "sr-only"
     title.textContent = `: ${this.selected.title}`

@@ -29,7 +29,8 @@ module Admin
         states: %i[rest hover focus],
         keys: %w[open_settings],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "the mail-failed notice's link is a Tab stop, and Enter on it opens Mail settings" ]
       )
 
       # `href` is where "Open Mail settings →" goes, resolved by the screen.

@@ -39,7 +39,8 @@ module Admin
         states: %i[rest invalid translated outdated hover focus],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a block's field: its label names its input, and Tab goes from one field's input to the next's" ]
       )
 
       # Turns a bracketed form name prefix into an id-safe one, e.g.

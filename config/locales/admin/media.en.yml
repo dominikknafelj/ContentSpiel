@@ -17,16 +17,3 @@ en:
       # The not-found page's link back to the library, when a chosen image is
       # gone (`Admin::MediaController#selected_asset`).
       not_found_back: "Back to Media"
-      # `Media::PickerComponent`, the Media screen's dialog that every image
-      # field opens (outside `app/components/admin/`, so read with full keys),
-      # and its grid view (`admin/media/picker`). `none` and `selected` are
-      # also `admin--media--select`'s, from the dialog's `data-messages`.
-      picker:
-        title: "Choose an image"
-        upload: "Upload"
-        close: "Close"
-        file: "Image file"
-        none: "No image selected"
-        selected: "1 selected"
-        cancel: "Cancel"
-        use: "Use image"

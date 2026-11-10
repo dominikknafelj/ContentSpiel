@@ -49,7 +49,8 @@ module Admin
         states: %i[title_only with_description_and_action],
         keys: [],
         slots: %i[action],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "an empty state's action is the Tab stop after its words, and Enter on it does what the action does" ]
       )
 
       renders_one :action

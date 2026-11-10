@@ -11,9 +11,7 @@
 @source "../../views/layouts/admin.html.erb";
 @source "../../helpers/setup_helper.rb";
 @source "../../components/admin";
-/* The media picker (`Media::PickerComponent`) is not under components/admin, and
-   the upload tiles are built in JS (`media/upload_tiles.js`). */
-@source "../../components/media";
+/* The upload tiles are built in JS (`media/upload_tiles.js`). */
 @source "../../javascript/media";
 /* Class names built in JS (the rich-text editor's toolbar state and
    popovers) -- not in any view, so Tailwind has to be

@@ -5,7 +5,8 @@ require "ripper"
 # and `assert_contract` holds the declaration to the code: the keywords of
 # `initialize`, the ViewComponent slots, the keys it owns in ui.en.yml, its
 # controller's file and that the component attaches it itself, and the browser
-# tests its script-held states and its keyboard name. The components are
+# tests its script-held states and its keyboard name (or the sentence that it
+# takes no focus). The components are
 # derived from the files, so a new one is in every check from the day its
 # file is written.
 #
@@ -13,29 +14,6 @@ require "ripper"
 # accessibility sentence, the motion, the content edges, the widths and the
 # limits.
 module UiContract
-  # The components of app/components/admin/ui made before the contract that
-  # name no keyboard browser test yet: one on it may declare `keyboard: nil`,
-  # and every other component names its test. Frozen: it only shrinks, when a
-  # component on it declares its keyboard test or is deleted, and nothing is
-  # ever added (test/lib/component_parts_test.rb).
-  MADE_BEFORE_CONTRACT = %w[
-    Admin::Ui::ActorAvatarComponent Admin::Ui::AvatarComponent Admin::Ui::BadgeComponent Admin::Ui::ButtonComponent
-    Admin::Ui::ChannelChipComponent Admin::Ui::CheckboxComponent
-    Admin::Ui::ConfirmDialogComponent Admin::Ui::ContentTypeDotComponent Admin::Ui::DialogComponent
-    Admin::Ui::EmptyStateComponent Admin::Ui::ErrorSummaryComponent Admin::Ui::FieldComponent
-    Admin::Ui::FileDropComponent Admin::Ui::IconChipComponent Admin::Ui::InsecureNoticeComponent
-    Admin::Ui::LanguageTabsComponent Admin::Ui::LibraryImageComponent Admin::Ui::ListStateComponent
-    Admin::Ui::MailFailedNoticeComponent Admin::Ui::PaginationComponent
-    Admin::Ui::PasswordFieldComponent Admin::Ui::PrefixInputComponent Admin::Ui::RailPanelComponent
-    Admin::Ui::RailSlotComponent Admin::Ui::RailTabComponent
-    Admin::Ui::SaveBarComponent Admin::Ui::SaveStatusComponent Admin::Ui::ScheduledDateComponent
-    Admin::Ui::SlotComponent Admin::Ui::StatusChipComponent Admin::Ui::SystemCheckRowComponent
-    Admin::Ui::TabLinksComponent Admin::Ui::ThemeSwitchComponent Admin::Ui::TimeAgoComponent
-    Admin::Ui::ToastComponent Admin::Ui::ToastRegionComponent
-    Admin::Ui::TranslationChipComponent Admin::Ui::UnpublishedChipComponent Admin::Ui::UserNameComponent
-    Admin::Ui::WordDiffComponent
-  ].freeze
-
   # A new component whose keyboard browser test comes in a later task of the
   # same pull request, mapped to the reason, so no commit between the two is
   # red. Empty when a pull request is merged.
@@ -75,13 +53,14 @@ module UiContract
   end
 
   # Whether `source` attaches `identifier` itself: in a `data-controller`
-  # attribute's list, or as the value of a `controller:` key of a tag's
-  # `data:`. A target or an action of it (`data-<identifier>-target`,
-  # `click->identifier#act`) is not an attachment.
+  # attribute's list, or in the list of a `controller:` key of a tag's
+  # `data:` (the media picker's dialog attaches two). A target or an action
+  # of it (`data-<identifier>-target`, `click->identifier#act`) is not an
+  # attachment.
   def self.attaches?(source, identifier)
     name = /(?<![\w-])#{Regexp.escape(identifier)}(?![\w-])/
-    source.scan(/data-controller=["']([^"']*)["']/).flatten.any? { |list| list.match?(name) } ||
-      source.match?(/controller:\s*["']#{Regexp.escape(identifier)}["']/)
+    lists = source.scan(/data-controller=["']([^"']*)["']/) + source.scan(/controller:\s*["']([^"']*)["']/)
+    lists.flatten.any? { |list| list.match?(name) }
   end
 
   # What the controller check reads of a component: its templates whole, and
@@ -91,6 +70,70 @@ module UiContract
     ruby_text = outside_contract(File.read(ruby)).reject { |_, type, _| %i[on_comment on_embdoc on_embdoc_beg on_embdoc_end].include?(type) }.map { |_, _, text| text }.join
     templates = Dir["#{ruby.delete_suffix('.rb')}.*"].reject { |path| path == ruby }.map { |path| File.read(path) }
     [ ruby_text, *templates ].join("\n")
+  end
+
+  # What may take the focus in a component's own markup, from HTML's
+  # focusable set: a link or an image map's area with an address, a form
+  # control (a tag, a `*_tag` helper, any `*_field_tag`, or a form builder,
+  # whose fields are controls), a summary, a frame or an embedded object, an
+  # audio or video with its controls, a dialog, a tabindex or
+  # contenteditable.
+  FOCUSABLE = {
+    "a link" => /<(?:a|area)\b[^>]*\bhref|\b(?:link_to|link_to_if|link_to_unless|mail_to|phone_to|sms_to)\b|\btag\.(?:a|area)\b|content_tag[( ]\s*:(?:a|area)\b/,
+    "a control" => /<(?:button|input|select|textarea)\b|\b\w+_field_tag\b|\b(?:button_to|button_tag|submit_tag|image_submit_tag|check_box_tag|radio_button_tag|text_area_tag|select_tag)\b|\btag\.(?:button|input|select|textarea)\b|content_tag[( ]\s*:(?:button|input|select|textarea)\b/,
+    "a form" => /\b(?:form_with|form_for|form_tag|fields_for)\b\s*[(\s]|<form\b|\btag\.form\b/,
+    "a summary" => /<summary\b|\btag\.summary\b|content_tag[( ]\s*:summary\b/,
+    "a frame" => /<(?:iframe|embed|object)\b|\btag\.(?:iframe|embed|object)\b|content_tag[( ]\s*:(?:iframe|embed|object)\b/,
+    "a media control" => /<(?:audio|video)\b[^>]*\bcontrols|\btag\.(?:audio|video)\b[^\n]*\bcontrols/,
+    "a dialog" => /<dialog\b|\btag\.dialog\b|content_tag[( ]\s*:dialog\b/,
+    "a tabindex" => /\btabindex\b/i,
+    "contenteditable" => /\bcontenteditable\b/i
+  }.freeze
+
+  # A component's own source with ERB comments taken out, as the focus check
+  # reads it (`own_source` keeps a template whole).
+  def self.markup_source(klass) = own_source(klass).gsub(/<%#.*?%>/m, "")
+
+  # The `Admin::Ui` components a source renders by name.
+  def self.rendered_components(klass)
+    markup_source(klass).scan(/(?:Admin::Ui::)?\b([A-Z]\w*Component)\.new\b/).flatten.uniq
+      .filter_map { |name| "Admin::Ui::#{name}".safe_constantize }.reject { |other| other == klass }
+  end
+
+  # What a component that says it takes no focus draws that can take it, as
+  # sentences: its own markup, the markup of each `Admin::Ui` component it
+  # renders by name (followed through their own renders) and of each partial
+  # it renders by path. What it cannot read is answered apart, in
+  # `unreadable_parts`.
+  def self.focusable_parts(klass, seen = Set.new)
+    return [] unless seen.add?(klass)
+
+    source = markup_source(klass)
+    own = FOCUSABLE.filter_map { |what, pattern| "#{klass.name} draws #{what}" if source.match?(pattern) }
+    partials = source.scan(/render[( ]\s*["']([\w\/]+)["']/).flatten.filter_map do |path|
+      file = Rails.root.join("app/views", File.dirname(path), "_#{File.basename(path)}.html.erb")
+      text = file.exist? ? file.read.gsub(/<%#.*?%>/m, "") : ""
+      FOCUSABLE.filter_map { |what, pattern| "#{klass.name}'s partial #{path} draws #{what}" if text.match?(pattern) }
+    end.flatten
+    own + partials + rendered_components(klass).flat_map { |other| focusable_parts(other, seen) }
+  end
+
+  # What a check of a component's own markup cannot see: its slots and the
+  # block it is handed, which a caller fills, and a render of something that
+  # is not named in the source (a registered entry's component, a panel
+  # handed over). A component it renders by name passes up its own such
+  # renders; its slots and its block are filled by the component that
+  # renders it, in a source this check reads.
+  def self.unreadable_parts(klass, seen = Set.new)
+    return [] unless seen.add?(klass)
+
+    source = markup_source(klass)
+    dynamic = source.scan(/render[( ]\s*([^\s"'()]+)/).flatten.reject { |target| target.match?(/\A(?:Admin::Ui::)?[A-Z]\w*Component\.new\b/) }
+    block = source.match?(/(?<![\w.:"'-])content(?![\w?:"'-])/) ? [ "the block it is handed (content)" ] : []
+    passed_up = rendered_components(klass).flat_map do |other|
+      unreadable_parts(other, seen).select { |part| part.include?("a render of ") }.map { |part| part.start_with?("Admin::") ? part : "#{other.name}'s #{part}" }
+    end
+    [ *klass.registered_slots.keys.map { |slot| "the slot #{slot}" }, *dynamic.map { |target| "a render of #{target}" }, *block, *passed_up ]
   end
 
   def ui_components
@@ -159,9 +202,25 @@ module UiContract
     end
   end
 
+  # A sentence (a component that takes no focus) names no test to look for,
+  # and is allowed only to a component whose own markup draws nothing that can
+  # take the focus. A slot is filled by its caller, out of this check's
+  # sight: a component with one may say it takes no focus only by naming the
+  # slot in its sentence (the person who reads it checks the callers), and a
+  # block it is handed, or a render of something not named in the source (a
+  # registered entry, a panel handed over), is refused outright, since what
+  # it draws could take the focus.
   def assert_contract_keyboard(klass)
-    file, name = declared_contract(klass).keyboard
-    assert_browser_test(file, name, "#{klass.name}'s contract keyboard") if file
+    keyboard = declared_contract(klass).keyboard
+    return assert_browser_test(*keyboard, "#{klass.name}'s contract keyboard") if keyboard.is_a?(Array)
+    return unless keyboard.is_a?(String)
+
+    drawn = UiContract.focusable_parts(klass)
+    assert_empty drawn, "#{klass.name} says it takes no focus, but it draws what can take it: name its keyboard browser test instead"
+    unreadable = UiContract.unreadable_parts(klass)
+    unnamed = unreadable.reject { |part| part.start_with?("the slot ") && keyboard.match?(/\b#{Regexp.escape(part.delete_prefix("the slot "))}\b/) }
+    assert_empty unnamed, "#{klass.name} says it takes no focus, but this check cannot read #{unnamed.join(', ')}: " \
+      "name a slot in the sentence, or name its keyboard browser test"
   end
 
   private

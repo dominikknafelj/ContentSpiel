@@ -31,7 +31,8 @@ module Admin
         states: %i[rest],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/notes_markers_test.rb", "the notes bubble's keyboard: a posts row's bubble is one Tab stop that opens the post's notes, and the tree's and a tile's take none" ]
       )
 
       def initialize(name:, record:, viewer:, loaded: nil, **context)

@@ -21,7 +21,8 @@ module Admin
         states: %i[named email_fallback deleted_user system],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a name in text, never a link."
       )
 
       # The two names for nobody in particular: a user who existed, and no user.

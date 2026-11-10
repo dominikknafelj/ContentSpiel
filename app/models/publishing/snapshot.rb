@@ -84,8 +84,13 @@ module Publishing
       data.fetch("blocks", []).any? { |block| BlockTypes.find(block["block_type"])&.capability?(:lists_posts) }
     end
 
-    def rebuild(version, record, with_blocks: true)
-      view = record.class.instantiate(record.attributes_for_database)
+    # `without_body:` leaves the view with no body at all (a missing
+    # attribute) rather than the row's: the copy was read without its own
+    # (`Publishing.published_all`).
+    def rebuild(version, record, with_blocks: true, without_body: false)
+      attributes = record.attributes_for_database
+      attributes = attributes.except("body") if without_body
+      view = record.class.instantiate(attributes)
       version.snapshot.fetch("fields", {}).each { |name, value| view.write_attribute(name, value) if view.has_attribute?(name) }
       view.clear_changes_information
       view.published_version = version

@@ -38,7 +38,8 @@ module Admin
         script_states: { busy: [ "test/system/admin/ai_settings_test.rb", "Test connection keeps its look while it is busy" ] },
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "a button is one Tab stop that Enter and Space both press: an image block's Choose image opens the picker" ]
       )
 
       # Every hover is `not-disabled:hover:`: a disabled button never answers

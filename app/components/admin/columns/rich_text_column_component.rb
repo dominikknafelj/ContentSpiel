@@ -46,7 +46,7 @@ module Admin
     # `value`/`original` are a `RichText::Document`, a document Hash, or nil.
     #
     # Images come from the library: the Image button
-    # opens `Media::PickerComponent` (rendered once by the admin layout) and
+    # opens `Admin::Ui::MediaPickerComponent` (rendered once by the admin layout) and
     # the picked asset is inserted as `image{asset_id}` -- the picker's
     # `media-picker:picked` event bubbles from the button to this
     # controller's element. There's no upload of the editor's own any more;

@@ -23,7 +23,8 @@ module Admin
         states: %i[first_page middle_page last_page hover focus],
         keys: %w[nav_label range previous next],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_navigation_test.rb", "the pagination's links are Tab stops, and Enter on Next goes to the next page, which it then says is current" ]
       )
 
       LINK_CLASS = "rounded-button px-2 py-0.5 text-sm text-dim hover:bg-sunken".freeze

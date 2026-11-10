@@ -28,7 +28,8 @@ module Admin
         states: %i[rest with_counts hover focus],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_navigation_test.rb", "a tab link is a Tab stop, and Enter on it goes to its tab, which the links mark current" ]
       )
 
       LINK_CLASS = "inline-flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent".freeze

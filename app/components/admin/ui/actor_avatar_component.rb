@@ -37,7 +37,8 @@ module Admin
         states: %i[user own deleted_user system nobody],
         keys: [],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: "It takes no focus: a circle or chip hidden from a screen reader, drawn beside the sentence that names the actor."
       )
 
       # A size's slot, which the empty slot and the System chip stand in at

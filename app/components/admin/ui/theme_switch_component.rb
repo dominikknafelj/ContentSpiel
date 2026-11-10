@@ -24,7 +24,8 @@ module Admin
         },
         keys: [],
         slots: [],
-        controller: "theme"
+        controller: "theme",
+        keyboard: [ "test/system/admin/keyboard_navigation_test.rb", "the theme switch's choices are one Tab stop each, and Enter or Space on one chooses it and marks it checked" ]
       )
 
       CHOICES = { "light" => "Light", "dark" => "Dark", "auto" => "Auto" }.freeze

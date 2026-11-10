@@ -35,7 +35,8 @@ module Admin
         states: %i[one_error several_errors hover focus],
         keys: %w[sentence heading],
         slots: [],
-        controller: nil
+        controller: nil,
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "an error summary takes the focus when it is drawn, Tab reaches its link, and Enter there moves the focus to the field" ]
       )
 
       def initialize(errors:, field_ids: {})

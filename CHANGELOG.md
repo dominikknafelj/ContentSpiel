@@ -11,11 +11,19 @@
 - A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
 - The development seed (`contentspiel dev`, `bin/rails db:seed`) builds `/showcase`, a new top-level page of the development site: every block type at the top level and in a section of every layout and band, every Note kind, a long table, every list and a link to the 404 page. On a database with no content yet it also turns German and Spanish on; a seed run again leaves the site's languages as they are.
 - Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
+- A post list reads its posts' addresses in one statement, and the shown page's or post's addresses in every language (the head's `hreflang` alternates, the language switcher) are one statement, not one per language (#122).
+- A post list reads no post body, from the rows or the copies, until its template asks for one, and then the whole list's in at most two statements (one when every listed post has a copy): the default blog and resume lists read none (#122). What a list template may call is unchanged: `rich_text(post)` draws the published body as before.
 - The find field of the page tree and of the mind graph's list keeps its status line's room from the first keystroke while it holds a query (two lines on Pages, one in the mind graph), so the count written once the typing stops no longer moves the rows under the pointer.
 
 ### Migrations
 
 - `20261110090000_default_site_locales_to_english`: the default of `site_settings.locales` becomes English alone; no row is changed.
+
+### For a gem or an outside caller
+
+- A content type's `list_component` (a gem's too) is handed posts read without their body, which they read on demand: `body`, `post[:body]`, `read_attribute(:body)`, `attributes` and `as_json` answer as for a post read whole. Only `has_attribute?(:body)` is false until one of them has asked (#122).
+- `Media::PickerComponent` is `Admin::Ui::MediaPickerComponent`, with no alias, and declares `Admin::Ui::Contract`. Its words moved from `admin.media.picker.*` to `admin.components.ui.media_picker.*`. A caller outside this repository that rendered the old constant gets a `NameError`; the layout draws the one picker, and a field opens it with `media-picker:open` as before.
+- `Admin::Ui::Contract`'s `keyboard:` also takes a sentence, for a component that takes no focus: the String that says so and what the keyboard stops on instead. It is allowed only where nothing the component draws can take the focus, and a component that renders a slot names the slot in it. The CMS's own tests now refuse `keyboard: nil` on its shared components; a gem's component that includes the contract is not read by them, and `nil` still loads.
 
 ## 0.1.0 (2026-11-10)
 
