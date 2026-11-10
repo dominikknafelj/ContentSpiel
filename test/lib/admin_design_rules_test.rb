@@ -36,6 +36,28 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # already switch with the theme, so a `dark:` class is always a second,
   # diverging source of colour. A variant is followed by a utility; prose
   # about the rule ("no `dark:` variants") is not.
+  # The mails: the layout, the button and each mailer's views. A mail has no
+  # tokens and a client reads no stylesheet, so its colours are named CSS
+  # colours written inline, with one exception: the button's violet,
+  # `MAIL_ACCENT`, which is `--cs-accent`'s light value (a mail has no dark
+  # scheme). The exception admits that spelling and no other, in a mail
+  # source alone.
+  MAIL_SOURCES = %w[
+    app/views/layouts/mailer.html.erb app/views/mails app/views/forms_mailer app/views/invites_mailer app/views/passwords_mailer app/views/system_mailer
+  ].freeze
+  MAIL_ACCENT = "#6236d9".freeze
+  MAIL_FILES = MAIL_SOURCES.flat_map do |source|
+    path = Rails.root.join(source)
+    path.file? ? [ path.to_s ] : Dir[path.join("**/*.erb")]
+  end.freeze
+
+  # A line's raw colour literals, after a mail source's one admitted value
+  # is taken out of it.
+  def raw_colours(line, mail:)
+    line = line.gsub(MAIL_ACCENT, "") if mail
+    line.scan(RAW_COLOUR)
+  end
+
   DARK_VARIANT = /(?<![\w-])dark:(?!scheme-dark(?![\w-]))[a-z\[!-]/
 
   # The one file allowed a `dark:` variant: the public site's footer toggle
@@ -67,10 +89,36 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       root = Rails.root.join("app", directory).to_s
       assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules look at nothing there"
     end
+    MAIL_SOURCES.each do |source|
+      root = Rails.root.join(source).to_s
+      assert MAIL_FILES.any? { |path| path == root || path.start_with?("#{root}/") }, "#{source} has no .erb file: the colour rule looks at nothing there"
+    end
   end
 
-  test "no raw colour literals in CS Studio" do
-    assert_empty design_offences(RAW_COLOUR)
+  test "no colour literal in CS Studio's sources or a mail's, but the mail's violet" do
+    offences = (ADMIN_SOURCES | MAIL_FILES).flat_map do |path|
+      File.readlines(path).each_with_index.filter_map do |line, index|
+        found = raw_colours(line, mail: MAIL_FILES.include?(path))
+        "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{found.join(" ")}" if found.any?
+      end
+    end
+    assert_empty offences
+
+    assert_empty raw_colours("background:#{MAIL_ACCENT};", mail: true), "the violet is admitted in a mail source"
+    assert_equal [ MAIL_ACCENT ], raw_colours("background:#{MAIL_ACCENT};", mail: false), "and refused in CS Studio's"
+    [ "background:#6236DA;", "color:#000;" ].each do |sample|
+      assert_not_empty raw_colours(sample, mail: true), "#{sample} is refused in a mail source"
+    end
+  end
+
+  test "a mail's one colour literal is the accent's violet, on the button alone" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read.gsub(%r{/\*.*?\*/}m, "")
+    light = css[/:root, \[data-theme="light"\]\s*\{(.*?)\}/m, 1]
+    assert_equal MAIL_ACCENT, light[/--cs-accent:\s*([^;]+);/, 1].strip, "the mail's violet is --cs-accent's light value"
+
+    holders = (ADMIN_SOURCES | MAIL_FILES).select { |path| File.read(path).include?(MAIL_ACCENT) }
+    assert_equal [ "app/views/mails/_button.html.erb" ], holders.map { |path| Pathname(path).relative_path_from(Rails.root).to_s }
+    assert_equal 1, Rails.root.join("app/views/mails/_button.html.erb").read.scan(MAIL_ACCENT).size, "once, on the button's link"
   end
 
   test "no dark: variants in CS Studio except dark:scheme-dark" do

@@ -13,6 +13,7 @@ class PasswordsMailerTest < ActionMailer::TestCase
   # `capture_log`: the Rails, Action Mailer and Active Job loggers, which is
   # everyone who writes on this path (test/support/log_capture.rb).
   include LogCapture
+  include MailButton
 
   setup { @user = users(:one) }
 
@@ -206,6 +207,10 @@ class PasswordsMailerTest < ActionMailer::TestCase
       assert_includes mail.html_part.body.to_s, "max-width:560px"
       assert_no_match(/<img/, mail.html_part.body.to_s)
     end
+  end
+
+  test "the button is the violet with white words and an 8px radius, and the address follows it as text" do
+    with_site_address(SITE) { assert_mail_button(PasswordsMailer.reset(@user).html_part.body.to_s) }
   end
 
   private

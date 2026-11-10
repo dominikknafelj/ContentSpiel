@@ -51,6 +51,18 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # A mail has no tokens: its button's ground is the one hex literal a mail
+  # may write (--cs-accent's light value, `admin_design_rules_test`), read
+  # from the button's own style, under named white words.
+  test "a mail button's white words on the violet are 4.5:1" do
+    style = Rails.root.join("app/views/mails/_button.html.erb").read[/<a\b.*?style="([^"]+)"/m, 1]
+    assert_includes style, "color:white;", "the words are white"
+    violet = resolve_colour({ "button" => style[/background:(#\h{6});/, 1] }, "button")
+    white = resolve_colour({ "words" => "#ffffff" }, "words")
+    assert_ratio(4.5, white, violet, "the button's white words on the violet")
+    assert_ratio(6.8, white, violet, "the button's white words on the violet, at the measured figure")
+  end
+
   # A disabled switch keeps its full colour: off, the sunken track in its
   # field-line outline with a meta knob; on, a meta track with a surface
   # knob. Each part that tells the state stands at 3:1 on what it meets,

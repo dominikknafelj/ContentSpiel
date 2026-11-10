@@ -2,6 +2,7 @@ require "test_helper"
 
 class InvitesMailerTest < ActionMailer::TestCase
   include LogCapture
+  include MailButton
   SITE = "https://docs.example.org".freeze
 
   setup do
@@ -43,6 +44,10 @@ class InvitesMailerTest < ActionMailer::TestCase
     assert_nil URI.parse(link).query
     assert_includes mail.html_part.body.to_s, "max-width:560px"
     assert_no_match(/<img/, mail.html_part.body.to_s)
+  end
+
+  test "the button is the violet with white words and an 8px radius, and the address follows it as text" do
+    assert_mail_button(invite.html_part.body.to_s)
   end
 
   test "the link follows the reset's origin rules: the site's address wins, none known sends nothing" do

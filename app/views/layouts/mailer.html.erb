@@ -3,12 +3,20 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <title><%= site_name %></title>
   </head>
 
-  <%# Colours are named, not hex: a mail has no tokens, and CS Studio's sources carry no literal (admin_design_rules_test). One column of at most 560px, system fonts, inline styles (a mail client
-      reads no stylesheet), the site's name as text and no image: nothing is
-      fetched when the mail is opened, so nothing can track it. %>
+  <%# Light only: the two metas ask a client in dark mode not to invert the
+      mail, and there is no dark rule. The layout's colours are named, not
+      hex (whitesmoke, white, black, dimgray): a mail has no tokens. The
+      violet is the button's alone (mails/_button), the one literal the
+      design rules admit in a mail, and it is --cs-accent's light value
+      (admin_design_rules_test). One column of at most 560px, system fonts,
+      inline styles (a mail client reads no stylesheet), the site's name as
+      text and no image: nothing is fetched when the mail is opened, so
+      nothing can track it. %>
   <body style="margin:0;padding:24px 16px;background:whitesmoke;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.5;color:black;">
     <div style="max-width:560px;margin:0 auto;background:white;padding:32px;">
       <p style="margin:0 0 24px;font-size:20px;font-weight:700;"><%= site_name %></p>
