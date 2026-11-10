@@ -79,6 +79,32 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert Publishing::Listing.lists?(row_block, bare.reload)
   end
 
+  # A list reads no body (#122): neither the rows' nor the copies'. The first
+  # body a template asks for reads the list's bodies, each the published one:
+  # the copy's for a post that has one, though its rows have moved on, and the
+  # rows' for a post with none. Two statements, however many posts.
+  test "a list reads no body until one is asked for, and then the whole list's, each as published, in two statements" do
+    block = published_block(content_type: "blog")
+    copied = create_post(title: "Copied")
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Published words") } })
+    publish_changes(copied)
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Draft words") } })
+    bare = create_post(title: "Bare")
+    Posts::Save.call(bare, translations: { "en" => { body: rich_doc("Bare words") } })
+    Publishing::Version.where(record_type: "Post", record_id: bare.id).delete_all
+
+    reads = capture_sql { @posts = Publishing::Listing.posts(block) }
+    assert reads.none? { |sql| sql.include?('"posts"."body"') || sql.include?('"posts".*') }, reads.join("\n")
+    assert reads.grep(/published_versions"\."snapshot"/).all? { |sql| sql.include?("#- CAST('{fields,body}' AS text[])") }, reads.join("\n")
+    assert @posts.none? { |post| post.has_attribute?(:body) }
+
+    view_copied, view_bare = @posts.index_by(&:id).values_at(copied.id, bare.id)
+    assert_equal 2, count_statements { assert_equal "Published words", view_copied.body_document(locale: "en").to_markdown.strip }
+    assert_equal 0, count_statements { assert_equal "Bare words", Locales.read(view_bare, :body).to_markdown.strip }
+    assert_not view_copied.changed?
+    assert_raises(ActiveRecord::ReadOnlyRecord) { view_copied.save }
+  end
+
   test "a list costs the same statements for 2 posts as for 12" do
     block = published_block(content_type: "blog")
     2.times { |index| create_post(title: "Post #{index}") }
@@ -105,7 +131,7 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     many = capture_sql { Publishing::Listing.posts(block, limit: 3) }
 
     assert_equal few.size, many.size
-    post_selects = many.select { |sql| sql.start_with?('SELECT "posts".* FROM "posts"') }
+    post_selects = many.select { |sql| sql.start_with?('SELECT "posts".') && sql.include?(' FROM "posts"') }
     assert post_selects.any?, many.inspect
     assert post_selects.all? { |sql| sql.include?("LIMIT") }, "a statement selected posts without a LIMIT: #{post_selects.inspect}"
     assert_equal 3, titles(Publishing::Listing.posts(block, limit: 3)).size

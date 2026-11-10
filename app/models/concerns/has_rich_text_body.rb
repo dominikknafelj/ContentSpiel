@@ -21,6 +21,13 @@ module HasRichTextBody
     translates :body
 
     validate :body_documents_valid
+
+    # Every column but the body, for a list that may draw no body: a record
+    # read this way raises `ActiveModel::MissingAttributeError` when its body
+    # is asked for, unless it was handed out through
+    # `Publishing::DeferredBodies`, which reads it then
+    # (`Publishing::Listing.posts`).
+    scope :without_body, -> { select(*(column_names - [ "body" ])) }
   end
 
   # This locale's document, read literally -- no fallback, the same rule

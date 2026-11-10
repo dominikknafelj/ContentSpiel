@@ -61,6 +61,26 @@ class PublishingTest < ActiveSupport::TestCase
     assert_raises(ActiveModel::MissingAttributeError) { @views.first.published_version.blocks }
   end
 
+  # A view rebuilt without its body must never fall back to the body of the
+  # row it was rebuilt over, which is the working version: it has none until
+  # asked, and then the copy's. A post served from its rows keeps the body it
+  # was read with.
+  test "published_all without_body: a rebuilt post has the copy's body when asked, never its rows', and a row keeps its own" do
+    copied = create_post(title: "Copied")
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Published") } })
+    publish_changes(copied)
+    Posts::Save.call(copied, translations: { "en" => { body: rich_doc("Draft") } })
+    draft = create_post(title: "Draft", published: false)
+    Posts::Save.call(draft, translations: { "en" => { body: rich_doc("Rows") } })
+
+    view, row = Publishing.published_all([ copied.reload, draft.reload ], without_body: true)
+
+    assert_not view.has_attribute?(:body)
+    assert_same draft, row
+    assert_equal "Published", view.body_document(locale: "en").to_markdown.strip
+    assert_equal 0, count_statements { assert_equal "Rows", row.body_document(locale: "en").to_markdown.strip }
+  end
+
   test "what is published is judged at the time asked: a pending copy is not it before its time and is after" do
     page = create_page(title: "Now")
     assert Pages::Save.call(page, translations: { "en" => { title: "Later" } }).ok?

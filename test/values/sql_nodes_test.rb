@@ -28,6 +28,14 @@ class SqlNodesTest < ActiveSupport::TestCase
     assert_equal %(("audit_events"."metadata" -> 'deleted_block_ids') @> CAST('[7]' AS jsonb)), sql(SqlNodes.json_array_contains(@events[:metadata], :deleted_block_ids, 7))
   end
 
+  test "json_at reads the value at a path of keys, and json_without takes it out" do
+    versions = Arel::Table.new(:published_versions)
+    assert_equal %("published_versions"."snapshot" #> CAST('{fields,body}' AS text[])), sql(SqlNodes.json_at(versions[:snapshot], "fields", :body))
+    assert_equal %("published_versions"."snapshot" #- CAST('{fields,body}' AS text[])), sql(SqlNodes.json_without(versions[:snapshot], "fields", "body"))
+    assert_raises(ArgumentError) { SqlNodes.json_at(versions[:snapshot], "fields", "b}'; --") }
+    assert_raises(ArgumentError) { SqlNodes.json_without(versions[:snapshot]) }
+  end
+
   test "coalesce takes nodes and values" do
     assert_equal %(COALESCE(LOWER("pages"."content_type"), '')), sql(SqlNodes.coalesce(@pages[:content_type].lower, ""))
   end

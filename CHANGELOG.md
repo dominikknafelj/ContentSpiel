@@ -5,6 +5,12 @@
 ### Changed
 
 - Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
+- A post list reads its posts' addresses in one statement, and the shown page's or post's addresses in every language (the head's `hreflang` alternates, the language switcher) are one statement, not one per language (#122).
+- A post list reads no post body, from the rows or the copies, until its template asks for one, and then the whole list's in two statements: the default blog and resume lists read none (#122). What a list template may call is unchanged: `rich_text(post)` draws the published body as before.
+
+### For a gem or an outside caller
+
+- A content type's `list_component` (a gem's too) is handed posts read without their body column: `rich_text(post)`, `body_document` and `Locales.read(post, :body)` read it on demand, while `read_attribute(:body)` or `attributes` on such a post raise `ActiveModel::MissingAttributeError` (#122).
 
 ## 0.1.0 (2026-11-10)
 

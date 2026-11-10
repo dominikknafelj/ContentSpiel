@@ -82,20 +82,31 @@ module Publishing
   # and a post list read titles and excerpts, and a page's blocks are most
   # of a copy's weight. A view rebuilt without blocks must not be asked for
   # them: its `content_blocks` would query the rows.
-  def published_all(records, now: Time.current, with_blocks: false)
+  #
+  # `without_body: true` (posts; a page has no body) reads the copies with
+  # their body taken out (`Version.snapshot_without_field`), and every view
+  # that has no body then, a rebuilt one or a row read `without_body`, gets
+  # it on demand (`DeferredBodies`): the first view asked for its body reads
+  # the bodies of all of them, in at most two statements. So a post list's
+  # template may still draw a body (`rich_text(post)`, as the "now" list
+  # does), and a list that draws none never reads one. A view rebuilt this
+  # way never keeps the body of the row it was rebuilt over: that is the
+  # working version's, not the copy's.
+  def published_all(records, now: Time.current, with_blocks: false, without_body: false)
     records = records.to_a
     using = records.select { |record| record.published_at.present? }
-    return records if using.empty?
 
     columns = with_blocks ? Version.column_names : Version.column_names - [ "blocks" ]
+    columns = columns.map { |name| name == "snapshot" ? Version.snapshot_without_field("body") : name } if without_body
     copies = using.group_by { |record| record.class.polymorphic_name }.values.reduce({}) do |all, group|
       all.merge(Version.current_for(group, now: now, columns: columns))
     end
 
-    records.map do |record|
+    views = records.map do |record|
       version = copies[[ record.class.polymorphic_name, record.id ]] if record.published_at.present?
-      version ? Snapshot.rebuild(version, record, with_blocks: with_blocks) : record
+      version ? Snapshot.rebuild(version, record, with_blocks: with_blocks, without_body: without_body) : record
     end
+    without_body ? DeferredBodies.defer(views) : views
   end
 
   def content_columns(record)
