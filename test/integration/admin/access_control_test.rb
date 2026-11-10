@@ -127,6 +127,40 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "No access"
   end
 
+  # The 403 and the 404 are the two centred things inside the shell
+  # (`test/lib/admin_design_rules_test.rb`): a message on the canvas with no
+  # card, a neutral chip over the code, and one secondary way back. Their
+  # words are keys; the 403's sentence is the refusal's own English.
+  test "the 403 and the 404 are centred messages with a neutral chip and one secondary way back, in keys" do
+    sign_in_as(users(:author))
+    secondary = Admin::Ui::ButtonComponent.classes(:secondary)
+    primary = Admin::Ui::ButtonComponent.classes(:primary)
+
+    { forbidden: [ "/cs-studio/users", "403", :forbidden ], not_found: [ "/cs-studio/posts/999999", "404", :not_found ] }.each do |page, (path, code, status)|
+      get path
+      assert_response status
+      words = I18n.t("admin.errors.#{page}")
+      assert_select "section.items-center.text-center", count: 1 do |section|
+        assert_select section, ".rounded-card, .shadow-1, .shadow-2, .bg-surface", count: 0
+        assert_no_match(/rounded-card|(?<![:\w-])shadow-|bg-surface/, section.first["class"])
+        assert_select "> span.rounded-chip.size-6.bg-sunken.text-dim[aria-hidden=true]:first-child svg", count: 1
+        assert_select "> span.rounded-chip + p.text-label.text-meta", text: code
+        assert_select "> h1.text-h1", text: words.fetch(:heading)
+        assert_select "> p.text-small.text-meta", text: words.fetch(:advice) if words.key?(:advice)
+        assert_select "a", count: 1
+        assert_select "a[href='/cs-studio'][class=?]", secondary, text: words.fetch(:back)
+        assert_select "a[class=?]", primary, count: 0
+      end
+      assert_select "title", text: words.fetch(:title)
+    end
+    assert_select "section > p.text-ink", text: I18n.t("admin.errors.not_found.sentence")
+
+    get "/cs-studio/users"
+    assert_select "section > p.text-ink[role=alert]", count: 1
+    assert_equal "No access", I18n.t("admin.errors.forbidden.heading")
+    assert_equal "Not found", I18n.t("admin.errors.not_found.heading")
+  end
+
   test "an area write without the permission is refused before reaching the service" do
     sign_in_as(users(:author))
 

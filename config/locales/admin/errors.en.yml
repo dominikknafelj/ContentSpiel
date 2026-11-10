@@ -1,0 +1,22 @@
+# The 403 and the 404 inside CS Studio (docs/reference/i18n.md):
+# `admin/errors/forbidden.html.erb` and `not_found.html.erb`, read by lazy
+# lookup. The 403's sentence is the refusal's own message and stays English;
+# a screen that knows a nearer way on than the dashboard hands the 404 its
+# own label (`@not_found_back`).
+en:
+  admin:
+    errors:
+      forbidden:
+        title: "No access · CS Studio"
+        code: "403"
+        heading: "No access"
+        advice: "If you need this, ask an owner or an admin to add you to a group that has it."
+        back: "Back to the dashboard"
+      not_found:
+        title: "Not found · CS Studio"
+        code: "404"
+        heading: "Not found"
+        # One sentence for a record that doesn't exist and one outside the
+        # viewer's scope, so the page never confirms which.
+        sentence: "This doesn't exist, or you don't have access to it."
+        back: "Back to the dashboard"

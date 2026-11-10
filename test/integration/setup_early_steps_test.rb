@@ -16,6 +16,18 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
   end
 
+  # The shared check list takes its frame from its caller: the wizard's is
+  # the ruled list under the step's heading, with no card around it.
+  test "the wizard's check list keeps its own frame" do
+    get setup_step_path("system_check")
+
+    assert_select "ul.mt-6.divide-y.divide-line.border-y.border-line", count: 1 do
+      assert_select "> li.admin-system-check", minimum: 1
+    end
+    assert_select "ul.px-4", count: 0
+    assert_select ".rounded-card.shadow-1 li.admin-system-check", count: 0
+  end
+
   # The wizard loads `application` only, where `admin--ui--clipboard` doesn't
   # exist: the shared rows must not draw a Copy button there.
   test "the system check shows the site address command but no dead Copy button" do

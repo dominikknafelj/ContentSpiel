@@ -1,23 +1,28 @@
-<%# System status (design spec §6.1): the setup wizard's own
-    `Setup::SystemCheck` results, through the same row component, so both
-    screens word every check identically. "Run checks again" is a plain GET
-    back to this screen, which re-runs every check -- idempotent, so a reload
-    does the same. The time is the site's (`Admin::BaseController` runs every
-    request in the site time zone). %>
-<% content_for :title, "System status" %>
+<%# System status: the setup wizard's own `Setup::SystemCheck` results,
+    through the same rows, so both screens word every check identically.
+    Here the rows sit in one card, divided inside it; the wizard keeps its
+    ruled list (`setup/_system_check_results` takes the list's classes from
+    its caller). A state is each row's chip and the summary line's words:
+    there is no summary chip. "Run checks again" is a plain GET back to this
+    screen, which re-runs every check -- idempotent, so a reload does the
+    same. The time is the site's (`Admin::BaseController` runs every request
+    in the site time zone). %>
+<% content_for :title, t(".title") %>
 <% passed = @results.count(&:ok?) %>
 <div class="max-w-[900px]">
   <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="text-h1 text-ink">System status</h1>
-      <p class="mt-1 text-meta"><%= passed %> of <%= @results.size %> checks passed · last run <%= Time.zone.now.strftime("%H:%M") %></p>
+      <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+      <p class="mt-1 text-small text-meta"><%= t(".summary", passed: passed, total: @results.size, time: I18n.l(Time.zone.now, format: :"admin.time")) %></p>
     </div>
-    <%= link_to "Run checks again", admin_system_status_path(**admin_url_options), class: setup_secondary_link_class,
+    <%= link_to t(".run_again"), admin_system_status_path(**admin_url_options), class: Admin::Ui::ButtonComponent.classes(:secondary),
           data: { turbo_prefetch: "false" } %>
   </div>
 
-  <%= render "setup/system_check_results", results: @results, copyable: true,
-        mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
-        image_settings_href: (admin_settings_path(anchor: "images", **admin_url_options) if can?("settings.manage")),
-        forms_href: (admin_forms_path(**admin_url_options) if %w[forms.manage form_submissions.view].any? { |key| can?(key) }) %>
+  <div class="rounded-card bg-surface shadow-1">
+    <%= render "setup/system_check_results", results: @results, copyable: true, list_class: "divide-y divide-line px-4",
+          mail_settings_href: (admin_settings_path(anchor: "mail", **admin_url_options) if can?("settings.manage")),
+          image_settings_href: (admin_settings_path(anchor: "images", **admin_url_options) if can?("settings.manage")),
+          forms_href: (admin_forms_path(**admin_url_options) if %w[forms.manage form_submissions.view].any? { |key| can?(key) }) %>
+  </div>
 </div>

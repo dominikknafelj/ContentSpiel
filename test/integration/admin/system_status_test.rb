@@ -1,6 +1,6 @@
 require "test_helper"
 
-# System status (design spec §6.1): the setup wizard's own read-only
+# System status: the setup wizard's own read-only
 # `Setup::SystemCheck` results, re-run on every load ("Run again" is a
 # plain reload), with a summary, warnings first and a copyable command.
 class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
@@ -25,7 +25,7 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
   end
 
   # The page is shown to anyone with `system_status.view`: it names the
-  # theme's folder and never where the server keeps it (theming spec §1).
+  # theme's folder and never where the server keeps it.
   #
   # And it says when the stylesheet is not that theme's, with the stamp the
   # build wrote (`ThemeFolder.stamp`), read for real here: this suite's
@@ -61,6 +61,33 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     results = Setup::SystemCheck.run
     assert_select "h1 + p", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
+  end
+
+  # One card holds the rows, divided inside it (the wizard keeps its own
+  # ruled list, `setup/_system_check_results`'s default frame), and the
+  # summary is one sentence in the site's time, in the admin time format.
+  test "the checks are one card, warnings first, and the summary names the count and the site's time" do
+    site_settings(:default).update!(time_zone: "Tokyo")
+    sign_in_as(users(:one))
+
+    at = Time.utc(2026, 10, 4, 8, 30)
+    travel_to(at) { get "/cs-studio/system_status" }
+
+    results = Setup::SystemCheck.run
+    time = I18n.l(at.in_time_zone("Tokyo"), format: :"admin.time")
+    assert_select "h1.text-h1", text: "System status"
+    assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run #{time}"
+    assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
+    assert_select "div.rounded-card.bg-surface.shadow-1", count: 1 do
+      assert_select "> ul.divide-y.divide-line.px-4", count: 1 do
+        assert_select "> li.admin-system-check", count: results.size
+      end
+    end
+    assert_select "ul.border-y", count: 0
+    assert_select ".admin-system-check-summary, [data-summary-chip]", count: 0
+
+    statuses = css_select("li.admin-system-check").map { |row| row["data-status"] }
+    assert_equal statuses.sort_by { |status| status == "warning" ? 0 : 1 }, statuses
   end
 
   test "warnings are listed before OK rows" do
