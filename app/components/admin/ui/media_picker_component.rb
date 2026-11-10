@@ -79,6 +79,8 @@ module Admin
       # - `keydown`: the same Escape, caught earlier where the browser lets us;
       # - `turbo:frame-load`: after the grid arrives or navigates, live upload tiles
       #   go back in and the selection is drawn again;
+      # - `turbo:fetch-request-error` / `turbo:frame-missing`: a grid load that
+      #   ended without a grid, so the next open asks again;
       # - the select controller's `chosen`, and the picker's own `reset`/`uploaded`
       #   telling it to forget or to select a finished upload.
       ACTIONS = [
@@ -88,6 +90,8 @@ module Admin
         "keydown->admin--media--picker#keydown",
         "turbo:frame-load->admin--media--picker#gridLoaded",
         "turbo:frame-load->admin--media--select#reapply",
+        "turbo:fetch-request-error->admin--media--picker#gridFailed",
+        "turbo:frame-missing->admin--media--picker#gridFailed",
         "admin--media--picker:reset->admin--media--select#reset",
         "admin--media--picker:uploaded->admin--media--select#selectUploaded",
         "admin--media--select:chosen->admin--media--picker#chosen"
