@@ -4,7 +4,8 @@ require "test_helper"
 # posts as for 30, whatever the list's template draws. Its addresses are read
 # in one statement (`PublicSite::Urls#prefetch`), its posts and their copies
 # without their bodies (`Publishing::Listing.posts`), and a template that draws
-# a body reads the list's bodies in two (`Publishing::DeferredBodies`).
+# a body reads the list's bodies in at most two, here one: every post has a
+# copy (`Publishing::DeferredBodies`).
 class PublicPostListReadsTest < ActionDispatch::IntegrationTest
   setup { root_page }
 
@@ -40,7 +41,7 @@ class PublicPostListReadsTest < ActionDispatch::IntegrationTest
 
   # The list's copies, read with the body taken out of their snapshot
   # (`Version.snapshot_without_field`).
-  def copies_without_body(sql) = sql.count { |statement| statement.include?(%("published_versions"."snapshot" #- CAST('{fields,body}' AS text[]) AS snapshot)) }
+  def copies_without_body(sql) = sql.count { |statement| statement.include?(Publishing::Version.snapshot_without_field("body").to_sql) }
 
   %w[blog resume_entry].each do |type|
     test "a #{type} list costs the same statements for 3 posts as for 30, and reads no body" do

@@ -1,10 +1,10 @@
 module Publishing
   # THE BODIES OF A LIST READ WITHOUT THEM (`Publishing.published_all(...,
   # without_body: true)`), read when the first of them is asked for: then the
-  # bodies of every view of that list are read together, one statement for
-  # the views rebuilt from a copy (the copy's body) and one for the views
-  # served from their rows (the rows' body; one per record type), and are
-  # written into the views.
+  # bodies of every view of that list are read together, in at most two
+  # statements: one for the views rebuilt from a copy (the copy's body) and,
+  # only when there are any, one for the views served from their rows (the
+  # rows' body; one per record type). They are written into the views.
   #
   # Why on demand and not a choice of the list: what a post list's template
   # receives is `posts`, and every template may call `rich_text(post)`
@@ -14,29 +14,46 @@ module Publishing
   # one that does (the "now" list) pays the same statements for one post and
   # for thirty.
   #
-  # A view asked for its body is any reader of `body` (Mobility's reader:
-  # `body_document`, `Locales.read(post, :body)`, `rich_text`). Reading the
-  # column itself (`read_attribute(:body)`, `attributes`) bypasses the reader
-  # and raises `ActiveModel::MissingAttributeError` until a reader has asked.
+  # A DEFERRED VIEW ANSWERS EVERY READER AS AN EAGERLY READ ONE DOES: the
+  # column read (`read_attribute`, which `post[:body]` and Mobility's backend
+  # go through, so `body`, `body_document`, `Locales.read` and `rich_text`
+  # too) and the whole-record readers (`attributes`, `attribute_names`, and
+  # through them `serializable_hash` and `as_json`) read the list's bodies
+  # first. Only `has_attribute?(:body)` tells a deferred view from another
+  # until then.
   #
   # The body is the published one, as `Snapshot.rebuild` would have written
   # it: the copy's, and the row's for a copy that holds no body (a field it
-  # predates) or a record with no copy. Both are the same published content
-  # the public content version and the ETag already cover, so a read made
-  # while the page is drawn tells nothing the ETag cannot see.
+  # predates) or a record with no copy. The whole column is written, every
+  # language, so a language's fallback reads as it would have. Both are the
+  # same published content the public content version and the ETag already
+  # cover, so a read made while the page is drawn tells nothing the ETag
+  # cannot see.
   class DeferredBodies
     # Extended onto each view of the list that has no body.
     module Deferred
-      def body(...)
+      def read_attribute(name, &)
+        @deferred_bodies.read if name.to_s == "body" && !has_attribute?("body")
+        super
+      end
+
+      def attributes
+        @deferred_bodies.read unless has_attribute?("body")
+        super
+      end
+
+      def attribute_names
         @deferred_bodies.read unless has_attribute?("body")
         super
       end
     end
 
-    # Hands `views` back, those of them without a body extended to read
-    # theirs, all together, when one is asked.
+    # Hands `views` back, those of them that carry a body (`HasRichTextBody`)
+    # and were read without it extended to read theirs, all together, when one
+    # is asked. A record of a type with no body (a page) is handed back as it
+    # is: there is nothing to read for it.
     def self.defer(views)
-      waiting = views.reject { |view| view.has_attribute?("body") }
+      waiting = views.select { |view| view.class.include?(HasRichTextBody) && !view.has_attribute?("body") }
       return views if waiting.empty?
 
       bodies = new(waiting)

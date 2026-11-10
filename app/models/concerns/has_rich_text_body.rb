@@ -22,11 +22,11 @@ module HasRichTextBody
 
     validate :body_documents_valid
 
-    # Every column but the body, for a list that may draw no body: a record
-    # read this way raises `ActiveModel::MissingAttributeError` when its body
-    # is asked for, unless it was handed out through
-    # `Publishing::DeferredBodies`, which reads it then
-    # (`Publishing::Listing.posts`).
+    # Every column but the body, for a list that may draw no body. A record
+    # read this way and used as it is raises `ActiveModel::MissingAttributeError`
+    # when its body is read and leaves the body out of `attributes`; handed out
+    # through `Publishing::DeferredBodies` (`Publishing::Listing.posts`) it
+    # reads the body when asked, as an eagerly read record has it.
     scope :without_body, -> { select(*(column_names - [ "body" ])) }
   end
 

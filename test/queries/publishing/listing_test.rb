@@ -82,7 +82,8 @@ class Publishing::ListingTest < ActiveSupport::TestCase
   # A list reads no body (#122): neither the rows' nor the copies'. The first
   # body a template asks for reads the list's bodies, each the published one:
   # the copy's for a post that has one, though its rows have moved on, and the
-  # rows' for a post with none. Two statements, however many posts.
+  # rows' for a post with none. At most two statements, however many posts:
+  # here two, since one post has a copy and one has none.
   test "a list reads no body until one is asked for, and then the whole list's, each as published, in two statements" do
     block = published_block(content_type: "blog")
     copied = create_post(title: "Copied")
@@ -95,7 +96,7 @@ class Publishing::ListingTest < ActiveSupport::TestCase
 
     reads = capture_sql { @posts = Publishing::Listing.posts(block) }
     assert reads.none? { |sql| sql.include?('"posts"."body"') || sql.include?('"posts".*') }, reads.join("\n")
-    assert reads.grep(/published_versions"\."snapshot"/).all? { |sql| sql.include?("#- CAST('{fields,body}' AS text[])") }, reads.join("\n")
+    assert reads.grep(/published_versions"\."snapshot"/).all? { |sql| sql.include?(Publishing::Version.snapshot_without_field("body").to_sql) }, reads.join("\n")
     assert @posts.none? { |post| post.has_attribute?(:body) }
 
     view_copied, view_bare = @posts.index_by(&:id).values_at(copied.id, bare.id)
@@ -103,6 +104,44 @@ class Publishing::ListingTest < ActiveSupport::TestCase
     assert_equal 0, count_statements { assert_equal "Bare words", Locales.read(view_bare, :body).to_markdown.strip }
     assert_not view_copied.changed?
     assert_raises(ActiveRecord::ReadOnlyRecord) { view_copied.save }
+  end
+
+  # A listed post answers every reader as one read with its body: the column
+  # read, `[]`, and the whole-record readers a gem's list component might
+  # serialise it with.
+  test "a listed post's body reads as an eagerly read one's through read_attribute, [], attributes and as_json" do
+    block = published_block(content_type: "blog")
+    post = create_post(title: "Read")
+    Posts::Save.call(post, translations: { "en" => { body: rich_doc("Published words") } })
+    publish_changes(post)
+    eager = Publishing.published_all([ post.reload ]).sole
+
+    { read_attribute: ->(view) { view.read_attribute(:body) }, brackets: ->(view) { view[:body] },
+      attributes: ->(view) { view.attributes["body"] }, as_json: ->(view) { view.as_json } }.each do |reader, read|
+      listed = Publishing::Listing.posts(block).sole
+      assert_not listed.has_attribute?(:body)
+      assert_equal read.(eager), read.(listed), reader.to_s
+      assert listed.has_attribute?(:body), reader.to_s
+    end
+    assert_equal eager.attributes, Publishing::Listing.posts(block).sole.attributes
+  end
+
+  # The whole column is written back, every language: a language with a body of
+  # its own reads it, one without falls back, each as published and never the
+  # rows' newer text.
+  test "a listed post's deferred body reads as published in every language, the fallback included" do
+    block = published_block(content_type: "now_update")
+    post = create_post(title: "Now", content_type: "now_update")
+    Posts::Save.call(post, translations: { "en" => { body: rich_doc("English") }, "de" => { body: rich_doc("Deutsch") } })
+    publish_changes(post)
+    Posts::Save.call(post, translations: { "en" => { body: rich_doc("Draft en") }, "de" => { body: rich_doc("Draft de") } })
+    eager = Publishing.published_all([ post.reload ]).sole
+
+    { "en" => "English", "de" => "Deutsch", "es" => "English" }.each do |locale, words|
+      listed = Publishing::Listing.posts(block).sole
+      assert_equal words, Locales.read(listed, :body, locale: locale).to_markdown.strip, locale
+      assert_equal Locales.read(eager, :body, locale: locale).to_h, Locales.read(listed, :body, locale: locale).to_h, locale
+    end
   end
 
   test "a list costs the same statements for 2 posts as for 12" do
