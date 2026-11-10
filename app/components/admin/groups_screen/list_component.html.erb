@@ -8,7 +8,7 @@
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-2">
             <%= link_to group.name, helpers.edit_admin_group_path(group, **url_options), data: { turbo_frame: "content" },
-                  class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" %>
+                  class: "admin-row-link font-medium text-ink" %>
             <% if group.built_in? %>
               <%= render Admin::Ui::BadgeComponent.new(label: "Built-in") %>
             <% end %>

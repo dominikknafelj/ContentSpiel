@@ -15,7 +15,7 @@
                 <%= render Admin::Ui::BadgeComponent.new(label: row.expired? ? t(".invite_expired") : t(".invited"), data: { invite_state: row.expired? ? "expired" : "open" }) %>
               <% else %>
                 <%= link_to helpers.edit_admin_user_path(row, **url_options), data: { turbo_frame: "content" },
-                      class: "font-medium text-ink after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-[-2px] focus-visible:after:outline-accent" do %><%= render Admin::Ui::UserNameComponent.new(user: row) %><% end %>
+                      class: "admin-row-link font-medium text-ink" do %><%= render Admin::Ui::UserNameComponent.new(user: row) %><% end %>
                 <% if you?(row) %><span class="text-sm text-meta"><%= t(".you") %></span><% end %>
                 <% if row.owner? %><%= render Admin::Ui::BadgeComponent.new(label: t(".owner")) %><% end %>
               <% end %>

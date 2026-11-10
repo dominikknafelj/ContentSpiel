@@ -9,22 +9,23 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794259911-f251".freeze
+  VERSION = "1794290753-3cf0".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
-    ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields Cover Dialog FieldFrame FormControls
+    ActionZone ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FormControls
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
     GroupFields IconChip ImageField ImageLoading ListState Mails Menu NoteMarker PasswordField PresenceMarker
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
     SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip
-    StudioBlockCard StudioCalmColour StudioCalmColourE4E5 StudioCalmDashboard StudioCalmE4More StudioCalmE4Setup
-    StudioCalmE4Together StudioCalmEditor StudioCalmEditorE StudioCommandPalette StudioDashboardCards
-    StudioAuditLog StudioEditorHeader StudioEmptyState StudioFilterBar StudioForms StudioHeldStrip StudioListTable StudioMediaGrid
-    StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioPageTree StudioRail StudioSectionTile
-    StudioSettings StudioShell StudioTagDetail StudioTranslationPair StudioTranslations StudioTrash StudioTree StudioWizard TableGrid TextFields Toast Tooltip UserName
+    StudioBlockCard StudioCalmColourE4E5 StudioCalmE4More StudioCalmE4Setup
+    StudioCalmE4Together StudioCalmEditor StudioCommandPalette StudioDashboardCards
+    StudioAccount StudioAuditLog StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid
+    StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail StudioSectionTile
+    StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations StudioTrash StudioTree StudioUsers StudioWizard
+    TableGrid TextFields Toast Tooltip UserName
   ].freeze
 
   # A component whose card has another name: the card whose "Code" section
@@ -45,6 +46,7 @@ module DesignSystemEntries
     "Admin::Ui::LanguageTabsComponent" => "StudioTranslationPair",
     "Admin::Ui::LibraryImageComponent" => "StudioMediaGrid",
     "Admin::Ui::MailFailedNoticeComponent" => "Alerts",
+    "Admin::Ui::NoticeComponent" => "Alerts",
     "Admin::Ui::PaginationComponent" => "StudioListTable",
     "Admin::Ui::RailPanelComponent" => "StudioRail",
     "Admin::Ui::RailSlotComponent" => "StudioRail",

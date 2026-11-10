@@ -6,6 +6,10 @@ module Admin
     # border: an outline is a button's, or a state chip's (Draft, unpublished
     # changes), never a badge's. `:warn` is No alt's tint.
     # Anything else the caller needs on the tag (`data`, `id`) passes through.
+    #
+    # `mark` is a small sign before the label (a scope chip's type dot),
+    # inside the badge and hidden from a screen reader: the label says what
+    # the mark shows, so the mark is decoration beside the name.
     class BadgeComponent < AdminComponent
       include Admin::Ui::Contract
 
@@ -19,14 +23,16 @@ module Admin
           "It cannot be pressed: an outline is a button's or a state chip's, never a badge's.",
           "It draws two tones, and another is refused."
         ],
-        states: %i[neutral warn],
+        states: %i[neutral warn marked],
         keys: [],
-        slots: [],
+        slots: %i[mark],
         controller: nil
       )
 
       TONES = { neutral: "bg-sunken text-meta", warn: "bg-warn-tint text-warn-ink" }.freeze
-      CLASS = "inline-flex shrink-0 items-center rounded-cs px-1.5 py-0.5 text-label".freeze
+      CLASS = "inline-flex shrink-0 items-center gap-1 rounded-cs px-1.5 py-0.5 text-label".freeze
+
+      renders_one :mark
 
       def initialize(label:, tone: :neutral, **html)
         raise ArgumentError, "unknown badge tone #{tone.inspect}" unless TONES.key?(tone)
@@ -37,7 +43,9 @@ module Admin
       end
 
       def call
-        tag.span(@label, **@html, class: [ CLASS, TONES.fetch(@tone), @html[:class] ].compact.join(" "))
+        tag.span(**@html, class: [ CLASS, TONES.fetch(@tone), @html[:class] ].compact.join(" ")) do
+          safe_join([ (tag.span(mark, class: "inline-flex", aria: { hidden: true }) if mark?), @label ].compact)
+        end
       end
     end
   end

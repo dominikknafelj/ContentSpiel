@@ -629,7 +629,11 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
    themes, and the radius and focus ring come from tokens too. */
 .cs-checkbox { accent-color: var(--cs-accent); border-radius: var(--cs-radius); width: 1rem; height: 1rem; flex: none; cursor: pointer; }
 .cs-checkbox:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
-.cs-checkbox:disabled { cursor: not-allowed; opacity: 0.5; }
+/* A box nobody may change (a group the viewer can't grant, a locked
+   permission) keeps its full colour, so its tick reads at the browser's own
+   3:1 on the card; the cursor and the label's meta words say it is fixed. */
+.cs-checkbox:disabled { cursor: not-allowed; opacity: 1; }
+.cs-checkbox:disabled + label, label:has(> .cs-checkbox:disabled) { color: var(--cs-meta); }
 
 /* Toggle switch (Admin::Fields::BooleanField): still a
    checkbox, so the form posts and autosaves it like one, drawn as a pill
@@ -866,6 +870,15 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-draft-tile__link::after { content: ""; position: absolute; inset: 0; border-radius: var(--cs-radius-tile); }
 .admin-draft-tile__link:focus-visible { outline: none; }
 .admin-draft-tile__link:focus-visible::after { outline: 2px solid currentColor; outline-offset: -2px; }
+/* A list row that opens one thing (a user, a group, an audit event) is
+   pressed anywhere: its one link, `.admin-row-link`, stretches its
+   `::after` over the row, and the focus ring is drawn on that cover, inside
+   the row's edge. Anything else pressable in the row stands above the cover
+   at `relative z-(--cs-z-raised)`. */
+tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
+.admin-row-link::after { content: ""; position: absolute; inset: 0; }
+.admin-row-link:focus-visible { outline: none; }
+.admin-row-link:focus-visible::after { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus

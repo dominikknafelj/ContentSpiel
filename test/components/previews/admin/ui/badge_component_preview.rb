@@ -1,10 +1,15 @@
 module Admin
   module Ui
-    # `Admin::Ui::BadgeComponent` (contrast and buttons spec, D1): neutral and warn.
+    # `Admin::Ui::BadgeComponent`: neutral, warn, and a badge with a mark
+    # before its label (a scope chip's type dot).
     class BadgeComponentPreview < ViewComponent::Preview
       def neutral = render(Admin::Ui::BadgeComponent.new(label: "Default"))
 
       def warn = render(Admin::Ui::BadgeComponent.new(label: "NO ALT", tone: :warn))
+
+      def marked
+        render(Admin::Ui::BadgeComponent.new(label: "Blog post").with_mark_content('<span class="size-1.5 rounded-full bg-cat-1"></span>'.html_safe))
+      end
     end
   end
 end

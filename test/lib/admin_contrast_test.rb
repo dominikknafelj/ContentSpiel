@@ -793,6 +793,16 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # `Admin::Ui::NoticeComponent`'s four tones: warn, ok and danger write the
+  # role's ink on its tint, neutral writes dim on sunken.
+  test "a notice's words read on its ground in every tone" do
+    each_scheme do |scheme, colour|
+      [ %w[--cs-warn-ink --cs-warn-tint], %w[--cs-ok-ink --cs-ok-tint], %w[--cs-danger-ink --cs-danger-tint], %w[--cs-dim --cs-sunken] ].each do |ink, ground|
+        assert_ratio(4.5, colour.(ink), colour.(ground), "a notice's #{ink} on #{ground} (#{scheme})")
+      end
+    end
+  end
+
   # A submission's delivery says Sent and Not delivered in a state chip, its
   # word on the role's tint, held at the figures they measure: ok 7.0 / 8.0
   # and warn 6.5 / 8.3, so a change of either pair cannot quietly take them

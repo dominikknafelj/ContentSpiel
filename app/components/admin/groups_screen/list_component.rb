@@ -1,11 +1,10 @@
 module Admin
   module GroupsScreen
-    # The Groups list (round 3 Task 10, handoff §4.7 / `Studio Groups.dc.html`):
-    # a card of rows -- name (with its "Built-in" tag and description), members,
-    # tokens -- where the WHOLE row is the link to the group's editor. The name
-    # is the one anchor, stretched over the row by a pseudo-element
-    # (`after:absolute after:inset-0` on a `relative` row), so there is no Edit
-    # button and nothing interactive nested inside another.
+    # The Groups list: a card of rows -- name (with its "Built-in" tag and
+    # description), members, tokens -- where the WHOLE row is the link to the
+    # group's editor. The name is the one anchor, `.admin-row-link`, whose
+    # cover stretches over the row, so there is no Edit button and nothing
+    # interactive nested inside another.
     #
     # `member_counts` and `token_counts` are `{ group_id => n }` from ONE grouped
     # query each (`Admin::GroupsController#index`): no per-row count. Tokens

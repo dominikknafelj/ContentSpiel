@@ -13,7 +13,7 @@ class Admin::UsersScreen::ListComponentTest < ViewComponent::TestCase
 
     assert_selector "li", count: User.count
     assert_selector "li#user_#{users(:two).id} a", count: 1, text: "Tara Two"
-    assert_selector "li#user_#{users(:two).id} a[class*='after:absolute'][class*='after:inset-0']"
+    assert_selector "li#user_#{users(:two).id} a.admin-row-link"
     assert_selector "li#user_#{users(:two).id} [aria-hidden=true]", text: "T"
     assert_selector "li#user_#{users(:two).id} span", text: "two@example.com"
     assert_selector "li#user_#{users(:two).id} [data-column=groups] span", text: "Admin"

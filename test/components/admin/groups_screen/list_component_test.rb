@@ -9,7 +9,7 @@ class Admin::GroupsScreen::ListComponentTest < ViewComponent::TestCase
 
     assert_selector "li", count: groups.size + 1
     assert_selector "li#access_control_group_#{custom.id} a", count: 1, text: "Zebras"
-    assert_selector "li#access_control_group_#{custom.id} a[class*='after:absolute'][class*='after:inset-0']"
+    assert_selector "li#access_control_group_#{custom.id} a.admin-row-link"
     assert_selector "li#access_control_group_#{custom.id} [data-column=members]", text: "3 members"
     assert_selector "li#access_control_group_#{custom.id} [data-column=tokens]", text: "1 token"
     assert_selector "li#access_control_group_#{custom.id}", text: "Striped"

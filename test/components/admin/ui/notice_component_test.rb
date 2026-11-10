@@ -1,0 +1,50 @@
+require "test_helper"
+
+# A box of the caller's words in one of four tones. Its role follows the
+# tone, so a screen reader hears a warning or a refusal at once, a success
+# politely and an explanation only when it reads there; inside a live region
+# the region speaks, and the notice says nothing of its own.
+class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
+  def notice_classes = page.find("div[data-notice]")["class"].split
+
+  test "each tone draws its ground, its words and its role: warn and danger an alert, ok a status, neutral a note" do
+    { warn: [ "bg-warn-tint", "text-warn-ink", "alert" ], ok: [ "bg-ok-tint", "text-ok-ink", "status" ],
+      danger: [ "bg-danger-tint", "text-danger-ink", "alert" ], neutral: [ "bg-sunken", "text-dim", "note" ] }.each do |tone, (ground, ink, role)|
+      render_inline(Admin::Ui::NoticeComponent.new(tone: tone, data: { notice: true })) { "Something to say." }
+
+      assert_selector "div[data-notice][role=#{role}]", exact_text: "Something to say.", count: 1
+      assert_includes notice_classes, ground, tone
+      assert_includes notice_classes, ink, tone
+    end
+  end
+
+  test "warn alone has an edge, every tone is rounded-card, and compact is 13px" do
+    %i[warn ok danger neutral].each do |tone|
+      render_inline(Admin::Ui::NoticeComponent.new(tone: tone, data: { notice: true })) { "Words." }
+
+      assert_includes notice_classes, "rounded-card", tone
+      assert_equal tone == :warn, notice_classes.include?("border"), tone
+      assert_equal tone == :warn, notice_classes.include?("border-warn"), tone
+      %w[px-3 py-2 text-sm].each { |utility| assert_includes notice_classes, utility, tone }
+    end
+
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, data: { notice: true })) { "Words." }
+    %w[px-3 py-2.5 text-small leading-normal].each { |utility| assert_includes notice_classes, utility }
+    assert_not_includes notice_classes, "text-sm"
+  end
+
+  test "role: nil writes no role, and an unknown tone or size is refused" do
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :warn, role: nil, data: { notice: true })) { "Inside a live region." }
+    assert_selector "div[data-notice]:not([role])", text: "Inside a live region."
+
+    assert_raises(ArgumentError) { Admin::Ui::NoticeComponent.new(tone: :loud) }
+    assert_raises(ArgumentError) { Admin::Ui::NoticeComponent.new(tone: :warn, size: :huge) }
+  end
+
+  test "a caller's class is added to the notice's own and its id and data reach the box" do
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :neutral, id: "why-not", class: "mt-4", data: { notice: true, reason: "owner" })) { "Only the owner can change this." }
+
+    assert_selector "div#why-not[data-notice][data-reason=owner]", text: "Only the owner can change this."
+    %w[mt-4 rounded-card bg-sunken text-dim].each { |utility| assert_includes notice_classes, utility }
+  end
+end
