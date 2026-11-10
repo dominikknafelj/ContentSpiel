@@ -884,13 +884,17 @@ tr:has(.admin-row-link), li:has(> * .admin-row-link) { position: relative; }
 /* The verb an action row ends in when it is words and not a link of its
    own, describing the row's one link: dim at rest, so a read row holds no
    accent, and accent while the row is under the pointer or holds the focus
-   (the Waiting for you row, the draft tile and a Translations row around
-   their stretched links, the Notes for you row that is the link). */
+   (the Waiting for you row, the draft tile, a Translations row and a
+   table row of one link around their stretched links, the Notes for you
+   row that is the link). In a table row the verb stands in a cell of its
+   own, outside the link, so the row lights it. */
 .admin-row-verb { color: var(--cs-dim); font-size: var(--cs-t-small); white-space: nowrap; }
 .admin-waiting-row:hover .admin-row-verb,
 .admin-waiting-row:focus-within .admin-row-verb,
 .admin-translation-row:hover .admin-row-verb,
 .admin-translation-row:focus-within .admin-row-verb,
+tr:has(.admin-row-link):hover .admin-row-verb,
+tr:has(.admin-row-link):focus-within .admin-row-verb,
 .admin-draft-tile:hover .admin-row-verb,
 .admin-draft-tile:focus-within .admin-row-verb,
 a:hover > .admin-row-verb,
@@ -1532,8 +1536,8 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    form's submissions': the sideways scroll alone, with no height of its
    own, so its rows scroll with the page. In
    both the first column sticks at the left as the card scrolls sideways,
-   but in a table whose row is one link (`.admin-row-link`: Users, Groups),
-   which scrolls sideways whole: a sticky cell is the containing block of
+   but in a table whose row is one link (`.admin-row-link`: Users), which
+   scrolls sideways whole: a sticky cell is the containing block of
    the link's cover, which would then cover the name cell alone.
    `.admin-table-scroll` is a stacking context of its own, so its local
    layers stay under the shell's top bar. In it the head's corner stands at

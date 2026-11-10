@@ -813,7 +813,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
     "app/components/admin/users_screen/group_cards_component.rb" => "the group cards' hand-drawn boxes, redrawn as the user editor's tiles",
     "app/components/admin/users_screen/group_cards_component.html.erb" => "the group cards' small words, redrawn with the user editor's tiles",
-    "app/views/admin/users/_form.html.erb" => "the user form's important danger edges, redrawn with the user editor",
+    "app/views/admin/users/_form.html.erb" => "the user form's !border-danger edges, redrawn with the user editor",
     "app/views/admin/users/edit.html.erb" => "the user editor's small words, redrawn with the user editor",
     "app/views/admin/users/new.html.erb" => "New user's small words, redrawn with the user editor"
   }.freeze
@@ -2160,11 +2160,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "var(--cs-accent)" ], lit.map(&:last).uniq, "the verb under the pointer or the focus"
     selectors = lit.flat_map(&:first)
     assert selectors.all? { |selector| selector.match?(/:(hover|focus-within|focus-visible)/) }, selectors.inspect
-    # The Waiting for you row, the draft tile and a Translations row around
-    # their stretched links, and the Notes for you row that is the link, each
-    # on hover and focus.
+    # The Waiting for you row, the draft tile, a Translations row and a table
+    # row of one link (`.admin-row-link`) around their stretched links, and
+    # the Notes for you row that is the link, each on hover and focus.
     assert_equal [ ".admin-waiting-row:hover .admin-row-verb", ".admin-waiting-row:focus-within .admin-row-verb",
                    ".admin-translation-row:hover .admin-row-verb", ".admin-translation-row:focus-within .admin-row-verb",
+                   "tr:has(.admin-row-link):hover .admin-row-verb", "tr:has(.admin-row-link):focus-within .admin-row-verb",
                    ".admin-draft-tile:hover .admin-row-verb", ".admin-draft-tile:focus-within .admin-row-verb",
                    "a:hover>.admin-row-verb", "a:focus-visible>.admin-row-verb" ].sort, selectors.sort
   end
@@ -2212,6 +2213,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/outline-offset:\s*-2px;/, ring)
 
     named = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?("admin-row-link") } }
+    verb, named = named.partition { |selectors, _| selectors.any? { |selector| selector.include?(".admin-row-verb") } }
+    # The verb at a link row's end stands in a cell of its own, outside the
+    # link, so the row lights it: the accent rule names the row link's row.
+    assert_equal 1, verb.size, "the row verb's accent is one rule: #{verb.map(&:first).inspect}"
+    assert_includes verb.first.first, "tr:has(.admin-row-link):hover .admin-row-verb"
+    assert_includes verb.first.first, "tr:has(.admin-row-link):focus-within .admin-row-verb"
     sticky, link = named.partition { |selectors, _| selectors.any? { |selector| selector.include?(":first-child") } }
     assert_equal 4, link.size, "the row link is four rules, written once: #{link.map(&:first).inspect}"
     # A sticky cell is the containing block of the cover, which would then

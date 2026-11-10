@@ -99,6 +99,9 @@ class Admin::InvitesSystemTest < ApplicationSystemTestCase
     visit_screen admin_users_path
     # Tab goes from a user's name, the row's one stop, to the next row's menu.
     page.execute_script("document.querySelector(\"#{row(users(:author))} a.admin-row-link\").focus()")
+    # The row holding the focus lights its Edit, which stands outside the link.
+    verb_colour = ->(user) { page.evaluate_script("getComputedStyle(document.querySelector(\"#{row(user)} .admin-row-verb\")).color") }
+    assert_not_equal verb_colour.call(users(:two)), verb_colour.call(users(:author)), "the focused row's Edit is not lit"
     page.driver.browser.keyboard.type(:Tab)
     assert_equal "Actions for dana@example.com", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
 
