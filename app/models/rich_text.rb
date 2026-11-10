@@ -1,6 +1,7 @@
 # Namespace for the rich-text subsystem (design spec §3): a schema registry
-# that built-ins and, later, plugins register node/mark types against
-# (`RichText::Schema`), a value object around a Tiptap/ProseMirror JSON
+# that built-ins register node/mark types against (`RichText::Schema`; a gem
+# cannot yet: docs/reference/content-blocks-and-types.md, "Registries with
+# no hook"), a value object around a Tiptap/ProseMirror JSON
 # document (`RichText::Document`), and -- from Task 2 onward -- the
 # renderers and Markdown converters that walk a document through that
 # schema. Nothing here talks to ActiveRecord directly; `posts.body` and
