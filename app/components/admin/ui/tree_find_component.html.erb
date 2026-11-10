@@ -3,11 +3,12 @@
     script toggling each by `hidden`) in its end; the field's own padding keeps
     the text clear of both. The status line under it is the polite live
     region the script writes the count into, 300ms after the last keystroke;
-    the figure's look and the moving sentence's line are handed to the script
+    the figure's look, the moving sentence's line and the line's room kept
+    while the field holds a query (`reserve_class`) are handed to the script
     as Stimulus classes. %>
 <div role="search" class="mb-2" data-controller="admin--tree--find"
      data-admin--tree--find-noun-value="<%= noun %>" data-admin--tree--find-moving-value="<%= moving %>" data-admin--tree--find-keep-value="<%= keep_across_frames %>"
-     data-admin--tree--find-figure-class="font-medium text-dim" data-admin--tree--find-line-class="block"
+     data-admin--tree--find-figure-class="font-medium text-dim" data-admin--tree--find-line-class="block" data-admin--tree--find-reserve-class="<%= reserve_class %>"
      data-action="keydown@document->admin--tree--find#slash keydown@document->admin--tree--find#treeKey:capture tree:changed@document->admin--tree--find#changed turbo:frame-load@document->admin--tree--find#frameLoaded turbo:load@document->admin--tree--find#loaded turbo:before-cache@document->admin--tree--find#reset"
      data-messages="<%= script_messages %>">
   <label for="<%= field_id %>" class="sr-only"><%= t(".label.#{noun}") %></label>

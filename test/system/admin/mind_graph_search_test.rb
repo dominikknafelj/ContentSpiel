@@ -68,6 +68,53 @@ class Admin::MindGraphSearchSystemTest < Admin::MindGraphSystemTestCase
     assert_selector SEARCH_SITE, visible: :hidden
   end
 
+  test "the find's status line keeps its one line from the first key, so no row of the list moves when the count is written, and gives it back with the rows" do
+    docs = create_page(title: "Docs")
+    guide = create_page(title: "Guide", parent: docs)
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    open_branches(docs)
+    visit_screen admin_mind_graph_path
+    await_graph
+    status = "#tree-column [role=search] [role=status]"
+    row = "#{LIST} [role=treeitem][data-node-id='#{nid(guide)}'] > .admin-tree-row"
+    back = "#{LIST} [role=treeitem][data-node-id='#{nid(a)}']"
+    # What stood at each `input` on the field, read by a listener on the
+    # document, which hears it after the find's own action on the field.
+    page.execute_script(<<~JS)
+      window.__inputs = []
+      document.addEventListener("input", () => {
+        const status = document.querySelector(#{status.to_json})
+        const row = document.querySelector(#{row.to_json})
+        const back = document.querySelector(#{back.to_json})
+        window.__inputs.push({
+          height: status.getBoundingClientRect().height,
+          line: parseFloat(getComputedStyle(status).lineHeight),
+          words: status.textContent,
+          top: row && row.checkVisibility() ? row.getBoundingClientRect().top : null,
+          back: Boolean(back && back.checkVisibility())
+        })
+      })
+    JS
+    box = ->(what, edge) { page.evaluate_script("document.querySelector(#{what.to_json}).getBoundingClientRect().#{edge}") }
+    assert_equal 0, box.(status, :height), "an empty field keeps no room"
+
+    find(FIND).send_keys("g")
+    assert_selector status, text: "1 match"
+    typed = page.evaluate_script("window.__inputs").first
+    assert_not typed["back"], "the key narrowed the list"
+    assert_equal "", typed["words"], "the words were written with the key, not after the typing stopped"
+    assert_in_delta typed["line"], typed["height"], 0.5, "the key keeps the room of the count's one line"
+    assert_in_delta typed["top"], box.(row, :top), 0.5, "a row of the list moved when the count was written"
+    assert_in_delta typed["line"], box.(status, :height), 0.5, "the count fills one line, no more"
+
+    find(FIND).send_keys(:escape)
+    emptied = page.evaluate_script("window.__inputs").last
+    assert_equal 0, emptied["height"], "the room goes in the step that gives the rows back"
+    assert emptied["back"], "the rows are back in the same step"
+    assert_equal 0, box.(status, :height)
+  end
+
   test "the whole site's search finds a post the graph does not draw and opens its neighbourhood" do
     a = create_post(title: "Connected")
     PostRelation.create!(post: a, related_post: create_post(title: "Also connected"))

@@ -8,7 +8,12 @@ const SAY_AFTER_MS = 300
 // The find field of a tree column (`Admin::Ui::TreeFindComponent`). It
 // narrows its tree as the person types (`tree/find.js`) and says the count
 // in its status line once the typing stops, so a screen reader hears one
-// sentence and not one per key.
+// sentence and not one per key. The line's room is kept from the first key
+// for as long as the field holds a query (the Stimulus class `reserve`: two
+// lines where the tree moves, for the count and the moving sentence, one
+// where not), set and taken off in the same step that narrows the tree and
+// gives it back: words written 300ms later then fill room that was already
+// there, and no row moves under a pointer aiming at it.
 //
 // THE TREE is the element the field's `aria-controls` names, looked up
 // whenever it is needed, since a tree's owner may draw it again; its
@@ -54,7 +59,7 @@ const SAY_AFTER_MS = 300
 export default class extends Controller {
   static targets = ["field", "hint", "clear", "status"]
   static values = { noun: String, moving: Boolean, keep: Boolean }
-  static classes = ["figure", "line"]
+  static classes = ["figure", "line", "reserve"]
 
   connect() {
     this.filtering = false
@@ -75,13 +80,18 @@ export default class extends Controller {
     return this.fieldTarget.value.trim()
   }
 
-  // `input` on the field: the tree narrows at once, the line is written
-  // after the typing stops.
+  // `input` on the field: the tree narrows at once and the line's room is
+  // kept with it; the line is written after the typing stops.
   filter() {
     const empty = this.fieldTarget.value === ""
     this.hintTarget.hidden = !empty
     this.clearTarget.hidden = empty
+    this.reserve(this.query !== "")
     this.apply()
+  }
+
+  reserve(kept) {
+    for (const name of this.reserveClasses) this.statusTarget.classList.toggle(name, kept)
   }
 
   apply() {

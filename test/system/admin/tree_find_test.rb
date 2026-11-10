@@ -140,6 +140,55 @@ class Admin::TreeFindSystemTest < ApplicationSystemTestCase
     assert_equal [ "1 page matches Clear the search to move pages" ], page.evaluate_script("window.__said")
   end
 
+  # What stood at the moment of each `input` on the field, read by a listener
+  # on the document, which hears the event after the find's own action on the
+  # field: the status line's height and words, its line height and a row's top.
+  def record_inputs(row, back:)
+    page.execute_script(<<~JS)
+      window.__inputs = []
+      document.addEventListener("input", () => {
+        const status = document.querySelector(#{STATUS.to_json})
+        const row = document.querySelector(#{row.to_json})
+        const back = document.querySelector(#{back.to_json})
+        window.__inputs.push({
+          height: status.getBoundingClientRect().height,
+          line: parseFloat(getComputedStyle(status).lineHeight),
+          words: status.textContent,
+          top: row && row.checkVisibility() ? row.getBoundingClientRect().top : null,
+          back: Boolean(back && back.checkVisibility())
+        })
+      })
+    JS
+  end
+
+  def inputs = page.evaluate_script("window.__inputs")
+
+  def top_of(row) = page.evaluate_script("document.querySelector(#{row.to_json}).getBoundingClientRect().top")
+
+  def status_height = page.evaluate_script("document.querySelector(#{STATUS.to_json}).getBoundingClientRect().height")
+
+  test "the status line's two lines are kept from the first key, so no row moves when the count is written, and go as the rows come back" do
+    visit_editor(@beta)
+    row = "#tree-row-#{@alpha.id}"
+    record_inputs(row, back: "#tree-row-#{@beta.id}")
+    assert_equal 0, status_height, "an empty field keeps no room"
+
+    type_in_field("l")
+    assert_selector STATUS, text: "pages match"
+    typed = inputs.first
+    assert_not typed["back"], "the key narrowed the tree"
+    assert_equal "", typed["words"], "the words were written with the key, not after the typing stopped"
+    assert_in_delta 2 * typed["line"], typed["height"], 0.5, "the key keeps the room of the count and the moving sentence"
+    assert_in_delta typed["top"], top_of(row), 0.5, "a row moved when the count was written"
+    assert_in_delta 2 * typed["line"], status_height, 0.5, "the count and the moving sentence fill two lines, no more"
+
+    page.send_keys(:escape)
+    emptied = inputs.last
+    assert_equal 0, emptied["height"], "the room goes in the step that gives the rows back"
+    assert emptied["back"], "the rows are back in the same step"
+    assert_equal 0, status_height
+  end
+
   test "a page saved while the tree is filtered keeps its row filtered and marked" do
     visit_editor(@translations)
     type_in_field("trans")
