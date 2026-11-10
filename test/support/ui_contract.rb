@@ -72,12 +72,19 @@ module UiContract
     [ ruby_text, *templates ].join("\n")
   end
 
-  # What may take the focus in a component's own markup: a link with an
-  # address, a control, a dialog, a tabindex or contenteditable, in a
-  # template's tags or in the Ruby helpers that write them.
+  # What may take the focus in a component's own markup, from HTML's
+  # focusable set: a link or an image map's area with an address, a form
+  # control (a tag, a `*_tag` helper, any `*_field_tag`, or a form builder,
+  # whose fields are controls), a summary, a frame or an embedded object, an
+  # audio or video with its controls, a dialog, a tabindex or
+  # contenteditable.
   FOCUSABLE = {
-    "a link" => /<a\b[^>]*\bhref|\b(?:link_to|link_to_if|link_to_unless|mail_to)\b|\btag\.a\b|content_tag[( ]\s*:a\b/,
-    "a control" => /<(?:button|input|select|textarea)\b|\b(?:button_to|button_tag|submit_tag|check_box_tag|radio_button_tag|text_field_tag|text_area_tag|select_tag|file_field_tag|password_field_tag)\b|\btag\.(?:button|input|select|textarea)\b|content_tag[( ]\s*:(?:button|input|select|textarea)\b/,
+    "a link" => /<(?:a|area)\b[^>]*\bhref|\b(?:link_to|link_to_if|link_to_unless|mail_to|phone_to|sms_to)\b|\btag\.(?:a|area)\b|content_tag[( ]\s*:(?:a|area)\b/,
+    "a control" => /<(?:button|input|select|textarea)\b|\b\w+_field_tag\b|\b(?:button_to|button_tag|submit_tag|image_submit_tag|check_box_tag|radio_button_tag|text_area_tag|select_tag)\b|\btag\.(?:button|input|select|textarea)\b|content_tag[( ]\s*:(?:button|input|select|textarea)\b/,
+    "a form" => /\b(?:form_with|form_for|form_tag|fields_for)\b\s*[(\s]|<form\b|\btag\.form\b/,
+    "a summary" => /<summary\b|\btag\.summary\b|content_tag[( ]\s*:summary\b/,
+    "a frame" => /<(?:iframe|embed|object)\b|\btag\.(?:iframe|embed|object)\b|content_tag[( ]\s*:(?:iframe|embed|object)\b/,
+    "a media control" => /<(?:audio|video)\b[^>]*\bcontrols|\btag\.(?:audio|video)\b[^\n]*\bcontrols/,
     "a dialog" => /<dialog\b|\btag\.dialog\b|content_tag[( ]\s*:dialog\b/,
     "a tabindex" => /\btabindex\b/i,
     "contenteditable" => /\bcontenteditable\b/i
@@ -86,6 +93,12 @@ module UiContract
   # A component's own source with ERB comments taken out, as the focus check
   # reads it (`own_source` keeps a template whole).
   def self.markup_source(klass) = own_source(klass).gsub(/<%#.*?%>/m, "")
+
+  # The `Admin::Ui` components a source renders by name.
+  def self.rendered_components(klass)
+    markup_source(klass).scan(/(?:Admin::Ui::)?\b([A-Z]\w*Component)\.new\b/).flatten.uniq
+      .filter_map { |name| "Admin::Ui::#{name}".safe_constantize }.reject { |other| other == klass }
+  end
 
   # What a component that says it takes no focus draws that can take it, as
   # sentences: its own markup, the markup of each `Admin::Ui` component it
@@ -102,19 +115,25 @@ module UiContract
       text = file.exist? ? file.read.gsub(/<%#.*?%>/m, "") : ""
       FOCUSABLE.filter_map { |what, pattern| "#{klass.name}'s partial #{path} draws #{what}" if text.match?(pattern) }
     end.flatten
-    rendered = source.scan(/(?:Admin::Ui::)?\b([A-Z]\w*Component)\.new\b/).flatten.uniq.filter_map { |name| "Admin::Ui::#{name}".safe_constantize }
-    own + partials + rendered.reject { |other| other == klass }.flat_map { |other| focusable_parts(other, seen) }
+    own + partials + rendered_components(klass).flat_map { |other| focusable_parts(other, seen) }
   end
 
   # What a check of a component's own markup cannot see: its slots and the
   # block it is handed, which a caller fills, and a render of something that
   # is not named in the source (a registered entry's component, a panel
-  # handed over).
-  def self.unreadable_parts(klass)
+  # handed over). A component it renders by name passes up its own such
+  # renders; its slots and its block are filled by the component that
+  # renders it, in a source this check reads.
+  def self.unreadable_parts(klass, seen = Set.new)
+    return [] unless seen.add?(klass)
+
     source = markup_source(klass)
     dynamic = source.scan(/render[( ]\s*([^\s"'()]+)/).flatten.reject { |target| target.match?(/\A(?:Admin::Ui::)?[A-Z]\w*Component\.new\b/) }
-    block = source.match?(/(?<![\w.:-])content(?![\w?:-])/) ? [ "the block it is handed (content)" ] : []
-    [ *klass.registered_slots.keys.map { |slot| "the slot #{slot}" }, *dynamic.map { |target| "a render of #{target}" }, *block ]
+    block = source.match?(/(?<![\w.:"'-])content(?![\w?:"'-])/) ? [ "the block it is handed (content)" ] : []
+    passed_up = rendered_components(klass).flat_map do |other|
+      unreadable_parts(other, seen).select { |part| part.include?("a render of ") }.map { |part| part.start_with?("Admin::") ? part : "#{other.name}'s #{part}" }
+    end
+    [ *klass.registered_slots.keys.map { |slot| "the slot #{slot}" }, *dynamic.map { |target| "a render of #{target}" }, *block, *passed_up ]
   end
 
   def ui_components
@@ -199,7 +218,7 @@ module UiContract
     drawn = UiContract.focusable_parts(klass)
     assert_empty drawn, "#{klass.name} says it takes no focus, but it draws what can take it: name its keyboard browser test instead"
     unreadable = UiContract.unreadable_parts(klass)
-    unnamed = unreadable.reject { |part| part.start_with?("the slot ") && keyboard.include?(part.delete_prefix("the slot ")) }
+    unnamed = unreadable.reject { |part| part.start_with?("the slot ") && keyboard.match?(/\b#{Regexp.escape(part.delete_prefix("the slot "))}\b/) }
     assert_empty unnamed, "#{klass.name} says it takes no focus, but this check cannot read #{unnamed.join(', ')}: " \
       "name a slot in the sentence, or name its keyboard browser test"
   end

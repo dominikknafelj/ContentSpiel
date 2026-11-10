@@ -319,10 +319,40 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
       failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(unnamed) }
       assert_match "the slot aside", failure.message
 
-      named = write.("UiContractNamedSlotComponent", "renders_one :aside", "It takes no focus: a word, and the aside a caller hands it is a word too.")
+      named = write.("UiContractNamedSlotComponent", "renders_one :aside", "It takes no focus: a word, and the `aside` a caller hands it is a word too.")
       assert_contract_keyboard(named)
+
+      # A slot is named as a word: "beside" does not name `aside`.
+      inside = write.("UiContractInsideWordComponent", "renders_one :aside", "It takes no focus: a word beside a link.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(inside) }
+      assert_match "the slot aside", failure.message
+
+      # The string "content" (the CS Studio frame's name) is no block handed over.
+      frame = write.("UiContractFrameNameComponent", "def drawn = tag.span(\"x\", data: { turbo_frame: \"content\" })", "It takes no focus: a word.")
+      assert_contract_keyboard(frame)
+
+      # A component it renders by name passes up what that one cannot read.
+      slot = write.("UiContractRendersSlotComponent", "def drawn = render(Admin::Ui::SlotComponent.new(name: \"x\", record: nil, viewer: nil))", "It takes no focus: a word.")
+      failure = assert_raises(Minitest::Assertion) { assert_contract_keyboard(slot) }
+      assert_match "Admin::Ui::SlotComponent's a render of entry.component.new", failure.message
+
+      # Each of HTML's other focusable shapes is refused.
+      {
+        "Summary" => [ "def drawn = tag.details(tag.summary(\"x\"))", "draws a summary" ],
+        "EmailField" => [ "def drawn = email_field_tag(:x)", "draws a control" ],
+        "SearchField" => [ "def drawn = search_field_tag(:x)", "draws a control" ],
+        "FormBuilder" => [ "def drawn = form_with(url: \"/x\") { |f| f.text_field(:x) }", "draws a form" ],
+        "Frame" => [ "def drawn = tag.iframe(src: \"/x\")", "draws a frame" ],
+        "Video" => [ "def drawn = tag.video(src: \"/x\", controls: true)", "draws a media control" ],
+        "Area" => [ "def drawn = tag.area(href: \"/x\")", "draws a link" ]
+      }.each do |part, (body, said)|
+        component = write.("UiContract#{part}ShapeComponent", body, "It takes no focus: a word.")
+        failure = assert_raises(Minitest::Assertion, part) { assert_contract_keyboard(component) }
+        assert_match "UiContract#{part}ShapeComponent #{said}", failure.message
+      end
     ensure
-      %w[Quiet Button Toasts Entries UnnamedSlot NamedSlot].each do |part|
+      %w[Quiet Button Toasts Entries UnnamedSlot NamedSlot InsideWord FrameName RendersSlot
+         SummaryShape EmailFieldShape SearchFieldShape FormBuilderShape FrameShape VideoShape AreaShape].each do |part|
         name = "UiContract#{part}Component"
         Object.send(:remove_const, name) if Object.const_defined?(name, false)
       end

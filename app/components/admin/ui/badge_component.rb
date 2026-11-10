@@ -27,7 +27,7 @@ module Admin
         keys: [],
         slots: %i[mark],
         controller: nil,
-        keyboard: "It takes no focus: a word beside a row's or a card's own link or button, which the keyboard stops on instead; what a caller hands its mark slot is a dot, never a control."
+        keyboard: "It takes no focus: a word beside a row's or a card's own link or button, which the keyboard stops on instead; what a caller hands its `mark` slot is a dot, never a control."
       )
 
       TONES = { neutral: "bg-sunken text-meta", warn: "bg-warn-tint text-warn-ink" }.freeze

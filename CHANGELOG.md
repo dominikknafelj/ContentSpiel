@@ -5,6 +5,7 @@
 ### For a gem or an outside caller
 
 - `Media::PickerComponent` is `Admin::Ui::MediaPickerComponent`, with no alias, and declares `Admin::Ui::Contract`. Its words moved from `admin.media.picker.*` to `admin.components.ui.media_picker.*`. A caller outside this repository that rendered the old constant gets a `NameError`; the layout draws the one picker, and a field opens it with `media-picker:open` as before.
+- `Admin::Ui::Contract`'s `keyboard:` also takes a sentence, for a component that takes no focus: the String that says so and what the keyboard stops on instead. It is allowed only where nothing the component draws can take the focus, and a component that renders a slot names the slot in it. The CMS's own tests now refuse `keyboard: nil` on its shared components; a gem's component that includes the contract is not read by them, and `nil` still loads.
 
 ## 0.1.0 (2026-11-10)
 
