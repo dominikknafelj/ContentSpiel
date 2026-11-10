@@ -60,34 +60,34 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
     end
 
     results = Setup::SystemCheck.run
-    assert_select "h1 + p", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
+    assert_select "h1.text-h1", text: "System status"
+    assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
+    assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
   end
 
-  # One card holds the rows, divided inside it (the wizard keeps its own
-  # ruled list, `setup/_system_check_results`'s default frame), and the
-  # summary is one sentence in the site's time, in the admin time format.
-  test "the checks are one card, warnings first, and the summary names the count and the site's time" do
-    site_settings(:default).update!(time_zone: "Tokyo")
+  # The summary is plural by the total: no site runs a single check, so the
+  # `one` form is read from the key itself.
+  test "the summary's words follow the total's plural" do
+    words = ->(passed, count) { I18n.t("admin.system_status.show.summary", passed: passed, count: count, time: "17:30") }
+
+    assert_equal "1 of 1 check passed · last run 17:30", words.(1, 1)
+    assert_equal "5 of 6 checks passed · last run 17:30", words.(5, 6)
+  end
+
+  # One card holds the rows, divided inside it; the wizard keeps its own
+  # ruled list (`setup/_system_check_results`'s default frame).
+  test "the checks are one card with their rows divided inside it, and no summary chip" do
     sign_in_as(users(:one))
 
-    at = Time.utc(2026, 10, 4, 8, 30)
-    travel_to(at) { get "/cs-studio/system_status" }
+    get "/cs-studio/system_status"
 
-    results = Setup::SystemCheck.run
-    time = I18n.l(at.in_time_zone("Tokyo"), format: :"admin.time")
-    assert_select "h1.text-h1", text: "System status"
-    assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run #{time}"
-    assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
     assert_select "div.rounded-card.bg-surface.shadow-1", count: 1 do
       assert_select "> ul.divide-y.divide-line.px-4", count: 1 do
-        assert_select "> li.admin-system-check", count: results.size
+        assert_select "> li.admin-system-check", count: Setup::SystemCheck.run.size
       end
     end
     assert_select "ul.border-y", count: 0
     assert_select ".admin-system-check-summary, [data-summary-chip]", count: 0
-
-    statuses = css_select("li.admin-system-check").map { |row| row["data-status"] }
-    assert_equal statuses.sort_by { |status| status == "warning" ? 0 : 1 }, statuses
   end
 
   test "warnings are listed before OK rows" do

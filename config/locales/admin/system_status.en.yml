@@ -6,8 +6,10 @@ en:
     system_status:
       show:
         title: "System status"
-        # The line under the heading: `time` is the site's time in the
-        # `admin.time` format, so a translation orders the three as its
-        # language does.
-        summary: "%{passed} of %{total} checks passed · last run %{time}"
+        # The line under the heading, plural by the total (`count`): `time`
+        # is the site's time in the `admin.time` format, so a translation
+        # orders the three as its language does.
+        summary:
+          one: "%{passed} of %{count} check passed · last run %{time}"
+          other: "%{passed} of %{count} checks passed · last run %{time}"
         run_again: "Run checks again"
