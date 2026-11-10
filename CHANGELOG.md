@@ -5,10 +5,7 @@
 ### Changed
 
 - A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
-
-### Environment
-
-- Nothing a site reads changed. `docs/reference/hosting.md`, "Every variable the code reads", now lists every variable with who sets it, its default and whether it is a secret, the three Active Record encryption keys, `CONTENT_SPIEL_DATABASE_PASSWORD` and `RAILS_LOG_LEVEL` among them. `config/deploy.yml`'s commented `DB_HOST`, which nothing read, is `PGHOST`, and its commented log level is `info`.
+- The development seed (`contentspiel dev`, `bin/rails db:seed`) builds `/showcase`, a new top-level page of the development site: every block type at the top level and in a section of every layout and band, every Note kind, a long table, every list and a link to the 404 page. On a database with no content yet it also turns German and Spanish on; a seed run again leaves the site's languages as they are.
 
 ### Migrations
 
