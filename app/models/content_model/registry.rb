@@ -19,9 +19,10 @@ module ContentModel
     # Bare names (`image`, `blog`) are reserved for built-ins. Every other
     # name (a gem's block type now, admin-defined types later, spec §3.2a) must be
     # prefixed with its owner, e.g. `gallery/album` -- one `/`, lowercase
-    # segments on both sides. Enforcing "plugins must actually prefix
-    # themselves" is a job for the plugin DSL (out of scope here); this only
-    # accepts or rejects the *shape* of a name.
+    # segments on both sides. This only accepts or rejects the *shape* of a
+    # name; the owner rules (an `owner/name` from a gem, one owner per hook,
+    # no owner named like a constant of the CMS's) are
+    # `ContentSpiel::Plugins::Registrar`'s, for the registries a hook reaches.
     NAME_FORMAT = /\A[a-z][a-z0-9_]*(\/[a-z][a-z0-9_]*)?\z/
 
     # `&block` receives the new definition to fill in via its DSL (`label`,

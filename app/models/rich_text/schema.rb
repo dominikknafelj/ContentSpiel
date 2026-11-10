@@ -22,11 +22,12 @@ module RichText
   module Schema
     # Bare camelCase names (`bulletList`, `internalLink`) are reserved for
     # built-ins, matching Tiptap's own node-name casing. Every other name
-    # (plugins, later admin-defined node types) must be prefixed with its
-    # owner, e.g. `gallery/carousel` -- one `/`, a camelCase-shaped segment
-    # on each side. As with `ContentModel::Registry::NAME_FORMAT`, this only
-    # checks the *shape* of a name; enforcing that plugins actually prefix
-    # themselves is the plugin DSL's job, out of scope here.
+    # (a gem's, once a hook reaches this registry; later admin-defined node
+    # types) must be prefixed with its owner, e.g. `gallery/carousel` -- one
+    # `/`, a camelCase-shaped segment on each side. As with
+    # `ContentModel::Registry::NAME_FORMAT`, this only checks the *shape* of
+    # a name; the owner rules are `ContentSpiel::Plugins::Registrar`'s, for
+    # the registries a hook reaches, and this one has none yet.
     NAME_FORMAT = /\A[a-z][A-Za-z0-9]*(\/[a-z][A-Za-z0-9_]*)?\z/
 
     # One declared attribute rule on a node or mark type (`attribute` below).

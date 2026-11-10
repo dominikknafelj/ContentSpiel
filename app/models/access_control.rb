@@ -1,6 +1,7 @@
 # Namespace for access control (design spec §3): a permission registry
-# (`AccessControl::Permissions`) that built-ins and, later, plugins register
-# against, plus -- from later tasks in this sub-project -- the groups and
+# (`AccessControl::Permissions`) that built-ins register against (a gem
+# cannot yet: docs/reference/content-blocks-and-types.md, "Registries with
+# no hook"), plus -- from later tasks in this sub-project -- the groups and
 # grants that assign those permissions to users and the checker that
 # decides whether an actor may act (`AccessControl.allowed?`/`.scope`).
 # The decision itself is `AccessControl.allowed?` below, delegating to

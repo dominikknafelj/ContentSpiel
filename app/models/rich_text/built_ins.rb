@@ -1,7 +1,9 @@
 # Registers every built-in node and mark type (design spec §3.2/Global
-# Constraints) against `RichText::Schema`, the same `register_node`/
-# `register_mark` calls a plugin will use later under a prefixed
-# `owner/name`. Called from `config/initializers/types.rb`'s `to_prepare`,
+# Constraints) against `RichText::Schema`, through `register_node`/
+# `register_mark`, which an outside type would take under a prefixed
+# `owner/name` once a hook reaches this registry (none does yet:
+# docs/reference/content-blocks-and-types.md, "Registries with no hook").
+# Called from `config/initializers/types.rb`'s `to_prepare`,
 # right after `RichText::Schema.reset!` -- see that initializer for why
 # (a code reload in development must re-register cleanly, not raise
 # `RichText::DuplicateType` against whatever's still sitting in the
