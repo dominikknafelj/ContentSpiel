@@ -22,7 +22,7 @@ module Admin
     # exactly the N+1 that scope exists to prevent over a whole page of
     # cards.
     #
-    # `pick: true` is the same grid inside `Media::PickerComponent`
+    # `pick: true` is the same grid inside `Admin::Ui::MediaPickerComponent`
     # (`Admin::MediaController#index` with `picker=1`, in its own frame): each
     # tile is then a button that selects it for the picker
     # (`TileComponent`'s own comment) instead of a link to the panel -- one

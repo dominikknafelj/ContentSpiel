@@ -180,6 +180,19 @@ en:
         rail_tabs:
           label: "Settings"
 
+        # The one media picker every image field and the rich-text editor's
+        # Image button open. `none` and `selected` are also
+        # `admin--media--select`'s, from the dialog's `data-messages`.
+        media_picker:
+          title: "Choose an image"
+          upload: "Upload"
+          close: "Close"
+          file: "Image file"
+          none: "No image selected"
+          selected: "1 selected"
+          cancel: "Cancel"
+          use: "Use image"
+
         pagination:
           nav_label: "Pagination"
           range: "%{first}–%{last} of %{total}"

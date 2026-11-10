@@ -71,7 +71,10 @@ module DesignSystemEntries
   }.freeze
 
   # A component no card's "Code" section names yet, with the reason.
-  NOT_YET = {}.freeze
+  NOT_YET = {
+    "Admin::Ui::MediaPickerComponent" => "No card draws the picker's dialog (its title, Upload and Close, the library in miniature, " \
+      "and the footer's selection, Cancel and Use image): StudioMediaGrid describes its tiles and Dialog names it as a use, and neither card's Code names it."
+  }.freeze
 
   # The card of a component (a class or its name): its `COVERED_BY` card,
   # else its own name less `Component` when that is a card, else nil.

@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
 # The one media picker:
-# `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
+# `Admin::Ui::MediaPickerComponent`, a modal that is the Media grid in miniature -- instant
 # search, segments, selectable tiles, a header Upload and a footer "N selected ·
 # Cancel · Use image" -- opened from the page hero field, an image block's image
 # field and the rich-text editor's Image button, each of which receives

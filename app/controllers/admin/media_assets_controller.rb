@@ -1,5 +1,5 @@
 module Admin
-  # `Media::PickerComponent`'s header Upload (media library Task 8, round 3 Task 9 -- the one
+  # `Admin::Ui::MediaPickerComponent`'s header Upload (media library Task 8, round 3 Task 9 -- the one
   # way to upload from a hero field, an image block or the Tiptap editor's
   # Image button, which used to POST here directly) POSTs a multipart
   # `file` straight here -- there's no page or post this belongs to yet at

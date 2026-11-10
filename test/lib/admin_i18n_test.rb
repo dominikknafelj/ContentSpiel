@@ -507,8 +507,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/media/index.html.erb
     app/views/admin/media/picker.html.erb
     app/javascript/media/upload_tiles.js
-    app/components/media/picker_component.rb
-    app/components/media/picker_component.html.erb
+    app/components/admin/ui/media_picker_component.rb
+    app/components/admin/ui/media_picker_component.html.erb
     app/javascript/controllers/admin/media/select_controller.js
     app/components/admin/trash_screen/list_component.rb
     app/components/admin/trash_screen/list_component.html.erb

@@ -19,7 +19,7 @@ module Admin
     # typed in the panel. The chosen image rides along as a hidden `selected`,
     # so searching or choosing a segment keeps the panel open.
     #
-    # `picker: true` is the same toolbar inside `Media::PickerComponent`'s own
+    # `picker: true` is the same toolbar inside `Admin::Ui::MediaPickerComponent`'s own
     # frame (`media-picker-grid`): the form targets that frame (no history, the
     # dialog is not a page), carries `picker=1` so every later request is the
     # picker's again, offers every segment but Untranslated (translating is

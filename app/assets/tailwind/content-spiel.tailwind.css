@@ -505,7 +505,7 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    (`test/lib/admin_contrast_test.rb`). Inset, so the row does not move. */
 .admin-menu-panel :is(a, button):focus-visible,
 .admin-palette [role="option"][aria-selected="true"] > a { box-shadow: inset 2px 0 0 var(--cs-accent); }
-/* The media picker (Media::PickerComponent) hangs from a fixed top edge
+/* The media picker (Admin::Ui::MediaPickerComponent) hangs from a fixed top edge
    instead of being centred, because its height changes while it is open: the
    Library frame is empty until its request answers, and the two tabs' panels
    differ. Centred (`margin: auto`), every such change moved the heading and

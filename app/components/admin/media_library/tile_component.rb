@@ -27,7 +27,7 @@ module Admin
     # replaces exactly that element (`Admin::MediaController#update`), so an
     # alt text typed in the panel takes "No alt" off the tile without a reload.
     #
-    # `pick: true` is the same tile inside `Media::PickerComponent`: a button,
+    # `pick: true` is the same tile inside `Admin::Ui::MediaPickerComponent`: a button,
     # not a link, because the picker is select-then-confirm. A click selects
     # it (`admin--media--select#select`, which sets `aria-pressed`), a double
     # click selects and confirms, Enter on a selected one confirms. Its whole

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### For a gem or an outside caller
+
+- `Media::PickerComponent` is `Admin::Ui::MediaPickerComponent`, with no alias, and declares `Admin::Ui::Contract`. Its words moved from `admin.media.picker.*` to `admin.components.ui.media_picker.*`. A caller outside this repository that rendered the old constant gets a `NameError`; the layout draws the one picker, and a field opens it with `media-picker:open` as before.
+
 ## 0.1.0 (2026-11-10)
 
 ### Theme contract

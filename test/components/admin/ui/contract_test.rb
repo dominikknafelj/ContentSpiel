@@ -176,6 +176,9 @@ class Admin::Ui::ContractTest < ActiveSupport::TestCase
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: "") }
     assert_match "controller", failure.message
 
+    # One of two controllers a `controller:` key attaches is attached.
+    assert_contract(UiContractSampleComponent, source: 'data: { controller: "admin--ui--dialog admin--media--select" }')
+
     # A target and an action of the controller are not its attachment.
     serves = 'data-admin--ui--dialog-target="panel" data-action="click->admin--ui--dialog#open"'
     failure = assert_raises(Minitest::Assertion) { assert_contract(UiContractSampleComponent, source: serves) }

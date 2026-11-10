@@ -215,8 +215,8 @@
         `#content` frame and every form, so there's exactly one per page
         however many image fields and editors open it, and its own inputs
         never feed an autosave. Renders nothing without `media.upload`
-        (`Media::PickerComponent`'s own comment). %>
-    <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
+        (`Admin::Ui::MediaPickerComponent`'s own comment). %>
+    <%= render Admin::Ui::MediaPickerComponent.new(url_options: admin_url_options) %>
 
     <%# The New page and New post dialogs: once
         each, here, outside `#content` and every form. Every "+ New page" /

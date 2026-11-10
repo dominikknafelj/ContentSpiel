@@ -66,13 +66,14 @@ module UiContract
   end
 
   # Whether `source` attaches `identifier` itself: in a `data-controller`
-  # attribute's list, or as the value of a `controller:` key of a tag's
-  # `data:`. A target or an action of it (`data-<identifier>-target`,
-  # `click->identifier#act`) is not an attachment.
+  # attribute's list, or in the list of a `controller:` key of a tag's
+  # `data:` (the media picker's dialog attaches two). A target or an action
+  # of it (`data-<identifier>-target`, `click->identifier#act`) is not an
+  # attachment.
   def self.attaches?(source, identifier)
     name = /(?<![\w-])#{Regexp.escape(identifier)}(?![\w-])/
-    source.scan(/data-controller=["']([^"']*)["']/).flatten.any? { |list| list.match?(name) } ||
-      source.match?(/controller:\s*["']#{Regexp.escape(identifier)}["']/)
+    lists = source.scan(/data-controller=["']([^"']*)["']/) + source.scan(/controller:\s*["']([^"']*)["']/)
+    lists.flatten.any? { |list| list.match?(name) }
   end
 
   # What the controller check reads of a component: its templates whole, and

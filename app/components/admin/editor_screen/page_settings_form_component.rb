@@ -2,7 +2,7 @@ module Admin
   module EditorScreen
     # The page editor's "Page settings" panel (cs-studio spec §5.1): title,
     # slug, template, subtitle, hero image (a library
-    # image, chosen through `Media::PickerComponent`) + alt
+    # image, chosen through `Admin::Ui::MediaPickerComponent`) + alt
     # (a template that lists `hero` only), and meta title/description under "SEO" -- one
     # autosaving `<form>` (spec §6.1), PATCHing `Admin::PagesController#update`
     # on every field's `input`/`change` (debounced) or `focusout` (immediate).
