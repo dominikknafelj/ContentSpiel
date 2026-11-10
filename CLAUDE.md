@@ -189,6 +189,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 - What `form-send` writes into a public page it takes back, at connect and disconnect and never at `turbo:before-cache`, and a link to an anchor of the same page is the browser's, not a Turbo visit (`site.js`). No static guard: these are browser tests (`test/system/form_block_test.rb`).
 - A table is allowed in a body that says so and in no other. **No guard** for the stored mid-table header cell a structural change rewrites to a plain one (only the controls normalise), for a header switch that snaps back in a one-row or one-column table, or for the grid's look in CS Studio, which is an open design question.
 - A note's heading says its kind to a screen reader, hidden under an editor's title. **No guard** that a theme's own Note template says the kind to a screen reader under an editor's title.
+- A new top-level name of the application (a directory or file at the top of an autoload root: `app/models/gallery/`, `app/components/slides/`) refuses a gem's hook owner of that name at the next boot (`TopLevelNames.owners`), so it is a breaking change to the plugin hooks and is named under `### Breaking` in `CHANGELOG.md`. **No guard** tells a new top-level name from an old one.
 - A new public component includes `Blocks::Contract` and declares ("Adding a block type", 9a); the generator writes the include and a true skeleton. **No guard** reads the declaration's sentences against the template, or a gem's component that includes it.
 
 **`docs/reference/hosting.md`:**
