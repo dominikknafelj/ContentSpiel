@@ -76,7 +76,7 @@
 - The setup wizard shows how far along it is, marks the current and finished steps, and opens with a welcome.
 - ⌘K offers every section of Settings.
 - In the rich-text Link popover and the Page link dialog, one Escape closes them while a page search is still on its way, and its answer opens nothing afterwards; only a list of suggestions that is shown takes the first Escape.
-- People in CS Studio, outside the Users list's one-letter circle, are rose circles with their initials, and a note count is a rose bubble; unread notes for you are the accent bubble that says how many are new ("3 new"), and a deleted user is an empty circle.
+- People in CS Studio are rose circles with their initials, and a note count is a rose bubble; unread notes for you are the accent bubble that says how many are new ("3 new"), and a deleted user is an empty circle.
 - The page tree and the posts list show who else is on a page or post as avatars, one circle and "+N" while the tree column is narrow.
 - Notes for you can show All, Unread or Mentions, shows who wrote and where on each row, and lists the open threads beside the list.
 - A block someone else is editing has a rose strip and outline, a block whose thread is open takes the same outline, and "Updated by" shows who, with their avatar.
@@ -86,6 +86,18 @@
 - Trash, Translations, Forms and the audit log take CS Studio's new look: a record's kind is shown by its icon, every state in words and none in red, Translations has a tile per language, and the audit log is one list with its days as headings.
 - The dashboard's "Languages behind" panel draws a language's progress as Translations' tiles do: the bar on the `line` track, then "↻ 1 outdated" before "12 missing". Its draft tiles are CS Studio's one tile, and a Translations row's closing verb is the lists' one verb, at their size.
 - People's circles in a stack stand side by side, and a page's title in a narrow tree keeps its room.
+- Users, Groups and the AI assistant's tokens are tables in one card. A user's or a group's row opens its editor from anywhere on it, and ends in "Edit". People are shown by their circles, open invitations among them, and groups, Owner, Built-in and Invited by their words in badges. On a narrow screen the Users and Groups tables scroll sideways whole, the name with its row.
+- The user and group editors, and Your account, are drawn in the Settings card frame. A group the person holds is a tile with an outline; a group you can't grant is a sunken tile. The permission matrix is two cards, Content permissions and Other permissions, each area under its own heading, and a permission's scope is shown in badges.
+- A checkbox or a switch nobody may change keeps its colour, with its label in grey, instead of fading.
+- Every notice in CS Studio is one look: the warn ones bordered in amber, the stale banner and the plain-HTTP notice among them; a refusal is red, a success green and an explanation grey, none with a shadow.
+- Deleting a user, a group, a form or a submission, and changing who is an owner, stand after the form under a line, with no box, all in one look.
+- Sign-in, the password reset and the invitation stand on a panel. A refused password shows its red edge and its message under the field, on the reset and invitation pages too.
+- System status is one card, with no summary chip. A token's state is a chip: Active, or Revoked with when. Every value to copy (a token, the MCP address, the configuration, a check's command) is one copy box, whose Copy says Copied, or selects the text where the browser can't copy.
+- The 403 and 404 pages in CS Studio are a centred message with its code and a way back.
+- The mails' button is CS Studio's violet, with white words and an 8px radius, and a mail asks a client in dark mode not to invert it.
+- A list's page range reads "1–50 of 212", not "1–50 OF 212".
+- The "+N" circle of a stack is white inside a grey ring, so it shows on a hovered or selected tree row.
+- A group's Save with nothing changed no longer records "updated" for a group with no description: a blank description is stored as none.
 
 ### Removed
 
@@ -103,6 +115,11 @@
 - `Admin::Ui::AvatarComponent`'s `ring:` keyword and its rings: a stack's circles stand apart and need no ground ring. A caller that passes `ring:` gets an `ArgumentError`.
 - `Admin::SettingsScreen::CardComponent`: it is `Admin::Ui::SettingsCardComponent`, with no alias.
 - `Admin::DashboardScreen::TranslationPanelComponent::WIDTHS`: the progress bar's widths are `Admin::Ui::LanguageProgressComponent`'s.
+- `Admin::Ui::InsecureNoticeComponent::BASE_CLASS`: the notice is drawn by `Admin::Ui::NoticeComponent` (warn, compact).
+- `Admin::UsersScreen::ListComponent::COLUMNS` and `Admin::GroupsScreen::ListComponent::COLUMNS`: the lists are tables.
+- `Admin::GroupsScreen::PermissionRowComponent::SHORT_LABELS`' English labels: it lists the actions that have a short label, and the labels are the keys `admin.components.groups_screen.permission_row.short.<action>`.
+- `Admin::UsersScreen::GroupCardsComponent::CARD`, `OPEN_CARD` and `LOCKED_CARD`: a group is an `.admin-tile`, `data-locked` when it can't be granted.
+- The CSS hooks `admin-delete-zone` and `admin-owner-zone`: a zone is `Admin::Ui::ActionZoneComponent` (`.admin-action-zone`), found by its `data-zone`.
 
 ### For a gem or an outside caller
 
@@ -131,3 +148,15 @@
 - Added `Admin::Ui::RecordChipComponent(kind:, label: nil)`: a kind of record (`page`, `post`, `media`, `form`, `settings`) as its CS Studio module's chip, with an optional word beside it; any other kind is refused.
 - Added `Admin::Ui::LanguageProgressComponent(language:, complete:, total:, outdated:, missing:, counts_id: nil)`: one language's translation progress, the bar and its counts, as the Dashboard and Translations draw it; `LanguageProgressComponent.percent(complete:, total:)` is its percentage. `Admin::DashboardScreen::TranslationPanelComponent::WIDTHS` is gone: the bar's widths are the part's.
 - `ui/float` lifts an open menu or list of suggestions out of a table's scroll box (`.admin-table-scroll`, `.admin-table-scroll--x`, `.admin-posts-scroll`) as it does out of a docked rail panel: the boxes it lifts out of are one list, `CLIPS` in `app/javascript/ui/float.js`.
+- Added `Admin::Ui::NoticeComponent(tone:, size: :regular, role: :default, **html)`: a box of words in the tones `warn`, `ok`, `danger` and `neutral`, `size: :compact` for a narrow column, its role its tone's (`alert`, `status`, `note`) unless `role:` names one or `nil`; `NoticeComponent.classes(tone, size:)` is the box's classes for a box a script fills.
+- Added `Admin::Ui::ActionZoneComponent(heading_id:, heading:, body:, reason: nil, pending_lock: false, **html)` with the slot `trigger`: an instant action after a form, with no outer margin of its own.
+- Added `Admin::Ui::CopyValueComponent(id:, value:, copy_label:, layout: :inline, copyable: true, source_data: {}, **html)`: a value to copy, in `layout: :inline` or `:block`, with no Copy when `copyable: false`.
+- `Admin::Ui::BadgeComponent` takes a `mark`, a slot drawn before the label and hidden from a screen reader.
+- `Admin::Ui::StateChipComponent`'s `detail:` may be safe markup, kept as markup; a plain string is still escaped.
+- `Admin::Ui::SystemCheckRowComponent` requires `index:`, the row's place in its list: a caller without it gets Ruby's missing keyword. Its words (the command's Copy label, "Learn more →") are keys.
+- `admin--ui--clipboard` copies its `source` target's text when it is handed no `text` or `url` value, and reads its words from `ui.copy_value.*` (`copy`, `copied`, `failed`, `selected`), from the element's `data-messages` or `<body>`'s.
+- `admin--tokens--reveal` has no `copy` action: Copy is the copy box's `admin--ui--clipboard`.
+- The partial `setup/_system_check_results` takes `list_class:`, the list's classes; without it it is the wizard's ruled list.
+- `Admin::Ui::PasswordFieldComponent`'s words, and its script's, are keys (`admin.components.ui.password_field.*`), and with errors its root carries `.admin-password-field--invalid`.
+- `ApiTokens::Issue` puts a refusal on the token's `:name` or `:group`, and `Invitations::Accept` copies a refused user's errors onto the invitation by field: a caller reads them by attribute.
+- `AccessControl::Group` stores a blank `description` as nil.
