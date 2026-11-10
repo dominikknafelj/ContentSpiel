@@ -1,4 +1,7 @@
-<%# The product layout's wordmark: the product's name in 12px capitals, a
-    link home to sign-in. On its own so the type-scale guard's allowance for
-    its `text-xs` covers this line and nothing else of the layout. %>
-<%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %><%# i18n-ok: the product's wordmark, never translated %>
+<%# The wordmark of the layouts before CS Studio, the product's and the
+    setup wizard's: the product's name in 12px capitals. A link home to
+    sign-in, or plain text with `link: false` (the wizard, where nobody can
+    sign in yet). On its own so the type-scale guard's allowance for its
+    `text-xs` covers this line and nothing else of a layout. %>
+<% link = local_assigns.fetch(:link, true) %>
+<%= content_tag (link ? :a : :span), "CONTENT·SPIEL", href: (admin_sign_in_path if link), class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %><%# i18n-ok: the product's wordmark, never translated %>

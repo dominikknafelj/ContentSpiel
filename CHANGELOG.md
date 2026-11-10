@@ -92,12 +92,13 @@
 - Every notice in CS Studio is one look: the warn ones bordered in amber, the stale banner and the plain-HTTP notice among them; a refusal is red, a success green and an explanation grey, none with a shadow.
 - Deleting a user, a group, a form or a submission, and changing who is an owner, stand after the form under a line, with no box, all in one look.
 - Sign-in, the password reset and the invitation stand on a panel. A refused password shows its red edge and its message under the field, on the reset and invitation pages too.
-- System status is one card, with no summary chip. A token's state is a chip: Active, or Revoked with when. Every value to copy (a token, the MCP address, the configuration, a check's command) is one copy box, whose Copy says Copied, or selects the text where the browser can't copy.
+- System status is one card, with no summary chip. A token's state is a chip: Active, or Revoked with when. Every value to copy (a token, the MCP address, the configuration, a check's command) is one copy box, whose Copy says Copied, or selects the text where the browser can't copy. The setup wizard's new token has that Copy too, and is blanked when the browser puts the page away, as on the AI assistant page.
 - The 403 and 404 pages in CS Studio are a centred message with its code and a way back.
 - The mails' button is CS Studio's violet, with white words and an 8px radius, and a mail asks a client in dark mode not to invert it.
 - A list's page range reads "1–50 of 212", not "1–50 OF 212".
 - The "+N" circle of a stack is white inside a grey ring, so it shows on a hovered or selected tree row.
 - A group's Save with nothing changed no longer records "updated" for a group with no description: a blank description is stored as none.
+- Saving Your account with nothing changed writes nothing and records no "updated".
 
 ### Removed
 

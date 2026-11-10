@@ -623,8 +623,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   UPPER_TRACKED = /(?<![\w-])uppercase(?![\w-])[^"'`]*(?<![\w-])tracking-[\w\[\].-]+|(?<![\w-])tracking-[\w\[\].-]+[^"'`]*(?<![\w-])uppercase(?![\w-])/
   UPPER_TRACKED_ALLOWED = {
     "admin-wordmark" => "the brand's wordmark, drawn as the Brand page draws it",
-    "CONTENT·SPIEL" => "the product layout's wordmark",
-    %("Content·Spiel" %></span>) => "the setup layout's wordmark"
+    "CONTENT·SPIEL" => "the wordmark of the product and setup layouts"
   }.freeze
   # CS Studio's sources, the setup pages and the three layouts around them.
   # The public site is the theme's and out of scope: its pages keep their look.
@@ -876,6 +875,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/accounts/*
     app/views/admin/system_status/*
     app/views/admin/errors/*
+    app/views/setup/*
+    app/views/layouts/setup.html.erb
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/

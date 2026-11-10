@@ -165,7 +165,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     end
     assert_select "nav[aria-label='Setup steps'] .bg-live", count: 0
     assert_select "nav[aria-label='Setup steps'] p", text: "Step 3 of 9"
-    assert_select "header", text: /Content·Spiel/
+    assert_select "header", text: /CONTENT·SPIEL/
     assert_select "header", text: /First-run setup/
     assert_select "[role=radiogroup][aria-label='Theme']"
   end

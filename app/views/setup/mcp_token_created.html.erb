@@ -1,8 +1,24 @@
+<%# The one-time reveal, rendered straight from `SetupController#update_mcp_token`
+    and served `no-store`; that action's comment says why nothing else ever
+    holds the raw token. The form that posts here sets `data-turbo="false"`,
+    so this is a whole document whose head carries
+    `turbo-cache-control: no-cache`: Turbo never snapshots it. The token is
+    the copy box's text and nothing else, a `secret` target that
+    `admin--tokens--reveal` blanks at `pagehide`, as on the AI assistant
+    page; both are CS Studio's scripts, which this step alone of the wizard
+    loads. %>
 <% content_for :title, t("setup.mcp_token.heading") %>
+<% content_for :entry_point, "admin" %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
 <h1 class="text-h1 font-semibold"><%= t(".heading") %></h1>
 <p class="mt-2 text-dim"><%= t(".intro") %></p>
 
-<pre id="mcp-token" class="mt-4 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
+<div data-controller="admin--tokens--reveal" class="mt-4">
+  <%= render Admin::Ui::CopyValueComponent.new(id: "mcp-token", value: @raw_token, copy_label: t(".copy_token"), layout: :block,
+        source_data: { "admin--tokens--reveal-target": "secret" }) %>
+</div>
 
 <div class="mt-6 flex items-center justify-end gap-3">
   <%= link_to t(".continue"), setup_step_path("starter_content"), class: setup_primary_button_class %>

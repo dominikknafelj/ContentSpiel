@@ -100,6 +100,7 @@ en:
     mcp_token_created:
       heading: "Your token"
       intro: "This is the only time the full token is shown. Copy it into your agent's config now. It carries the Admin group and acts as you; if you lose it, or want a narrower one, create a new one from CS Studio's \"AI assistant\" page and revoke this one there."
+      copy_token: "Copy token"
       continue: "Continue"
     starter_content:
       heading: "Starter content"

@@ -3,7 +3,8 @@
     `list_class` is the list's frame, the caller's: the wizard's ruled list
     under its step's heading by default, and System status's rows divided
     inside its card.
-    `copyable` is false in the wizard, which loads no admin JavaScript, so a
+    `copyable` is false in the wizard, whose steps load no admin JavaScript
+    (the token step alone does, for its copy box), so a
     Copy button there would do nothing (`Admin::Ui::SystemCheckRowComponent`).
     The rows' sentences are `Setup::SystemCheck`'s and stay English. %>
 <% copyable = local_assigns.fetch(:copyable, false) %>

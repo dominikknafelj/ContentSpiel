@@ -124,6 +124,34 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     assert_not_includes session.to_hash.to_s, raw
   end
 
+  # The wizard's reveal is the AI assistant page's: the shared copy box, a
+  # `secret` target of `admin--tokens--reveal`, on a page that loads CS
+  # Studio's scripts for it and that Turbo never snapshots. Failures name no
+  # token: each check says what failed in words of its own.
+  test "the revealed token is the copy box's text, blanked at pagehide by the reveal, and in no attribute" do
+    patch setup_step_path("mcp_token"), params: { token_name: "claude-desktop" }
+
+    assert_response :success
+    assert_select "[data-controller~='admin--tokens--reveal'] [data-controller~='admin--ui--clipboard'] " \
+                  "pre#mcp-token[data-admin--tokens--reveal-target=secret][data-admin--ui--clipboard-target=source]"
+    assert_select "[data-controller~='admin--ui--clipboard'] button[aria-label='Copy token']", text: "Copy"
+    assert_select "head meta[name=turbo-cache-control][content=no-cache]"
+    assert_select "head script[type=module]", text: /import "admin"/
+
+    raw = css_select("#mcp-token").first.text
+    assert ApiToken.authenticate(raw), "the box's text is not exactly the token"
+    attributes = css_select("*").flat_map { |node| node.attributes.values.map(&:value) }
+    assert attributes.none? { |value| value.include?(raw) }, "the token stands in an attribute"
+    assert_equal 1, response.body.scan(raw).size, "the token stands more than once in the page"
+  end
+
+  test "the other steps of the wizard load no CS Studio script" do
+    get setup_step_path("mcp_token")
+
+    assert_select "head script[type=module]", text: /import "application"/
+    assert_select "head script[type=module]", text: /import "admin"/, count: 0
+  end
+
   test "the review step shows the token's name, or Skipped, and never the token" do
     get setup_step_path("review")
     assert_select "dt", text: "MCP token"
