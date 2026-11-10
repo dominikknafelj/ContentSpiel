@@ -95,6 +95,11 @@ en:
               other: "Kept in Trash for %{count} days."
             never: "Kept in Trash until someone empties it."
           trash:
+            # The zone's name (its `aria-label`: the panel's zone has no
+            # heading). The same words as the dialog's `confirm` in English,
+            # a key of its own so another language can name a region and an
+            # action differently.
+            zone: "Move to trash"
             button: "Move to trash…"
             see_where: "See where it's used"
             title: "Move this image to the trash?"

@@ -6,6 +6,10 @@
 
 - Every `ContentSpiel::Plugins` hook (`block_types`, `form_field_types`, `form_destinations`, `studio_modules`) refuses an owner named like one of the CMS's own top-level constants, so `media/album`, `notes/rating`, `publishing/crm` or `audit/reports` now stops the boot with an `ArgumentError` naming the constant and the place of the hook's call (on a development reload it is the theme's refusal, or for a module hook a log line, as any refused hook is). A gem's code lives in a module named after its owner, which would reopen the CMS's. The names are everything at the top of the application's autoload roots as the autoloader names it (`app/models`, `app/services`, `app/queries`, `app/values`, `app/constraints`, `app/components`, `app/controllers`, `app/helpers`, `app/jobs`, `app/mailers`, `app/channels`, `app/mcp`, `app/sanitizers` and `lib`, so `blocks`, `admin`, `fields`, `public` and `mcp` are refused too); a folder the autoloader ignores (`lib/tasks`) is none, and the owner is compared as the application's inflector camelizes it and plainly. A gem whose owner is refused renames it, and with it its keys, tokens and stored type names, which name the owner. The list grows with the CMS: a later release that adds a top-level name can refuse an installed gem's owner, and names that name under Breaking.
 
+### Changed
+
+- Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
+
 ## 0.1.0 (2026-11-10)
 
 ### Theme contract

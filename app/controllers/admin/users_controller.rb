@@ -20,12 +20,6 @@ module Admin
     include StaleForm
     include UsersList
 
-    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
-    # changed it and when where the audit log says, and the message is the whole
-    # banner where it doesn't.
-    STALE_LEAD = "This user was changed".freeze
-    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
-
     # The whole module is `users.manage`; `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
     before_action :set_user, only: %i[edit update destroy owner]
@@ -102,7 +96,7 @@ module Admin
         redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: owner_notice(@user, was_owner)
       else
         forbidden_or(result) do
-          redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
+          redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: a service's refusals, joined with the locale's support.array words
         end
       end
     end
@@ -121,7 +115,7 @@ module Admin
       result = Users::Destroy.call(@user)
 
       if !result.ok?
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        redirect_to admin_users_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: a service's refusals, joined with the locale's support.array words
       elsif deleting_self
         terminate_session
         redirect_to admin_sign_in_path, status: :see_other, notice: t("admin.users.deleted_own")
