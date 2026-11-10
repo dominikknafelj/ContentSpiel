@@ -29,6 +29,11 @@ development:
   port: 5433
   username: contentspiel
   password: contentspiel
+  # libpq on macOS negotiates GSSAPI encryption first, through Kerberos,
+  # which is not safe after a fork: a parallel test run's worker can crash in
+  # the pg gem and hang the run. The compose Postgres offers no GSSAPI, so the
+  # negotiation is off for development and test (test/lib/database_gssencmode_test.rb).
+  gssencmode: disable
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
@@ -71,6 +76,8 @@ test:
   port: 5433
   username: contentspiel
   password: contentspiel
+  # As development's, above.
+  gssencmode: disable
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is

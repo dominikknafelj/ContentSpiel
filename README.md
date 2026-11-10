@@ -23,20 +23,23 @@ CS Studio.
 
 ```sh
 docker compose up -d          # Postgres 17, published on host port 5433
-bin/setup --skip-server       # installs gems, prepares the development + test databases
+bin/setup --skip-server       # installs gems, waits for Postgres, prepares the databases, builds the stylesheets
 bin/rails db:seed             # dev accounts (an owner and an Author-group member), demo content and /showcase (development only -- see db/seeds.rb)
 bin/rails server              # or `bin/dev`, which bin/setup runs for you without --skip-server
 ```
 
-Start the container first: `bin/setup` runs `bin/rails db:prepare`, which fails
-with connection refused if Postgres isn't up.
+Start the container first: `bin/setup` waits up to 30 seconds for Postgres and
+stops with what to run when it does not answer. A database `bin/setup` creates
+is seeded too; `bin/rails db:seed` adds what an existing one lacks, and is safe
+to run again. After `bin/dev`, <http://localhost:3000/showcase> draws every
+block type in every layout and band.
 
 - App: <http://localhost:3000>
 - Sign in: <http://localhost:3000/cs-studio/sign-in> (`<ADMIN_PATH>/sign-in`)
 - Admin (CS Studio, behind the same sign-in): <http://localhost:3000/cs-studio> (`ContentSpiel::ADMIN_PATH`, configurable via `ADMIN_PATH`)
 
-Run the test suite with `bin/rails test`, and the browser tests with
-`bin/rails test:system`.
+Run the test suite with `bin/rails test`, the browser tests with
+`bin/rails test:system`, and everything CI runs with `bin/ci`.
 
 ## Learning the code
 

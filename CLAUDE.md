@@ -10,7 +10,7 @@ ContentSpiel is a Rails 8.1 CMS: a page-tree-driven public website plus CS Studi
 
 ```sh
 docker compose up -d          # Postgres 17, published on host port 5433 -- start this first
-bin/setup --skip-server       # installs gems, prepares dev + test databases
+bin/setup --skip-server       # installs gems, waits for Postgres, prepares the databases (seeding a new one), builds the stylesheets
 bin/rails db:seed             # the built-in groups (every environment), and in development an admin account, demo content and /showcase, every block type in every layout and band (see db/seeds.rb)
 bin/rails server               # or `bin/dev`, which runs server + `tailwindcss:watch` (see Procfile.dev)
 ```
@@ -19,7 +19,7 @@ bin/rails server               # or `bin/dev`, which runs server + `tailwindcss:
 - Sign in: http://localhost:3000/cs-studio/sign-in (`<ADMIN_PATH>/sign-in`)
 - Admin (CS Studio, behind the same sign-in): http://localhost:3000/cs-studio (`ContentSpiel::ADMIN_PATH`, configurable via `ADMIN_PATH`)
 
-**Tests:** `bin/rails test` (full suite, minitest). Single file: `bin/rails test test/models/page_test.rb`. Single test: `bin/rails test test/models/page_test.rb -n test_method_name` or `bin/rails test test/models/page_test.rb:42`. System tests: `bin/rails tailwindcss:build`, then `PARALLEL_WORKERS=6 bin/rails test:system` (the whole browser suite, whatever file is named after it: one file is `bin/rails test test/system/admin/tree_test.rb`), on a quiet machine (check `sysctl -n vm.loadavg`: a load near the core count is not quiet). On macOS prefix every test command with `PGGSSENCMODE=disable`: a parallel run can otherwise hang forever. A new worktree runs `bin/rails db:test:prepare` once. Never run a build while tests run, and a running `bin/dev`'s `theme_css:watch` counts as one. `VERBOSE=1` prints what tests print, `COVERAGE=1` writes `coverage/index.html`. CI runs the browser suite for every pull request and a merge to `main` is not tested again.
+**Tests:** `bin/rails test` (full suite, minitest). Single file: `bin/rails test test/models/page_test.rb`. Single test: `bin/rails test test/models/page_test.rb -n test_method_name` or `bin/rails test test/models/page_test.rb:42`. System tests: `bin/rails tailwindcss:build`, then `PARALLEL_WORKERS=6 bin/rails test:system` (the whole browser suite, whatever file is named after it: one file is `bin/rails test test/system/admin/tree_test.rb`), on a quiet machine (check `sysctl -n vm.loadavg`: a load near the core count is not quiet). No prefix is needed on macOS: `config/database.yml` turns libpq's GSSAPI negotiation off for development and test (`gssencmode: disable`), without which a parallel run could hang forever (`test/lib/database_gssencmode_test.rb`). A new worktree runs `bin/rails db:test:prepare` once. `bin/ci` (`config/ci.rb`) runs what CI runs, one step after another, the browser suite included. Never run a build while tests run, and a running `bin/dev`'s `theme_css:watch` counts as one. `VERBOSE=1` prints what tests print, `COVERAGE=1` writes `coverage/index.html`. CI runs the browser suite for every pull request and a merge to `main` is not tested again.
 
 Before writing a test, or to read what CI runs, read `docs/reference/writing-tests.md`, and `test/system/README.md` before a browser test.
 
