@@ -6,7 +6,7 @@ import { Controller } from "@hotwired/stimulus"
 // localStorage and on <html data-theme-choice>; `data-theme` is what it
 // resolves to and is what the token CSS keys every colour off.
 // shared/_theme_head does the same resolution before first paint, and
-// `connect` only marks the checked button, so the first paint never fades.
+// `connect` only marks the checked button (and makes it the Tab stop), so the first paint never fades.
 //
 // A change after it (a press, a toggle, the OS changing while the choice is
 // Auto) goes through `apply`, which cross-fades the page with a view
@@ -18,6 +18,13 @@ import { Controller } from "@hotwired/stimulus"
 // it runs, not the one `apply` was called with: a transition's callback runs
 // late, and still runs when a newer press skips its transition, so the last
 // choice is what every callback writes.
+//
+// The switch is an ARIA radio group: one Tab stop, the checked choice
+// (`sync` keeps a roving `tabindex`, 0 on it and -1 on the others), and
+// Left/Up and Right/Down choose the previous or next choice, wrapping at the
+// ends. An arrow moves the focus before it chooses, so the newly checked
+// choice already holds the focus when the fade starts, as a press does. Space
+// and Enter on the focused choice are the button's own click (`choose`).
 //
 // The fade's length and easing are `--cs-theme-fade-*` in content-spiel.css,
 // read under CS Studio's surface only. The public toggle calls the same
@@ -39,7 +46,29 @@ export default class extends Controller {
   }
 
   choose({ params }) {
-    const choice = ["light", "dark", "auto"].includes(params.choice) ? params.choice : "auto"
+    this.pick(params.choice)
+  }
+
+  previous(event) {
+    this.step(event, -1)
+  }
+
+  next(event) {
+    this.step(event, 1)
+  }
+
+  // The arrows' default would scroll the page (Up, Down) under the switch.
+  step(event, offset) {
+    event.preventDefault()
+    const choices = this.choiceTargets
+    const index = choices.indexOf(event.currentTarget)
+    const target = choices[(index + offset + choices.length) % choices.length]
+    target.focus()
+    this.pick(target.dataset.themeChoiceParam)
+  }
+
+  pick(value) {
+    const choice = ["light", "dark", "auto"].includes(value) ? value : "auto"
     try { localStorage.setItem("cs-theme", choice) } catch (e) {}
     this.apply(choice)
   }
@@ -75,8 +104,11 @@ export default class extends Controller {
   }
 
   sync() {
-    this.choiceTargets.forEach((button) =>
-      button.setAttribute("aria-checked", String(button.dataset.themeChoiceParam === this.choice)))
+    this.choiceTargets.forEach((button) => {
+      const checked = button.dataset.themeChoiceParam === this.choice
+      button.setAttribute("aria-checked", String(checked))
+      button.tabIndex = checked ? 0 : -1
+    })
   }
 
   get choice() {

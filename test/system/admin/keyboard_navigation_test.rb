@@ -98,27 +98,49 @@ class Admin::KeyboardNavigationSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "the theme switch's choices are one Tab stop each, and Enter or Space on one chooses it and marks it checked" do
+  # The stored choice is Dark, the middle one, so a Tab stop on the first or
+  # the last choice of the group is told apart from the checked one.
+  test "the theme switch is one Tab stop, the checked choice, and the arrows choose the previous or next, move the focus with it and wrap" do
+    visit_screen admin_root_path
+    page.execute_script("localStorage.setItem('cs-theme', 'dark')")
     visit_screen admin_root_path
 
-    switch = "[role=radiogroup][aria-label='Theme']"
-    # A press on Light chooses it and puts the focus there, where Tab starts.
-    find("#{switch} [role=radio]", text: "Light").click
-    assert_selector "#{switch} [role=radio][aria-checked=true]", text: "Light"
+    radio = "[role=radiogroup][aria-label='Theme'] [role=radio]"
+    checked = "#{radio}[aria-checked=true]"
+    assert_equal 1, page.evaluate_script("[ ...document.querySelectorAll(#{radio.to_json}) ].filter((choice) => choice.tabIndex === 0).length")
+
+    # The sidebar stands before the content, so Shift+Tab from the heading
+    # comes to the switch from after it, and lands on the checked choice.
+    find("h1").click
+    stop_on(radio, keys: [ :shift, :tab ])
+    assert_equal "Dark", focused_text
+    page.send_keys([ :shift, :tab ])
+    assert_not focus_in?(radio), "Shift+Tab stayed in the group"
     page.send_keys(:tab)
     assert_equal "Dark", focused_text
-    page.send_keys(:enter)
-    assert_selector "#{switch} [role=radio][aria-checked=true]", text: "Dark"
-    assert_equal "dark", page.evaluate_script("document.documentElement.dataset.themeChoice")
+
+    { right: "Auto", down: "Light", left: "Auto", up: "Dark" }.each do |key, choice|
+      page.send_keys(key)
+      assert_selector checked, text: choice
+      assert_equal choice, focused_text, "#{key} did not move the focus to #{choice}"
+      assert_equal choice.downcase, page.evaluate_script("document.documentElement.dataset.themeChoice")
+    end
+    assert_selector "html[data-theme='dark']"
+    assert_equal "dark", page.evaluate_script("localStorage.getItem('cs-theme')")
+
+    page.send_keys(:left)
+    assert_selector "html[data-theme='light'][data-theme-choice='light']"
+    assert_equal "Light", focused_text
+    page.send_keys(:space)
+    assert_selector checked, text: "Light"
 
     page.send_keys(:tab)
-    assert_equal "Auto", focused_text
-    page.send_keys(:space)
-    assert_selector "#{switch} [role=radio][aria-checked=true]", text: "Auto"
-    assert_equal "auto", page.evaluate_script("document.documentElement.dataset.themeChoice")
+    assert_not focus_in?(radio), "Tab stayed in the group"
   end
 
   private
+
+  def focus_in?(selector) = page.evaluate_script("document.activeElement.matches(#{selector.to_json})")
 
   # The posts list's page size, for a list short enough to make: the server
   # runs in this process, so the controller reads the constant set here.

@@ -13,6 +13,7 @@
 - Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
 - A post list reads its posts' addresses in one statement, and the shown page's or post's addresses in every language (the head's `hreflang` alternates, the language switcher) are one statement, not one per language (#122).
 - A post list reads no post body, from the rows or the copies, until its template asks for one, and then the whole list's in at most two statements (one when every listed post has a copy): the default blog and resume lists read none (#122). What a list template may call is unchanged: `rich_text(post)` draws the published body as before.
+- CS Studio's theme switch (Light, Dark, Auto) is one Tab stop, the chosen theme, and the arrow keys choose the previous or next theme, wrapping at the ends, as a radio group's do (#224). Its words are translation keys (`admin.components.ui.theme_switch`).
 
 ### Migrations
 
