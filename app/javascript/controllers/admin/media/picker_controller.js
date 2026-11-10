@@ -41,6 +41,7 @@ export default class extends Controller {
     this.opener = null
     this.pending = null
     this.escapeCleared = false
+    this.gridPending = false
     this.uploads = new UploadTiles({
       url: this.uploadUrlValue,
       grid: () => this.frameTarget.querySelector("ul.admin-media-grid"),
@@ -74,7 +75,22 @@ export default class extends Controller {
 
   // A fresh load on every open: setting `src` to the URL it already has
   // wouldn't refetch, so a repeated open reloads the frame instead.
+  //
+  // The last open's grid is taken out first. Left standing while the new one
+  // loads, it is an old library a person can press in, and a press the new
+  // grid is drawn in the middle of (down on an old tile, up on its new twin)
+  // is no click at all: nothing is selected and Use image stays off.
+  //
+  // A load still under way -- the picker was closed and opened again before
+  // its grid was drawn -- is that fresh grid already, and is let finish. A
+  // second load would draw over it: the search box the first grid was drawn
+  // with, and the focus `gridLoaded` gave it, would be taken out from under
+  // the person, and the focus left on the page's body.
   loadGrid() {
+    if (this.gridPending) return
+
+    this.gridPending = true
+    this.frameTarget.replaceChildren()
     const url = new URL(this.gridUrlValue, window.location.href).toString()
     if (this.frameTarget.src === url) {
       this.frameTarget.reload()
@@ -89,6 +105,7 @@ export default class extends Controller {
   gridLoaded(event) {
     if (event.target !== this.frameTarget) return
 
+    this.gridPending = false
     this.uploads.reattach()
     if (!this.focusSearchOnLoad) return
 
@@ -97,6 +114,12 @@ export default class extends Controller {
     if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media--picker#browse")) {
       this.search?.focus()
     }
+  }
+
+  // The load ended with no grid (the network failed, or the answer held no
+  // such frame): the next open asks again.
+  gridFailed(event) {
+    if (event.target === this.frameTarget) this.gridPending = false
   }
 
   get search() {
@@ -127,7 +150,14 @@ export default class extends Controller {
   // The dialog's own `close` event -- after a pick, Cancel, ×, or Escape (the
   // native `cancel` closes it too). Hands focus back to the opener, then
   // tells it what was picked, if anything.
+  //
+  // The event comes a task after the close itself, so a picker opened again
+  // at once (Escape, then Space on the same button) is already open when the
+  // last close's event arrives: that one is not this open's to answer, and
+  // acting on it would forget the new opener before its own close.
   closed() {
+    if (this.element.open) return
+
     // Aborting only stops the browser waiting for an upload still in
     // flight -- if the request already reached the server, the asset is
     // created anyway (`Media::Upload` has no way to know the picker went

@@ -289,6 +289,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/toast_component.html.erb
     app/components/admin/ui/toast_region_component.rb
     app/components/admin/ui/toast_region_component.html.erb
+    app/components/admin/ui/theme_switch_component.rb
+    app/components/admin/ui/theme_switch_component.html.erb
+    app/javascript/controllers/theme_controller.js
     app/components/admin/ui/save_bar_component.rb
     app/components/admin/ui/save_bar_component.html.erb
     app/components/admin/ui/save_status_component.rb

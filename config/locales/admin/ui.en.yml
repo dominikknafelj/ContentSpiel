@@ -289,3 +289,12 @@ en:
           # Said under the count while the tree is narrowed, where its rows move.
           no_moving: "Clear the search to move pages"
           clear: "Clear"
+
+        # The three-way theme control in CS Studio's sidebar, the setup
+        # wizard and the sign-in pages: the group's name and its choices.
+        # Auto follows the operating system's light or dark setting.
+        theme_switch:
+          label: "Theme"
+          light: "Light"
+          dark: "Dark"
+          auto: "Auto"

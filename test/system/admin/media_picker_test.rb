@@ -409,14 +409,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   test "the picker's top edge stays where it is when the grid arrives and when a search narrows it" do
     other = create_media_asset(filename: "tiny.png")
     visit_editor(@landing)
-    page.execute_script(<<~JS)
-      const original = window.fetch
-      window.__gridHeld = new Promise((release) => { window.__releaseGrid = release })
-      window.fetch = (url, options) => {
-        if (!String(url?.url || url).includes("picker=1")) return original(url, options)
-        return window.__gridHeld.then(() => original(url, options))
-      }
-    JS
+    hold_picker_grid
     top = -> { page.evaluate_script("document.getElementById('media-picker').getBoundingClientRect().top") }
 
     within("#page-hero-image-section") { click_on "Choose image" }
@@ -436,7 +429,86 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_in_delta before_grid, top.call, 0.5, "the dialog moved when a search narrowed the grid"
   end
 
+  # Opened again, the picker loads a fresh grid, and the last open's stood in
+  # the frame until it came: a press that began on an old tile and ended on
+  # its fresh twin was no click (CI: Use image never came on). The grid's
+  # answer is held so the frame is seen between the open and the grid.
+  test "opened again, the picker shows none of the last open's grid before its own arrives" do
+    visit_editor(@landing)
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") { assert_button @asset.title }
+    page.send_keys(:escape)
+    refute_selector "dialog[open]"
+    hold_picker_grid
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+    assert_no_selector "#media-picker-grid *", visible: :all
+
+    page.execute_script("window.__releaseGrid()")
+    pick_from_library(@asset)
+    assert_selector "#page-hero-image-section [data-admin--media--field-target=title]", text: @asset.title
+  end
+
+  # Closed and opened again before its grid was drawn, the picker let that
+  # load finish: a second one drew over it, took the search box the first
+  # grid had focused out from under the person and left the focus on the
+  # page's body (CI: the next key pressed went to a detached node).
+  test "closed and opened again before its grid arrives, the picker asks for the grid once and the search box keeps the focus" do
+    visit_editor(@landing)
+    hold_picker_grid
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+    page.send_keys(:escape)
+    refute_selector "dialog[open]"
+    assert_selector "#page-hero-image-section button:focus", text: "Choose image"
+    page.send_keys(:space)
+    assert_selector "dialog#media-picker[open]"
+
+    page.execute_script("window.__releaseGrid()")
+    within("dialog[open]") { assert_button @asset.title }
+    assert_selector "#media-picker-q:focus"
+    assert_equal 1, page.evaluate_script("window.__gridRequests")
+  end
+
+  # A dialog's `close` event comes a task after the close, so a picker opened
+  # again at once is already open when it arrives; answering it then forgot
+  # the new opener, and the image picked next went nowhere. A person is never
+  # that quick; a script closing and opening in one task is the event's order
+  # every time.
+  test "a close whose event arrives after the next open leaves that open's pick standing" do
+    block = @landing.content_blocks.create!(block_type: :image, position: 0)
+    card = "[data-block-id='#{block.id}']"
+    visit_editor(@landing)
+    within(card) { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+
+    page.execute_script(<<~JS)
+      const opener = document.querySelector("#{card} button[data-action*='admin--media--field#choose']")
+      document.getElementById("media-picker").close()
+      window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener } }))
+    JS
+    pick_from_library(@asset)
+    assert_selector "#{card} [data-admin--media--field-target=title]", text: @asset.title
+  end
+
   private
+
+  # Holds every grid request of the picker until `window.__releaseGrid()`,
+  # counting them in `window.__gridRequests`.
+  def hold_picker_grid
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.__gridRequests = 0
+      window.__gridHeld = new Promise((release) => { window.__releaseGrid = release })
+      window.fetch = (url, options) => {
+        if (!String(url?.url || url).includes("picker=1")) return original(url, options)
+        window.__gridRequests += 1
+        return window.__gridHeld.then(() => original(url, options))
+      }
+    JS
+  end
 
   # A modal opened from far down a page must stand in the viewport, not at
   # the bottom of the page cut off, with the page behind shifted and a band
