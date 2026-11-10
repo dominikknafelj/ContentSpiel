@@ -13,5 +13,10 @@ production:
   connects_to:
     database:
       writing: cable
-  polling_interval: 0.1.seconds
+  # A broadcast reaches a subscriber within one interval. Notes, presence and
+  # editing signals are read by a person, so a quarter second is not seen;
+  # the listener's poll is a statement on the cable database every interval
+  # of every process, idle or not, so a shorter one is load on a small host
+  # for nobody.
+  polling_interval: 0.25.seconds
   message_retention: 1.day

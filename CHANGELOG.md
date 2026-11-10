@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Solid Cable's listener polls its database every 0.25 seconds instead of every 0.1 (`config/cable.yml`), so an idle production process asks four times a second, not ten. A note, presence or editing signal reaches another tab up to a quarter second later.
+
 ## 0.1.0 (2026-11-10)
 
 ### Theme contract
