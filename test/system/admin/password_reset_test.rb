@@ -324,4 +324,42 @@ class Admin::PasswordResetSystemTest < ApplicationSystemTestCase
     assert_selector "#{FORM}[hidden]", visible: :all
     assert_selector "[role=alert]", text: INCOMPLETE
   end
+  # The product layout on a phone: the panel keeps its gutter, the
+  # full-width Sign in stays inside it, "Forgot your password?" stays inside
+  # the panel (its row wraps, so a label and aside too wide for one line put
+  # the aside under the label), and a long site name breaks onto more lines.
+  # Nothing scrolls the page sideways.
+  test "at 360px the sign-in panel keeps its gutter, the button fits and a long site name wraps" do
+    site_settings(:default).update!(title: "Landesarbeitsgemeinschaft der Denkmalpflegevereine Salzburgs")
+    at_window(360, height: 800) do
+      visit admin_sign_in_path
+      assert_selector "h1", text: "Sign in"
+
+      panel = rect(".rounded-rail")
+      viewport = page.evaluate_script("document.documentElement.clientWidth")
+      assert_operator panel["left"], :>=, 16, "the panel keeps a gutter on the left"
+      assert_operator viewport - panel["right"], :>=, 16, "the panel keeps a gutter on the right"
+      assert_operator page.evaluate_script("document.documentElement.scrollWidth"), :<=, viewport, "nothing scrolls the page sideways"
+
+      button = rect("button[type=submit]")
+      assert_operator button["left"], :>=, panel["left"]
+      assert_operator button["right"], :<=, panel["right"]
+
+      label = rect("label[for=password]")
+      forgot = rect("a", text: "Forgot your password?")
+      assert_operator forgot["right"], :<=, panel["right"], "the aside stays inside the panel"
+      assert(forgot["left"] >= label["right"] || forgot["top"] >= label["bottom"] - 1, "the aside stands beside the label or under it, never over it")
+      assert_equal "wrap", find("label[for=password]").find(:xpath, "..").evaluate_script("getComputedStyle(this).flexWrap"),
+        "a row too narrow for both puts the aside under the label"
+
+      name = rect(".admin-site-name")
+      assert_operator name["right"], :<=, panel["right"]
+      assert_operator name["height"], :>, 2 * page.evaluate_script("parseFloat(getComputedStyle(document.querySelector('.admin-site-name')).lineHeight)") - 1,
+        "the long site name wraps onto more lines"
+    end
+  end
+
+  def rect(selector, **options)
+    find(selector, **options).evaluate_script("(({ left, right, top, bottom, height }) => ({ left, right, top, bottom, height }))(this.getBoundingClientRect())")
+  end
 end

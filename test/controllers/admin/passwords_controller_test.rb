@@ -74,20 +74,22 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "[role=alert]", text: "This reset link has expired. Ask for a new one."
   end
 
-  # Handoff "Studio Password Reset": the form on the page itself (no card), the
-  # site name above the heading, and a back link that underlines on hover only.
-  test "every state sits directly on the page, with the site name above the heading and an ununderlined back link" do
+  # Every state stands on the product layout's panel, the site name above
+  # the heading, and its way back to sign-in is a tertiary small link.
+  test "every state stands on the panel, with the site name above the heading and a tertiary way back" do
+    back = Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
     [ new_admin_password_path, new_admin_password_path(sent: "1"), new_admin_password_path(expired: "1"),
       admin_edit_password_path ].each do |path|
       get path
-      assert_select "main div.bg-surface.border", count: 0, message: "no card on #{path}"
-      assert_select ".admin-site-name + h1"
+      assert_select "main > div.max-w-\\[420px\\] > div.rounded-rail.bg-surface.shadow-2", count: 1, message: "one panel on #{path}"
+      assert_select ".admin-site-name.text-small.text-dim + h1.text-h1.font-semibold"
       assert_select ".admin-site-name", text: site_settings(:default).title
-      assert_select "main a.underline", count: 0, message: "no always-underlined link on #{path}"
+      assert_equal back, css_select("a[href='#{admin_sign_in_path}']").reject { |link| link.text == "CONTENT·SPIEL" }.sole["class"], "the way back on #{path}"
+      assert_select "main .rounded-cs.bg-danger-tint", count: 0
     end
-    get new_admin_password_path
-    assert_select "a.hover\\:underline", text: "← Back to sign in"
-    assert_select "h1.text-\\[28px\\].font-semibold"
+    get new_admin_password_path(expired: "1")
+    assert_select "div[role=alert].rounded-card.bg-danger-tint.text-small", text: "This reset link has expired. Ask for a new one."
+    assert_select "a.w-full.justify-center.bg-accent[href='#{new_admin_password_path}']", text: "Send a new link"
   end
 
   # With no address configured the mail's link can only point where the
@@ -215,7 +217,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
         assert_select "button[type=submit]", text: "Set password"
       end
       assert_select "div[hidden][data-reset-token-target=incomplete]", count: 1 do
-        assert_select "p[role=alert]", text: "This link is incomplete. Open the link in the email again, or ask for a new one."
+        assert_select "[role=alert]", text: "This link is incomplete. Open the link in the email again, or ask for a new one."
         assert_select "a[href='#{ADMIN}/password/new']", text: "Send a new link"
       end
       assert_select "noscript", text: /Setting a new password needs JavaScript\. Turn it on in your browser and open the link again\./
@@ -359,6 +361,18 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[type=hidden][name=token]" do |fields|
       assert_equal token, fields.first["value"]
     end
+  end
+
+  # Two refusals are two lines of the one alert, each the service's own
+  # sentence: nothing glues them into one.
+  test "a password refused twice over is one alert with a line per message" do
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "short", password_confirmation: "other" }
+
+    assert_response :unprocessable_entity
+    assert_select "#alert[role=alert] > p", count: 2
+    assert_select "#alert > p", text: "Use at least 12 characters."
+    assert_select "#alert > p", text: "Password confirmation doesn't match Password"
+    assert_select "#alert", text: /\band\b/, count: 0
   end
 
   # The token the form came back with is still the one that was mailed: the

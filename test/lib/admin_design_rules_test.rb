@@ -813,6 +813,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/views/admin/groups/*
     app/components/admin/tokens_screen/*
     app/views/admin/api_tokens/*
+    app/views/layouts/product.html.erb
+    app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/sessions/*
+    app/views/admin/passwords/*
+    app/views/invitations/*
   ].freeze
   OFF_SCALE = /(?<![\w-])text-\[\d+px\]|(?<![\w-])text-xs(?![\w-])|(?<![\w-])border-dashed(?![\w-])|(?<![\w-])!border-danger(?![\w-])/
   QUOTED = /"((?:[^"\n]|"[ \t]*\\\n[ \t]*")*)"|'([^'\n]*)'/
@@ -822,7 +827,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A file of those screens that may keep one of the refused looks, mapped to
   # the reason.
   HAND_BOX_ALLOWED = {
-    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet"
+    "app/views/admin/media/index.html.erb" => "the drop overlay's dashed accent frame: creating is violet",
+    "app/views/layouts/product.html.erb" => "the wordmark's 12px capitals, the product's mark as every layout's header draws it"
   }.freeze
 
   def self.type_scale_sources = TYPE_SCALE_SCREENS.flat_map { |glob| Dir[Rails.root.join(glob)] }.uniq
@@ -888,9 +894,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # it and the main column, the 1680px a docked composition grows to) are
   # tokens of the same kind, beside it.
   RAIL_WIDTH_LITERAL = /(?<![\w-])(?:w|max-w|min-w|basis|gap|gap-x)-\[(?:1680|360|28)px\]|(?:max-|min-)?width:\s*(?:1680|360)px|(?:column-)?gap:\s*28px/
-  RAIL_WIDTH_ALLOWED = {
-    "app/views/layouts/product.html.erb" => "the sign-in pages' centred column, a whole-screen form's width that is not the rail's"
-  }.freeze
+  RAIL_WIDTH_ALLOWED = {}.freeze
 
   test "the form column's width is a token: 760px and 1144px are written once, in content-spiel.css" do
     tokens = Rails.root.join("app/assets/tailwind/content-spiel.css").read
@@ -1906,10 +1910,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/ui/chip_input_controller.js
     app/javascript/controllers/password_field_controller.js
     app/views/admin/accounts/edit.html.erb
-    app/views/admin/passwords/edit.html.erb
-    app/views/admin/passwords/new.html.erb
-    app/views/admin/sessions/new.html.erb
-    app/views/invitations/show.html.erb
     app/views/setup/_steps.html.erb
   ].freeze
 
@@ -1952,10 +1952,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # with the rest of its screen's look; the list only shrinks.
   NOTICE_NOT_YET = %w[
     app/views/admin/accounts/edit.html.erb
-    app/views/admin/passwords/edit.html.erb
-    app/views/admin/passwords/new.html.erb
-    app/views/admin/sessions/new.html.erb
-    app/views/invitations/show.html.erb
   ].freeze
   NOTICE_TINT = /\A(?:[\w-]+:)*bg-(?:warn|ok|danger)-tint\z/
   NOTICE_RADII = %w[rounded-cs rounded-card].freeze

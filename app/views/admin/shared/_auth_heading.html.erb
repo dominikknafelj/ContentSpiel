@@ -1,7 +1,7 @@
-<%# locals: title -- the heading block of the sign-in and reset screens
-    (handoff "Studio Sign In" / "Studio Password Reset"): the site's name in
-    the default language above a 28px / 600 heading. %>
+<%# locals: title -- the heading block of the sign-in, reset and invitation
+    pages: the site's name in the default language above the page's heading.
+    Both break inside a word, so a long German name wraps in the panel. %>
 <div class="flex flex-col gap-1.5">
-  <p class="admin-site-name text-sm text-dim"><%= site_name %></p>
-  <h1 class="text-[28px] font-semibold"><%= title %></h1>
+  <p class="admin-site-name break-words text-small text-dim"><%= site_name %></p>
+  <h1 class="break-words text-h1 font-semibold text-ink"><%= title %></h1>
 </div>

@@ -206,6 +206,21 @@ en:
             one: "%{count} thing needs fixing"
             other: "%{count} things need fixing"
 
+        password_field:
+          # The toggle's words are its state: what pressing it does.
+          show: "Show"
+          hide: "Hide"
+          # The line under the meter before anything is typed; `%{count}` is
+          # `User::MINIMUM_PASSWORD_LENGTH`, the server's own rule.
+          minimum: "Use at least %{count} characters."
+          # What `password-field` writes under the bars as a password is
+          # typed (`data-messages` on the field), one sentence per level.
+          strength:
+            too_short: "Too short. Use %{count} or more characters."
+            fair: "Fair. A few unrelated words work well."
+            good: "Good."
+            strong: "Strong."
+
         chip_input:
           # The two sentences that name what the chips are, by the caller's
           # `noun:`, each whole so a translator can inflect the noun in it. A new

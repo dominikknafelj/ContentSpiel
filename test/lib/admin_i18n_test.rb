@@ -536,6 +536,18 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/audit_screen/changes_component.html.erb
     app/views/admin/audit_events/index.html.erb
     app/views/admin/audit_events/show.html.erb
+    app/views/layouts/product.html.erb
+    app/views/admin/shared/_auth_heading.html.erb
+    app/views/admin/sessions/new.html.erb
+    app/views/admin/passwords/new.html.erb
+    app/views/admin/passwords/edit.html.erb
+    app/views/invitations/show.html.erb
+    app/controllers/admin/sessions_controller.rb
+    app/controllers/admin/passwords_controller.rb
+    app/controllers/invitations_controller.rb
+    app/components/admin/ui/password_field_component.rb
+    app/components/admin/ui/password_field_component.html.erb
+    app/javascript/controllers/password_field_controller.js
   ].freeze
 
   PLACEHOLDER = "".freeze

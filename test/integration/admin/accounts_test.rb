@@ -34,7 +34,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     # In the Password card, where the form is, not above the cards.
     assert_select "#password .admin-error-summary[role=alert] li", text: "That's not your current password."
     assert_select ".admin-error-summary", count: 1
-    assert_select "#current_password-errors", text: "That's not your current password."
+    assert_select "#current_password-errors p > span:not([aria-hidden])", text: "That's not your current password."
     assert_select "#current_password[aria-invalid=true][aria-describedby~='current_password-errors']"
     assert users(:reader).reload.authenticate("password")
   end

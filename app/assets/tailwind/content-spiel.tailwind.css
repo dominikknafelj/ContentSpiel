@@ -749,6 +749,13 @@ details[open] > .admin-disclosure::before { transform: rotate(90deg); }
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-field-line); }
 .admin-prefix-input:focus-within { background-color: var(--cs-surface); }
+/* A refused password (`Admin::Ui::PasswordFieldComponent`): the field is
+   drawn whole with its errors and no autosave replaces its slot, so its
+   root carries the class at render time. Its well is `setup_input_class`
+   wherever it stands, inside a wrapper or not, so the bottom edge takes the
+   property itself; the focus ring is an outline and leaves it red. */
+.admin-password-field--invalid { --cs-field-invalid-border: var(--cs-danger); }
+.admin-password-field--invalid input { border-bottom-color: var(--cs-field-invalid-border); }
 /* The Media panel's Alt field while the default-language alt is empty: the
    warn colour, drawn only while the input is empty (it carries a placeholder)
    so it clears as soon as the editor types, and never over an error, whose

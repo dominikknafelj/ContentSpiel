@@ -1,7 +1,7 @@
 <%# The reset flow's "form" state: new password with the strength meter and a
     confirmation.
 
-    THE TOKEN (safe-address spec §4). The mailed link is this page's address
+    THE TOKEN. The mailed link is this page's address
     with the token after a "#", which no server is sent, so the page is drawn
     without one: the form hidden and its `token` field empty. The script
     (`reset-token`, controllers/reset_token_controller.js) moves the token
@@ -17,7 +17,8 @@
 
     `@token` is set only on the 422 of a refused password, where the form
     comes back with the token it was sent with, so it is drawn open and
-    nothing is asked again.
+    nothing is asked again. Its alert is one line per message the service
+    gave, never a sentence glued from them.
 
     Without JavaScript neither the form nor the message is shown, and the
     <noscript> line says why. A script that is on but never runs (a module
@@ -31,29 +32,27 @@
 <div class="flex flex-col gap-[18px]" data-controller="reset-token"
      data-reset-token-check-url-value="<%= admin_check_password_path %>"
      data-reset-token-expired-url-value="<%= new_admin_password_path(expired: 1) %>">
-  <%= render "admin/shared/auth_heading", title: "Update your password" %>
+  <%= render "admin/shared/auth_heading", title: t(".title") %>
 
-  <% if flash[:alert] %>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
-  <% end %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= safe_join(Array(flash[:alert]).map { |message| tag.p(message) }) %><% end %>
 
   <noscript>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink"><%= t(".noscript") %></p>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, role: nil) do %><%= t(".noscript") %><% end %>
   </noscript>
 
   <%= form_with url: admin_update_password_path, method: :patch, class: "flex flex-col gap-[18px]",
         data: { reset_token_target: "form" }, html: { hidden: @token.blank? } do |form| %>
     <%= hidden_field_tag :token, @token, id: "reset-token", autocomplete: "off", data: { reset_token_target: "token" } %>
-    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
-    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
-    <%= render Admin::Ui::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".new_password"), meter: true, autofocus: true) %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: t(".repeat")) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full", data: { password_submit: true }) %>
   <% end %>
 
   <%# The same shape as the request page's "expired" state: what is wrong,
       the way to a new link, the way back. %>
   <div class="flex flex-col gap-[18px]" data-reset-token-target="incomplete" hidden>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert"><%= t(".incomplete") %></p>
-    <%= link_to t(".request_new"), new_admin_password_path, class: "#{setup_primary_button_class} w-full text-center" %>
-    <p><%= link_to t(".back"), admin_sign_in_path, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %></p>
+    <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact) do %><%= t(".incomplete") %><% end %>
+    <%= link_to t(".request_new"), new_admin_password_path, class: "#{setup_primary_button_class} w-full justify-center" %>
+    <p><%= link_to t(".back"), admin_sign_in_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %></p>
   </div>
 </div>

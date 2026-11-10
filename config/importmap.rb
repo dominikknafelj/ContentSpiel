@@ -88,8 +88,10 @@ pin_all_from "app/javascript/ui", under: "ui", preload: "admin"
 pin_all_from "app/javascript/tree", under: "tree", preload: "admin"
 
 # The strings a script shows, read from the server's `data-messages`
-# (`Admin::MessagesHelper`; docs/reference/i18n.md). Only CS Studio's
-# controllers import it today.
+# (`Admin::MessagesHelper`; docs/reference/i18n.md). CS Studio's
+# controllers import it, and so does `password_field` of the `application`
+# entry, which fetches it when it loads: preloaded for CS Studio only, so a
+# public page preloads none of it (`test/integration/public_javascript_test.rb`).
 pin_all_from "app/javascript/i18n", under: "i18n", preload: "admin"
 
 # The upload queue the Media screen's drop zone and the media picker share:

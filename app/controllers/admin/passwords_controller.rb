@@ -1,5 +1,5 @@
 module Admin
-  # CS Studio's password reset (cs-studio spec §3) -- see the comment on
+  # CS Studio's password reset -- see the comment on
   # Admin::SessionsController for why this isn't an Admin::BaseController.
   class PasswordsController < ApplicationController
     layout "product"
@@ -15,7 +15,7 @@ module Admin
     # `update` keep working whatever the state, so a person holding a valid
     # link finishes even if an owner has just changed the settings.
     before_action :require_mail_ready, only: %i[ new create ]
-    rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_admin_password_path, alert: "Try again later." }
+    rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_admin_password_path, alert: t("admin.passwords.limited") }
     # The early check has the request form's limit, counted on its own
     # (`name:`), so that asking for links and opening them do not use each
     # other up. Past it the answer is a bare 429, which the page's script
@@ -48,7 +48,7 @@ module Admin
       redirect_to new_admin_password_path(sent: 1)
     end
 
-    # THE TOKEN IS IN NO ADDRESS (safe-address spec §4). The mailed link is
+    # THE TOKEN IS IN NO ADDRESS. The mailed link is
     # `password/edit#<token>`; a browser sends what follows the "#" to no
     # server, so this action is never told it: no lookup, the same page for
     # everyone. The page's script (`reset-token`) moves the token from the
@@ -90,16 +90,17 @@ module Admin
         actor: @user, keep_acting_session: false)
 
       if result.ok?
-        redirect_to admin_sign_in_path, notice: "Password has been reset."
+        redirect_to admin_sign_in_path, notice: t("admin.passwords.reset")
       else
         # Rendered, not redirected: the form needs the token again, and a
         # redirect could carry it only in an address or in the session. It
         # is in the hidden field of this one response, to the person who
         # just sent it (and it is the token `set_user_by_token` verified, so
         # a String). `no_store` (Rails' own, the `before_action` above)
-        # keeps the response out of every cache.
+        # keeps the response out of every cache. The service's messages are
+        # whole sentences, each drawn on a line of its own.
         @token = params[:token]
-        flash.now[:alert] = result.errors.to_sentence
+        flash.now[:alert] = result.errors
         render :edit, status: :unprocessable_entity
       end
     end

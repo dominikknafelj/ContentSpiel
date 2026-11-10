@@ -1,42 +1,38 @@
-<%# The sign-in form (handoff "Studio Sign In"): directly on the page, no card,
-    in the layout's 360px column; the site name above the heading. The labels
-    are real <label>s: the old placeholders were the fields' only accessible
-    names. Field names (email_address, password) are what the controller and
-    every test post. %>
+<%# The sign-in form, on the product layout's panel: the site name above the
+    heading, an alert or a notice from the last answer, the two fields and
+    the full-width Sign in, the panel's one primary. The labels are real
+    <label>s. Field names (email_address, password) are what the controller
+    and every test post. %>
 <% mail_ready = MailSettings.current.ready? %>
 <div class="flex flex-col gap-[18px]">
-  <%= render "admin/shared/auth_heading", title: "Sign in" %>
+  <%= render "admin/shared/auth_heading", title: t(".title") %>
 
-  <% if flash[:alert] %>
-    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
-  <% end %>
-
-  <% if flash[:notice] %>
-    <p class="rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink" role="status" id="notice"><%= flash[:notice] %></p>
-  <% end %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= flash[:alert] %><% end %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, id: "notice") do %><%= flash[:notice] %><% end %>
 
   <%= form_with url: admin_sign_in_path, class: "flex flex-col gap-[18px]" do |form| %>
-    <div>
-      <%= form.label :email_address, "Email", class: setup_label_class %>
+    <div class="admin-field">
+      <%= form.label :email_address, t(".email"), class: setup_label_class %>
       <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
     </div>
 
     <%# "Forgot your password?" rides the Password label row, right-aligned
-        (the field's `label_aside` slot). %>
-    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") do |field| %>
+        (the field's `label_aside` slot), and wraps under the label where
+        the panel is too narrow for both. %>
+    <%= render Admin::Ui::PasswordFieldComponent.new(name: "password", id: "password", label: t(".password"), autocomplete: "current-password") do |field| %>
       <% if mail_ready %>
         <% field.with_label_aside do %>
-          <%= link_to "Forgot your password?", new_admin_password_path, class: "text-xs text-accent hover:text-accent-hover" %>
+          <%= link_to t(".forgot"), new_admin_password_path, class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
         <% end %>
       <% end %>
     <% end %>
 
-    <%# Where the link would stand when mail does not work (design answer M7):
-        no console command, this page is shown to anyone. %>
+    <%# Where the link would stand when mail does not work: no console
+        command, this page is shown to anyone. %>
     <% unless mail_ready %>
-      <p class="text-xs leading-normal text-meta"><%= t(".forgot_without_mail") %></p>
+      <p class="text-small text-meta"><%= t(".forgot_without_mail") %></p>
     <% end %>
 
-    <%= render Admin::Ui::ButtonComponent.new(label: "Sign in", type: "submit", class: "w-full") %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full") %>
   <% end %>
 </div>

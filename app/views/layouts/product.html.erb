@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-surface="studio" lang="en">
   <head>
-    <title><%= content_for(:title) || "Sign in" %></title>
+    <title><%= content_for(:title) || t("admin.layout.product.title") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -10,26 +10,31 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <%# Product UI layout for sign-in and password reset (handoff "Studio Sign
-      In"): product stylesheet, no public header/footer. The header is the
+  <%# Product UI layout for sign-in, the password reset and an invitation:
+      product stylesheet, no public header/footer. The header is the
       wordmark (a link home to sign-in) and the theme switch, with no rule
-      under it; the form sits directly on the page (no card) in a
-      centred 360px column, 64px below the header (handoff "Studio Sign In":
-      `padding: 64px 22px`, not vertically centred).
+      under it. Below it, in a centred 420px column, the page stands on one
+      panel, the setup wizard's: a surface at elevation 2, `rounded-rail`,
+      24px of padding on a phone and 32px from 480px. The words are read by
+      full key (`admin.layout.product.*`): a lazy lookup from a layout lands
+      in `layouts.product.*`.
       color-scheme stays scoped to this body. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %>
+      <%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %><%# i18n-ok: the product's wordmark, never translated %>
       <%= render Admin::Ui::ThemeSwitchComponent.new %>
     </header>
     <main class="px-[22px] pb-16 pt-16">
       <%# A password is typed on every page of this layout (sign-in, the
-          reset request and the new password), so the notice that the
-          connection is plain HTTP is here once, for everyone: nobody is
-          signed in yet. Production only (the component's own rule). %>
-      <div class="mx-auto w-full max-w-[360px]">
+          reset request, the new password and an invitation), so the notice
+          that the connection is plain HTTP is here once, for everyone,
+          above the panel: nobody is signed in yet. Production only (the
+          component's own rule). %>
+      <div class="mx-auto w-full max-w-[420px]">
         <%= render Admin::Ui::InsecureNoticeComponent.new(request: request, class: "mb-[18px]") %>
-        <%= yield %>
+        <div class="rounded-rail bg-surface p-6 shadow-2 min-[480px]:p-8">
+          <%= yield %>
+        </div>
       </div>
     </main>
   </body>
