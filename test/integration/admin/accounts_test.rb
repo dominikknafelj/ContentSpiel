@@ -355,7 +355,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       assert_select ".admin-settings-card__head h2#account-password", text: "Password"
       assert_select ".admin-settings-card__head p.text-small", text: "You'll stay signed in here. Other sessions are signed out."
     end
-    # The password form's own words are keys, read as they always were.
+    # The password form's words are keys of `admin.accounts.password`.
     assert_select "label[for=current_password]", text: "Current password"
     assert_select "label[for=new_password]", text: "New password"
     assert_select "label[for=password_confirmation]", text: "Confirm new password"

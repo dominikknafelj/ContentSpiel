@@ -67,14 +67,13 @@ module Admin
       def contained? = @contained
 
       # The words' size: the floating bar's line is 14px on a 20px line
-      # (`text-sm`; CS Studio's `text-small` is 13px); a card's footer keeps
-      # its 13px.
-      def line_class = contained? ? "text-[13px]" : "text-sm"
+      # (`text-sm`); a card's footer is the type scale's 13px, `text-small`.
+      def line_class = contained? ? "text-small" : "text-sm"
 
       # Sticky at `--cs-sp-3` above the window's edge, so the bar floats clear
       # of it over the fields and stands under them at the form's end.
       def bar_class
-        return "admin-save-bar admin-save-bar--contained flex flex-wrap items-center gap-3 border-t border-line px-[18px] py-3.5" if contained?
+        return "admin-save-bar admin-save-bar--contained flex flex-wrap items-center gap-3 border-t border-line px-4 py-3.5" if contained?
 
         "admin-save-bar admin-save-bar--floating sticky bottom-(--cs-sp-3) z-(--cs-z-sticky) mt-6 flex flex-wrap items-center gap-3 rounded-card bg-popover px-4 py-3 shadow-3"
       end

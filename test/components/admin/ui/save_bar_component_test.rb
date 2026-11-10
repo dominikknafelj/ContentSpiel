@@ -55,8 +55,9 @@ class Admin::Ui::SaveBarComponentTest < ViewComponent::TestCase
     assert_selector ".admin-save-bar.admin-save-bar--contained.border-t.border-line[data-admin--saving--save-bar-target=bar]"
     assert_no_selector ".admin-save-bar.sticky, .admin-save-bar.bg-popover, .admin-save-bar.shadow-3, .admin-save-bar--floating"
     assert_no_selector "[data-admin--saving--save-bar-target=dot]", visible: :all
-    assert_selector ".admin-save-bar[class~='px-[18px]'] button[type=submit][form=f][data-admin--saving--save-bar-target=save]", text: "Change password"
+    assert_selector ".admin-save-bar[class~='px-4'] button[type=submit][form=f][data-admin--saving--save-bar-target=save]", text: "Change password"
     assert_selector ".admin-save-bar a[data-save-bar-cancel]", text: "Discard"
-    assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=count][aria-live=polite]", visible: :all
+    assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=count][aria-live=polite].text-small", visible: :all
+    assert_selector ".admin-save-bar [data-admin--saving--save-bar-target=blocked].text-small", visible: :all
   end
 end
