@@ -6,6 +6,10 @@
 
 - A new site starts with one language, English, where it started with English, German and Spanish. The setup wizard's Languages step offers every other language unchosen. A site that exists keeps the languages it has.
 
+### Environment
+
+- Nothing a site reads changed. `docs/reference/hosting.md`, "Every variable the code reads", now lists every variable with who sets it, its default and whether it is a secret, the three Active Record encryption keys, `CONTENT_SPIEL_DATABASE_PASSWORD` and `RAILS_LOG_LEVEL` among them. `config/deploy.yml`'s commented `DB_HOST`, which nothing read, is `PGHOST`, and its commented log level is `info`.
+
 ### Migrations
 
 - `20261110090000_default_site_locales_to_english`: the default of `site_settings.locales` becomes English alone; no row is changed.
