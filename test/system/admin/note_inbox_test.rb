@@ -70,7 +70,7 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     within("turbo-frame#notes-for-you") { press "Dana mentioned you" }
 
     assert_current_path(/\/media\?selected=#{asset.id}&thread=#{thread.id}\z/)
-    assert_selector "#media-panel #media-notes #note-thread-#{thread.id}", text: "Too dark"
+    assert_selector "#media-rail #media-notes #note-thread-#{thread.id}", text: "Too dark"
     assert_eventually(message: "opening the thread never marked its delivery read") { Notes::Delivery.unread.where(user: @me).none? }
   end
 

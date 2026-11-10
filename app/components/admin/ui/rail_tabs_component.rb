@@ -1,6 +1,6 @@
 module Admin
   module Ui
-    # The tabs of an editor's rail (`.admin-rail__tabs`, drawn only where the
+    # The tabs of a rail, an editor's or the Media screen's (`.admin-rail__tabs`, drawn only where the
     # rail docks): ARIA's tabs pattern on `<button>`s, which are not a
     # `ButtonComponent` variant. Each tab controls its panel
     # (`Admin::Ui::RailPanelComponent`) by id, and only the current one is in
@@ -11,12 +11,14 @@ module Admin
     # A rail of one tab has nothing to choose: it is an `h2` with the tab's
     # label and the tab's id, which the panel's `aria-labelledby` names.
     #
-    # `slot_tabs` are the tabs features registered at `editor.rail.tabs`
+    # `slot_tabs` are the tabs features registered at the rail's panel slot
     # (`Admin::Ui::RailSlotComponent`): they join the tablist after `tabs`, and
     # a rail of one tab of its own becomes a tablist with the first of them.
     #
     # `count` is a figure beside the label (`text-count`), hidden at zero so
-    # a redraw of the tab can show it again; nil draws none. `count_data` are
+    # a redraw of the tab can show it again; nil draws none. It is the tab's
+    # bubble (`data-tab-count`, drawn by the stylesheet on the people tint,
+    # and on the accent while it carries `data-unread`). `count_data` are
     # the figure's own `data-` attributes, the entry's (`tab_count_data`), so
     # the feature's script can keep the figure current.
     #

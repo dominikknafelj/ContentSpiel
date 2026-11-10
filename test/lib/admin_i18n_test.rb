@@ -441,6 +441,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/setup/mail.html.erb
     app/controllers/setup_controller.rb
     app/components/admin/media_library/grid_component.rb
+    app/components/admin/media_library/panel_component.rb
+    app/components/admin/media_library/panel_component.html.erb
     app/components/admin/media_library/grid_component.html.erb
     app/components/admin/media_library/tile_component.rb
     app/components/admin/media_library/tile_component.html.erb

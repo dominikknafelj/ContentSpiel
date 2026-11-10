@@ -808,7 +808,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "head meta[name='turbo-prefetch'][content='false']"
   end
 
-  test "the panel follows the grid in the DOM with no order swap, and the controller that moves focus wraps both" do
+  test "the rail follows the grid in the DOM with no order swap, and the controller that moves focus wraps both" do
     sign_in_as(users(:one))
     asset = upload_asset
 
@@ -817,6 +817,58 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--media--panel'] > div + div #media-panel[tabindex='-1']"
     assert_no_match(/\border-[12]\b/, css_select("[data-controller='admin--media--panel']").first.to_s)
     assert_select "#media-asset-#{asset.id} a[data-action='click->admin--media--panel#choose']"
+  end
+
+  # The rail is the editors' rail parts: Image, then what `media.rail.tabs`
+  # holds (the notes' tab), each panel drawn once, Close last.
+  test "the chosen image's rail: the tabs Image and Notes, a panel each, and Close last with the tile to return to" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+
+    get "/cs-studio/media", params: { selected: asset.id, q: "tiny", filter: "unused" }
+
+    assert_select "#media-library.admin-media-library > .admin-media-library__head + .admin-media-library__grid[data-controller='admin--media--panel']"
+    assert_select ".admin-media-library__grid > .admin-media-library__main + #media-rail.admin-media-rail[data-controller='admin--ui--rail']" \
+                  "[data-action~='keydown.esc->admin--media--panel#escape']"
+    rail = css_select("#media-rail").sole
+    assert_equal %w[div div div a], rail.element_children.map(&:name)
+    assert_equal %w[media-rail-tab-image media-rail-tab-notes], css_select("#media-rail [role=tablist] [role=tab]").map { |tab| tab["id"] }
+    assert_select "#media-rail-tab-image[aria-selected=true]", text: "Image"
+    assert_select "#media-rail-tab-notes[aria-selected=false] span[data-tab-count][data-admin--notes--drawer-target=total][data-notes-total-words]", visible: :all
+    assert_select "#media-rail-panel-image[role=tabpanel][data-current] > #media-panel"
+    assert_select "#media-rail-panel-notes[role=tabpanel]:not([data-current]) > #media-notes turbo-frame#notes", count: 1
+    assert_select "turbo-frame#notes", count: 1
+    close = rail.element_children.last
+    assert_equal "/cs-studio/media?filter=unused&q=tiny", close["href"]
+    assert_equal "Close panel", close["aria-label"]
+    assert_includes close["class"], Admin::Ui::ButtonComponent.classes(:tertiary, size: :small)
+    assert_includes close["data-action"].split, "click->admin--media--panel#close"
+    assert_equal asset.id.to_s, close["data-admin--media--panel-tile-id-param"]
+    assert_equal "close", close["data-admin--media--panel-target"]
+    assert_select "#media-rail > a.admin-media-rail__close [data-tooltip]", text: "Close panel"
+    assert_select "#media-rail > a.admin-media-rail__close svg"
+  end
+
+  test "an address that asks for the notes draws the Notes tab current" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+
+    [ { notes: "open" }, { thread: "3" } ].each do |query|
+      get "/cs-studio/media", params: { selected: asset.id, **query }
+      assert_select "#media-rail-tab-notes[aria-selected=true]"
+      assert_select "#media-rail-panel-notes[data-current]"
+      assert_select "#media-rail-panel-image:not([data-current])"
+    end
+  end
+
+  test "with nothing chosen there is no rail, and the grid's column takes the width" do
+    sign_in_as(users(:one))
+    upload_asset
+
+    get "/cs-studio/media"
+
+    assert_select "#media-rail", count: 0
+    assert_select ".admin-media-library__grid > .admin-media-library__main:only-child"
   end
 
   test "several files upload successfully, one request per file" do

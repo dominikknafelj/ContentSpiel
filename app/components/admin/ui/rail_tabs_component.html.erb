@@ -1,5 +1,5 @@
 <% count = ->(tab) do %>
-  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero?, data: tab.count_data %><% end %>
+  <% unless tab.count.nil? %><%= tag.span tab.count, class: "text-count", hidden: tab.count.zero?, data: { tab_count: "", **tab.count_data.to_h } %><% end %>
 <% end %>
 <% if single? %>
   <% tab = tabs.first %>

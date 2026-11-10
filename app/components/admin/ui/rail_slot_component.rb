@@ -1,11 +1,15 @@
 module Admin
   module Ui
-    # The panels registered at `editor.rail.tabs` (`Admin::Slots`): each entry
+    # The panels registered at a rail's panel slot (`Admin::Slots`): each entry
     # that renders is one tab (`#tabs`, which the rail's tablist draws after its
     # own through `RailTabsComponent`'s `slot_tabs:`) and one panel (`#call`,
-    # drawn in the rail's grid after the host's own panels). The shape an entry
+    # drawn in the rail after the host's own panels). The shape an entry
     # answers is in `Admin::Slots`' header. With nothing registered there is no
     # tab and no markup.
+    #
+    # `slot` is the host's: the editors draw `editor.rail.tabs`, the Media
+    # screen's rail `media.rail.tabs`. A rail draws one slot, so what is
+    # registered for one host never stands in another.
     #
     # The entries are built once, so a tab and its panel come from one object.
     class RailSlotComponent < AdminComponent
@@ -16,7 +20,7 @@ module Admin
         motion: :none,
         content_edges: %i[none many],
         widths: :from_container,
-        interface: %i[rail_id record viewer reserved],
+        interface: %i[slot rail_id record viewer reserved],
         limits: [
           "With nothing registered it draws no tab and no markup.",
           "A tab key that is another tab's, or not lowercase letters, is refused."
@@ -29,7 +33,8 @@ module Admin
 
       KEY = /\A[a-z]+\z/
 
-      def initialize(rail_id:, record:, viewer:, reserved: [], **context)
+      def initialize(slot:, rail_id:, record:, viewer:, reserved: [], **context)
+        @slot = slot
         @reserved = reserved
         @rail_id = rail_id
         @record = record
@@ -70,7 +75,7 @@ module Admin
 
       def panels
         taken = @reserved.map(&:to_s)
-        @panels ||= Admin::Slots.entries("editor.rail.tabs").filter_map do |entry|
+        @panels ||= Admin::Slots.entries(@slot).filter_map do |entry|
           panel = entry.component.new(record: @record, viewer: @viewer, data: nil, **@context, **entry.options)
           next unless panel.render?
           raise ArgumentError, "#{entry.component} answers tab_key #{panel.tab_key.inspect}; a tab key is lowercase letters" unless KEY.match?(panel.tab_key.to_s)

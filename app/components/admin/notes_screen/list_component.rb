@@ -1,8 +1,9 @@
 module Admin
   module NotesScreen
-    # The list view of the notes frame (notes spec §4.2), top to bottom:
+    # The list view of the notes frame, top to bottom:
     # Pinned, Open by group, Resolved (collapsed, loaded when opened), or the
-    # shared empty state with "New note"; above them, when it was asked for
+    # shared empty state with "New note" (an image's: one line, over the field
+    # for a new note); above them, when it was asked for
     # (`?compose=<key>`, what "New note" and a block's "Add note" open) or
     # when a new note just failed, the field for a new note (`#notes-new`), on
     # the record or on the block the key names. The same list in the editors' drawer
@@ -41,6 +42,17 @@ module Admin
 
       def empty? = listing.open_count.zero? && listing.resolved_count.zero?
 
+      # An image's notes with no thread say so in one line, with the field for
+      # a new note under it for whoever may start one; a page's or a post's
+      # say it with the shared empty state and its "New note".
+      def empty_line? = empty? && type == "media"
+
+      def empty_line = t("admin.components.notes_screen.rail_panel.empty_image")
+
+      # Starting a thread asks the record's read right (`Notes::Start`), so
+      # whoever may read the notes may start one.
+      def may_start? = ::Notes.readable?(viewer, container)
+
       def frame_params(**extra) = { view: (view unless view == "editor"), **helpers.admin_url_options, **extra }.compact
 
       def more_path = helpers.admin_record_notes_path(*helpers.note_args(container), **frame_params(limit: listing.next_limit))
@@ -57,7 +69,7 @@ module Admin
 
       def composing? = compose.present? || failed_new.present?
 
-      # The passage the new note quotes (decision D4): from the failed form, or
+      # The passage the new note quotes: from the failed form, or
       # from the URL the opener built. A copy, cut to the column's length.
       #
       # In the URL its name is `note_quote`, never `quote`: a GET's query

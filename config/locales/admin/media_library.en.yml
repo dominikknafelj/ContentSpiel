@@ -1,8 +1,7 @@
 # The Media library's components (`app/components/admin/media_library/`):
 # `admin.components.media_library.*` are their keys (docs/reference/i18n.md:
-# one file per component folder). The panel's older words are still
-# literals; only "Download original" is a key so far. A tile's notes words
-# are in `notes.en.yml`, which holds what notes put on other screens.
+# one file per component folder). A tile's notes words are in
+# `notes.en.yml`, which holds what notes put on other screens.
 en:
   admin:
     components:
@@ -41,6 +40,63 @@ en:
           dismiss: "Dismiss"
           status_done: "Uploaded %{name}"
           status_failed: "%{name} was not uploaded: %{reason}"
+        # One image's panel, the Media rail's Image tab
+        # (`Admin::MediaLibrary::PanelComponent`).
         panel:
+          dimensions: "%{width} × %{height}px"
+          facts:
+            file: "File"
+            type: "Type"
+            uploaded: "Uploaded"
+            # `%{name}` is the uploader's name as `UserNameComponent` draws it.
+            uploaded_by_html: "by %{name} · %{date}"
           download_original: "Download original"
           download_hint: "Only editors can download the original."
+          alt_placeholder: "Add alt text"
+          # What a viewer who may not edit the image sees in place of the form.
+          view_only:
+            title: "Title"
+            alt: "Alt text"
+            caption: "Caption"
+            sentence: "Only the uploader or a media manager can edit this image."
+          used_on:
+            heading: "Used on"
+            unresolved: "Used somewhere that can’t be shown — the record of where may be out of date."
+            none: "Not used anywhere yet."
+            trash_only: "Only by items in the trash."
+            trash_only_named: "Only by items in the trash: %{names}."
+            quoted: "“%{title}”"
+            # Between the names of a list: the trashed owners, the roles, the languages.
+            names_separator: ", "
+            # A place's row: its role (`roles`), its title, and the languages
+            # it uses the image in (`locales`, or nothing).
+            readable:
+              page: "%{role} — page “%{title}”%{locales}"
+              post: "%{role} — post “%{title}”%{locales}"
+            unreadable:
+              page: "%{role} — a page you can't open%{locales}"
+              post: "%{role} — a post you can't open%{locales}"
+            locales: " (%{locales})"
+          # How a page or a post uses the image (`Media::Usage`'s roles).
+          roles:
+            hero: "Hero image"
+            block_image: "Image block"
+            rich_text: "Rich text"
+            published: "Published version"
+          # Why Move to trash is disabled, by the kept places that use the image.
+          in_use:
+            unknown: "In use somewhere that can’t be shown. Remove it there first."
+            page: "In use on 1 page. Remove it there first."
+            post: "In use on 1 post. Remove it there first."
+            many: "In use in %{count} places. Remove it there first."
+          retention:
+            days:
+              one: "Kept in Trash for %{count} day."
+              other: "Kept in Trash for %{count} days."
+            never: "Kept in Trash until someone empties it."
+          trash:
+            button: "Move to trash…"
+            see_where: "See where it's used"
+            title: "Move this image to the trash?"
+            body: "You can restore it from the trash."
+            confirm: "Move to trash"

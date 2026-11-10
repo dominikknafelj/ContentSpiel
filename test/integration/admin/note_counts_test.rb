@@ -56,7 +56,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 
     assert_select "#media-asset-#{@asset.id} span[data-notes-chip][aria-label='1 open note']", text: "1"
     assert_select "#media-asset-#{@asset.id} span.admin-notes-marker.admin-notes-marker--on-image[data-has-notes] svg[class~='size-3']"
-    assert_select "#media-panel #media-notes turbo-frame#notes[loading=lazy][src='/cs-studio/notes/media/#{@asset.id}/threads/7?view=media']"
+    assert_select "#media-rail #media-notes turbo-frame#notes[loading=lazy][src='/cs-studio/notes/media/#{@asset.id}/threads/7?view=media']"
     get "/cs-studio/media", params: { selected: @asset.id }
     assert_select "#media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@asset.id}?view=media']"
     # The panel's header, "NOTES · 1 OPEN": the number follows the counts
@@ -86,6 +86,22 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "[data-notes-chip]", count: 0
   end
 
+  test "an image's notes with no thread say so over the composer, which starts one; a page's keep the empty state" do
+    quiet = create_media_asset
+
+    get "/cs-studio/notes/media/#{quiet.id}", params: { view: "media" }, headers: { "Turbo-Frame" => "notes" }
+
+    assert_response :success
+    assert_select "#notes-list > #notes-new > p#notes-new-title[data-notes-empty]", text: "No notes on this image yet."
+    assert_select "#notes-new form[action^='/cs-studio/notes/media/#{quiet.id}/threads'] textarea[name=body]"
+    assert_select "[data-empty-state-title]", count: 0
+    assert_select "a[data-note-new-link]", count: 0
+
+    get "/cs-studio/notes/page/#{@page.id}", headers: { "Turbo-Frame" => "notes" }
+    assert_response :success
+    assert_select "[data-notes-empty]", count: 0
+  end
+
   test "a thread that is not a number does not travel to the panel's frame" do
     get "/cs-studio/media", params: { selected: @asset.id, thread: "7/../../x" }
 
@@ -108,7 +124,7 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "#media-panel form[data-controller~='admin--saving--autosave']", count: 0
-    assert_select "#media-panel #media-notes turbo-frame#notes"
+    assert_select "#media-rail #media-notes turbo-frame#notes"
   end
 
   test "a note started in the media panel records where it was written" do

@@ -868,7 +868,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/\.admin-form-column\s*\{\s*max-width:\s*var\(--cs-form-max\);\s*\}/, css)
     assert_match(/\.admin-form-column--pair\s*\{\s*max-width:\s*var\(--cs-form-max-pair\);\s*\}/, css)
     assert_match(/@container admin-pair \(min-width: 824px\)\s*\{\s*\.admin-translation-pair\s*\{\s*grid-template-columns:\s*repeat\(2, minmax\(0, 560px\)\);/m, css)
-    assert_no_match(/\b(?:760|1144)px/, css)
+    # The media library's middle range starts at 760px of the library: a
+    # container's width, not the form column's, and a container query cannot
+    # read the token.
+    assert_no_match(/\b(?:760|1144)px/, css.sub("@container admin-media (min-width: 760px)", ""))
     assert_empty design_offences(/\[(?:760|1144)px\]|max-width:\s*(?:760|1144)px/)
 
     assert_no_match(/\b(?:1680|360|28)px|\b(?:72|100)ch\b/, css)
@@ -1171,6 +1174,43 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_no_match(/\b(?:lg|xl|2xl):(?:grid|col|row)/, view, "the view leaves the grid to the stylesheet")
   end
 
+  # The Media screen's rail: laid out by the library's own width, never a
+  # window media query. Below 760px one column, the rail a card under the
+  # grid; from 760px the card beside it at 340px, sticky; docked at the one
+  # threshold on the rail's ground, with the tabs shown and one panel.
+  test "the Media screen's panel is laid out by the library's own width, never a window media query" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
+    assert_match(/\.admin-media-library\s*\{\s*container:\s*admin-media\s*\/\s*inline-size;\s*\}/, css)
+    assert_match(/\.admin-media-library__grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/, css, "one column in a narrow library")
+    card = css[/\.admin-media-rail\s*\{([^}]*)\}/, 1]
+    %w[background:\s*var\(--cs-surface\) box-shadow:\s*var\(--cs-shadow-1\) border-radius:\s*var\(--cs-radius-card\)].each do |declaration|
+      assert_match(/#{declaration};/, card, "below the threshold the rail is a card")
+    end
+
+    middle = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-media \(min-width: 760px\)\s*\{/)
+    assert_equal 1, middle.size
+    assert_match(/\.admin-media-library__grid\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\) 340px;\s*\}/, middle.first, "from 760px the card stands 340px beside the grid")
+    assert_match(/\.admin-media-rail\s*\{[^}]*position:\s*sticky;[^}]*overflow-y:\s*auto;/, middle.first, "and sticks, scrolling inside itself")
+    assert_no_match(/admin-rail__tabs/, middle.first, "the card has no tabs")
+
+    docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-media \(min-width: 1200px\)\s*\{/).first
+    rail = docked[/(?:\A|[};])\s*\.admin-media-rail\s*\{([^}]*)\}/, 1]
+    assert rail, "the docked block grounds the rail"
+    [ '--admin-rail-docked:\s*1', 'background:\s*var\(--cs-rail\)', 'box-shadow:\s*var\(--cs-shadow-2\)', 'border-radius:\s*var\(--cs-radius-rail\)' ].each do |declaration|
+      assert_match(/#{declaration};/, rail, "docked, the rail is on the rail's ground and says it is docked")
+    end
+    assert_match(/\.admin-media-rail \.admin-rail__tabs\s*\{\s*display:\s*flex;/, docked, "docked, the tabs are shown")
+    assert_match(/\.admin-media-rail \.admin-rail__panel:not\(\[data-current\]\)\s*\{\s*display:\s*none;\s*\}/, docked, "docked, one panel is shown")
+    assert_match(/\.admin-media-rail__section-heading\s*\{\s*display:\s*none;\s*\}/, docked, "docked, the tab names the notes and their heading goes")
+    assert_match(/\.admin-media-rail__close\s*\{[^}]*position:\s*absolute;[^}]*top:[^}]*right:/, css, "Close stands over the rail's top-right corner")
+
+    medias = self.class.css_blocks("content-spiel.tailwind.css", /@media[^{]*\{/)
+    assert medias.any?, "the stylesheet's @media blocks were found"
+    assert_empty medias.select { |body| body.include?("admin-media") }, "no window media query lays out the Media screen"
+    view = Rails.root.join("app/views/admin/media/index.html.erb").read
+    assert_no_match(/\blg:/, view, "the view leaves the layout to the library's container")
+  end
+
   # The Tags list's usage bar takes the structure hue through a token of its
   # own, as a tag's square on the canvas does, so it can change without
   # moving the icons; the bar is drawn in one place.
@@ -1215,7 +1255,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     { "admin-editor" => [ ".admin-rail-grid" ],
       "admin-dashboard" => [ ".admin-dashboard__grid", ".admin-dashboard__head,\n  .admin-dashboard__notice" ],
       "admin-list" => [ ".admin-list-rail__head", ".admin-list-rail__grid" ],
-      "admin-settings" => [ ".admin-settings-layout__grid" ] }.each do |container, selectors|
+      "admin-settings" => [ ".admin-settings-layout__grid" ],
+      "admin-media" => [ ".admin-media-library__head", ".admin-media-library__grid" ] }.each do |container, selectors|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).first
       selectors.each do |selector|
         rule = docked[/(?:\A|[};])\s*#{Regexp.escape(selector)}\s*\{([^}]*)\}/, 1]
@@ -1233,7 +1274,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     # Undocked nothing centres: no rule outside a docked block carries an
     # auto inline margin but the header's, which applies only while docked.
-    outside = %w[admin-editor admin-dashboard admin-list admin-settings].reduce(css) do |rest, container|
+    outside = %w[admin-editor admin-dashboard admin-list admin-settings admin-media].reduce(css) do |rest, container|
       self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/).reduce(rest) { |text, block| text.sub(block, "") }
     end
     assert_equal 1, outside.scan(/margin-inline:\s*auto/).size, "only the docked header row centres outside a docked block"
@@ -1242,7 +1283,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   test "every docked composition grows to --cs-content-max from the rail's tokens, at the one threshold" do
     { "admin-editor" => /\.admin-rail-grid\s*\{([^}]*)\}/,
       "admin-dashboard" => /\.admin-dashboard__grid\s*\{([^}]*)\}/,
-      "admin-list" => /\.admin-list-rail__grid\s*\{([^}]*)\}/ }.each do |container, rule|
+      "admin-list" => /\.admin-list-rail__grid\s*\{([^}]*)\}/,
+      "admin-media" => /\.admin-media-library__grid\s*\{([^}]*)\}/ }.each do |container, rule|
       docked = self.class.css_blocks("content-spiel.tailwind.css", /@container #{container} \(min-width: 1200px\)\s*\{/)
       assert_equal 1, docked.size, "one block docks #{container}"
       grid = docked.first[rule, 1]
@@ -1362,7 +1404,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   # A container query cannot read a custom property, so the threshold is a
-  # number written in four places; this holds them to one.
+  # number written in five places (the media library's too); this holds them to one.
   test "the editors' rail, the dashboard's, the lists' and Settings' dock at one threshold" do
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     # The editor area asks one other width: 1244px, where a docked post's
@@ -1383,6 +1425,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_equal [ "40rem", editor.first ].sort, dashboard.sort, "the dashboard's container widths"
     assert_equal [ editor.first ], css.scan(/@container admin-list \(min-width: ([^)]+)\)/).flatten, "the lists' container asks the threshold alone"
     assert_equal [ editor.first ], css.scan(/@container admin-settings \(min-width: ([^)]+)\)/).flatten, "the Settings area's container asks the threshold alone"
+    # The media library asks the threshold and 760px, where its rail stands
+    # beside the grid as a card.
+    assert_equal [ "1200px", "760px" ].sort, css.scan(/@container admin-media \(min-width: ([^)]+)\)/).flatten.sort
 
     docked = self.class.css_blocks("content-spiel.tailwind.css", /@container admin-dashboard \(min-width: #{Regexp.escape(editor.first)}\)\s*\{/)
     assert_equal 1, docked.size
@@ -1496,6 +1541,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # the tokens to utilities and is not a rule that draws.
   PEOPLE_RULES = [
     ".admin-notes-marker[data-has-notes]",
+    ".admin-rail__tab [data-tab-count]",
     PEOPLE_FRAME.join(", "),
     SECTION_FRAME.join(", "),
     ".admin-block-card:has(> .admin-block-card__head [data-editing-mark]:not(.admin-editing-mark--leaving)):not([data-card-edge=\"held\"]):not([data-notes-active])"

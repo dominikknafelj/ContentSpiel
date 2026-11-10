@@ -110,6 +110,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/ui/rail_panel_component.rb
     app/components/admin/ui/rail_slot_component.rb
     app/controllers/admin/answers/rail_tab_streams.rb
+    app/views/admin/media/index.html.erb
     app/views/admin/pages/show.html.erb
     app/views/admin/posts/show.html.erb
   ].freeze
@@ -144,7 +145,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   }.freeze
 
   test "the editors' header, the media panel, the rail and the two editor views do not name notes: they draw their slots" do
-    assert_equal 20, SLOT_HOSTS.size
+    assert_equal 21, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end

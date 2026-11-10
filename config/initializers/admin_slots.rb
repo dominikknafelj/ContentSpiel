@@ -13,7 +13,8 @@ Rails.application.config.to_prepare do
   Admin::Slots.register "editor.header.actions", Admin::NotesScreen::HeaderButtonComponent
   # The editors' rail: the Notes tab, after the rail's own.
   Admin::Slots.register "editor.rail.tabs", Admin::NotesScreen::RailPanelComponent
-  Admin::Slots.register "media.panel.sections", Admin::NotesScreen::MediaSectionComponent
+  # The Media screen's rail: the Notes tab, after Image.
+  Admin::Slots.register "media.rail.tabs", Admin::NotesScreen::MediaSectionComponent
 
   # The lists' rows. Presence comes first in a tree row's markers (room for two circles), then
   # the notes bubble; on a posts row presence stands on the title's line,

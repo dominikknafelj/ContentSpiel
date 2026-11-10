@@ -9,6 +9,9 @@ en:
         upload: "Upload images"
         hint: "PNG, JPEG, GIF or WebP, up to %{mb} MB"
         drop: "Drop images to upload"
+        # The rail of the chosen image: its own tab, and its Close's name and tooltip.
+        image_tab: "Image"
+        close: "Close panel"
       # `Media::PickerComponent`, the Media screen's dialog that every image
       # field opens (outside `app/components/admin/`, so read with full keys),
       # and its grid view (`admin/media/picker`). `none` and `selected` are
