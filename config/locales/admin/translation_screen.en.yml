@@ -5,23 +5,50 @@
 en:
   admin:
     components:
-      # `Admin::TranslationScreen::MatrixComponent` (a cell's link label).
+      # `Admin::TranslationScreen::MatrixComponent`: its columns, the kind's
+      # word beside its chip, the settings row's title and a cell's link label.
       translation_screen:
         matrix:
+          columns:
+            item: "Item"
+            type: "Type"
+            action: "Action"
+          types:
+            page: "Page"
+            post: "Post"
+            media: "Image"
+            settings: "Settings"
+          settings_title: "Site settings · title, tagline"
+          untitled: "(untitled)"
+          empty: "Everything is translated."
           cell_label:
             complete: "%{title}: %{language}, translated"
             missing: "%{title}: %{language}, missing"
             outdated: "%{title}: %{language}, outdated"
-          # The row's action (layout points spec, B): a word shown while the row is
-          # hovered or its title link has the focus, and the title link's name.
+          # The row's verb at its end, and the title link's name.
           action:
             review: "Review changes →"
             translate: "Translate →"
           open_label:
             review: "Review changes: %{title}"
             translate: "Translate: %{title}"
-        # `Admin::TranslationScreen::StateCellComponent`, a cell's word (O4).
+        # `Admin::TranslationScreen::StateCellComponent`, a cell's word.
         state_cell:
           complete: "Translated"
           missing: "Missing"
           outdated: "Outdated"
+        # `Admin::TranslationScreen::SummaryCardComponent`, a language's tile.
+        # The link's name says what pressing it does; the figures describe it.
+        summary_card:
+          link_label:
+            language: "%{language}: show items to translate"
+            all: "%{language}: show all languages"
+          done: "%{percent}% done"
+          progress_label: "%{language} translated"
+          all_translated: "All translated"
+          outdated:
+            one: "%{count} outdated"
+            other: "%{count} outdated"
+          missing:
+            one: "%{count} missing"
+            other: "%{count} missing"

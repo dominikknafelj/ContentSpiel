@@ -259,11 +259,6 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   :root:not([data-tree-folded]) .admin-shell__tree--fill { display: flex; flex-direction: column; }
   :root:not([data-tree-folded]) .admin-shell__tree--fill > .admin-shell__tree-region { flex: 1; }
 }
-/* The Translations row's action word sits under the row's stretched link, so it
-   is shown by opacity, never visibility. */
-.admin-translation-row__action { opacity: 0; }
-.admin-translation-row:hover .admin-translation-row__action,
-.admin-translation-row:has(th a:focus-visible) .admin-translation-row__action { opacity: 1; }
 
 /* The divider (`Admin::Shell::TreeDividerComponent`). AT REST it is
    nothing but the column's own 1px line: this element is the 8px HIT AREA,
@@ -1515,11 +1510,25 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
    box, never to the window), on the surface over the rows, at the raised
    layer. `.admin-table-scroll--x` is Trash's table: the sideways scroll
    alone, with no height of its own, so its rows scroll with the page. In
-   both the first column sticks at the left as the card scrolls sideways. */
-.admin-table-scroll { overflow: auto; max-height: calc(100dvh - var(--admin-top-offset) - var(--cs-sp-4) * 2); overscroll-behavior: auto; }
+   both the first column sticks at the left as the card scrolls sideways.
+   `.admin-table-scroll` is a stacking context of its own, so its local
+   layers stay under the shell's top bar. In it the head's corner stands at
+   `raised-top`, over the rest of the head (which slides under it sideways)
+   and over the Item column (which slides under it as the rows scroll); the
+   head and the Item column stand at `raised`, over a row's links at `lift`
+   and its stretched link at none. */
+.admin-table-scroll { isolation: isolate; overflow: auto; max-height: calc(100dvh - var(--admin-top-offset) - var(--cs-sp-4) * 2); overscroll-behavior: auto; }
 .admin-table-scroll thead th { position: sticky; top: 0; z-index: var(--cs-z-raised); background: var(--cs-surface); }
 .admin-table-scroll--x { overflow-x: auto; }
 :is(.admin-table-scroll, .admin-table-scroll--x) :is(th, td):first-child { position: sticky; left: 0; background: var(--cs-surface); }
+.admin-table-scroll tbody :is(th, td):first-child { z-index: var(--cs-z-raised); }
+.admin-table-scroll thead th:first-child { z-index: var(--cs-z-raised-top); }
+/* A Translations row under the pointer is on paper, every cell of it: the
+   sticky Item cell's own surface ground is written above, so the row's
+   tint is written on its cells, after it and with the weight to win. */
+@media (hover: hover) {
+  .admin-table-scroll .admin-translation-row:hover > :is(th, td) { background: var(--cs-paper); }
+}
 
 /* A picture in a note or a still GIF's tile
    (`Admin::NotesScreen::FilesComponent`). Its box is the picture's own size and shows

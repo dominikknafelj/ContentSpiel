@@ -458,7 +458,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   test "the matrix lists a post missing in German and links into its German editor" do
     post = create_post(title: "Only in English")
 
-    visit "/cs-studio/translations"
+    visit_screen "/cs-studio/translations"
 
     assert_text "Posts"
     click_on "Only in English"
@@ -485,20 +485,72 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_current_path "/cs-studio/posts/#{post.id}?locale=es"
   end
 
-  test "below 1280px the top bar stays over the row titles when the page scrolls" do
-    posts = Array.new(25) { |i| create_post(title: "Only in English #{i}") }
+  # The matrix scrolls inside its own box, at most the window's height under
+  # the top bar: a sticky element inside a scrolling box sticks to that box,
+  # never to the window, so the head row sticks to the box's top and the Item
+  # column to its left. The box is a stacking context of its own, under the
+  # top bar. At 640px the table is wider than its card, and 51 posts make a
+  # second page, so the page itself scrolls far enough to take the box under
+  # the top bar.
+  test "the matrix's header row stays in view as its rows scroll, the Item column stays at the left as the card scrolls sideways, and the top bar stays over both" do
+    51.times { |i| create_post(title: "Only in English #{i}") }
     begin
-      page.current_window.resize_to(1000, 700)
-      visit "/cs-studio/translations"
-      assert_selector "#translation-item-post-#{posts.last.id}"
-      page.execute_script("window.scrollTo(0, 400)")
-      assert page.evaluate_script(<<~JS), "a point inside the top bar is the bar, not a row title"
-        (() => { const bar = document.querySelector(".admin-top-bar");
-        const r = bar.getBoundingClientRect();
-        const th = document.querySelector("th[scope=row]").getBoundingClientRect();
-        const el = document.elementFromPoint(th.left + th.width / 2, r.top + r.height / 2);
-        return bar.contains(el) && !el.closest("th[scope=row]") })()
+      page.current_window.resize_to(640, 700)
+      visit_screen "/cs-studio/translations"
+      assert_selector "tbody tr", minimum: 50
+      scroller = ".admin-table-scroll"
+      assert page.evaluate_script("(() => { const s = document.querySelector('#{scroller}'); return s.scrollHeight > s.clientHeight && s.scrollWidth > s.clientWidth })()"),
+        "the matrix overflows its box both ways"
+      assert page.evaluate_script("document.querySelector('#{scroller}').getBoundingClientRect().height <= window.innerHeight"), "the box is no taller than the window"
+
+      # The rows scroll inside the box: the head stays at its top, and a
+      # point on a column's head is that head, never a row passing under it.
+      page.execute_script("document.querySelector('#{scroller}').scrollTop = 300")
+      head = page.evaluate_script(<<~JS)
+        (() => { const s = document.querySelector("#{scroller}").getBoundingClientRect();
+        const th = document.querySelector("thead th[data-locale=de]"); const r = th.getBoundingClientRect();
+        const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { offset: Math.abs(r.top - s.top), hit: th.contains(el) } })()
       JS
+      assert_operator head["offset"], :<, 1, "the head row stays at the box's top as its rows scroll"
+      assert head["hit"], "the head row is over the rows that scroll under it"
+
+      # The card scrolls sideways: the Item column stays at its left, over
+      # the cells and their links, and the head's corner over the head.
+      page.execute_script("document.querySelector('#{scroller}').scrollLeft = 300")
+      item = page.evaluate_script(<<~JS)
+        (() => { const s = document.querySelector("#{scroller}").getBoundingClientRect();
+        const corner = document.querySelector("thead th:first-child"); const c = corner.getBoundingClientRect();
+        const rows = [...document.querySelectorAll("tbody th[scope=row]")];
+        const title = rows.find((th) => { const r = th.getBoundingClientRect(); return r.top > c.bottom + 4 && r.bottom < s.bottom });
+        const t = title.getBoundingClientRect();
+        const titleHit = document.elementFromPoint(t.right - 4, t.top + t.height / 2);
+        const cornerHit = document.elementFromPoint(c.right - 4, c.top + c.height / 2);
+        return { titleLeft: Math.abs(t.left - s.left), cornerLeft: Math.abs(c.left - s.left),
+                 title: title.contains(titleHit), corner: corner.contains(cornerHit) } })()
+      JS
+      assert_operator item["titleLeft"], :<, 1, "the Item column stays at the box's left"
+      assert_operator item["cornerLeft"], :<, 1, "the head's corner stays at the box's left"
+      assert item["title"], "a row's title is over the cells that scroll under it"
+      assert item["corner"], "the head's corner is over the head that scrolls under it"
+
+      # The page scrolls the box under the top bar, which stays over the head
+      # and the Item column.
+      page.execute_script("document.querySelector('#{scroller}').scrollLeft = 0")
+      page.execute_script("window.scrollTo(0, document.documentElement.scrollHeight)")
+      bar = page.evaluate_script(<<~JS)
+        (() => { const bar = document.querySelector(".admin-top-bar"); const b = bar.getBoundingClientRect();
+        const s = document.querySelector("#{scroller}").getBoundingClientRect();
+        const corner = document.querySelector("thead th:first-child").getBoundingClientRect();
+        const de = document.querySelector("thead th[data-locale=de]").getBoundingClientRect();
+        const y = b.bottom - 2;
+        const onItem = document.elementFromPoint(corner.left + corner.width / 2, y);
+        const onHead = document.elementFromPoint(de.left + de.width / 2, y);
+        return { under: s.top < y, item: bar.contains(onItem), head: bar.contains(onHead) } })()
+      JS
+      assert bar["under"], "the page scrolled the box's top under the top bar"
+      assert bar["item"], "the top bar is over the Item column"
+      assert bar["head"], "the top bar is over the head row"
     ensure
       page.current_window.resize_to(1400, 1400)
     end

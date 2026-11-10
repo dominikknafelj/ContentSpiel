@@ -464,6 +464,11 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/trash_screen/tabs_component.rb
     app/components/admin/trash_screen/tabs_component.html.erb
     app/views/admin/trash/index.html.erb
+    app/components/admin/translation_screen/matrix_component.rb
+    app/components/admin/translation_screen/matrix_component.html.erb
+    app/components/admin/translation_screen/summary_card_component.rb
+    app/components/admin/translation_screen/summary_card_component.html.erb
+    app/views/admin/translations/index.html.erb
   ].freeze
 
   PLACEHOLDER = "".freeze

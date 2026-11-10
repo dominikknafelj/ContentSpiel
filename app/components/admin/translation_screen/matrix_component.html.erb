@@ -1,30 +1,33 @@
 <div class="rounded-card bg-surface shadow-1">
   <% if items.empty? %>
-    <%= render Admin::Ui::EmptyStateComponent.new(title: "Everything is translated.") %>
+    <%= render Admin::Ui::EmptyStateComponent.new(title: t(".empty")) %>
   <% else %>
-    <div class="isolate overflow-x-auto" data-translation-matrix-scroll>
+    <%# Rounded as the card is, so the sticky head and Item column keep the card's corners. %>
+    <div class="admin-table-scroll rounded-card">
       <table class="w-full min-w-[40rem] border-collapse text-left">
         <thead>
           <tr class="border-b border-line-strong text-label text-meta">
-            <th scope="col" class="sticky left-0 min-w-60 bg-surface px-4 py-2 font-normal">Item</th>
-            <th scope="col" class="px-3 py-2 font-normal">Type</th>
+            <th scope="col" class="min-w-60 px-4 py-2 font-normal"><%= t(".columns.item") %></th>
+            <th scope="col" class="px-3 py-2 font-normal"><%= t(".columns.type") %></th>
             <% locales.each do |locale| %>
               <th scope="col" class="px-3 py-2 font-normal" data-locale="<%= locale %>"><%= language_name(locale) %></th>
             <% end %>
-            <th scope="col" class="px-4 py-2 font-normal"><span class="sr-only">Action</span></th>
+            <th scope="col" class="px-4 py-2 font-normal"><span class="sr-only"><%= t(".columns.action") %></span></th>
           </tr>
         </thead>
         <tbody>
           <% items.each do |item| %>
             <% focus = editor_path(item, focus_locale(item)) %>
-            <tr id="<%= row_id(item) %>" class="admin-translation-row relative border-b border-line last:border-b-0 hover:bg-paper">
-              <th scope="row" class="sticky left-0 z-(--cs-z-raised-top) min-w-60 max-w-80 bg-surface p-0 text-left font-medium">
+            <tr id="<%= row_id(item) %>" class="admin-translation-row group relative border-b border-line last:border-b-0">
+              <th scope="row" class="min-w-60 max-w-80 p-0 text-left font-medium">
                 <%= link_to title(item), focus, class: "relative block truncate px-4 py-2 text-ink hover:underline", aria: { label: open_label(item) }, data: { turbo_frame: "_top" } %>
               </th>
-              <td class="px-3 py-2 text-sm text-dim" data-column="type"><%= type_label(item) %></td>
+              <td class="px-3 py-2" data-column="type">
+                <%= render Admin::Ui::RecordChipComponent.new(kind: item.type, label: type_label(item)) %>
+              </td>
               <% locales.each do |locale| %>
                 <td class="px-3 py-2">
-                  <%= link_to editor_path(item, locale), aria: { label: cell_label(item, locale) }, class: "relative z-(--cs-z-raised) inline-flex", data: { turbo_frame: "_top" } do %>
+                  <%= link_to editor_path(item, locale), aria: { label: cell_label(item, locale) }, class: "relative z-(--cs-z-lift) inline-flex", data: { turbo_frame: "_top" } do %>
                     <%= render Admin::TranslationScreen::StateCellComponent.new(state: item.states.fetch(locale), locale: locale) %>
                   <% end %>
                 </td>
@@ -32,7 +35,7 @@
               <td class="px-4 py-2 text-right text-sm whitespace-nowrap">
                 <%# The row's stretched link: no tab stop and nothing for a screen reader (the title link is both), and absolute against the row, not the sticky title cell. %>
                 <%= link_to "", focus, tabindex: -1, aria: { hidden: true }, class: "absolute inset-0", data: { turbo_frame: "_top", translation_row_link: "" } %>
-                <span class="admin-translation-row__action text-accent" aria-hidden="true"><%= action(item) %></span>
+                <span class="admin-translation-row__action text-dim group-hover:text-accent group-focus-within:text-accent" aria-hidden="true"><%= action(item) %></span>
               </td>
             </tr>
           <% end %>

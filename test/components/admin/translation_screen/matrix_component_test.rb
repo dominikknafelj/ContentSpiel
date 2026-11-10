@@ -1,8 +1,8 @@
 require "test_helper"
 
-# The translations matrix (design pass round 2, Task 18): a cell per target
-# language linking to that language's editor, the row title and call to
-# action following the first outdated, else first missing, language.
+# The translations matrix: a cell per target language linking to that
+# language's editor, the row title and its verb following the first outdated,
+# else first missing, language.
 class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
   Item = Admin::TranslationsController::Item
 
@@ -49,7 +49,6 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
     assert_selector "#{row} a[aria-label='Welcome: Español, missing']"
     assert_selector "thead th[scope=col]", text: "Deutsch"
     assert_selector "thead th[scope=col]", text: "Español"
-    assert_selector "[data-translation-matrix-scroll].overflow-x-auto"
 
     matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :outdated }))
 
@@ -66,10 +65,26 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
     assert_selector "#{row} td[data-column=type]"
   end
 
+  test "a row's type is the kind's chip and its word, and the table scrolls inside its own bounded box" do
+    matrix(Item.new(type: "post", record: @post, states: { "de" => :complete, "es" => :missing }),
+      Item.new(type: "settings", record: SiteSetting.first, states: { "de" => :complete, "es" => :missing }))
+
+    assert_selector "#{row} td[data-column=type] > span.inline-flex > span.rounded-chip.size-5[aria-hidden=true] + span.text-small", text: "Post"
+    assert_selector "#translation-item-settings td[data-column=type]", text: "Settings"
+    assert_selector ".admin-table-scroll > table"
+    assert_no_selector ".overflow-x-auto"
+    assert_selector "thead th[scope=col]", text: "Item"
+    assert_selector "thead th[scope=col]", text: "Type"
+    assert_selector "thead th[scope=col] .sr-only", text: "Action"
+    # The verb is always there, dim, and accent while the row is under the
+    # pointer or holds the focus.
+    assert_selector "tr#{row}.group .admin-translation-row__action.text-dim.group-hover\\:text-accent.group-focus-within\\:text-accent"
+  end
+
   test "the site settings row links to Settings in that language" do
     matrix(Item.new(type: "settings", record: SiteSetting.first, states: { "de" => :complete, "es" => :missing }))
 
-    assert_selector "#translation-item-settings th[scope=row] a[href='/cs-studio/settings?locale=es']", text: "Site settings"
+    assert_selector "#translation-item-settings th[scope=row] a[href='/cs-studio/settings?locale=es']", text: "Site settings · title, tagline"
   end
 
   test "nothing to show reads Everything is translated" do

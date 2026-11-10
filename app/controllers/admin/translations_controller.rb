@@ -1,16 +1,14 @@
 module Admin
-  # The Translations matrix (design pass round 2, Task 18, handoff §4.4): one
-  # screen for every target language instead of one page per language.
-  # Summary cards on top (per language: "% done", a bar, "12 missing · 1
-  # outdated"), a type filter, then a matrix whose rows are the items that
+  # The Translations matrix: one screen for every target language. A tile per
+  # language on top ("% done", a bar, "↻ 1 outdated", "12 missing"), a type
+  # filter, then a matrix whose rows are the items that
   # need work in ANY target language and whose columns are the languages;
   # each cell is that language's state chip linking to the item's editor in
   # that language. `?type=page|post|media|settings` narrows it, `?language=de`
-  # (a summary card's link) keeps the rows that need work in that language; `?locale=` is
-  # a retired parameter from the one-page-per-language screen and is ignored,
-  # so old links (the dashboard card's, bookmarks) still answer 200.
+  # (a language tile's link) keeps the rows that need work in that language;
+  # `?locale=` is ignored, so a link that carries it (a bookmark) answers 200.
   #
-  # `suggest` (the editor's AI Translate buttons, spec §6.4) lives here too,
+  # `suggest` (the editor's AI Translate buttons) lives here too,
   # on its own route -- so every filter of the matrix is `only: :index`.
   #
   # What's listed, and counted, is exactly what the actor may read: pages and
@@ -23,7 +21,7 @@ module Admin
   #
   # Where a record stands is the stored `translation_states` row
   # (`Translations::StateIndex`, kept current by the save services), so none
-  # of this loads records to filter them: the cards come from
+  # of this loads records to filter them: the tiles come from
   # `StateIndex.summaries` (grouped SQL, two queries per type whatever the
   # number of languages), each type's rows from an EXISTS over the target
   # languages (`exists_in_any_locale_sql`), counted with `COUNT`, and this
@@ -38,23 +36,24 @@ module Admin
   # every cell. A record with no row reads complete and isn't
   # listed (`StateIndex`).
   #
-  # Order (§4.4): rows with an outdated language first -- they are already
+  # Order: rows with an outdated language first -- they are already
   # visible on the site -- the most recently changed first, then rows that
-  # only miss something, in the same order of original change. Paging is by page number
-  # (`Pagination`, design pass spec §4); the Site settings row isn't paged,
+  # only miss something, in the same order of original change. Paging is by
+  # page number (`Pagination`); the Site settings row isn't paged,
   # it tops the first page.
   class TranslationsController < BaseController
     include TranslatableRecordLoading
 
     PER_PAGE = 50
 
-    # In display order; `label` heads the filter segment, `short` is the
-    # Type column's word.
+    # In display order, each with the right that lists it. A type's words are
+    # keys: the filter's segment `admin.translations.index.types.<type>`, the
+    # Type column's `admin.components.translation_screen.matrix.types.<type>`.
     TYPES = {
-      "page" => { label: "Pages", short: "Page", permission: "pages.read" },
-      "post" => { label: "Posts", short: "Post", permission: "posts.read" },
-      "media" => { label: "Images", short: "Image", permission: "media.upload" },
-      "settings" => { label: "Site settings", short: "Settings", permission: "settings.manage" }
+      "page" => { permission: "pages.read" },
+      "post" => { permission: "posts.read" },
+      "media" => { permission: "media.upload" },
+      "settings" => { permission: "settings.manage" }
     }.freeze
 
     # One row of the matrix: `states` is `{ locale => :complete|:missing|:outdated }`
@@ -79,7 +78,7 @@ module Admin
       readable = readable_relations
       @types = TYPES.keys.select { |type| readable.key?(type) || (type == "settings" && can?("settings.manage")) }
       @type = params[:type].presence_in(@types)
-      # `?language=de` (a summary card's link, the dashboard's): only the rows
+      # `?language=de` (a language tile's link, the dashboard's): only the rows
       # that need work in that language. All the columns stay.
       @language = params[:language].presence_in(@target_locales)
       @needed_in = @language ? [ @language ] : @target_locales
@@ -101,12 +100,12 @@ module Admin
       @items.unshift(settings) if settings && [ nil, "settings" ].include?(@type) && @pagination.page == 1
     end
 
-    # AI suggestions for some of one record's fields (translation helpers
-    # spec §6.4), asked by the editor's Translate buttons and its
+    # AI suggestions for some of one record's fields, asked by the editor's
+    # Translate buttons and its
     # "Suggest translations for N empty fields" (one request per record and cap-sized part,
     # `TranslateAllComponent`). `AI::Translate` decides everything --
     # `ai.translate`, the record's edit right, the caps -- and saves
-    # nothing (Review Focus 4); this only loads the record (a 404 outside
+    # nothing; this only loads the record (a 404 outside
     # the actor's read scope, `TranslatableRecordLoading`) and answers with
     # one Turbo Stream per requested field that named its input, updating
     # that field's suggestion box: the suggestion with Use/Discard, or the

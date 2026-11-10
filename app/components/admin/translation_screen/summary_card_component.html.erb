@@ -1,15 +1,25 @@
-<div class="flex flex-col gap-2 rounded-cs border bg-surface px-4 py-3.5 <%= current? ? "border-accent" : "border-line" %>" data-locale="<%= locale %>">
-  <div class="flex items-baseline justify-between gap-3">
-    <% if url %>
-      <%= link_to name, url, class: "font-semibold text-ink hover:underline #{"underline decoration-accent decoration-2 underline-offset-4" if current?}", aria: { label: link_label, current: (current? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "replace" } %>
+<%= link_to url, class: "admin-tile flex flex-col gap-2 px-4 py-3.5",
+      aria: { label: link_label, describedby: "#{done_id} #{counts_id}", current: (current? ? "true" : nil) },
+      data: { locale: locale, turbo_frame: "content", turbo_action: "replace" } do %>
+  <span class="flex items-baseline justify-between gap-3">
+    <span class="text-sm font-semibold text-ink"><%= name %></span>
+    <span id="<%= done_id %>" class="text-label text-meta"><%= t(".done", percent: percent) %></span>
+  </span>
+  <span class="block h-1 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="<%= t(".progress_label", language: name) %>"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= percent %>">
+    <span class="block h-full rounded-full bg-ok <%= width_class %>"></span>
+  </span>
+  <span id="<%= counts_id %>" class="text-sm">
+    <% if done? %>
+      <span class="text-meta"><%= t(".all_translated") %></span>
     <% else %>
-      <span class="font-semibold text-ink"><%= name %></span>
+      <% if outdated.positive? %>
+        <span class="text-warn-ink"><span aria-hidden="true">↻</span> <%= t(".outdated", count: outdated) %></span>
+      <% end %>
+      <% if outdated.positive? && missing.positive? %><span class="text-meta" aria-hidden="true">·</span><% end %>
+      <% if missing.positive? %>
+        <span class="text-meta"><%= t(".missing", count: missing) %></span>
+      <% end %>
     <% end %>
-    <span class="text-label text-meta"><%= percent %>% done</span>
-  </div>
-  <div class="h-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="<%= name %> translated"
-       aria-valuemin="0" aria-valuemax="100" aria-valuenow="<%= percent %>">
-    <div class="h-full rounded-full bg-ok <%= width_class %>"></div>
-  </div>
-  <span class="text-sm <%= outdated? ? "text-warn-ink" : "text-dim" %>"><%= counts %></span>
-</div>
+  </span>
+<% end %>
