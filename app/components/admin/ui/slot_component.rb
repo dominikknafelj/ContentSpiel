@@ -32,7 +32,7 @@ module Admin
         keys: [],
         slots: [],
         controller: nil,
-        keyboard: "It takes no focus of its own and draws no wrapper: each registered entry's component brings its own keyboard."
+        keyboard: [ "test/system/admin/notes_markers_test.rb", "the notes bubble's keyboard: a posts row's bubble is one Tab stop that opens the post's notes, and the tree's and a tile's take none" ]
       )
 
       def initialize(name:, record:, viewer:, loaded: nil, **context)

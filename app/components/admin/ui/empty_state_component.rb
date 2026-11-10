@@ -50,7 +50,7 @@ module Admin
         keys: [],
         slots: %i[action],
         controller: nil,
-        keyboard: "It takes no focus: one line of text, and the action a caller hands its slot is a button or link with its own keyboard."
+        keyboard: [ "test/system/admin/keyboard_controls_test.rb", "an empty state's action is the Tab stop after its words, and Enter on it does what the action does" ]
       )
 
       renders_one :action

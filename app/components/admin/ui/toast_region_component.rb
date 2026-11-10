@@ -38,7 +38,7 @@ module Admin
         keys: [],
         slots: [],
         controller: nil,
-        keyboard: "It takes no focus of its own: it is the live region the toasts land in, and each toast's Dismiss and action are held by Toast's keyboard test."
+        keyboard: [ "test/system/admin/keyboard_feedback_test.rb", "a toast's action and its Dismiss are Tab stops after its words: Enter on Undo undoes, and Enter on Dismiss closes it" ]
       )
 
       def initialize(flash:, relay: false)

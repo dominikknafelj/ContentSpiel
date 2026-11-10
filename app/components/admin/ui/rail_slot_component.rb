@@ -29,7 +29,7 @@ module Admin
         keys: [],
         slots: [],
         controller: nil,
-        keyboard: "It takes no focus of its own: each entry's tab is a RailTab, held by RailTabs' keyboard test, and its panel a RailPanel, and what the panel holds brings its own keyboard."
+        keyboard: [ "test/system/admin/editor_rail_test.rb", "Page and Section are tabs: arrows move between them, Home and End go to the ends" ]
       )
 
       KEY = /\A[a-z]+\z/

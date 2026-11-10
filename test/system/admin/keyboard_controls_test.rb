@@ -81,6 +81,18 @@ class Admin::KeyboardControlsSystemTest < ApplicationSystemTestCase
     assert_not Tag.exists?(tag.id)
   end
 
+  # What the action slot holds is the caller's: on the Pages screen it is
+  # "+ New page", a link that opens the New page dialog.
+  test "an empty state's action is the Tab stop after its words, and Enter on it does what the action does" do
+    visit_screen admin_pages_path
+
+    find(".admin-empty-state [data-empty-state-title]", text: "Choose a page from the tree.").click
+    page.send_keys(:tab)
+    assert_equal "+ New page", focused_text
+    page.send_keys(:enter)
+    assert_selector "dialog#new-page-dialog[open]"
+  end
+
   test "a checkbox is a Tab stop that Space checks and unchecks: a posts row's Select" do
     post = Current.set(actor: users(:one)) { create_post(title: "Checked by keyboard") }
     visit_screen admin_posts_path

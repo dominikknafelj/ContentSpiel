@@ -72,6 +72,51 @@ module UiContract
     [ ruby_text, *templates ].join("\n")
   end
 
+  # What may take the focus in a component's own markup: a link with an
+  # address, a control, a dialog, a tabindex or contenteditable, in a
+  # template's tags or in the Ruby helpers that write them.
+  FOCUSABLE = {
+    "a link" => /<a\b[^>]*\bhref|\b(?:link_to|link_to_if|link_to_unless|mail_to)\b|\btag\.a\b|content_tag[( ]\s*:a\b/,
+    "a control" => /<(?:button|input|select|textarea)\b|\b(?:button_to|button_tag|submit_tag|check_box_tag|radio_button_tag|text_field_tag|text_area_tag|select_tag|file_field_tag|password_field_tag)\b|\btag\.(?:button|input|select|textarea)\b|content_tag[( ]\s*:(?:button|input|select|textarea)\b/,
+    "a dialog" => /<dialog\b|\btag\.dialog\b|content_tag[( ]\s*:dialog\b/,
+    "a tabindex" => /\btabindex\b/i,
+    "contenteditable" => /\bcontenteditable\b/i
+  }.freeze
+
+  # A component's own source with ERB comments taken out, as the focus check
+  # reads it (`own_source` keeps a template whole).
+  def self.markup_source(klass) = own_source(klass).gsub(/<%#.*?%>/m, "")
+
+  # What a component that says it takes no focus draws that can take it, as
+  # sentences: its own markup, the markup of each `Admin::Ui` component it
+  # renders by name (followed through their own renders) and of each partial
+  # it renders by path. What it cannot read is answered apart, in
+  # `unreadable_parts`.
+  def self.focusable_parts(klass, seen = Set.new)
+    return [] unless seen.add?(klass)
+
+    source = markup_source(klass)
+    own = FOCUSABLE.filter_map { |what, pattern| "#{klass.name} draws #{what}" if source.match?(pattern) }
+    partials = source.scan(/render[( ]\s*["']([\w\/]+)["']/).flatten.filter_map do |path|
+      file = Rails.root.join("app/views", File.dirname(path), "_#{File.basename(path)}.html.erb")
+      text = file.exist? ? file.read.gsub(/<%#.*?%>/m, "") : ""
+      FOCUSABLE.filter_map { |what, pattern| "#{klass.name}'s partial #{path} draws #{what}" if text.match?(pattern) }
+    end.flatten
+    rendered = source.scan(/(?:Admin::Ui::)?\b([A-Z]\w*Component)\.new\b/).flatten.uniq.filter_map { |name| "Admin::Ui::#{name}".safe_constantize }
+    own + partials + rendered.reject { |other| other == klass }.flat_map { |other| focusable_parts(other, seen) }
+  end
+
+  # What a check of a component's own markup cannot see: its slots and the
+  # block it is handed, which a caller fills, and a render of something that
+  # is not named in the source (a registered entry's component, a panel
+  # handed over).
+  def self.unreadable_parts(klass)
+    source = markup_source(klass)
+    dynamic = source.scan(/render[( ]\s*([^\s"'()]+)/).flatten.reject { |target| target.match?(/\A(?:Admin::Ui::)?[A-Z]\w*Component\.new\b/) }
+    block = source.match?(/(?<![\w.:-])content(?![\w?:-])/) ? [ "the block it is handed (content)" ] : []
+    [ *klass.registered_slots.keys.map { |slot| "the slot #{slot}" }, *dynamic.map { |target| "a render of #{target}" }, *block ]
+  end
+
   def ui_components
     Dir[Rails.root.join("app/components/admin/ui/*_component.rb")].sort.map do |file|
       "Admin::Ui::#{File.basename(file, '.rb').camelize}".constantize
@@ -138,10 +183,25 @@ module UiContract
     end
   end
 
-  # A sentence (a component that takes no focus) names no test to look for.
+  # A sentence (a component that takes no focus) names no test to look for,
+  # and is allowed only to a component whose own markup draws nothing that can
+  # take the focus. A slot is filled by its caller, out of this check's
+  # sight: a component with one may say it takes no focus only by naming the
+  # slot in its sentence (the person who reads it checks the callers), and a
+  # block it is handed, or a render of something not named in the source (a
+  # registered entry, a panel handed over), is refused outright, since what
+  # it draws could take the focus.
   def assert_contract_keyboard(klass)
     keyboard = declared_contract(klass).keyboard
-    assert_browser_test(*keyboard, "#{klass.name}'s contract keyboard") if keyboard.is_a?(Array)
+    return assert_browser_test(*keyboard, "#{klass.name}'s contract keyboard") if keyboard.is_a?(Array)
+    return unless keyboard.is_a?(String)
+
+    drawn = UiContract.focusable_parts(klass)
+    assert_empty drawn, "#{klass.name} says it takes no focus, but it draws what can take it: name its keyboard browser test instead"
+    unreadable = UiContract.unreadable_parts(klass)
+    unnamed = unreadable.reject { |part| part.start_with?("the slot ") && keyboard.include?(part.delete_prefix("the slot ")) }
+    assert_empty unnamed, "#{klass.name} says it takes no focus, but this check cannot read #{unnamed.join(', ')}: " \
+      "name a slot in the sentence, or name its keyboard browser test"
   end
 
   private
