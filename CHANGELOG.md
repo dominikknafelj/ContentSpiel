@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Breaking
+
+- Every `ContentSpiel::Plugins` hook (`block_types`, `form_field_types`, `form_destinations`, `studio_modules`) refuses an owner named like one of the CMS's own top-level constants, so `media/album`, `notes/rating`, `publishing/crm` or `audit/reports` now stops the boot with an `ArgumentError` naming the constant and the place of the hook's call (on a development reload it is the theme's refusal, or for a module hook a log line, as any refused hook is). A gem's code lives in a module named after its owner, which would reopen the CMS's. The names are everything at the top of `app/models`, `app/services`, `app/queries`, `app/values`, `app/constraints` and `lib`, camelized both as Zeitwerk inflects them and plainly (`ai` is refused as `AI` and as `Ai`). A gem whose owner is refused renames it, and with it its keys, tokens and stored type names, which name the owner.
+
 ## 0.1.0 (2026-11-10)
 
 ### Theme contract
