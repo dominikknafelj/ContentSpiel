@@ -71,17 +71,22 @@ module Admin
   # (its spans carry the run instead). A refused passkey names no account
   # and no email, so it records nothing of its own (its `auth.passkey` span
   # carries it); only the wide bucket it closed is one `session.locked`. A
-  # passkey's `session.created` says `{ "method" => "passkey" }`.
+  # passkey's `session.created` says `{ "method" => "passkey" }`. How a
+  # closed bucket is audited and mailed is `SignInLocks`', which the second
+  # step shares.
+  #
+  # A RIGHT PASSWORD THAT OWES A SECOND PROOF (`:second_factor_required`,
+  # an account holding a passkey or unused recovery codes) signs nobody in
+  # and writes no known device: it holds the account in the second step's
+  # cookie (`SecondFactorsController::SECOND_FACTOR_COOKIE`) and goes to
+  # the second step, on its code view when the account has no passkey.
   class SessionsController < ApplicationController
     include MailLinkOrigin
     include PasskeyChallenges
     include SignInCompletion
+    include SignInLocks
 
     layout "product"
-
-    # The longest an email address can be (RFC 5321's path limit), and so
-    # the most of one `session.failed` or `session.locked` keeps.
-    MAX_EMAIL_LENGTH = 254
 
     allow_unauthenticated_access only: %i[ new create passkey_options passkey ]
     helper_method :passkey_relying_party
@@ -125,13 +130,14 @@ module Admin
       if outcome.ok?
         complete_sign_in(outcome.account, method: "password")
         redirect_to after_authentication_url
+      elsif outcome.status == :second_factor_required
+        session.delete(:sign_in_bot_check)
+        hold_second_step(outcome.account)
+        redirect_to outcome.account.passkeys.exists? ? admin_second_factor_path : admin_second_factor_path(with: "code")
       else
         if outcome.status == :refused
           Audit.record("session.failed", metadata: email_metadata(attempt.email))
-          outcome.trips.each do |trip|
-            Audit.record("session.locked", metadata: locked_metadata(trip, attempt.email))
-            queue_lockout_mail(trip, attempt) if trip.bucket == :account
-          end
+          record_locks(outcome.trips, email: attempt.email, identifier: attempt.identifier)
         end
         if outcome.bot_check_due
           session[:sign_in_bot_check] = true
@@ -253,33 +259,17 @@ module Admin
       head :not_found if passkey_relying_party.nil?
     end
 
-    # The account's pause mail, at most once an hour per email
-    # (`Throttle#notice_due?` writes the hour's mark). Queued for an email
-    # with no account as for one with an account: the job looks the account
-    # up, so both do the same work here, a cache write and an enqueue.
-    def queue_lockout_mail(trip, attempt)
-      Telemetry.in_span("auth.lockout_mail") do |span|
-        due = SignIn::Throttle.new.notice_due?(identifier: attempt.identifier)
-        if due
-          SignIn::LockoutMailJob.perform_later(attempt.email, locked_at: Time.current, from_address: request.remote_ip,
-            minutes: trip.seconds.fdiv(60).ceil, **mail_link_origin)
-        end
-        Telemetry.record(span, "auth.mail.queued" => due)
-      end
-    end
-
-    def locked_metadata(trip, email)
-      if trip.bucket == :account || trip.bucket == :device
-        { "bucket" => trip.bucket.to_s, **email_metadata(email), "level" => trip.level, "seconds" => trip.seconds }
-      else
-        { "bucket" => "address_wide", "seconds" => trip.seconds }
-      end
-    end
-
-    # `email` is the attempt's (`SignIn::PasswordAttempt#email`): a String
-    # Postgres takes, or "".
-    def email_metadata(email)
-      email.include?("@") ? { "email_address" => email.first(MAX_EMAIL_LENGTH) } : {}
+    # The second step's cookie holds the account's id and the time,
+    # encrypted and HttpOnly, never the password. It lives as long as the browser's
+    # session, and the second step reads its `at` against
+    # `SignIn::SECOND_STEP_LIFETIME` (`SecondFactorsController#pending_user`),
+    # so a step left too long is answered "That took too long" rather than
+    # vanishing into a plain sign-in page.
+    def hold_second_step(user)
+      cookies.encrypted[SecondFactorsController::SECOND_FACTOR_COOKIE] = {
+        value: { "user_id" => user.id, "at" => Time.current.to_i },
+        httponly: true, same_site: :lax, secure: request.ssl?
+      }
     end
   end
 end

@@ -1,0 +1,52 @@
+<%# The second step of a sign-in, on the product layout's panel, in one of
+    two views. The passkey view: the lead naming the account, "Use your
+    passkey" (the panel's one primary) and "Use a recovery code" when the
+    account has one left. The code view (`?with=code`, and always for an
+    account with no passkey): the code field with its help line and Sign in.
+    Both end in Start over, which forgets the step. The words are read by
+    full key: they are `admin.second_factor.show.*`, where a lazy lookup
+    would read the controller's plural name.
+
+    "Use your passkey" is `passkey-sign-in`'s button with this step's own
+    endpoints, drawn only where the site has a relying party (none at an IP
+    address) and `hidden` until the browser has its options, so a browser
+    that can use no passkey shows the lead and the code link alone. %>
+<div class="flex flex-col gap-[18px]">
+  <%= render "admin/shared/auth_heading", title: t("admin.second_factor.show.title") %>
+
+  <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= flash[:alert] %><% end %>
+
+  <% if @code_view %>
+    <%= form_with url: admin_second_factor_code_path, class: "flex flex-col gap-[18px]" do |form| %>
+      <div class="admin-field">
+        <%= form.label :recovery_code, t("admin.second_factor.show.code"), class: setup_label_class %>
+        <%= form.text_field :recovery_code, required: true, autofocus: true, autocomplete: "one-time-code",
+              autocapitalize: "characters", spellcheck: false, class: setup_input_class,
+              aria: { describedby: "recovery-code-help" } %>
+        <p id="recovery-code-help" class="mt-1 text-small text-meta"><%= t("admin.second_factor.show.code_help") %></p>
+      </div>
+      <%= render Admin::Ui::ButtonComponent.new(label: t("admin.second_factor.show.submit_code"), type: "submit", class: "w-full") %>
+    <% end %>
+  <% else %>
+    <p class="text-sm leading-relaxed text-dim"><%= t("admin.second_factor.show.lead", email: @user.email_address) %></p>
+
+    <% if passkey_relying_party %>
+      <div class="contents" data-controller="passkey-sign-in"
+           data-passkey-sign-in-options-url-value="<%= admin_second_factor_options_path %>"
+           data-passkey-sign-in-verify-url-value="<%= admin_second_factor_passkey_path %>">
+        <button type="button" class="w-full <%= Admin::Ui::ButtonComponent.classes(:primary) %>" hidden
+                data-passkey-sign-in-target="button" data-action="passkey-sign-in#signIn">
+          <%= render "admin/shared/icon", name: :fingerprint, size: "size-4" %>
+          <%= t("admin.second_factor.show.use_passkey") %>
+        </button>
+      </div>
+    <% end %>
+
+    <% if @has_codes %>
+      <p><%= link_to t("admin.second_factor.show.use_code"), admin_second_factor_path(with: "code"), class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %></p>
+    <% end %>
+  <% end %>
+
+  <%= button_to t("admin.second_factor.show.start_over"), admin_second_factor_path, method: :delete,
+        class: Admin::Ui::ButtonComponent.classes(:tertiary, size: :small) %>
+</div>

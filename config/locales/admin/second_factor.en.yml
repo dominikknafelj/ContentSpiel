@@ -1,0 +1,24 @@
+# The second step of a sign-in (docs/reference/i18n.md): `admin.second_factor.show`
+# is the lazy-lookup scope of `app/views/admin/second_factors/show.html.erb`,
+# and the alerts beside it are `Admin::SecondFactorsController`'s.
+en:
+  admin:
+    second_factor:
+      show:
+        title: "Confirm it's you"
+        # The passkey view's lead, naming the account the password was
+        # typed for.
+        lead: "Use your passkey to finish signing in as %{email}."
+        use_passkey: "Use your passkey"
+        use_code: "Use a recovery code"
+        # The code view's field, its help line and its button.
+        code: "Recovery code"
+        code_help: "One of the ten codes you saved. Each works once."
+        submit_code: "Sign in"
+        start_over: "Start over"
+      # A passkey that was not accepted, whatever the reason: one sentence
+      # for all, naming the codes only when the account has one left.
+      passkey_failed: "That passkey didn't work. Try again, or use a recovery code."
+      passkey_failed_no_codes: "That passkey didn't work. Try again."
+      # A wrong code and a used one: one sentence for both.
+      code_failed: "That code didn't work. Check it, or use another one."

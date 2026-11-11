@@ -185,10 +185,12 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/views/admin/errors
       app/views/admin/jump
       app/views/admin/passwords
+      app/views/admin/second_factors
       app/views/admin/sessions
       app/views/admin/system_status
       app/controllers/admin/jump_controller.rb
       app/controllers/admin/passwords_controller.rb
+      app/controllers/admin/second_factors_controller.rb
       app/controllers/admin/sessions_controller.rb
       app/controllers/admin/system_status_controller.rb
       app/controllers/admin/media_assets_controller.rb
@@ -204,6 +206,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/record_of_kind.rb
       app/controllers/concerns/admin/refusal_status.rb
       app/controllers/concerns/admin/sign_in_completion.rb
+      app/controllers/concerns/admin/sign_in_locks.rb
       app/controllers/concerns/admin/stale_form.rb
       app/controllers/concerns/admin/toast_stream.rb
       app/controllers/concerns/admin/translatable_record_loading.rb

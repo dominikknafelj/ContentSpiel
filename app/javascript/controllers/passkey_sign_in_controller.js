@@ -1,9 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 
-// "Sign in with a passkey" on the sign-in panel: the divider and the button
-// the server draws hidden
-// below the password form, shown only where the browser can use a passkey,
-// so a browser that cannot keeps the panel exactly as it was.
+// A passkey's button on the product layout's panel: "Sign in with a
+// passkey" below the sign-in form, with its "or" divider, and "Use your
+// passkey" on the second step, which has no divider (the target is
+// optional). The server draws both hidden, and they are shown only where
+// the browser can use a passkey, so a browser that cannot keeps the panel
+// exactly as it was. The two pages differ only in the endpoints they name.
 //
 // Lives in controllers/ rather than controllers/admin/ because sign-in loads
 // only the `application` entry point, which public pages load too. So the
@@ -21,7 +23,7 @@ import { Controller } from "@hotwired/stimulus"
 // challenge with the first answer.
 //
 // The answer is posted as `credential` and the server says where to go
-// (`{ location }`: CS Studio, or the sign-in page with its alert), whatever
+// (`{ location }`: CS Studio, or the page with its alert), whatever
 // happened; the page is left for it. A prompt the person closed says
 // nothing and fetches fresh options, for the next press. Nothing is written
 // into the page but `hidden` and `disabled`, which connect decides afresh,
@@ -39,7 +41,7 @@ export default class extends Controller {
     if (this.ceremony.supported()) {
       this.fetch()
     } else {
-      this.dividerTarget.hidden = true
+      if (this.hasDividerTarget) this.dividerTarget.hidden = true
       this.buttonTarget.hidden = true
     }
   }
@@ -70,7 +72,7 @@ export default class extends Controller {
     if (status !== 200 || !this.element.isConnected) return
 
     this.options = options
-    this.dividerTarget.hidden = false
+    if (this.hasDividerTarget) this.dividerTarget.hidden = false
     this.buttonTarget.hidden = false
     this.buttonTarget.disabled = false
   }

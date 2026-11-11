@@ -28,6 +28,14 @@ Rails.application.routes.draw do
     post "sign-in", to: "sessions#create"
     post "sign-in/passkey/options", to: "sessions#passkey_options", as: :sign_in_passkey_options
     post "sign-in/passkey", to: "sessions#passkey", as: :sign_in_passkey
+    # The second step, after a right password for an account that holds a
+    # passkey or recovery codes (`Admin::SecondFactorsController`). Under
+    # `sign-in/`, which `Setup::RedirectConstraint` lets through.
+    get "sign-in/second-step", to: "second_factors#show", as: :second_factor
+    post "sign-in/second-step/options", to: "second_factors#options", as: :second_factor_options
+    post "sign-in/second-step/passkey", to: "second_factors#passkey", as: :second_factor_passkey
+    post "sign-in/second-step/code", to: "second_factors#code", as: :second_factor_code
+    delete "sign-in/second-step", to: "second_factors#destroy"
     delete "sign-out", to: "sessions#destroy", as: :sign_out
 
     # ⌘K "Jump to..." results: a layout-less HTML
