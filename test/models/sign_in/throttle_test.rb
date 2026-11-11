@@ -33,8 +33,8 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     @throttle = SignIn::Throttle.new(store: @store)
   end
 
-  def attempt(identifier: EMAIL, address: ADDRESS, throttle: @throttle)
-    throttle.reserve(identifier: identifier, address: address)
+  def attempt(identifier: EMAIL, address: ADDRESS, throttle: @throttle, device: nil)
+    throttle.reserve(identifier: identifier, address: address, device: device)
   end
 
   def attempts(count, **options) = Array.new(count) { attempt(**options) }.last
@@ -169,6 +169,43 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
     travel 15.minutes + 1.second
     assert_not @throttle.bot_check_due?(address: "198.51.100.4", identifier: EMAIL)
+  end
+
+  test "a known device counts in a bucket of its own: the account's lock does not refuse it, and its own lock closes it alone" do
+    attempts(5)
+    assert_equal :account, attempt.refused_by.bucket
+
+    device = attempt(device: "d" * 32)
+    assert device.ok?, "the account's lock does not hold a known device"
+    3.times { assert attempt(device: "d" * 32).ok? }
+    assert_equal [ Trip.new(bucket: :device, level: 0, seconds: 60) ], attempt(device: "d" * 32).closes
+    assert_equal Trip.new(bucket: :device, level: 0, seconds: 60), attempt(device: "d" * 32).refused_by
+    assert attempt(device: "e" * 32).ok?, "another device of the account is open"
+    assert_equal 5, count_of(:account), "a device's attempts are not the account's"
+
+    travel 61.seconds
+    assert attempt.ok?, "the account's own lock ended as it was set"
+  end
+
+  test "a success on a known device forgets the device's run and leaves the account's; clear forgets the account's" do
+    4.times { attempt(device: "d" * 32) }
+    attempts(5)
+    @throttle.record_success(identifier: EMAIL, address: ADDRESS, device: "d" * 32)
+    assert_equal :account, attempt.refused_by.bucket, "the account's lock stands"
+    assert_empty Array.new(4) { attempt(device: "d" * 32) }.flat_map(&:closes), "the device's run began again"
+
+    assert_nil @throttle.clear(identifier: EMAIL)
+    assert attempt.ok?
+    assert_equal 1, count_of(:account)
+    assert_not @throttle.bot_check_due?(address: "198.51.100.9", identifier: EMAIL), "the account's bot-check count is forgotten too"
+  end
+
+  test "a device's bucket is decided in an auth.throttle span of its own name" do
+    exporter = Rails.application.config.x.otel_test_exporter
+    exporter.reset
+    Telemetry.tracer.in_span("test request", kind: :server) { attempt(device: "d" * 32) }
+
+    assert_equal %w[address_wide device], exporter.finished_spans.select { |span| span.name == "auth.throttle" }.map { |span| span.attributes["auth.bucket"] }
   end
 
   test "a notice is due once an hour per account" do

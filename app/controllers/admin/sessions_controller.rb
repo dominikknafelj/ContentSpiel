@@ -19,7 +19,9 @@ module Admin
   #                        counts whether or not an account has the address,
   #                        so an address with no account locks and answers
   #                        exactly alike. The attempt that closed it is
-  #                        answered so too.
+  #                        answered so too, and so is a known device's own
+  #                        bucket (`DEVICE_COOKIE`), which only a browser
+  #                        that signed in to the account meets.
   #   :locked, address     "Try again later.", as the per-address rate limit
   #                        answers: an address's bucket says nothing of an
   #                        account. It wins over the account's when an
@@ -42,8 +44,9 @@ module Admin
   # cost more than for an unknown one), so both carry the email that was
   # tried in `metadata`, never the password. For the same reason the
   # account's pause mail is a job queued for any email, known or not
-  # (`SignIn::LockoutMailJob`, which looks the account up). Nor a password typed into the
-  # email box by mistake: a value without an "@" isn't an address, so
+  # (`SignIn::LockoutMailJob`, which looks the account up); a known
+  # device's lock is the person's own and mails nothing. Nor a password
+  # typed into the email box by mistake: a value without an "@" isn't an address, so
   # nothing is kept; an address is cut to the 254 characters an email
   # address can have, so the log can't be stuffed through it. An attempt
   # refused by a closed bucket or the bot check records nothing: it checked
@@ -60,6 +63,20 @@ module Admin
 
     allow_unauthenticated_access only: %i[ new create ]
 
+    RATE_LIMIT_PURPOSE = "content_spiel sign-in rate limit".freeze
+
+    # THE KNOWN DEVICE (`SignIn::KnownDevice`): written after a right
+    # password only, so a bot never holds one, and read back on every
+    # attempt, so a browser that signed in to an account before is counted
+    # apart from the account's bucket a bot may hold closed. Encrypted and
+    # signed (`cookies.encrypted`): a cookie that does not open, or that
+    # names another account, is no known device and the attempt goes the
+    # common way. HttpOnly, SameSite Lax, Secure where the site is HTTPS,
+    # for DEVICE_LIFETIME from its last sign-in. It holds a random id and
+    # the HMACs of the accounts, never an email.
+    DEVICE_COOKIE = :cs_known_device
+    DEVICE_LIFETIME = 90.days
+
     # Where Turnstile's script is loaded from and its widget framed from.
     BOT_CHECK_ORIGIN = "https://challenges.cloudflare.com".freeze
     # On a site with both Turnstile keys every answer of the sign-in page
@@ -71,7 +88,11 @@ module Admin
     # `create`, a success and a refusal alike, not failures alone. Its
     # store is the throttle's (`SignIn.store`), so it counts where every
     # process sees it, and trips in tests too, whose cache is a null store.
-    rate_limit to: 10, within: 3.minutes, only: :create, store: SignIn.store, with: -> { answer_address_limited }
+    # Keyed as the throttle keys an address (`VisitorAddress`): an HMAC, so
+    # the store holds no IP, and an IPv6 visitor by their /64, so rotating
+    # within it is one visitor.
+    rate_limit to: 10, within: 3.minutes, only: :create, store: SignIn.store,
+      by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { answer_address_limited }
 
     def new
       bot_check = SignIn::BotCheck.current
@@ -83,13 +104,15 @@ module Admin
       attempt = SignIn::PasswordAttempt.new(
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
-        bot_check_token: params["cf-turnstile-response"]
+        bot_check_token: params["cf-turnstile-response"],
+        device: known_device
       )
       outcome = attempt.call
 
       if outcome.ok?
         session.delete(:sign_in_bot_check)
         start_new_session_for outcome.account
+        remember_device(attempt.identifier)
         Current.actor = outcome.account
         Audit.record("session.created", subject: outcome.account)
         redirect_to after_authentication_url
@@ -156,7 +179,7 @@ module Admin
       else
         buckets = outcome.trips.map(&:bucket)
         if buckets.include?(:address_wide) then t("admin.sessions.limited")
-        elsif buckets.include?(:account) then t("admin.sessions.locked")
+        elsif buckets.intersect?([ :account, :device ]) then t("admin.sessions.locked")
         else t("admin.sessions.refused")
         end
       end
@@ -187,9 +210,18 @@ module Admin
       end
     end
 
+    def known_device = SignIn::KnownDevice.from(cookies.encrypted[DEVICE_COOKIE])
+
+    def remember_device(identifier)
+      cookies.encrypted[DEVICE_COOKIE] = {
+        value: known_device.remember(identifier).to_h,
+        expires: DEVICE_LIFETIME, httponly: true, same_site: :lax, secure: request.ssl?
+      }
+    end
+
     def locked_metadata(trip, email)
-      if trip.bucket == :account
-        { "bucket" => "account", **email_metadata(email), "level" => trip.level, "seconds" => trip.seconds }
+      if trip.bucket == :account || trip.bucket == :device
+        { "bucket" => trip.bucket.to_s, **email_metadata(email), "level" => trip.level, "seconds" => trip.seconds }
       else
         { "bucket" => "address_wide", "seconds" => trip.seconds }
       end

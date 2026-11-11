@@ -431,11 +431,14 @@ module Audit
         [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
       end
 
-      # A lock-out of the account's bucket or of the address's (`bucket` in
-      # the metadata).
+      # A lock-out of the account's bucket, of one known device's or of the
+      # address's (`bucket` in the metadata).
       def locked_sentence
-        bucket = event.metadata.is_a?(Hash) ? event.metadata["bucket"] : nil
-        bucket == "address_wide" ? "Sign-in from one address paused after repeated failures" : "Sign-in to one account paused after repeated failures"
+        case event.metadata.is_a?(Hash) ? event.metadata["bucket"] : nil
+        when "address_wide" then "Sign-in from one address paused after repeated failures"
+        when "device" then "Sign-in to one account from one browser paused after repeated failures"
+        else "Sign-in to one account paused after repeated failures"
+        end
       end
 
       def denied_parts

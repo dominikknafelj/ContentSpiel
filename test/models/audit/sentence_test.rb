@@ -201,14 +201,17 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_no_match(/someone@example\.com/, read(sentence))
   end
 
-  test "a lock-out reads as paused sign-in, for one account or one address, with no actor, as a security event" do
+  test "a lock-out reads as paused sign-in, for one account, one browser or one address, with no actor, as a security event" do
     account = event("session.locked", channel: "admin", ip: "203.0.113.4",
       metadata: { "bucket" => "account", "email_address" => "someone@example.com", "level" => 0, "seconds" => 60 })
     address = event("session.locked", channel: "admin", ip: "203.0.113.4", metadata: { "bucket" => "address_wide", "seconds" => 3600 })
 
     assert_equal "Sign-in to one account paused after repeated failures", read(sentence_for(account))
     assert_equal "Sign-in from one address paused after repeated failures", read(sentence_for(address))
-    [ account, address ].each do |locked|
+    device = event("session.locked", channel: "admin", ip: "203.0.113.4",
+      metadata: { "bucket" => "device", "email_address" => "someone@example.com", "level" => 0, "seconds" => 60 })
+    assert_equal "Sign-in to one account from one browser paused after repeated failures", read(sentence_for(device))
+    [ account, address, device ].each do |locked|
       sentence = sentence_for(locked)
       assert sentence.actor.none
       assert sentence.security

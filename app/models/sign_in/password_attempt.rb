@@ -15,9 +15,10 @@ module SignIn
   #    bot without a token costs the account nothing and learns nothing.
   #    Cloudflare unreachable (`:unavailable`) goes on as if it passed.
   # 2. The reservation (`Throttle#reserve`), which counts the attempt in the
-  #    account's and the address's buckets BEFORE the password is checked,
-  #    so attempts at once get no more guesses per lock than attempts one
-  #    after another. A closed bucket is `:locked`, with no password checked.
+  #    account's bucket (or, from a browser that signed in to it before,
+  #    `device`, that device's) and the address's BEFORE the password is
+  #    checked, so attempts at once get no more guesses per lock than
+  #    attempts one after another. A closed bucket is `:locked`, with no password checked.
   # 3. The password, through `accounts.authenticate_by`, which hashes the
   #    password whether or not the address has an account (`User.new(password:)`
   #    for an unknown one), so a refusal takes the same work either way.
@@ -45,8 +46,10 @@ module SignIn
   class PasswordAttempt
     attr_reader :address
 
-    def initialize(email:, password:, address:, hostname:, bot_check_token:, accounts: User, throttle: SignIn::Throttle.new, bot_check: SignIn::BotCheck.current)
+    # `device`: the `KnownDevice` the browser carries, or nil.
+    def initialize(email:, password:, address:, hostname:, bot_check_token:, device: nil, accounts: User, throttle: SignIn::Throttle.new, bot_check: SignIn::BotCheck.current)
       @email = email
+      @device = device
       @password = password
       @address = address
       @hostname = hostname
@@ -86,7 +89,7 @@ module SignIn
         end
       end
 
-      reservation = @throttle.reserve(identifier: identifier, address: address)
+      reservation = @throttle.reserve(identifier: identifier, address: address, device: known_device_id)
       return outcome(:locked, trips: [ reservation.refused_by ]) unless reservation.ok?
 
       password = @password.is_a?(String) ? @password : ""
@@ -94,8 +97,13 @@ module SignIn
       Telemetry.record(span, "auth.account_exists" => account.present? || @accounts.exists?(email_address: email)) unless password.empty?
       return outcome(:refused, trips: reservation.closes) unless account
 
-      @throttle.record_success(identifier: identifier, address: address)
+      @throttle.record_success(identifier: identifier, address: address, device: known_device_id)
       outcome(:ok, account: account)
+    end
+
+    # The device's id when it has signed in to this account before.
+    def known_device_id
+      @device.id if @device&.knows?(identifier)
     end
 
     def outcome(status, account: nil, trips: [], bot_check_due: bot_check_due?)

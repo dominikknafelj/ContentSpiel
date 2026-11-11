@@ -27,14 +27,28 @@ module SignIn
   # a person on the fifth).
   #
   # A REFUSED ATTEMPT NEVER COUNTS. One refused by a standing lock is
-  # refused on a read, before any increment, so a bot cannot keep a person
-  # out for good by trying through the lock: once it ends, the right
-  # password signs them in and their next mistake counts from one. The read
+  # refused on a read, before any increment, so a bot trying through the
+  # lock does not lengthen it: once it ends, the right password signs the
+  # person in and their next mistake counts from one. (A bot that tries
+  # once at each lock's end can hold the account bucket closed; the known
+  # device, below, is what keeps the person in.) The read
   # before the increment is safe because a lock only ever moves the answer
   # toward refusal: a lock written just after the read is met by the
   # attempt's own `unless_exist` write, which it then loses. An attempt
   # refused after its increment (it lost the race for the lock, or the
   # other bucket refused it) takes its count back with a `decrement`.
+  #
+  # A KNOWN DEVICE COUNTS APART. An attempt from a browser that signed in to
+  # this account before (the caller hands its device id as `device:`, from a
+  # cookie a bot never holds: OWASP's "device cookie") is counted in a
+  # bucket of that account and that device, with the account bucket's
+  # figures, and is neither counted in nor refused by the account's own
+  # bucket. So a bot that closes an account at every lock's end, which the
+  # account bucket alone cannot stop (one attempt an hour, from anywhere),
+  # does not keep the person out of their own browser; and a device bucket
+  # that closes closes that device alone. The wide bucket and the bot check
+  # apply to a known device as to anyone. `clear` (a reset of the password,
+  # the console's) opens the account's bucket for every browser.
   #
   # THE WIDE BUCKET counts every attempt from one address (`VisitorAddress`,
   # an IPv6 one by its /64), whatever accounts it tried: WIDE_LIMIT go on in
@@ -73,8 +87,9 @@ module SignIn
     NOTICE_EVERY = 1.hour
     KEY_PURPOSE = "content_spiel sign-in throttle".freeze
 
-    # A closed bucket: `:account` with its back-off level (count - 5), or
-    # `:address_wide` with none, and the seconds it stays closed.
+    # A closed bucket: `:account` or `:device` with its back-off level
+    # (count - 5), or `:address_wide` with none, and the seconds it stays
+    # closed.
     Trip = Data.define(:bucket, :level, :seconds)
 
     # `refused_by`: the closed bucket that refuses the attempt, which then
@@ -103,14 +118,16 @@ module SignIn
       @store = store
     end
 
-    def reserve(identifier:, address:)
+    # `device`: the id of a browser that signed in to this account before,
+    # or nil.
+    def reserve(identifier:, address:, device: nil)
       account = identifier_digest(identifier)
       address = address_digest(address)
 
       wide_refusal, wide_closes = reserve_wide(address)
       return Reservation.new(refused_by: wide_refusal, closes: []) if wide_refusal
 
-      account_refusal, account_closes = reserve_account(account)
+      account_refusal, account_closes = device ? reserve_run(:device, device_digest(identifier, device)) : reserve_run(:account, account)
       if account_refusal
         take_back(key(:wide, address), WIDE_WINDOW)
         return Reservation.new(refused_by: account_refusal, closes: [])
@@ -121,15 +138,30 @@ module SignIn
       Reservation.new(refused_by: nil, closes: [ account_closes, wide_closes ].compact)
     end
 
-    # The attempt's password was right: the account's run, its lock and its
-    # bot-check count are forgotten, and the address's counts take back this
-    # attempt's own.
-    def record_success(identifier:, address:)
-      account = identifier_digest(identifier)
+    # The attempt's password was right: the bucket it was counted in
+    # forgets its run and its lock (the account's with its bot-check count,
+    # or for a known device the device's alone: the account's run may be a
+    # bot's, which a success on the person's own browser must not hand five
+    # fresh guesses), and the address's counts take back this attempt's own.
+    def record_success(identifier:, address:, device: nil)
+      if device
+        digest = device_digest(identifier, device)
+        store.delete_multi([ key(:device, digest), key(:device_lock, digest) ])
+      else
+        clear(identifier: identifier)
+      end
       address = address_digest(address)
-      store.delete_multi([ key(:account, account), key(:account_lock, account), key(:bot_account, account) ])
       take_back(key(:wide, address), WIDE_WINDOW)
       take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
+      nil
+    end
+
+    # The account's run, its lock and its bot-check count are forgotten:
+    # its password was set by someone who proved the account (a reset's
+    # token, the console), so the bucket opens for every browser.
+    def clear(identifier:)
+      account = identifier_digest(identifier)
+      store.delete_multi([ key(:account, account), key(:account_lock, account), key(:bot_account, account) ])
       nil
     end
 
@@ -169,33 +201,36 @@ module SignIn
         end
       end
 
-      def reserve_account(account)
-        decide("account") do
-          lock_key = key(:account_lock, account)
-          standing = account_lock(lock_key)
+      # The account's run, or a known device's (`bucket` :account or
+      # :device), under `digest`.
+      def reserve_run(bucket, digest)
+        decide(bucket.to_s) do
+          count_key = key(bucket, digest)
+          lock_key = key(:"#{bucket}_lock", digest)
+          standing = run_lock(bucket, lock_key)
           next [ standing, nil ] if standing
 
-          count = store.increment(key(:account, account), 1, expires_in: ACCOUNT_RUN)
+          count = store.increment(count_key, 1, expires_in: ACCOUNT_RUN)
           next [ nil, nil ] if count.nil? || count < ACCOUNT_FREE_FAILURES
 
           seconds = self.class.lock_seconds(count)
           level = count - ACCOUNT_FREE_FAILURES
-          next [ nil, Trip.new(bucket: :account, level: level, seconds: seconds) ] if store.write(lock_key, [ now + seconds, level ], unless_exist: true, expires_in: seconds)
+          next [ nil, Trip.new(bucket: bucket, level: level, seconds: seconds) ] if store.write(lock_key, [ now + seconds, level ], unless_exist: true, expires_in: seconds)
 
           # Lost: another attempt's lock stands, and refuses this one. With
           # none to be read the write failed (Solid Cache's failsafe answers
           # false), and the bucket is open.
-          standing = account_lock(lock_key)
-          take_back(key(:account, account), ACCOUNT_RUN) if standing
+          standing = run_lock(bucket, lock_key)
+          take_back(count_key, ACCOUNT_RUN) if standing
           [ standing, nil ]
         end
       end
 
       # The standing lock as a Trip, or nil.
-      def account_lock(lock_key)
+      def run_lock(bucket, lock_key)
         ends, level = store.read(lock_key)
         left = seconds_until(ends)
-        Trip.new(bucket: :account, level: level, seconds: left) if left
+        Trip.new(bucket: bucket, level: level, seconds: left) if left
       end
 
       def wide_trip(address)
@@ -234,5 +269,8 @@ module SignIn
 
       # An email as written, never cut as an address would be.
       def identifier_digest(identifier) = VisitorAddress.digest(identifier, purpose: KEY_PURPOSE)
+
+      # One account on one device.
+      def device_digest(identifier, device) = VisitorAddress.digest("#{identifier_digest(identifier)}:#{device}", purpose: KEY_PURPOSE)
   end
 end
