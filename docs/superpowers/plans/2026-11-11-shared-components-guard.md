@@ -73,10 +73,11 @@ Same shape as Task 1. Callers: `app/components/admin/ui/field_component.rb`, `ap
 Its existing keys move with it. Its preview moves.
 - [ ] Steps as Task 1, plus run the reference card's browser test alone (the translation pair's). Commit: `ref: the reference card is a shared component (Admin::Ui::ReferenceCardComponent), its words keys`.
 
-### Task 3b: Suggestion moves to `ui/`
+### Task 3b: Suggestion and Pending move to `ui/`
 
 Found while building Task 1: `Admin::Ui::TranslateButtonComponent#box_id` reads `Admin::TranslationScreen::SuggestionComponent.dom_id`, and `Admin::TranslationsController` (the AI suggestion endpoint every editor field and Settings uses) renders it. That makes it a shared part: the box an AI suggestion streams into, under any translatable field. Same shape as Task 1: it becomes `Admin::Ui::SuggestionComponent`, its literals become keys `admin.components.ui.suggestion.*`, it gets a contract (keyboard: the existing browser test that accepts or discards a suggestion), its preview and test move, `COVERED_BY` → `"StudioTranslationPair"`, and the old constant goes under Removed. The comments in `field_component.html.erb`, `plain_column_component.html.erb`, `rich_text_column_component.html.erb` and `app/views/admin/shared/_translation_box.html.erb` name the new constant.
-- [ ] Steps as Task 1, plus run the suggestion's browser test alone. Commit: `ref: the AI suggestion box is a shared component (Admin::Ui::SuggestionComponent), its words keys`.
+`Admin::TranslationScreen::PendingComponent` (the waiting state a suggestion box shows, rendered once by `app/views/layouts/admin.html.erb` into `#translation-pending-template` for the script to clone) is drawn by the layout, so it is shared too: it moves the same way to `Admin::Ui::PendingComponent`, renamed `Admin::Ui::TranslationPendingComponent` if a bare `Pending` would be ambiguous among `ui/`'s names (check `ls app/components/admin/ui`), its literals keys, its contract (it takes no focus → the sentence, if its markup draws nothing focusable).
+- [ ] Steps as Task 1, plus run the suggestion's browser test alone. Commit (one per component): `ref: the AI suggestion box is a shared component (Admin::Ui::SuggestionComponent), its words keys` and `ref: the suggestion's waiting state is a shared component`.
 
 ### Task 4: The guard
 
