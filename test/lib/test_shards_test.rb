@@ -5,7 +5,7 @@ load Rails.root.join("bin/test-shard").to_s
 
 # CI runs both suites as several jobs side by side, each taking one shard of the
 # files (`bin/test-shard`, `.github/workflows/ci.yml`): the browser suite as
-# four, the unit suite (every test file outside test/system/) as two. A file
+# six, the unit suite (every test file outside test/system/) as two. A file
 # that fell out of every shard would simply never run in CI, and nothing would
 # say so: so every test file of either suite is in exactly one shard, at the
 # number of shards the workflow asks for and at any other.
@@ -43,7 +43,7 @@ class TestShardsTest < ActiveSupport::TestCase
   # One file can be heavier than a fair share (the mind graph's is a third of
   # the browser suite), and then its shard is that file alone: so the limit is
   # the larger of that file and a fair share with some slack.
-  { "system" => 4, "unit" => 2 }.each do |suite, total|
+  { "system" => 6, "unit" => 2 }.each do |suite, total|
     test "no #{suite} shard is much heavier than a fair share" do
       weights = TestShard.weights(suite, Rails.root.to_s)
       loads = TestShard.shards(suite, total, Rails.root.to_s).map { |files| files.sum { |path| weights.fetch(path) } }
