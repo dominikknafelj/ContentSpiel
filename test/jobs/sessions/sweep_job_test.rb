@@ -49,6 +49,35 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
     Sessions::SweepJob.const_set(:BATCH, stub)
   end
 
+  # Each batch commits on its own: a later one that raises leaves the
+  # earlier ones ended, and they are still recorded, once, before the error
+  # reaches the job.
+  test "a batch that raises after another committed still records the ended ones, once" do
+    rows = Array.new(3) { start(seen: @now - 13.hours) }
+    stub = Sessions::SweepJob.const_get(:BATCH)
+    Sessions::SweepJob.send(:remove_const, :BATCH)
+    Sessions::SweepJob.const_set(:BATCH, 2)
+    transaction = Session.method(:transaction)
+    calls = 0
+    # The absolute sweep's one empty batch, the idle sweep's first batch of
+    # two, then its second batch raises.
+    failing = lambda do |*args, **options, &block|
+      calls += 1
+      raise ActiveRecord::ConnectionFailed, "lost" if calls == 3
+      transaction.call(*args, **options, &block)
+    end
+
+    with_singleton_override(Session, :transaction, failing) do
+      assert_raises(ActiveRecord::ConnectionFailed) { Sessions::SweepJob.perform_now(at: @now) }
+    end
+
+    assert_equal 1, Session.where(id: rows.map(&:id)).count
+    assert_equal [ { "reason" => "expired_idle", "count" => 2, "after_hours" => 12 } ], ended_events.map(&:metadata)
+  ensure
+    Sessions::SweepJob.send(:remove_const, :BATCH)
+    Sessions::SweepJob.const_set(:BATCH, stub)
+  end
+
   test "a run with nothing to do records nothing" do
     start(seen: @now)
     assert_no_difference -> { Audit::Event.count } do

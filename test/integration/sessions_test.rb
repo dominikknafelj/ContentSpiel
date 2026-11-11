@@ -149,6 +149,32 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_no_match ENDED_SENTENCE, response.body
   end
 
+  # A script's fetch that meets the gone session before any page does (an
+  # autosave's PATCH, a stream, JSON, an XHR) follows the redirect inside
+  # the fetch, where the sign-in page would spend the flash unseen: it is
+  # told nothing and the cookie stays, so the person's next page says it.
+  test "a fetch that meets a gone session first spends nothing, and the next page says it" do
+    sign_in_cookie_value
+    @user.sessions.sole.destroy!
+
+    [
+      -> { patch "/cs-studio/account/profile", params: { name: "x" }, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" } },
+      -> { get "/cs-studio", headers: { "Accept" => "application/json" } },
+      -> { get "/cs-studio", xhr: true }
+    ].each do |fetch|
+      fetch.call
+      assert_redirected_to "/cs-studio/sign-in"
+      assert_not cookie_cleared?, "a fetch leaves the cookie"
+      follow_redirect!
+      assert_no_match ENDED_SENTENCE, response.body
+    end
+
+    get "/cs-studio"
+    assert cookie_cleared?
+    follow_redirect!
+    assert_select "#flash-session-ended[data-turbo-temporary]", text: ENDED_SENTENCE
+  end
+
   test "an idle-expired session says so at sign-in" do
     freeze_time
     sign_in_cookie_value

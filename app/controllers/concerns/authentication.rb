@@ -60,11 +60,26 @@ module Authentication
     # cleared so the next visit is a plain sign-in. A browser with no cookie
     # and a forged one (`cookies.signed` reads nil) are told nothing, and the
     # sentence names no account.
+    #
+    # Only a page the person asked for (a GET or HEAD for HTML that is no
+    # XHR) is told, and only it clears the cookie. A write or a script's
+    # fetch (an autosave, a stream, JSON) that meets the gone session first
+    # leaves both: its redirect is followed inside the fetch, where the
+    # sign-in page drawn would spend the flash unseen, and a cookie cleared
+    # there would leave the person's next page nothing to name, so they
+    # would get a plain sign-in. Kept, the cookie still names a row that is
+    # gone (ids are never reused), and that next page says it. A script's
+    # GET for HTML (a live refresh) still counts as a page: nothing in the
+    # request tells it from a visit.
     def forget_ended_session
-      return if cookies.signed[:session_id].blank?
+      return if cookies.signed[:session_id].blank? || !page_request?
 
       cookies.delete(:session_id)
       flash[:session_ended] = true
+    end
+
+    def page_request?
+      (request.get? || request.head?) && !request.xhr? && request.format.html?
     end
 
     # The public site needs no authentication of its own (PagesController

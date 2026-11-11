@@ -9,7 +9,8 @@ module Sessions
   # go in batches of BATCH, each in its own transaction, through
   # `Session.destroy_each_locked` (a destroy, so the cable disconnects). It
   # records at most one `session.ended` per reason per run, with no actor and
-  # no subject, since a sweep is nobody's act, and the count it ended.
+  # no subject, since a sweep is nobody's act, and the count it ended, even
+  # when a batch raises after others committed.
   class SweepJob < ApplicationJob
     queue_as :default
 
@@ -24,6 +25,9 @@ module Sessions
 
     private
 
+    # The event is recorded in `ensure`, so a batch that raises (a lost
+    # connection, a deadlock) still leaves the one event for the batches
+    # that had committed before it, and the error goes on to the job.
     def sweep(reason, at)
       ended = 0
       loop do
@@ -31,8 +35,9 @@ module Sessions
         ended += batch
         break if batch.zero?
       end
-      Audit.record("session.ended", metadata: { "reason" => reason, "count" => ended, **Session.timeout_metadata(reason) }) if ended.positive?
       ended
+    ensure
+      Audit.record("session.ended", metadata: { "reason" => reason, "count" => ended, **Session.timeout_metadata(reason) }) if ended&.positive?
     end
   end
 end
