@@ -219,6 +219,24 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_equal %w[address_wide device], exporter.finished_spans.select { |span| span.name == "auth.throttle" }.map { |span| span.attributes["auth.bucket"] }
   end
 
+  test "reserve_address counts in the wide bucket alone, so an account's lock never refuses it, and release_address takes the address's counts back" do
+    attempts(5)
+    assert_equal :account, attempt.refused_by.bucket
+
+    reservation = @throttle.reserve_address(address: ADDRESS)
+    assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), reservation
+    assert_equal 6, count_of(:wide)
+    assert_equal 5, count_of(:account), "the account's run is not counted"
+
+    assert_nil @throttle.release_address(address: ADDRESS)
+    assert_equal 5, count_of(:wide)
+    assert_equal 4, count_of(:bot_address), "this attempt's bot-check count is taken back with its wide one"
+    assert_equal :account, attempt.refused_by.bucket, "the account's lock stands"
+
+    45.times { @throttle.reserve_address(address: ADDRESS) }
+    assert_equal :address_wide, @throttle.reserve_address(address: ADDRESS).refused_by.bucket
+  end
+
   test "a notice is due once an hour per account" do
     assert @throttle.notice_due?(identifier: EMAIL)
     assert_not @throttle.notice_due?(identifier: EMAIL)

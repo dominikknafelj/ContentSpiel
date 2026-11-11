@@ -51,6 +51,21 @@ module SignIn
   # anyone who proved the account) opens the account's bucket and every
   # device's at once.
   #
+  # A SECOND PROOF counts where its password did. A right password for an
+  # account that holds a second factor (a passkey or an unused recovery
+  # code) is not a success: its count in the account's bucket (or the known
+  # device's) stands, and only the address's counts are taken back
+  # (`release_address`), so a whole sign-in costs the address what one did
+  # before. The second proof (a recovery code or a passkey of the account's
+  # own) and Confirm it's you's proof reserve in that same bucket again
+  # before they check anything, so their failures close the account as
+  # wrong passwords do, and a stolen password earns no fresh guesses; only
+  # the proof's success forgets the run. A passkey sign-in, which names no
+  # account until it is verified, reserves in the wide bucket alone
+  # (`reserve_address`) and is never refused by an account's lock: a
+  # passkey cannot be guessed, and a bot naming a credential must not lock
+  # out its owner.
+  #
   # THE WIDE BUCKET counts every attempt from one address (`VisitorAddress`,
   # an IPv6 one by its /64), whatever accounts it tried: WIDE_LIMIT go on in
   # an hour from the first, and the address is then closed until that hour
@@ -143,6 +158,27 @@ module SignIn
       Reservation.new(refused_by: nil, closes: [ account_closes, wide_closes ].compact)
     end
 
+    # The wide bucket's half of `reserve`, for an attempt that names no
+    # account (a passkey sign-in): no account's or device's run is counted,
+    # and none refuses it.
+    def reserve_address(address:)
+      refusal, closes = reserve_wide(address_digest(address))
+      Reservation.new(refused_by: refusal, closes: [ closes ].compact)
+    end
+
+    # Takes back one count in the wide bucket and one in the address's bot
+    # check: the address's half of `record_success`, and on its own the
+    # answer to a right password that still owes a second proof, or to a
+    # verified passkey. `reserve_address` counts no bot check, so after it
+    # the bot-check count taken back is an earlier attempt's: one per
+    # verified passkey, which no bot holds.
+    def release_address(address:)
+      address = address_digest(address)
+      take_back(key(:wide, address), WIDE_WINDOW)
+      take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
+      nil
+    end
+
     # The attempt's password was right: the bucket it was counted in
     # forgets its run and its lock (the account's with its bot-check count,
     # or for a known device the device's alone: the account's run may be a
@@ -155,10 +191,7 @@ module SignIn
       else
         clear(identifier: identifier)
       end
-      address = address_digest(address)
-      take_back(key(:wide, address), WIDE_WINDOW)
-      take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
-      nil
+      release_address(address: address)
     end
 
     # The account's run, its lock and its bot-check count are forgotten,
