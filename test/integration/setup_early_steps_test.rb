@@ -206,6 +206,20 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Password confirmation doesn&#39;t match"
   end
 
+  test "the wizard refuses a leaked password for the founding owner" do
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      assert_no_difference "User.count" do
+        patch setup_step_path("admin"), params: { user: {
+          email_address: "owner@example.com", password: "correct horse battery", password_confirmation: "correct horse battery"
+        } }
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert]", text: /#{Regexp.escape("This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.")}/
+    assert_not_includes response.body, "correct horse battery"
+  end
+
   test "a blank email is rejected" do
     patch setup_step_path("admin"), params: { user: { email_address: " ", password: "password12345", password_confirmation: "password12345" } }
 

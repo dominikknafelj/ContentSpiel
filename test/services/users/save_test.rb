@@ -38,6 +38,55 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not User.exists?(email_address: "fresh@example.com")
   end
 
+  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+
+  LEAKED = "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.".freeze
+
+  test "a leaked password is refused on a new user and on a typed change, with the sentence on the password, and nothing is written or audited" do
+    leaked = "correct horse battery"
+    with_leaked_password_check(leaked: [ leaked ]) do
+      created = changed = nil
+      assert_no_difference [ -> { User.count }, -> { Audit::Event.count } ] do
+        created = Users::Save.call(attributes: { email_address: "fresh@example.com", password: leaked, password_confirmation: leaked }, actor: nil)
+        changed = Users::Save.call(users(:two), attributes: { name: "Typed Name", password: leaked, password_confirmation: leaked }, actor: nil)
+      end
+
+      [ created, changed ].each do |result|
+        assert_not result.ok?
+        assert_not result.denied?
+        assert_equal [ LEAKED ], result.errors
+        assert_equal [ LEAKED ], result.record.errors[:password]
+      end
+      assert users(:two).reload.authenticate("password")
+      assert_nil users(:two).name
+      assert_equal 2, leaked_password_requests.size
+
+      clean = Users::Save.call(users(:two), attributes: { password: "a-clean-password-1", password_confirmation: "a-clean-password-1" }, actor: nil)
+      assert clean.ok?, clean.errors.inspect
+      assert users(:two).reload.authenticate("a-clean-password-1")
+    end
+  end
+
+  test "a password too short or unconfirmed is refused by the model first and is never looked up" do
+    leaked = "correct horse battery"
+    # A fresh record each time: a refused assignment stays on the one it was made to.
+    with_leaked_password_check(leaked: [ leaked ]) do
+      short = Users::Save.call(User.find(users(:two).id), attributes: { password: "short", password_confirmation: "short" }, actor: nil)
+      unconfirmed = Users::Save.call(User.find(users(:two).id), attributes: { password: leaked, password_confirmation: "" }, actor: nil)
+      mismatched = Users::Save.call(User.find(users(:two).id), attributes: { password: leaked, password_confirmation: "another-password" }, actor: nil)
+      taken = Users::Save.call(attributes: { email_address: users(:one).email_address, password: leaked, password_confirmation: leaked }, actor: nil)
+      untouched = Users::Save.call(User.find(users(:two).id), attributes: { name: "Tara", password: "", password_confirmation: "" }, actor: nil)
+
+      assert_equal [ "Use at least 12 characters." ], short.errors
+      assert_includes unconfirmed.errors, "Password confirmation can't be blank"
+      assert_includes mismatched.errors, "Password confirmation doesn't match Password"
+      assert_includes taken.errors, "Email address has already been taken"
+      [ short, unconfirmed, mismatched, taken ].each { |result| assert_not_includes result.errors, LEAKED }
+      assert untouched.ok?, untouched.errors.inspect
+      assert_empty leaked_password_requests
+    end
+  end
+
   # --- Groups and owner (access-control design spec §3.3 "Users", Task 8) ------
 
   test "a user's groups are saved and recorded in user.updated" do

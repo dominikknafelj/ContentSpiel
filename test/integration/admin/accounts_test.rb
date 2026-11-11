@@ -124,6 +124,36 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert users(:reader).reload.authenticate("password")
   end
 
+  test "Your account refuses a leaked password in its card" do
+    sign_in_as(users(:reader))
+
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      patch "/cs-studio/account/password", params: { current_password: "password", password: "correct horse battery", password_confirmation: "correct horse battery" }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#password .admin-error-summary[role=alert] li", text: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
+    assert_not_includes response.body, "correct horse battery"
+    assert users(:reader).reload.authenticate("password")
+  end
+
+  # Have I Been Pwned out of reach: the password is accepted (the check
+  # fails open), and the person is told only that it changed.
+  test "with the range lookup unavailable a new password is saved and the save says nothing of the check" do
+    sign_in_as(users(:reader))
+
+    with_leaked_password_check(leaked: [ "correct horse battery" ], unavailable: Errno::ECONNREFUSED) do
+      patch "/cs-studio/account/password", params: { current_password: "password", password: "correct horse battery", password_confirmation: "correct horse battery" }
+    end
+
+    assert_equal 1, leaked_password_requests.size
+    assert_redirected_to "/cs-studio/account#password"
+    follow_redirect!
+    assert_select "#password [data-password-saved][role=status]", text: "Password changed. Your other sessions were signed out."
+    assert_no_match(/leaked|could not be made|check/i, css_select("#password").text)
+    assert users(:reader).reload.authenticate("correct horse battery")
+  end
+
   test "a success changes the password and signs out other sessions only" do
     user = users(:reader)
     other_session = user.sessions.create!

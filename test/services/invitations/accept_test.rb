@@ -98,6 +98,54 @@ class Invitations::AcceptTest < ActiveSupport::TestCase
     assert_empty Audit::Event.all
   end
 
+  # The lookup is an outside call of up to five seconds: it is made before
+  # the invitation's row is locked, so no other request waits on it.
+  test "a leaked password is refused, the invitation stays open, and the lookup runs before the invitation is locked" do
+    leaked = "correct horse battery"
+    sentence = "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
+    order = []
+    result = nil
+
+    with_leaked_password_check(leaked: [ leaked ]) do
+      looked_up = SignIn::LeakedPassword.method(:range)
+      range = ->(prefix, url: nil) { order << :looked_up; looked_up.call(prefix) }
+      with_singleton_override(SignIn::LeakedPassword, :range, range) do
+        callback = ->(*, payload) { order << :locked if payload[:sql].include?("FOR UPDATE") }
+        assert_no_difference [ -> { User.count }, -> { AccessControl::Membership.count } ] do
+          ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { result = accept(password: leaked) }
+        end
+      end
+    end
+
+    assert_not result.ok?
+    assert_equal [ sentence ], result.errors
+    assert_equal @invitation, result.record
+    assert_equal [ sentence ], result.record.errors.messages_for(:password)
+    assert_equal [ :looked_up ], order
+    assert @invitation.reload.open?
+    assert_empty Audit::Event.all
+
+    accepted = []
+    with_leaked_password_check(leaked: [ leaked ]) do
+      looked_up = SignIn::LeakedPassword.method(:range)
+      range = ->(prefix, url: nil) { accepted << :looked_up; looked_up.call(prefix) }
+      with_singleton_override(SignIn::LeakedPassword, :range, range) do
+        callback = ->(*, payload) { accepted << :locked if payload[:sql].include?("FOR UPDATE") }
+        ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { assert accept.ok? }
+      end
+    end
+    assert_equal [ :looked_up, :locked ], accepted
+  end
+
+  test "a password the model refuses is never looked up" do
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      accept(password: "short")
+      accept(password: "correct horse battery", password_confirmation: "")
+      accept(password: "correct horse battery", name: "x" * 121)
+      assert_empty leaked_password_requests
+    end
+  end
+
   # The New user form made the account meanwhile: the person signs in.
   test "an address that has an account by now is used, and no second account is made" do
     User.create!(email_address: "dana@example.com", password: "a-long-password-1")

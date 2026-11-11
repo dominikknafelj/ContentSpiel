@@ -12,7 +12,12 @@ module Users
   # dropped before assignment rather than passed through empty -- the same
   # "a blank value is a no-op, not a write" rule `Admin::FileParams` applies
   # to an untouched file input. A typed password, though, always needs its
-  # confirmation (`#unconfirmed_password`).
+  # confirmation (`#unconfirmed_password`), and is refused when it is in the
+  # list of leaked passwords (`Users::LeakedPasswordRule`): asked only once
+  # the user is otherwise valid, and before the transaction. The setup
+  # wizard calls this inside its `LOCK TABLE users` transaction, so there the
+  # lookup does run under a lock; that step has one person and one row, and
+  # the lookup's timeouts bound it.
   #
   # A password that did change ends that user's sessions, in the same
   # transaction (`OwnerProtection#end_sessions_after_password_change`): an
@@ -43,6 +48,7 @@ module Users
   #   apart from any other change's `user.updated`.
   class Save < ApplicationService
     include OwnerProtection
+    include LeakedPasswordRule
 
     def initialize(user = User.new, attributes:, actor: Current.actor)
       @user = user
@@ -69,6 +75,7 @@ module Users
 
       @user.assign_attributes(attrs)
       return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
+      return leaked_password_failure(@user) if attrs.key?(:password) && @user.valid? && leaked_password?(attrs[:password])
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)

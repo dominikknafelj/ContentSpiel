@@ -363,6 +363,22 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the reset refuses a leaked password and keeps the token in the form" do
+    token = @user.password_reset_token
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      assert_no_changes -> { @user.reload.password_digest } do
+        patch admin_update_password_path, params: { token: token, password: "correct horse battery", password_confirmation: "correct horse battery" }
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#alert[role=alert]", text: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
+    assert_select "input[type=hidden][name=token]" do |fields|
+      assert_equal token, fields.first["value"]
+    end
+    assert_not_includes response.body, "correct horse battery"
+  end
+
   # Two refusals are two lines of the one alert, each the service's own
   # sentence: nothing glues them into one. Each field says its own under it
   # with the refused edge, tied to its input, with no live role of its own.

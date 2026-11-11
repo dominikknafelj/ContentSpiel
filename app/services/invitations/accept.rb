@@ -29,9 +29,22 @@ module Invitations
   # field they belong to (`messages_for(:password)`), so the page can put
   # each under its own field. The invitation is not saved with them.
   #
-  # The row is locked and asked again before anything is written, so a second
-  # press that arrives while the first is in flight reads `:used`.
+  # A password in the list of leaked passwords is refused as the model's own
+  # rules are (`Users::LeakedPasswordRule`), with its sentence on the
+  # password.
+  #
+  # THE ORDER. The account is built and judged first, outside the
+  # transaction: the model's rules, the confirmation, and then the leak
+  # lookup, which is an outside call of up to five seconds and so must not
+  # run while the invitation's row is locked (a second press would wait on
+  # it). Only then is the row locked and asked again, and the account saved
+  # under the lock, so a second press that arrives while the first is in
+  # flight reads `:used`. The save validates again: an account made for the
+  # address meanwhile is `:used` (`used?` under the lock, or the unique
+  # index).
   class Accept < ApplicationService
+    include Users::LeakedPasswordRule
+
     # authorize: none (the invitation token is the credential: a token that finds an open invitation is the right to make that one account, and the service acts as the account it makes, as the reset flow does)
 
     EXPIRED = :expired
@@ -49,13 +62,16 @@ module Invitations
       return failure(nil, [ EXPIRED ]) if @invitation.nil?
       return failure(@invitation, [ USED ]) if @invitation.used?
 
+      user = build_user
+      return refused(user) if user.errors.any?
+
       outcome = Invitation.transaction do
         @invitation.lock!
         next USED if @invitation.used?
-        next :invalid unless (@user = create_user)
+        next :invalid unless user.save
 
         # From here on everything is recorded as the new account's.
-        @actor = @user
+        @user = @actor = user
         group_ids = @invitation.invitation_groups.pluck(:group_id).sort
         # Through `Membership` itself, as `Users::Save#sync_groups`, so its
         # `after_commit` drops the memoised grants.
@@ -71,7 +87,7 @@ module Invitations
       case outcome
       when :accepted then success(@user)
       when USED then failure(@invitation, [ USED ])
-      else failure(@invitation, @user_errors)
+      else refused(user)
       end
     rescue ActiveRecord::RecordNotFound
       # Withdrawn while this request was on its way.
@@ -83,19 +99,23 @@ module Invitations
 
     private
 
-    # The account, or nil with the form's sentences in `@user_errors`. As
-    # `Users::Save`: a typed password needs a typed confirmation, which
-    # `has_secure_password` compares only when it is given.
-    def create_user
+    # The account, unsaved, with the form's sentences in its `errors` when it
+    # is refused. As `Users::Save`: a typed password needs a typed
+    # confirmation, which `has_secure_password` compares only when it is
+    # given; and the leak lookup is asked only of an otherwise valid account.
+    def build_user
       user = User.new(email_address: @invitation.email_address, name: @name, password: @password, password_confirmation: @password_confirmation)
       user.validate
       user.errors.add(:password_confirmation, :blank) if @password.present? && @password_confirmation.blank?
-      if user.errors.any? || !user.save
-        @user_errors = user.errors.full_messages
-        user.errors.each { |error| @invitation.errors.add(error.attribute, error.full_message) }
-        return nil
-      end
+      user.errors.add(:password, :leaked) if user.errors.empty? && leaked_password?(@password)
       user
+    end
+
+    # The form's failure: the account's sentences, and the same sentences on
+    # the invitation by the field they belong to.
+    def refused(user)
+      user.errors.each { |error| @invitation.errors.add(error.attribute, error.full_message) }
+      failure(@invitation, user.errors.full_messages)
     end
   end
 end
