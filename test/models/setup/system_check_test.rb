@@ -155,7 +155,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   end
 
   test "the Visitor address link points at the hosting reference's section that says how to fill TRUSTED_PROXIES" do
-    path, anchor = Setup::SystemCheck::VISITOR_ADDRESS_DOCS.delete_prefix("https://github.com/dominikknafelj/ContentSpiel/blob/main/").split("#")
+    path, anchor = Setup::SystemCheck::VISITOR_ADDRESS_DOCS.delete_prefix("https://github.com/dominikknafelj/ContentSpiel/blob/v#{ContentSpiel::VERSION}/").split("#")
     headings = Rails.root.join(path).read.scan(/^## (.+)$/).flatten
     slugs = headings.map { |heading| heading.downcase.gsub(/[^a-z0-9 _-]/, "").tr(" ", "-") }
 

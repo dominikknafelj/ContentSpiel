@@ -29,7 +29,7 @@ class SignInMailerTest < ActionMailer::TestCase
         assert_includes body, "There were several failed attempts to sign in to your account on Test Site, so signing in is paused for 4 minutes."
         # 22:30 UTC is 23:30 in Berlin, in November.
         assert_includes body, "The last attempt was at 10 Nov 2026, 23:30, from the address 203.0.113.7."
-        assert_includes body, "If this was you, wait and try again, or reset your password. If it wasn't, your password kept them out, and resetting it is still the safest step."
+        assert_includes body, "If this was you, wait and try again, or reset your password, which ends the pause. A browser you have signed in with before is not paused. If it wasn't you, your password kept them out, and resetting it is still the safest step."
         assert_includes body, "Sent by Test Site via Content Spiel"
       end
 

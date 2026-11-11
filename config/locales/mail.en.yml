@@ -30,7 +30,7 @@ en:
         other: "There were several failed attempts to sign in to your account on %{site}, so signing in is paused for %{count} minutes."
       details: "The last attempt was at %{time}, from the address %{address}."
       button: "Reset password"
-      outro: "If this was you, wait and try again, or reset your password. If it wasn't, your password kept them out, and resetting it is still the safest step."
+      outro: "If this was you, wait and try again, or reset your password, which ends the pause. A browser you have signed in with before is not paused. If it wasn't you, your password kept them out, and resetting it is still the safest step."
     invite:
       subject: "%{inviter} invited you to %{site}"
       intro: "%{inviter} invited you to work on %{site} in Content Spiel. Set a password to finish your account:"

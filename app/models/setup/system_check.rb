@@ -53,8 +53,10 @@ module Setup
 
     # Where the "Visitor address" warning sends the reader: the reference's
     # section on TRUSTED_PROXIES, which says how to fill it with Cloudflare's
-    # published ranges. A fixed address, like the commands above.
-    VISITOR_ADDRESS_DOCS = "https://github.com/dominikknafelj/ContentSpiel/blob/main/docs/reference/hosting.md#the-visitors-address-behind-a-proxy".freeze
+    # published ranges, at the tag of the running version, so a site reads
+    # the reference of the code it runs and a heading renamed later on main
+    # does not break its link.
+    VISITOR_ADDRESS_DOCS = "https://github.com/dominikknafelj/ContentSpiel/blob/v#{ContentSpiel::VERSION}/docs/reference/hosting.md#the-visitors-address-behind-a-proxy".freeze
 
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
