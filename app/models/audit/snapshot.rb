@@ -203,6 +203,8 @@ module Audit
       when ApiToken then record.name.presence || "API token ##{record.id}"
       when SiteSetting then "Site settings"
       when Forms::Form then record.name
+      # The name its person gave it, never its credential id.
+      when Passkey then record.name
       else "#{record.model_name.human} ##{record.id}"
       end
     end

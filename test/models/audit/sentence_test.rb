@@ -86,12 +86,18 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_empty recorded - Audit::Sentence::ACTIONS, "actions with no sentence in Audit::Sentence"
   end
 
+  # The sign-in steps that record these are not built yet: their sentences
+  # stand ahead of them. An entry fails once something records it, so the
+  # list empties as they arrive.
+  RECORDED_LATER = %w[recovery_code.used session.second_factor_failed session.confirmation_failed].freeze
+
   test "the sentence table lists no action nothing records" do
     literals, = scan_recorded_actions
     recorded = literals + DYNAMIC_SITES.values.flatten
     # `session.destroyed`, `block.*`, ... are all recorded somewhere; a retired
     # action's sentence should go with it.
-    assert_empty Audit::Sentence::ACTIONS - recorded, "sentences for actions nothing records any more"
+    assert_empty Audit::Sentence::ACTIONS - recorded - RECORDED_LATER, "sentences for actions nothing records any more"
+    assert_empty RECORDED_LATER & recorded, "recorded now: take these out of RECORDED_LATER"
   end
 
   test "every known action reads as a sentence, never the plugin fallback" do
@@ -301,7 +307,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted]
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted] + PASSKEY_EVENTS - %w[passkey.renamed]
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
 
@@ -668,5 +674,79 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { Audit::Sentence.build(published, viewer: @me, target: nil, count: 2) }
     assert_raises(ArgumentError) { Audit::Sentence.build(block, viewer: @me, target: nil, count: 2) }
     assert_equal %w[block.created block.updated media.uploaded], Audit::Sentence::COUNTED
+  end
+
+  # --- passkeys and recovery codes ------------------------------------------
+
+  PASSKEY_EVENTS = %w[passkey.added passkey.renamed passkey.removed recovery_codes.generated recovery_code.used
+    session.second_factor_failed session.confirmation_failed].freeze
+
+  def passkey_event(action, label: "MacBook", **attributes)
+    event(action, subject_type: "Passkey", subject_id: 7, subject_label: label, **attributes)
+  end
+
+  def account_event(action, user: users(:two), **attributes)
+    event(action, subject_type: "User", subject_id: user.id, subject_label: user.email_address, **attributes)
+  end
+
+  test "every new event but passkey.renamed is a Security event" do
+    PASSKEY_EVENTS.each do |action|
+      assert Audit::Sentence.known?(action), action
+      assert_equal action != "passkey.renamed", sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security, action
+    end
+  end
+
+  test "passkey.added names the passkey" do
+    assert_equal "You added the passkey “MacBook”", read(sentence_for(passkey_event("passkey.added", metadata: { "name" => "MacBook" })))
+    other = passkey_event("passkey.added", user_id: users(:reader).id, metadata: { "name" => "MacBook" })
+    assert_equal "reader@example.com added the passkey “MacBook”", read(sentence_for(other))
+  end
+
+  test "passkey.renamed names the passkey before and after" do
+    renamed = passkey_event("passkey.renamed", label: "Work laptop", field_changes: { "name" => [ "MacBook", "Work laptop" ] })
+    assert_equal "You renamed the passkey “MacBook” to “Work laptop”", read(sentence_for(renamed))
+    assert_equal "You renamed the passkey “Work laptop”", read(sentence_for(passkey_event("passkey.renamed", label: "Work laptop")))
+  end
+
+  test "passkey.removed names the passkey, and the console's tells how many with no actor" do
+    assert_equal "You removed the passkey “Phone”",
+      read(sentence_for(passkey_event("passkey.removed", label: "Phone", metadata: { "name" => "Phone", "recovery_codes_removed" => 0 })))
+
+    console = account_event("passkey.removed", user_id: nil, channel: "console",
+      metadata: { "count" => 2, "recovery_codes_removed" => 10, "reason" => "console" })
+    sentence = sentence_for(console)
+    assert sentence.actor.none
+    assert_equal "2 passkeys of “two@example.com” removed from the console", read(sentence)
+    one = account_event("passkey.removed", user_id: nil, channel: "console", metadata: { "count" => 1, "recovery_codes_removed" => 0, "reason" => "console" })
+    assert_equal "1 passkey of “two@example.com” removed from the console", read(sentence_for(one))
+  end
+
+  test "recovery_codes.generated says new codes were made, and nothing of them" do
+    generated = account_event("recovery_codes.generated", user: @me, metadata: { "count" => 10, "replaced" => 3 })
+    assert_equal "You made new recovery codes", read(sentence_for(generated))
+  end
+
+  test "recovery_code.used says how many are left" do
+    assert_equal "You signed in with a recovery code (7 left)", read(sentence_for(account_event("recovery_code.used", user: @me, metadata: { "left" => 7 })))
+    assert_equal "You signed in with a recovery code (0 left)", read(sentence_for(account_event("recovery_code.used", user: @me, metadata: { "left" => 0 })))
+  end
+
+  test "session.second_factor_failed names the account with no actor" do
+    sentence = sentence_for(account_event("session.second_factor_failed", user_id: nil, metadata: { "method" => "recovery_code" }))
+    assert sentence.actor.none
+    assert_equal "Failed second sign-in step for “two@example.com”", read(sentence)
+  end
+
+  test "session.confirmation_failed says the person didn't confirm it was them" do
+    failed = account_event("session.confirmation_failed", user_id: users(:two).id, metadata: { "method" => "password" })
+    assert_equal "two@example.com didn't confirm it was them before a sign-in change", read(sentence_for(failed))
+    mine = account_event("session.confirmation_failed", user: @me, metadata: { "method" => "passkey" })
+    assert_equal "You didn't confirm it was you before a sign-in change", read(sentence_for(mine))
+  end
+
+  test "session.created says a passkey or a recovery code when it was one" do
+    assert_equal "You signed in with a passkey", read(sentence_for(account_event("session.created", user: @me, metadata: { "method" => "passkey" })))
+    assert_equal "You signed in with a recovery code", read(sentence_for(account_event("session.created", user: @me, metadata: { "method" => "recovery_code" })))
+    assert_equal "You signed in", read(sentence_for(account_event("session.created", user: @me)))
   end
 end

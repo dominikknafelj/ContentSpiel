@@ -1,0 +1,12 @@
+# What the passkey services answer when they refuse (docs/reference/i18n.md):
+# `add` is `Passkeys::Add`'s, for a registration the check refused or a
+# credential already stored, and `remove` is `Passkeys::Remove`'s, for the
+# last passkey of a person the policy covers. The screens draw the same words
+# from their own component keys (`admin.components.account_screen.*`).
+en:
+  admin:
+    passkeys:
+      add:
+        failed: "The passkey wasn't added. Try again."
+      remove:
+        last_required: "This site asks you to sign in with a passkey. Add another before removing this one."
