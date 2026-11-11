@@ -6,7 +6,8 @@ import { Controller } from "@hotwired/stimulus"
 // row an End was pressed in is remembered, and when that row leaves the
 // document the focus goes to the next row's End, or, after the last row, to
 // the foot's "Sign out everywhere else…", or, when no other session is left
-// and the foot offers nothing, to the foot itself.
+// and the foot offers nothing (or that button waits, disabled, for the
+// screen's unsaved changes: `admin--saving--pending-lock`), to the foot itself.
 //
 // The answer replaces the foot before it removes the row, so the foot read
 // here is already the new one. A row that goes for any other reason (a visit,
@@ -28,7 +29,7 @@ export default class extends Controller {
     const next = this.following.find((candidate) => candidate.isConnected)
     this.following = []
     const end = next && this.endTargets.find((button) => next.contains(button))
-    const target = end || (this.hasEndOthersTarget && this.endOthersTarget) || (this.hasFootTarget && this.footTarget)
+    const target = end || (this.hasEndOthersTarget && !this.endOthersTarget.disabled && this.endOthersTarget) || (this.hasFootTarget && this.footTarget)
     if (target) target.focus()
   }
 }

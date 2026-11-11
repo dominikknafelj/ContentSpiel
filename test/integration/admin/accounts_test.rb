@@ -49,6 +49,33 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "typed-new-password-9"
   end
 
+  # The controller loads the card's rows for every answer that draws the
+  # screen (`AccountsController#load_sessions`), and the view queries
+  # nothing itself: the screen, a refused password and a refused name all
+  # show the person's live sessions and none that expired. "Sign out
+  # everywhere else" waits for the forms (`admin--saving--pending-lock`).
+  test "the Sessions card shows the live sessions on the screen and on both refusals" do
+    user = users(:reader)
+    sign_in_as(user)
+    other = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil, at: 1.hour.ago)
+    expired = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil, at: 15.days.ago)
+
+    [
+      -> { get "/cs-studio/account" },
+      -> { patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" } },
+      -> { patch "/cs-studio/account/profile", params: { name: "a" * 121 } }
+    ].each do |request|
+      request.call
+      assert_select "#account-sessions li[id^='session-']", count: 2
+      assert_select "#session-#{other.id}"
+      assert_select "#session-#{expired.id}", count: 0
+      assert_select "#account-sessions-foot[data-controller~='admin--saving--pending-lock']" do
+        assert_select "button[data-admin--saving--pending-lock-target=control]", text: "Sign out everywhere else…"
+        assert_select "p[data-admin--saving--pending-lock-target=hint][hidden]"
+      end
+    end
+  end
+
   test "the screen promises what the code does, and links the reset flow from the card's footer" do
     put_mail_state(:working)
     sign_in_as(users(:reader))

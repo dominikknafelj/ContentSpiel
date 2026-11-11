@@ -72,8 +72,10 @@ class User < ApplicationRecord
 
   def name_or_email = name.presence || email_address
 
-  # How many sessions of this user are open at `at` (not past either timeout).
-  def open_session_count(at = Time.current) = sessions.live(at).count
+  # The sessions of this user that are open at `at` (not past either
+  # timeout), and how many.
+  def open_sessions(at = Time.current) = sessions.live(at)
+  def open_session_count(at = Time.current) = open_sessions(at).count
 
   private
 

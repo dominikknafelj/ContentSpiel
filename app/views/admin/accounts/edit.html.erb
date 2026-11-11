@@ -166,7 +166,10 @@
 
   <%# Sessions: after both forms and in neither, so nothing in it is a
       change a save bar counts or "Leave without saving?" asks about. Its
-      endings are forms of their own (`Admin::AccountSessionsController`). %>
-  <%= render Admin::AccountScreen::SessionsCardComponent.new(sessions: Current.user.sessions.live(Time.current).to_a, current: Current.session,
+      endings are forms of their own (`Admin::AccountSessionsController`);
+      "Sign out everywhere else", which draws the screen again, waits for
+      both forms (`Admin::AccountScreen::SessionsFootComponent`). The
+      sessions are the controller's (`@sessions`). %>
+  <%= render Admin::AccountScreen::SessionsCardComponent.new(sessions: @sessions, current: Current.session,
         url_options: admin_url_options, class: "mt-8") %>
 </div>

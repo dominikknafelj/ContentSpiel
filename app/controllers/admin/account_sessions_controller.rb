@@ -52,6 +52,6 @@ module Admin
       result.ok? ? result.record : 0
     end
 
-    def other_sessions_count = Current.user.sessions.live(Time.current).where.not(id: Current.session.id).count
+    def other_sessions_count = Current.user.open_sessions.where.not(id: Current.session.id).count
   end
 end
