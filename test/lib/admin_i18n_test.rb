@@ -493,7 +493,6 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/notes/permission_controller.js
     app/components/admin/ui/note_inbox_row_component.rb
     app/components/admin/ui/note_inbox_row_component.html.erb
-    app/components/admin/notes_screen/person_name_component.rb
     app/components/admin/notes_screen/quote_component.rb
     app/views/admin/note_inbox/index.html.erb
     app/views/admin/note_inbox/_card.html.erb

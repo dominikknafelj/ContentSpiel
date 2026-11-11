@@ -11,6 +11,11 @@ module Admin
         render Admin::Ui::UserNameComponent.new(user: User.new(email_address: "ada@example.com"))
       end
 
+      # A note's way: the part of the address before the at sign.
+      def short_email
+        render Admin::Ui::UserNameComponent.new(user: User.new(email_address: "ada@example.com"), short: true)
+      end
+
       def deleted_user
         render Admin::Ui::UserNameComponent.new(user: nil, user_id: 42)
       end
