@@ -47,6 +47,13 @@ There are two kinds of site, and each gets its own way in:
 
 ## The design
 
+**Development stays simple (the owner, 2026-11-11).** In development, sign-in is plain email and password, as today:
+- The leaked-password check is off unless switched on. The dev seed's simple password would otherwise be refused.
+- There is no bot check, since development has no Turnstile keys.
+- When passkeys come, the policy defaults to "nobody required" in development.
+
+The throttles stay, because they never get in the way of ordinary use. Production's defaults are unchanged, and tests switch each part on where they test it.
+
 ### 1. Throttles, the bot check and leaked passwords (#172)
 
 **Throttles.** There are three independent buckets, each counted on failed attempts only:

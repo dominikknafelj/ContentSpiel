@@ -103,6 +103,12 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
 
 ## Global Constraints
 
+- **Development stays simple (the owner, 2026-11-11):**
+  - The leaked-password check defaults to **off** in development and test, and **on** in production. `LEAKED_PASSWORD_CHECK=on` or `off` overrides it in any environment.
+  - The dev seed's password must keep working.
+  - The bot check needs both Turnstile keys, which development doesn't set.
+  - Sign-in in development is plain email and password.
+
 - **The design's figures, exactly:**
   - the per-account back-off is "5 failures, then 1 minute, doubling to a 1 hour cap, reset by a success";
   - the wide per-address cap is "50 failures an hour";
