@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Environment
+
+- `TRUSTED_PROXIES` (optional): a CDN's ranges, comma-separated, added to the proxies Rails believes about whose request it is, so that behind Cloudflare each visitor counts as themselves to sign-in's limits, the bot check's trigger and the forms' send limit, and not as one of Cloudflare's few edge addresses. An entry that is not an address or a range stops the boot and names it. Behind Cloudflare a site sets it to Cloudflare's published ranges AND kamal-proxy's `proxy.forward_headers: true` (with `ssl: true` kamal-proxy otherwise replaces `X-Forwarded-For` with the edge's own), which `config/deploy.yml` and a new site's `config/deploy.yml` now carry as a commented line. System status's new "Visitor address" row warns while Cloudflare's `CF-Connecting-IP` differs from the address Rails reads (`docs/reference/hosting.md`, "The visitor's address behind a proxy").
+- `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` (optional, both or neither; the secret is a secret): Cloudflare Turnstile's keys, which turn on sign-in's bot check. One without the other is no check, and production's boot names the missing one. With both, the sign-in page is always loaded whole (not through Turbo) under the site's policy with `https://challenges.cloudflare.com` added to `frame-src`.
+- `LEAKED_PASSWORD_CHECK` (optional): `off` or `on`, the check of a new password against Have I Been Pwned's list of leaked passwords. Unset, it is ON in production and off in development and test, so a production site now calls `https://api.pwnedpasswords.com` when a person sets a password (five characters of the password's SHA-1 leave the server, never the password). A site that cannot reach it accepts the password and logs one line.
+
+### Added
+
+- Sign-in counts the attempts for one email, whether or not an account has it, before the password is checked: the fifth closes the email for 1 minute, each later one doubles it up to 1 hour, a right password clears the run, and a run is forgotten 24 hours after its first attempt. While it is closed the panel says "Try again in a few minutes.", for a known and an unknown email alike.
+- Sign-in closes an address for the rest of the hour after 50 attempts from it in an hour, whatever emails it tried ("Try again later."). An IPv6 address counts by its /64. The store holds neither emails nor addresses, only their HMACs.
+- A bot check on sign-in (Cloudflare Turnstile, verified on the server for this site's host and the sign-in action), shown after 3 attempts from the address or with the email in 15 minutes. An attempt without its answer checks no password and counts nothing ("Complete the check, then sign in again."). When Cloudflare cannot be reached, or refuses for a reason of the site's (a wrong secret), the check counts as passed and one line says why.
+- A password a person sets (the setup wizard, an invitation, the reset, Your account, the Users editor, the console's `Users::UpdatePassword`) is refused when Have I Been Pwned lists it: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one." Asked only once the password is otherwise valid; a lookup that cannot be made (5 seconds at most) accepts it.
+- The mail "Signing in to <site> is paused" to an account whose email a run of failed sign-ins closed, at most once an hour: how long, when, from which address, and a button to the reset request page (no reset link).
+- The audit event `session.locked`, one per bucket a failed sign-in closed (an email's or an address's), with no actor and no subject, its bucket, seconds and back-off level in its metadata, and the email for an email's. A Security event: "Sign-in to one account paused after repeated failures", "Sign-in from one address paused after repeated failures".
+- The CMS's own spans, for sign-in: `auth.sign_in`, `auth.throttle`, `auth.bot_check`, `auth.leaked_password` and `auth.lockout_mail`, each a child of the request's, with fixed words only (`Telemetry::SPANS` and `ATTRIBUTES`; `docs/reference/hosting.md`, "Telemetry", has the Honeycomb queries). The two outside calls are not traced by the HTTP instrumentation, whose span would record the lookup's path.
+
+### Changed
+
+- A sign-in refused for any reason answers the same for an email that has an account and one that does not, in its status, redirect, sentence, cookies, statements and password hashing.
+- A reset request looks up nobody in the request: it queues `PasswordResetRequestJob` for every address typed, which finds the account and queues the reset mail, so a known and an unknown address take the same time. The job's arguments (the address typed) are not logged.
+- Sign-in's per-address limit (10 attempts in 3 minutes, every attempt counted) counts in the sign-in throttle's store (`SignIn.store`, Solid Cache in production as before, a memory store in tests, where it now trips) and answers inside an `auth.sign_in` span.
+
 ## 0.2.0 (2026-11-10)
 
 ### Breaking
