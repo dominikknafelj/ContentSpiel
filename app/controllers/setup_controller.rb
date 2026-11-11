@@ -69,7 +69,9 @@ class SetupController < ApplicationController
 
   def show
     case @step
-    when "system_check" then @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?)
+    when "system_check"
+      @results = Setup::SystemCheck.run(request_ssl: request.ssl?, reset_link_from_request: PasswordsMailer.request_origin_used?,
+        remote_ip: request.remote_ip, cf_connecting_ip: request.headers[Setup::SystemCheck::CLOUDFLARE_HEADER])
     when "admin" then @user = User.new
     when "site", "languages" then @site_setting = Current.site
     when "mail"

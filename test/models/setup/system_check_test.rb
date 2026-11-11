@@ -116,6 +116,52 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_nil result("HTTPS", Setup::SystemCheck.run(request_ssl: false))
   end
 
+  test "with the request's address the Visitor address row stands after HTTPS, and without it there is none" do
+    labels = run_check(production: true, request_ssl: true, remote_ip: "203.0.113.5").map(&:label)
+
+    assert_equal [ "Site address", "HTTPS", "Visitor address", "Theme" ], labels.first(4)
+    assert_nil result("Visitor address", run_check)
+  end
+
+  test "Visitor address is OK without Cloudflare's header" do
+    [ nil, "", " " ].each do |header|
+      check = result("Visitor address", run_check(remote_ip: "203.0.113.5", cf_connecting_ip: header))
+
+      assert check.ok?
+      assert_equal "Each visitor counts by the address their request comes from.", check.message
+      assert_nil check.docs
+    end
+  end
+
+  test "Visitor address is OK when Cloudflare's header is the address the request is counted by, however IPv6 is written" do
+    [ %w[203.0.113.5 203.0.113.5], %w[2001:db8::1 2001:0db8:0:0::1] ].each do |remote_ip, header|
+      check = result("Visitor address", run_check(remote_ip:, cf_connecting_ip: header))
+
+      assert check.ok?, header
+      assert_equal "Requests come through Cloudflare, and the visitor's own address is read.", check.message
+    end
+  end
+
+  test "Visitor address warns when Cloudflare's header differs from the address counted, and links the hosting reference" do
+    [ "203.0.113.5", "not an address" ].each do |header|
+      check = result("Visitor address", run_check(remote_ip: "173.245.48.10", cf_connecting_ip: header))
+
+      assert_equal :warning, check.status
+      assert_equal "Requests come through Cloudflare, but the visitor's own address is not read: every visitor counts as " \
+        "Cloudflare's. Set TRUSTED_PROXIES to Cloudflare's ranges.", check.message
+      assert_equal Setup::SystemCheck::VISITOR_ADDRESS_DOCS, check.docs
+      assert_nil check.command
+    end
+  end
+
+  test "the Visitor address link points at the hosting reference's section that says how to fill TRUSTED_PROXIES" do
+    path, anchor = Setup::SystemCheck::VISITOR_ADDRESS_DOCS.delete_prefix("https://github.com/dominikknafelj/ContentSpiel/blob/main/").split("#")
+    headings = Rails.root.join(path).read.scan(/^## (.+)$/).flatten
+    slugs = headings.map { |heading| heading.downcase.gsub(/[^a-z0-9 _-]/, "").tr(" ", "-") }
+
+    assert_includes slugs, anchor
+  end
+
   test "without a theme folder the row says the default theme draws the site" do
     check = result("Theme", run_check(theme: Theme.new))
 
@@ -446,6 +492,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   test "only the site address and the not-ready mail warnings carry a command, each a fixed string" do
     results = with_mail_state(:not_set_up) do
       run_check(address: SiteAddress.parse(nil), production: true, request_ssl: false,
+        remote_ip: "173.245.48.10", cf_connecting_ip: "203.0.113.5",
         storage_probe: -> { false }, image_probe: -> { false }, queue_adapter: "solid_queue", worker_alive_probe: -> { false },
         stylesheet_probe: -> { false }, image_progress: progress(total: 3, made: 0, failed: 1))
     end

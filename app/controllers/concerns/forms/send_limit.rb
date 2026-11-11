@@ -34,9 +34,10 @@ module Forms
   # CDN in front (Cloudflare, which `config/deploy.yml` plans for) is a
   # public address Rails does not trust: every visitor then arrives "from"
   # the CDN's edge, shares one counter, and the sixth visitor of ten minutes
-  # is refused. Such a site must add the CDN's published ranges to
-  # `config.action_dispatch.trusted_proxies`. Nothing here detects the
-  # mistake; the per-form limit is unaffected by it.
+  # is refused. Such a site sets TRUSTED_PROXIES to the CDN's published
+  # ranges (lib/trusted_proxies.rb). Nothing here detects the mistake;
+  # System status's "Visitor address" row does behind Cloudflare. The
+  # per-form limit is unaffected by it.
   #
   # THE STORE is `CounterStore.current`, the one every counter of the site
   # shares (it says why a test has a memory store).
