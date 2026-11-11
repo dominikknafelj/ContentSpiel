@@ -129,7 +129,47 @@ Each goes to the account's own address. They use the existing mailer and layout,
 - **The console reset:** the existing console password command also removes the account's passkeys and recovery codes, if asked, and ends its sessions. That is the last-resort path and must stay simple.
 - **The guide:** the pages on signing in, Your account, users and the setup wizard, plus a new integrator page on SSO. These are named in each PR's Documentation section.
 
-### 7. The screens
+### 7. Telemetry: spans on every sign-in decision
+
+The owner wants each part of sign-in visible in traces (Honeycomb today). A bot run must show up as a pattern, and a slow provider or an outside check must show up as a slow span. The app has no hand-made spans yet; this feature brings in the first ones, and with them the rules for all later ones.
+
+- **One tracer.** It lives on `Telemetry` (`lib/telemetry.rb`), for example `Telemetry.tracer`, and is a no-op when the SDK isn't configured, so a test or a plain development boot pays nothing. Spans are started with `in_span`.
+- **Under the request's own span.** Every span is a child of the request's (or job's) server span. `Telemetry::WorkSampler` keeps the trace then, and drops nothing new: no span here is a root.
+- **The spans** (the names are the builder's, but keep one prefix such as `auth.`):
+  - the sign-in attempt as a whole;
+  - each throttle decision, with which bucket and whether it tripped;
+  - the bot check's server verification, a CLIENT span to Turnstile;
+  - the leaked-password lookup, a CLIENT span to Have I Been Pwned;
+  - passkey registration and verification;
+  - recovery code use;
+  - the OIDC redirect, callback, token exchange and daily re-check, the last two as CLIENT spans to the IdP;
+  - session expiry decisions and the sweep job;
+  - the lock-out and alert mails.
+- **Attributes say what happened, never who or what was typed.** Allowed:
+  - the method (`password`, `passkey`, `sso`, `recovery_code`);
+  - the outcome (`ok`, `refused`, `locked`, `bot_check_required`, `bot_check_failed`, `second_factor_required`);
+  - the bucket;
+  - the back-off level;
+  - whether the account exists, **only** as a span attribute, never in a response;
+  - the policy that applied;
+  - the provider's issuer host;
+  - an outside check's result class (`leaked`, `clean`, `unavailable`);
+  - durations.
+- **Never in a span, an event or a log:**
+  - the email address, a password or any part of its hash;
+  - passkey material or a challenge;
+  - a recovery code;
+  - an OIDC code, state, token or secret;
+  - the Turnstile token.
+
+  The user's id may appear only after a successful sign-in, as on any signed-in request. The request's own address attribute is the instrumentation's and stays as it is.
+- **Held by tests:**
+  - A test exports the spans of one refused, one throttled and one successful sign-in by each method, into the in-memory exporter the test environment already uses (`test/integration/opentelemetry_test.rb`'s pattern).
+  - It asserts the names, the parent, and that no attribute or event holds the email typed, the password typed, a recovery code or an OIDC token. The values are planted and searched for.
+  - `Telemetry::PathScrubber` already drops the OIDC callback's query (code and state), and a test holds that for the callback route.
+- **Documented.** `docs/reference/hosting.md`, "Telemetry", lists the spans and their attributes. It also gives a Honeycomb query that shows a credential-stuffing run: refused attempts grouped by the bucket that tripped, over time.
+
+### 8. The screens
 
 These are drawn by the design agent before the build, as cards in the Design System, then built:
 - the sign-in panel's passkey and SSO buttons and the second-factor step;
@@ -140,7 +180,7 @@ These are drawn by the design agent before the build, as cards in the Design Sys
 - the Settings policy card;
 - the owner's "End all sessions" in the user editor.
 
-### 8. A seam for a members area later
+### 9. A seam for a members area later
 
 **What the owner foresees:** a sign-in on the public site, where a page and its children form a private section that only signed-in readers see. That is its own later project. Its private pages bypass the public cache and ETag, and stay out of the sitemap, the feeds, search and post lists. It is not built here. This design must not block it:
 - **One layer for both kinds of sign-in.** The throttles, the bot check, the leaked-password check, the enumeration rules, passkey verification and the OIDC link sit in plain objects that a second kind of sign-in can call. Only the screens, routes and session handling are CS Studio's own.
