@@ -49,6 +49,14 @@ class Session < ApplicationRecord
       last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT)
   end
 
+  # The sessions past their absolute timeout at `at`.
+  scope :expired_absolute, ->(at) { where(expires_at: ..at) }
+
+  # The sessions unseen for the idle timeout at `at`; read after the absolute
+  # ones are gone (`Sessions::SweepJob`), it holds only sessions that are
+  # idle alone.
+  scope :expired_idle, ->(at) { where(last_seen_at: ..(at - IDLE_TIMEOUT)) }
+
   # Ends every session of the relation it is called on and answers how many:
   # each row is read under its lock and destroyed (so `disconnect_cable`
   # runs), and a row another request ended first is simply not among them,
