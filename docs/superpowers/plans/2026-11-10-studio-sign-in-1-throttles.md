@@ -38,15 +38,34 @@ Not here: sessions (§2), passkeys and recovery codes (§3), SSO (§4), the othe
 
 The Turnstile widget's place on the sign-in panel is the design agent's StudioSignIn card. The look is not decided here.
 
-**PENDING.** Before Task 10 starts, the coordinator writes the card's answer into this section:
-- where the widget stands in the panel (between Password and Sign in, or elsewhere);
-- the gap around it;
-- whether a line of words goes with it, and its key and English;
-- the alert's words for `admin.sessions.bot_check`, if they differ from this plan's;
-- the widget's `size` (`flexible` or `normal`) and `theme` (`auto` follows the page's scheme);
-- what the panel shows while the widget's script loads.
+**Handed in.** This is the design agent's StudioSignIn card, at Design System version 194 (index `1794358556-b35f`). Task 10 sets `test/support/design_system_entries.rb` `VERSION` to that id. No card is new.
 
-The card's version id is written here, and in `test/support/design_system_entries.rb` if the card is new. Task 10 is not built on a guess: an implementer who finds this section still PENDING stops and reports **NEEDS_CONTEXT**.
+Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout's panel).
+
+1. **When it shows:** only after 3 failures within 15 minutes, from the address or for the email. The email bucket counts whether or not an account exists, so showing the check reveals nothing. It never shows when the site has no Turnstile keys.
+2. **Placement:** inside the `form_with`, after the Password field, and after the "Ask the site's owner…" line when mail is off. It comes before Sign in. The form's existing `gap-[18px]` spaces it.
+3. **Markup:**
+   - a group `<div class="flex flex-col gap-2">`;
+   - in it, the hint `<p id="turnstile-hint" class="text-small text-dim">`;
+   - then the widget's box `<div class="min-h-[65px] w-full">`, given its height from the first paint so Sign in doesn't jump.
+4. **Widget options:**
+   - `size: "flexible"`, at most 356px. Use `size: "compact"` (150×140, left-aligned) when the box is narrower than 300px, which is a window under about 392px. The size is chosen once, at render.
+   - `theme` from `document.documentElement.dataset.theme`, "light" or "dark", never "auto". When the theme switch changes it, the widget renders again.
+   - `language` from the page's `lang`, and `action: "sign_in"`.
+5. **Sign in** stays enabled; the server decides.
+6. **Words** (keys under `admin.sessions`):
+   - `new.check_hint`: "A quick check is needed before you can sign in."
+   - `check_failed`: the `#alert` notice, `NoticeComponent :danger, :compact`, reading "Complete the check, then sign in again." It is used when the token is failed, expired or missing. The password is not tried, the email stays filled in, and the check is shown again.
+   - `new.check_unavailable`: "The check couldn't load. Reload the page to try again." It replaces the hint when Turnstile's script fails to load.
+7. **A temporarily locked account:**
+   - It answers exactly `refused`, "Try another email address or password.", and the panel shows nothing else.
+   - The check is already showing by then, because 3 failures come before the lock.
+   - The person learns of the lock from the mail §1 sends to the account's address.
+   - The per-address `limited` "Try again later." stays as it is.
+   - The owner is deciding on the neutral alternative "Try again in a few minutes"; see the ledger.
+8. **Light and dark:** the hint and the notice use tokens only. Cloudflare draws the widget itself, in the theme passed.
+
+**The lock-out's words:** the owner has not yet decided between the approved "same sentence as any refusal" and a neutral "Try again in a few minutes". Build the approved one, with the refusal's key read through a single method (`SignIn::Outcome#message_key` or its equivalent), so a change is one line. The coordinator records the owner's answer in the ledger.
 
 ---
 
@@ -553,7 +572,35 @@ The card's version id is written here, and in `test/support/design_system_entrie
 
 ---
 
-### Task 11: The reference, the changelog and the pull request
+### Task 11: The visitor's real address behind a proxy
+
+**Why:** every per-address bucket (sign-in's 10 in 3 minutes, the new 50 an hour, the bot check's trigger, and the forms' own limit) keys on `request.remote_ip`. Production names no `trusted_proxies`. Behind Cloudflare, every visitor is then a few Cloudflare addresses, and 50 failures from anyone close sign-in for the whole site, owners included. That breaks the design's sixth goal. The coordinator's ruling: this cannot stay documented-only.
+
+**Files:**
+- Create: `lib/trusted_proxies.rb`. It is read before autoloading, from `config/environments/production.rb` or an initializer, following CLAUDE.md's `lib/` rule.
+- Modify: `config/environments/production.rb` or the initializer; `Setup::SystemCheck`, which gains one row; its component and locale keys; `docs/reference/hosting.md`, both the variable table and the Forms section; `CLAUDE.md`'s Deploy paragraph, where it names `trusted_proxies`.
+- Test: `test/lib/trusted_proxies_test.rb`, `test/models/setup/system_check_test.rb`, and an integration test of `remote_ip` behind a trusted proxy.
+
+**Interfaces:**
+- `TRUSTED_PROXIES`, an environment variable: a comma-separated list of CIDRs. They are added to Rails' default trusted proxies (the private ranges), never replacing them. A malformed entry stops the boot with a message that names it. Unset, it changes nothing.
+- `Setup::SystemCheck` row "Visitor address":
+  - **OK** when a request carries no `CF-Connecting-IP`, or when that header equals `request.remote_ip`.
+  - **A warning** when the header is present and differs: "Requests come through Cloudflare, but the visitor's own address is not read: every visitor counts as Cloudflare's. Set TRUSTED_PROXIES to Cloudflare's ranges." It links the hosting page.
+  - The header is never trusted to set the address, since it can be forged without Cloudflare in front. It only tells whether the setting is missing.
+- `hosting.md`: how to fill `TRUSTED_PROXIES` with Cloudflare's published ranges (https://www.cloudflare.com/ips/), and that they change rarely and are re-checked at upgrades.
+
+- [ ] **Step 1: Write the failing tests.**
+  - The parser accepts IPv4 and IPv6 CIDRs and refuses a malformed one by name.
+  - With `TRUSTED_PROXIES` set to a range, a request from that range carrying `X-Forwarded-For` gets the forwarded `remote_ip`. Without the setting, it gets the proxy's address.
+  - The system check row is OK without the header, OK when the header equals `remote_ip`, and the warning when they differ.
+- [ ] **Step 2: Run them, and verify they fail.**
+- [ ] **Step 3: Implement.** One reader for the variable; the row follows the existing rows' pattern and words-as-keys.
+- [ ] **Step 4: Run** the tests above, `test/lib/environment_variables_test.rb` (the variable must be listed in `hosting.md`'s table, done in this task) and the system status tests. Expected: PASS.
+- [ ] **Step 5: Commit** `feat: TRUSTED_PROXIES, and System status says when Cloudflare's visitors all count as one address`.
+
+---
+
+### Task 12: The reference, the changelog and the pull request
 
 **Files:**
 - Modify:
