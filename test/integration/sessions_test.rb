@@ -175,6 +175,33 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_select "#flash-session-ended[data-turbo-temporary]", text: ENDED_SENTENCE
   end
 
+  # Turbo's own GET (a Drive visit, a frame's load, a prefetch) and a frame's
+  # GET are answered with a page Turbo may not draw, so the browser loads the
+  # address whole; nothing is spent or cleared until that load, which is told.
+  test "Turbo's GET of a gone session asks for a whole load and spends nothing" do
+    sign_in_cookie_value
+    @user.sessions.sole.destroy!
+
+    [
+      { "Turbo-Frame" => "content", "X-Turbo-Request-Id" => SecureRandom.uuid },
+      { "X-Turbo-Request-Id" => SecureRandom.uuid },
+      { "X-Turbo-Request-Id" => SecureRandom.uuid, "X-Sec-Purpose" => "prefetch" },
+      { "Turbo-Frame" => "notes" }
+    ].each do |headers|
+      get "/cs-studio/posts", headers: headers.merge("Accept" => "text/html, application/xhtml+xml")
+      assert_response :success
+      assert_select "head meta[name=turbo-visit-control][content=reload]"
+      assert_select "turbo-frame", count: 0
+      assert_not cookie_cleared?
+    end
+
+    get "/cs-studio/posts"
+    assert_redirected_to "/cs-studio/sign-in"
+    assert cookie_cleared?
+    follow_redirect!
+    assert_select "#flash-session-ended", text: ENDED_SENTENCE
+  end
+
   test "an idle-expired session says so at sign-in" do
     freeze_time
     sign_in_cookie_value
