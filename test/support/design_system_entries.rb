@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794356972-d606".freeze
+  VERSION = "1794360159-ac3d".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -20,8 +20,7 @@ module DesignSystemEntries
     PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
     SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip
-    StudioBlockCard StudioCalmColourE4E5 StudioCalmE4More StudioCalmE4Setup
-    StudioCalmE4Together StudioCalmEditor StudioCommandPalette StudioDashboardCards
+    StudioBlockCard StudioCommandPalette StudioDashboardCards
     StudioAccount StudioAuditLog StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid
     StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail StudioSectionTile
     StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations StudioTrash StudioTree StudioUsers StudioWizard
