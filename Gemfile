@@ -19,15 +19,15 @@ gem "importmap-rails"
 # system tests (test/system/save_bar_test.rb, test/system/admin/autosave_test.rb,
 # changed_elsewhere_test.rb, blocks_test.rb) before anything else.
 gem "turbo-rails", "2.0.23"
-
-# Reads a session's user agent string into a browser and a system (SessionDevice).
-gem "useragent", "~> 0.16"
 # Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem "stimulus-rails"
 # Use Tailwind CSS [https://github.com/rails/tailwindcss-rails]
 gem "tailwindcss-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
+
+# Reads a session's user agent string into a browser and a system (SessionDevice).
+gem "useragent", "~> 0.16"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"

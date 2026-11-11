@@ -25,6 +25,8 @@ class SessionDevice
     "ChromeOS" => "ChromeOS"
   }.freeze
 
+  EDGE_TOKEN = %r{\bEdg(?:A|iOS)?/\d}
+
   attr_reader :browser, :os
 
   def initialize(user_agent)
@@ -54,6 +56,8 @@ class SessionDevice
 
     # The gem answers a product it has no class for with its base class: not a browser.
     browser = agent.class == UserAgent::Browsers::Base ? nil : agent.browser.presence
+    # The gem reads Edge (its "Edg/", "EdgA/" and "EdgiOS/" tokens) as Chrome or Safari.
+    browser = "Edge" if browser && EDGE_TOKEN.match?(user_agent)
     [ browser, os_of(agent) ]
   rescue StandardError
     [ nil, nil ]

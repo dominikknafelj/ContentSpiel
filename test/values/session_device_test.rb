@@ -17,6 +17,15 @@ class SessionDeviceTest < ActiveSupport::TestCase
     assert_equal [ "device", { browser: "Chrome", os: "Windows" } ], SessionDevice.new(CHROME_WINDOWS).key_and_values
   end
 
+  test "Edge is Edge, not Chrome, on desktop and on a phone" do
+    desktop = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.2592.81"
+    android = "Mozilla/5.0 (Linux; Android 10; HD1913) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 EdgA/126.0.2592.80"
+    ios = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 EdgiOS/126.2592.82 Mobile/15E148 Safari/605.1.15"
+    assert_equal [ "device", { browser: "Edge", os: "Windows" } ], SessionDevice.new(desktop).key_and_values
+    assert_equal [ "device", { browser: "Edge", os: "Android" } ], SessionDevice.new(android).key_and_values
+    assert_equal [ "device", { browser: "Edge", os: "iOS" } ], SessionDevice.new(ios).key_and_values
+  end
+
   test "Safari on an iPhone is iOS" do
     device = SessionDevice.new(SAFARI_IPHONE)
     assert_equal "Safari", device.browser
