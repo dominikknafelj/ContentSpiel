@@ -1,6 +1,6 @@
 module Admin
   module NotesScreen
-    # What the Notes screen's two kinds of row share (`InboxRowComponent`, a
+    # What the Notes screen's two kinds of row share (`Admin::Ui::NoteInboxRowComponent`, a
     # delivery; `OpenThreadRowComponent`, a record with open threads): the
     # chip that stands for a kind of record and this request's URL options for
     # the link into its notes.

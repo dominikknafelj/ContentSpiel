@@ -1582,7 +1582,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
     "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
     "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip's dot",
+    "app/components/admin/ui/note_inbox_row_component.html.erb" => "the New chip's dot",
     "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
     "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
     "app/javascript/notes/merge.js" => "the NEW divider",
@@ -1613,7 +1613,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/badge_component.rb" => "the accent badge, the MCP channel chip's, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable",
+    "app/components/admin/ui/note_inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable",
     "app/components/admin/ui/segmented_component.rb" => "the chosen segment, a selection behind aria-current or :checked, with its accent edge"
   }.freeze
 

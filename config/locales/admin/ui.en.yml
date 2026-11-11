@@ -363,3 +363,34 @@ en:
           you: "You"
           via_you: ", via %{label}"
           via_other: " via %{label}"
+        # One line of the inbox. Each reason is a whole sentence in each of
+        # its three shapes: with a name (`%{name}` arrives as markup, the
+        # name in a heavier weight), for a person who has since been deleted,
+        # and with nobody to name (a reopen records no one).
+        note_inbox_row:
+          # The chip on an unread row: new, and for you.
+          new: "New"
+          # The verb the row ends in, inside its one link.
+          verb: "Open thread"
+          untitled: "(untitled)"
+          mention:
+            somebody_html: "%{name} mentioned you"
+            deleted: "A deleted user mentioned you"
+            nobody: "You were mentioned"
+          reply:
+            somebody_html: "%{name} replied"
+            deleted: "A deleted user replied"
+            nobody: "Someone replied"
+          resolved:
+            somebody_html: "%{name} resolved a note"
+            deleted: "A deleted user resolved a note"
+            nobody: "A note was resolved"
+          reopened:
+            somebody_html: "%{name} reopened a note"
+            deleted: "A deleted user reopened a note"
+            nobody: "A note was reopened"
+          where:
+            page: "Page · %{title}"
+            post: "Post · %{title}"
+            media: "Image · %{title}"
+            block: "%{place} · %{block}"

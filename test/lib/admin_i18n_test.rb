@@ -491,8 +491,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/notes/merge.js
     app/javascript/controllers/admin/notes/alert_controller.js
     app/javascript/controllers/admin/notes/permission_controller.js
-    app/components/admin/notes_screen/inbox_row_component.rb
-    app/components/admin/notes_screen/inbox_row_component.html.erb
+    app/components/admin/ui/note_inbox_row_component.rb
+    app/components/admin/ui/note_inbox_row_component.html.erb
     app/components/admin/notes_screen/person_name_component.rb
     app/components/admin/notes_screen/quote_component.rb
     app/views/admin/note_inbox/index.html.erb

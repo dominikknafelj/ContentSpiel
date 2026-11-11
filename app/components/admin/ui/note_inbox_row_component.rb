@@ -1,5 +1,5 @@
 module Admin
-  module NotesScreen
+  module Ui
     # One line of the inbox, in Notes for you on the dashboard and in the
     # full list: who did what, the note's first
     # words, where, and when. `Dashboard::NotesForYou::Row` is data; the
@@ -21,8 +21,31 @@ module Admin
     # the row is one Tab stop.
     #
     # Nothing here queries: the row carries its users, record and block.
-    class InboxRowComponent < Admin::AdminComponent
-      include Admin::NotesScreen::RecordRow
+    class NoteInboxRowComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "One link whose name is the row's sentence, ending in its verb Open thread; the avatar, the chips and New take no focus, so the row is one Tab stop, pressed with Enter.",
+        motion: :none,
+        content_edges: %i[short long missing],
+        widths: :fluid,
+        interface: %i[row],
+        limits: [
+          "It queries nothing: the row carries its users, record and block.",
+          "New is the one use of accent here, for an unread row addressed to the viewer, and the row is never marked read by anything but following its link.",
+          "A route name not on Admin::NotePathsHelper::NOTE_ROUTES raises and calls nothing."
+        ],
+        states: %i[unread read on_a_block],
+        keys: %w[new verb untitled
+                 mention.somebody_html mention.deleted mention.nobody
+                 reply.somebody_html reply.deleted reply.nobody
+                 resolved.somebody_html resolved.deleted resolved.nobody
+                 reopened.somebody_html reopened.deleted reopened.nobody
+                 where.page where.post where.media where.block],
+        slots: [],
+        controller: nil,
+        keyboard: [ "test/system/admin/note_inbox_test.rb", "an inbox row is one Tab stop: its avatar, chips and New take no focus" ]
+      )
 
       def initialize(row:)
         @row = row
@@ -33,6 +56,10 @@ module Admin
       attr_reader :row
 
       def path = helpers.note_route_path(row.route, **url_options)
+
+      # `admin_url_options` is a controller helper, absent when a component
+      # is rendered on its own (a component test).
+      def url_options = helpers.respond_to?(:admin_url_options) ? helpers.admin_url_options : {}
 
       # A named person, or one who is gone; a reopen names nobody, and so
       # does a note whose author was deleted (the foreign key nulls the
@@ -53,7 +80,7 @@ module Admin
       def where_chip
         return render(Admin::Ui::BlockIconComponent.new(definition: row.block.definition, place: :row, block: row.block)) if row.heading && row.block
 
-        record_chip(row.kind)
+        render(Admin::Ui::RecordChipComponent.new(kind: row.kind))
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich

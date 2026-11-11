@@ -67,6 +67,7 @@ module DesignSystemEntries
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
     "Admin::Ui::AuditSentenceComponent" => "StudioAuditLog",
+    "Admin::Ui::NoteInboxRowComponent" => "StudioNotesInbox",
     "Admin::Ui::ReferenceCardComponent" => "StudioTranslationPair",
     "Admin::Ui::SuggestionComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateAllComponent" => "StudioTranslationPair",

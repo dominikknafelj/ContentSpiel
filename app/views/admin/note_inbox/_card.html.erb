@@ -20,7 +20,7 @@
       <% end %>
     <% end %>
     <% rows.each do |row| %>
-      <% card.with_row { render Admin::NotesScreen::InboxRowComponent.new(row: row) } %>
+      <% card.with_row { render Admin::Ui::NoteInboxRowComponent.new(row: row) } %>
     <% end %>
     <%# The way to the same rows as a page, in words at the foot of the panel
         ("All notes for you →"), not the head's arrow. %>
