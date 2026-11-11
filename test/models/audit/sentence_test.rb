@@ -201,6 +201,24 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     assert_no_match(/someone@example\.com/, read(sentence))
   end
 
+  test "a lock-out reads as paused sign-in, for one account, one browser or one address, with no actor, as a security event" do
+    account = event("session.locked", channel: "admin", ip: "203.0.113.4",
+      metadata: { "bucket" => "account", "email_address" => "someone@example.com", "level" => 0, "seconds" => 60 })
+    address = event("session.locked", channel: "admin", ip: "203.0.113.4", metadata: { "bucket" => "address_wide", "seconds" => 3600 })
+
+    assert_equal "Sign-in to one account paused after repeated failures", read(sentence_for(account))
+    assert_equal "Sign-in from one address paused after repeated failures", read(sentence_for(address))
+    device = event("session.locked", channel: "admin", ip: "203.0.113.4",
+      metadata: { "bucket" => "device", "email_address" => "someone@example.com", "level" => 0, "seconds" => 60 })
+    assert_equal "Sign-in to one account from one browser paused after repeated failures", read(sentence_for(device))
+    [ account, address, device ].each do |locked|
+      sentence = sentence_for(locked)
+      assert sentence.actor.none
+      assert sentence.security
+      assert_no_match(/someone@example\.com|203\.0\.113/, read(sentence))
+    end
+  end
+
   test "a refused permission reads as the permission's own label, security flagged" do
     denied = event("access.denied", user_id: users(:author).id, metadata: { "permission" => "settings.manage" })
     sentence = sentence_for(denied)
@@ -220,7 +238,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.failed access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted]
+    secure = %w[session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted]
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
 

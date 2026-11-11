@@ -136,5 +136,6 @@ class Editing::SignalsTest < ActiveSupport::TestCase
     assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "notes.removed", subject_type: "Page", subject_id: @page.id)) }
     assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "note.started", subject_type: "Page", subject_id: @page.id)) }
     assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "session.created")) }
+    assert_empty only_new { Editing::Signals.heard(Audit::Event.new(action: "session.locked")) }
   end
 end

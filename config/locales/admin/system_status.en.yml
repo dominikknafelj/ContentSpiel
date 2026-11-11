@@ -1,6 +1,7 @@
 # System status (docs/reference/i18n.md): `admin/system_status/show.html.erb`,
 # read by lazy lookup. The rows' words are `Admin::Ui::SystemCheckRowComponent`'s
-# (`ui.en.yml`), and the checks' own sentences stay `Setup::SystemCheck`'s English.
+# (`ui.en.yml`), and the checks' own sentences stay `Setup::SystemCheck`'s English,
+# but for the Forms row's (`forms.en.yml`) and the Visitor address row's, below.
 en:
   admin:
     system_status:
@@ -13,3 +14,11 @@ en:
           one: "%{passed} of %{count} check passed · last run %{time}"
           other: "%{passed} of %{count} checks passed · last run %{time}"
         run_again: "Run checks again"
+      # The "Visitor address" row (`Setup::SystemCheck#visitor_address`):
+      # OK with no Cloudflare header, OK when the header is the address the
+      # request is counted by, and the warning when it is not.
+      visitor_address:
+        label: "Visitor address"
+        no_header: "Each visitor counts by the address their request comes from."
+        read: "Requests come through Cloudflare, and the visitor's own address is read."
+        cloudflare_not_trusted: "Requests come through Cloudflare, but the visitor's own address is not read: every visitor counts as Cloudflare's. Set TRUSTED_PROXIES to Cloudflare's ranges."

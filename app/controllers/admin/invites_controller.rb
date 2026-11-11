@@ -18,6 +18,7 @@ module Admin
   # form goes to `_top` (a whole Turbo visit, as the schedule dialog's), so
   # the dialog's `open_on_load` opens it on that visit's `turbo:load`.
   class InvitesController < BaseController
+    include MailLinkOrigin
     include UsersList
 
     before_action -> { require_permission("users.manage") }
@@ -33,7 +34,7 @@ module Admin
 
     def create
       result = Invitations::Invite.call(email_address: invite_params[:email_address].to_s.strip, name: invite_params[:name].presence,
-        group_ids: Array(invite_params[:group_ids]), **mail_origin)
+        group_ids: Array(invite_params[:group_ids]), **mail_link_origin)
 
       if result.ok?
         redirect_to admin_users_path(**admin_url_options), status: :see_other,
@@ -52,7 +53,7 @@ module Admin
     end
 
     def resend
-      result = Invitations::Resend.call(@invitation, **mail_origin)
+      result = Invitations::Resend.call(@invitation, **mail_link_origin)
 
       if result.ok?
         redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: t("admin.invites.resent", email: @invitation.email_address)
@@ -86,15 +87,6 @@ module Admin
     # Groups are the user editor's group cards.
     def invite_params
       @invite_params ||= params.fetch(:user, ActionController::Parameters.new).permit(:email_address, :name, group_ids: [])
-    end
-
-    # As the reset request (`Admin::PasswordsController#reset_mail_origin`,
-    # which says why): the request's origin goes to the mail only in
-    # development and test, and only when no site address is configured.
-    def mail_origin
-      return {} if SiteAddress.current.configured? || !PasswordsMailer.request_origin_used?
-
-      { origin: request.base_url }
     end
   end
 end

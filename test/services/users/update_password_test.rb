@@ -85,6 +85,38 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
 
+  # --- Leaked passwords (Users::LeakedPasswordRule) ---------------------------
+
+  test "a leaked password is refused and the user's sessions all stay" do
+    leaked = "correct horse battery"
+    sessions = 2.times.map { users(:reader).sessions.create! }
+
+    with_leaked_password_check(leaked: [ leaked ]) do
+      result = nil
+      assert_no_difference -> { Audit::Event.count } do
+        result = as(nil) { Users::UpdatePassword.call(users(:reader), password: leaked, password_confirmation: leaked, keep_acting_session: false, actor: users(:reader)) }
+      end
+
+      assert_not result.ok?
+      assert_equal [ "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one." ], result.errors
+      assert_equal result.errors, result.record.errors[:password]
+      assert_equal 1, leaked_password_requests.size
+    end
+    assert users(:reader).reload.authenticate("password")
+    sessions.each { |session| assert Session.exists?(session.id) }
+  end
+
+  test "a password the model refuses is never looked up, and a wrong current password neither" do
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      as(users(:reader)) do
+        Users::UpdatePassword.call(users(:reader), password: "short", password_confirmation: "short", actor: users(:reader))
+        Users::UpdatePassword.call(users(:reader), password: "correct horse battery", password_confirmation: "other", actor: users(:reader))
+        Users::UpdatePassword.call(users(:reader), password: "correct horse battery", password_confirmation: "correct horse battery", current_password: "wrong", actor: users(:reader))
+      end
+      assert_empty leaked_password_requests
+    end
+  end
+
   # --- A password change ends that user's sessions ---------------------------
 
   test "an admin changing someone's password ends every session of that user, the admin's own untouched" do

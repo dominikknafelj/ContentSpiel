@@ -97,7 +97,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # mail is delivered by a job).
   test "create" do
     with_site_address(nil) do
-      post admin_password_path, params: { email_address: @user.email_address }
+      perform_enqueued_jobs(only: PasswordResetRequestJob) { post admin_password_path, params: { email_address: @user.email_address } }
       assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user, { origin: "http://www.example.com" } ]
       assert_redirected_to new_admin_password_path(sent: 1)
 
@@ -112,9 +112,11 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "create with a site address configured hands the mailer no origin, whatever Host the request named" do
     with_site_address("https://docs.example.org") do
       post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
+      assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+      perform_enqueued_jobs(only: PasswordResetRequestJob)
 
       assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
-      assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+      assert_not_includes enqueued_jobs.to_s, "evil.example"
     end
   end
 
@@ -122,12 +124,14 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # request's origin is never used for the link, so it is not handed over
   # either: no mail is sent, and the page says the same words.
   test "create in production with no address configured hands over no origin, sends no mail and answers the same" do
-    with_singleton_override(PasswordsMailer, :request_origin_used?, ->(*) { false }) do
+    with_singleton_override(ApplicationMailer, :request_origin_used?, ->(*) { false }) do
       with_site_address(nil) do
         post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
+        assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+        perform_enqueued_jobs(only: PasswordResetRequestJob)
 
         assert_enqueued_email_with queued(PasswordsMailer), :reset, args: [ @user ]
-        assert_not_includes enqueued_jobs.sole.to_s, "evil.example"
+        assert_not_includes enqueued_jobs.to_s, "evil.example"
         assert_no_emails { perform_enqueued_jobs }
         assert_redirected_to new_admin_password_path(sent: 1)
 
@@ -150,7 +154,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "create for an unknown user redirects but sends no mail" do
-    post admin_password_path, params: { email_address: "missing-user@example.com" }
+    perform_enqueued_jobs(only: PasswordResetRequestJob) { post admin_password_path, params: { email_address: "missing-user@example.com" } }
     assert_enqueued_emails 0
     assert_redirected_to new_admin_password_path(sent: 1)
 
@@ -166,6 +170,33 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_equal known, css_select("main").text.squish
     assert_match "If that address belongs to an account, we've sent a link. It expires in 15 minutes.", known
+  end
+
+  # The request looks nobody up (`PasswordResetRequestJob` does): a known
+  # and an unknown address run the same statements, the mail settings' read
+  # alone, and enqueue the one job, whose arguments differ by the address.
+  test "a reset request runs the same statements and enqueues the same one job for a known and an unknown address" do
+    work = [ @user.email_address, "nobody@example.com" ].map do |email|
+      queued = enqueued_jobs.size
+      statements = capture_sql { post admin_password_path, params: { email_address: email } }
+      assert_redirected_to new_admin_password_path(sent: 1)
+      jobs = enqueued_jobs.drop(queued)
+      assert_equal [ email ], jobs.sole[:args].first(1), "the address typed is the job's"
+      { statements: statements, jobs: jobs.map { it[:job] } }
+    end
+
+    assert_equal(*work)
+    assert_equal [ PasswordResetRequestJob ], work.first[:jobs]
+    assert_empty work.first[:statements].grep(/\busers\b/), "no statement reads the users"
+  end
+
+  test "a reset request with an address that is a list enqueues the job with an empty address" do
+    [ { email_address: [ @user.email_address ] }, { email_address: { "a" => @user.email_address } }, {} ].each do |params|
+      assert_enqueued_with(job: PasswordResetRequestJob, args: [ "", { origin: "http://www.example.com" } ]) do
+        with_site_address(nil) { post admin_password_path, params: params }
+      end
+      assert_redirected_to new_admin_password_path(sent: 1)
+    end
   end
 
   # The states are selected by exactly the value the controller redirects
@@ -361,6 +392,22 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[type=hidden][name=token]" do |fields|
       assert_equal token, fields.first["value"]
     end
+  end
+
+  test "the reset refuses a leaked password and keeps the token in the form" do
+    token = @user.password_reset_token
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      assert_no_changes -> { @user.reload.password_digest } do
+        patch admin_update_password_path, params: { token: token, password: "correct horse battery", password_confirmation: "correct horse battery" }
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#alert[role=alert]", text: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
+    assert_select "input[type=hidden][name=token]" do |fields|
+      assert_equal token, fields.first["value"]
+    end
+    assert_not_includes response.body, "correct horse battery"
   end
 
   # Two refusals are two lines of the one alert, each the service's own

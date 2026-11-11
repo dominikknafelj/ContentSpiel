@@ -162,11 +162,13 @@ en:
             # that must read the same wherever it is shown, so errors on
             # `password` carry no "Password " prefix in `full_messages`. The
             # two other messages that can land on it are spelled out with
-            # the prefix they would otherwise have had.
+            # the prefix they would otherwise have had. `leaked` is
+            # `Users::LeakedPasswordRule`'s, a whole sentence too.
             password:
               format: "%{message}"
               blank: "Password can't be blank"
               too_long: "Password is too long (maximum is %{count} characters)"
+              leaked: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
             # "Change password": a wrong current password reads the same
             # under its field and in the summary, with no attribute prefix.
             current_password:

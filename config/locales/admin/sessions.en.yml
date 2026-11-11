@@ -1,5 +1,5 @@
 # The sign-in page (docs/reference/i18n.md): `admin.sessions.new` is the
-# lazy-lookup scope of `app/views/admin/sessions/new.html.erb`, and the two
+# lazy-lookup scope of `app/views/admin/sessions/new.html.erb`, and the
 # alerts beside it are `Admin::SessionsController`'s.
 en:
   admin:
@@ -13,8 +13,20 @@ en:
         # It names no console command: the page is shown to anyone.
         forgot_without_mail: "Forgot your password? Ask the site's owner to reset it."
         submit: "Sign in"
+        # Above the bot check's widget, shown only after repeated failures.
+        check_hint: "A quick check is needed before you can sign in."
+        # In the hint's place when Turnstile's script cannot be loaded
+        # (read by the `bot-check` script from its `data-messages`).
+        check_unavailable: "The check couldn't load. Reload the page to try again."
       # A wrong address or password: one answer for both, so the page does
       # not say which addresses have an account.
       refused: "Try another email address or password."
-      # Past the sign-in form's rate limit.
+      # While the email's bucket is closed after repeated failures. The
+      # bucket counts whether or not an account has the address, so this
+      # says nothing of who exists.
+      locked: "Try again in a few minutes."
+      # Past the sign-in form's rate limit, or an address's wide cap.
       limited: "Try again later."
+      # The bot check was due and its answer was missing or refused: no
+      # password was tried.
+      bot_check: "Complete the check, then sign in again."

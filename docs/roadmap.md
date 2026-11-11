@@ -291,6 +291,7 @@ The owner's own sites come first this way (2026-11-01): one server with a deploy
 | Single sign-on and passkeys | Should | A separate project (the owner, mail spec decision 8). "Forgot your password?" and the reset mail apply only to accounts that have a password: an account that signs in by single sign-on or a passkey alone needs its own way back, and an invite's "Set a password" page its own first step |
 | Script CSP with nonces | Should | S20 |
 | Audit log export and retention (the log grows without limit); partition `audit_events` by month when retention is built | Should | D5 |
+| Sign-in's counters share `Rails.cache` (Solid Cache, `max_size` in `config/cache.yml`) with the public render cache, so an eviction can end an account's run or a lock early (`SignIn.store`'s comment). A table of their own, with an `INSERT … ON CONFLICT DO UPDATE`, if eviction of throttle rows is seen | Could | Sign-in PR 1, final review |
 
 ### AI
 
@@ -871,8 +872,7 @@ Left by Forms (spec "As built"; `docs/reference/forms.md`). Each line ends with 
 - **The CMS's words to a visitor are English** (`public.forms`: the required word, the errors, the thank-you a form has none of, the plain pages): read in the visitor's language with English as the explicit fallback, and no `public.de.yml` exists ("Next", item 7).
 - **A send from `/preview` is a real submission** when the previewed page is live and places the form (the endpoint cannot tell), and refused from a draft page's preview (the owner's decision on M-2: a form takes sends only from a live page that places it). The guide says so; close it if editors ask for a test mode.
 - **The clean-up locks every submission of a keep-nothing form for that form's transaction** (`Forms::PurgeExpiredJob#delivered_ids`): such a form holds a few undelivered submissions; batch the locks if one ever holds a backlog.
-- **The two rate limits' stores are one rule written twice** (`Forms::SendLimit.store`, `MailTestLimit.store`): a shared helper when a third limit comes.
-- **Behind a CDN every visitor is one visitor to the rate limit** unless the CDN's ranges are in `config.action_dispatch.trusted_proxies` (`docs/reference/hosting.md`, "Forms"); nothing detects it. Close it with a System status check, or a boot warning, when a site's requests all arrive from one public address.
+- **Behind a CDN other than Cloudflare every visitor is one visitor to the rate limit** unless its ranges are in `TRUSTED_PROXIES` (`docs/reference/hosting.md`, "The visitor's address behind a proxy"): System status's "Visitor address" row reads Cloudflare's `CF-Connecting-IP` only. Close it with a check of another CDN's header when a site uses one.
 - **A failure after a real send marks the delivery failed**, and Send again may send the mail twice; a transient error is a permanent failure that waits for Send again. Look again if a destination's errors after a send prove common.
 - **"Mail to …" lists the recipients as they are now**, not as they were at the send: a delivery stores no address.
 - **A submission from a purged page reads "—"**: `page_id` nullifies (every submission is made with its page). A column of its own would tell them apart.

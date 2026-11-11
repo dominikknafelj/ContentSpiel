@@ -29,10 +29,15 @@ end
 # and a child process a test starts (test/lib/production_boot_test.rb) must
 # get the theme the test names and not the shell's. The mail variables go too
 # (`MailSettings::ENV_NAMES`): a developer's MAIL_SMTP_SERVER would otherwise
-# point every test's mail at a real server.
+# point every test's mail at a real server. The Turnstile keys and
+# LEAKED_PASSWORD_CHECK go too, so a test has a bot check only inside
+# `with_bot_check` and a leaked-password check only inside
+# `with_leaked_password_check`, neither of which asks the network
+# (test/support/sign_in_helper.rb).
 %w[PUBLIC_HOST THEME_PATH
    MAIL_SMTP_SERVER MAIL_SMTP_PORT MAIL_SMTP_SECURITY MAIL_SMTP_USERNAME MAIL_SMTP_PASSWORD
-   MAIL_SENDER_NAME MAIL_SENDER_ADDRESS].each { |name| ENV.delete(name) }
+   MAIL_SENDER_NAME MAIL_SENDER_ADDRESS
+   TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY LEAKED_PASSWORD_CHECK].each { |name| ENV.delete(name) }
 
 require_relative "../config/environment"
 SiteAddress.reset!
@@ -61,6 +66,7 @@ require_relative "support/log_capture"
 require_relative "support/sanitizer_parses"
 require_relative "support/contrast_measure"
 require_relative "support/theme_test_helper"
+require_relative "support/sign_in_helper"
 
 # What tests themselves print -- the statements a migration test runs
 # ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
@@ -140,6 +146,12 @@ module ActiveSupport
     # test/support/theme_test_helper.rb.
     include ThemeTestHelper
 
+    # `with_bot_check(answer) { ... }`, `with_leaked_password_check { ... }`
+    # and `with_http_stub { |url, requests| ... }`:
+    # the sign-in checks' outside calls, never the network -- see
+    # test/support/sign_in_helper.rb.
+    include SignInHelper
+
     # Setup.required? memoizes "setup is done" per process, reset by
     # SiteSetting after every commit -- but a test that clears the table with
     # `delete_all`/`destroy_all` bypasses callbacks entirely, and the memo
@@ -147,6 +159,11 @@ module ActiveSupport
     # worker last completed setup. Resetting before every test keeps that leak
     # from ever being observable.
     setup { Setup.reset! }
+
+    # The throttle's counters live in one memory store of the process in this
+    # environment (`SignIn.store`), so a test's failures would close the next
+    # test's buckets.
+    setup { SignIn.store.clear }
 
     # Runs the block as `actor` (a User or ApiToken) on `channel`, the way a
     # CS Studio request would -- so a service called inside it is authorized

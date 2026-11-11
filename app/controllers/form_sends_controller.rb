@@ -53,7 +53,7 @@
 # query string (`Telemetry::PathScrubber`); nothing of them is in a URL.
 # THE VISITOR'S ADDRESS: `Current.ip_address` is never set here, so the
 # visitor's event has no IP (`Audit.record`); the rate limit's cache key is
-# an HMAC of it (`Forms::SendLimit.visitor_key`); no span of ours names it.
+# an HMAC of it (`VisitorAddress.key`); no span of ours names it.
 # Rails' own request line ("Started POST "/forms/1" for <address> at …")
 # still does, as for every request of the site: that is the request log's,
 # not this endpoint's, and it holds no answer.

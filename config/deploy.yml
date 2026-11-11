@@ -26,6 +26,10 @@ proxy:
   # ssl: true
   # host: app.example.com
 
+  # Behind Cloudflare: hand on Cloudflare's X-Forwarded-For (with ssl: true kamal-proxy otherwise writes its
+  # own, naming only the edge), and set TRUSTED_PROXIES to Cloudflare's ranges too (docs/reference/hosting.md).
+  # forward_headers: true
+
   # How long kamal-proxy waits for the app to answer a request (default 30 s).
   # CS Studio's AI translation suggestions (`POST /<admin>/translations/suggest`)
   # wait on the AI provider inside the web request: up to two provider calls of

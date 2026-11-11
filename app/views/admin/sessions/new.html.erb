@@ -1,9 +1,19 @@
 <%# The sign-in form, on the product layout's panel: the site name above the
-    heading, an alert or a notice from the last answer, the two fields and
-    the full-width Sign in, the panel's one primary. The labels are real
+    heading, an alert or a notice from the last answer, the two fields, the
+    bot check when one is due, and the full-width Sign in, the panel's one
+    primary. The labels are real
     <label>s. Field names (email_address, password) are what the controller
     and every test post. %>
 <% mail_ready = MailSettings.current.ready? %>
+<%# On a site with both Turnstile keys the page is loaded whole, never
+    drawn into a document by Turbo: the widget's frame is allowed by the
+    policy of the response that loaded the document, and only this page's
+    answers carry that policy (`Admin::SessionsController`, "THE POLICY
+    BELONGS TO THE DOCUMENT"). Sign in sends the form without Turbo for the
+    same reason. %>
+<% if @bot_check_configured %>
+  <% content_for :head do %><meta name="turbo-visit-control" content="reload"><% end %>
+<% end %>
 <div class="flex flex-col gap-[18px]">
   <%= render "admin/shared/auth_heading", title: t(".title") %>
 
@@ -33,6 +43,25 @@
       <p class="text-small text-meta"><%= t(".forgot_without_mail") %></p>
     <% end %>
 
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full") %>
+    <%# The bot check, only when the controller hands one over (after
+        repeated failures, on a site with both Turnstile keys): inside the
+        form, so the widget's hidden answer is posted with it, and before
+        Sign in. The box has the widget's height from the first paint, so
+        Sign in does not move when Cloudflare draws into it. `bot-check`
+        draws and removes the widget by hand (its header says why). %>
+    <% if @bot_check %>
+      <div class="flex flex-col gap-2" data-controller="bot-check" data-bot-check-site-key-value="<%= @bot_check.site_key %>" data-bot-check-action-value="<%= SignIn::BotCheck::ACTION %>" data-messages="<%= messages_data("sessions.new.check_unavailable") %>">
+        <p id="turnstile-hint" class="text-small text-dim" aria-live="polite" data-bot-check-target="hint"><%= t(".check_hint") %></p>
+        <div class="min-h-[65px] w-full" data-bot-check-target="widget"></div>
+      </div>
+    <% end %>
+
+    <%# With the check drawn, Sign in is described by its hint, which is
+        where a screen reader that lands on the button learns of it. With
+        the keys, Sign in sends the form without Turbo (the submitter's
+        `data-turbo`, which Enter's implicit submission uses too), so the
+        answer is a whole load; the form's links stay Turbo's. %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full",
+          aria: (@bot_check ? { describedby: "turnstile-hint" } : {}), data: (@bot_check_configured ? { turbo: false } : {})) %>
   <% end %>
 </div>

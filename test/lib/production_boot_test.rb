@@ -9,7 +9,10 @@ require "fileutils"
 # `config/environments/production.rb` that calls it, and the initializer in
 # `config/application.rb` that prints the boot's lines, could be deleted with
 # every one of them green. The site would then answer any host over plain
-# HTTP while its documents say otherwise.
+# HTTP while its documents say otherwise. The same holds for its line that
+# calls `TrustedProxies.apply`: without it every visitor behind a CDN would
+# count as the CDN's edge, whatever TRUSTED_PROXIES says, so the https boot
+# sets the variable and the boot with no address leaves it out.
 #
 # So this boots production for real, as `test/lib/telemetry_exporter_test.rb`
 # boots development: `bin/rails runner` in a child process, killed when it
@@ -38,10 +41,11 @@ class ProductionBootTest < ActiveSupport::TestCase
     puts "mailer: #{config.action_mailer.default_url_options.inspect}"
     puts "health check excluded: #{[ config.host_authorization[:exclude], config.ssl_options.dig(:redirect, :exclude) ].all? { |rule| rule.equal?(HostSettings::HEALTH_CHECK) }}"
     puts "theme: #{Theme.current.name} #{Theme.current.fingerprint}"
+    puts "trusted proxies: #{config.action_dispatch.trusted_proxies&.map { |range| "#{range}/#{range.prefix}" }.inspect}"
   RUBY
 
   test "production with an https address answers that host alone, forces HTTPS, mails the address and says so at boot" do
-    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org")
+    printed, status = boot_production("PUBLIC_HOST" => "https://docs.example.org", "TRUSTED_PROXIES" => "173.245.48.0/20, 2400:cb00::/32")
     lines = printed.lines(chomp: true)
 
     assert status.success?, printed
@@ -56,6 +60,9 @@ class ProductionBootTest < ActiveSupport::TestCase
       assert_includes lines, line
     end
     assert_empty lines.grep(/RAILS_LOG_LEVEL/), "no warning about the log level at info"
+    # Rails' own list first, the variable's ranges after it.
+    proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES.map { |range| "#{range}/#{range.prefix}" } + [ "173.245.48.0/20", "2400:cb00::/32" ]
+    assert_includes lines, "trusted proxies: #{proxies.inspect}"
   end
 
   test "production with no address refuses and forces nothing, says so, and warns about a debug log level" do
@@ -70,6 +77,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     assert_includes lines, HostSettings.log_level_warning({ "RAILS_LOG_LEVEL" => "debug" })
     assert_includes lines, "[ContentSpiel] Theme: the default theme (THEME_PATH is not set)"
     assert_includes lines, "theme: default default"
+    assert_includes lines, "trusted proxies: nil", "unset, Rails' middleware keeps its own default"
   end
 
   test "production with a PUBLIC_HOST that is no address does not start, and says which variable without repeating it" do
@@ -163,7 +171,7 @@ class ProductionBootTest < ActiveSupport::TestCase
     def boot_production(variables)
       env = {
         "RAILS_ENV" => "production", "SECRET_KEY_BASE_DUMMY" => "1",
-        "PUBLIC_HOST" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
+        "PUBLIC_HOST" => nil, "TRUSTED_PROXIES" => nil, "THEME_PATH" => nil, "ASSUME_SSL" => nil, "RAILS_LOG_LEVEL" => nil,
         "SECRET_KEY_BASE" => nil, "RAILS_MASTER_KEY" => nil, "DATABASE_URL" => nil, "ADMIN_PATH" => nil,
         "OTEL_EXPORTER_OTLP_ENDPOINT" => nil, "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => nil, "OTEL_CONSOLE" => nil
       }.merge(variables)

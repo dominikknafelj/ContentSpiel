@@ -31,6 +31,14 @@ Rails.application.configure do
   # stops the boot here, with a message that names the variable.
   HostSettings.apply(config)
 
+  # Which proxies are believed when they say whose request it is: Rails' own
+  # (loopback and the private ranges) and the ranges in TRUSTED_PROXIES,
+  # which a site behind a CDN sets to the CDN's (lib/trusted_proxies.rb).
+  # Every per-address limit counts `request.remote_ip`, so without them a
+  # CDN's visitors all count as its few edge addresses. An entry that is not
+  # a range stops the boot here, with a message that names it.
+  TrustedProxies.apply(config)
+
   # Log to STDOUT with the current request id as a default log tag.
   config.log_tags = [ :request_id ]
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)

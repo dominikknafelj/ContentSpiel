@@ -46,6 +46,10 @@ proxy:
   ssl: true
   host: <%%= host %>
 
+  # Behind Cloudflare: pass on the visitor's address, which kamal-proxy
+  # otherwise replaces with Cloudflare's. Needs TRUSTED_PROXIES below too.
+  # forward_headers: true
+
   # The CMS's own value: AI translation waits on the provider inside a web
   # request, up to two calls of 25 s. Keep it in step with the CMS.
   response_timeout: 75
@@ -115,6 +119,23 @@ env:
     # MAIL_SENDER_NAME: Example
     # MAIL_SENDER_ADDRESS: site@example.com
 
+    # Behind a CDN: its published ranges, comma-separated, so each visitor
+    # counts as themselves to sign-in's and the forms' limits and not as the
+    # CDN's edge. Behind Cloudflare, with forward_headers above; System
+    # status warns while it is missing. Cloudflare's, as one line:
+    #   { curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; } | grep . | paste -sd, -
+    # TRUSTED_PROXIES: 173.245.48.0/20,2400:cb00::/32
+
+    # The bot check on sign-in after repeated failures (Cloudflare
+    # Turnstile): the widget's site key here, its secret below. Both or
+    # neither.
+    # TURNSTILE_SITE_KEY: 0x4AAAAAAA-your-site-key
+
+    # A new password is refused when Have I Been Pwned lists it as leaked
+    # (five characters of its hash leave the server). On in production;
+    # `off` turns it off.
+    # LEAKED_PASSWORD_CHECK: off
+
     # Never set RAILS_LOG_LEVEL to debug here: at debug Rails logs every mail
     # in full, a password reset link included.
   secret:
@@ -134,6 +155,7 @@ env:
     # Uncomment with its line in .kamal/secrets when you use it.
     # - OTEL_EXPORTER_OTLP_HEADERS
     # - MAIL_SMTP_PASSWORD
+    # - TURNSTILE_SECRET_KEY
 
 # Uploads. The CMS stores them on disk in production, under /rails/storage.
 # One named volume holds them and is kept when a container is replaced.
