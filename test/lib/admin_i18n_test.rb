@@ -184,7 +184,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/ai_state.rb
     app/components/admin/settings_screen/ai_test_result_component.rb
     app/components/admin/ui/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_test_outcome_component.rb
+    app/components/admin/ui/mail_test_outcome_component.rb
     app/components/admin/settings_screen/mail_test_result_component.rb
     app/controllers/admin/mail_logins_controller.rb
     app/javascript/controllers/admin/settings/mail_controller.js

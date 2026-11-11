@@ -65,6 +65,6 @@
       <%= link_to t(".skip"), setup_step_path("languages"), class: setup_tertiary_link_class %>
       <%= button_tag t(".continue"), type: "submit", class: setup_primary_button_class %>
     </div>
-    <%= render Admin::SettingsScreen::MailTestOutcomeComponent.new(address: Current.user&.email_address, **(@mail_result || {})) %>
+    <%= render Admin::Ui::MailTestOutcomeComponent.new(address: Current.user&.email_address, **(@mail_result || {})) %>
   </div>
 <% end %>
