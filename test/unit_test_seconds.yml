@@ -50,7 +50,7 @@ test/components/admin/editor_screen/no_address_chip_component_test.rb: 0.0
 test/components/admin/editor_screen/page_settings_form_component_test.rb: 4.7
 test/components/admin/editor_screen/post_form_component_test.rb: 2.0
 test/components/admin/editor_screen/publish_changes_dialog_component_test.rb: 3.4
-test/components/admin/editor_screen/reference_card_component_test.rb: 3.0
+test/components/admin/ui/reference_card_component_test.rb: 3.0
 test/components/admin/editor_screen/related_posts_component_test.rb: 0.8
 test/components/admin/editor_screen/rich_text_dialogs_component_test.rb: 0.1
 test/components/admin/editor_screen/schedule_dialog_component_test.rb: 2.1

@@ -327,3 +327,11 @@ en:
           gone: "This field is no longer on the page — reload and try again"
           not_applied: "This text can't be replaced here"
           no_answer: "No suggestion came back for this field — try again"
+        # `Admin::Ui::ReferenceCardComponent`: the primary-language original
+        # beside a translated field; the notes of an outdated card.
+        reference_card:
+          confirm: "Still correct — mark up to date"
+          changed: "↻ Changed"
+          formatting_note: "Formatting changed"
+          too_long_note: "The text is too long to compare word by word."
+          no_source_note: "%{language} changed since this was translated."

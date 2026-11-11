@@ -88,9 +88,8 @@ module Admin
       end
 
       # The reference card's state, confirm and record options for a translated field
-      # (translation helpers spec §4) -- see `Admin::EditorScreen
-      # ::ReferenceCardComponent.options_for`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable? && !read_only_hold?)
+      # (translation helpers spec §4) -- see `Admin::Ui::ReferenceCardComponent.options_for`.
+      def translation(field) = Admin::Ui::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       # The homepage has no slug of its own (`Page#generates_slugs?`) -- its
       # path is "/" by design, so there's nothing here for an editor to type.

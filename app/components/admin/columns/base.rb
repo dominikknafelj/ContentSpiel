@@ -59,13 +59,12 @@ module Admin
       def errors_id = "#{id}-errors"
 
       # The card showing the primary-language original beside (or, in a
-      # narrow column, above) the field (`Admin::EditorScreen
-      # ::ReferenceCardComponent`). An `:outdated` card carries the "Original
+      # narrow column, above) the field (`Admin::Ui::ReferenceCardComponent`). An `:outdated` card carries the "Original
       # changed" note (translation helpers spec §4) and its "Mark as up to
       # date" button; `:unknown` (a translation older than tracking) and
       # `:current` show nothing extra.
       def reference_card
-        Admin::EditorScreen::ReferenceCardComponent.new(
+        Admin::Ui::ReferenceCardComponent.new(
           field: name, locale: locale, original: card_original, kind: card_kind,
           state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )

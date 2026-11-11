@@ -1,8 +1,8 @@
 require "test_helper"
 
-class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
+class Admin::Ui::ReferenceCardComponentTest < ViewComponent::TestCase
   def render_card(**options)
-    render_inline(Admin::EditorScreen::ReferenceCardComponent.new(field: "title", locale: "de", original: "About us", **options))
+    render_inline(Admin::Ui::ReferenceCardComponent.new(field: "title", locale: "de", original: "About us", **options))
   end
 
   test "shows the primary language's own name and the original beside its state" do
@@ -22,7 +22,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
   test "the summary is a disclosure: the triangle, the language, and the change time at the far end" do
     post = create_post(title: "Hello")
-    render_inline Admin::EditorScreen::ReferenceCardComponent.new(field: "title", locale: "de", original: "Hello", record: post)
+    render_inline Admin::Ui::ReferenceCardComponent.new(field: "title", locale: "de", original: "Hello", record: post)
 
     assert_selector "summary.admin-disclosure > span:first-child", text: Locales.name(Locales.default, native: true)
     assert_no_selector "summary.justify-between"
@@ -52,7 +52,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
   def render_outdated(record, field: "title", original: nil, kind: :plain, confirm: true)
     original ||= record.translation_value(field, "en")
-    render_inline(Admin::EditorScreen::ReferenceCardComponent.new(
+    render_inline(Admin::Ui::ReferenceCardComponent.new(
       field: field, locale: "de", original: original, kind: kind, state: :outdated, record: record,
       confirm: (confirm_for(record, field) if confirm)
     ))
@@ -186,8 +186,8 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
     render_outdated(post)
 
-    assert_equal "reference-card-post-#{post.id}-title-de", Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")
-    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")}.admin-reference-card"
+    assert_equal "reference-card-post-#{post.id}-title-de", Admin::Ui::ReferenceCardComponent.dom_id(post, "title", "de")
+    assert_selector "##{Admin::Ui::ReferenceCardComponent.dom_id(post, "title", "de")}.admin-reference-card"
   end
 
   test "current_for builds the current-state card for a record's field" do
@@ -195,9 +195,9 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     post.confirm_translation("title", "de")
     post.save!
 
-    render_inline Admin::EditorScreen::ReferenceCardComponent.current_for(post, "title", locale: "de")
+    render_inline Admin::Ui::ReferenceCardComponent.current_for(post, "title", locale: "de")
 
-    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")}[data-translation-state='current'] p", text: "A small room"
+    assert_selector "##{Admin::Ui::ReferenceCardComponent.dom_id(post, "title", "de")}[data-translation-state='current'] p", text: "A small room"
     assert_no_selector "button"
   end
 
@@ -210,7 +210,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
   end
 
   def render_with_suggest(post)
-    render_inline(Admin::EditorScreen::ReferenceCardComponent.new(
+    render_inline(Admin::Ui::ReferenceCardComponent.new(
       field: "title", locale: "de", original: "A small room", state: :outdated, record: post, confirm: confirm_for(post), suggest: suggest_for(post)
     ))
   end

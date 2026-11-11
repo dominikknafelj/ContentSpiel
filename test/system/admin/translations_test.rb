@@ -480,6 +480,21 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_equal "Hallo", post.title(locale: "de", fallback: false)
   end
 
+  test "Still correct is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: "Hello there" } }).ok?
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "[data-original-for='title'] button[form='translation-confirm-form']", keys: %i[shift tab], limit: 80
+    assert_equal "Still correct — mark up to date", focused_text
+    page.send_keys(:enter)
+    assert_no_button "Still correct — mark up to date", wait: 5
+    assert_equal :current, post.reload.translation_state("title", "de")
+  end
+
   test "the matrix lists a post missing in German and links into its German editor" do
     post = create_post(title: "Only in English")
 

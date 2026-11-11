@@ -3,7 +3,7 @@
     <summary class="admin-disclosure cursor-pointer text-label text-meta">
       <span><%= language_name %></span>
       <% if changed_at %>
-        <span class="ml-auto text-warn-ink">↻ Changed <%= render Admin::Ui::TimeAgoComponent.new(time: changed_at) %></span>
+        <span class="ml-auto text-warn-ink"><%= t(".changed") %> <%= render Admin::Ui::TimeAgoComponent.new(time: changed_at) %></span>
       <% end %>
     </summary>
 
@@ -30,7 +30,7 @@
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <%= render suggest if suggest %>
           <% if confirmable? %>
-            <%= tag.button self.class::CONFIRM_LABEL, type: "submit", form: self.class::FORM_ID, formaction: confirm_url,
+            <%= tag.button t(".confirm"), type: "submit", form: self.class::FORM_ID, formaction: confirm_url,
                   class: "cursor-pointer rounded-cs border border-transparent px-2 py-0.5 text-dim hover:bg-sunken hover:text-ink" %>
           <% end %>
         </div>

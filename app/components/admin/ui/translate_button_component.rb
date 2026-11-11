@@ -62,7 +62,7 @@ module Admin
       MODES = %i[translate update].freeze
 
       # `mode: :update` is the outdated reference card's **Suggest update**
-      # (`Admin::EditorScreen::ReferenceCardComponent`): the same wrapper and
+      # (`Admin::Ui::ReferenceCardComponent`): the same wrapper and
       # the same single-field request as **Translate**, carrying
       # `data-translate-mode="update"` so `admin--translation--translate` sends `mode=update`
       # and the suggestion that comes back also shows the field's current

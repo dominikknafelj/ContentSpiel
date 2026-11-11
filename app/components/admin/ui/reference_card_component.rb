@@ -1,5 +1,5 @@
 module Admin
-  module EditorScreen
+  module Ui
     # The primary-language original shown beside (or, in a narrow column,
     # above) a translated field (handoff §4.1 "Side-by-side translation"):
     # the language's own name as an uppercase mono label, then the original --
@@ -62,15 +62,31 @@ module Admin
     # input, on the field's own side of the pair, next to the suggestion box
     # it streams into.
     class ReferenceCardComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A details disclosure whose summary names the primary language and is one Tab stop (inert, and not a stop, where the pair sits side by side); the outdated note is a polite status line, and Still correct is a real submit button that is one Tab stop, pressed with Enter or Space.",
+        motion: :none,
+        content_edges: %i[short long missing],
+        widths: :fluid,
+        interface: %i[field locale original kind state confirm record suggest],
+        limits: [
+          "Still correct belongs to the layout's confirm form through form=, never to the editor's own form it sits inside, and is drawn only for an outdated card whose viewer may edit.",
+          "It shows a diff only for a stored source taken in the current primary language; otherwise the current original with a sentence.",
+          "Suggest update is drawn by the caller's TranslateButtonComponent and appears only with AI set up."
+        ],
+        states: %i[current outdated unknown missing],
+        keys: %w[confirm changed formatting_note too_long_note no_source_note],
+        slots: [],
+        controller: nil,
+        keyboard: [ "test/system/admin/translations_test.rb", "Still correct is one Tab stop that Enter presses" ]
+      )
+
       # The one empty confirm form the admin layout renders outside every
       # editor form (`app/views/layouts/admin.html.erb`).
       FORM_ID = "translation-confirm-form".freeze
 
       STATES = %i[current outdated unknown missing].freeze
-
-      CONFIRM_LABEL = "Still correct — mark up to date".freeze
-      FORMATTING_NOTE = "Formatting changed".freeze
-      TOO_LONG_NOTE = "The text is too long to compare word by word.".freeze
 
       # Per language (round 3, Task 5): Settings holds every language's fields
       # on one screen, so two cards for the same record and field (German and
@@ -153,7 +169,7 @@ module Admin
         @changed_at = record&.translation_original_changed_at_for(field)
       end
 
-      def no_source_note = "#{language_name} changed since this was translated."
+      def no_source_note = t(".no_source_note", language: language_name)
 
       # Which outdated body to show: `:diff`, `:formatting`, `:too_long` or
       # `:no_source` (see the class comment). Nil for any other state.
@@ -174,8 +190,8 @@ module Admin
       # The sentence under the body: nil for the diff, which speaks for itself.
       def outdated_note
         case outdated_body
-        when :formatting then FORMATTING_NOTE
-        when :too_long then TOO_LONG_NOTE
+        when :formatting then t(".formatting_note")
+        when :too_long then t(".too_long_note")
         when :no_source then no_source_note
         end
       end

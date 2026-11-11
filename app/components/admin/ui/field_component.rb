@@ -130,7 +130,7 @@ module Admin
       # The card showing the primary-language original beside (or above) the
       # input -- see `Admin::Columns::Base#reference_card`.
       def reference_card
-        Admin::EditorScreen::ReferenceCardComponent.new(
+        Admin::Ui::ReferenceCardComponent.new(
           field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
       end

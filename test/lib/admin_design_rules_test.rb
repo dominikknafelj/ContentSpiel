@@ -944,7 +944,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # The reference card folds only when stacked; side by side its summary is inert, and shows no triangle.
     assert_match(/\.admin-translation-pair > \.admin-reference-card > details > summary::before\s*\{\s*display:\s*none;/, css)
     %w[app/components/admin/editor_screen/page_settings_form_component.html.erb app/components/admin/editor_screen/shared_fields_component.html.erb
-       app/components/admin/editor_screen/reference_card_component.html.erb app/views/admin/audit_events/show.html.erb].each do |path|
+       app/components/admin/ui/reference_card_component.html.erb app/views/admin/audit_events/show.html.erb].each do |path|
       Rails.root.join(path).read.scan(/<summary[^>]*>/).each { |summary| assert_includes summary, "admin-disclosure", path }
     end
   end
@@ -1445,8 +1445,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   POST_FORM_SOURCES = [
     "app/components/admin/editor_screen/post_form_component.html.erb",
     "app/components/admin/columns/*", "app/components/admin/fields/*",
-    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input,translate_all,translate_button}_component.*",
-    "app/components/admin/editor_screen/{related_posts,shared_fields,reference_card}_component.*",
+    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input,translate_all,translate_button,reference_card}_component.*",
+    "app/components/admin/editor_screen/{related_posts,shared_fields}_component.*",
     "app/components/admin/translation_screen/suggestion_component.*",
     "app/views/admin/shared/{_translation_box,_field_errors,_base_updated_at_field,_override_field}.html.erb",
     "app/javascript/rich_text/*.js", "app/javascript/controllers/admin/rich_text/*.js"

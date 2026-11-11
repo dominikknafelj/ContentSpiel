@@ -74,7 +74,7 @@ module Admin
       end
 
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable? && !read_only_hold?)
+      def translation(field) = Admin::Ui::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable? && !read_only_hold?)
 
       def field_id(name) = "#{ID_PREFIX}-#{name}"
 
