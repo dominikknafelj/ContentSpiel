@@ -29,7 +29,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
   def entry(component, loader: nil, **options) = Admin::Slots::Entry.new(component:, loader:, options:)
 
   test "the names a screen may put a slot at" do
-    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers editor.rail.tabs media.rail.tabs], Admin::Slots::NAMES
+    assert_equal %w[editor.header.people editor.header.actions media.panel.header media.panel.sections tree.row.markers posts.row.markers posts.row.title editor.block.markers editor.rail.tabs media.rail.tabs editor.block.removed], Admin::Slots::NAMES
   end
 
   test "editor.rail.tabs is a name a screen may put a slot at" do
@@ -172,6 +172,7 @@ class Admin::SlotsTest < ViewComponent::TestCase
     assert_equal [ [ Admin::PresenceScreen::RowMarkerComponent, { joined: true, shown: 3 } ] ], Admin::Slots.entries("posts.row.title").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :header } ] ], Admin::Slots.entries("editor.header.people").map { |entry| [ entry.component, entry.options ] }
     assert_equal [ [ Admin::PresenceScreen::PeopleComponent, { size: :panel } ] ], Admin::Slots.entries("media.panel.header").map { |entry| [ entry.component, entry.options ] }
+    assert_equal [ Admin::NotesScreen::CountsStreamComponent ], Admin::Slots.entries("editor.block.removed").map(&:component)
   end
 
   test "the initializer can run again, as after a development reload, without registering anything twice" do

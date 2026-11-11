@@ -146,4 +146,15 @@ class Admin::Answers::BlockSavedTest < ActionView::TestCase
     assert_equal :ok, answer.status
     assert_equal [ [ "remove", dom_id_of(block) ], [ "replace", "notes-counts" ], [ "replace", chip ] ], streams_of(answer)
   end
+
+  # The counts are notes', registered at the stream slot `editor.block.removed`:
+  # the answer draws what stands there and names no feature.
+  test "a removed block's answer draws the stream slot's entries after the removal, and nothing for an empty slot" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    block.destroy!
+
+    answer = Admin::Slots.with("editor.block.removed" => []) { saved.removed(block, kept_ids: [], section: nil) }
+
+    assert_equal [ [ "remove", dom_id_of(block) ], [ "replace", chip ] ], streams_of(answer)
+  end
 end
