@@ -38,7 +38,7 @@ module Admin
       components.ui.save_bar.unsaved components.ui.save_bar.no_changes components.ui.save_bar.blocked
       components.ui.toast.order_failed components.ui.toast.dropped
       components.ui.copy_value.copy components.ui.copy_value.copied components.ui.copy_value.failed components.ui.copy_value.selected
-      components.ui.translate_all.nothing_empty components.ui.translate_all.failed components.ui.translate_all.gone components.ui.translate_all.not_applied components.ui.translate_all.no_answer
+      components.ui.translate_all.nothing_empty components.ui.translate_all.failed components.ui.translate_all.gone components.ui.translate_all.not_applied components.ui.translate_all.no_answer components.ui.suggestion.dismiss
       layout.leave_dialog.body layout.leave_dialog.body_with_count shell.nav.unread_count
       notes.script.marker.add notes.script.marker.open notes.script.marker.open_unread notes.script.marker.new notes.script.marker.selection notes.script.total notes.script.delete_warning notes.script.delete_section_warning
       notes.script.toast.on notes.script.toast.many notes.script.live.new_divider notes.script.live.new_messages notes.script.live.gone

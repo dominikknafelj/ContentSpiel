@@ -14,6 +14,11 @@ class Admin::Ui::SuggestionComponentTest < ViewComponent::TestCase
     assert_equal "translation-suggestion-post-title", Admin::Ui::SuggestionComponent.dom_id("post-title")
   end
 
+  test "the script's Dismiss word is served on <body>, where every box's controller reaches it" do
+    body = JSON.parse(ApplicationController.helpers.extend(Admin::MessagesHelper).admin_script_messages)
+    assert_equal "Dismiss", body["components.ui.suggestion.dismiss"]
+  end
+
   test "a plain suggestion is editable and names the model that wrote it" do
     render_inline(Admin::Ui::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo Welt",
       model: "claude-sonnet-5"))

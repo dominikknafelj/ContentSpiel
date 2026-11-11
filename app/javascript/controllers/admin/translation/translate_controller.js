@@ -629,7 +629,7 @@ function showError(box, message) {
   dismiss.type = "button"
   dismiss.className = box.dataset.dismissClass || ""
   dismiss.dataset.action = "admin--translation--translate#discard"
-  dismiss.textContent = "Dismiss"
+  dismiss.textContent = messages(box).t("components.ui.suggestion.dismiss")
   actions.append(dismiss)
   wrapper.append(text, actions)
   box.replaceChildren(wrapper)
