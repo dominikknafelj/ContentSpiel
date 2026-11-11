@@ -1,7 +1,7 @@
 name: CI
 
 # CI runs for every pull request: lint, the scans, the unit tests (as two shards)
-# and the browser suite (as four shards). A merge to main is the code a pull request
+# and the browser suite (as six shards). A merge to main is the code a pull request
 # already tested, so it is not run again; main is run by hand when that is
 # wanted. `workflow_dispatch` runs everything on any branch, main included
 # ("Run workflow", or `gh workflow run CI --ref main`).
@@ -240,7 +240,7 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # The browser suite, as four jobs side by side: a runner has two cores, and
+  # The browser suite, as six jobs side by side: a runner has two cores, and
   # the whole suite on two processes took 28 minutes. `bin/test-shard system`
   # deals the files so each job takes about the same time, by the seconds in
   # test/system_test_seconds.yml (test/lib/test_shards_test.rb keeps every file
@@ -253,7 +253,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
 
     services:
       postgres:
@@ -297,7 +297,7 @@ jobs:
           BROWSER_PATH: /usr/bin/google-chrome
         run: |
           bin/rails db:test:prepare tailwindcss:build
-          bin/rails test -v $(bin/test-shard system ${{ matrix.shard }} 4)
+          bin/rails test -v $(bin/test-shard system ${{ matrix.shard }} 6)
 
       - name: Keep screenshots from failed system tests
         uses: actions/upload-artifact@v7
@@ -307,7 +307,7 @@ jobs:
           path: ${{ github.workspace }}/tmp/screenshots
           if-no-files-found: ignore
 
-  # One check that speaks for the four: green when every shard passed, when
+  # One check that speaks for the six: green when every shard passed, when
   # the suite was skipped because only documents changed.
   system-test:
     needs: [changes, system-test-shard]
