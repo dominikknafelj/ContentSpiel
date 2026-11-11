@@ -2,6 +2,8 @@
 
 Status: draft for the owner's approval, 2026-11-11.
 Base: `main` at 9213771f (release 0.3.0). No issue yet.
+Amended 2026-11-11 with the spike's findings (`2026-11-11-diagram-block-spike.md`, items 1–12 of its "Changes the spec needs") and two owner decisions (the drawing limit, non-Latin scripts). Each change is marked "(spike, 2026-11-11)" or "(owner, 2026-11-11)".
+**Design System for the build: v213 (index 1794424314-9bbe)**, with the cards `EditorDiagramBlock`, `EditorDiagramError` and `PublicDiagramBlock`. They already show the owner's later decisions: 60%-then-scroll (call 13), the tile preview (call 14) and the import ("Decided by the owner").
 
 ## Why
 
@@ -43,7 +45,7 @@ These are the owner's decisions, in his words and mine:
 - **What it is:** a Diagram block in the CMS, not rich text and not the guide only. Editors type Mermaid text in a monospace field and see it drawn live beside it, like mermaid.live and like the Code block's field. There is no composer now.
 - **Where it is drawn:** in CS Studio. The drawing is stored and served static. Mermaid loads only in CS Studio, never on public pages. On save, the drawn SVG is stored with the block. The public page serves that SVG with no script, and the public cache and ETag work as for any block.
 - **Security:**
-  - The CS Studio preview renders with Mermaid's `securityLevel: "sandbox"` and a pinned, patched Mermaid version. This answers CVE-2026-41149, DOM injection through `classDef` in state diagrams even under `strict`, and GitLab #332528, where sanitizing depended on `htmlLabels`.
+  - The CS Studio preview renders with a pinned, patched Mermaid version, in the renderer frame with `securityLevel: "strict"` (spike, 2026-11-11: Mermaid's `"sandbox"` mode throws inside an opaque-origin frame and isolates nothing the frame doesn't; see "My calls" 2). This answers CVE-2026-41149, DOM injection through `classDef` in state diagrams even under `strict`, and GitLab #332528, where sanitizing depended on `htmlLabels`.
   - The server sanitizes the SVG against a strict allowlist before storing it, and refuses what it can't sanitize. The allowlist means: no script, no `foreignObject` or HTML labels, no event handlers, no external references and no `style` that can load anything.
 - **Theme colours:** a block type promises the theme's colours, never Tailwind's palette. Mermaid's output reads the theme's colour tokens, in light and in dark.
 - **Accessibility:** a required text description is a field of the block, like an image's alt. The public markup is `role="img"` with an accessible name and the description.
@@ -52,6 +54,8 @@ These are the owner's decisions, in his words and mine:
   - **From Markdown content:** wherever CS Studio turns Markdown into blocks (the rich-text Markdown form and its import paths, the MCP tools that write content), a ```mermaid fence becomes a Diagram block (source filled, drawing made at the editor's next open, description empty, so the site shows it only once a description is added) instead of a Code block. The plan names each such path from `docs/reference/rich-text.md` and `app/mcp/`.
   - Not in scope: mermaid.live links and ready-made SVG uploads.
 - **After the cards (v211), 2026-11-11:** a large diagram scales down to about 60%, then scrolls sideways in its own figure box (call 13); the tile shows a small preview of the stored drawing (call 14).
+- **Drawing limit (owner, 2026-11-11):** a drawing may hold about 1 MB after cleaning (`Drawing::MAX_BYTES` = 1_048_576), because a full 10,000-character source can draw 770 KB. The source stays at 10,000 characters and the drawing at 5,000 elements. The frame checks the cleaned size and shows a "too large" state before a save would be refused.
+- **Non-Latin scripts (owner, 2026-11-11):** Cyrillic, Greek, Vietnamese, CJK and right-to-left text are a general roadmap item for the whole CMS, issue #246 (https://github.com/dominikknafelj/ContentSpiel/issues/246). In this block they are a named limit (§4): the drawing is measured and painted in fallback fonts and its boxes may fit less snugly. The block ships no other font subsets.
 - **Questions left to this spec:**
   - inline SVG or `<img>`;
   - how the theme's colours reach the drawing;
@@ -104,8 +108,10 @@ These are the owner's decisions, in his words and mine:
 **Mermaid runs in a frame of its own with an opaque origin, not in CS Studio's page.**
 - The block card's script, `admin--diagram--preview` (the topic `diagram`: its controllers go in `app/javascript/controllers/admin/diagram/`, its plain modules in `app/javascript/diagram/`), creates the frame when the card connects. A screen with no Diagram block never fetches Mermaid.
 - The frame is a CS Studio route, `GET <admin>/diagram-renderer`. It holds no data and is the same document for everyone. It is served with:
-  - its own `Content-Security-Policy`: `sandbox allow-scripts`, `default-src 'none'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'` (Mermaid writes a `<style>`), `font-src 'self'`, `connect-src 'none'`, `form-action 'none'`;
+  - its own `Content-Security-Policy`: `sandbox allow-scripts`, `default-src 'none'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'` (Mermaid writes a `<style>`), `font-src 'self'`, `connect-src 'none'`, `form-action 'none'` (spike, 2026-11-11: works as written);
   - the element's own `sandbox="allow-scripts"`.
+- **The frame's origin is `"null"`** (spike, 2026-11-11). `'self'` in its CSP still matches the server's origin, so its two scripts load. The card posts to the frame with target origin `'*'` (an opaque origin can't be named), accepts a message only when `event.source` is its own frame **and** `event.origin === "null"`, and the frame posts back with `'*'`.
+- **The frame's font files are served with `Access-Control-Allow-Origin: *`** (spike, 2026-11-11). A font fetched by an opaque-origin document is a CORS request with `Origin: null`, so `font-src 'self'` alone is not enough: without the header `FontFace.load()` fails. The Archivo `.woff2` files are public. The frame loads them with `FontFace` and `document.fonts.add` and awaits them before `initialize` and the first render.
 
   It has no `allow-same-origin`, so the frame cannot read CS Studio's cookies, storage or DOM. It can send no request and navigate nothing.
 - **The protocol:**
@@ -116,10 +122,14 @@ These are the owner's decisions, in his words and mine:
 - **What the frame draws with:**
   - Mermaid at an exact patched version, at least 11.15.0, the release that fixes CVE-2026-41149 (GHSA-ghcm-xqfw-q4vr). It is vendored like d3-force: the file is in `vendor/javascript`, loaded by its asset URL, with a `pin "mermaid", preload: false` line kept only so that `bin/importmap audit` and `outdated` see the package.
   - `startOnLoad: false`, `htmlLabels: false` (and the flowchart's own), `maxTextSize` equal to the block's limit, and `maxEdges` at Mermaid's default.
-  - `theme: "base"` and the default theme's font (§4).
-  - `securityLevel: "sandbox"` where the spike (§9) shows it hands back a usable SVG, otherwise `"strict"` (see "My calls").
-- **Before Mermaid sees the source,** the frame runs the same line rules as the server (§5): the type list and the refused constructs. A refused source is never parsed, so the `classDef` path of the CVE never reaches Mermaid at all.
-- **After Mermaid draws,** the frame strips what the server will strip (§3: Mermaid's `<style>`, `style` attributes and colour attributes) and paints with the same class rules on CS Studio's colours, which the card posts in with the source. Light and dark follow CS Studio's theme. In CS Studio the preview therefore follows the backend's look and has the site's shape (the owner's answer of 2026-10-13: "for the backend it follows the backend").
+  - `theme: "base"`, and `fontFamily` and `themeVariables.fontFamily` set to Archivo (§4).
+  - **`securityLevel: "strict"`** (spike, 2026-11-11). Sandbox mode lays out in a nested iframe whose `contentDocument` is null inside an opaque-origin frame, so every type fails there.
+  - **`gantt.useWidth` at a fixed figure** near the content column's width (spike, 2026-11-11). Without it a gantt is laid out at the frame's width, so a stored gantt would depend on how wide the editor's frame happened to be.
+- **Before Mermaid draws,** the frame makes three checks, in this order (spike, 2026-11-11):
+  1. the text's length: over `Diagram::Source::MAX_CHARACTERS` is refused by the frame itself, because Mermaid does not throw for an over-long text but draws a stand-in diagram ("Maximum text size in diagram exceeded");
+  2. the same line rules as the server (§5): the type list and the refused constructs, so a refused source never reaches the parser and the `classDef` path of the CVE never reaches Mermaid at all;
+  3. `mermaid.parse(text)`, refusing when its `config` is non-empty (every directive and front matter shows there) or its `diagramType` is not on the list.
+- **After Mermaid draws,** the frame cleans the SVG as the server will (§3), checks the **cleaned size** and element count against `MAX_BYTES` and `MAX_ELEMENTS`, and shows the "too large" state (§7) instead of handing the drawing back, so that a save is never left to be refused (owner, 2026-11-11). It paints with the same class rules on CS Studio's colours, which the card posts in with the source. Light and dark follow CS Studio's theme. In CS Studio the preview therefore follows the backend's look and has the site's shape (the owner's answer of 2026-10-13: "for the backend it follows the backend").
 
 **Saving.**
 - The script draws on `input`, with its own short debounce.
@@ -145,30 +155,31 @@ These are the owner's decisions, in his words and mine:
   - Nokogiri's strict XML parser, with `NONET`, no DTD loading and no entity expansion.
   - A document with a DOCTYPE, an entity, a processing instruction or more than one root is refused.
   - **The output is written from the parse tree by `Drawing`, never passed through from the input string.**
-- **Allowed elements:**
-  - `svg`, `g`, `defs`, `marker`, `clipPath`;
-  - `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`;
-  - `text`, `tspan`, `title`, `desc`;
-  - `use`, with an `href` / `xlink:href` that is a fragment of an id in the same drawing.
+- **Allowed elements** (spike, 2026-11-11: what the seven types and a 60-node flowchart use after cleaning; `2026-11-11-diagram-block-spike.md`, §3):
+  - `svg`, `g`, `defs`, `marker`;
+  - `path`, `rect`, `circle`, `line`, `polygon`;
+  - `text`, `tspan`, `title`, `desc`.
 
-  The spike may add an element Mermaid needs for an allowed type, and that element is named in the plan.
+  `use`, `clipPath`, `ellipse` and `polyline` are never produced and are not on the list, and with `use` gone there is **no `href` rule**: every `href` is refused. A type that later needs one adds it with its fixture.
 - **Allowed attributes:**
-  - geometry: `x y x1 y1 x2 y2 cx cy r rx ry width height d points transform viewBox preserveAspectRatio`;
-  - text: `dx dy text-anchor dominant-baseline alignment-baseline font-size font-weight`;
-  - markers: `marker-start marker-mid marker-end markerWidth markerHeight markerUnits refX refY orient`, and `clip-path`, each only as `url(#<id in this drawing>)`;
+  - geometry: `x y x1 y1 x2 y2 cx cy r rx ry width height d points transform viewBox`, by name on any allowed element (`viewBox` is also written on `marker` and `path`);
+  - text: `dy text-anchor dominant-baseline alignment-baseline font-size font-weight font-style` (`font-style` is new, spike, 2026-11-11: Mermaid writes `font-style="normal"` on every label `tspan`);
+  - markers: `marker-start marker-end` (on `path` and `line`), only as `url(#<id in this drawing>)`; `markerWidth markerHeight markerUnits refX refY orient` (on `marker`);
   - `id`;
-  - `class`, each class matching `/\A[A-Za-z][\w-]*\z/`;
-  - on the root, `aria-roledescription`.
-- **Dropped quietly,** because Mermaid always writes them and none of them can be harmless *and* themed:
-  - the `<style>` element;
+  - `class`, each token matching `/\A[A-Za-z][\w-]*\z/`;
+  - `xmlns` on the root, and on the root `aria-roledescription`.
+
+  Values seen, which are cheap to enforce as lists: `orient` `auto` / `auto-start-reverse`; `markerUnits` `userSpaceOnUse`; `text-anchor` `middle`; `dominant-baseline` and `alignment-baseline` `central` / `middle`; `font-size` `10` / `11`; `font-weight` empty or `normal`; `font-style` `normal`.
+- **Dropped quietly,** because Mermaid always writes them and none of them can be harmless *and* themed (spike, 2026-11-11: the list is what Mermaid 11.17.2 writes in every drawing of the seven types; a refusal for any of them would refuse every flowchart, class, state, ER, sequence or gantt drawing):
+  - elements: `style`, `filter`, `feDropShadow`, `linearGradient`, `stop` and `symbol` (the last four are in `defs`, referenced only from the dropped styles, or unused: three actor icons of 13 KB in every sequence diagram), and the empty `g`;
   - every `style` attribute;
   - `fill`, `stroke`, `stroke-width`, `stroke-dasharray`, `opacity`, `color` and `font-family`;
-  - `data-*` attributes;
-  - Mermaid's own root `aria-*` and `role` (§6 writes them);
-  - empty `g` elements.
+  - `name` (sequence lifelines), `fill-rule` and `clip-rule` (ER), `transform-origin` (gantt) and `data-*`;
+  - on the root: `width`, `style`, `role` and `aria-*` (§6 writes them);
+  - any single class *token* that fails the class pattern (gantt's `width-27.4375`, sequence's `200` on lifelines): the token goes, the element stays.
 - **A refusal, which refuses the whole drawing:**
-  - any element not on the list, by name: `script`, `foreignObject`, `a`, `image`, `iframe`, `animate`, `set`, `animateTransform` and `animateMotion` (SMIL can set an `href`), `style` inside `defs` included;
-  - any attribute not on the list, by name: an `on*` handler, `href` other than a local fragment, and `xml:base`;
+  - any element not on the list and not dropped quietly, by name: `script`, `foreignObject`, `a`, `image`, `iframe`, `animate`, `set`, `animateTransform` and `animateMotion` (SMIL can set an `href`), `style` inside `defs` included;
+  - any attribute not on the list and not dropped quietly, by name: an `on*` handler, any `href` (`<a href>` from `click … href`, `link` and `links` is the seen case) and `xml:base`;
   - a `url(` other than `url(#id)`;
   - a value holding `javascript:`, `data:` or `//`;
   - more than `MAX_BYTES` after cleaning, or more than `MAX_ELEMENTS`.
@@ -184,7 +195,15 @@ These are the owner's decisions, in his words and mine:
 
 ### 4. Colours, the font and the theme contract
 
-**Mermaid's own styles never reach a page.** The sanitizer drops them (§3). The block's stylesheet, `app/assets/tailwind/themes/default/diagram.css` (declared with `t.stylesheet "diagram.css"`), paints the drawing by the class names Mermaid writes, scoped under `.content-block--diagram`. It writes plain rules, not utilities, since the classes come from data. It holds no colour of its own.
+**Mermaid's own styles never reach a page.** The sanitizer drops them (§3). The block's stylesheet, `app/assets/tailwind/themes/default/diagram.css` (declared with `t.stylesheet "diagram.css"`), paints the drawing by the class names Mermaid writes, scoped under `.content-block--diagram`. It writes plain rules, not utilities, since the classes come from data. It holds no colour of its own. The class names it must paint, per type, are in the spike's report, §3 ("Class names `diagram.css` must paint").
+
+**It carries Mermaid's layout, not only colours** (spike, 2026-11-11). The dropped `<style>` held layout that the drawing needs, so `diagram.css` writes it again:
+- `text-anchor: middle` for flowchart labels, **scoped to `svg.flowchart`** (class, state and ER labels are start-anchored and break if the rule is global);
+- the font sizes by class: the root's 16 px, titles 18 px, pie labels and legend 17 px, pie title 25 px, ER edge labels 14 px, class terminals 11 px, gantt task text 11 px;
+- the dash patterns: dotted and dashed edges, `messageLine1`, `loopLine`, `note-edge` and state dividers;
+- a pie's slice colours from `.pieCircle:nth-of-type(6n+k)` and its legend from `.legend:nth-of-type(6n+k+1)`, and a gantt's task states from `done`, `active` and `crit` with the section suffix `0…3`.
+
+The frame paints with the same rules. **A theme that replaces the stylesheet must keep these layout rules**, and the theming reference says so.
 
 **Themed tokens** (`t.tokens themed:`), defined in `tokens.css` from the base tokens wherever one is right:
 
@@ -192,7 +211,7 @@ These are the owner's decisions, in his words and mine:
 |---|---|---|
 | `--th-diagram-ink` | every label | `var(--th-ink)` |
 | `--th-diagram-fill` | a node, an entity, a participant, a state | `var(--th-surface)` |
-| `--th-diagram-line` | a node's outline | `var(--th-line-strong)` |
+| `--th-diagram-line` | a node's outline | `var(--th-dim)` (spike, 2026-11-11: `--th-line-strong` measures 1.54:1 in light and 1.67:1 in dark on the surface, under the 3:1 below; `--th-dim` measures 6.65:1 and 8.21:1) |
 | `--th-diagram-edge` | an edge, an arrow, a lifeline, a marker | `var(--th-dim)` |
 | `--th-diagram-group` | a subgraph, a composite state, a sequence box, a gantt section | `var(--th-sunken)` |
 | `--th-diagram-note` | a note | `color-mix()` of `--th-accent-tint` and the surface |
@@ -208,6 +227,8 @@ The strong band re-values them in `sections.css` as it does for the Code block. 
 - `diagram.css` sets the drawing's text in `--th-diagram-font`, a fixed token whose default names Archivo.
 
 A theme may change it, and then answers for labels that no longer fit their boxes. This is said in the theming reference.
+
+**Non-Latin scripts are a named limit** (owner, 2026-11-11; spike, 2026-11-11). The CMS ships `archivo-latin-*` only. A label in Cyrillic, Greek, Vietnamese, CJK or a right-to-left script is measured in the editor's fallback font and painted in the visitor's, so its box may fit less snugly or not at all. With Archivo loaded the spike measured no overflow and a smallest margin of 6.2 px; without it margins fell to 1.9 px and one label overflowed by 2.8 px. Shipping the other subsets is a general item for the whole CMS, issue #246 (https://github.com/dominikknafelj/ContentSpiel/issues/246), and not part of this block. The guide's editor page names the limit.
 
 **What a theme may do,** from the least work to the most, as for the Code block:
 1. declare the tokens again;
@@ -238,13 +259,13 @@ The list only grows. Each later type is an additive change: its line, its rules,
 **Left off, with the reason:**
 - `architecture-beta`, which fetches icon packs;
 - `C4`, which is experimental and uses HTML in labels;
-- `mindmap`, `kanban` and `block-beta`, which rely on HTML labels (unverified: the spike checks them, and one that passes may join);
+- `mindmap`, `kanban` and `block-beta`: they draw with no `foreignObject` under `htmlLabels: false` (spike, 2026-11-11), so they are left off for the extra stylesheet work, each needing its own class rules, fixture and contrast pairs, and may join later;
 - `zenuml`, an outside plugin;
 - every other `-beta` type.
 
 **Refused constructs,** by a trimmed line's first word or by a marker anywhere in the line. The frame and `:mermaid`'s `validate` hold the same list, written once in Ruby and handed to the script as data:
-- `%%{`, an init directive, which can turn `htmlLabels` back on or set `themeCSS`;
-- YAML front matter (`---` on the first line);
+- `%%{`, an init directive, which can turn `htmlLabels` back on or set `themeCSS`, matched **anywhere in a line, case-insensitively** (spike, 2026-11-11: Mermaid honours a directive at the end of a line);
+- YAML front matter (`---` as the first non-blank line), which can set `htmlLabels: true` and draws `foreignObject`;
 - `classDef`, `class … <style name>` in flowcharts and states, `:::`, `cssClass`, `style` and `linkStyle`, the CVE's path and editors' own colours;
 - `click`, `link`, `links`, `href` and `call`;
 - `$$` maths, which draws as HTML or MathML.
@@ -255,7 +276,7 @@ Each refusal names the line and says why, in words (§7).
 
 **Limits:**
 - the source holds at most **10,000 characters** (`Diagram::Source::MAX_CHARACTERS`), refused and never cut, with the Code block's counter from nine tenths;
-- a drawing holds at most **300 KB** after cleaning (`Drawing::MAX_BYTES`) and **5,000 elements** (`MAX_ELEMENTS`);
+- a drawing holds at most **1 MB** after cleaning (`Drawing::MAX_BYTES` = 1_048_576) and **5,000 elements** (`MAX_ELEMENTS`) (owner, 2026-11-11, replacing 300 KB: the spike measured a full 10,000-character flowchart at 770 KB cleaned, 716 KB with coordinates rounded to 2 places, 4,024 elements, gzip about 130 KB). The frame checks the cleaned size and shows the "too large" state (§7) before a save would be refused;
 - each language's drawing counts separately, so a block in three languages can hold three drawings in its row, in its published copy and in its audit snapshot. An audit event's changes are digests, by the field types.
 
 ### 6. The public page
@@ -276,8 +297,8 @@ Each refusal names the line and says why, in words (§7).
 ```
 
 - **The accessible name is the block's description**: in the visitor's language, tracked by translation state and written by the server as escaped text.
-- **Mermaid's `accDescr`**, if it survives the frame and the sanitizer, is kept as `<desc>` and becomes the description. Mermaid's `accTitle` is dropped, since the block's description is the name. *Whether either survives sandbox mode is unverified;* the spike says, and without them the markup has no `<desc>`.
-- **Size:** the drawing keeps its natural `width` and `height` from the `viewBox`. CSS gives it `max-width: 100%` and `height: auto`, so a wide diagram scales down to its column. With `role="img"` its labels are not read one by one, so the description is the whole text alternative.
+- **Mermaid's `accDescr`**, if it survives the frame and the sanitizer, is kept as `<desc>` and becomes the description. Mermaid's `accTitle` is dropped, since the block's description is the name. Both survive in strict mode as `<title id="chart-title-…">` and `<desc id="chart-desc-…">`, referenced by Mermaid's root `aria-labelledby` and `aria-describedby`, and pass the element list (spike, 2026-11-11). Without an `accDescr` the markup has no `<desc>`.
+- **Size:** a cleaned root has no `width`, `height` or `style` (§3), and an inline SVG then fills its column, so small diagrams would be blown up several times. The component therefore **must** write `width` and `height` from the `viewBox` (spike, 2026-11-11: required, not cosmetic). The drawing keeps its natural `width` and `height` from the `viewBox`. CSS gives it `max-width: 100%` and `height: auto`, so a wide diagram scales down to its column. With `role="img"` its labels are not read one by one, so the description is the whole text alternative.
 - **The one `html_safe`** in the component is `Drawing`'s output. A source test holds that nothing else in the component or its template marks a string safe, and that only `Diagram::Drawing` parses SVG.
 - **No public words:** `words: []`. The component draws nothing rather than say something.
 
@@ -299,6 +320,7 @@ Each refusal names the line and says why, in words (§7).
 | refused line | "Line 3: colours come from the site's theme, so `classDef` isn't used here." (one sentence per construct, keys) |
 | parse error | Mermaid's message, as text, under "This diagram doesn't draw:"; then "The site keeps the last drawing that worked." when there is one, or "Nothing is drawn yet." when there isn't |
 | type not on the list | "`mindmap` diagrams aren't supported yet." with the list |
+| too large | "This diagram is too large to keep. Shorten it or split it in two." (the cleaned drawing is over `MAX_BYTES` or `MAX_ELEMENTS`; owner, 2026-11-11). The hidden field keeps the last drawing that worked, as for a parse error, and the card says so |
 
 The error is a polite live region, announced once per new error, never per keystroke.
 
@@ -338,7 +360,7 @@ The error is a polite live region, announced once per new error, never per keyst
 
 ### 9. The spike, before the plan
 
-The spike is one branch that is never merged. It answers what this spec marks unverified, and its answers go into the plan:
+**Done 2026-11-11** (`2026-11-11-diagram-block-spike.md`); its findings are folded into this spec and marked "(spike, 2026-11-11)". The spike was one branch that was never merged. It answered what this spec marked unverified:
 
 1. Pin Mermaid (at least 11.15.0) and serve the renderer frame with its CSP and sandbox. Then check:
    - Does `securityLevel: "sandbox"` inside the frame give back an SVG that can be read out (Mermaid wraps it in an iframe with a `data:` URL)?
@@ -371,8 +393,8 @@ The design agent draws these first:
 
 ## How it ships
 
-1. **The spike** (§9), not merged. Its answers update this spec before the plan.
-2. **The Design System cards** above.
+1. **The spike** (§9), not merged, done; its answers are in this spec.
+2. **The Design System cards** above, done: v213 (index 1794424314-9bbe), `EditorDiagramBlock`, `EditorDiagramError`, `PublicDiagramBlock`. The build reads those cards, which already show 60%-then-scroll, the tile preview and the import.
 3. **One pull request** for the block, following "Adding a block type" step by step:
    - the generator;
    - the two field types;
@@ -386,6 +408,8 @@ The design agent draws these first:
    - the browser files: typing draws, autosave stores, reload, a parse error keeps the last drawing, a refused line, a held card, and the translation tab's starting content;
    - `bin/ci`.
 
+**The plan's first step is the Mermaid pin** (spike, 2026-11-11, item 12). The spike measured `mermaid@11.17.2` (published 2026-08-25, `dist/mermaid.min.js`, 3,572,661 bytes, SHA-256 `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`, MIT; the jsDelivr and unpkg copies are identical; it is later than 11.15.0, which carries the CVE-2026-41149 fix). But 12.x is the current major (12.0.0 on 2026-09-10, 12.3.0 on 2026-11-03). Before vendoring, the plan checks whether 11.x still receives security fixes. It then pins the version and records the file's size and SHA-256 next to the vendored file, so a later upgrade can tell what changed.
+
 ## My calls (marked so the owner can check them)
 
 1. **Inline SVG, not `<img>`.**
@@ -393,7 +417,7 @@ The design agent draws these first:
    - Only inline lets a theme re-colour diagrams already stored, and keeps the labels as text in the page.
    - The price is that the sanitizer is the only wall. Hence it runs on write *and* on read, writes its output from a parse tree, and refuses rather than repairs anything dangerous.
    - `<img>` would isolate completely, but it would freeze each drawing's colours at drawing time, in CS Studio's idea of the theme.
-2. **Mermaid runs in a renderer frame of CS Studio's own with an opaque origin,** and `securityLevel: "sandbox"` runs inside it where the spike shows it works, else `"strict"`. This goes beyond the owner's decision. Sandbox mode alone isolates Mermaid's *output*, but Mermaid itself would still run in CS Studio's page, which is where a parser bug lands. The frame isolates all of it. If sandbox mode gives back no usable SVG, strict inside the frame is still stronger than sandbox in the page.
+2. **Mermaid runs in a renderer frame of CS Studio's own with an opaque origin, with `securityLevel: "strict"`** (spike, 2026-11-11, replacing "sandbox where it works"). This goes beyond the owner's decision. Sandbox mode alone isolates Mermaid's *output*, but Mermaid itself would still run in CS Studio's page, which is where a parser bug lands. The frame isolates all of it. The spike showed that sandbox mode throws inside the frame (its nested iframe has a null `contentDocument`) and that its isolation is only display isolation, so strict inside the frame is stronger than sandbox in the page and loses nothing. The frame's CSP blocked an inline event handler in the spike's HTML-label run, which is evidence that it is load-bearing.
 3. **Mermaid is not import-mapped with `preload: "admin"`.** It is a vendored single-file build loaded by the frame by URL, with a `preload: false` pin kept for `bin/importmap audit`, as d3-force is. The reasons:
    - it is several MB, and `preload: "admin"` would fetch it on every CS Studio screen;
    - an opaque-origin frame can't load module scripts from the app without CORS;
@@ -402,22 +426,25 @@ The design agent draws these first:
    It is still never on a public page.
 4. **Colours by class at the sanitizer and the stylesheet, not by `themeVariables` or `themeCSS`.** Mermaid's theming needs hex colours and derives others from them, so `var(--th-…)` can't go through it. Dropping Mermaid's styles and painting its classes from tokens is what lets a stored drawing follow the theme. The cost: `diagram.css` must know Mermaid's class names per allowed type, and a Mermaid upgrade that renames them is checked against the fixtures.
 5. **Editors' own colours and links are refused** (`classDef`, `style`, `:::`, `click`, …), not dropped quietly. They would do nothing on the site, and `classDef` is the CVE's path.
-6. **The first type list** is seven types: flowchart, sequence, class, state, ER, gantt, pie. Every other type is left off until proven to draw without HTML.
+6. **The first type list** is seven types: flowchart, sequence, class, state, ER, gantt, pie. All seven draw with no `foreignObject` under `htmlLabels: false` (spike, 2026-11-11). Every other type is left off for the stylesheet work it needs (§5); `mindmap`, `kanban` and `block-beta` could join later.
 7. **The source is translated, per language, optional;** the drawing follows it; the description is translated and required where the original has one. A language starts from the default's source as starting content (the Table block's rule).
 8. **AI never translates the source.** Labels inside Mermaid syntax would go out as plain text and might come back broken. "Translate a diagram's labels" is a roadmap row.
 9. **A source that doesn't parse keeps the last drawing that worked,** saved with the source. Autosave sends half-typed states all the time, and storing no drawing would empty the site's diagram at every keystroke. The editor and the tile say that the kept drawing is older.
 10. **No description, no diagram on the site** (and in the preview): the required description is enforced at drawing, not at save, because the picker makes an empty block and "Require nothing unless the block is useless without it". The card and the tile say why it isn't shown.
 11. **A public page shows nothing** for a block with no drawing, no description, or a drawing that fails on read. It never shows an error text or an empty box. A failure on read is logged once.
-12. **Limits:** 10,000 characters of source, 300 KB and 5,000 elements of drawing.
+12. **Limits:** 10,000 characters of source, 1 MB (`MAX_BYTES` 1_048_576) and 5,000 elements of drawing. *(Owner, 2026-11-11, replacing 300 KB, after the spike's measurements.)*
 13. **The drawing is scaled to its column,** down to about 60% of its drawn size (where labels would fall under 9px); below that it keeps that size and scrolls sideways inside its own figure box. The page never scrolls sideways. *(Owner, 2026-11-11, replacing "never scrolled".)*
 14. **The tile shows a small preview:** the stored, cleaned SVG scaled down, with no script, painted by the same tokens, beside the summary line; "No description" and "Last drawing kept" as before. *(Owner, 2026-11-11, replacing "text only".)*
 15. **Archivo is the drawing's font,** fixed by a token (`--th-diagram-font`), because the boxes are measured in it.
 16. **The new top-level name is `Diagram`** (`Diagram::Source`, `Diagram::Drawing`), named under `### Breaking`.
+17. **Non-Latin scripts are a named limit of this block,** with the general fix on the roadmap as issue #246. *(Owner, 2026-11-11.)*
+18. **The frame checks before it draws:** text length, the line rules, then `mermaid.parse`; and after: the cleaned size. It refuses over-long text itself because Mermaid draws a stand-in diagram instead of failing. *(Spike, 2026-11-11.)*
 
 ## Left to the builder
 
 - Whether `source` and `drawing` are two fields (as above) or one value of `{ source, svg, from }`, so long as the translation state reads the source and the description only.
-- The exact allowlist entries the spike's fixtures need, each named in the plan.
+- Any allowlist entry beyond the spike's lists (§3) that the real fixtures need, each named in the plan.
+- Whether the Mermaid 11.x line is still supported, and the pin (the plan's first step, "How it ships").
 - The debounce, and how the save after a draw is sent so that source and drawing arrive together.
 - The key names, and the wording of each refused construct's sentence.
 - The task that regenerates the fixture drawings after a Mermaid upgrade.
