@@ -23,7 +23,7 @@ module SignIn
 
     # A device from what the caller stored (`to_h`), or a new one that
     # knows no account.
-    def self.from(value)
+    def self.read(value)
       return new unless value.is_a?(Hash) && value["id"].is_a?(String) && value["id"].match?(ID) && value["accounts"].is_a?(Array)
 
       new(id: value["id"], accounts: value["accounts"].grep(String).select { |key| key.match?(ACCOUNT_KEY) }.first(MAX_ACCOUNTS))

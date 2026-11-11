@@ -13,7 +13,7 @@ class SignIn::KnownDeviceTest < ActiveSupport::TestCase
     assert_not remembered.knows?("bea@example.org")
     assert_equal device.id, remembered.id
     assert_not_includes remembered.to_h.to_json, "ann"
-    assert_equal remembered.to_h, SignIn::KnownDevice.from(JSON.parse(remembered.to_h.to_json)).to_h
+    assert_equal remembered.to_h, SignIn::KnownDevice.read(JSON.parse(remembered.to_h.to_json)).to_h
   end
 
   test "it keeps the five latest accounts, the latest first" do
@@ -31,8 +31,8 @@ class SignIn::KnownDeviceTest < ActiveSupport::TestCase
     key = SignIn::KnownDevice.account_key("ann@example.org")
     [ nil, "text", [], { "id" => "x", "accounts" => [ key ] }, { "id" => "a" * 32, "accounts" => key },
       { "id" => "a" * 32 } ].each do |junk|
-      assert_empty SignIn::KnownDevice.from(junk).accounts, junk.inspect
+      assert_empty SignIn::KnownDevice.read(junk).accounts, junk.inspect
     end
-    assert_equal [ key ], SignIn::KnownDevice.from({ "id" => "a" * 32, "accounts" => [ key, "short", 7 ] }).accounts
+    assert_equal [ key ], SignIn::KnownDevice.read({ "id" => "a" * 32, "accounts" => [ key, "short", 7 ] }).accounts
   end
 end

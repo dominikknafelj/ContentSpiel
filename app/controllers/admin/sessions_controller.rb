@@ -210,7 +210,7 @@ module Admin
       end
     end
 
-    def known_device = SignIn::KnownDevice.from(cookies.encrypted[DEVICE_COOKIE])
+    def known_device = SignIn::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
 
     def remember_device(identifier)
       cookies.encrypted[DEVICE_COOKIE] = {
