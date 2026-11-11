@@ -1,0 +1,3 @@
+<p><%= t("mail.recovery_code_used.intro", site: site_name, time: account_mail_time, address: @from_address, count: @left) %></p>
+<%= render "mails/button", url: account_url, label: t("mail.recovery_code_used.button") %>
+<p><%= t("mail.recovery_code_used.outro") %></p>
