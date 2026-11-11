@@ -19,6 +19,11 @@
 - The mail "Signing in to <site> is paused" to an account whose email a run of failed sign-ins closed, at most once an hour: how long, when, from which address, and a button to the reset request page (no reset link).
 - The audit event `session.locked`, one per bucket a failed sign-in closed (an email's, a known browser's or an address's), with no actor and no subject, its bucket, seconds and back-off level in its metadata, and the email for an email's. A Security event: "Sign-in to one account paused after repeated failures", "Sign-in to one account from one browser paused after repeated failures", "Sign-in from one address paused after repeated failures".
 - The CMS's own spans, for sign-in: `auth.sign_in`, `auth.throttle`, `auth.bot_check`, `auth.leaked_password` and `auth.lockout_mail`, each a child of the request's, with fixed words only (`Telemetry::SPANS` and `ATTRIBUTES`; `docs/reference/hosting.md`, "Telemetry", has the Honeycomb queries). The two outside calls are not traced by the HTTP instrumentation, whose span would record the lookup's path.
+- Sessions have limits: idle after 12 hours unseen, and 14 days after sign-in whatever is done (`Session::IDLE_TIMEOUT`, `ABSOLUTE_TIMEOUT`). A request or a cable connection that meets an expired session ends it; `Sessions::SweepJob` ends the ones nobody met, hourly. The sign-in page says "Your session ended. Sign in again." to the browser it ended in, and to no other.
+- Your account has a Sessions card: every live session with its browser and system (`SessionDevice`, from the new `useragent` gem), address, last activity and how its person signed in, an End on each other one, and "Sign out everywhere else".
+- The user editor has a Sessions zone for an owner: "End all sessions" for another user (`Sessions::EndAll`, not offered on the owner's own account).
+- `session.ended` in the audit log (Security), one event per act with a count and a reason (`expired_idle`, `expired_absolute`, `ended_by_self`, `ended_by_owner`, `password_changed`); sign-out stays `session.destroyed`.
+- Spans `auth.session` (a session ended for expiry) and `auth.session_sweep`, with `auth.session.reason` and `auth.session.count` (`docs/reference/hosting.md`, "Telemetry").
 
 ### Changed
 
@@ -33,6 +38,7 @@
 - An outdated language's mark on the language tabs is ↻ in warn ink, as on a translation chip and under a language's progress bar, where it was a solid warn dot; a screen reader still hears "<language>: outdated" (#237).
 - A danger notice (a refusal, a broken link, a sign-in page's error) has a 1px danger edge, as a form's error summary has; warn kept its edge, and ok and neutral have none (#237).
 - A switch that is on in a form someone else is editing keeps its accent track, where it was drawn in meta as a switch nobody may change (#237).
+- A password change's endings of sessions are audited: one `session.ended` (`password_changed`) with the count, when any session ended.
 
 ### Migrations needing action
 
@@ -55,6 +61,7 @@
 - `Admin::Ui::ActorAvatarComponent` also takes `user:` with an optional `viewer:` in place of `actor:` (the two together are refused with an `ArgumentError`), and a 26px slot, `size: :md`: the one rule that turns a user into a circle, for an audit actor and for a person a note names alike (#237).
 - `Admin::Ui::BadgeComponent` takes `tone: :accent` (the accent tint with accent words), and `Admin::Ui::ChannelChipComponent` draws through it (#237).
 - `Admin::Ui::StatusChipComponent::SHELL_CLASS` (the chip's shell without its `admin-status-chip` hook) and `OUTLINE_CLASS` (the Draft outline) are the classes `Admin::Ui::UnpublishedChipComponent` draws from; `BASE_CLASS` is unchanged (#237).
+- `Session.from_cookies` answers only a live session and ends an expired one (audited, traced); a session is made through `Session.start(user:, method:, user_agent:, ip_address:)`, and `start_new_session_for(user, method: "password")` takes the method.
 
 ## 0.2.0 (2026-11-10)
 
