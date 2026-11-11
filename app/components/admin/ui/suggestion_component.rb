@@ -1,5 +1,5 @@
 module Admin
-  module TranslationScreen
+  module Ui
     # One AI suggestion under a field's original (translation helpers spec
     # §6.4): the suggested text -- or, for rich text, the suggested
     # document rendered as a preview -- with **Use** and **Discard**, plus
@@ -7,7 +7,7 @@ module Admin
     # the inline error variant instead: the message and a Dismiss.
     #
     # `Admin::TranslationsController#suggest` streams it (`update`) into the
-    # empty box `TranslateButtonComponent` rendered, `.dom_id(input_id)`.
+    # empty box `Admin::Ui::TranslateButtonComponent` rendered, `.dom_id(input_id)`.
     #
     # A plain suggestion sits in an editable `<textarea>` (no `name`, so it
     # never feeds the form's autosave or the save bar's change count) that
@@ -37,9 +37,26 @@ module Admin
     # editor on page load), since the target language's document may not
     # reference them yet.
     class SuggestionComponent < Admin::AdminComponent
-      def self.dom_id(input_id) = "translation-suggestion-#{input_id}"
+      include Admin::Ui::Contract
 
-      LABEL = "Suggested translation · edit before using".freeze
+      contract(
+        accessibility: "The editable suggestion is a labelled textarea, and Use and Discard (or Dismiss on an error) are real buttons that are one Tab stop each, pressed with Enter or Space; the error is an alert.",
+        motion: :none,
+        content_edges: %i[short long missing],
+        widths: :fluid,
+        interface: %i[input_id locale suggestion warnings error model mode current],
+        limits: [
+          "It only ever draws the suggestion escaped: plain text as a text node and a data attribute, rich text as its document JSON plus the scrubbed preview.",
+          "Nothing in it saves: Use is admin--translation--translate#use, which fills the field and lets that form's own autosave write it, and its input, change and focusout stop at the box so the form never sees them.",
+          "Its Use and Discard are type=button, since the box sits inside an autosave form; it carries no controller of its own, the box it streams into runs admin--translation--translate."
+        ],
+        states: %i[plain rich update error],
+        keys: %w[label field_label current dismiss use discard],
+        slots: [],
+        controller: nil,
+        keyboard: [ "test/system/admin/translations_test.rb", "a suggestion's Use is one Tab stop that Enter presses" ]
+      )
+      def self.dom_id(input_id) = "translation-suggestion-#{input_id}"
 
       # How much of the existing translation "Current: …" shows.
       CURRENT_LIMIT = 300

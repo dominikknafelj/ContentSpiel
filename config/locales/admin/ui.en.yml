@@ -335,3 +335,13 @@ en:
           formatting_note: "Formatting changed"
           too_long_note: "The text is too long to compare word by word."
           no_source_note: "%{language} changed since this was translated."
+        # `Admin::Ui::SuggestionComponent`: the box an AI suggestion streams
+        # into under a translatable field. `field_label` names the editable
+        # textarea; `current` is the existing translation shown in update mode.
+        suggestion:
+          label: "Suggested translation · edit before using"
+          field_label: "Suggested translation"
+          current: "Current: %{text}"
+          dismiss: "Dismiss"
+          use: "Use"
+          discard: "Discard"

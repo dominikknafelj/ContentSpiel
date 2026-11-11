@@ -256,7 +256,7 @@ export default class extends Controller {
   // Editing a suggestion is not editing the form: its textarea sits inside
   // the autosave `<form>`, whose `input`/`change`/`focusout` listeners would
   // otherwise save on every keystroke of text that isn't a field's value
-  // yet. The box stops them here (`SuggestionComponent` wires this).
+  // yet. The box stops them here (`Admin::Ui::SuggestionComponent` wires this).
   contain(event) {
     event.stopPropagation()
   }
@@ -608,11 +608,11 @@ function setBusy(button, busy) {
   if (spinner) spinner.hidden = !busy
 }
 
-// The same shape as `SuggestionComponent`'s error variant -- including its
+// The same shape as `Admin::Ui::SuggestionComponent`'s error variant -- including its
 // Dismiss, so a client-side error can be cleared like a server-sent one --
 // built from text nodes only. The button is `type="button"`: the box sits
 // inside an autosave form, and a default (submit) button would post it.
-// Its classes are `SuggestionComponent::BUTTON_CLASS`, read from the box's
+// Its classes are `Admin::Ui::SuggestionComponent::BUTTON_CLASS`, read from the box's
 // `data-dismiss-class` (`_translation_box`), so no copy of them lives here.
 function showError(box, message) {
   if (!box) return

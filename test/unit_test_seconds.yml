@@ -130,7 +130,7 @@ test/components/admin/tokens_screen/table_component_test.rb: 0.1
 test/components/admin/translation_screen/matrix_component_test.rb: 0.9
 test/components/admin/translation_screen/pending_component_test.rb: 0.0
 test/components/admin/translation_screen/state_cell_component_test.rb: 0.0
-test/components/admin/translation_screen/suggestion_component_test.rb: 0.2
+test/components/admin/ui/suggestion_component_test.rb: 0.2
 test/components/admin/translation_screen/summary_card_component_test.rb: 0.1
 test/components/admin/ui/translate_all_component_test.rb: 1.6
 test/components/admin/translation_screen/translate_button_component_test.rb: 0.1

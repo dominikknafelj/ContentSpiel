@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::TranslationScreen::SuggestionComponent`, with no alias: it is `Admin::Ui::SuggestionComponent`, with the same keywords, `dom_id` and `BUTTON_CLASS`; its `LABEL` constant went, the words being the keys `admin.components.ui.suggestion.label`, `.field_label`, `.current`, `.dismiss`, `.use` and `.discard`.
 - `Admin::EditorScreen::ReferenceCardComponent`, with no alias: it is `Admin::Ui::ReferenceCardComponent`, with the same keywords, `FORM_ID`, `dom_id`, `options_for` and `current_for`; its `CONFIRM_LABEL`, `FORMATTING_NOTE` and `TOO_LONG_NOTE` constants went, the words being the keys `admin.components.ui.reference_card.confirm`, `.changed`, `.formatting_note`, `.too_long_note` and `.no_source_note`.
 - `Admin::TranslationScreen::TranslateAllComponent`, with no alias: it is `Admin::Ui::TranslateAllComponent`, with the same keywords; its `label(count)` class method went, the words being the plural key `admin.components.ui.translate_all.label` (with `progress`, `ready`, `ready_initial`, `suggesting`, `cancel`, `use_all` and `discard_all`), and `admin--translation--translate` reads its label, progress and ready words from the header's `data-messages`.
 - `Admin::TranslationScreen::TranslateButtonComponent`, with no alias: it is `Admin::Ui::TranslateButtonComponent`, with the same keywords, `BUTTON_CLASS` and `SPINNER_CLASS`; its `LABEL` and `UPDATE_LABEL` constants went, the words being the keys `admin.components.ui.translate_button.label` and `.update_label`.

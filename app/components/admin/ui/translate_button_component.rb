@@ -5,7 +5,7 @@ module Admin
     # rendered into its `data-translate-slot` by the three field renderers
     # (`Admin::Ui::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
     # `RichTextColumnComponent`). The empty box a suggestion streams into
-    # (`SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
+    # (`Admin::Ui::SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
     # component: the renderers put it right beside the button, under the
     # field's own input (`admin/shared/_translation_box`), so a suggestion
     # appears inside the field rather than in the reference card beside it.
@@ -66,7 +66,7 @@ module Admin
       # the same single-field request as **Translate**, carrying
       # `data-translate-mode="update"` so `admin--translation--translate` sends `mode=update`
       # and the suggestion that comes back also shows the field's current
-      # translation (`SuggestionComponent` `mode: :update`). The header's bulk
+      # translation (`Admin::Ui::SuggestionComponent` `mode: :update`). The header's bulk
       # run skips it (`admin--translation--translate`'s `emptyFields`): its field already has
       # a translation.
       #
@@ -87,7 +87,7 @@ module Admin
 
       def label = t(@mode == :update ? ".update_label" : ".label")
 
-      def box_id = Admin::TranslationScreen::SuggestionComponent.dom_id(input_id)
+      def box_id = Admin::Ui::SuggestionComponent.dom_id(input_id)
 
       def wrapper_data
         {

@@ -89,6 +89,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/tree_hide_component.rb
     app/components/admin/ui/reference_card_component.rb
     app/components/admin/ui/reference_card_component.html.erb
+    app/components/admin/ui/suggestion_component.rb
+    app/components/admin/ui/suggestion_component.html.erb
     app/components/admin/ui/translate_all_component.rb
     app/components/admin/ui/translate_all_component.html.erb
     app/components/admin/ui/translate_button_component.rb

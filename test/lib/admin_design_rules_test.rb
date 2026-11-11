@@ -1447,7 +1447,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/columns/*", "app/components/admin/fields/*",
     "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input,translate_all,translate_button,reference_card}_component.*",
     "app/components/admin/editor_screen/{related_posts,shared_fields}_component.*",
-    "app/components/admin/translation_screen/suggestion_component.*",
+    "app/components/admin/ui/suggestion_component.*",
     "app/views/admin/shared/{_translation_box,_field_errors,_base_updated_at_field,_override_field}.html.erb",
     "app/javascript/rich_text/*.js", "app/javascript/controllers/admin/rich_text/*.js"
   ].freeze

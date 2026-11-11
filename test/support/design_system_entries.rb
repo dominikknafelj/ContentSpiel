@@ -66,6 +66,7 @@ module DesignSystemEntries
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
     "Admin::Ui::ReferenceCardComponent" => "StudioTranslationPair",
+    "Admin::Ui::SuggestionComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateAllComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateButtonComponent" => "StudioTranslationPair",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"

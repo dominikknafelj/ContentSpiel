@@ -111,6 +111,20 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_suggestion "translation-suggestion-post-title", "[de] Hello"
   end
 
+  test "a suggestion's Use is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    press_within slot("title"), "Translate"
+    find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]").click
+    stop_on "#translation-suggestion-post-title [data-translate-use]"
+    assert_equal "Use", focused_text
+    page.send_keys(:enter)
+    assert_equal "[de] Hello", find_field(id: "post-title").value
+    assert_eventually { post.reload.title(locale: "de", fallback: false) == "[de] Hello" }
+  end
+
   test "an edited suggestion is what Use applies, and editing it saves nothing by itself" do
     post = create_post(title: "Hello")
 
