@@ -58,6 +58,8 @@ module Telemetry
     auth.bot_check
     auth.leaked_password
     auth.lockout_mail
+    auth.session
+    auth.session_sweep
   ].freeze
 
   ATTRIBUTES = %w[
@@ -71,6 +73,8 @@ module Telemetry
     auth.bot_check.result
     auth.leaked_password.result
     auth.mail.queued
+    auth.session.reason
+    auth.session.count
     server.address
     http.response.status_code
     error.type

@@ -84,6 +84,19 @@ module ServiceCalls
     "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")"
   }.freeze
 
+  # Low-level services that ask no permission because every caller has
+  # decided already: nobody (an expiry) or a service that authorized. Instead
+  # of the refusal run, the contract proves the call is ok and audited for
+  # whoever runs it, and that it is called from `callers:` and nowhere else
+  # in app/ and lib/, so a new caller is a deliberate edit here. The factory
+  # returns `call:`.
+  UNGATED = {
+    "Sessions::End" => {
+      reason: "the one ending of a session row: Session.from_cookies ends an expiry, which nobody asked for, and the Sessions services authorize before calling it",
+      callers: %w[app/models/session.rb]
+    }
+  }.freeze
+
   # `ApplicationService` subclasses that are not services of their own (a
   # base class other services inherit from).
   ABSTRACT = [].freeze
@@ -106,6 +119,7 @@ module ServiceCalls
 
   def self.exempt?(service_class)
     SELF_SERVICE.key?(service_class.name) || OWN_RESULT.key?(service_class.name) || TOKEN_CREDENTIAL.key?(service_class.name) ||
+      UNGATED.key?(service_class.name) ||
       ABSTRACT.include?(service_class.name)
   end
 
@@ -612,6 +626,12 @@ module ServiceCalls
       accept = ->(token) { Invitations::Accept.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
       token = target.generate_token_for(:accept)
       { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: -> { User.find_by!(email_address: "invited@example.com") } }
+    },
+
+    # See UNGATED.
+    "Sessions::End" => lambda {
+      session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::End.call(session, reason: "ended_by_owner") } }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

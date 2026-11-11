@@ -460,6 +460,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(time_zone: "Berlin")
     page = create_page(title: "Later", published: false)
     travel_to Time.utc(2027, 3, 1) do
+      sign_in_as(users(:one)) # the setup's session ended months before
       post schedule_admin_page_path(page), params: { published_at: "2027-03-28T02:30" } # 02:30 doesn't exist that night in Berlin
       assert_response :see_other
       assert_equal Time.use_zone("Berlin") { Time.zone.parse("2027-03-28T02:30") }, page.reload.published_at

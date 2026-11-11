@@ -129,7 +129,7 @@ module Audit
     SPECIAL_ACTIONS = %w[
       starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
       language.enabled language.disabled language.configured language.default_changed
-      session.created session.destroyed session.failed session.locked access.denied
+      session.created session.destroyed session.ended session.failed session.locked access.denied
     ].freeze
 
     ACTIONS = (
@@ -141,7 +141,14 @@ module Audit
     # an actor.
     NO_ACTOR = %w[session.failed session.locked].freeze
 
-    SECURITY_ACTIONS = %w[session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
+    # The reasons of a `session.ended` whose sentence names who ended it
+    # ("Ada ended every session of “Bo”"). An expiry has nobody to name, and
+    # a password change's sentence is about the sessions ("2 sessions of “Bo”
+    # ended by a password change"; the change itself is its own event), so
+    # those are told with no actor, as NO_ACTOR's are.
+    SESSION_ENDED_BY = %w[ended_by_self ended_by_owner].freeze
+
+    SECURITY_ACTIONS = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
 
     class << self
       # One event for one viewer (resolving its target by itself).
@@ -171,7 +178,7 @@ module Audit
         end
         raise ArgumentError, "at_least is for a counted sentence (count above 1)" if at_least && count <= 1
         visitor = visitor?(event)
-        actor = actor_for(event, viewer, none: NO_ACTOR.include?(action) || visitor)
+        actor = actor_for(event, viewer, none: NO_ACTOR.include?(action) || visitor || actorless_ending?(event, action))
         parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:, at_least:).parts
         parts = [ Wording.visitor_part ] + parts if visitor
         new(
@@ -216,6 +223,12 @@ module Audit
         scheduled ? action.sub(".updated", ".scheduled") : action
       end
 
+      def actorless_ending?(event, action)
+        return false unless action == "session.ended"
+
+        event.actor_id.nil? || !SESSION_ENDED_BY.include?(Wording.metadata_of(event)["reason"])
+      end
+
       def actor_for(event, viewer, none:)
         user_id = event.user_id
         # A token event whose user is gone has no `user_id` to name; the
@@ -235,6 +248,8 @@ module Audit
       end
 
       def self.visitor_part = Part.new(:text, "A visitor ")
+
+      def self.metadata_of(event) = event.metadata.is_a?(Hash) ? event.metadata : {}
 
       def initialize(event, action, target, fallback_scheduled_at, you: false, count: 1, mixed: false, at_least: false)
         @you = you
@@ -411,6 +426,7 @@ module Audit
         when "media.regenerated" then regenerated_parts
         when "session.created" then [ text("signed in") ]
         when "session.destroyed" then [ text("signed out") ]
+        when "session.ended" then ended_parts
         # No user, no email: the attempted address is in `metadata` for the
         # record, but the log never showed it and still doesn't.
         when "session.failed" then [ text("Failed sign-in attempt") ]
@@ -439,6 +455,33 @@ module Audit
         when "device" then "Sign-in to one account from one browser paused after repeated failures"
         else "Sign-in to one account paused after repeated failures"
         end
+      end
+
+      # One ending's sentence by its reason, with the number of sessions it
+      # ended (`count`). An expiry met by a request names the user whose
+      # session it was; the sweep's has no subject and tells how many.
+      def ended_parts
+        metadata = self.class.metadata_of(event)
+        count = metadata.key?("count") ? metadata["count"].to_i : 1
+        sessions = count == 1 ? "session" : "sessions"
+        user = subject_label
+        case metadata["reason"]
+        when "expired_idle" then expired_parts(user, count, sessions, "ended after #{Session::IDLE_TIMEOUT.inspect} unused")
+        when "expired_absolute" then expired_parts(user, count, sessions, "ended #{Session::ABSOLUTE_TIMEOUT.inspect} after sign-in")
+        when "ended_by_self" then [ text("ended #{count == 1 ? "one" : count} of #{@you ? "your" : "their"} other sessions") ]
+        when "ended_by_owner" then user ? subject_parts("ended every session of ", " (#{count})") : [ text("ended #{count} #{sessions}") ]
+        when "password_changed" then counted_of(user, count, sessions, " ended by a password change")
+        else counted_of(user, count, sessions, " ended")
+        end
+      end
+
+      def expired_parts(user, count, sessions, after)
+        user ? [ text("Session of "), Part.new(:subject, user), text(" #{after}") ] : [ text("#{count} #{sessions} #{after}") ]
+      end
+
+      # "2 sessions of “Bo” ended …", or "2 sessions ended …" with no one to name.
+      def counted_of(user, count, sessions, after)
+        user ? [ text("#{count} #{sessions} of "), Part.new(:subject, user), text(after) ] : [ text("#{count} #{sessions}#{after}") ]
       end
 
       def denied_parts

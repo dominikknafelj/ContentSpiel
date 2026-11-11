@@ -51,7 +51,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
     ContentBlocks::Save Editing::TakeOver Forms::DeleteSubmissions Forms::Resend Forms::Save Forms::Submit Groups::Destroy Groups::EnsureBuiltIns Groups::Save Invitations::Accept Invitations::Invite Invitations::Resend Invitations::Withdraw Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Regenerate Media::Save
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::React Notes::Remove Notes::Reopen Notes::Reply
-    Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges Settings::Save
+    Notes::Resolve Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Publishing::CancelScheduledChange Publishing::DiscardChanges Publishing::PublishChanges Sessions::End Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
     Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze
@@ -214,6 +214,37 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
       next
     end
 
+    if ServiceCalls::UNGATED.key?(klass.name)
+      test "#{klass} acts for whoever calls it, audits it, and asks no permission" do
+        built = ServiceCalls.for(klass, self)
+        nobody
+        audit_ids = Audit::Event.pluck(:id)
+        before = digests
+
+        result = Current.set(actor: nobody, channel: :admin) { built[:call].call }
+
+        assert_predicate result, :ok?, "#{klass} failed: #{result.errors.inspect}"
+        actions = Audit::Event.where.not(id: audit_ids).pluck(:action)
+        assert_not_empty actions, "#{klass} recorded no audit event"
+        assert_not_includes actions, "access.denied"
+        assert_not_equal before, digests, "#{klass} changed nothing"
+      end
+
+      test "#{klass} is called only from its listed callers" do
+        entry = ServiceCalls::UNGATED.fetch(klass.name)
+        own = Object.const_source_location(klass.name).first.delete_prefix("#{Rails.root}/")
+        short = klass.name.split("::").last
+        call = /(?:\b#{Regexp.escape(klass.name)}|(?<!::)\b#{Regexp.escape(short)})\.call\b/
+        callers = Dir[Rails.root.join("{app,lib}/**/*.rb")].map { |path| path.delete_prefix("#{Rails.root}/") }.select do |path|
+          path != own && File.readlines(Rails.root.join(path)).reject { |line| line.strip.start_with?("#") }.join.match?(call)
+        end
+
+        assert_equal entry[:callers].sort, callers.sort, "#{klass} asks no permission: a new caller authorizes first and is listed in UNGATED"
+        assert_operator entry[:reason].length, :>, 20
+      end
+      next
+    end
+
     if ServiceCalls::TOKEN_CREDENTIAL.key?(klass.name)
       # A token that finds nothing is refused like a wrong password: nothing
       # written, and no `access.denied`, since no permission was asked.
@@ -350,7 +381,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
 
   test "every exemption and factory names a real service" do
     names = self.class.services.map(&:name)
-    (ServiceCalls::SELF_SERVICE.keys + ServiceCalls::OWN_RESULT.keys + ServiceCalls::TOKEN_CREDENTIAL.keys + ServiceCalls::FACTORIES.keys + ServiceCalls::MCP_REACHABLE.keys +
+    (ServiceCalls::SELF_SERVICE.keys + ServiceCalls::OWN_RESULT.keys + ServiceCalls::TOKEN_CREDENTIAL.keys + ServiceCalls::UNGATED.keys + ServiceCalls::FACTORIES.keys + ServiceCalls::MCP_REACHABLE.keys +
       ServiceCalls::VARIANTS.keys).each do |name|
       assert_includes names, name, "#{name} in test/support/service_calls.rb is not an ApplicationService"
     end

@@ -105,4 +105,62 @@ class SessionsTest < ActionDispatch::IntegrationTest
       broadcasts("action_cable/#{@user.to_gid_param}").map { |payload| ActiveSupport::JSON.decode(payload) }
     assert_empty broadcasts("action_cable/#{other.to_gid_param}")
   end
+
+  test "an idle-expired session sends the next request to sign-in" do
+    freeze_time
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
+    get "/cs-studio"
+    assert_response :success
+
+    travel 12.hours do
+      get "/cs-studio"
+    end
+
+    assert_redirected_to "/cs-studio/sign-in"
+    assert_empty @user.sessions
+  end
+
+  # The expiry's span (`auth.session`) is drawn only for a session ended at
+  # this request, as a child of the request's server span, and says only
+  # why: the user's email and the session's id are planted and searched for
+  # in everything every exported span writes.
+  test "an expired session's request exports one auth.session span with its reason and nothing else" do
+    freeze_time
+    email = "planted-#{SecureRandom.hex(6)}@planted-#{SecureRandom.hex(6)}.test"
+    user = User.create!(email_address: email, password: "password12345")
+    planted_id = 10**11 + SecureRandom.random_number(10**11)
+    session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
+    Session.where(id: session.id).update_all(id: planted_id)
+    jar = ActionDispatch::TestRequest.create.cookie_jar
+    jar.signed[:session_id] = planted_id
+    cookies[:session_id] = jar[:session_id]
+    exporter = Rails.application.config.x.otel_test_exporter
+
+    exporter.reset
+    get "/cs-studio"
+    assert_response :success
+    assert_empty exporter.finished_spans.select { |span| span.name == "auth.session" }, "a live request draws no auth.session"
+
+    exporter.reset
+    travel 12.hours do
+      get "/cs-studio"
+    end
+    spans = exporter.finished_spans
+
+    assert_redirected_to "/cs-studio/sign-in"
+    expiry = spans.select { |span| span.name == "auth.session" }.sole
+    root = spans.select { |span| span.parent_span_id == OpenTelemetry::Trace::INVALID_SPAN_ID }.sole
+    assert_equal :server, root.kind
+    assert_equal root.span_id, expiry.parent_span_id, "auth.session is a child of the request's server span"
+    assert_equal({ "auth.session.reason" => "expired_idle" }, expiry.attributes.to_h)
+
+    written = spans.map do |span|
+      [ span.name, span.attributes.to_a, span.status&.description, Array(span.links).map { |link| link.attributes.to_a },
+        Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.compact.join(" ")
+    end.join("\n")
+    local, domain = email.split("@")
+    [ email, local, domain, CGI.escape(email), planted_id.to_s ].each do |value|
+      assert_not_includes written, value, "a span holds #{value}"
+    end
+  end
 end

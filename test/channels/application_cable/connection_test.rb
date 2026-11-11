@@ -30,4 +30,16 @@ class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
     session.destroy!
     assert_reject_connection { connect }
   end
+
+  # The cable resumes a session through the same lookup as a request, so a
+  # cookie past its session's end is refused here too, and the row ended.
+  test "an expired cookie is refused at connect" do
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, at: 15.days.ago)
+    cookies.signed[:session_id] = session.id
+
+    assert_reject_connection { connect }
+
+    assert_not Session.exists?(session.id)
+    assert_equal "expired_absolute", Audit::Event.where(action: "session.ended").sole.metadata["reason"]
+  end
 end

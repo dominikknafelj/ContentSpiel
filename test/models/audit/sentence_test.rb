@@ -219,6 +219,60 @@ class Audit::SentenceTest < ActiveSupport::TestCase
     end
   end
 
+  # `session.ended`, one sentence per reason. An expiry and a password
+  # change are told with no actor; the two endings a person chose name them.
+  def ended(reason, count: 1, user: users(:two), **attributes)
+    subject = user ? { subject_type: "User", subject_id: user.id, subject_label: user.name_or_email } : {}
+    event("session.ended", metadata: { "reason" => reason, "count" => count }, **subject, **attributes)
+  end
+
+  test "an idle expiry names whose session it was, or counts them, with no actor, as a security event" do
+    sentence = sentence_for(ended("expired_idle", user_id: nil))
+
+    assert sentence.actor.none
+    assert sentence.security
+    assert_equal "Session of “#{users(:two).name_or_email}” ended after 12 hours unused", read(sentence)
+    assert_equal "3 sessions ended after 12 hours unused", read(sentence_for(ended("expired_idle", count: 3, user: nil, user_id: nil)))
+    assert_equal "1 session ended after 12 hours unused", read(sentence_for(ended("expired_idle", count: 1, user: nil, user_id: nil)))
+  end
+
+  test "an absolute expiry reads as fourteen days after sign-in" do
+    sentence = sentence_for(ended("expired_absolute", user_id: nil))
+
+    assert sentence.actor.none
+    assert_equal "Session of “#{users(:two).name_or_email}” ended 14 days after sign-in", read(sentence)
+    assert_equal "2 sessions ended 14 days after sign-in", read(sentence_for(ended("expired_absolute", count: 2, user: nil, user_id: nil)))
+  end
+
+  test "ending one's other sessions names the person and how many" do
+    other = users(:two)
+    one = ended("ended_by_self", user: other, user_id: other.id, actor_type: "User", actor_id: other.id)
+    two = ended("ended_by_self", count: 2, user: other, user_id: other.id, actor_type: "User", actor_id: other.id)
+
+    assert_equal "#{other.name_or_email} ended one of their other sessions", read(sentence_for(one))
+    assert_equal "#{other.name_or_email} ended 2 of their other sessions", read(sentence_for(two))
+    mine = ended("ended_by_self", count: 2, user: @me, actor_type: "User", actor_id: @me.id)
+    assert_equal "You ended 2 of your other sessions", read(sentence_for(mine))
+    assert sentence_for(one).security
+  end
+
+  test "an owner ending every session of a user names both, with the count" do
+    sentence = sentence_for(ended("ended_by_owner", count: 3, actor_type: "User", actor_id: @me.id))
+
+    assert_not sentence.actor.none
+    assert_equal "You ended every session of “#{users(:two).name_or_email}” (3)", read(sentence)
+  end
+
+  test "a password change's endings are counted, with no actor" do
+    sentence = sentence_for(ended("password_changed", count: 2, actor_type: "User", actor_id: @me.id))
+
+    assert sentence.actor.none
+    assert sentence.security
+    assert_equal "2 sessions of “#{users(:two).name_or_email}” ended by a password change", read(sentence)
+    assert_equal "1 session of “#{users(:two).name_or_email}” ended by a password change",
+      read(sentence_for(ended("password_changed", count: 1, actor_type: "User", actor_id: @me.id)))
+  end
+
   test "a refused permission reads as the permission's own label, security flagged" do
     denied = event("access.denied", user_id: users(:author).id, metadata: { "permission" => "settings.manage" })
     sentence = sentence_for(denied)
@@ -238,7 +292,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
   end
 
   test "the security keys" do
-    secure = %w[session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted]
+    secure = %w[session.ended session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted]
     assert_equal secure.sort, Audit::Sentence::ACTIONS.select { |action| sentence_for(Audit::Event.new(action:, occurred_at: Time.current, last_occurred_at: Time.current)).security }.sort
   end
 
