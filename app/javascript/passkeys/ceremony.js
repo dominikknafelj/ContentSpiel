@@ -1,5 +1,5 @@
-// The browser's half of every passkey ceremony (sign-in, the second step,
-// Confirm it's you, adding one), with no library: the server's options in,
+// The browser's half of a passkey ceremony, making one (`create`) or using
+// one (`get`), with no library: the server's options in,
 // the credential out as JSON for the `credential` parameter.
 //
 // THE PROMPT OPENS IN THE PRESS. WebKit lets `navigator.credentials.create`

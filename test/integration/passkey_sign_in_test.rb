@@ -43,13 +43,24 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_nil cookies["session_id"].presence
   end
 
+  def session_key = Rails.application.config.session_options.fetch(:key)
+
   # The session cookie holding `values`, encrypted as the cookie store
   # writes it: an integration test has no other way into the session.
   def plant_session(values)
-    key = Rails.application.config.session_options.fetch(:key)
     jar = ActionDispatch::TestRequest.create.cookie_jar
-    jar.encrypted[key] = { value: values.deep_stringify_keys }
-    cookies[key] = jar[key]
+    jar.encrypted[session_key] = { value: values.deep_stringify_keys }
+    cookies[session_key] = jar[session_key]
+  end
+
+  # The session cookie as the browser holds it now, to send again later as
+  # someone who copied it would.
+  def saved_session_cookie = cookies[session_key]
+
+  def send_again_with(saved_cookie, credential)
+    cookies.delete("session_id")
+    cookies[session_key] = saved_cookie
+    send_passkey(credential)
   end
 
   test "a passkey signs its person in, with the passkey method, the known-device cookie and session.created saying passkey" do
@@ -59,7 +70,6 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     session = Session.sole
     assert_equal @user, session.user
     assert_equal "passkey", session.authenticated_with
-    assert_not session.enrolment_due
     assert cookies[Admin::SignInCompletion::DEVICE_COOKIE.to_s].present?
     event = Audit::Event.where(action: "session.created").sole
     assert_equal @user.id, event.subject_id
@@ -94,14 +104,28 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
   end
 
   test "an assertion sent twice, one after five minutes and one made for another purpose's challenge are refused, and the second press works with a fresh challenge" do
-    # Twice: the first signs in; the same answer again, from a browser
-    # with no session, meets no challenge. Made by a synced passkey, whose
-    # counter stays 0, so the counter alone would let it through.
+    # Made by a synced passkey, whose counter stays 0, so the counter alone
+    # would let a second sending through.
     first = assertion(options.fetch("challenge"), sign_count: 0)
+    before_first = saved_session_cookie
     assert_equal admin_root_url, send_passkey(first)
+    assert_equal 1, Session.count
+
+    # Twice: sent again with the cookie the first answer left (which holds
+    # no challenge), and with the cookie from before it (which still does,
+    # as a copy taken by whoever captured the assertion would): both are
+    # refused, the second by the challenge's spent mark on the server.
     cookies.delete("session_id")
     refused_to_sign_in_page(send_passkey(first))
+    refused_to_sign_in_page(send_again_with(before_first, first))
     assert_equal 1, Session.count
+
+    # A refused answer spends its challenge too: the right assertion for it,
+    # sent after a wrong one with the cookie that still holds it, is refused.
+    challenge = options.fetch("challenge")
+    before_wrong = saved_session_cookie
+    refused_to_sign_in_page(send_passkey("not a credential"))
+    refused_to_sign_in_page(send_again_with(before_wrong, assertion(challenge, sign_count: 0)))
 
     # Late: answered one second past the five minutes.
     late = assertion(options.fetch("challenge"))
@@ -114,10 +138,51 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     plant_session(passkey_challenge: { purpose: "register", challenge: challenge, at: Time.current.to_i })
     refused_to_sign_in_page(send_passkey(assertion(challenge)))
 
-    # Each refusal spent its challenge, and a fresh one signs in.
+    # A fresh challenge signs in.
     travel PACE
     assert_equal admin_root_url, send_passkey(assertion(options.fetch("challenge")))
     assert_equal 2, Session.count
+  end
+
+  test "under a policy that covers everyone a passkey sign-in owes no enrolment, a password sign-in without a passkey does, and auth.policy is on the request's span" do
+    site_settings(:default).update!(passkey_policy: "everyone")
+    exporter = Rails.application.config.x.otel_test_exporter
+    exporter.reset
+
+    send_passkey(assertion(options.fetch("challenge")))
+
+    assert_not Session.sole.enrolment_due
+    span = exporter.finished_spans.find { |each| each.kind == :server && each.attributes["auth.policy"] }
+    assert span, "the passkey sign-in's request span carries auth.policy"
+    assert_equal "everyone", span.attributes["auth.policy"]
+
+    delete admin_sign_out_path
+    User.create!(email_address: "bea@example.org", password: PASSWORD)
+    post admin_sign_in_path, params: { email_address: "bea@example.org", password: PASSWORD }
+    assert_redirected_to admin_root_path
+    assert Session.find_by!(user: User.find_by!(email_address: "bea@example.org")).enrolment_due
+  end
+
+  test "with forgery protection on, both endpoints refuse a POST without the page's token and answer one with it" do
+    before = ActionController::Base.allow_forgery_protection
+    ActionController::Base.allow_forgery_protection = true
+
+    post admin_sign_in_passkey_options_path, as: :json
+    assert_response :unprocessable_content
+    post admin_sign_in_passkey_path, params: { credential: "{}" }, as: :json
+    assert_response :unprocessable_content
+    assert_equal 0, Session.count
+
+    get admin_sign_in_path
+    token = css_select("meta[name=csrf-token]").first["content"]
+    post admin_sign_in_passkey_options_path, as: :json, headers: { "X-CSRF-Token" => token }
+    assert_response :success
+    challenge = response.parsed_body.fetch("challenge")
+    post admin_sign_in_passkey_path, params: { credential: assertion(challenge) }, as: :json, headers: { "X-CSRF-Token" => token }
+    assert_response :success
+    assert_equal admin_root_url, response.parsed_body.fetch("location")
+  ensure
+    ActionController::Base.allow_forgery_protection = before
   end
 
   test "a passkey signs in an account whose email bucket a bot holds closed" do

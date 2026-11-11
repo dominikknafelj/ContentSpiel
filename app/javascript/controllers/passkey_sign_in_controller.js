@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
-// "Sign in with a passkey" on the sign-in panel, and the passkey of a
-// sign-in's second step: the divider and the button the server draws hidden
+// "Sign in with a passkey" on the sign-in panel: the divider and the button
+// the server draws hidden
 // below the password form, shown only where the browser can use a passkey,
 // so a browser that cannot keeps the panel exactly as it was.
 //
