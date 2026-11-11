@@ -9,11 +9,13 @@
 ### Removed
 
 - `Admin::Ui::TabLinksComponent`, with no alias: its links are `Admin::Ui::SegmentedComponent.new(mode: :links, label:, segments:, control_data:)`, a segment `{ label:, href:, current:, count: }` as a tab was, and `link_data:` is `control_data:`.
+- `Admin::NotesScreen::AvatarComponent`, with no alias: a person a note names is `Admin::Ui::ActorAvatarComponent.new(user:, viewer:, size: :md | :sm)` (a thread or inbox row's `:row` was `:md`, a message's `:message` `:sm`), drawing the same circle; `user_id:` is not taken, a nil user being a deleted one (#237).
 - The class constants `Admin::Ui::TabLinksComponent::LINK_CLASS`, `Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS`, `Admin::MediaLibrary::ToolbarComponent::SEGMENT_CLASS` and `Admin::Fields::SelectField::SEGMENT_CLASS`: a segmented control is drawn by `Admin::Ui::SegmentedComponent`, never from a class string. With them went the filter bar's height rule for a segment (`.admin-filter-bar fieldset label`): the control is 38px by its own track.
 
 ### For a gem or an outside caller
 
 - `Admin::Ui::SegmentedComponent` is the one segmented control, in `mode: :links` (a `<nav>` of links, the chosen one `aria-current="page"`) or `mode: :radios` (a `<fieldset>` of sr-only radios named `name:`, its legend `legend: :hidden` or `:visible`, with `required:`, `id:` and `describedby:` on the group). A segment is a Hash of `label:`, `current:` and `count:` (nil draws none), with `href:` for a link and `value:` and `id:` for a radio (each required by its key, so `value: ""` is a value), which also takes `count_id:`, `disabled:` and `data:`. A segment missing its mode's keys, holding a key of the other mode or an unknown one, and links handed `name:`, `required:`, `describedby:` or `legend:`, are refused with an `ArgumentError`. A `MediaLibrary::ToolbarComponent`'s count spans keep their ids (`count_id`).
+- `Admin::Ui::ActorAvatarComponent` also takes `user:` with an optional `viewer:` in place of `actor:` (the two together are refused with an `ArgumentError`), and a 26px slot, `size: :md`: the one rule that turns a user into a circle, for an audit actor and for a person a note names alike (#237).
 
 ## 0.2.0 (2026-11-10)
 

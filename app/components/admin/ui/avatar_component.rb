@@ -2,8 +2,8 @@ module Admin
   module Ui
     # A person as a round circle with their initials: THE ONE DRAWING of it,
     # in a note's message and thread row and among a record's people. Notes draws its
-    # authors through it (`Admin::NotesScreen::AvatarComponent`, which knows
-    # who the viewer is and what a deleted user is called) and presence the
+    # authors through `Admin::Ui::ActorAvatarComponent` (which knows who the
+    # viewer is and that a deleted user has no letters) and presence the
     # people on a record (`Admin::PresenceScreen::PeopleComponent`).
     #
     # It is told the initials (`PersonName.initials`, drawn upper-case by the

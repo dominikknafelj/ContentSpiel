@@ -51,14 +51,14 @@ module Admin
             author: author,
             # The letters of the avatar, written here and only here
             # (`PersonName.initials`); a gone author has none: the card draws
-            # the empty circle, as `Admin::NotesScreen::AvatarComponent` does.
+            # the empty circle, as `Admin::Ui::ActorAvatarComponent` does for a note.
             initials: author ? PersonName.initials(author) : "",
             replies: thread.messages.size - 1, pinned: thread.pinned,
             # What turns the row's dot accent in the card: one
             # query for the whole listing (`Notes::Listing#unread?`).
             unread: listing.unread?(thread, Current.user),
             # The viewer's own avatar is the filled one, as in the drawer
-            # (`Admin::NotesScreen::AvatarComponent`).
+            # (`Admin::Ui::ActorAvatarComponent`).
             mine: first.author_id.present? && first.author_id == Current.user&.id }
         end
       }
