@@ -1,0 +1,28 @@
+<%= render Admin::Ui::SettingsCardComponent.new(heading_id: HEADING_ID, heading: t(".title"), icon: :monitor_smartphone, family: :neutral,
+      intro: t(".intro"), id: ID, class: card_class, data: { controller: "admin--account--sessions" }) do %>
+  <ul class="divide-y divide-line">
+    <% rows.each do |session| %>
+      <%# Narrow, the details wrap under the device; End keeps the row's end. %>
+      <%= tag.li id: row_id(session), class: "flex items-center gap-3 px-4 py-3",
+            data: (current?(session) ? {} : { "admin--account--sessions-target": "row" }) do %>
+        <div class="min-w-0 flex-1">
+          <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink">
+            <span class="font-semibold" data-session-device><%= device(session) %></span>
+            <% if current?(session) %>
+              <%= render Admin::Ui::BadgeComponent.new(label: t(".this_session")) %>
+            <% end %>
+          </p>
+          <p class="mt-0.5 text-small text-dim" data-session-details><%= details(session) %></p>
+        </div>
+        <% unless current?(session) %>
+          <%= form_with url: helpers.admin_account_session_path(session, **url_options), method: :delete, class: "shrink-0",
+                data: { action: "submit->admin--account--sessions#ending" } do %>
+            <%= render Admin::Ui::ButtonComponent.new(label: t(".end"), variant: :secondary, size: :small, type: "submit",
+                  aria: { label: t(".end_label", device: device(session)) }, data: { "admin--account--sessions-target": "end" }) %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </ul>
+  <%= render Admin::AccountScreen::SessionsFootComponent.new(others: others.size, url_options: url_options) %>
+<% end %>

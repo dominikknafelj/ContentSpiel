@@ -1,8 +1,9 @@
 # THE DEVICE A SESSION WAS MADE FROM, read from its user agent string: a
 # browser's name and a person's name for the system ("Firefox", "macOS"),
 # for the Sessions card on Your account. A value object: it reads no locale
-# (`#key_and_values` answers the key under `admin.accounts.sessions` and its
-# interpolations, and the component says it in words).
+# (`#key_and_values` answers the key under
+# `admin.components.account_screen.sessions_card` and its interpolations,
+# and the component says it in words).
 #
 # A user agent is what a client chose to send, so it is read as untrusted:
 # a string over MAX_LENGTH is not parsed at all, a bot or a product the gem
@@ -33,7 +34,8 @@ class SessionDevice
     @browser, @os = read(user_agent)
   end
 
-  # The locale key under `admin.accounts.sessions` and what it interpolates.
+  # The locale key under `admin.components.account_screen.sessions_card` and
+  # what it interpolates.
   def key_and_values
     if browser && os
       [ "device", { browser: browser, os: os } ]

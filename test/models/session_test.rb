@@ -60,6 +60,18 @@ class SessionTest < ActiveSupport::TestCase
     travel_to(t + 14.days) { assert_equal "expired_absolute", session.expiry, "both hold: the absolute timeout wins" }
   end
 
+  test "live holds a session exactly while expiry says nothing" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    live = ->(at) { Session.where(id: session.id).live(at).to_a }
+
+    assert_equal [ session ], live.(t + 12.hours - 1.second)
+    assert_empty live.(t + 12.hours)
+    session.update_column(:last_seen_at, t + 14.days - 1.hour)
+    assert_equal [ session ], live.(t + 14.days - 1.second)
+    assert_empty live.(t + 14.days)
+  end
+
   test "from_cookies ends an expired session and answers nil" do
     freeze_time
     session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)

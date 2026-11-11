@@ -323,6 +323,10 @@ Rails.application.routes.draw do
     get "account/password", to: "accounts#moved", as: nil
     patch "account/password", to: "accounts#update", as: :account_password
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
+    # The Sessions card's two endings, of the signed-in user's own sessions
+    # only: the request names a session, never a user.
+    delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session
+    delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions
 
     # "Connect an AI assistant": the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

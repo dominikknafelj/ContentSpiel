@@ -57,6 +57,11 @@ class Session < ApplicationRecord
   # idle alone.
   scope :expired_idle, ->(at) { where(last_seen_at: ..(at - IDLE_TIMEOUT)) }
 
+  # The sessions past neither timeout at `at`: what a person is shown as
+  # signed in (an expired row stands until a request meets it or the sweep
+  # runs).
+  scope :live, ->(at) { where.not(expires_at: ..at).where.not(last_seen_at: ..(at - IDLE_TIMEOUT)) }
+
   # Ends every session of the relation it is called on and answers how many:
   # each row is read under its lock and destroyed (so `disconnect_cable`
   # runs), and a row another request ended first is simply not among them,
