@@ -123,7 +123,7 @@ export default class extends Controller {
       url: this.searchUrlValue,
       locale,
       autoSelect: true,
-      onPick: (row) => this.finish({ target: { type: row.type, id: row.id, title: row.title || `(untitled ${row.type} #${row.id})` } })
+      onPick: (row) => this.finish({ target: { type: row.type, id: row.id, title: row.title || messages(this.element).t("components.ui.rich_text_dialogs.untitled_target", { type: row.type, id: row.id }) } })
     })
   }
 

@@ -412,7 +412,7 @@ en:
           cancel: "Cancel"
         # `Admin::Ui::RichTextDialogsComponent`: the rich-text editor's image,
         # YouTube and Page link dialogs. `edit_image`, `save`, `alt_fallback`,
-        # `not_youtube` and `video_id` are written by `admin--rich-text--dialog`
+        # `not_youtube`, `video_id` and `untitled_target` are written by `admin--rich-text--dialog`
         # (with `insert_image`, the image dialog's title when it inserts), and
         # reach it from <body>'s messages (`Admin::MessagesHelper::SCRIPT_MESSAGES`).
         rich_text_dialogs:
@@ -437,6 +437,7 @@ en:
           page_search: "Search pages and posts"
           page_placeholder: "Title…"
           page_list: "Pages and posts"
+          untitled_target: "(untitled %{type} #%{id})"
         # `Admin::Ui::MailTestOutcomeComponent`: the answer to a test mail, on
         # Settings' Mail card and in the wizard's Mail step.
         mail_test_outcome:

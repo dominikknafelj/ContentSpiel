@@ -28,7 +28,7 @@ module Admin
     #
     # The words the script writes (the image dialog's Edit image / Insert
     # image title and its Save, the alt placeholder's fallback, the YouTube
-    # error and "Video id: …") are this component's keys, served on <body>
+    # error, "Video id: …" and the name of a picked record with no title) are this component's keys, served on <body>
     # (`Admin::MessagesHelper::SCRIPT_MESSAGES`): the dialogs are drawn once
     # per page, beside it.
     class RichTextDialogsComponent < Admin::AdminComponent
@@ -51,7 +51,7 @@ module Admin
         },
         keys: %w[image_title edit_image insert_image save remove_image cancel alt_text caption media_fallback alt_fallback
                  youtube_title insert_video youtube_label youtube_placeholder not_youtube video_id
-                 page_title remove_link page_search page_placeholder page_list],
+                 page_title remove_link page_search page_placeholder page_list untitled_target],
         slots: [],
         controller: "admin--rich-text--dialog",
         keyboard: [ "test/system/admin/rich_text_test.rb", "the YouTube dialog by the keyboard: its field takes the focus, Tab reaches Insert video and Enter inserts" ]
