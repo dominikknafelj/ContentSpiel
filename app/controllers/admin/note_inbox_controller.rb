@@ -67,14 +67,14 @@ module Admin
     # nothing about which.
     #
     # The sentence is the inbox row's, from the same keys
-    # (`Admin::NotesScreen::InboxRowComponent#sentence`), as TEXT: `I18n.t`,
+    # (`Admin::Ui::NoteInboxRowComponent#sentence`), as TEXT: `I18n.t`,
     # not the view's `t`, which would escape the name for a page -- the
     # script writes it with `textContent`. A GET that writes nothing: only
     # opening the thread reads a delivery.
     def delivery
       row = inbox.find(params[:id]) or raise ActiveRecord::RecordNotFound
 
-      render json: { id: row.id, reason: row.reason, sentence: delivery_sentence(row), title: row.title || t("admin.components.notes_screen.inbox_row.untitled"),
+      render json: { id: row.id, reason: row.reason, sentence: delivery_sentence(row), title: row.title || t("admin.components.ui.note_inbox_row.untitled"),
         excerpt: row.excerpt, url: helpers.note_route_path(row.route, **admin_url_options), thread_id: row.thread_id }
     end
 
@@ -84,7 +84,7 @@ module Admin
     # neither does a note whose author was deleted): the row component's
     # three cases.
     def delivery_sentence(row)
-      scope = "admin.components.notes_screen.inbox_row.#{row.reason}"
+      scope = "admin.components.ui.note_inbox_row.#{row.reason}"
       return I18n.t("#{scope}.nobody") unless row.by || row.by_id
       return I18n.t("#{scope}.deleted") unless row.by
 

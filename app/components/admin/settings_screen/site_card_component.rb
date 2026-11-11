@@ -55,7 +55,7 @@ module Admin
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation`. Anyone seeing this
       # card holds `settings.manage`, the same right `Translations::Confirm`
       # asks for a site field.
-      def translation(code, field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)
+      def translation(code, field) = Admin::Ui::ReferenceCardComponent.options_for(site_setting, field, locale: code, confirmable: true)
 
       # What the save bar calls a language's title or tagline: "Deutsch:
       # Title", the language as the tabs name it; with one language on, the

@@ -32,13 +32,13 @@ module Admin
         Answer.new(streams: [ *streams, *publishing_streams ], status: :ok)
       end
 
-      # A delete (`removal_streams`). The notes on what was deleted are gone
-      # with it (`Notes::Remove`): the header's number, the markers and the
-      # next delete dialog's warning are told with the same answer, through the
-      # page's one copy of the counts.
+      # A delete (`removal_streams`), then what features registered at the
+      # stream slot `editor.block.removed` (`SlotStreams`): what they keep
+      # about the deleted block went with it, and the page's copy of it is
+      # told with the same answer.
       def removed(block, kept_ids:, section:)
-        counts = Admin::NotesScreen::CountsComponent.new(counts: Notes::Counts.for_container(context.page, user: context.viewer), id: "notes-counts")
-        Answer.new(streams: [ *removal_streams(block, kept_ids, section), turbo_stream.replace("notes-counts", counts), *publishing_streams ], status: :ok)
+        registered = SlotStreams.for("editor.block.removed", context.page, view: context.view, viewer: context.viewer)
+        Answer.new(streams: [ *removal_streams(block, kept_ids, section), *registered, *publishing_streams ], status: :ok)
       end
 
       # A reorder. A STRUCTURAL one (it named a section or moved a block

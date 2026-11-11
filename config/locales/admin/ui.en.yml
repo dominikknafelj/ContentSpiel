@@ -298,3 +298,168 @@ en:
           light: "Light"
           dark: "Dark"
           auto: "Auto"
+        # `Admin::Ui::TranslateButtonComponent`: the button under a translated
+        # field's input, and the outdated reference card's variant.
+        translate_button:
+          label: "Translate"
+          update_label: "Suggest update"
+        # `Admin::Ui::TranslateAllComponent`: the header of a page, post or
+        # settings editor in a non-default language. `label`, `progress` and
+        # `ready` are also written by `admin--translation--translate`, which
+        # reads them from `data-messages`; `progress` counts by its total.
+        translate_all:
+          label:
+            one: "Suggest translations for %{count} empty field"
+            other: "Suggest translations for %{count} empty fields"
+          progress:
+            one: "Suggesting %{index} of %{count} field"
+            other: "Suggesting %{index} of %{count} fields"
+          ready:
+            one: "%{count} suggestion ready"
+            other: "%{count} suggestions ready"
+          ready_initial: "0 suggestions ready"
+          suggesting: "Suggesting…"
+          cancel: "Cancel"
+          use_all: "Use all"
+          discard_all: "Discard all"
+          nothing_empty: "No empty fields to translate"
+          failed: "Couldn't get a suggestion — reload the page and try again"
+          gone: "This field is no longer on the page — reload and try again"
+          not_applied: "This text can't be replaced here"
+          no_answer: "No suggestion came back for this field — try again"
+        # `Admin::Ui::ReferenceCardComponent`: the primary-language original
+        # beside a translated field; the notes of an outdated card.
+        reference_card:
+          confirm: "Still correct — mark up to date"
+          changed: "↻ Changed"
+          formatting_note: "Formatting changed"
+          too_long_note: "The text is too long to compare word by word."
+          no_source_note: "%{language} changed since this was translated."
+        # `Admin::Ui::TranslationPendingComponent`: the waiting box a field's
+        # suggestion slot shows. `elapsed` is also written by
+        # `admin--translation--translate` every second; `timeout` is written
+        # into the box when the provider's time is up.
+        translation_pending:
+          running: "Suggesting a translation…"
+          elapsed: "%{seconds}s"
+          cancel: "Cancel"
+          timeout: "No suggestion after %{seconds} seconds."
+          try_again: "Try again"
+        # `Admin::Ui::SuggestionComponent`: the box an AI suggestion streams
+        # into under a translatable field. `field_label` names the editable
+        # textarea; `current` is the existing translation shown in update mode.
+        suggestion:
+          label: "Suggested translation · edit before using"
+          field_label: "Suggested translation"
+          current: "Current: %{text}"
+          dismiss: "Dismiss"
+          use: "Use"
+          discard: "Discard"
+        # `Admin::Ui::AuditSentenceComponent`: the actor's own words, the rest
+        # of a sentence being `Audit::Sentence`'s. The viewer is "You" and
+        # their own token follows after a comma; another person's token
+        # follows after a space.
+        audit_sentence:
+          you: "You"
+          via_you: ", via %{label}"
+          via_other: " via %{label}"
+        # One line of the inbox. Each reason is a whole sentence in each of
+        # its three shapes: with a name (`%{name}` arrives as markup, the
+        # name in a heavier weight), for a person who has since been deleted,
+        # and with nobody to name (a reopen records no one).
+        note_inbox_row:
+          # The chip on an unread row: new, and for you.
+          new: "New"
+          # The verb the row ends in, inside its one link.
+          verb: "Open thread"
+          untitled: "(untitled)"
+          mention:
+            somebody_html: "%{name} mentioned you"
+            deleted: "A deleted user mentioned you"
+            nobody: "You were mentioned"
+          reply:
+            somebody_html: "%{name} replied"
+            deleted: "A deleted user replied"
+            nobody: "Someone replied"
+          resolved:
+            somebody_html: "%{name} resolved a note"
+            deleted: "A deleted user resolved a note"
+            nobody: "A note was resolved"
+          reopened:
+            somebody_html: "%{name} reopened a note"
+            deleted: "A deleted user reopened a note"
+            nobody: "A note was reopened"
+          where:
+            page: "Page · %{title}"
+            post: "Post · %{title}"
+            media: "Image · %{title}"
+            block: "%{place} · %{block}"
+        # `Admin::Ui::NewRecordDialogComponent`: the New page and New post
+        # dialogs' shells; each kind's title and Create, the rest shared. The
+        # standalone no-JS pages (`admin/pages/new`, `admin/posts/new`) read
+        # the same words.
+        new_record_dialog:
+          page:
+            title: "New page"
+            create: "Create page"
+          post:
+            title: "New post"
+            create: "Create draft"
+          loading: "Loading…"
+          load_failed: "The form couldn’t be loaded."
+          submit_failed: "Couldn’t save. Check your connection and try again."
+          retry: "Try again"
+          cancel: "Cancel"
+        # `Admin::Ui::RichTextDialogsComponent`: the rich-text editor's image,
+        # YouTube and Page link dialogs. `edit_image`, `save`, `alt_fallback`,
+        # `not_youtube`, `video_id` and `untitled_target` are written by `admin--rich-text--dialog`
+        # (with `insert_image`, the image dialog's title when it inserts), and
+        # reach it from <body>'s messages (`Admin::MessagesHelper::SCRIPT_MESSAGES`).
+        rich_text_dialogs:
+          image_title: "Image"
+          edit_image: "Edit image"
+          insert_image: "Insert image"
+          save: "Save"
+          remove_image: "Remove image"
+          cancel: "Cancel"
+          alt_text: "Alt text"
+          caption: "Caption"
+          media_fallback: "Empty uses the text from Media"
+          alt_fallback: "Describe the image"
+          youtube_title: "YouTube video"
+          insert_video: "Insert video"
+          youtube_label: "YouTube URL or video ID"
+          youtube_placeholder: "https://www.youtube.com/watch?v=…"
+          not_youtube: "That doesn’t look like a YouTube link."
+          video_id: "Video id: %{id}"
+          page_title: "Page link"
+          remove_link: "Remove link"
+          page_search: "Search pages and posts"
+          page_placeholder: "Title…"
+          page_list: "Pages and posts"
+          untitled_target: "(untitled %{type} #%{id})"
+        # `Admin::Ui::MailTestOutcomeComponent`: the answer to a test mail, on
+        # Settings' Mail card and in the wizard's Mail step.
+        mail_test_outcome:
+          sent: "Test mail sent to %{address}. Check your inbox."
+        # `Admin::Ui::MailHostValueComponent`: a mail field the host sets, the
+        # security in its words.
+        mail_host_value:
+          set_by_host: "Set by the host"
+          starttls: "STARTTLS"
+          tls: "TLS"
+          none: "None"
+        # `Admin::Ui::MailFieldsComponent`: the Mail form's fields, on Settings
+        # and in the wizard's Mail step: a label per `MailSettings` field.
+        mail_fields:
+          server_group: "Server"
+          sender_group: "Sender"
+          server: "Server"
+          server_placeholder: "smtp.example.com"
+          port: "Port"
+          security: "Security"
+          starttls: "STARTTLS"
+          tls: "TLS"
+          sender_name: "Sender name"
+          sender_address: "Sender address"
+          sender_address_placeholder: "no-reply@yourdomain"

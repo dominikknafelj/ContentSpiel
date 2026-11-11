@@ -1,9 +1,8 @@
 module Admin
   module NotesScreen
-    # What the Notes screen's two kinds of row share (`InboxRowComponent`, a
-    # delivery; `OpenThreadRowComponent`, a record with open threads): the
-    # chip that stands for a kind of record and this request's URL options for
-    # the link into its notes.
+    # What `OpenThreadRowComponent` (a record with open threads) draws its row
+    # with: the chip that stands for a kind of record and this request's URL
+    # options for the link into its notes.
     module RecordRow
       private
 

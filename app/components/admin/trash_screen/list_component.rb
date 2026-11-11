@@ -142,7 +142,7 @@ module Admin
         return label unless actor.via_label
 
         # "You, via <token>" with the comma, "<name> via <token>" without: the
-        # audit log's own two forms (`Admin::AuditScreen::SentenceComponent`).
+        # audit log's own two forms (`Admin::Ui::AuditSentenceComponent`).
         actor.you ? t(".you_via", token: actor.via_label) : t(".via", name: label, token: actor.via_label)
       end
 

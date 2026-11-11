@@ -944,7 +944,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     # The reference card folds only when stacked; side by side its summary is inert, and shows no triangle.
     assert_match(/\.admin-translation-pair > \.admin-reference-card > details > summary::before\s*\{\s*display:\s*none;/, css)
     %w[app/components/admin/editor_screen/page_settings_form_component.html.erb app/components/admin/editor_screen/shared_fields_component.html.erb
-       app/components/admin/editor_screen/reference_card_component.html.erb app/views/admin/audit_events/show.html.erb].each do |path|
+       app/components/admin/ui/reference_card_component.html.erb app/views/admin/audit_events/show.html.erb].each do |path|
       Rails.root.join(path).read.scan(/<summary[^>]*>/).each { |summary| assert_includes summary, "admin-disclosure", path }
     end
   end
@@ -1445,9 +1445,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   POST_FORM_SOURCES = [
     "app/components/admin/editor_screen/post_form_component.html.erb",
     "app/components/admin/columns/*", "app/components/admin/fields/*",
-    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input}_component.*",
-    "app/components/admin/editor_screen/{related_posts,shared_fields,reference_card}_component.*",
-    "app/components/admin/translation_screen/{suggestion,translate_button}_component.*",
+    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input,translate_all,translate_button,reference_card}_component.*",
+    "app/components/admin/editor_screen/{related_posts,shared_fields}_component.*",
+    "app/components/admin/ui/suggestion_component.*",
     "app/views/admin/shared/{_translation_box,_field_errors,_base_updated_at_field,_override_field}.html.erb",
     "app/javascript/rich_text/*.js", "app/javascript/controllers/admin/rich_text/*.js"
   ].freeze
@@ -1582,11 +1582,11 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/shell/sidebar_component.rb" => "the Dashboard's count pill",
     "app/components/admin/notes_screen/header_button_component.html.erb" => "the unread count pill",
     "app/components/admin/notes_screen/thread_row_component.html.erb" => "the unread bubble",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip's dot",
+    "app/components/admin/ui/note_inbox_row_component.html.erb" => "the New chip's dot",
     "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
     "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
     "app/javascript/notes/merge.js" => "the NEW divider",
-    "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
+    "app/components/admin/ui/translate_all_component.html.erb" => "a progress bar",
     "app/javascript/media/upload_tiles.js" => "a progress bar",
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
     "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",
@@ -1613,7 +1613,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/components/admin/ui/badge_component.rb" => "the accent badge, the MCP channel chip's, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable",
+    "app/components/admin/ui/note_inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable",
     "app/components/admin/ui/segmented_component.rb" => "the chosen segment, a selection behind aria-current or :checked, with its accent edge"
   }.freeze
 

@@ -65,7 +65,7 @@ module Admin
     NOTHING_TO_TRANSLATE = "The original is empty — nothing to translate".freeze
 
     # What `suggest` accepts as an input's DOM id: it's echoed back as the
-    # target of a stream (`SuggestionComponent.dom_id`), so nothing but a
+    # target of a stream (`Admin::Ui::SuggestionComponent.dom_id`), so nothing but a
     # plain id the editors themselves render (`post-title`,
     # `block-12-body-json`, `settings_fields-text`).
     INPUT_ID = /\A[A-Za-z][\w-]*\z/
@@ -116,7 +116,7 @@ module Admin
     # `mode=update` is the outdated card's **Suggest update**: the fields
     # already have a translation, and each answer then also shows it
     # ("Current: …", read from the record and never sent to the provider --
-    # `SuggestionComponent`) so the editor can compare before pressing Use,
+    # `Admin::Ui::SuggestionComponent`) so the editor can compare before pressing Use,
     # which replaces the field's value. Which fields are translated is
     # unchanged: only the requested ones, blank originals still skipped. Any
     # other value of `mode` is the ordinary translate.
@@ -164,7 +164,7 @@ module Admin
       named = { model: AI.model }
       update = params[:mode].to_s == "update"
       requested_inputs(fields).map do |field, input_id|
-        box = Admin::TranslationScreen::SuggestionComponent
+        box = Admin::Ui::SuggestionComponent
         component =
           if !result.ok? then box.new(input_id: input_id, locale: params[:locale], error: result.errors.to_sentence)
           elsif translation.suggestions.key?(field)

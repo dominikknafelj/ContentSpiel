@@ -33,4 +33,8 @@ Rails.application.config.to_prepare do
   # editors hand the page's holds to the slot as `holds:`, and it asks those.
   Admin::Slots.register "editor.block.markers", Admin::EditorScreen::HolderAvatarComponent
   Admin::Slots.register "editor.block.markers", Admin::NotesScreen::MarkerComponent
+
+  # A block's delete answers with the page's notes counts again: the notes on
+  # the deleted block went with it.
+  Admin::Slots.register "editor.block.removed", Admin::NotesScreen::CountsStreamComponent
 end

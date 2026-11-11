@@ -1,7 +1,7 @@
 module Admin
   # "Still correct — mark up to date" (translation helpers spec §3.4/§4): the button an
   # outdated translation shows beside its original
-  # (`Admin::EditorScreen::ReferenceCardComponent`) posts here with
+  # (`Admin::Ui::ReferenceCardComponent`) posts here with
   # `record_type`, `record_id`, `field` and `locale`; `Translations::Confirm`
   # does the rest, including deciding whether the actor may.
   #
@@ -60,8 +60,8 @@ module Admin
     # language -- the switcher's marker.
     def confirmed_streams(record)
       field = params[:field].to_s
-      card_id = Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field, params[:locale].to_s)
-      card = Admin::EditorScreen::ReferenceCardComponent.current_for(record, field, locale: params[:locale].to_s)
+      card_id = Admin::Ui::ReferenceCardComponent.dom_id(record, field, params[:locale].to_s)
+      card = Admin::Ui::ReferenceCardComponent.current_for(record, field, locale: params[:locale].to_s)
       streams = [ turbo_stream.replace(card_id, card) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record
       unless Translations::Status.outdated_locales(switcher_record).include?(params[:locale].to_s)

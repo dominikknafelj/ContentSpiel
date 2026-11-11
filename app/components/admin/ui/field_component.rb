@@ -130,7 +130,7 @@ module Admin
       # The card showing the primary-language original beside (or above) the
       # input -- see `Admin::Columns::Base#reference_card`.
       def reference_card
-        Admin::EditorScreen::ReferenceCardComponent.new(
+        Admin::Ui::ReferenceCardComponent.new(
           field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
       end
@@ -147,7 +147,7 @@ module Admin
       def translate_button
         return unless translation_confirm && translatable? && value.blank?
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
+        Admin::Ui::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
       end
 
       # **Suggest update** for an outdated text field -- see
@@ -155,7 +155,7 @@ module Admin
       def suggest_update_button
         return unless translation_state == :outdated && translation_confirm && translatable?
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(
+        Admin::Ui::TranslateButtonComponent.new(
           confirm: translation_confirm, input_id: input_id, characters: original.to_s.length, mode: :update
         )
       end

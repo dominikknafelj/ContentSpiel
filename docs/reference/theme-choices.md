@@ -50,7 +50,7 @@ Tests: `test/models/content_model/theme_choice_field_test.rb`, `test/models/page
 - **The hero fields follow the template.** Each template option carries the fields its template declares (`data-fields`), and `admin--editor--template-fields` shows or hides the hero's group by `hidden` alone: the groups are always in the form, because a form holding unsaved text is never replaced. A hidden hero still posts its values (harmless: `Pages::Save` takes them), and changing the template clears nothing.
 - **The New page dialog** asks for the template under the same rule (two or more) and sends blank for the first.
 
-Tests: `test/components/admin/fields/theme_choice_field_test.rb`, `test/components/admin/editor_screen/page_settings_form_component_test.rb`, `new_page_dialog_component_test.rb`, `section_card_component_test.rb`, `shared_fields_component_test.rb`, `held_fields_test.rb`, `block_card_component_test.rb`, `test/integration/admin/page_editor_test.rb`, `test/integration/admin/new_record_dialogs_test.rb`, `test/system/admin/editor_fields_test.rb`, `test/system/admin/card_block_test.rb`.
+Tests: `test/components/admin/fields/theme_choice_field_test.rb`, `test/components/admin/editor_screen/page_settings_form_component_test.rb`, `new_page_form_component_test.rb`, `section_card_component_test.rb`, `shared_fields_component_test.rb`, `held_fields_test.rb`, `block_card_component_test.rb`, `test/integration/admin/page_editor_test.rb`, `test/integration/admin/new_record_dialogs_test.rb`, `test/system/admin/editor_fields_test.rb`, `test/system/admin/card_block_test.rb`.
 
 ## CS Studio and the theme
 

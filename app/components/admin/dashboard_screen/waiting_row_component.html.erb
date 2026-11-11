@@ -7,7 +7,7 @@
           aria: one_link_aria(link_id:, reason_ids:, verb: !review?), data: { turbo_frame: "_top" } do %><%= title %><% end %>
     <span class="flex min-w-0 items-center gap-1.5 text-xs text-meta">
       <span class="size-1.5 shrink-0 <%= marker_class %>" aria-hidden="true" data-type-marker="<%= post? ? "round" : "square" %>"></span>
-      <span class="truncate"><%= type_name %><% if author? %> · <%= render Admin::NotesScreen::PersonNameComponent.new(user: thread.last_author, user_id: thread.last_author_id) %><% end %> · <%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
+      <span class="truncate"><%= type_name %><% if author? %> · <%= render Admin::Ui::UserNameComponent.new(user: thread.last_author, user_id: thread.last_author_id, short: true) %><% end %> · <%= render Admin::Ui::TimeAgoComponent.new(time: row.at) %></span>
     </span>
   </span>
   <span class="flex shrink-0 items-center gap-2">

@@ -45,6 +45,14 @@ module Admin
   # are drawn again by a save's answer (`Admin::Answers::RailTabStreams`), the
   # panel never, since it may hold typed text.
   #
+  # A STREAM slot, `editor.block.removed`, is drawn by a write's answer, not
+  # by a screen (`Admin::Answers::SlotStreams`): the page editor's answer to a
+  # block's delete. Each entry is built like a single-record slot component,
+  # for the page, with no `reads:` and no `query:`; one that renders answers
+  # `stream_target`, the id of the element of the page it replaces, and,
+  # drawn, is the replacement. A target the page does not hold is a stream
+  # that does nothing.
+  #
   # A list slot's `loader` is called ONCE per render of the list with all its
   # records and the viewer (`Slots.load`), so a row costs no query of its own:
   # `->(records, viewer:) { { record.id => data } }`.
@@ -70,6 +78,7 @@ module Admin
       media.panel.header media.panel.sections
       tree.row.markers posts.row.markers posts.row.title
       editor.block.markers editor.rail.tabs media.rail.tabs
+      editor.block.removed
     ].freeze
 
     # The slot's own constructor arguments: an option of these names would replace

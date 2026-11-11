@@ -1,0 +1,154 @@
+require "test_helper"
+
+# The New post dialog's form: a Title, a Type select (or, with one creatable
+# type, a hidden input), every word a key; the dialog's shell is
+# `Admin::Ui::NewRecordDialogComponent`'s test.
+class Admin::EditorScreen::NewPostFormComponentTest < ViewComponent::TestCase
+  include ContentHelper
+
+  # Tests here store words into the shared backend, and reloading in teardown
+  # puts the files' translations back. A reload leaves the backend empty until
+  # its next lookup, which loads the files OVER whatever was stored before it,
+  # so every test starts with the files loaded and a store always wins.
+  setup { I18n.backend.eager_load! }
+  teardown { I18n.reload! }
+
+  def render_form(user = users(:one), **options)
+    as(user, channel: :admin) { render_inline(Admin::EditorScreen::NewPostFormComponent.new(**options)) }
+  end
+
+  def only_now_update_for_branch_editors
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.create", scope: { "content_types" => [ "now_update" ] })
+  end
+
+  test "the form: Title first, then a labelled Type select with each type's listing path, the URL line and the draft note" do
+    journal = create_page(title: "Journal")
+    ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(journal)
+    render_form
+
+    assert_selector "form#new-post-form[action='/cs-studio/posts'][data-turbo-frame='_top']"
+    fields = page.all("form#new-post-form input:not([type=hidden]), form#new-post-form select").map { |field| field[:id] }
+    assert_equal [ "new-post-title", "new-post-type" ], fields
+    assert_selector "label[for=new-post-title]", text: "Title"
+    assert_selector "input#new-post-title[name='post[title]'][autofocus]"
+    assert_selector "label[for=new-post-type]", text: "Type"
+    assert_selector "select#new-post-type[name='post[content_type]'][data-admin--editor--new-record-target=type]"
+    assert_equal ContentTypes.all.map(&:name), page.all("select#new-post-type option").map(&:value)
+    ContentTypes.all.each { |type| assert_selector "select#new-post-type option[value='#{type.name}']", text: type.label }
+    assert_selector "option[value=blog][data-path='/journal']"
+    assert_no_selector "option[value=now_update][data-path]"
+    assert_no_selector "input[type=radio]", visible: :all
+    assert_no_selector ".admin-type-dot"
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "URL: /journal/"
+    assert_selector "p.text-small", text: "Created as a draft in English. Everything can be changed in the editor."
+  end
+
+  test "with one creatable type there is no select: a hidden input carries the type and the note names it" do
+    only_now_update_for_branch_editors
+    render_form(users(:editor_branch))
+
+    assert_no_selector "select#new-post-type"
+    assert_no_selector "label[for=new-post-type]"
+    assert_selector "input#new-post-type[type=hidden][name='post[content_type]'][value=now_update][data-admin--editor--new-record-target=type]", visible: :all
+    assert_text "Created as a draft (Now update) in English. Everything can be changed in the editor."
+  end
+
+  test "with one creatable type a refused type's summary link goes to Title, never to the hidden input" do
+    only_now_update_for_branch_editors
+    post_record = Post.new
+    post_record.errors.add(:content_type, "is not allowed")
+    render_form(users(:editor_branch), errors: post_record.errors)
+    assert_selector ".admin-error-summary a[href='#new-post-title']"
+    assert_no_selector ".admin-error-summary a[href='#new-post-type']"
+
+    post_record = Post.new
+    post_record.errors.add(:content_type, "is not allowed")
+    render_form(errors: post_record.errors)
+    assert_selector ".admin-error-summary a[href='#new-post-type']"
+  end
+
+  test "the URL line is drawn from the script's own keys" do
+    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { new_record: { url: "Address %{path}", not_listed: "Nowhere yet" } } } })
+    render_form
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Nowhere yet"
+
+    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { new_record: { page_note: "Under %{title}" } } } })
+    create_page(title: "About")
+    as(users(:one), channel: :admin) { render_inline(Admin::EditorScreen::NewPageFormComponent.new) }
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Address /"
+    assert_selector "[data-admin--editor--new-record-target=note]", text: "Under "
+  end
+
+  test "the first type is preselected unless one is asked for" do
+    render_form
+    assert_selector "option[selected]", count: 1
+    assert_selector "option[value='#{ContentTypes.all.first.name}'][selected]"
+
+    render_form(content_type: "now_update")
+    assert_selector "option[value=now_update][selected]"
+    assert_selector "option[selected]", count: 1
+  end
+
+  test "only the types the viewer may create are offered" do
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.create", scope: { "content_types" => [ "now_update", "blog" ] })
+    render_form(users(:editor_branch))
+    assert_equal %w[blog now_update], page.all("select#new-post-type option").map(&:value).sort
+  end
+
+  test "an unlisted type says so; a listed one carries its page's path" do
+    render_form
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
+
+    journal = create_page(title: "Journal")
+    ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    publish_changes(journal)
+    render_form
+    assert_selector "option[value=blog][data-path='/journal']"
+  end
+
+  test "a listing page the viewer can't read keeps its path to itself unless it is live" do
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.create", scope: { "content_types" => [ "blog" ] })
+    journal = create_page(title: "Journal", published: false)
+    ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+
+    render_form(users(:one))
+    assert_selector "option[value=blog][data-path='/journal']"
+
+    render_form(users(:editor_branch))
+    assert_selector "input#new-post-type[value=blog]", visible: :all
+    assert_no_selector "input#new-post-type[data-path]", visible: :all
+    assert_selector "[data-admin--editor--new-record-target=url]", text: "Not listed on any page yet"
+
+    journal.update_columns(published_at: 1.day.ago)
+    render_form(users(:editor_branch))
+    assert_selector "input#new-post-type[value=blog][data-path='/journal']", visible: :all
+  end
+
+  test "the form builds in a constant number of queries however many listing pages there are" do
+    count = lambda do
+      queries = 0
+      callback = ->(*, payload) { queries += 1 unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { render_form }
+      queries
+    end
+    create_listing = lambda do |title, type|
+      ContentBlock.create!(owner: create_page(title: title), block_type: :post_list, position: 0, settings: { "content_type" => type })
+    end
+    create_listing.call("One", "blog")
+    count.call
+    one = count.call
+    %w[now_update resume_entry].each_with_index { |type, index| create_listing.call("More #{index}", type) }
+    4.times { |index| create_listing.call("Extra #{index}", "blog") }
+    assert_equal one, count.call
+  end
+
+  test "the form alone keeps the typed title and type and shows the summary" do
+    post_record = Post.new
+    post_record.errors.add(:title, "can't be blank")
+    render_form(content_type: "now_update", title: "Typed", errors: post_record.errors)
+    assert_selector ".admin-error-summary", text: "1 thing needs fixing"
+    assert_selector "option[value=now_update][selected]"
+    assert_selector "input#new-post-title[value=Typed][aria-invalid=true]"
+  end
+end

@@ -1,9 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 import { youtubeIdFrom } from "rich_text/youtube"
 import { createTargetSearch } from "rich_text/target_search"
+import { messages } from "i18n/messages"
 
 // The rich-text editor's three shared dialogs -- image (alt text and caption),
-// YouTube and "Page link" -- on `Admin::EditorScreen::RichTextDialogsComponent`,
+// YouTube and "Page link" -- on `Admin::Ui::RichTextDialogsComponent`,
 // rendered once by the admin layout. This controller only gathers input; the
 // editor (`admin--rich-text--editor`) applies it through a Tiptap command, so the
 // document change goes down the one path that writes the hidden input and
@@ -33,12 +34,6 @@ export default class extends Controller {
     "pageInput", "pageList", "pageMessage", "pageRemove"
   ]
   static values = { searchUrl: String }
-
-  static texts = {
-    altFallback: "Describe the image",
-    notYoutube: "That doesn’t look like a YouTube link.",
-    videoId: "Video id: "
-  }
 
   connect() {
     this.session = null
@@ -93,13 +88,14 @@ export default class extends Controller {
 
   prepareImage({ mode, alt = "", caption = "", defaultAlt = "", defaultCaption = "", url = "" }) {
     const editing = mode === "edit"
-    this.dialogs.image.querySelector("#rich-text-image-dialog-title").textContent = editing ? "Edit image" : "Insert image"
-    this.imageSubmitTarget.textContent = editing ? "Save" : "Insert image"
+    const text = messages(this.element)
+    this.dialogs.image.querySelector("#rich-text-image-dialog-title").textContent = text.t(`components.ui.rich_text_dialogs.${editing ? "edit_image" : "insert_image"}`)
+    this.imageSubmitTarget.textContent = text.t(`components.ui.rich_text_dialogs.${editing ? "save" : "insert_image"}`)
     this.imageRemoveTarget.hidden = !editing
     // Blank fields fall back to the library's own text in this language,
     // which is what the placeholders show.
     this.imageAltTarget.value = alt
-    this.imageAltTarget.placeholder = defaultAlt || this.constructor.texts.altFallback
+    this.imageAltTarget.placeholder = defaultAlt || text.t("components.ui.rich_text_dialogs.alt_fallback")
     this.imageCaptionTarget.value = caption
     this.imageCaptionTarget.placeholder = defaultCaption
     this.imagePreviewTarget.hidden = !url
@@ -127,7 +123,7 @@ export default class extends Controller {
       url: this.searchUrlValue,
       locale,
       autoSelect: true,
-      onPick: (row) => this.finish({ target: { type: row.type, id: row.id, title: row.title || `(untitled ${row.type} #${row.id})` } })
+      onPick: (row) => this.finish({ target: { type: row.type, id: row.id, title: row.title || messages(this.element).t("components.ui.rich_text_dialogs.untitled_target", { type: row.type, id: row.id }) } })
     })
   }
 
@@ -153,7 +149,7 @@ export default class extends Controller {
       if (id) {
         this.finish({ id })
       } else {
-        this.youtubeErrorTarget.textContent = this.constructor.texts.notYoutube
+        this.youtubeErrorTarget.textContent = messages(this.element).t("components.ui.rich_text_dialogs.not_youtube")
         this.youtubeInputTarget.setAttribute("aria-invalid", "true")
         this.youtubeInputTarget.focus()
       }
@@ -168,7 +164,7 @@ export default class extends Controller {
     this.youtubeErrorTarget.textContent = ""
     this.youtubeInputTarget.removeAttribute("aria-invalid")
     const id = youtubeIdFrom(this.youtubeInputTarget.value, { allowBareId: true })
-    this.youtubeStatusTarget.textContent = id ? `${this.constructor.texts.videoId}${id}` : ""
+    this.youtubeStatusTarget.textContent = id ? messages(this.element).t("components.ui.rich_text_dialogs.video_id", { id }) : ""
   }
 
   finish(result) {

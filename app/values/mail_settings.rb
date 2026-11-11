@@ -59,6 +59,8 @@ require "openssl"
 # caches. Neither writer locks anything: a lost update costs one timestamp.
 class MailSettings
   FIELDS = %i[server port security username password sender_name sender_address].freeze
+  # The halves of the login, which are credentials: no screen shows their value.
+  LOGIN_FIELDS = %i[username password].freeze
   DELIVERY_FIELDS = (FIELDS - %i[sender_name]).freeze
 
   ENV_NAMES = {

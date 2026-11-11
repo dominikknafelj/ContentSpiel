@@ -140,7 +140,7 @@ module Admin
         value = public_send(*SINGLE_READERS.fetch(name) { [ :mail, name ] }).to_s
         case name
         when :image_widths then value.scan(/\d+/)
-        when :mail_security then MailFieldsComponent::SECURITIES.include?(value) ? value : ::MailSettings::DEFAULT_SECURITY
+        when :mail_security then Admin::Ui::MailFieldsComponent::SECURITIES.include?(value) ? value : ::MailSettings::DEFAULT_SECURITY
         else value
         end
       end

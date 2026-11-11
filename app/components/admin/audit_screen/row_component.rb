@@ -3,7 +3,7 @@ module Admin
     # One event in the audit log: the time
     # ("16:05", or "16:05–16:31" for a coalesced span), the actor's small mark
     # (`Admin::Ui::ActorAvatarComponent` at `:sm`, the dashboard's too), the
-    # sentence (`Audit::Sentence`, drawn by `SentenceComponent`), the channel
+    # sentence (`Audit::Sentence`, drawn by `Admin::Ui::AuditSentenceComponent`), the channel
     # chip and the raw action key in mono meta at the right. A security event
     # says so in words: a warn "Security" state chip before its key, whose
     # colour is the same as any other key's, so the colour is never the only

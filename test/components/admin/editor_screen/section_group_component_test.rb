@@ -176,11 +176,11 @@ class Admin::EditorScreen::SectionGroupComponentTest < ViewComponent::TestCase
   end
 
   # "Suggest translations for N empty fields" walks every block of the page
-  # (`Admin::TranslationScreen::TranslateAllComponent`), so a block in a
+  # (`Admin::Ui::TranslateAllComponent`), so a block in a
   # column counts as one outside a section does: the text's body and the
   # image's alt here.
   test "the blocks in a column are among the fields Suggest translations counts" do
-    count = ->(record) { Admin::TranslationScreen::TranslateAllComponent.new(record: record.reload, locale: "de", editable: true).count }
+    count = ->(record) { Admin::Ui::TranslateAllComponent.new(record: record.reload, locale: "de", editable: true).count }
 
     assert_equal count.call(create_page(title: "No blocks")) + 2, count.call(@owner)
   end
