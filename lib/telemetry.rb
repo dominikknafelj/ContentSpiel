@@ -85,9 +85,12 @@ module Telemetry
   end
 
   # The block's value, inside a span `name` of `kind`, a child of the current
-  # span. `tracer` is for a test that needs a provider of its own.
+  # span. `tracer` is for a test that needs a provider of its own. The SDK
+  # records whatever kind it is handed, so a misspelt one is refused here
+  # rather than sent.
   def self.in_span(name, kind: :internal, attributes: {}, tracer: self.tracer, &block)
     raise ArgumentError, "#{name.inspect} is not among Telemetry::SPANS" unless SPANS.include?(name)
+    raise ArgumentError, "#{kind.inspect} is not a span kind" unless span_kinds.include?(kind)
     check_keys(attributes)
 
     tracer.in_span(name, kind: kind, attributes: attributes, &block)
@@ -106,5 +109,10 @@ module Telemetry
 
     raise ArgumentError, "#{unlisted.map(&:inspect).join(", ")} not among Telemetry::ATTRIBUTES"
   end
-  private_class_method :check_keys
+
+  # :internal, :server, :client, :producer and :consumer, read from the API.
+  def self.span_kinds
+    OpenTelemetry::Trace::SpanKind.constants.map { |name| OpenTelemetry::Trace::SpanKind.const_get(name) }
+  end
+  private_class_method :check_keys, :span_kinds
 end

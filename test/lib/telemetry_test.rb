@@ -22,6 +22,9 @@ class TelemetryTest < ActiveSupport::TestCase
     error = assert_raises(ArgumentError) { Telemetry.in_span("auth.sign_in", attributes: { "auth.method": "password" }) { ran = true } }
     assert_includes error.message, "auth.method", "a Symbol key is not the listed String"
 
+    error = assert_raises(ArgumentError) { Telemetry.in_span("auth.bot_check", kind: :clinet) { ran = true } }
+    assert_includes error.message, ":clinet"
+
     assert_not ran, "a refused span runs no block"
 
     span = OpenTelemetry::Trace::Span::INVALID

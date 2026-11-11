@@ -19,7 +19,10 @@ class TelemetrySpansTest < ActiveSupport::TestCase
   ROOTS = %w[app lib].freeze
   HELPERS = "lib/telemetry.rb".freeze
 
-  STARTS = /\.(in_span|start_span|start_root_span)\b/
+  # A start on any receiver but the checked helper's own (`Telemetry.in_span`,
+  # which is how a span is started everywhere else). `lib/telemetry.rb` itself
+  # starts one on its tracer, so it is the one file that matches.
+  STARTS = /(?<!\bTelemetry)\.(in_span|start_span|start_root_span)\b/
   WRITES = /\.(set_attribute|add_attributes|add_event)\b/
 
   WRITERS = {
@@ -32,7 +35,24 @@ class TelemetrySpansTest < ActiveSupport::TestCase
   test "no file but lib/telemetry.rb starts a span" do
     starters = sources.select { |_path, code| code.match?(STARTS) }.keys
 
-    assert_equal [ HELPERS ], starters, "a span is started through Telemetry.in_span (lib/telemetry.rb), which checks its name and keys"
+    assert_equal [ HELPERS ], starters,
+      "a span is started through Telemetry.in_span (lib/telemetry.rb), which checks its name and keys; " \
+      "lib/telemetry.rb is listed because its helper starts the span on the tracer, so it fails too if the helper stops doing so"
+  end
+
+  test "the starter pattern lets the checked helper's callers through and catches every other start" do
+    [ 'Telemetry.in_span("auth.sign_in") { }', '::Telemetry.in_span("auth.throttle", kind: :internal) { |span| span }' ].each do |call|
+      assert_no_match STARTS, call
+    end
+
+    [
+      'tracer.in_span("auth.sign_in") { }',
+      'Telemetry.tracer.in_span("auth.sign_in") { }',
+      'OpenTelemetry.tracer_provider.tracer("x").in_span("auth.sign_in") { }',
+      'OpenTelemetry.tracer_provider.tracer("x").start_span("auth.sign_in")',
+      'Telemetry::Other.start_root_span("auth.sign_in")',
+      'MyTelemetry.in_span("auth.sign_in") { }'
+    ].each { |call| assert_match STARTS, call }
   end
 
   test "every write to a span outside lib/telemetry.rb is listed with its reason, and every listed one is still there" do
@@ -47,6 +67,9 @@ class TelemetrySpansTest < ActiveSupport::TestCase
     offenders = (Telemetry::SPANS + Telemetry::ATTRIBUTES).reject { |name| name.start_with?(*PREFIXES) }
 
     assert_empty offenders
+  end
+
+  test "both lists are frozen and name each entry once" do
     assert Telemetry::SPANS.frozen? && Telemetry::ATTRIBUTES.frozen?
     assert_equal Telemetry::SPANS.uniq, Telemetry::SPANS
     assert_equal Telemetry::ATTRIBUTES.uniq, Telemetry::ATTRIBUTES
