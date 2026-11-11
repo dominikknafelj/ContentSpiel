@@ -47,6 +47,10 @@ These are the owner's decisions, in his words and mine:
   - The server sanitizes the SVG against a strict allowlist before storing it, and refuses what it can't sanitize. The allowlist means: no script, no `foreignObject` or HTML labels, no event handlers, no external references and no `style` that can load anything.
 - **Theme colours:** a block type promises the theme's colours, never Tailwind's palette. Mermaid's output reads the theme's colour tokens, in light and in dark.
 - **Accessibility:** a required text description is a field of the block, like an image's alt. The public markup is `role="img"` with an accessible name and the description.
+- **Import (owner, 2026-11-11):** a diagram can be brought in two ways, beside typing it:
+  - **Upload a file into the block:** an "Import file…" control on the Diagram block's card reads a `.mmd` file, or a `.md` file's first ```mermaid fence, into the source field of the language being edited (replacing what is there, after a confirm when the field isn't empty); it is then drawn and saved as if typed. The file is read in the browser and never stored; its size is held to the source limit; a file with no Mermaid in it says so.
+  - **From Markdown content:** wherever CS Studio turns Markdown into blocks (the rich-text Markdown form and its import paths, the MCP tools that write content), a ```mermaid fence becomes a Diagram block (source filled, drawing made at the editor's next open, description empty, so the site shows it only once a description is added) instead of a Code block. The plan names each such path from `docs/reference/rich-text.md` and `app/mcp/`.
+  - Not in scope: mermaid.live links and ready-made SVG uploads.
 - **After the cards (v211), 2026-11-11:** a large diagram scales down to about 60%, then scrolls sideways in its own figure box (call 13); the tile shows a small preview of the stored drawing (call 14).
 - **Questions left to this spec:**
   - inline SVG or `<img>`;
