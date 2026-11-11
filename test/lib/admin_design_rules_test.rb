@@ -1137,7 +1137,10 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
 
     css = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read.gsub(%r{/\*.*?\*/}m, "")
     assert_match(/\.admin-filter-bar input:not\(\.sr-only\),.*?min-height:\s*var\(--cs-control-compact\);\s*padding-block:\s*0;/m, css)
-    assert_match(/\.admin-filter-bar fieldset label\s*\{\s*min-height:\s*calc\(var\(--cs-control-compact\) - 2px\);/m, css)
+    assert_no_match(/\.admin-filter-bar fieldset label/, css, "a segmented control is the bar's height by its own track, never by the bar")
+    assert_includes css, ".admin-filter-bar a.inline-flex:not(.admin-chip__remove, .admin-segmented a)", "a segmented control's links are not sized by the bar's link rule"
+    assert_no_match(/\.admin-filter-bar[^{,]*\.admin-segmented(?! a\))/, css, "no rule of the bar names the segmented control but to leave it out")
+    assert_includes Admin::Ui::SegmentedComponent::TRACK_CLASS.split, "admin-segmented"
     assert_match(/\.admin-filter-bar select,\s*\.admin-filter-panel select,.*?min-height:\s*var\(--cs-control-compact\);/m, css, "a filter panel's selects are the bar's height")
     assert_no_match(/\b38px|2\.375rem/, css)
 
@@ -1607,13 +1610,14 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   TINT_PAIR_ALLOWED = {
     "app/components/admin/ui/button_component.rb" => "the secondary button",
     "app/javascript/rich_text/popover.js" => "the popover's secondary, a script-built button",
-    "app/components/admin/ui/channel_chip_component.rb" => "the MCP chip, not pressable",
+    "app/components/admin/ui/badge_component.rb" => "the accent badge, the MCP channel chip's, not pressable",
     "app/components/admin/shell/sidebar_component.rb" => "the current module's row, a link marked aria-current",
     "app/components/admin/notes_screen/body_component.rb" => "your own mention",
-    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable"
+    "app/components/admin/notes_screen/inbox_row_component.html.erb" => "the New chip: unread and for you, never pressable",
+    "app/components/admin/ui/segmented_component.rb" => "the chosen segment, a selection behind aria-current or :checked, with its accent edge"
   }.freeze
 
-  test "the tint with accent words is a secondary button's, a chip's, your own mention or the current module's row, and nothing else" do
+  test "the tint with accent words is a secondary button's, a chip's, your own mention, the current module's row or the chosen segment, and nothing else" do
     assert_empty class_offences(TINT_PAIR, allowed: TINT_PAIR_ALLOWED)
   end
 
@@ -1960,7 +1964,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
     app/components/admin/ui/language_progress_component.html.erb
-    app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/notice_component.rb
     app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb
@@ -2293,8 +2296,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A switch that cannot be changed is never faded either: off, the sunken
   # track and field-line outline it has at rest with the meta knob; on, a
   # meta track (not the accent, which says it can be pressed) with the
-  # surface knob; its label reads meta. A disabled segment keeps its
-  # colour too: meta words, no hover, and a chosen one stays inverted.
+  # surface knob, but for a held form's, which keeps the accent; its label
+  # reads meta. A disabled segment keeps its
+  # colour too: meta words, no hover, and a chosen one keeps the chosen look.
   test "a disabled switch keeps its colour, refuses the pointer, is meta when on and its label reads meta" do
     switch = single_rule(".cs-toggle:disabled")
     assert_match(/cursor:\s*not-allowed;/, switch)
@@ -2308,13 +2312,19 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/border-color:\s*var\(--cs-meta\);/, on)
     assert_match(/background:\s*var\(--cs-surface\);/, single_rule(".cs-toggle:disabled:checked::before"))
     assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-toggle:disabled + label", "label:has(> .cs-toggle:disabled)" ]))
+    # A held form is read-only, not off-limits: its switch that is on keeps
+    # the accent (`test/system/admin/editing_holds_test.rb`: "a held post's
+    # switch that is on keeps its accent").
+    held = single_rule(".admin-held .cs-toggle:disabled:checked")
+    assert_match(/background:\s*var\(--cs-accent\);/, held)
+    assert_match(/border-color:\s*var\(--cs-accent\);/, held)
     rules = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?(".cs-toggle") } }
     rules.each { |selectors, body| assert_no_match(/opacity:\s*0/, body, selectors.join(", ")) }
 
-    segment = Admin::Fields::SelectField::SEGMENT_CLASS.split
+    segment = Admin::Ui::SegmentedComponent::RADIO_SEGMENT_CLASS.split
     assert_empty segment.grep(/opacity/), "a disabled segment is not faded"
     %w[has-[:disabled]:cursor-not-allowed has-[:disabled]:not-has-[:checked]:text-meta has-[:disabled]:not-has-[:checked]:hover:bg-transparent
-       has-[:checked]:bg-ink has-[:checked]:text-paper].each { |name| assert_includes segment, name }
+       has-[:checked]:bg-accent-tint has-[:checked]:text-accent].each { |name| assert_includes segment, name }
   end
 
   # THE TREE: both trees draw one row (`Admin::Ui::TreeItemComponent`), whose

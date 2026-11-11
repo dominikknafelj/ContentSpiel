@@ -10,12 +10,13 @@ module Admin
     #
     # `contents: true` draws only what is inside the button, its label and its
     # number: what the answer puts into the tab, so the button stays and a tab
-    # that has the keyboard's focus keeps it.
+    # that has the keyboard's focus keeps it, and what a rail of one tab's
+    # heading holds.
     class RailTabComponent < AdminComponent
       include Admin::Ui::Contract
 
       contract(
-        accessibility: "A button with role=tab, aria-selected and aria-controls its panel; only the current tab is in the tab order.",
+        accessibility: "A button with role=tab, aria-selected and aria-controls its panel, named by its label and its count; only the current tab is in the tab order.",
         motion: :none,
         content_edges: %i[short long],
         widths: :fluid,
@@ -51,8 +52,17 @@ module Admin
 
       private
 
+      # The label, and the count after it with a hidden no-break space
+      # between, so the name read out is "Label 3" ("Label 2 new" once a
+      # feature's script writes its words into the count), never "Label3". A
+      # no-break space, because a plain one inside an `sr-only` span, out of
+      # the flow, collapses away; out of the flow it is no flex item either,
+      # so the tab's gap is unchanged. Only the count's own text is a script's.
       def contents
-        safe_join([ @tab.label, (tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?, data: { tab_count: "", **@tab.count_data.to_h }) unless @tab.count.nil?) ])
+        return safe_join([ @tab.label ]) if @tab.count.nil?
+
+        safe_join([ @tab.label, tag.span("\u00a0", class: "sr-only"),
+          tag.span(@tab.count, class: "text-count", hidden: @tab.count.zero?, data: { tab_count: "", **@tab.count_data.to_h }) ])
       end
     end
   end

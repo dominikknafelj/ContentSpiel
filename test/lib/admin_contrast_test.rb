@@ -251,6 +251,46 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The language tabs (`Admin::Ui::LanguageTabsComponent`) stand on a card's
+  # surface and on the rail. The chosen language's 2px underline is the
+  # accent, a rail tab's, so a state's mark: 3:1. An outdated language's ↻ is
+  # warn ink, a glyph read as a word: 4.5:1. The figures are the design's
+  # measure, so a token that drifts is caught before it nears the floor.
+  test "the language tabs: the accent underline 3:1 and the outdated ↻ in warn ink 4.5:1, on the surface and the rail" do
+    source = Rails.root.join("app/components/admin/ui/language_tabs_component.html.erb").read
+    assert_match(/has-\[\[aria-selected=true\]\]:border-accent/, source, "buttons mode's underline is the accent")
+    assert_match(/current\?\(code\) \? "border-accent"/, source, "links mode's underline is the accent")
+    assert_match(/class: "[^"]*text-warn-ink[^"]*", title: t\("\.outdated_title"\)/, source, "the outdated mark is warn ink")
+    figures = {
+      underline: { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-rail" => { light: 6.0, dark: 6.2 } },
+      outdated: { "--cs-surface" => { light: 7.6, dark: 9.8 }, "--cs-rail" => { light: 6.6, dark: 8.7 } }
+    }
+    each_scheme do |scheme, colour|
+      figures.fetch(:underline).each do |ground, floor|
+        assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the chosen language's accent underline on #{ground} (#{scheme})")
+        assert_ratio(floor.fetch(scheme), colour.("--cs-accent"), colour.(ground), "the chosen language's accent underline on #{ground}, at the measured figure (#{scheme})")
+      end
+      figures.fetch(:outdated).each do |ground, floor|
+        assert_ratio(4.5, colour.("--cs-warn-ink"), colour.(ground), "the outdated ↻ on #{ground} (#{scheme})")
+        assert_ratio(floor.fetch(scheme), colour.("--cs-warn-ink"), colour.(ground), "the outdated ↻ on #{ground}, at the measured figure (#{scheme})")
+      end
+    end
+  end
+
+  # The danger notice's edge (`Admin::Ui::NoticeComponent`, the error
+  # summary's too) is the box's outline, a state's mark: 3:1 on the surface
+  # it stands on and on its own tint inside it, at the design's figures.
+  test "the danger notice's edge is 3:1 on the surface and on its own tint" do
+    assert_match "border border-danger", Admin::Ui::NoticeComponent::TONES.fetch(:danger)
+    each_scheme do |scheme, colour|
+      { "--cs-surface" => { light: 5.8, dark: 5.2 }, "--cs-danger-tint" => { light: 5.0, dark: 4.6 } }.each do |ground, floor|
+        back = colour.(ground, under: ("--cs-surface" if ground == "--cs-danger-tint"))
+        assert_ratio(3.0, colour.("--cs-danger"), back, "the danger notice's edge on #{ground} (#{scheme})")
+        assert_ratio(floor.fetch(scheme), colour.("--cs-danger"), back, "the danger notice's edge on #{ground}, at the measured figure (#{scheme})")
+      end
+    end
+  end
+
   # The section chosen in the page editor's rail (`.admin-section-card[data-chosen]`):
   # an outline 2px outside the frame, so it stands on the canvas. Its colour is
   # read from the rule that draws it.
@@ -467,13 +507,25 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "a tab's words are 4.5:1 on the surface, the current one's on ink, and the focus outline 3:1 on the surface and on the current tab's paper ring" do
+  # `Admin::Ui::SegmentedComponent`: a segment at rest is dim on the track's
+  # surface, under the pointer ink on sunken, its count meta on either; the
+  # chosen one is accent words and a 1px accent edge on the accent tint over
+  # the surface, the edge 3:1 against the tint and against a neighbour at
+  # rest; the track's field-line edge is 3:1 on the paper and the surface it
+  # stands on, and the focus outline 3:1 on both.
+  test "a segment's words and count are 4.5:1, the chosen one's accent words, its edge and the track's edge 3:1 or better" do
     each_scheme do |scheme, colour|
-      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a tab's words on the surface (#{scheme})")
-      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-sunken"), "a hovered tab's words on sunken (#{scheme})")
-      assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "the current tab's words on ink (#{scheme})")
-      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus outline on the surface (#{scheme})")
-      assert_ratio(3.0, colour.("--cs-paper"), colour.("--cs-ink"), "the paper ring on the current tab (#{scheme})")
+      tint = colour.("--cs-accent-tint", under: "--cs-surface")
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a segment's words on the surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-sunken"), "a hovered segment's words on sunken (#{scheme})")
+      %w[--cs-surface --cs-sunken].each { |ground| assert_ratio(4.5, colour.("--cs-meta"), colour.(ground), "a count on #{ground} (#{scheme})") }
+      assert_ratio(4.5, colour.("--cs-accent"), tint, "the chosen segment's words and count on its tint (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), tint, "the chosen segment's edge against its tint (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the chosen segment's edge against a neighbour at rest (#{scheme})")
+      %w[--cs-paper --cs-surface].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the track's edge on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the focus outline on #{ground} (#{scheme})")
+      end
     end
   end
 

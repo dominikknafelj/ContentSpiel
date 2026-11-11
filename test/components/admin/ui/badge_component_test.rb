@@ -18,6 +18,12 @@ class Admin::Ui::BadgeComponentTest < ViewComponent::TestCase
     assert_selector "span.bg-warn-tint.text-warn-ink", text: "NO ALT"
   end
 
+  test "the accent tone is the accent tint with accent words" do
+    render_inline Admin::Ui::BadgeComponent.new(label: "MCP", tone: :accent)
+    assert_selector "span.bg-accent-tint.text-accent", text: "MCP"
+    assert_no_selector "span.bg-sunken"
+  end
+
   test "an unknown tone is a programming error" do
     assert_raises(ArgumentError) { Admin::Ui::BadgeComponent.new(label: "x", tone: :loud) }
   end

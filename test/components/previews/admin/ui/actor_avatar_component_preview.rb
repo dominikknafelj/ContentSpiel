@@ -1,7 +1,8 @@
 module Admin
   module Ui
     # `Admin::Ui::ActorAvatarComponent`: the mark beside an audit sentence, one
-    # example per kind of actor, and a user in the small slot.
+    # example per kind of actor, a user in the small slot, and a note's
+    # author from the user form in the 26px slot.
     class ActorAvatarComponentPreview < ViewComponent::Preview
       Actor = Audit::Sentence::Actor
 
@@ -16,6 +17,8 @@ module Admin
       def nobody = render(Admin::Ui::ActorAvatarComponent.new(actor: actor(none: true)))
 
       def small = render(Admin::Ui::ActorAvatarComponent.new(actor: actor(user: ada, user_id: 1), size: :sm))
+
+      def note_author = render(Admin::Ui::ActorAvatarComponent.new(user: ada, size: :md))
 
       private
 

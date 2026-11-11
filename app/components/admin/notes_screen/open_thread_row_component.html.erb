@@ -6,7 +6,7 @@
   </span>
   <span class="flex flex-none items-center gap-0.5">
     <% row.authors.each do |author| %>
-      <span class="flex flex-none"><%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: author&.id, viewer: viewer, size: :message) %></span>
+      <span class="flex flex-none"><%= render Admin::Ui::ActorAvatarComponent.new(user: author, viewer: viewer, size: :sm) %></span>
     <% end %>
     <% if more? %>
       <span class="flex flex-none"><%= render Admin::Ui::AvatarComponent.new(initials: more_label, size: :sm, tone: :more) %></span>

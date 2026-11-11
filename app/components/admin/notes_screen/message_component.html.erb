@@ -6,7 +6,7 @@
               "admin--notes--unsaved-key-value": (key if own?), "admin--notes--unsaved-user-value": (viewer.id if own?) } do %>
   <div class="flex items-start gap-2">
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-      <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
+      <%= render Admin::Ui::ActorAvatarComponent.new(user: author, viewer: viewer, size: :sm) %>
       <strong class="text-[13px] font-semibold text-ink"><%= render Admin::NotesScreen::PersonNameComponent.new(user: author, user_id: message.author_id) %></strong>
       <span class="text-label text-meta"><%= render Admin::Ui::TimeAgoComponent.new(time: message.created_at) %></span>
       <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>

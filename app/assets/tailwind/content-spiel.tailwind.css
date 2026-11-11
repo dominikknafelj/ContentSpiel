@@ -588,8 +588,10 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
    and focus ring, and a segmented group that wraps (Media's five segments in a
    narrow window) grows instead of clipping, which a group height would do. It
    is unlayered like `.cs-select`, so it beats the utilities written beside a
-   control (`py-1.5`, `py-2`): those are dead inside a bar. The segments sit
-   inside the group's 1px frame, hence two pixels less. A list's filter panel
+   control (`py-1.5`, `py-2`): those are dead inside a bar. A segmented
+   control (`Admin::Ui::SegmentedComponent`, `.admin-segmented`) is 38px by
+   its own track: its labels are not named here and its links are left out
+   of the link rule, which would make each segment 38px and the track 44px. A list's filter panel
    (`.admin-filter-panel`, below) is part of its bar's form, so its selects
    take the bar's height wherever the panel stands. The audit log's subject
    chip is the chip input's pill, not a control of the row: neither it nor
@@ -600,17 +602,13 @@ span.admin-tree-row__disclosure svg { transform: rotate(90deg); }
 .admin-filter-bar select,
 .admin-filter-panel select,
 .admin-filter-bar a.inline-block,
-.admin-filter-bar a.inline-flex:not(.admin-chip__remove),
+.admin-filter-bar a.inline-flex:not(.admin-chip__remove, .admin-segmented a),
 .admin-filter-bar button {
   min-height: var(--cs-control-compact);
   padding-block: 0;
 }
 .admin-filter-bar a.inline-block,
 .admin-filter-bar button { display: inline-flex; align-items: center; }
-.admin-filter-bar fieldset label {
-  min-height: calc(var(--cs-control-compact) - 2px);
-  padding-block: 0;
-}
 
 /* A disclosure whose summary is a label ("▸ Page settings", the SEO
    and Shared fields boxes, an audit event's Snapshot). The browser's own
@@ -1773,6 +1771,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-held select:disabled,
 .admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
+/* A held switch that is on stays the accent of a switch that is on: the form is
+   read-only, not disabled-looking, so the meta of `.cs-toggle:disabled:checked`
+   (a switch nobody may change) would say off-limits where it means held. */
+.admin-held .cs-toggle:disabled:checked { background: var(--cs-accent); border-color: var(--cs-accent); }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes): it can't be `disabled`

@@ -440,7 +440,7 @@ export default class extends Controller {
       option.dataset.label = person.label
       option.dataset.action = "mousedown->admin--notes--composer#choose"
       option.className = "flex cursor-pointer items-center gap-2 rounded-cs px-2 py-1.5 hover:bg-sunken aria-selected:bg-sunken"
-      // The avatar is decoration, as everywhere (`Admin::NotesScreen::AvatarComponent`):
+      // The avatar is decoration, as everywhere (`Admin::Ui::ActorAvatarComponent`):
       // the server writes the letters (`PersonName.initials`), none is computed here.
       const circle = avatar(person.initials, { size: "sm" })
       const name = document.createElement("span")

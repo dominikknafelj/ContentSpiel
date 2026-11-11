@@ -12,10 +12,12 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "a", text: "Deutsch"
   end
 
-  test "missing is a hollow ring, outdated a solid warn dot, each with screen-reader text and no red" do
+  test "missing is a hollow ring, outdated the ↻ in warn ink, each with screen-reader text and no red" do
     render_inline(Admin::Ui::LanguageTabsComponent.new(current: "en", missing: %w[de], outdated: %w[es], url: @url))
     assert_selector "span[data-language-state=missing][class~='border-field-line'][class~='border-[1.5px]']"
-    assert_selector "span.bg-warn[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
+    assert_selector "span.text-warn-ink[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
+    assert_selector "[data-language-state=outdated] > span[aria-hidden=true]:first-child", exact_text: "↻"
+    assert_no_selector "[data-language-state=outdated].bg-warn, [data-language-state=outdated].rounded-full"
     assert_selector ".sr-only", text: "Deutsch: missing"
     assert_selector ".sr-only", text: "Español: outdated"
     assert_no_selector "[class*=danger]"
@@ -25,6 +27,17 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
     assert_selector "[data-language-state=missing] .sr-only", text: "Deutsch: missing"
     assert_selector "[title='Outdated']", count: 1
     assert_selector "[title='Missing required fields']", count: 1
+  end
+
+  test "the chosen language's 2px underline is the accent, a rail tab's, in links and in buttons mode" do
+    render_inline(Admin::Ui::LanguageTabsComponent.new(current: "de", url: @url))
+    assert_selector "li.border-b-2.border-accent", text: "Deutsch"
+    assert_selector "li.border-b-2.border-transparent", text: "English"
+    assert_no_selector "li[class~='border-ink']"
+
+    render_inline(Admin::Ui::LanguageTabsComponent.new(current: "de", mode: :buttons, button_data: ->(code) { {} }, panel_id: ->(code) { "panel-#{code}" }))
+    assert_selector "li.border-b-2.border-transparent[class~='has-[[aria-selected=true]]:border-accent']", count: 3
+    assert_no_selector "li[class*='border-ink']"
   end
 
   test "no markers when nothing is missing or outdated" do

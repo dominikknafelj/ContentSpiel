@@ -7,7 +7,8 @@ module Admin
     # count, then Clear. One GET form that applies as it changes
     # (`admin--ui--auto-submit`, no Filter button, only the `content` frame
     # reloads), like the posts list's (`Admin::PostsScreen::ToolbarComponent`,
-    # whose radio-group shape this follows: one tab stop, arrows move it). Its
+    # both drawn by the shared segmented control's radios,
+    # `Admin::Ui::SegmentedComponent`: one tab stop, arrows move it). Its
     # words are `admin.components.media_library.toolbar.*`, a segment's under
     # `segments.<key>`.
     #
@@ -29,8 +30,6 @@ module Admin
     class ToolbarComponent < Admin::AdminComponent
       # `[filter value, key]`: the key names the count and the segment's word.
       SEGMENTS = [ [ "", :all ], [ "unused", :unused ], [ "missing_alt", :missing_alt ], [ "untranslated", :untranslated ], [ "mine", :mine ] ].freeze
-
-      SEGMENT_CLASS = Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS
 
       def self.count_id(key, picker: false) = "media-#{"picker-" if picker}count-#{key}"
 
@@ -66,7 +65,13 @@ module Admin
       # `filter` is `Media::Search#filter`: already normalised, `all` or a segment's name.
       def checked?(value) = filter == (value.presence || "all")
 
-      def count_for(key) = counts.fetch(key)
+      # The segments as the shared segmented control's radios
+      # (`Admin::Ui::SegmentedComponent`), each count in its span of `count_dom_id`.
+      def segment_items
+        segments.map do |value, key|
+          { label: segment_label(key), value:, id: filter_id(key), current: checked?(value), count: counts.fetch(key), count_id: count_dom_id(key) }
+        end
+      end
 
       def hidden_locale? = url_options.key?(:locale)
 

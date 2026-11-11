@@ -1,7 +1,7 @@
 require "application_system_test_case"
 
 # The keyboard of CS Studio's shared ways about a screen: the language tabs,
-# the tab links, the pagination, a rail's panel and the theme switch, each a
+# the segmented control, the pagination, a rail's panel and the theme switch, each a
 # test its component's contract names (`keyboard:`,
 # `docs/reference/design-system.md`, "Component contract"). A test sets where
 # Tab starts by clicking words beside the control, and never focuses the
@@ -50,18 +50,42 @@ class Admin::KeyboardNavigationSystemTest < ApplicationSystemTestCase
     assert_not page.evaluate_script("document.activeElement.matches(#{"#{tabs} [role=tab]".to_json})"), "Tab stayed in the tablist"
   end
 
-  test "a tab link is a Tab stop, and Enter on it goes to its tab, which the links mark current" do
+  # Links mode on the Trash screen's types, radios mode on the posts list's
+  # scope, whose form applies as it changes and hands the focus back by id.
+  test "the segmented control: in links mode each segment is a Tab stop that Enter follows, and in radios mode the group is one Tab stop whose arrows choose and apply" do
     Current.set(actor: users(:one)) { Trash::Move.call(create_post(title: "Gone for now")) }
     visit_screen admin_trash_path
 
     tabs = "nav[aria-label='Filter by type']"
     assert_selector "#{tabs} a[aria-current=page]", text: "All"
     find("h1", text: "Trash").click
+    stop_on("#{tabs} a")
+    assert_equal "All", focused_text.squish.sub(/ \d+\z/, "")
+    page.send_keys(:tab)
+    assert_match(/\APages/, focused_text.squish, "every link is a Tab stop")
     stop_on("#{tabs} a[href*='type=posts']")
     click_frame_link { page.send_keys(:enter) }
 
     assert_selector "#{tabs} a[aria-current=page]", text: "Posts"
     assert_current_path(/type=posts/)
+
+    Current.set(actor: users(:one)) { create_post(title: "Out there", published: true) }
+    visit_screen admin_posts_path
+    radio = "fieldset input[type=radio][name=scope]"
+    find("h1", text: "Posts").click
+    stop_on(radio)
+    assert_equal "posts-scope-all", page.evaluate_script("document.activeElement.id"), "the group's Tab stop is its checked radio"
+
+    # The arrow submits the form, whose answer replaces the content frame
+    # and hands the focus back by id: wait for the load, then for the focus
+    # on the new radio, before the next key.
+    click_frame_link { page.send_keys(:right) }
+    assert_current_path(/scope=live/)
+    assert_selector "#posts-scope-live:checked:focus", visible: :all
+    assert_text "Out there"
+
+    page.send_keys(:tab)
+    assert_not focus_in?(radio), "Tab stayed in the group"
   end
 
   # Three posts at two a page: the posts list's own size is 50.

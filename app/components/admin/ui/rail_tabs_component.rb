@@ -9,7 +9,9 @@ module Admin
     # drawn again, and is never stored beyond the document.
     #
     # A rail of one tab has nothing to choose: it is an `h2` with the tab's
-    # label and the tab's id, which the panel's `aria-labelledby` names.
+    # id, which the panel's `aria-labelledby` names, holding what a tab holds
+    # (`RailTabComponent` with `contents: true`, its label and its count), so
+    # its first draw is what a save's answer draws into it by that id.
     #
     # `slot_tabs` are the tabs features registered at the rail's panel slot
     # (`Admin::Ui::RailSlotComponent`): they join the tablist after `tabs`, and

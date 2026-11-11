@@ -18,19 +18,28 @@ class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "warn alone has an edge, every tone is rounded-card, and compact is 13px" do
-    %i[warn ok danger neutral].each do |tone|
+  test "warn and danger have an edge in their own colour, ok and neutral none, every tone is rounded-card, and compact is 13px" do
+    edges = { warn: "border-warn", danger: "border-danger", ok: nil, neutral: nil }
+    edges.each do |tone, edge|
       render_inline(Admin::Ui::NoticeComponent.new(tone: tone, data: { notice: true })) { "Words." }
 
       assert_includes notice_classes, "rounded-card", tone
-      assert_equal tone == :warn, notice_classes.include?("border"), tone
-      assert_equal tone == :warn, notice_classes.include?("border-warn"), tone
+      assert_equal edge.present?, notice_classes.include?("border"), tone
+      assert_equal [ edge ].compact, notice_classes.grep(/\Aborder-/), tone
       %w[px-3 py-2 text-sm].each { |utility| assert_includes notice_classes, utility, tone }
     end
 
     render_inline(Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, data: { notice: true })) { "Words." }
     %w[px-3 py-2.5 text-small leading-normal].each { |utility| assert_includes notice_classes, utility }
     assert_not_includes notice_classes, "text-sm"
+  end
+
+  test "the danger notice's edge is the error summary's, so a refusal looks the same in a notice and above a form" do
+    render_inline(Admin::Ui::NoticeComponent.new(tone: :danger, data: { notice: true })) { "Refused." }
+    summary = Rails.root.join("app/components/admin/ui/error_summary_component.html.erb").read[/class="admin-error-summary ([^"]*)"/, 1].split
+
+    assert_empty notice_classes - %w[px-3 py-2 text-sm] - summary, "every look class of the danger notice is the summary's"
+    assert_includes summary, "border-danger"
   end
 
   test "role: nil writes no role, and an unknown tone or size is refused" do

@@ -630,6 +630,45 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # A held form is read-only, not disabled-looking: a switch that is on
+  # keeps the accent of a switch that is on (`.admin-held .cs-toggle:disabled:checked`),
+  # where a switch disabled for another reason is drawn in meta.
+  test "a held post's switch that is on keeps its accent" do
+    with_test_types do
+      ContentTypes.register "test/flagged" do |t|
+        t.label "Flagged"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :featured, :boolean
+      end
+      post = create_post(title: "Launch", content_type: "test/flagged", published: false)
+      visit_editor(post)
+      await_notes_live
+      find("input.cs-toggle[role=switch]").click
+      assert_writes_settled
+      assert_eventually(message: "the switch was never saved") { post.reload.fields.featured == true }
+
+      join(:dana, @dana, path: "/cs-studio/posts/#{post.id}") do
+        assert_selector "#editor-notice [data-editing-kind=held]", text: "Olga Braun is editing this post", wait: LIVE
+        assert_selector "fieldset.admin-held input.cs-toggle[role=switch][disabled]:checked"
+        colours = page.evaluate_script(<<~JS)
+          (() => {
+            const toggle = document.querySelector("fieldset.admin-held input.cs-toggle:checked")
+            const probe = document.createElement("span")
+            probe.style.background = "var(--cs-accent)"
+            document.body.append(probe)
+            const accent = getComputedStyle(probe).backgroundColor
+            probe.remove()
+            const style = getComputedStyle(toggle)
+            return { accent, background: style.backgroundColor, border: style.borderTopColor }
+          })()
+        JS
+        assert_equal colours["accent"], colours["background"], "the held switch's track is the accent"
+        assert_equal colours["accent"], colours["border"], "the held switch's edge is the accent"
+      end
+    end
+  end
+
   test "a post's lost claim shows the notice in the notice area when the form is not stale" do
     post = create_post(title: "Hello", published: false)
     visit "/cs-studio/posts/#{post.id}"

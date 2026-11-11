@@ -76,7 +76,7 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/pages/#{@page.id}"
     assert_equal %w[editor-grid-tab-page editor-grid-tab-section editor-grid-tab-notes], css_select("#editor-grid [role=tablist] [role=tab]").map { |tab| tab["id"] }
-    assert_select "#editor-grid-tab-notes[aria-selected=false][aria-controls=editor-grid-panel-notes]", text: /Notes\s*2/ do
+    assert_select "#editor-grid-tab-notes[aria-selected=false][aria-controls=editor-grid-panel-notes]", text: "Notes\u00a02" do
       assert_select "span.text-count[data-admin--notes--drawer-target=total]", text: "2"
     end
     assert_select "#editor-grid-panel-notes[aria-labelledby=editor-grid-tab-notes]"

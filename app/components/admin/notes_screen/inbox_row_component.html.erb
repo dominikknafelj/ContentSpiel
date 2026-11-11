@@ -18,7 +18,7 @@
 <%= link_to path, class: "-mx-4 -my-2.5 grid min-w-0 flex-1 grid-cols-[26px_1fr_auto] items-start gap-x-2.5 px-4 py-[11px] no-underline hover:bg-paper focus-visible:-outline-offset-2",
       data: { delivery: row.id, unread: (true if row.unread), turbo_frame: "_top" } do %>
   <% if somebody? %>
-    <%= render Admin::NotesScreen::AvatarComponent.new(user: row.by, user_id: row.by_id, viewer: nil, size: :row) %>
+    <%= render Admin::Ui::ActorAvatarComponent.new(user: row.by, size: :md) %>
   <% else %>
     <span class="flex size-[26px] items-center justify-center rounded-full bg-sunken text-meta" aria-hidden="true"><%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3.5" %></span>
   <% end %>

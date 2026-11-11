@@ -22,6 +22,20 @@ class Admin::Ui::ChannelChipComponentTest < ViewComponent::TestCase
     assert_selector ".admin-channel-chip.text-meta", text: "Public"
   end
 
+  # The chip is the one badge, at the badge's one height (2px above and
+  # below the label; the audit log's 20px line holds it), with its hook.
+  test "drawn as a badge: the badge's classes, its tone, and the chip's hook" do
+    { "mcp" => :accent, "admin" => :neutral }.each do |channel, tone|
+      render_inline(Admin::Ui::ChannelChipComponent.new(channel: channel))
+      chip = page.find(".admin-channel-chip")
+
+      expected = [ Admin::Ui::BadgeComponent::CLASS, Admin::Ui::BadgeComponent::TONES.fetch(tone), "admin-channel-chip" ].join(" ").split
+      assert_equal expected.sort, chip[:class].split.sort, channel
+      assert_includes chip[:class].split, "py-0.5", channel
+      assert_equal "span", chip.tag_name
+    end
+  end
+
   test "no channel draws nothing" do
     render_inline(Admin::Ui::ChannelChipComponent.new(channel: nil))
     assert_no_selector ".admin-channel-chip"

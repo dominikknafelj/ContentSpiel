@@ -12,17 +12,8 @@
             aria: { describedby: "new_form_name_help" }, class: setup_input_class %>
       <p id="new_form_name_help" class="mt-1 text-sm text-meta"><%= t(".name_help") %></p>
     </div>
-    <fieldset class="m-0 min-w-0 border-0 p-0">
-      <legend class="<%= setup_label_class %> mb-1"><%= t(".start") %></legend>
-      <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
-        <% STARTS.each do |value| %>
-          <label for="<%= start_id(value) %>" class="<%= Admin::Fields::SelectField::SEGMENT_CLASS %>">
-            <%= radio_button_tag "form[start]", value, start == value, id: start_id(value), class: "sr-only" %>
-            <span><%= t(".#{value}") %></span>
-          </label>
-        <% end %>
-      </div>
-    </fieldset>
+    <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: "form[start]", label: t(".start"), legend: :visible,
+          segments: STARTS.map { |value| { label: t(".#{value}"), value:, id: start_id(value), current: start == value } }) %>
     <div>
       <%= label_tag "new_form_recipients", t(".mail_to"), class: setup_label_class %>
       <%= text_area_tag "form[recipients]", recipients, id: "new_form_recipients", rows: 2, autocomplete: "off",

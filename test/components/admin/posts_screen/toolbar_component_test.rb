@@ -103,15 +103,14 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
     assert_selector "a", text: "Clear"
   end
 
-  # A selected pill is inverted, ink with
-  # paper words (the accent tint was 1.13:1 against the others), and its
-  # keyboard ring is paper, since the accent on dark ink is 1.96:1.
-  test "a selected pill is inverted, its count with it, and its focus ring is paper" do
-    classes = Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS.split
+  # The scope is the shared segmented control's radios: its look is the
+  # component's (`Admin::Ui::SegmentedComponentTest`), and the toolbar only
+  # hands it the scopes.
+  test "the scope is the shared segmented control's radios, the chosen scope checked" do
+    render_toolbar(scope: "drafts")
 
-    %w[has-[:checked]:bg-ink has-[:checked]:text-paper has-[:checked]:has-[:focus-visible]:outline-paper has-[:checked]:has-[:focus-visible]:-outline-offset-4].each do |name|
-      assert_includes classes, name
-    end
-    assert_empty classes.grep(/accent-tint/)
+    assert_selector "fieldset label.group\\/segment", count: Posts::List::SCOPES.size
+    assert_equal Admin::Ui::SegmentedComponent::RADIO_SEGMENT_CLASS, page.find("label[for=posts-scope-drafts]")[:class]
+    assert_selector "label[for=posts-scope-drafts] > input[type=radio][name=scope][value=drafts][checked].sr-only", visible: :all
   end
 end

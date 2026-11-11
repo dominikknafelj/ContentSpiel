@@ -8,7 +8,7 @@ module Admin
     # keeps the panel an item of the dashboard's grid.
     #
     # The filter is three links in the panel's head
-    # (`Admin::Ui::TabLinksComponent`), each navigating the frame to its
+    # (`Admin::Ui::SegmentedComponent`'s links), each navigating the frame to its
     # filter. The filter shown as current is the query's own, so an unknown
     # one reads as Everything, as the query reads it. The filter is the
     # frame's `src` and never the page's address: a live note reloads the

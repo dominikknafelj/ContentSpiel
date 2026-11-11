@@ -18,8 +18,8 @@ module Admin
     #
     # `outdated:` is the set of codes whose translation was made against an
     # older version of the original (`Translations::Status.outdated_locales`)
-    # -- a second, solid warn dot
-    # with its own title and screen-reader text, since "something changed
+    # -- the ↻ glyph in warn ink, as a translation chip and a language's
+    # progress mark it, with its own title and screen-reader text, since "something changed
     # since" asks for a different job than "something is still empty". Each
     # one carries a stable id (`.outdated_marker_id`) so "Still correct — mark up to date"
     # can stream it away once the last outdated field in that language is

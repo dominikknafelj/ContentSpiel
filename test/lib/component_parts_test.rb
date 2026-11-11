@@ -157,7 +157,7 @@ class ComponentPartsTest < ActiveSupport::TestCase
 
     assert_equal [ missing ], self.class.without_entry([ "Admin::Ui::ButtonComponent", missing ])
     assert_equal "Button", DesignSystemEntries.entry_for(Admin::Ui::ButtonComponent)
-    assert_equal "Badge", DesignSystemEntries.entry_for(Admin::Ui::StatusChipComponent)
+    assert_equal "RecordState", DesignSystemEntries.entry_for(Admin::Ui::StatusChipComponent)
     stale = self.class.stale_entries(names,
       covered_by: { missing => "Badge", "Admin::Ui::BadgeComponent" => "Badge", "Admin::Ui::MenuComponent" => "NoSuchCard" },
       not_yet: { "Admin::Ui::ButtonComponent" => "a reason" })

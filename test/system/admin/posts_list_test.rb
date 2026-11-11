@@ -183,24 +183,25 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_selector "button[aria-label='Choose another type of post']:focus"
   end
 
-  # The accent ring would be 1.96:1 on a dark selected pill.
-  test "a selected pill reached with the keyboard is ringed in paper, in both schemes" do
+  # The chosen pill is the accent tint, so the accent ring stands 2px outside it.
+  test "a selected pill reached with the keyboard is ringed in the accent 2px outside it, in both schemes" do
     visit_screen "/cs-studio/posts"
     %w[light dark].each do |scheme|
       page.execute_script("document.documentElement.dataset.theme = #{scheme.to_json}")
       find_field("Search titles").send_keys(:tab)
-      ring, paper = page.evaluate_script(<<~JS)
+      ring, accent, offset = page.evaluate_script(<<~JS)
         (() => {
           const label = document.querySelector("label:has(#posts-scope-all)")
           const probe = document.createElement("span")
-          probe.style.color = "var(--cs-paper)"
+          probe.style.color = "var(--cs-accent)"
           document.body.append(probe)
-          const colours = [ getComputedStyle(label).outlineColor, getComputedStyle(probe).color ]
+          const colours = [ getComputedStyle(label).outlineColor, getComputedStyle(probe).color, getComputedStyle(label).outlineOffset ]
           probe.remove()
           return colours
         })()
       JS
-      assert_equal paper, ring, scheme
+      assert_equal accent, ring, scheme
+      assert_equal "2px", offset, scheme
     end
   ensure
     page.execute_script("document.documentElement.dataset.theme = 'light'")

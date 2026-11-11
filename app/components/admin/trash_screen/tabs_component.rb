@@ -1,8 +1,8 @@
 module Admin
   module TrashScreen
     # The Trash screen's type tabs: All, Pages, Posts, Images and Forms, each
-    # with how many rows it lists, drawn as the shared tab links
-    # (`Admin::Ui::TabLinksComponent`). Plain links (`?type=pages|posts|
+    # with how many rows it lists, drawn as the shared segmented control's
+    # links (`Admin::Ui::SegmentedComponent`). Plain links (`?type=pages|posts|
     # images|forms`, none for All): a tab change is a navigation, so the page
     # number is dropped with it. The counts are `Admin::TrashController.counts`
     # (what the viewer may act on, branch roots for pages), the same numbers
@@ -31,7 +31,7 @@ module Admin
       # of their own, and nobody else may restore one).
       def tabs
         TABS.select { |_, _, model| model.nil? || @counts.key?(model) }.map do |word, key, model|
-          { label: t(".#{word}"), key:, count: model ? @counts.fetch(model, 0) : @counts.values.sum, current: key == @current, href: @url.call(key) }
+          { label: t(".#{word}"), count: model ? @counts.fetch(model, 0) : @counts.values.sum, current: key == @current, href: @url.call(key) }
         end
       end
     end

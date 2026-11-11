@@ -94,7 +94,6 @@ test/components/admin/media_library/tile_component_test.rb: 0.6
 test/components/admin/media_library/toolbar_component_test.rb: 0.1
 test/components/admin/mind_graph_screen/legend_component_test.rb: 0.2
 test/components/admin/mind_graph_screen/swatch_component_test.rb: 0.0
-test/components/admin/notes_screen/avatar_component_test.rb: 0.0
 test/components/admin/notes_screen/body_component_test.rb: 0.0
 test/components/admin/notes_screen/header_button_component_test.rb: 2.1
 test/components/admin/notes_screen/marker_component_test.rb: 0.2
@@ -166,7 +165,6 @@ test/components/admin/ui/save_bar_component_test.rb: 0.0
 test/components/admin/ui/save_status_component_test.rb: 0.0
 test/components/admin/ui/status_chip_component_test.rb: 0.0
 test/components/admin/ui/system_check_row_component_test.rb: 0.0
-test/components/admin/ui/tab_links_component_test.rb: 0.0
 test/components/admin/ui/theme_switch_component_test.rb: 0.0
 test/components/admin/ui/time_ago_component_test.rb: 0.0
 test/components/admin/ui/toast_component_test.rb: 0.1
