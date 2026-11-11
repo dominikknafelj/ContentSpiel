@@ -26,10 +26,13 @@ module Audit
     # mail settings' fingerprint is an HMAC of the delivery settings, login
     # included: never shown, logged or audited. `secrets` is a form
     # destination's sealed credentials (`Forms::Destination`): not even the
-    # ciphertext is audited.
+    # ciphertext is audited. A passkey's credential id and public key, and a
+    # recovery code's digest, are passkey material: their serializers below
+    # leave them out, and these names keep them out of a changes row too.
     NEVER_STORED = %w[
       password password_confirmation password_digest token token_digest lookup_digest ai_api_key
       mail_username mail_password mail_verified_fingerprint preview renditions secrets
+      external_id public_key digest
     ].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
@@ -273,6 +276,12 @@ module Audit
         }
       when ApiToken
         { "id" => record.id, "name" => record.name, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
+      when Passkey
+        # Named fields: whose it is, its name and its uses. Never the
+        # credential id, the public key or the authenticator's counter.
+        { "id" => record.id, "user_id" => record.user_id, "name" => record.name, "last_used_at" => record.last_used_at, "created_at" => record.created_at }
+      when RecoveryCode
+        { "id" => record.id, "user_id" => record.user_id, "generated_at" => record.generated_at, "used_at" => record.used_at }
       when Media::Asset
         # Named fields, not `attributes` (media library design spec §5.1):
         # the title and every locale's alt/caption default (the raw jsonb

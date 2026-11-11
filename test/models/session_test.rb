@@ -184,4 +184,26 @@ class SessionTest < ActiveSupport::TestCase
   ensure
     Rails.logger.stop_broadcasting_to(logger) if logger
   end
+
+  test "a session starts confirmed at its sign-in and stays so for ten minutes" do
+    t = Time.zone.local(2026, 11, 12, 9, 0, 0)
+    session = Session.start(user: users(:reader), method: "password", user_agent: "UA", ip_address: "192.0.2.1", at: t)
+    stamp = session.updated_at
+
+    assert_equal t, session.confirmed_at
+    assert session.confirmed_recently?(t + Session::CONFIRM_WINDOW - 1.second)
+    assert_not session.confirmed_recently?(t + 10.minutes)
+
+    travel_to(t + 10.minutes) do
+      assert_not session.confirmed_recently?
+      session.confirm!
+      assert session.reload.confirmed_recently?
+    end
+    assert_equal stamp, session.updated_at
+  end
+
+  test "a session carries whether enrolment is due, false unless it is said" do
+    assert_not Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil).enrolment_due
+    assert Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, enrolment_due: true).reload.enrolment_due
+  end
 end

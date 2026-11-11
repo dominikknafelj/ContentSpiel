@@ -4,6 +4,10 @@ class User < ApplicationRecord
   has_many :api_tokens, dependent: :destroy
   has_many :memberships, class_name: "AccessControl::Membership", dependent: :destroy
   has_many :groups, through: :memberships, class_name: "AccessControl::Group"
+  # A passkey or a recovery code is nothing without its account, and neither
+  # has a callback, so they go in one statement each.
+  has_many :passkeys, dependent: :delete_all # version: none (passkeys are on no public page)
+  has_many :recovery_codes, dependent: :delete_all # version: none (recovery codes are on no public page)
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
@@ -76,6 +80,19 @@ class User < ApplicationRecord
   # timeout), and how many.
   def open_sessions(at = Time.current) = sessions.live(at)
   def open_session_count(at = Time.current) = open_sessions(at).count
+
+  # Whether the account has a second proof beside its password: a passkey,
+  # or a recovery code not yet used. An account that has one is never signed
+  # in by its password alone.
+  def second_factor? = passkeys.exists? || recovery_codes.unused.exists?
+
+  # The random user handle an authenticator keeps for this account in place
+  # of its email (WebAuthn's `user.id`), made at the first ask and kept, so
+  # every passkey of the account carries the same one.
+  def webauthn_handle!
+    update_column(:webauthn_id, WebAuthn.generate_user_id) if webauthn_id.nil? # version: none (a user's handle is on no public page)
+    webauthn_id
+  end
 
   private
 

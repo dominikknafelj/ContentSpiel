@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_090100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -383,6 +383,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
     t.index ["updated_at"], name: "index_pages_on_updated_at"
   end
 
+  create_table "passkeys", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "external_id", null: false
+    t.text "public_key", null: false
+    t.bigint "sign_count", default: 0, null: false
+    t.string "name", null: false
+    t.string "transports", default: [], null: false, array: true
+    t.datetime "last_used_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_id"], name: "index_passkeys_on_external_id", unique: true
+    t.index ["user_id"], name: "index_passkeys_on_user_id"
+  end
+
   create_table "post_relations", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "post_id", null: false
@@ -483,6 +497,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
     t.index ["tag_ids"], name: "index_published_versions_on_tag_ids", using: :gin
   end
 
+  create_table "recovery_codes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "digest", null: false
+    t.datetime "used_at"
+    t.datetime "generated_at", null: false
+    t.index ["user_id", "digest"], name: "index_recovery_codes_on_user_id_and_digest", unique: true
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -492,6 +514,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
     t.datetime "last_seen_at", null: false
     t.datetime "expires_at", null: false
     t.string "authenticated_with", null: false
+    t.datetime "confirmed_at"
+    t.boolean "enrolment_due", default: false, null: false
     t.index ["expires_at"], name: "index_sessions_on_expires_at"
     t.index ["last_seen_at"], name: "index_sessions_on_last_seen_at"
     t.index ["user_id"], name: "index_sessions_on_user_id"
@@ -533,6 +557,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
     t.jsonb "image_widths", default: [480, 960, 1600, 2400], null: false
     t.integer "image_max_upload_mb", default: 10, null: false
     t.integer "form_keep_days", default: 90, null: false
+    t.string "passkey_policy"
   end
 
   create_table "tags", force: :cascade do |t|
@@ -564,7 +589,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
     t.string "name"
     t.boolean "notes_sound", default: true, null: false
     t.boolean "notes_desktop", default: false, null: false
+    t.string "webauthn_id"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+    t.index ["webauthn_id"], name: "index_users_on_webauthn_id", unique: true
   end
 
   add_foreign_key "access_control_grants", "access_control_groups", column: "group_id", on_delete: :cascade
@@ -606,6 +633,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "pages", "pages", column: "trash_root_id", on_delete: :nullify
   add_foreign_key "pages", "users", column: "trashed_by_id", on_delete: :nullify
+  add_foreign_key "passkeys", "users"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"
@@ -614,5 +642,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
   add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "presence_marks", "users", on_delete: :cascade
   add_foreign_key "published_versions", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "recovery_codes", "users"
   add_foreign_key "sessions", "users"
 end

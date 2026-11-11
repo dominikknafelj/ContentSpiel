@@ -29,6 +29,13 @@ gem "jbuilder"
 # Reads a session's user agent string into a browser and a system (SessionDevice).
 gem "useragent", "~> 0.16"
 
+# Passkeys (WebAuthn): the registration and sign-in ceremonies' options and their verification.
+gem "webauthn", "~> 3.5"
+
+# The registrable domain of the site's host (`PublicSuffix.domain`), a passkey's relying party id. Named here, not
+# only reached through addressable, because the code calls it itself.
+gem "public_suffix", "~> 7.0"
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"
 

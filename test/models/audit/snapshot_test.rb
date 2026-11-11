@@ -90,6 +90,24 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal [ "two@example.com", "renamed@example.com" ], changes["email_address"]
   end
 
+  test "a passkey's snapshot and changes hold no credential id or public key, and a recovery code's no digest" do
+    passkey = users(:two).passkeys.create!(name: "Phone", external_id: "cred-id-abc", public_key: "pk-xyz")
+    code = users(:two).recovery_codes.create!(digest: RecoveryCode.digest("ABCD-EFGH"), generated_at: Time.current)
+
+    snapshot = Audit::Snapshot.for(passkey)
+    assert_equal "Phone", snapshot["name"]
+    assert_equal users(:two).id, snapshot["user_id"]
+    [ snapshot, Audit::Snapshot.field_changes_for(passkey) ].each do |hash|
+      assert_not_includes hash.to_json, "cred-id-abc"
+      assert_not_includes hash.to_json, "pk-xyz"
+    end
+
+    [ Audit::Snapshot.for(code), Audit::Snapshot.field_changes_for(code) ].each do |hash|
+      assert_not_includes hash.to_json, code.digest
+    end
+    assert_not Audit::Snapshot.for(users(:two).tap(&:webauthn_handle!)).key?("webauthn_id")
+  end
+
   test "any key matching filter_parameters is dropped" do
     scrubbed = Audit::Snapshot.scrub("id" => 1, "title" => "kept", "secret_answer" => "x", "api_token" => "y", "salt" => "z", "otp_code" => "q")
 
