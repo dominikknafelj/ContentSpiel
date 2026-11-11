@@ -10,19 +10,30 @@ module SignIn
   # production's boot names the missing variable (`missing_variable`,
   # `config/initializers/sign_in.rb`), never a value.
   #
+  # WHAT PASSES. Cloudflare's `success`, for a token solved on this site's
+  # host (`hostname`, compared with the request's host the caller hands in)
+  # and by the sign-in widget (`action`, ACTION, which the widget's markup
+  # reads too). A token the same site key minted on another host (a staging
+  # copy, a second site sharing the key) or by another widget is `:failed`.
+  #
   # FAILING OPEN. When Cloudflare cannot be reached, answers other than 200,
-  # sends something that is no JSON object, or says `internal-error`, the
-  # answer is `:unavailable` and the caller goes on as if the check passed:
-  # one line, `[ContentSpiel] The bot check could not be verified: <class or
-  # status>`, and the span's `auth.bot_check.result` say so. A provider's
-  # outage must not lock an owner out of their own site, and the throttles
-  # still stand without the check. Any other error raises: it is a bug.
+  # sends something that is no JSON object, or refuses for a reason of the
+  # site's and not the visitor's (any code but USER_CODES: `internal-error`,
+  # and a mistyped or missing secret, `invalid-input-secret`,
+  # `missing-input-secret`, `bad-request`), the answer is `:unavailable` and
+  # the caller goes on as if the check passed: one line, `[ContentSpiel] The
+  # bot check could not be verified: <class, status or code>`, and the
+  # span's `auth.bot_check.result` say so. A provider's outage or a host's
+  # wrong key must not lock an owner out of their own site, the line shows
+  # the host what to fix, and the throttles still stand without the check.
+  # A refusal for the visitor's token (USER_CODES: a wrong, expired or
+  # replayed token) is `:failed`. Any other error raises: it is a bug.
   #
   # A token that is no String, is blank or is over TOKEN_MAX characters is
   # `:failed` without asking Cloudflare: a bot's junk costs no outside call.
   #
   # THE SECRET AND THE TOKEN ARE NEVER LOGGED, nor put in a span: the log
-  # line and `error.type` name a class or a status, and the request runs
+  # line and `error.type` name a class, a status or a code, and the request runs
   # untraced (`SignIn::OutsideCall`).
   class BotCheck
     VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify".freeze
@@ -34,8 +45,14 @@ module SignIn
       Timeout::Error, SocketError, SystemCallError, OpenSSL::SSL::SSLError, EOFError, IOError,
       Net::HTTPBadResponse, JSON::ParserError
     ].freeze
-    # Cloudflare's own failure, which says nothing about the visitor.
-    INTERNAL_ERROR = "internal-error".freeze
+    # The widget's action, rendered with the widget and required back.
+    ACTION = "sign_in".freeze
+    # Siteverify's codes that refuse the visitor's token. Every other code
+    # is the site's or Cloudflare's own failure, and says nothing of the
+    # visitor.
+    USER_CODES = %w[invalid-input-response timeout-or-duplicate].freeze
+    # A code is logged as Cloudflare spells its codes, or not at all.
+    CODE = /\A[a-z][a-z-]{0,63}\z/
 
     class Unavailable < OutsideCall::Unavailable; end
 
@@ -68,7 +85,7 @@ module SignIn
       response = OutsideCall.perform(uri, request, open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
       raise Unavailable.status(response.code) unless response.code == "200"
 
-      answer = JSON.parse(response.body)
+      answer = JSON.parse(response.body.to_s)
       raise Unavailable, "an answer that is no JSON object" unless answer.is_a?(Hash)
 
       answer
@@ -80,16 +97,19 @@ module SignIn
     end
 
     # :passed, :failed or :unavailable (which the caller treats as passed).
-    def verify(token, address:)
+    # `hostname` is the request's host.
+    def verify(token, address:, hostname:)
       return :failed unless token.is_a?(String) && token.present? && token.length <= TOKEN_MAX
 
       Telemetry.in_span("auth.bot_check", kind: :client, attributes: { "server.address" => SERVER }) do |span|
         answer = self.class.siteverify({ "secret" => @secret_key, "response" => token, "remoteip" => address }.compact)
-        if answer["success"] == true
+        site_codes = Array(answer["error-codes"]) - USER_CODES
+        if answer["success"] == true && ours?(answer, hostname)
           Telemetry.record(span, "auth.bot_check.result" => "passed", "http.response.status_code" => 200)
           :passed
-        elsif Array(answer["error-codes"]).include?(INTERNAL_ERROR)
-          unavailable(span, INTERNAL_ERROR, "http.response.status_code" => 200)
+        elsif answer["success"] != true && site_codes.any?
+          code = site_codes.first
+          unavailable(span, code.is_a?(String) && code.match?(CODE) ? code : "an unknown error code", "http.response.status_code" => 200)
         else
           Telemetry.record(span, "auth.bot_check.result" => "failed", "http.response.status_code" => 200)
           :failed
@@ -100,6 +120,11 @@ module SignIn
     end
 
     private
+
+    def ours?(answer, hostname)
+      answer["hostname"].is_a?(String) && hostname.is_a?(String) &&
+        answer["hostname"].casecmp?(hostname) && answer["action"] == ACTION
+    end
 
     def unavailable(span, described, attributes)
       Rails.logger.warn("[ContentSpiel] The bot check could not be verified: #{described}")

@@ -8,6 +8,8 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
 
   TOKEN = "XXXX.DUMMY.TOKEN.XXXX-planted-token".freeze
   ADDRESS = "203.0.113.7".freeze
+  HOST = SignInHelper::BOT_CHECK_HOSTNAME
+  YES = %({"success":true,"hostname":"#{HOST}","action":"sign_in"}).freeze
   SITE_KEY = SignInHelper::BOT_CHECK_KEYS.fetch("TURNSTILE_SITE_KEY")
   SECRET_KEY = SignInHelper::BOT_CHECK_KEYS.fetch("TURNSTILE_SECRET_KEY")
 
@@ -56,9 +58,9 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
   test "a token that is no String or is over 2,048 characters is refused without asking Cloudflare" do
     with_bot_check(:passed) do
       [ [ "x" ], { "token" => "x" }, nil, "", "a" * 2049 ].each do |token|
-        assert_equal :failed, check.verify(token, address: ADDRESS), token.inspect.truncate(40)
+        assert_equal :failed, check.verify(token, address: ADDRESS, hostname: HOST), token.inspect.truncate(40)
       end
-      assert_equal :passed, check.verify("a" * 2048, address: ADDRESS)
+      assert_equal :passed, check.verify("a" * 2048, address: ADDRESS, hostname: HOST)
     end
 
     assert_equal 1, bot_check_requests.size, "only the token of 2,048 characters was sent"
@@ -68,11 +70,11 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
     # Under a request's span, as in the application: a CLIENT root is
     # dropped by the sampler.
     Telemetry.tracer.in_span("probe", kind: :server) do
-      with_bot_check(:passed) { assert_equal :passed, check.verify(TOKEN, address: ADDRESS) }
-      with_bot_check(:failed) { assert_equal :failed, check.verify(TOKEN, address: ADDRESS) }
+      with_bot_check(:passed) { assert_equal :passed, check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
+      with_bot_check(:failed) { assert_equal :failed, check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
 
       log = capture_log do
-        with_bot_check(:unavailable) { assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS) }
+        with_bot_check(:unavailable) { assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
       end
       assert_equal [ "[ContentSpiel] The bot check could not be verified: Errno::ECONNREFUSED" ], log.lines(chomp: true)
 
@@ -80,7 +82,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
       log = capture_log do
         with_bot_check do
           with_singleton_override(SignIn::BotCheck, :siteverify, internal) do
-            assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS)
+            assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
           end
         end
       end
@@ -90,7 +92,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
         log = capture_log do
           with_bot_check do
             with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
-              assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS)
+              assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
             end
           end
         end
@@ -101,7 +103,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
         log = capture_log do
           with_bot_check do
             with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
-              assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS)
+              assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
             end
           end
         end
@@ -123,11 +125,83 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
     [ TOKEN, SECRET_KEY ].each { |secret| assert_not_includes spans, secret }
   end
 
+  test "Cloudflare's yes for another host or another action is failed" do
+    answers = {
+      { "success" => true, "hostname" => "other.example", "action" => "sign_in" } => :failed,
+      { "success" => true, "hostname" => HOST, "action" => "newsletter" } => :failed,
+      { "success" => true, "hostname" => HOST } => :failed,
+      { "success" => true, "action" => "sign_in" } => :failed,
+      { "success" => true, "hostname" => HOST.upcase, "action" => "sign_in" } => :passed
+    }
+
+    Telemetry.tracer.in_span("probe", kind: :server) do
+      with_bot_check do
+        answers.each do |answer, expected|
+          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+            assert_equal expected, check.verify(TOKEN, address: ADDRESS, hostname: HOST), answer.inspect
+          end
+        end
+        assert_equal :failed, check.verify(TOKEN, address: ADDRESS, hostname: "other.example"), "the request's host is the one compared"
+      end
+    end
+
+    assert_equal %w[failed failed failed failed passed failed],
+      @exporter.finished_spans.select { |span| span.name == "auth.bot_check" }.map { |span| span.attributes["auth.bot_check.result"] }
+  end
+
+  test "a code of the site's is unavailable with one line naming it, and a wrong, expired or replayed token is failed" do
+    site_codes = {
+      "invalid-input-secret" => "invalid-input-secret",
+      "missing-input-secret" => "missing-input-secret",
+      "bad-request" => "bad-request",
+      "internal-error" => "internal-error",
+      "some-new-code" => "some-new-code",
+      "<script>#{SECRET_KEY}</script>" => "an unknown error code"
+    }
+    site_codes.each do |code, named|
+      answer = { "success" => false, "error-codes" => [ "invalid-input-response", code ] }
+      log = capture_log do
+        with_bot_check do
+          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+            assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST), code
+          end
+        end
+      end
+      assert_equal [ "[ContentSpiel] The bot check could not be verified: #{named}" ], log.lines(chomp: true)
+      assert_not_includes log, SECRET_KEY
+    end
+
+    [ [ "invalid-input-response" ], [ "timeout-or-duplicate" ], [] ].each do |codes|
+      answer = { "success" => false, "error-codes" => codes }
+      log = capture_log do
+        with_bot_check do
+          with_singleton_override(SignIn::BotCheck, :siteverify, ->(_form, url: nil) { answer }) do
+            assert_equal :failed, check.verify(TOKEN, address: ADDRESS, hostname: HOST), codes.inspect
+          end
+        end
+      end
+      assert_empty log, "a token Cloudflare turned down is the visitor's, and writes no line"
+    end
+  end
+
+  test "a 200 with an empty body is unavailable" do
+    with_http_stub(body: "") do |base|
+      log = capture_log do
+        with_bot_check do
+          with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
+            assert_equal :unavailable, check.verify(TOKEN, address: ADDRESS, hostname: HOST)
+          end
+        end
+      end
+      assert_equal [ "[ContentSpiel] The bot check could not be verified: JSON::ParserError" ], log.lines(chomp: true)
+    end
+  end
+
   test "the form sent is the secret, the token and the address, and nothing else" do
-    with_bot_check { check.verify(TOKEN, address: ADDRESS) }
+    with_bot_check { check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
     assert_equal [ { "secret" => SECRET_KEY, "response" => TOKEN, "remoteip" => ADDRESS } ], bot_check_requests
 
-    with_http_stub(body: %({"success":true}), content_type: "application/json") do |base, requests|
+    with_http_stub(body: YES, content_type: "application/json") do |base, requests|
       SignIn::BotCheck.siteverify({ "secret" => SECRET_KEY, "response" => TOKEN, "remoteip" => ADDRESS }, url: "#{base}/turnstile/v0/siteverify")
 
       assert_equal [ "POST /turnstile/v0/siteverify HTTP/1.1" ], requests.map(&:line)
@@ -137,7 +211,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
   end
 
   test "siteverify runs untraced: no span of the HTTP instrumentation is recorded for it" do
-    with_http_stub(body: %({"success":true}), content_type: "application/json") do |base|
+    with_http_stub(body: YES, content_type: "application/json") do |base|
       port = URI(base).port.to_s
 
       # The instrumentation is installed and would record this call: without
@@ -149,7 +223,7 @@ class SignIn::BotCheckTest < ActiveSupport::TestCase
 
       with_bot_check do
         with_singleton_override(SignIn::BotCheck, :siteverify, siteverify_at(base)) do
-          Telemetry.tracer.in_span("probe", kind: :server) { assert_equal :passed, check.verify(TOKEN, address: ADDRESS) }
+          Telemetry.tracer.in_span("probe", kind: :server) { assert_equal :passed, check.verify(TOKEN, address: ADDRESS, hostname: HOST) }
         end
       end
 

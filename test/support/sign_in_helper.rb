@@ -4,7 +4,9 @@ require "socket"
 #
 # - `with_bot_check(answer) { … }`: Turnstile configured with Cloudflare's
 #   documented always-pass test keys, and `SignIn::BotCheck.siteverify`
-#   answering `:passed`, `:failed` or `:unavailable` (a refused connection).
+#   answering `:passed` (for `hostname`, an integration test's host unless
+#   named, and the sign-in action), `:failed` or `:unavailable` (a refused
+#   connection).
 #   Each form it was sent is in `bot_check_requests`.
 # - `with_leaked_password_check(leaked:, unavailable:) { … }`: the check
 #   switched on (it is off in tests unless asked), and
@@ -24,8 +26,10 @@ module SignInHelper
     "TURNSTILE_SECRET_KEY" => "1x0000000000000000000000000000000AA"
   }.freeze
 
+  BOT_CHECK_HOSTNAME = "www.example.com".freeze
+
   BOT_CHECK_ANSWERS = {
-    passed: { "success" => true },
+    passed: { "success" => true, "action" => SignIn::BotCheck::ACTION },
     failed: { "success" => false, "error-codes" => [ "invalid-input-response" ] }
   }.freeze
 
@@ -43,7 +47,7 @@ module SignInHelper
 
   def bot_check_requests = (@bot_check_requests ||= [])
 
-  def with_bot_check(answer = :passed, &block)
+  def with_bot_check(answer = :passed, hostname: BOT_CHECK_HOSTNAME, &block)
     raise ArgumentError, "no bot check answer #{answer.inspect}" unless answer == :unavailable || BOT_CHECK_ANSWERS.key?(answer)
 
     requests = bot_check_requests
@@ -51,7 +55,7 @@ module SignInHelper
       requests << form
       raise Errno::ECONNREFUSED if answer == :unavailable
 
-      BOT_CHECK_ANSWERS.fetch(answer)
+      BOT_CHECK_ANSWERS.fetch(answer).merge("hostname" => hostname)
     end
     with_sign_in_env(BOT_CHECK_KEYS) { with_singleton_override(SignIn::BotCheck, :siteverify, siteverify, &block) }
   end

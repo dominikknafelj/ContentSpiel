@@ -14,10 +14,16 @@ module SignIn
   # cuts queries, not paths. Each caller records the call in a CLIENT span of
   # its own instead, with fixed words only.
   #
-  # BOUNDED. Opening (TCP and TLS) and reading are each bounded by the
-  # caller's timeouts, writing by the read timeout, and Net::HTTP's one retry
-  # of an idempotent request is turned off, or a GET that timed out would
-  # wait its timeouts twice. A sign-in or a password save waits on this.
+  # BOUNDED. Opening (TCP and TLS) is bounded by the caller's open timeout,
+  # each read by its read timeout and each write by the same, and Net::HTTP's
+  # one retry of an idempotent request is turned off, or a GET that timed out
+  # would wait its timeouts twice. A per-read timeout restarts with every
+  # chunk, so a server that drips bytes could still hold the call: the whole
+  # call is also cut at the sum of the two (`Timeout.timeout`, raising
+  # `Timeout::Error`, which both callers count as unavailable). A sign-in or
+  # a password save waits on this, the wizard's under `LOCK TABLE users`.
+  # `Timeout.timeout` interrupts the thread wherever it is; inside this block
+  # that is Net::HTTP's own I/O, which closes its socket in an `ensure`.
   module OutsideCall
     AGENT = "ContentSpiel/#{ContentSpiel::VERSION}".freeze
 
@@ -34,13 +40,17 @@ module SignIn
       end
     end
 
-    # The response to `request` (a `Net::HTTPRequest` built for `uri`).
-    def self.perform(uri, request, open_timeout:, read_timeout:)
+    # The response to `request` (a `Net::HTTPRequest` built for `uri`),
+    # within `deadline` seconds in all (the sum of the timeouts unless a
+    # test names less).
+    def self.perform(uri, request, open_timeout:, read_timeout:, deadline: open_timeout + read_timeout)
       request["User-Agent"] = AGENT
       OpenTelemetry::Common::Utilities.untraced do
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-          open_timeout: open_timeout, read_timeout: read_timeout, write_timeout: read_timeout, max_retries: 0) do |http|
-          http.request(request)
+        Timeout.timeout(deadline) do
+          Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+            open_timeout: open_timeout, read_timeout: read_timeout, write_timeout: read_timeout, max_retries: 0) do |http|
+            http.request(request)
+          end
         end
       end
     end
