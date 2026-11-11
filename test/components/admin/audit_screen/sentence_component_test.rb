@@ -31,7 +31,7 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
     assert_text "You, via Claude desktop created “Hello”"
   end
 
-  test "no user at all is System; a deleted user is named so; a failed sign-in has no actor" do
+  test "no user at all is System; a deleted user is named so; a failed sign-in and a lock-out have no actor" do
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("post.created", user_id: nil))
     assert_text "System created"
 
@@ -40,6 +40,9 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
 
     render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("session.failed", user_id: nil))
     assert_equal "Failed sign-in attempt", page.text.strip
+
+    render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("session.locked", user_id: nil, metadata: { "bucket" => "account", "level" => 0, "seconds" => 60 }))
+    assert_equal "Sign-in to one account paused after repeated failures", page.text.strip
   end
 
   test "stored text is escaped" do

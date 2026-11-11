@@ -27,11 +27,24 @@ module Users
   # emailed token made the change, not a session, so a session that happens
   # to be signed in in the same browser goes with the rest.
   #
+  # A change opens sign-in for the account in every browser
+  # (`SignIn::Throttle#clear`: the account's bucket and every known
+  # device's), after the commit: whoever set the password proved the
+  # account (the reset's token, the current password, the console; a
+  # manager's set is `Users::Save`'s, which clears the same way), and a bot
+  # holding the bucket closed must not keep them out with the new password.
+  # The reset mail and the lock-out mail send a person here.
+  #
+  # A password in the list of leaked passwords is refused
+  # (`Users::LeakedPasswordRule`), asked only once the user is otherwise
+  # valid and before the transaction; a refusal ends no session.
+  #
   # The password itself never reaches the log (Review Focus 5): the event
   # is `user.updated` with a `"credentials"` marker (`OwnerProtection#
   # user_field_changes`).
   class UpdatePassword < ApplicationService
     include OwnerProtection
+    include LeakedPasswordRule
 
     def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, actor: Current.actor)
       @user = user
@@ -53,6 +66,8 @@ module Users
       return blank_password if @password.blank?
 
       @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
+      return leaked_password_failure(@user) if leaked_password?(@user, @password)
+
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change(keep_acting_session: @keep_acting_session)
@@ -62,6 +77,7 @@ module Users
       end
       return failure(@user) unless saved
 
+      SignIn::Throttle.new.clear(identifier: @user.email_address)
       success(@user)
     end
 

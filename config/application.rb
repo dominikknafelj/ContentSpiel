@@ -29,12 +29,14 @@ require_relative "../lib/content_spiel/version"
 Bundler.require(*Rails.groups)
 
 # Required here although lib/ is autoloaded (`config.autoload_lib` below):
-# config/environments/production.rb calls HostSettings while the application
-# is being configured, before any autoloading is set up. `theme_folder` for
+# config/environments/production.rb calls HostSettings and TrustedProxies
+# while the application is being configured, before any autoloading is set
+# up. `theme_folder` for
 # the same reason: the initializer below and `config/importmap.rb` read the
 # theme folder before any application class is loaded.
 require_relative "../lib/site_address"
 require_relative "../lib/host_settings"
+require_relative "../lib/trusted_proxies"
 require_relative "../lib/theme_folder"
 
 # And these three for another reason: config/initializers/opentelemetry.rb

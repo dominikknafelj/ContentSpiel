@@ -557,6 +557,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/ui/password_field_component.rb
     app/components/admin/ui/password_field_component.html.erb
     app/javascript/controllers/password_field_controller.js
+    app/javascript/controllers/bot_check_controller.js
     app/views/admin/system_status/show.html.erb
     app/views/admin/errors/forbidden.html.erb
     app/views/admin/errors/not_found.html.erb

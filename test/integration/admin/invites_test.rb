@@ -89,6 +89,39 @@ class Admin::InvitesTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The origin the invite's mail is handed (`Admin::MailLinkOrigin`): the
+  # request's only with no site address and in development and test, and
+  # never a Host a client named when an address is configured or in
+  # production. Pinned on create and on resend alike.
+  test "an invite's mail is handed the request's origin only with no address configured, in development and test" do
+    with_mail_state(:working) do
+      origin_of = lambda do |headers|
+        queued = enqueued_jobs.size
+        post "/cs-studio/invites", params: { user: { email_address: "dana#{queued}@example.com" } }, headers: headers
+        invitation = Invitation.open.find_by!(email_address: "dana#{queued}@example.com")
+        post "/cs-studio/invites/#{invitation.id}/resend", headers: headers
+        jobs = enqueued_jobs.drop(queued)
+        assert_equal 2, jobs.size, "an invite and a resend each queue the mail"
+        [ jobs.map { |job| job[:args].last.dig("args", 1, "origin") }.uniq.sole, jobs.to_s ]
+      end
+      hostile = { "Host" => "evil.example" }
+
+      with_site_address(nil) { assert_equal "http://www.example.com", origin_of.call({}).first }
+      with_site_address("https://docs.example.org") do
+        origin, jobs = origin_of.call(hostile)
+        assert_nil origin
+        assert_not_includes jobs, "evil.example"
+      end
+      with_singleton_override(ApplicationMailer, :request_origin_used?, ->(*) { false }) do
+        with_site_address(nil) do
+          origin, jobs = origin_of.call(hostile)
+          assert_nil origin
+          assert_not_includes jobs, "evil.example"
+        end
+      end
+    end
+  end
+
   test "an invitation with no name is listed by its address among the users, opens no editor, and an expired one says so instead of its dates" do
     fresh = open_invitation("fresh@example.com")
     lapsed = open_invitation("lapsed@example.com", sent_at: 8.days.ago)

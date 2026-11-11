@@ -59,7 +59,8 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
       get "/cs-studio/system_status"
     end
 
-    results = Setup::SystemCheck.run
+    # The request's own address makes the Visitor address row one of them.
+    results = Setup::SystemCheck.run(remote_ip: "127.0.0.1")
     assert_select "h1.text-h1", text: "System status"
     assert_select "h1 + p.text-small.text-meta", text: "#{results.count(&:ok?)} of #{results.size} checks passed · last run 17:30"
     assert_select "a[href='/cs-studio/system_status'][class=?]", Admin::Ui::ButtonComponent.classes(:secondary), text: "Run checks again"
@@ -83,11 +84,27 @@ class Admin::SystemStatusTest < ActionDispatch::IntegrationTest
 
     assert_select "div.rounded-card.bg-surface.shadow-1", count: 1 do
       assert_select "> ul.divide-y.divide-line.px-4", count: 1 do
-        assert_select "> li.admin-system-check", count: Setup::SystemCheck.run.size
+        assert_select "> li.admin-system-check", count: Setup::SystemCheck.run(remote_ip: "127.0.0.1").size
       end
     end
     assert_select "ul.border-y", count: 0
     assert_select ".admin-system-check-summary, [data-summary-chip]", count: 0
+  end
+
+  test "Visitor address reads the request: OK without Cloudflare's header, and a warning with a link when it is not the address counted" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/system_status"
+    assert_select "li.admin-system-check[data-status=ok]", text: /Visitor address\s+Each visitor counts by the address their request comes from\./
+
+    get "/cs-studio/system_status", headers: { "CF-Connecting-IP" => "203.0.113.5" }
+    assert_select "li.admin-system-check[data-status=warning]", text: /Visitor address/ do
+      assert_select "p", text: /Set TRUSTED_PROXIES to Cloudflare's ranges\./
+      assert_select "a[href=?]", Setup::SystemCheck::VISITOR_ADDRESS_DOCS, text: "Learn more →"
+    end
+
+    get "/cs-studio/system_status", headers: { "CF-Connecting-IP" => "127.0.0.1" }
+    assert_select "li.admin-system-check[data-status=ok]", text: /Visitor address\s+Requests come through Cloudflare, and the visitor's own address is read\./
   end
 
   test "warnings are listed before OK rows" do

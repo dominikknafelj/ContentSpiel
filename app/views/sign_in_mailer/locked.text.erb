@@ -1,0 +1,7 @@
+<%= t("mail.locked.intro", site: site_name, count: @minutes) %>
+
+<%= t("mail.locked.details", time: locked_time, address: @from_address) %>
+
+<%= reset_request_url %>
+
+<%= t("mail.locked.outro") %>

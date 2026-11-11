@@ -47,6 +47,17 @@ module Setup
     # image's, which is no one command, and the warning carries none.
     STYLESHEET_COMMAND = "bin/rails tailwindcss:build".freeze
 
+    # The header Cloudflare names the visitor's address in, which both
+    # screens hand over as `cf_connecting_ip`.
+    CLOUDFLARE_HEADER = "CF-Connecting-IP".freeze
+
+    # Where the "Visitor address" warning sends the reader: the reference's
+    # section on TRUSTED_PROXIES, which says how to fill it with Cloudflare's
+    # published ranges, at the tag of the running version, so a site reads
+    # the reference of the code it runs and a heading renamed later on main
+    # does not break its link.
+    VISITOR_ADDRESS_DOCS = "https://github.com/dominikknafelj/ContentSpiel/blob/v#{ContentSpiel::VERSION}/docs/reference/hosting.md#the-visitors-address-behind-a-proxy".freeze
+
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
     # uploading -- if the upload fails (the case this probe exists to catch),
@@ -101,10 +112,16 @@ module Setup
     # a test can say it. `stylesheet_probe` answers whether the public
     # stylesheet was built for that theme: by default, whether the build's
     # stamp is the theme's fingerprint (`ThemeFolder.stamp`, one small file).
+    #
+    # `remote_ip` is the address the request that asked for the checks is
+    # counted by (`request.remote_ip`), and `cf_connecting_ip` its
+    # `CF-Connecting-IP` header, nil when it has none: both screens hand them
+    # over. Without a `remote_ip` (the console) there is no "Visitor address"
+    # row.
     def initialize(storage_probe: STORAGE_PROBE, image_probe: IMAGE_PROBE, worker_alive_probe: WORKER_ALIVE_PROBE,
       queue_adapter: ActiveJob::Base.queue_adapter_name,
       address: SiteAddress.current, request_ssl: nil, production: Rails.env.production?,
-      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil,
+      reset_link_from_request: false, theme: Theme.current, stylesheet_probe: nil, remote_ip: nil, cf_connecting_ip: nil,
       mail_settings: nil, mail_settings_link: false, image_progress: nil, image_settings_link: false, forms_link: false)
       @storage_probe = storage_probe
       @image_probe = image_probe
@@ -119,6 +136,8 @@ module Setup
       @request_ssl = request_ssl
       @production = production
       @reset_link_from_request = reset_link_from_request
+      @remote_ip = remote_ip
+      @cf_connecting_ip = cf_connecting_ip
       @theme = theme
       @stylesheet_probe = stylesheet_probe || self.class.stylesheet_probe(theme)
     end
@@ -135,7 +154,7 @@ module Setup
     end
 
     def run
-      [ site_address, https, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
+      [ site_address, https, visitor_address, theme, storage, image_processing, images, background_jobs, mail, forms ].compact
     end
 
     private
@@ -193,6 +212,40 @@ module Setup
           warning("HTTPS", "This page was reached over plain HTTP. Passwords and sessions can be read on the way. " \
             "Set PUBLIC_HOST to an https address.")
         end
+      end
+
+      # Whether the address every per-address limit counts (the sign-in's
+      # buckets, the bot check's trigger, the forms' send limit) is the
+      # visitor's. Cloudflare puts the visitor's address in `CF-Connecting-IP`
+      # and in `X-Forwarded-For`; Rails reads the second only from a proxy it
+      # trusts, so when the two differ, Cloudflare's edges are not trusted
+      # (TRUSTED_PROXIES, lib/trusted_proxies.rb) and every visitor counts as
+      # one of a few edge addresses. The header only tells whether that
+      # setting is missing and never sets the address: anyone can send it to
+      # a site with no Cloudflare in front. So a forged header can make this
+      # row warn for its sender, and that is all it can do.
+      #
+      # The two are compared as addresses where both read as one, so an IPv6
+      # address written in two ways counts as the same.
+      def visitor_address
+        return nil if @remote_ip.blank?
+
+        label = I18n.t("admin.system_status.visitor_address.label")
+        header = @cf_connecting_ip.to_s.strip
+        if header.empty?
+          ok(label, I18n.t("admin.system_status.visitor_address.no_header"))
+        elsif same_address?(header, @remote_ip.to_s)
+          ok(label, I18n.t("admin.system_status.visitor_address.read"))
+        else
+          Result.new(label:, status: :warning, message: I18n.t("admin.system_status.visitor_address.cloudflare_not_trusted"),
+            docs: VISITOR_ADDRESS_DOCS)
+        end
+      end
+
+      def same_address?(one, other)
+        IPAddr.new(one) == IPAddr.new(other)
+      rescue IPAddr::Error
+        one == other
       end
 
       # Which theme draws the site (theming spec §1): the fact the boot line

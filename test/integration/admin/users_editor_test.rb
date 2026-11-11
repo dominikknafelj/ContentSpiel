@@ -261,6 +261,23 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Tara Two"
   end
 
+  test "the user editor refuses a leaked password" do
+    with_leaked_password_check(leaked: [ "correct horse battery" ]) do
+      patch "/cs-studio/users/#{users(:two).id}", params: { user: { email_address: "two@example.com", password: "correct horse battery", password_confirmation: "correct horse battery" } }
+      assert_response :unprocessable_entity
+      assert_select "[role=alert]", text: /#{Regexp.escape("This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.")}/
+      assert_select "details.admin-set-password[open]"
+      assert_not_includes response.body, "correct horse battery"
+
+      assert_no_difference "User.count" do
+        post "/cs-studio/users", params: { user: { email_address: "fresh@example.com", password: "correct horse battery", password_confirmation: "correct horse battery" } }
+      end
+      assert_response :unprocessable_entity
+      assert_select "[role=alert]", text: /#{Regexp.escape("This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.")}/
+    end
+    assert users(:two).reload.authenticate("password")
+  end
+
   test "a new user has the password fields with the meter and no owner or delete zone" do
     get "/cs-studio/users/new"
 
