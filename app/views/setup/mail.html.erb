@@ -33,7 +33,7 @@
       <div class="grid gap-3.5 sm:grid-cols-2">
         <div class="admin-column">
           <% if mail.from_host?(:username) %>
-            <%= render Admin::SettingsScreen::HostValueComponent.new(field: :username, label: t(".username"), mail_settings: mail) %>
+            <%= render Admin::Ui::MailHostValueComponent.new(field: :username, label: t(".username"), mail_settings: mail) %>
           <% else %>
             <%= label_tag "setup-mail_username", t(".username"), class: setup_label_class %>
             <%= text_field_tag "site_setting[mail_username]", nil, id: "setup-mail_username", autocomplete: "off", spellcheck: false, class: setup_input_class %>
@@ -41,7 +41,7 @@
         </div>
         <div class="admin-column">
           <% if mail.from_host?(:password) %>
-            <%= render Admin::SettingsScreen::HostValueComponent.new(field: :password, label: t(".password"), mail_settings: mail) %>
+            <%= render Admin::Ui::MailHostValueComponent.new(field: :password, label: t(".password"), mail_settings: mail) %>
           <% else %>
             <%= label_tag "setup-mail_password", t(".password"), class: setup_label_class %>
             <%= password_field_tag "site_setting[mail_password]", nil, id: "setup-mail_password", autocomplete: "new-password", class: setup_input_class %>

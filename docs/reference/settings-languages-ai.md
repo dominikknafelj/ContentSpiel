@@ -30,7 +30,7 @@
 
 ## The Mail card
 
-**The Mail card** (`#mail`, `settings.manage`) is described with the rest of outgoing mail in `docs/reference/mail.md` ("Settings → Mail"): five fields of the Settings form (server, port, security, sender name, sender address), the login's own instant forms on the AI key's pattern ("Set on 14 Oct 2026", Replace, Remove…), a field the host's environment sets drawn read-only as "Set by the host" (`HostValueComponent`), the fields in two groups, Server and Sender (`MailFieldsComponent`, the form the wizard's Mail step draws too), the state chip at the head's end, and "Send test mail" at the foot, under the pending lock like Test connection.
+**The Mail card** (`#mail`, `settings.manage`) is described with the rest of outgoing mail in `docs/reference/mail.md` ("Settings → Mail"): five fields of the Settings form (server, port, security, sender name, sender address), the login's own instant forms on the AI key's pattern ("Set on 14 Oct 2026", Replace, Remove…), a field the host's environment sets drawn read-only as "Set by the host" (`Admin::Ui::MailHostValueComponent`), the fields in two groups, Server and Sender (`MailFieldsComponent`, the form the wizard's Mail step draws too), the state chip at the head's end, and "Send test mail" at the foot, under the pending lock like Test connection.
 
 
 ## The Forms card

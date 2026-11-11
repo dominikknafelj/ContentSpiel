@@ -19,7 +19,7 @@ module Admin
     # Port unless another port was typed. The caller's root carries the
     # `mail-port` controller.
     #
-    # A field the host sets is `HostValueComponent` and no input, so it is
+    # A field the host sets is `Admin::Ui::MailHostValueComponent` and no input, so it is
     # never posted (and `Settings::Save` refuses one forged in).
     #
     # - `value` is a callable `(column) -> String`: what the field shows (on
@@ -72,7 +72,7 @@ module Admin
 
       def wrapper_data(name) = { field_name: name, save_bar_changed: changed&.call(name) }
 
-      def host_value(name) = Admin::SettingsScreen::HostValueComponent.new(field: SETTING.fetch(name), label: label(name), mail_settings: mail_settings)
+      def host_value(name) = Admin::Ui::MailHostValueComponent.new(field: SETTING.fetch(name), label: label(name), mail_settings: mail_settings)
 
       def field_errors(name) = errors.respond_to?(:full_messages_for) ? errors.full_messages_for(name) : []
 

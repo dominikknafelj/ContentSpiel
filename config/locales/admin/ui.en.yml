@@ -441,3 +441,10 @@ en:
         # Settings' Mail card and in the wizard's Mail step.
         mail_test_outcome:
           sent: "Test mail sent to %{address}. Check your inbox."
+        # `Admin::Ui::MailHostValueComponent`: a mail field the host sets, the
+        # security in its words.
+        mail_host_value:
+          set_by_host: "Set by the host"
+          starttls: "STARTTLS"
+          tls: "TLS"
+          none: "None"

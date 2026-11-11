@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::SettingsScreen::HostValueComponent`, with no alias: it is `Admin::Ui::MailHostValueComponent` (a bare `HostValue` would read as any host's value), with the same `field:`, `label:` and `mail_settings:` keywords and `BOX`, drawing the same box; `MailLoginComponent::MASK` and `MailLoginComponent.secret?` went with it, being the host-value box's: they are `MailHostValueComponent::MASK` and `.secret?`; its words moved from `admin.components.settings_screen.host_value.*` to `admin.components.ui.mail_host_value.*`, unchanged.
 - `Admin::SettingsScreen::MailTestOutcomeComponent`, with no alias: it is `Admin::Ui::MailTestOutcomeComponent`, with the same `address:`, `sent:`, `alert:` and `line:` keywords, drawing the same answer; its one sentence moved from `admin.components.settings_screen.mail_test_outcome.sent` to `admin.components.ui.mail_test_outcome.sent`, unchanged.
 - `Admin::SettingsScreen::MailAlertComponent`, with no alias: it is `Admin::Ui::MailAlertComponent`, with the same `sentence:`, `line:` and `class:` keywords, drawing the same alert; `MailStateComponent` and `MailTestOutcomeComponent` render it by its new name.
 - `Admin::EditorScreen::RichTextDialogsComponent`, with no alias: it is `Admin::Ui::RichTextDialogsComponent`, with the same `IMAGE`, `YOUTUBE` and `PAGE` ids; its English became the keys `admin.components.ui.rich_text_dialogs.*`, and `admin--rich-text--dialog` reads the words it writes (`edit_image`, `insert_image`, `save`, `alt_fallback`, `not_youtube`, `video_id`) from <body>'s `data-messages`.

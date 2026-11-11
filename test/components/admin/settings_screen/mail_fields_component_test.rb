@@ -37,7 +37,7 @@ class Admin::SettingsScreen::MailFieldsComponentTest < ViewComponent::TestCase
   end
 
   # The login is the slot's: the fields draw no input of it, and the mask of
-  # a login half is `HostValueComponent`'s (host_value_component_test.rb).
+  # a login half is `Admin::Ui::MailHostValueComponent`'s (mail_host_value_component_test.rb).
   HOST = { "MAIL_SMTP_SERVER" => "smtp.host.test", "MAIL_SMTP_PORT" => "2525", "MAIL_SMTP_SECURITY" => "tls",
            "MAIL_SMTP_USERNAME" => "host-user-secret", "MAIL_SMTP_PASSWORD" => "host-pass-secret",
            "MAIL_SENDER_NAME" => "Host Site", "MAIL_SENDER_ADDRESS" => "host@site.test" }.freeze

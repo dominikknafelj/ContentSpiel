@@ -138,12 +138,6 @@ en:
           sender_name: "Sender name"
           sender_address: "Sender address"
           sender_address_placeholder: "no-reply@yourdomain"
-        # A mail field the host sets, the security in its words.
-        host_value:
-          set_by_host: "Set by the host"
-          starttls: "STARTTLS"
-          tls: "TLS"
-          none: "None"
         mail_login:
           heading: "Login"
           username: "Username"
