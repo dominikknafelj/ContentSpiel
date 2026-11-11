@@ -56,13 +56,19 @@ module Users
     #
     # Only a *changed* digest counts -- a blank password field, a new name or
     # new groups touch no session -- and a user being created has none.
+    #
+    # The ending is ONE `session.ended` (`password_changed`, with the count,
+    # the user its subject), recorded here in the same transaction, and none
+    # when no session was open but the kept one.
     def end_sessions_after_password_change(keep_acting_session: true)
       return unless @user.saved_change_to_password_digest? && !@user.previously_new_record?
 
       sessions = @user.sessions
       kept = Current.session if keep_acting_session && actor.is_a?(User) && actor == @user
       sessions = sessions.where.not(id: kept.id) if kept && kept.user_id == @user.id
-      sessions.destroy_all
+      count = sessions.destroy_each_locked
+      # No snapshot: the user's own change is the service's `user.updated`.
+      record_event("session.ended", subject: @user, metadata: { "reason" => "password_changed", "count" => count }, snapshot: nil) if count.positive?
     end
 
     def user_field_changes(user)

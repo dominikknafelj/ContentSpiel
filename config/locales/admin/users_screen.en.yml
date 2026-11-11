@@ -62,6 +62,8 @@ en:
           remove_body_own: "You keep your groups and the permissions those give."
           make_confirm: "Make owner"
           remove_confirm: "Remove owner rights"
+        sessions_zone:
+          reason_own: "End your own sessions from Your account."
     invites:
       sent: "Invite sent to %{email}."
       resent: "New invite sent to %{email}."

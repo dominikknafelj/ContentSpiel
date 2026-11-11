@@ -36,9 +36,10 @@ class Session < ApplicationRecord
   # Every path that ends a session destroys the row through this callback,
   # and none may use `delete_all`, which would skip it: sign-out
   # (`Authentication#terminate_session`, `destroy`), `Users::UpdatePassword`
-  # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`,
-  # `destroy_all`), `Users::Destroy` (`User`'s `dependent: :destroy`), an
-  # expiry (`Sessions::End`, `destroy!`).
+  # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`),
+  # `Sessions::EndOthers` and `Sessions::EndAll` (all three through
+  # `.destroy_each_locked`), `Users::Destroy` (`User`'s `dependent: :destroy`),
+  # an expiry (`Sessions::End`, `destroy!`).
   # `test/models/session_test.rb` has each.
   after_destroy_commit :disconnect_cable
 
@@ -46,6 +47,15 @@ class Session < ApplicationRecord
   def self.start(user:, method:, user_agent:, ip_address:, at: Time.current)
     create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
       last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT)
+  end
+
+  # Ends every session of the relation it is called on and answers how many:
+  # each row is read under its lock and destroyed (so `disconnect_cable`
+  # runs), and a row another request ended first is simply not among them,
+  # so it is counted once. Called inside the transaction that records the
+  # ending, which is ONE `session.ended` with this count, however many rows.
+  def self.destroy_each_locked
+    lock.order(:id).to_a.each(&:destroy!).size
   end
 
   # The live session a request's cookies name, or nil: the ONE lookup,

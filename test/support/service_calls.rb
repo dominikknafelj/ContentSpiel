@@ -41,7 +41,7 @@
 # `own:` changes), `own:` (the call made on that user's record) and
 # `own_event:` (the audit action it records).
 module ServiceCalls
-  # The four services open to any signed-in user for their OWN record.
+  # The five services open to any signed-in user for their OWN record.
   # `manager_may:` is what a holder of the right to manage others (the Admin
   # group) gets when acting on someone else's record: the call, or a refusal
   # (`Users::UpdateProfile`'s anyone else goes through `Users::Save`, even
@@ -50,7 +50,8 @@ module ServiceCalls
     "ApiTokens::Issue" => { manager_may: true, reason: "any signed-in user may issue a token for themselves; anyone else needs tokens.manage" },
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
-    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" }
+    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
+    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -92,7 +93,7 @@ module ServiceCalls
   # returns `call:`.
   UNGATED = {
     "Sessions::End" => {
-      reason: "the one ending of a session row: Session.from_cookies ends an expiry, which nobody asked for, and the Sessions services authorize before calling it",
+      reason: "the ending of one expired session row: Session.from_cookies ends an expiry, which nobody asked for, so there is nobody to authorize",
       callers: %w[app/models/session.rb]
     }
   }.freeze
@@ -632,6 +633,26 @@ module ServiceCalls
     "Sessions::End" => lambda {
       session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
       { call: -> { Sessions::End.call(session, reason: "ended_by_owner") } }
+    },
+
+    # See SELF_SERVICE. The control runs as the user themselves, with no
+    # session kept, so their one open session ends.
+    "Sessions::EndOthers" => lambda {
+      target = stranger_target
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
+      mine = stranger_target(email: "mine@example.com")
+      Session.start(user: mine, method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
+        control_actor: target,
+        owner: mine, own: -> { Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
+    },
+
+    # Owner-only: a holder of no grants is refused for users.manage, the
+    # trusted actor passes, as every trusted code path does.
+    "Sessions::EndAll" => lambda {
+      target = stranger_target
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.
