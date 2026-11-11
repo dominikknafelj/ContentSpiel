@@ -410,3 +410,30 @@ en:
           submit_failed: "Couldn’t save. Check your connection and try again."
           retry: "Try again"
           cancel: "Cancel"
+        # `Admin::Ui::RichTextDialogsComponent`: the rich-text editor's image,
+        # YouTube and Page link dialogs. `edit_image`, `save`, `alt_fallback`,
+        # `not_youtube` and `video_id` are written by `admin--rich-text--dialog`
+        # (with `insert_image`, the image dialog's title when it inserts), and
+        # reach it from <body>'s messages (`Admin::MessagesHelper::SCRIPT_MESSAGES`).
+        rich_text_dialogs:
+          image_title: "Image"
+          edit_image: "Edit image"
+          insert_image: "Insert image"
+          save: "Save"
+          remove_image: "Remove image"
+          cancel: "Cancel"
+          alt_text: "Alt text"
+          caption: "Caption"
+          media_fallback: "Empty uses the text from Media"
+          alt_fallback: "Describe the image"
+          youtube_title: "YouTube video"
+          insert_video: "Insert video"
+          youtube_label: "YouTube URL or video ID"
+          youtube_placeholder: "https://www.youtube.com/watch?v=…"
+          not_youtube: "That doesn’t look like a YouTube link."
+          video_id: "Video id: %{id}"
+          page_title: "Page link"
+          remove_link: "Remove link"
+          page_search: "Search pages and posts"
+          page_placeholder: "Title…"
+          page_list: "Pages and posts"

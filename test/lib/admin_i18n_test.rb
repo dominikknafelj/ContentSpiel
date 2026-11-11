@@ -247,6 +247,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb
     app/components/admin/ui/new_record_dialog_component.rb
+    app/components/admin/ui/rich_text_dialogs_component.rb
+    app/components/admin/ui/rich_text_dialogs_component.html.erb
+    app/javascript/controllers/admin/rich_text/dialog_controller.js
     app/components/admin/editor_screen/changed_elsewhere_component.rb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
     app/components/admin/ui/new_record_dialog_component.html.erb

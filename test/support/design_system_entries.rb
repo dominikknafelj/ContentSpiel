@@ -70,6 +70,7 @@ module DesignSystemEntries
     "Admin::Ui::NoteInboxRowComponent" => "StudioNotesInbox",
     "Admin::Ui::NewRecordDialogComponent" => "StudioNewRecordDialog",
     "Admin::Ui::ReferenceCardComponent" => "StudioTranslationPair",
+    "Admin::Ui::RichTextDialogsComponent" => "RichTextEditor",
     "Admin::Ui::SuggestionComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateAllComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateButtonComponent" => "StudioTranslationPair",

@@ -1,7 +1,7 @@
 require "test_helper"
 
-class Admin::EditorScreen::RichTextDialogsComponentTest < ViewComponent::TestCase
-  setup { @rendered = -> { as(users(:one)) { render_inline(Admin::EditorScreen::RichTextDialogsComponent.new) } } }
+class Admin::Ui::RichTextDialogsComponentTest < ViewComponent::TestCase
+  setup { @rendered = -> { as(users(:one)) { render_inline(Admin::Ui::RichTextDialogsComponent.new) } } }
 
   test "renders the three 560 form dialogs under one controller, none of them open" do
     @rendered.call
