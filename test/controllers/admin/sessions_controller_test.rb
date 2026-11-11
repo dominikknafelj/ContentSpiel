@@ -75,14 +75,24 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_select "[role=alert]", text: "Try another email address or password.", count: 1
   end
 
+  SITE_FRAMES = "frame-src 'self' https://www.youtube-nocookie.com".freeze
+
+  def directive(name)
+    response.headers["Content-Security-Policy"].to_s.split(";").map(&:strip).find { |part| part.split.first == name }
+  end
+
+  def reload_meta = css_select("head meta[name=turbo-visit-control][content=reload]")
+
+  # Without the keys (development, a site that never asked for the check)
+  # the page is the site's own: its policy, a Turbo form, no reload.
   test "a first visit draws no bot check, and the page's policy is the site's" do
-    with_bot_check do
-      get admin_sign_in_path
-    end
+    get admin_sign_in_path
 
     assert_select "[data-controller=bot-check]", count: 0
     assert_select "#turnstile-hint", count: 0
-    assert_equal "frame-src 'self' https://www.youtube-nocookie.com", frame_src
+    assert_equal SITE_FRAMES, frame_src
+    assert_empty reload_meta
+    assert_nil css_select("form[action='#{admin_sign_in_path}'] button[type=submit]").sole["data-turbo"]
   end
 
   # Without the keys there is no check, however many failures: development
@@ -92,7 +102,30 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     get admin_sign_in_path
 
     assert_select "[data-controller=bot-check]", count: 0
-    assert_equal "frame-src 'self' https://www.youtube-nocookie.com", frame_src
+    assert_equal SITE_FRAMES, frame_src
+    assert_empty reload_meta
+  end
+
+  # The policy is the document's, taken from the response that loaded it,
+  # so with the keys every answer of the page carries it, the page is
+  # loaded whole by Turbo and the form is sent without Turbo, before any
+  # widget is drawn.
+  test "with the keys every answer of the sign-in page allows Cloudflare, and the page is always loaded whole" do
+    with_bot_check do
+      get admin_sign_in_path
+      assert_select "[data-controller=bot-check]", count: 0
+      assert_equal "#{SITE_FRAMES} #{CLOUDFLARE}", frame_src
+      assert_equal 1, reload_meta.size
+      assert_equal "false", css_select("form[action='#{admin_sign_in_path}'] button[type=submit]").sole["data-turbo"]
+      assert_nil css_select("form[action='#{admin_sign_in_path}']").sole["data-turbo"], "the form's links stay Turbo's"
+      # Scripts are unrestricted by the site's policy; one that restricts
+      # them must name Cloudflare on this page, or the widget never loads.
+      [ directive("script-src"), directive("default-src") ].compact.each { |part| assert_includes part, CLOUDFLARE }
+
+      post admin_sign_in_path, params: { email_address: @user.email_address, password: "wrong" }
+      assert_redirected_to admin_sign_in_path
+      assert_equal "#{SITE_FRAMES} #{CLOUDFLARE}", frame_src
+    end
   end
 
   test "after three failures the page draws the bot check with the site key, and allows Cloudflare's frame on this page alone" do
@@ -109,15 +142,16 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
           assert_select "p#turnstile-hint.text-small.text-dim[data-bot-check-target=hint]", text: "A quick check is needed before you can sign in."
           assert_select "p#turnstile-hint + div.min-h-\\[65px\\].w-full[data-bot-check-target=widget]:empty"
         end
-        # Before Sign in, after the password field.
-        assert_select ".admin-password-field ~ [data-controller=bot-check] ~ button[type=submit]", text: "Sign in"
+        # After the password field and the no-mail line, before Sign in,
+        # which the hint describes.
+        assert_select ".admin-password-field ~ p.text-meta + [data-controller=bot-check] + button[type=submit][aria-describedby=turnstile-hint]", text: "Sign in"
       end
-      assert_equal "frame-src 'self' #{CLOUDFLARE}", frame_src
+      assert_equal "#{SITE_FRAMES} #{CLOUDFLARE}", frame_src
 
       put_mail_state(:working)
       get new_admin_password_path
       assert_response :success
-      assert_equal "frame-src 'self' https://www.youtube-nocookie.com", frame_src
+      assert_equal SITE_FRAMES, frame_src
     end
   end
 

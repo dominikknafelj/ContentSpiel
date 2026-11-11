@@ -60,9 +60,13 @@ module Admin
 
     allow_unauthenticated_access only: %i[ new create ]
 
-    # Where Turnstile's widget is framed from (`bot-check` loads its script
-    # from there too: the site's policy sets no script-src).
+    # Where Turnstile's script is loaded from and its widget framed from.
     BOT_CHECK_ORIGIN = "https://challenges.cloudflare.com".freeze
+    # On a site with both Turnstile keys every answer of the sign-in page
+    # carries a policy that lets the widget in (`allow_bot_check_origin`).
+    # Declared before the rate limit's before_action, so a limited POST's
+    # answer carries it too.
+    before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::BotCheck.current }
     # The per-address bucket, Rails' `rate_limit`: it counts every POST to
     # `create`, a success and a refusal alike, not failures alone. Its
     # store is the throttle's (`SignIn.store`), so it counts where every
@@ -71,8 +75,8 @@ module Admin
 
     def new
       bot_check = SignIn::BotCheck.current
+      @bot_check_configured = bot_check.present?
       @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
-      allow_bot_check_frame if @bot_check
     end
 
     def create
@@ -114,15 +118,35 @@ module Admin
 
     private
 
-    # Turnstile's widget is an iframe from Cloudflare, and the site's policy
-    # frames only itself and youtube-nocookie.com. A sign-in page that draws
-    # the widget frames itself and Cloudflare instead; every other page,
-    # this one without the widget included, keeps the site's policy. Set on
-    # the request, which the policy's middleware writes as the header after
-    # the action.
-    def allow_bot_check_frame
+    # THE POLICY BELONGS TO THE DOCUMENT. A browser takes a page's
+    # Content-Security-Policy from the response that loaded the document;
+    # the headers of what Turbo fetches into it (a form's answer, a visit)
+    # change nothing. So widening the one answer that draws the widget is
+    # not enough: the document it is drawn into must have been loaded with
+    # the widened policy. On a site with both keys, therefore:
+    #
+    # - every answer of the sign-in page, drawn or redirected to, carries
+    #   the site's policy with BOT_CHECK_ORIGIN added to `frame-src` (the
+    #   widget is an iframe) and to `script-src` and `default-src` where
+    #   the site sets them (it sets neither today, which leaves scripts
+    #   unrestricted: a later script-src gets the origin here);
+    # - the page asks Turbo to load it whole (`turbo-visit-control`
+    #   `reload`, `admin/sessions/new`), so a Turbo visit from a page
+    #   loaded under the site's policy (sign-out, the reset pages) becomes
+    #   a full load under this one;
+    # - Sign in sends the form without Turbo (`data-turbo="false"` on the
+    #   submit button), so its answer is a full load too, and the redirect's
+    #   flash reaches the page: a Turbo answer that reloaded would have
+    #   spent the flash on the fetch it threw away.
+    #
+    # Without the keys none of this applies, and the page is the site's
+    # policy and a Turbo form, as in development.
+    def allow_bot_check_origin
       policy = current_content_security_policy
-      policy.frame_src :self, BOT_CHECK_ORIGIN
+      directives = policy.directives
+      policy.frame_src(*directives.fetch("frame-src", [ "'self'" ]), BOT_CHECK_ORIGIN)
+      policy.script_src(*directives["script-src"], BOT_CHECK_ORIGIN) if directives.key?("script-src")
+      policy.default_src(*directives["default-src"], BOT_CHECK_ORIGIN) if directives.key?("default-src")
       request.content_security_policy = policy
     end
 

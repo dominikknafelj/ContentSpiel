@@ -34,7 +34,14 @@ import { messages } from "i18n/messages"
 //
 // When the script cannot be loaded (blocked, offline) the hint is replaced
 // by the server's sentence (`sessions.new.check_unavailable`, from the
-// element's `data-messages`), and the next page tries again.
+// element's `data-messages`), and the next page tries again. The server's
+// hint is put back before Turbo caches the page and on disconnect, so a
+// snapshot never says the check failed to load.
+//
+// The frame is allowed only by the document's policy, which a Turbo fetch
+// cannot change: on a site with the keys the sign-in page is always loaded
+// whole (`Admin::SessionsController`, "THE POLICY BELONGS TO THE
+// DOCUMENT").
 const SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
 // Turnstile's flexible widget is at least this wide.
 const FLEXIBLE_MINIMUM = 300
@@ -68,7 +75,8 @@ export default class extends Controller {
   static values = { siteKey: String, action: String }
 
   connect() {
-    this.removeBeforeCache = () => this.removeWidget()
+    this.serverHint = this.hintTarget.textContent
+    this.removeBeforeCache = () => this.takeBack()
     document.addEventListener("turbo:before-cache", this.removeBeforeCache)
     this.themeObserver = new MutationObserver(() => {
       if (this.widgetId !== undefined && this.theme !== this.drawnTheme) this.redraw()
@@ -80,7 +88,13 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("turbo:before-cache", this.removeBeforeCache)
     this.themeObserver.disconnect()
+    this.takeBack()
+  }
+
+  // Everything the script wrote into the page: the widget and the hint.
+  takeBack() {
     this.removeWidget()
+    this.hintTarget.textContent = this.serverHint
   }
 
   // A draw whose script arrives after the element left the page draws

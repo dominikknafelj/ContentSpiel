@@ -8,6 +8,8 @@
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    <%# A page's own head lines (sign-in's `turbo-visit-control`). %>
+    <%= yield :head %>
   </head>
 
   <%# Product UI layout for sign-in, the password reset and an invitation:

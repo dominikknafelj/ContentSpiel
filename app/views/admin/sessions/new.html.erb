@@ -5,6 +5,15 @@
     <label>s. Field names (email_address, password) are what the controller
     and every test post. %>
 <% mail_ready = MailSettings.current.ready? %>
+<%# On a site with both Turnstile keys the page is loaded whole, never
+    drawn into a document by Turbo: the widget's frame is allowed by the
+    policy of the response that loaded the document, and only this page's
+    answers carry that policy (`Admin::SessionsController`, "THE POLICY
+    BELONGS TO THE DOCUMENT"). Sign in sends the form without Turbo for the
+    same reason. %>
+<% if @bot_check_configured %>
+  <% content_for :head do %><meta name="turbo-visit-control" content="reload"><% end %>
+<% end %>
 <div class="flex flex-col gap-[18px]">
   <%= render "admin/shared/auth_heading", title: t(".title") %>
 
@@ -47,6 +56,12 @@
       </div>
     <% end %>
 
-    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full") %>
+    <%# With the check drawn, Sign in is described by its hint, which is
+        where a screen reader that lands on the button learns of it. With
+        the keys, Sign in sends the form without Turbo (the submitter's
+        `data-turbo`, which Enter's implicit submission uses too), so the
+        answer is a whole load; the form's links stay Turbo's. %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".submit"), type: "submit", class: "w-full",
+          aria: (@bot_check ? { describedby: "turnstile-hint" } : {}), data: (@bot_check_configured ? { turbo: false } : {})) %>
   <% end %>
 </div>
