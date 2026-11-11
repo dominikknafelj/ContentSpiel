@@ -33,12 +33,10 @@ module Admin
 
       # What a half of the login the host sets is drawn as: never its value.
       MASK = "••••••••".freeze
-      # The halves of the mail login, which are credentials.
-      LOGIN_HALVES = %i[username password].freeze
       BOX = "mt-1 rounded-cs border border-line bg-sunken px-3 py-2 text-sm".freeze
 
       # Whether a mail field is a half of the login, whose value no screen shows.
-      def self.secret?(field) = LOGIN_HALVES.include?(field.to_sym)
+      def self.secret?(field) = MailSettings::LOGIN_FIELDS.include?(field.to_sym)
 
       def initialize(field:, label:, mail_settings:)
         @field = field.to_sym

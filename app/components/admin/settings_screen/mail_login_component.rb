@@ -29,7 +29,7 @@ module Admin
       LOGIN_FORM = "settings-mail-login-form".freeze
       REMOVE_DIALOG = "settings-mail-remove-login-dialog".freeze
       LOCK = { "admin--saving--pending-lock-target": "control" }.freeze
-      FIELDS = { username: "mail_username", password: "mail_password" }.freeze
+      FIELDS = MailSettings::LOGIN_FIELDS.index_with { |field| "mail_#{field}" }.freeze
       def initialize(site_setting:, mail_settings:, error: nil)
         @site_setting = site_setting
         @mail_settings = mail_settings

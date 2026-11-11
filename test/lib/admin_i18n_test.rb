@@ -258,6 +258,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/new_page_form_component.rb
     app/components/admin/editor_screen/new_page_form_component.html.erb
     app/javascript/controllers/admin/editor/new_record_controller.js
+    app/javascript/controllers/admin/translation/translate_controller.js
     app/components/admin/dashboard_screen/panel_component.rb
     app/components/admin/dashboard_screen/panel_component.html.erb
     app/components/admin/dashboard_screen/translation_panel_component.rb

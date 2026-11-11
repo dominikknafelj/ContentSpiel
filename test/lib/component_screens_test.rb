@@ -206,7 +206,6 @@ class ComponentScreensTest < ActiveSupport::TestCase
     ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them
   }.freeze
 
-
   # A file that draws more than one screen, each by name, with the reason. It is
   # one of CALLERS' files, here and never under two keys of SCREENS, where a
   # file listed twice is a mistake the map refuses.
@@ -229,7 +228,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
   }.freeze
 
   # The (class, file) pairs that name a screen class, its own screen's included:
-  # 239 today. The guard's floor ("the guard is looking at the code").
+  # The guard's floor ("the guard is looking at the code").
   USERS_FLOOR = 150
 
   MAP = { screens: SCREENS, several: SEVERAL_SCREENS, files: SCREEN_FILES }.freeze
@@ -359,8 +358,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
     { unmapped:, twice:, stale:, outside:, files: }
   end
 
-  # Floors well under today's counts (147 screen classes, 132 callers, 1075
-  # files read, 239 users): a broken glob, path, matcher or comment stripper
+  # Floors well under what the tree holds: a broken glob, path, matcher or comment stripper
   # finds a handful or none and fails here, and moving more components to ui/
   # does not.
   test "the guard is looking at the code" do
