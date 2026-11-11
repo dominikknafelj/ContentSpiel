@@ -28,3 +28,36 @@ en:
         # The form's answer, said in the card, where the form is.
         changed: "Password changed. Your other sessions were signed out."
         limited: "Try again later."
+      # Your account's Sessions card (`Admin::AccountScreen::SessionsCardComponent`).
+      sessions:
+        title: "Sessions"
+        intro: "Where you're signed in. End a session you don't recognise, then change your password."
+        this_session: "This session"
+        device: "%{browser} on %{os}"
+        browser_only: "%{browser}"
+        os_only: "A browser on %{os}"
+        unknown_device: "Unknown browser"
+        active: "Active %{time}"
+        active_now: "Active now"
+        signed_in_with:
+          password: "Signed in with password"
+          passkey: "Signed in with a passkey"
+          sso: "Signed in with single sign-on"
+          recovery_code: "Signed in with a recovery code"
+        end: "End"
+        end_label: "End the session in %{device}"
+        others:
+          one: "1 other session"
+          other: "%{count} other sessions"
+        none_else: "You're not signed in anywhere else."
+        end_others: "Sign out everywhere else…"
+        end_others_title: "Sign out everywhere else?"
+        end_others_body:
+          one: "Your other session ends, and that browser must sign in again. You stay signed in here."
+          other: "Your %{count} other sessions end, and those browsers must sign in again. You stay signed in here."
+        end_others_confirm: "Sign out everywhere else"
+        ended: "Session ended."
+        already_ended: "That session had already ended."
+        ended_others:
+          one: "Signed out of 1 other session."
+          other: "Signed out of %{count} other sessions."
