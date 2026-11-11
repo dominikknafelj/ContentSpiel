@@ -35,4 +35,21 @@ class Admin::Ui::RailTabComponentTest < ViewComponent::TestCase
     assert_selector "span.text-count", exact_text: "2"
     assert_includes rendered_content, "Notes"
   end
+
+  test "the name read out is the label and the count apart, \"Notes 3\" and \"Notes 2 new\", with no separator without a count" do
+    nbsp = "\u00a0"
+    button = render_inline(Admin::Ui::RailTabComponent.new(rail_id: "r", tab: Tab.new(key: "notes", label: "Notes", count: 3))).at_css("button")
+    assert_equal "Notes#{nbsp}3", button.text
+    separator = button.at_css("span.sr-only")
+    assert_equal nbsp, separator.text
+    assert_equal button.at_css("[data-tab-count]"), separator.next_element, "the separator stands between the label and the count"
+
+    # The notes script writes its words into the count alone (`drawer_controller.js`).
+    button.at_css("[data-tab-count]").content = "2 new"
+    assert_equal "Notes#{nbsp}2 new", button.text
+
+    plain = render_inline(Admin::Ui::RailTabComponent.new(rail_id: "r", tab: Tab.new(key: "page", label: "Page"))).at_css("button")
+    assert_equal "Page", plain.text
+    assert_nil plain.at_css("span")
+  end
 end

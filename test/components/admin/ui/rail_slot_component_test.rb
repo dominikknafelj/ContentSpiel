@@ -18,7 +18,7 @@ class Admin::Ui::RailSlotComponentTest < ViewComponent::TestCase
 
       render_inline Admin::Ui::RailTabsComponent.new(rail_id: "editor-grid", current: "page", slot_tabs: component.tabs,
         tabs: [ Admin::Ui::RailTabsComponent::Tab.new(key: "page", label: "Page") ])
-      assert_equal %w[Page Probe3], page.all("[role=tab]").map(&:text).map(&:strip)
+      assert_equal [ "Page", "Probe\u00a03" ], page.all("[role=tab]").map(&:text).map(&:strip)
 
       render_inline slot
       assert_selector "#editor-grid-panel-probe[role=tabpanel][aria-labelledby='editor-grid-tab-probe'] p[data-probe]"

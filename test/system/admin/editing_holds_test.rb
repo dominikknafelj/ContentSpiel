@@ -642,7 +642,7 @@ class Admin::EditingHoldsSystemTest < ApplicationSystemTestCase
         t.field :featured, :boolean
       end
       post = create_post(title: "Launch", content_type: "test/flagged", published: false)
-      visit "/cs-studio/posts/#{post.id}"
+      visit_editor(post)
       await_notes_live
       find("input.cs-toggle[role=switch]").click
       assert_writes_settled
