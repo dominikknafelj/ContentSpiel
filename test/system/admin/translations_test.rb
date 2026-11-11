@@ -99,6 +99,18 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_equal :current, post.translation_state("title", "de")
   end
 
+  test "Translate is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "#{slot("title")} button"
+    assert_equal "Translate", focused_text
+    page.send_keys(:enter)
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
+  end
+
   test "an edited suggestion is what Use applies, and editing it saves nothing by itself" do
     post = create_post(title: "Hello")
 

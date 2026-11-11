@@ -1,7 +1,7 @@
 <%= tag.div class: "flex flex-wrap items-center gap-2", data: wrapper_data.merge(action: "translate:changed@document->admin--translation--translate#refresh") do %>
   <%# Idle: the button. Its label is rewritten by `admin--translation--translate#refresh` as the screen's empty fields change. %>
   <%= tag.div data: { "admin--translation--translate-target": "idle" } do %>
-    <%= tag.button type: "button", class: Admin::TranslationScreen::TranslateButtonComponent::BUTTON_CLASS,
+    <%= tag.button type: "button", class: Admin::Ui::TranslateButtonComponent::BUTTON_CLASS,
           data: { action: "admin--translation--translate#translateEmpty" } do %>
       <span data-translate-label><%= label %></span>
     <% end %>

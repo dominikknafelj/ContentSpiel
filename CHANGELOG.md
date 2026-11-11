@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::TranslationScreen::TranslateButtonComponent`, with no alias: it is `Admin::Ui::TranslateButtonComponent`, with the same keywords, `BUTTON_CLASS` and `SPINNER_CLASS`; its `LABEL` and `UPDATE_LABEL` constants went, the words being the keys `admin.components.ui.translate_button.label` and `.update_label`.
 - `Admin::Ui::TabLinksComponent`, with no alias: its links are `Admin::Ui::SegmentedComponent.new(mode: :links, label:, segments:, control_data:)`, a segment `{ label:, href:, current:, count: }` as a tab was, and `link_data:` is `control_data:`.
 - `Admin::NotesScreen::AvatarComponent`, with no alias: a person a note names is `Admin::Ui::ActorAvatarComponent.new(user:, viewer:, size: :md | :sm)` (a thread or inbox row's `:row` was `:md`, a message's `:message` `:sm`), drawing the same circle; `user_id:` is not taken, a nil user being a deleted one (#237).
 - `Admin::Ui::ChannelChipComponent#tone_class`, with no alias: the chip draws through `Admin::Ui::BadgeComponent` (`tone: :accent` for MCP, else `:neutral`); `label` and `aria_label` stay (#237).

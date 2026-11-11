@@ -5,7 +5,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 // §6.4, design pass round 2 handoff §10). One controller, three places:
 //
 // - on a field's Translate / Suggest update wrapper (`Admin::
-//   TranslationScreen::TranslateButtonComponent`): `#translate` asks for that
+//   Ui::TranslateButtonComponent`): `#translate` asks for that
 //   one field (`data-translate-mode="update"` sends `mode=update`, and the box
 //   it gets back also shows the current translation);
 // - on the suggestion box under every such field (`admin/shared/

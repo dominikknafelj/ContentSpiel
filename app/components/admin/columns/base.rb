@@ -85,7 +85,7 @@ module Admin
       def translate_button
         return unless translation_confirm && translation_field_empty?
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
+        Admin::Ui::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
       end
 
       # **Suggest update** in an outdated card (same wrapper as Translate,
@@ -94,7 +94,7 @@ module Admin
       def suggest_update_button
         return unless translation_state == :outdated && translation_confirm
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
+        Admin::Ui::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
       end
 
       # What the field holds as it was rendered; the rich-text column reads its

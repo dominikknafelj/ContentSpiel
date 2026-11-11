@@ -206,7 +206,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
   end
 
   def suggest_for(post)
-    Admin::TranslationScreen::TranslateButtonComponent.new(confirm: confirm_for(post), input_id: "post-title", characters: 12, mode: :update)
+    Admin::Ui::TranslateButtonComponent.new(confirm: confirm_for(post), input_id: "post-title", characters: 12, mode: :update)
   end
 
   def render_with_suggest(post)

@@ -3,7 +3,7 @@ require "test_helper"
 # The Translate button in a translated field's original box (translation
 # helpers spec §6.4): only for a viewer who may edit the record (`confirm`
 # given), with AI set up and `ai.translate`; never a submit button.
-class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::TestCase
+class Admin::Ui::TranslateButtonComponentTest < ViewComponent::TestCase
   CONFIRM = { record_type: "Post", record_id: 7, field: "title", locale: "de" }.freeze
 
   class StubProvider
@@ -19,7 +19,7 @@ class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::Te
   teardown { Rails.application.reloader.prepare! }
 
   def component(**options)
-    Admin::TranslationScreen::TranslateButtonComponent.new(confirm: CONFIRM, input_id: "post-title", characters: 5, **options)
+    Admin::Ui::TranslateButtonComponent.new(confirm: CONFIRM, input_id: "post-title", characters: 5, **options)
   end
 
   test "the button, what it asks for, and the empty box its suggestion lands in" do
@@ -34,6 +34,12 @@ class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::Te
     assert_equal "translation-suggestion-post-title", component.box_id
   end
 
+  test "update mode says Suggest update and names its mode" do
+    render_inline component(mode: :update)
+
+    assert_selector "[data-translate-mode='update'] button", text: "Suggest update"
+  end
+
   test "rich text names its kind" do
     render_inline component(kind: :rich, input_id: "post-body-json")
 
@@ -41,7 +47,7 @@ class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::Te
   end
 
   test "nothing without confirm (view only, or the primary language)" do
-    render_inline Admin::TranslationScreen::TranslateButtonComponent.new(confirm: nil, input_id: "post-title")
+    render_inline Admin::Ui::TranslateButtonComponent.new(confirm: nil, input_id: "post-title")
 
     refute_selector "button"
   end

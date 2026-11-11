@@ -298,3 +298,8 @@ en:
           light: "Light"
           dark: "Dark"
           auto: "Auto"
+        # `Admin::Ui::TranslateButtonComponent`: the button under a translated
+        # field's input, and the outdated reference card's variant.
+        translate_button:
+          label: "Translate"
+          update_label: "Suggest update"

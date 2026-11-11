@@ -1,5 +1,5 @@
 module Admin
-  module TranslationScreen
+  module Ui
     # The **Translate** button under a translated field's own input, on the
     # field's side of the translation pair (translation helpers spec §6.4),
     # rendered into its `data-translate-slot` by the three field renderers
@@ -35,14 +35,30 @@ module Admin
     # sits inside the field's autosave `<form>`, and a submit button there
     # would submit that form instead.
     class TranslateButtonComponent < Admin::AdminComponent
-      LABEL = "Translate".freeze
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A real button named Translate (or Suggest update) that is one Tab stop, pressed with Enter or Space; it is aria-busy and disabled while its request runs.",
+        motion: :reduced,
+        content_edges: %i[short missing],
+        widths: :fluid,
+        interface: %i[confirm input_id kind characters mode],
+        limits: [
+          "It draws nothing without confirm, AI set up and ai.translate.",
+          "It never submits the form it sits in: its request is a fetch, and the suggestion box is drawn by the field, not by this button."
+        ],
+        states: %i[translate update],
+        keys: %w[label update_label],
+        slots: [],
+        controller: "admin--translation--translate",
+        keyboard: [ "test/system/admin/translations_test.rb", "Translate is one Tab stop that Enter presses" ]
+      )
 
       # The small secondary, shared with `TranslateAllComponent`'s button. While a request runs it is `aria-busy` and
       # disabled, which keeps the variant's look beside the spinner.
       BUTTON_CLASS = Admin::Ui::ButtonComponent.classes(:secondary, size: :small).freeze
       SPINNER_CLASS = "inline-block size-3 motion-safe:animate-spin rounded-full border-2 border-current border-t-transparent".freeze
 
-      UPDATE_LABEL = "Suggest update".freeze
       MODES = %i[translate update].freeze
 
       # `mode: :update` is the outdated reference card's **Suggest update**
@@ -69,9 +85,9 @@ module Admin
 
       def render? = confirm.present? && AI.configured? && can?("ai.translate")
 
-      def label = @mode == :update ? UPDATE_LABEL : LABEL
+      def label = t(@mode == :update ? ".update_label" : ".label")
 
-      def box_id = SuggestionComponent.dom_id(input_id)
+      def box_id = Admin::TranslationScreen::SuggestionComponent.dom_id(input_id)
 
       def wrapper_data
         {
