@@ -322,3 +322,8 @@ en:
           cancel: "Cancel"
           use_all: "Use all"
           discard_all: "Discard all"
+          nothing_empty: "No empty fields to translate"
+          failed: "Couldn't get a suggestion — reload the page and try again"
+          gone: "This field is no longer on the page — reload and try again"
+          not_applied: "This text can't be replaced here"
+          no_answer: "No suggestion came back for this field — try again"

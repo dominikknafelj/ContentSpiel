@@ -58,14 +58,6 @@ export default class extends Controller {
     maxCharacters: Number
   }
 
-  static texts = {
-    failed: "Couldn't get a suggestion — reload the page and try again",
-    gone: "This field is no longer on the page — reload and try again",
-    notApplied: "This text can't be replaced here",
-    noAnswer: "No suggestion came back for this field — try again",
-    nothingEmpty: "No empty fields to translate"
-  }
-
   // A request must not outlive the page it was asked on: after a language
   // tab or any Turbo navigation the same input ids exist again, in another
   // language, and a late answer would land under the wrong field. So jobs
@@ -100,7 +92,7 @@ export default class extends Controller {
     const fields = emptyFields()
     if (fields.length === 0) {
       this.refresh()
-      this.showStatus(this.constructor.texts.nothingEmpty)
+      this.showStatus(messages(this.element).t("components.ui.translate_all.nothing_empty"))
       return
     }
 
@@ -177,12 +169,12 @@ export default class extends Controller {
         focused.forEach(({ box }) => box.querySelector("[data-translate-use]")?.focus())
         // A box nothing answered (the stream named no such field) must not
         // wait forever.
-        fields.forEach((field) => { if (isPendingOf(field.box, job)) showError(field.box, this.constructor.texts.noAnswer) })
+        fields.forEach((field) => { if (isPendingOf(field.box, job)) showError(field.box, messages(this.element).t("components.ui.translate_all.no_answer")) })
       } else {
-        fields.forEach((field) => showError(field.box, this.constructor.texts.failed))
+        fields.forEach((field) => showError(field.box, messages(this.element).t("components.ui.translate_all.failed")))
       }
     } catch (error) {
-      if (error.name !== "AbortError" && !job.over && !job.timedOut) fields.forEach((field) => showError(field.box, this.constructor.texts.failed))
+      if (error.name !== "AbortError" && !job.over && !job.timedOut) fields.forEach((field) => showError(field.box, messages(this.element).t("components.ui.translate_all.failed")))
     } finally {
       fields.forEach((field) => setBusy(field.button, false))
       if (!job.timedOut || job.over) endJob(job)
@@ -223,7 +215,7 @@ export default class extends Controller {
     const box = button.closest("[data-translation-box]")
     const input = document.getElementById(button.dataset.translateInputId)
     if (!input) {
-      showError(box, this.constructor.texts.gone)
+      showError(box, messages(this.element).t("components.ui.translate_all.gone"))
       return
     }
     const hadFocus = box?.contains(document.activeElement)
@@ -240,7 +232,7 @@ export default class extends Controller {
       // something it can't show).
       input.dispatchEvent(new CustomEvent("translate:use", { bubbles: true, detail }))
       if (!detail.applied) {
-        showError(box, this.constructor.texts.notApplied)
+        showError(box, messages(this.element).t("components.ui.translate_all.not_applied"))
         return
       }
     } else {
@@ -248,7 +240,7 @@ export default class extends Controller {
       // has typed into it now is what gets applied, not what the server sent.
       const text = button.closest("[data-translation-suggestion]")?.querySelector("[data-translate-suggestion-text]")
       if (!text) {
-        showError(box, this.constructor.texts.notApplied)
+        showError(box, messages(this.element).t("components.ui.translate_all.not_applied"))
         return
       }
       input.value = text.value

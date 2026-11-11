@@ -40,6 +40,19 @@ class Admin::Ui::TranslateAllComponentTest < ViewComponent::TestCase
     assert_selector "button", text: "Suggest translations for 3 empty fields"
   end
 
+  test "the script's error words come from <body>'s messages, and its header words from the header's" do
+    render_all english_post
+    header = JSON.parse(page.find("[data-messages]")["data-messages"])
+    assert_equal "Suggest translations for %{count} empty fields", header.dig("components.ui.translate_all.label", "other")
+
+    body = JSON.parse(ApplicationController.helpers.extend(Admin::MessagesHelper).admin_script_messages)
+    assert_equal "Couldn't get a suggestion — reload the page and try again", body["components.ui.translate_all.failed"]
+    assert_equal "No empty fields to translate", body["components.ui.translate_all.nothing_empty"]
+    assert_equal "This text can't be replaced here", body["components.ui.translate_all.not_applied"]
+    assert_equal "This field is no longer on the page — reload and try again", body["components.ui.translate_all.gone"]
+    assert_equal "No suggestion came back for this field — try again", body["components.ui.translate_all.no_answer"]
+  end
+
   test "a field that already has a translation is not counted, and one is singular" do
     post = english_post
     assert Posts::Save.call(post, translations: { "de" => { title: "Hallo", excerpt: "Eine Zusammenfassung" } }).ok?

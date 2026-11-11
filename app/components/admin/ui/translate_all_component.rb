@@ -51,14 +51,14 @@ module Admin
         limits: [
           "It draws nothing in the default language, for a viewer who may not edit the record, without AI set up and ai.translate, or when no field is empty.",
           "It leaves out the fields of a block or page settings that someone else holds, and is not offered at all for a held post.",
-          "Its three states (idle, running, ready) are one element flipped by admin--translation--translate; the script writes the words it shows from data-messages."
+          "Its three states (idle, running, ready) are one element flipped by admin--translation--translate; the script writes the words it shows from data-messages (its errors from <body>'s set, since a field's wrapper and a suggestion box run the same controller)."
         ],
         states: %i[idle],
         script_states: {
           running: [ "test/system/admin/translations_test.rb", "Suggest translations for N empty fields, then Use all, fills the page's fields and its block's" ],
           ready: [ "test/system/admin/translations_test.rb", "Suggest translations for N empty fields, then Use all, fills the page's fields and its block's" ]
         },
-        keys: %w[label progress ready ready_initial suggesting cancel use_all discard_all],
+        keys: %w[label progress ready ready_initial suggesting cancel use_all discard_all nothing_empty failed gone not_applied no_answer],
         slots: [],
         controller: "admin--translation--translate",
         keyboard: [ "test/system/admin/translations_test.rb", "Suggest translations is one Tab stop that Enter presses" ]
