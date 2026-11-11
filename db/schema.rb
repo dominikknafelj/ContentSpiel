@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_10_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_11_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -489,6 +489,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_10_090000) do
     t.datetime "updated_at", null: false
     t.string "user_agent"
     t.bigint "user_id", null: false
+    t.datetime "last_seen_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "authenticated_with", null: false
+    t.index ["expires_at"], name: "index_sessions_on_expires_at"
+    t.index ["last_seen_at"], name: "index_sessions_on_last_seen_at"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 

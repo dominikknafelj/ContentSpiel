@@ -11,8 +11,8 @@ class SessionTest < ActiveSupport::TestCase
 
   setup do
     @user = users(:reader)
-    @sessions = Array.new(2) { @user.sessions.create! }
-    @other = users(:two).sessions.create!
+    @sessions = Array.new(2) { Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil) }
+    @other = Session.start(user: users(:two), method: "password", user_agent: nil, ip_address: nil)
   end
 
   # Action Cable's own name for the channel a user's connections listen on.
@@ -22,12 +22,86 @@ class SessionTest < ActiveSupport::TestCase
 
   def cookie_jar(session) = ActionDispatch::TestRequest.create.cookie_jar.tap { |jar| jar.signed[:session_id] = session&.id }
 
+  test "a new session is seen now and ends fourteen days on" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: users(:reader), method: "password", user_agent: "UA", ip_address: "192.0.2.1", at: t)
+
+    assert_equal t, session.last_seen_at
+    assert_equal t + 14.days, session.expires_at
+    assert_equal "password", session.authenticated_with
+  end
+
+  test "a method outside METHODS is refused" do
+    assert_raises(ActiveRecord::RecordInvalid) do
+      Session.start(user: users(:reader), method: "magic", user_agent: "UA", ip_address: "192.0.2.1")
+    end
+  end
+
   test "the one lookup: a signed cookie's session, and nil for none" do
     assert_equal @other, Session.from_cookies(cookie_jar(@other))
     assert_nil Session.from_cookies(cookie_jar(nil))
     assert_nil Session.from_cookies(ActionDispatch::TestRequest.create.cookie_jar.tap { |jar| jar[:session_id] = @other.id.to_s })
     @other.destroy!
     assert_nil Session.from_cookies(cookie_jar(@other))
+  end
+
+  test "a session unused for 12 hours is idle-expired, one at 14 days absolute, and absolute wins" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+
+    travel_to(t + 12.hours - 1.second) { assert_nil session.expiry }
+    travel_to(t + 12.hours) { assert_equal "expired_idle", session.expiry }
+
+    session.update_column(:last_seen_at, t + 14.days - 1.hour)
+    travel_to(t + 14.days - 1.second) { assert_nil session.expiry }
+    travel_to(t + 14.days) { assert_equal "expired_absolute", session.expiry }
+
+    session.update_column(:last_seen_at, t)
+    travel_to(t + 14.days) { assert_equal "expired_absolute", session.expiry, "both hold: the absolute timeout wins" }
+  end
+
+  test "live holds a session exactly while expiry says nothing" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    live = ->(at) { Session.where(id: session.id).live(at).to_a }
+
+    assert_equal [ session ], live.(t + 12.hours - 1.second)
+    assert_empty live.(t + 12.hours)
+    session.update_column(:last_seen_at, t + 14.days - 1.hour)
+    assert_equal [ session ], live.(t + 14.days - 1.second)
+    assert_empty live.(t + 14.days)
+  end
+
+  test "from_cookies ends an expired session and answers nil" do
+    freeze_time
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)
+
+    travel 12.hours do
+      assert_nil Session.from_cookies(cookie_jar(session))
+    end
+
+    assert_not Session.exists?(session.id)
+    event = Audit::Event.where(action: "session.ended").sole
+    assert_equal({ "reason" => "expired_idle", "count" => 1, "after_hours" => 12 }, event.metadata)
+    assert_nil event.actor_id
+    assert_nil event.user_id
+    assert_equal @user, event.subject
+    assert_equal [ DISCONNECT ], disconnects(@user)
+    assert_equal @sessions.map(&:id).sort, @user.sessions.ids.sort, "one expired session ends, not the user's others"
+  end
+
+  test "from_cookies writes last_seen_at at most every five minutes and never updated_at" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil, at: t)
+    updated_at = session.reload.updated_at
+
+    assert_equal session, Session.from_cookies(cookie_jar(session), at: t + 4.minutes)
+    assert_equal t, session.reload.last_seen_at
+    assert_equal updated_at, session.updated_at
+
+    assert_equal session, Session.from_cookies(cookie_jar(session), at: t + 5.minutes)
+    assert_equal t + 5.minutes, session.reload.last_seen_at
+    assert_equal updated_at, session.updated_at
   end
 
   test "a destroyed session disconnects its user's cable after the commit, and not when rolled back" do

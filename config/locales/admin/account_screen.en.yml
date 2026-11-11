@@ -1,0 +1,41 @@
+# Your account's components (docs/reference/i18n.md):
+# `admin.components.account_screen.*`. The screen's own words, and the
+# toasts its controllers raise, are `accounts.en.yml`'s.
+#
+# The Sessions card says a session's device in one of four shapes, the key
+# `SessionDevice#key_and_values` names (`device`, `browser_only`, `os_only`,
+# `unknown_device`). `active_html` is handed the time as markup
+# (`Admin::Ui::TimeAgoComponent`).
+en:
+  admin:
+    components:
+      account_screen:
+        sessions_card:
+          title: "Sessions"
+          intro: "Where you're signed in. End a session you don't recognise, then change your password."
+          this_session: "This session"
+          device: "%{browser} on %{os}"
+          browser_only: "%{browser}"
+          os_only: "A browser on %{os}"
+          unknown_device: "Unknown browser"
+          active_html: "Active %{time}"
+          active_now: "Active now"
+          signed_in_with:
+            password: "Signed in with password"
+            passkey: "Signed in with a passkey"
+            sso: "Signed in with single sign-on"
+            recovery_code: "Signed in with a recovery code"
+          end: "End"
+          end_label: "End the session in %{device}"
+        # The card's foot, drawn again by a row's End.
+        sessions_foot:
+          others:
+            one: "1 other session"
+            other: "%{count} other sessions"
+          none_else: "You're not signed in anywhere else."
+          end_others: "Sign out everywhere else…"
+          end_others_title: "Sign out everywhere else?"
+          end_others_body:
+            one: "Your other session ends, and that browser must sign in again. You stay signed in here."
+            other: "Your %{count} other sessions end, and those browsers must sign in again. You stay signed in here."
+          end_others_confirm: "Sign out everywhere else"

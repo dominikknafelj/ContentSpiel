@@ -48,7 +48,7 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
 
   test "removing your own owner rights is said to you" do
     other = User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
-    Current.session = other.sessions.create!
+    Current.session = Session.start(user: other, method: "password", user_agent: nil, ip_address: nil)
     zone(other)
     assert_selector "dialog", text: "You keep your groups and the permissions those give.", visible: :all
   ensure

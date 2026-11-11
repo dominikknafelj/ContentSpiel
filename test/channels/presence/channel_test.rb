@@ -13,7 +13,7 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
     @stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
   end
 
-  def connect_as(user) = stub_connection(current_user: user, session_id: user.sessions.create!.id)
+  def connect_as(user) = stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
 
   def record_stream = "presence:record:Page-#{@page.id}"
 
@@ -179,10 +179,10 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
 
   test "two connections of one tab: a late unsubscribe of the older leaves the newer subscription's row, and the newer one's deletes it" do
     user = users(:reader)
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     first = subscription
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     second = subscription
     assert_equal 1, Presence::Mark.count
@@ -205,11 +205,11 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
   # would delete nothing and the person would stay until the row went stale.
   test "an older live subscription's beat leaves the newer one's token on the row" do
     user = users(:reader)
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     first = subscription
     old_token = Presence::Mark.sole.token
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     second = subscription
     new_token = Presence::Mark.sole.token
@@ -253,10 +253,10 @@ class Presence::ChannelTest < ActionCable::Channel::TestCase
   # left neither moves its state nor its `seen_at`.
   test "a report that comes after the leave does not touch the row a newer subscription of the tab holds" do
     user = users(:reader)
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     old = subscription
-    stub_connection(current_user: user, session_id: user.sessions.create!.id)
+    stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
     subscribe type: "page", id: @page.id, tab: TAB
     old.unsubscribe_from_channel
     before = Presence::Mark.sole.attributes

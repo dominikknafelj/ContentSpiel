@@ -1,0 +1,18 @@
+<%= tag.div id: ID, tabindex: "-1", class: "flex flex-wrap items-center justify-between gap-3 rounded-b-card border-t border-line px-4 py-3",
+      data: { "admin--account--sessions-target": "foot", controller: "admin--saving--pending-lock" } do %>
+  <% if others.positive? %>
+    <p class="text-small text-dim"><%= t(".others", count: others) %></p>
+    <%= render Admin::Ui::ButtonComponent.new(label: t(".end_others"), variant: :secondary, size: :small, type: "button",
+          data: dialog_trigger(DIALOG_ID).merge("admin--account--sessions-target": "endOthers", "admin--saving--pending-lock-target": "control")) %>
+    <p class="basis-full text-small text-meta" data-admin--saving--pending-lock-target="hint" hidden></p>
+    <%= render Admin::Ui::ConfirmDialogComponent.new(id: DIALOG_ID, title: t(".end_others_title"), body: t(".end_others_body", count: others)) do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: helpers.admin_account_sessions_path(**url_options), method: :delete do %>
+          <%= render Admin::Ui::ButtonComponent.new(label: t(".end_others_confirm"), type: "submit") %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <p class="text-small text-dim"><%= t(".none_else") %></p>
+  <% end %>
+<% end %>

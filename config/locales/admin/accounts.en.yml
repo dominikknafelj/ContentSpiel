@@ -28,3 +28,12 @@ en:
         # The form's answer, said in the card, where the form is.
         changed: "Password changed. Your other sessions were signed out."
         limited: "Try again later."
+      # The Sessions card's answers (`Admin::AccountSessionsController`);
+      # the card's own words are `account_screen.en.yml`'s. An End that ended
+      # nothing says `already_ended`, whoever's the id was.
+      sessions:
+        ended: "Session ended."
+        already_ended: "That session had already ended."
+        ended_others:
+          one: "Signed out of 1 other session."
+          other: "Signed out of %{count} other sessions."

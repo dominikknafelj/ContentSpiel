@@ -1,7 +1,35 @@
 # One signed-in browser. The signed cookie holds its id; ending it (sign-out,
-# a password change, the user's deletion) destroys the row.
+# a password change, the user's deletion, an expiry) destroys the row.
 class Session < ApplicationRecord
   belongs_to :user
+
+  # The idle timeout is how long a session may go unseen, the absolute
+  # timeout how long it may live whatever is done with it (it is the cookie's
+  # expiry too), and `last_seen_at` is written at most this often.
+  IDLE_TIMEOUT = 12.hours
+  ABSOLUTE_TIMEOUT = 14.days
+  SEEN_EVERY = 5.minutes
+
+  # How a person proved who they are. Every session is made through
+  # `Session.start`, which refuses a method outside this list.
+  METHODS = %w[password passkey sso recovery_code].freeze
+
+  # Why a session ended other than by signing out (`session.destroyed`):
+  # `metadata["reason"]` of every `session.ended` (`Sessions::End`).
+  END_REASONS = %w[expired_idle expired_absolute ended_by_self ended_by_owner password_changed].freeze
+
+  validates :authenticated_with, inclusion: { in: METHODS }
+
+  # What a `session.ended` for an expiry stores of the timeout it ended by
+  # (`Sessions::End`, `Sessions::SweepJob`): the event's sentence reads it
+  # from there, so an old event keeps its words when a timeout changes.
+  def self.timeout_metadata(reason)
+    case reason
+    when "expired_idle" then { "after_hours" => (IDLE_TIMEOUT / 1.hour).to_i }
+    when "expired_absolute" then { "after_days" => (ABSOLUTE_TIMEOUT / 1.day).to_i }
+    else {}
+    end
+  end
 
   # A SESSION THAT ENDS TAKES ITS CABLE WITH IT. A WebSocket is authenticated
   # once, when it connects (`ApplicationCable::Connection`), and then lives as
@@ -19,17 +47,79 @@ class Session < ApplicationRecord
   # Every path that ends a session destroys the row through this callback,
   # and none may use `delete_all`, which would skip it: sign-out
   # (`Authentication#terminate_session`, `destroy`), `Users::UpdatePassword`
-  # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`,
-  # `destroy_all`), `Users::Destroy` (`User`'s `dependent: :destroy`).
+  # and `Users::Save` (`OwnerProtection#end_sessions_after_password_change`),
+  # `Sessions::EndOthers` and `Sessions::EndAll` (all three through
+  # `.destroy_each_locked`), `Users::Destroy` (`User`'s `dependent: :destroy`),
+  # an expiry (`Sessions::End`, `destroy!`).
   # `test/models/session_test.rb` has each.
   after_destroy_commit :disconnect_cable
 
-  # The session a request's cookies name, or nil: the ONE lookup, shared by
-  # the controllers (`Authentication`) and the cable's connection, so the
-  # two can never authenticate by different rules.
-  def self.from_cookies(cookies)
+  # The one way a session is made: seen now and ending ABSOLUTE_TIMEOUT on.
+  def self.start(user:, method:, user_agent:, ip_address:, at: Time.current)
+    create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
+      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT)
+  end
+
+  # The sessions past their absolute timeout at `at`.
+  scope :expired_absolute, ->(at) { where(expires_at: ..at) }
+
+  # The sessions unseen for the idle timeout at `at`; read after the absolute
+  # ones are gone (`Sessions::SweepJob`), it holds only sessions that are
+  # idle alone.
+  scope :expired_idle, ->(at) { where(last_seen_at: ..(at - IDLE_TIMEOUT)) }
+
+  # The sessions past neither timeout at `at`: what a person is shown as
+  # signed in (an expired row stands until a request meets it or the sweep
+  # runs).
+  scope :live, ->(at) { where.not(expires_at: ..at).where.not(last_seen_at: ..(at - IDLE_TIMEOUT)) }
+
+  # Ends every session of the relation it is called on and answers how many:
+  # each row is read under its lock and destroyed (so `disconnect_cable`
+  # runs), and a row another request ended first is simply not among them,
+  # so it is counted once. Called inside the transaction that records the
+  # ending, which is ONE `session.ended` with this count, however many rows.
+  def self.destroy_each_locked
+    lock.order(:id).to_a.each(&:destroy!).size
+  end
+
+  # The live session a request's cookies name, or nil: the ONE lookup,
+  # shared by the controllers (`Authentication`) and the cable's connection,
+  # so the two can never authenticate by different rules. A session past
+  # either timeout is ended here, at the first request or connection that
+  # meets it, audited without an actor (nobody ended it) and, inside a
+  # request, traced as `auth.session`; a live one is marked seen. The cable's
+  # connect runs outside any request's span, where the span would be a root
+  # the sampler drops, so there the ending is audited and not traced
+  # (`Telemetry.in_child_span`).
+  def self.from_cookies(cookies, at: Time.current)
     id = cookies.signed[:session_id]
-    find_by(id: id) if id
+    session = find_by(id: id) if id
+    return unless session
+
+    if (reason = session.expiry(at))
+      Telemetry.in_child_span("auth.session", attributes: { "auth.session.reason" => reason }) do
+        Sessions::End.call(session, reason: reason, actor: nil)
+      end
+      return
+    end
+
+    session.seen!(at)
+    session
+  end
+
+  # Why the session is over at `at`, or nil while it lives. The absolute
+  # timeout wins when both hold: it is the one the cookie carries.
+  def expiry(at = Time.current)
+    if at >= expires_at then "expired_absolute"
+    elsif at >= last_seen_at + IDLE_TIMEOUT then "expired_idle"
+    end
+  end
+
+  # Marks the session seen, at most every SEEN_EVERY. `update_column`, so
+  # neither `updated_at` nor a callback moves, and two tabs that race the
+  # write both just write it.
+  def seen!(at = Time.current)
+    update_column(:last_seen_at, at) if last_seen_at <= at - SEEN_EVERY # version: none (a session is on no public page)
   end
 
   private

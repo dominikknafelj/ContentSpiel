@@ -589,7 +589,7 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_stays("a new user") { user = ok(Users::Save.call(attributes: { email_address: "new@example.com", password: ServiceCalls::PASSWORD, password_confirmation: ServiceCalls::PASSWORD, group_ids: [ group.id ] })).record }
     assert_stays("a user's name") { ok(Users::Save.call(user, attributes: { name: "Somebody" })) }
     assert_stays("a token") { ok(ApiTokens::Issue.call(users(:one), group: access_control_groups(:admin), name: "Laptop")) }
-    assert_stays("a session") { users(:one).sessions.create!(user_agent: "test", ip_address: "127.0.0.1") }
+    assert_stays("a session") { Session.start(user: users(:one), method: "password", user_agent: "test", ip_address: "127.0.0.1") }
     assert_stays("a user deleted") { ok(Users::Destroy.call(user)) }
     assert_stays("a group deleted") { ok(Groups::Destroy.call(group)) }
   end

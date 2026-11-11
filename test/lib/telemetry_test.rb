@@ -69,4 +69,29 @@ class TelemetryTest < ActiveSupport::TestCase
     assert_not yielded.recording?
     assert_empty @exporter.finished_spans
   end
+
+  # The cable's connect runs outside any request's span: a span started there
+  # would be a root the sampler drops, so none is started.
+  test "in_child_span is a child inside a recording span, and with none runs the block alone" do
+    probe = nil
+    Telemetry.tracer.in_span("probe", kind: :server) do |span|
+      probe = span
+      Telemetry.in_child_span("auth.session", attributes: { "auth.session.reason" => "expired_idle" }) { }
+    end
+    child = @exporter.finished_spans.find { |span| span.name == "auth.session" }
+    assert_equal probe.context.span_id, child.parent_span_id
+
+    @exporter.reset
+    yielded = :unset
+    value = Telemetry.in_child_span("auth.session", attributes: { "auth.session.reason" => "expired_idle" }) do |span|
+      yielded = span
+      :the_block
+    end
+    assert_equal :the_block, value
+    assert_nil yielded
+    assert_empty @exporter.finished_spans
+    # Its name and keys are checked with no span to start, too.
+    assert_raises(ArgumentError) { Telemetry.in_child_span("auth.unlisted") { } }
+    assert_raises(ArgumentError) { Telemetry.in_child_span("auth.session", attributes: { "auth.typed" => "x" }) { } }
+  end
 end

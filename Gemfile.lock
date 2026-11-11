@@ -710,6 +710,7 @@ DEPENDENCIES
   thruster
   turbo-rails (= 2.0.23)
   tzinfo-data
+  useragent (~> 0.16)
   view_component (~> 4.23)
   web-console
 

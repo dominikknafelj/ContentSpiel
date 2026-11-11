@@ -391,6 +391,7 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='channel=']", count: 0
 
     travel_to 2.days.from_now do
+      sign_in_as(@me) # the earlier session is past its idle timeout
       get "/cs-studio/audit_events/#{one.id}", params: { range: "today", locale: "de" }
       assert_redirected_to "/cs-studio/audit_events/#{one.id}?locale=de"
     end

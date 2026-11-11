@@ -89,7 +89,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
   test "a leaked password is refused and the user's sessions all stay" do
     leaked = "correct horse battery"
-    sessions = 2.times.map { users(:reader).sessions.create! }
+    sessions = 2.times.map { Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
 
     with_leaked_password_check(leaked: [ leaked ]) do
       result = nil
@@ -120,8 +120,8 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
   # --- A password change ends that user's sessions ---------------------------
 
   test "an admin changing someone's password ends every session of that user, the admin's own untouched" do
-    target = users(:reader).sessions.create!
-    mine = users(:two).sessions.create!
+    target = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+    mine = Session.start(user: users(:two), method: "password", user_agent: nil, ip_address: nil)
 
     result = Current.set(session: mine) { as(users(:two)) { change(users(:reader), actor: users(:two)) } }
 
@@ -131,8 +131,8 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
   end
 
   test "changing your own password keeps the session you act in and ends the others" do
-    current = users(:reader).sessions.create!
-    other = users(:reader).sessions.create!
+    current = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+    other = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
 
     result = Current.set(session: current) { as(users(:reader)) { change(users(:reader), actor: users(:reader)) } }
 
@@ -144,7 +144,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
   # The reset flow: the emailed token is what authenticated the change, no
   # session is acting, so there is none to keep.
   test "the reset flow ends every session of the user" do
-    2.times { users(:reader).sessions.create! }
+    2.times { Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
 
     result = as(nil) { change(users(:reader), actor: users(:reader), keep_acting_session: false) }
 
@@ -152,8 +152,39 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert_empty users(:reader).sessions.reload
   end
 
+  test "a change that ends sessions records one session.ended with the count, the user its subject" do
+    2.times { Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
+
+    as(users(:two)) { change(users(:reader), actor: users(:two)) }
+
+    event = Audit::Event.where(action: "session.ended").sole
+    assert_equal({ "reason" => "password_changed", "count" => 2 }, event.metadata)
+    assert_equal users(:reader), event.subject
+    assert_equal users(:two), event.actor
+  end
+
+  test "a change of your own password with no other session open records no session.ended" do
+    current = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+
+    result = Current.set(session: current) { as(users(:reader)) { change(users(:reader), actor: users(:reader)) } }
+
+    assert result.ok?, result.errors.inspect
+    assert Session.exists?(current.id)
+    assert_not Audit::Event.exists?(action: "session.ended")
+  end
+
+  test "the reset flow's ending is recorded as the user's" do
+    Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+
+    as(nil) { change(users(:reader), actor: users(:reader), keep_acting_session: false) }
+
+    event = Audit::Event.where(action: "session.ended").sole
+    assert_equal({ "reason" => "password_changed", "count" => 1 }, event.metadata)
+    assert_equal users(:reader), event.actor
+  end
+
   test "a failed change ends no session" do
-    session = users(:reader).sessions.create!
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
 
     result = as(users(:reader)) { change(users(:reader), actor: users(:reader), current_password: "wrong") }
 
