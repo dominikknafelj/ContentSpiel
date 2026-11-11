@@ -284,9 +284,16 @@ class ComponentScreensTest < ActiveSupport::TestCase
   end
 
   # The screens a file draws for: its screen folder, its map entry, or "shared".
+  # A SHARED path is shared unless SEVERAL_SCREENS or SCREEN_FILES names the
+  # file itself, so a broad SCREENS entry (`app/views/admin`) can never make a
+  # shared partial one screen's.
   def self.screens_of(path, map = MAP)
     folder = path[%r{\A#{COMPONENTS}/([^/]+)/}, 1]
     return [ folder ] if folder && !REGISTRIES.include?(folder)
+
+    return map[:several][path].first if map[:several].key?(path)
+    return [ map[:files][path].first ] if map[:files].key?(path)
+    return [ :shared ] if SHARED.any? { |prefix| path.start_with?(prefix) }
 
     mapped_screens(path, map) || [ :shared ]
   end
@@ -438,6 +445,11 @@ class ComponentScreensTest < ActiveSupport::TestCase
     assert_equal [ :shared ], self.class.screens_of("app/components/admin/ui/q.html.erb", map)
     assert_equal [ :shared ], self.class.screens_of("app/views/setup/mail.html.erb", map)
     assert_equal [ :shared ], self.class.screens_of("app/views/layouts/admin.html.erb", map)
+
+    broad = { screens: { "a_screen" => %w[app/views/admin app/controllers/admin] }, several: {}, files: {} }
+    assert_equal [ "a_screen" ], self.class.screens_of("app/views/admin/x/one.html.erb", broad)
+    assert_equal [ :shared ], self.class.screens_of("app/views/admin/shared/_row.html.erb", broad)
+    assert_equal [ :shared ], self.class.screens_of("app/controllers/admin/base_controller.rb", broad)
 
     classes = [ [ "Admin::BScreen::RowComponent", "b_screen" ], [ "Admin::CScreen::RowComponent", "c_screen" ] ]
     drawn = self.class.strangers(classes, { "app/controllers/admin/w_controller.rb" => "Admin::BScreen::RowComponent; CScreen::RowComponent" }, map)
