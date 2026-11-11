@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.0 (2026-11-11)
+
 ### Environment
 
 - `TRUSTED_PROXIES` (optional): a CDN's ranges, comma-separated, added to the proxies Rails believes about whose request it is, so that behind Cloudflare each visitor counts as themselves to sign-in's limits, the bot check's trigger and the forms' send limit, and not as one of Cloudflare's few edge addresses. An entry that is not an address or a range stops the boot and names it. Behind Cloudflare a site sets it to Cloudflare's published ranges AND kamal-proxy's `proxy.forward_headers: true` (with `ssl: true` kamal-proxy otherwise replaces `X-Forwarded-For` with the edge's own), which `config/deploy.yml` and a new site's `config/deploy.yml` now carry as a commented line. System status's new "Visitor address" row warns while Cloudflare's `CF-Connecting-IP` differs from the address Rails reads (`docs/reference/hosting.md`, "The visitor's address behind a proxy").
