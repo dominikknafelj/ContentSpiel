@@ -49,6 +49,19 @@ class Admin::Ui::RailTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "button", wait: 0
   end
 
+  test "one tab's heading holds exactly what a tab holds, its label and its count, as a save's answer draws them" do
+    notes = tab(key: "notes", label: "Notes", count: 3, count_data: { unread: true })
+    heading = render_inline(Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "notes", tabs: [ notes ])).at_css("h2#r-tab-notes")
+    contents = render_inline(Admin::Ui::RailTabComponent.new(rail_id: "r", tab: notes, contents: true))
+
+    assert_equal contents.to_html, heading.inner_html
+    assert_equal %w[text-count], heading.at_css("span[data-tab-count][data-unread=true]")[:class].split
+
+    zero = render_inline(Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "notes", tabs: [ tab(key: "notes", label: "Notes", count: 0) ]))
+    assert zero.at_css("h2#r-tab-notes span.text-count[hidden]"), "a zero count is drawn hidden"
+    assert_nil render_inline(Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "post", tabs: [ tab(key: "post", label: "Post") ])).at_css("h2 span")
+  end
+
   test "a tab's count is text-count and hidden at zero" do
     render_inline Admin::Ui::RailTabsComponent.new(rail_id: "r", current: "page",
       tabs: [ tab(key: "page", label: "Page"), tab(key: "notes", label: "Notes", count: 3), tab(key: "files", label: "Files", count: 0) ])

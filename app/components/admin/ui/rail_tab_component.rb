@@ -10,7 +10,8 @@ module Admin
     #
     # `contents: true` draws only what is inside the button, its label and its
     # number: what the answer puts into the tab, so the button stays and a tab
-    # that has the keyboard's focus keeps it.
+    # that has the keyboard's focus keeps it, and what a rail of one tab's
+    # heading holds.
     class RailTabComponent < AdminComponent
       include Admin::Ui::Contract
 
