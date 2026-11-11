@@ -54,7 +54,7 @@ There are two kinds of site, and each gets its own way in:
 - **Per account:** keyed by the normalised email, whether or not an account exists, so the bucket does not reveal one. It is an exponential back-off. A lock-out is temporary, never permanent, so a bot cannot lock a real person out for good.
 - **Wide per address:** a longer-window cap per address, so a slow drip is caught too.
 
-The counters live where every process sees them: `Rails.cache` (Solid Cache) or a table. They never live in a process's memory, unlike Rack::Attack's current `MemoryStore`. A lock-out answers like any refusal, with the same sentence, and records `session.locked`. When the email belongs to an account, the account's address is mailed: the time and the address the attempts came from, and how to reset.
+The counters live where every process sees them: `Rails.cache` (Solid Cache) or a table. They never live in a process's memory, unlike Rack::Attack's current `MemoryStore`. While the account's bucket is closed, the panel says "Try again in a few minutes." The owner decided this on 2026-11-11. It reveals nothing, because the email bucket counts the same whether or not an account exists, so an address with no account locks and answers exactly alike. The lock records `session.locked`. When the email belongs to an account, the account's address is mailed: the time and the address the attempts came from, and how to reset.
 
 **The bot check.** Cloudflare Turnstile appears on the sign-in form only after repeated failures from an address or for an account. A first-time visitor never sees it. It is verified on the server. It is optional per site: with no Turnstile keys configured, the throttles still stand alone.
 

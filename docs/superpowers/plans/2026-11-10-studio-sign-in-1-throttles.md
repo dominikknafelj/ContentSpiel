@@ -65,7 +65,7 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
    - The owner is deciding on the neutral alternative "Try again in a few minutes"; see the ledger.
 8. **Light and dark:** the hint and the notice use tokens only. Cloudflare draws the widget itself, in the theme passed.
 
-**The lock-out's words:** the owner has not yet decided between the approved "same sentence as any refusal" and a neutral "Try again in a few minutes". Build the approved one, with the refusal's key read through a single method (`SignIn::Outcome#message_key` or its equivalent), so a change is one line. The coordinator records the owner's answer in the ledger.
+**The lock-out's words (the owner decided, 2026-11-11):** while the email's bucket is closed, the panel says "Try again in a few minutes." under the key `admin.sessions.locked`, as the `#alert` notice (`NoticeComponent :danger, :compact`). It replaces design point 7's "identical to `refused`". An email with no account locks and answers exactly the same, which a test holds: a known and an unknown address, five failures each, get the same status, body and redirect. The address buckets keep `limited` ("Try again later.").
 
 ---
 
