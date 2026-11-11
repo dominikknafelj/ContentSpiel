@@ -14,9 +14,11 @@ module Admin
     # warning). Any other role a caller names is written as
     # given.
     #
-    # Warn alone keeps an edge: the tint and its edge are the thing on
-    # paper and surface alike, where the other tints read as grounds of their
-    # own. Every tone is `rounded-card` and none has a shadow: a notice
+    # Warn and danger keep an edge, the two that are an alert: the tint and
+    # its edge are the thing on paper and surface alike, where the ok and
+    # neutral tints read as grounds of their own. Danger's is a form's error
+    # summary's (`ErrorSummaryComponent`), so a refusal looks the same in a
+    # notice and above a form. Every tone is `rounded-card` and none has a shadow: a notice
     # stands in its card or its page, never above it. Compact is the
     # 13px size for a notice in a narrow column (the sign-in panel's, a
     # card's line). Anything else the caller hands it (`id`, `data`, a
@@ -45,7 +47,7 @@ module Admin
       TONES = {
         warn: "border border-warn bg-warn-tint text-warn-ink",
         ok: "bg-ok-tint text-ok-ink",
-        danger: "bg-danger-tint text-danger-ink",
+        danger: "border border-danger bg-danger-tint text-danger-ink",
         neutral: "bg-sunken text-dim"
       }.freeze
       SIZES = { regular: "px-3 py-2 text-sm", compact: "px-3 py-2.5 text-small leading-normal" }.freeze

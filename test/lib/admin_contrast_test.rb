@@ -277,6 +277,20 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The danger notice's edge (`Admin::Ui::NoticeComponent`, the error
+  # summary's too) is the box's outline, a state's mark: 3:1 on the surface
+  # it stands on and on its own tint inside it, at the design's figures.
+  test "the danger notice's edge is 3:1 on the surface and on its own tint" do
+    assert_match "border border-danger", Admin::Ui::NoticeComponent::TONES.fetch(:danger)
+    each_scheme do |scheme, colour|
+      { "--cs-surface" => { light: 5.8, dark: 5.2 }, "--cs-danger-tint" => { light: 5.0, dark: 4.6 } }.each do |ground, floor|
+        back = colour.(ground, under: ("--cs-surface" if ground == "--cs-danger-tint"))
+        assert_ratio(3.0, colour.("--cs-danger"), back, "the danger notice's edge on #{ground} (#{scheme})")
+        assert_ratio(floor.fetch(scheme), colour.("--cs-danger"), back, "the danger notice's edge on #{ground}, at the measured figure (#{scheme})")
+      end
+    end
+  end
+
   # The section chosen in the page editor's rail (`.admin-section-card[data-chosen]`):
   # an outline 2px outside the frame, so it stands on the canvas. Its colour is
   # read from the rule that draws it.
