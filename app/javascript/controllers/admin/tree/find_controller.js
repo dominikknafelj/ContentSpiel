@@ -8,7 +8,15 @@ const SAY_AFTER_MS = 300
 // The find field of a tree column (`Admin::Ui::TreeFindComponent`). It
 // narrows its tree as the person types (`tree/find.js`) and says the count
 // in its status line once the typing stops, so a screen reader hears one
-// sentence and not one per key.
+// sentence and not one per key. The line's one line of room is kept from
+// the first key for as long as the field holds a query (the Stimulus class
+// `reserve`), set and taken off in the same step that narrows the tree and
+// gives it back: the count written 300ms later then fills room that was
+// already there, and no row moves under a pointer aiming at it. Where the
+// tree moves, the `moving` target ("Clear the search to move pages") is shown
+// and hidden in that same step, so it takes whatever height it wraps to at
+// once; it is a standing instruction, not news, so it stands outside the live
+// region and is named in the field's `aria-describedby` while it shows.
 //
 // THE TREE is the element the field's `aria-controls` names, looked up
 // whenever it is needed, since a tree's owner may draw it again; its
@@ -52,9 +60,9 @@ const SAY_AFTER_MS = 300
 // emptied with the snapshot, and the count is said again for the tree on
 // screen.
 export default class extends Controller {
-  static targets = ["field", "hint", "clear", "status"]
-  static values = { noun: String, moving: Boolean, keep: Boolean }
-  static classes = ["figure", "line"]
+  static targets = ["field", "hint", "clear", "status", "moving"]
+  static values = { noun: String, keep: Boolean }
+  static classes = ["figure", "reserve"]
 
   connect() {
     this.filtering = false
@@ -75,13 +83,23 @@ export default class extends Controller {
     return this.fieldTarget.value.trim()
   }
 
-  // `input` on the field: the tree narrows at once, the line is written
-  // after the typing stops.
+  // `input` on the field: the tree narrows at once, the line's room and the
+  // moving sentence come with it; the line is written after the typing stops.
   filter() {
     const empty = this.fieldTarget.value === ""
     this.hintTarget.hidden = !empty
     this.clearTarget.hidden = empty
+    this.narrowing(this.query !== "")
     this.apply()
+  }
+
+  narrowing(on) {
+    for (const name of this.reserveClasses) this.statusTarget.classList.toggle(name, on)
+    if (!this.hasMovingTarget) return
+
+    this.movingTarget.hidden = !on
+    if (on) this.fieldTarget.setAttribute("aria-describedby", this.movingTarget.id)
+    else this.fieldTarget.removeAttribute("aria-describedby")
   }
 
   apply() {
@@ -168,12 +186,6 @@ export default class extends Controller {
         span.textContent = figure
         parts.push(sentence.slice(0, at), span, sentence.slice(at + figure.length))
       }
-    }
-    if (this.movingValue) {
-      const line = document.createElement("span")
-      line.classList.add(...this.lineClasses)
-      line.textContent = words.t("components.ui.tree_find.no_moving")
-      parts.push(" ", line)
     }
     this.statusTarget.replaceChildren(...parts)
   }

@@ -11,6 +11,7 @@ require "application_system_test_case"
 class Admin::TreeFindSystemTest < ApplicationSystemTestCase
   FIELD = "#tree-list-find".freeze
   STATUS = "#tree [role=search] [role=status]".freeze
+  MOVING = "#tree-list-find-moving".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -88,7 +89,7 @@ class Admin::TreeFindSystemTest < ApplicationSystemTestCase
     assert_empty page.evaluate_script("Array.from(document.querySelectorAll('#tree .admin-tree-node__handle')).filter((each) => getComputedStyle(each).display !== 'none')"), "a handle is drawn while the tree is narrowed"
     assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector(#{handle.to_json})).display")
     assert_equal [ true ], page.evaluate_script(sortables_disabled).uniq
-    assert_selector STATUS, text: "Clear the search to move pages"
+    assert_selector MOVING, text: "Clear the search to move pages"
     assert_selector "#tree-row-#{@alpha.id} .admin-tree-row__add", visible: :all
     assert_not_equal "none", page.evaluate_script("getComputedStyle(document.querySelector('#tree-row-#{@alpha.id} .admin-tree-row__add')).display")
 
@@ -137,7 +138,92 @@ class Admin::TreeFindSystemTest < ApplicationSystemTestCase
     type_in_field("trans")
     assert_selector STATUS, text: "1 page matches"
     sleep 0.4 # sleep: longer than the status line's 300ms timer, to see that no second sentence follows
-    assert_equal [ "1 page matches Clear the search to move pages" ], page.evaluate_script("window.__said")
+    assert_equal [ "1 page matches" ], page.evaluate_script("window.__said")
+  end
+
+  # What stood at the moment of each `input` on the field, read by a listener
+  # on the document, which hears the event after the find's own action on the
+  # field: the status line's height, line height and words, the moving
+  # sentence's state and height, the field's description, a row's top and
+  # whether a row that does not match is shown.
+  def record_inputs(row, back:)
+    page.execute_script(<<~JS)
+      window.__inputs = []
+      document.addEventListener("input", () => {
+        const status = document.querySelector(#{STATUS.to_json})
+        const moving = document.querySelector(#{MOVING.to_json})
+        const row = document.querySelector(#{row.to_json})
+        const back = document.querySelector(#{back.to_json})
+        window.__inputs.push({
+          height: status.getBoundingClientRect().height,
+          line: parseFloat(getComputedStyle(status).lineHeight),
+          words: status.textContent,
+          moving: moving.checkVisibility(),
+          movingHeight: moving.getBoundingClientRect().height,
+          describedBy: document.querySelector(#{FIELD.to_json}).getAttribute("aria-describedby"),
+          top: row && row.checkVisibility() ? row.getBoundingClientRect().top : null,
+          back: Boolean(back && back.checkVisibility())
+        })
+      })
+    JS
+  end
+
+  def inputs = page.evaluate_script("window.__inputs")
+
+  def top_of(row) = page.evaluate_script("document.querySelector(#{row.to_json}).getBoundingClientRect().top")
+
+  def status_height = page.evaluate_script("document.querySelector(#{STATUS.to_json}).getBoundingClientRect().height")
+
+  def described_by = find(FIELD)["aria-describedby"]
+
+  # One key, then the count: the status line's one line and the moving
+  # sentence stand at the key, and no row moves when the count is written.
+  # Answers what stood at the key.
+  def type_one_key_and_hold_still(row)
+    page.execute_script("window.__inputs = []")
+    type_in_field("l")
+    assert_selector STATUS, text: "pages match"
+    typed = inputs.first
+    assert_not typed["back"], "the key narrowed the tree"
+    assert_equal "", typed["words"], "the count was written with the key, not after the typing stopped"
+    assert_in_delta typed["line"], typed["height"], 0.5, "the key keeps the room of the count's one line"
+    assert typed["moving"], "the moving sentence shows with the narrowing"
+    assert_equal MOVING.delete_prefix("#"), typed["describedBy"], "the field is described by the moving sentence while it shows"
+    assert_in_delta typed["top"], top_of(row), 0.5, "a row moved when the count was written"
+    assert_in_delta typed["line"], status_height, 0.5, "the count fills one line, no more"
+    assert_not_includes find(STATUS).text, "Clear the search", "the live region says the count only"
+    typed
+  end
+
+  test "the count's line and the moving sentence stand from the first key, so no row moves when the count is written, at the widest and the narrowest column, and go as the rows come back" do
+    visit_editor(@beta)
+    row = "#tree-row-#{@alpha.id}"
+    record_inputs(row, back: "#tree-row-#{@beta.id}")
+    assert_equal 0, status_height, "an empty field keeps no room"
+    assert_selector MOVING, visible: :hidden
+    assert_nil described_by
+
+    type_one_key_and_hold_still(row)
+
+    page.send_keys(:escape)
+    emptied = inputs.last
+    assert_equal 0, emptied["height"], "the room goes in the step that gives the rows back"
+    assert_not emptied["moving"], "the moving sentence goes in the same step"
+    assert_nil emptied["describedBy"], "Escape takes the description off the field"
+    assert emptied["back"], "the rows are back in the same step"
+    assert_equal 0, status_height
+
+    # The column at its least width: the moving sentence wraps, and still
+    # takes its height at the key.
+    page.execute_script("document.documentElement.style.setProperty('--admin-tree-width', '220px')")
+    await_js "document.getElementById('tree-column').getBoundingClientRect().width === 220", message: "the column did not narrow to 220px"
+    typed = type_one_key_and_hold_still(row)
+    assert_operator typed["movingHeight"], :>, typed["line"] * 1.5, "at 220px the moving sentence wraps, so the narrow case is measured"
+
+    find("[role=search] button[aria-label=Clear]").click
+    assert_selector MOVING, visible: :hidden
+    assert_nil described_by, "Clear takes the description off the field"
+    assert_equal 0, status_height
   end
 
   test "a page saved while the tree is filtered keeps its row filtered and marked" do

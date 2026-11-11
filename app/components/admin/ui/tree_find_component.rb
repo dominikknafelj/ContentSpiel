@@ -11,7 +11,8 @@ module Admin
     # `noun:` picks the words for what the tree holds: `:pages` (Pages), or
     # `:nodes` (the mind graph's list, which holds posts and tags too).
     # `moving:` says the tree's rows move by drag, which is off while the
-    # tree is narrowed, so the status line then says how to move them again.
+    # tree is narrowed, so a sentence under the status line then says how to
+    # move them again.
     #
     # The script talks to the tree by events and owns the keys of a find:
     # "/" from anywhere but a text field, Down Arrow to the first match, Up
@@ -23,7 +24,7 @@ module Admin
       NOUNS = %i[pages nodes].freeze
 
       contract(
-        accessibility: "A search landmark round a search field with a real label, naming the tree it narrows and its shortcut, the slash; a polite status line says the count once the typing stops; Down Arrow reaches the first match and Escape clears.",
+        accessibility: "A search landmark round a search field with a real label, naming the tree it narrows and its shortcut, the slash; a polite status line says the count once the typing stops, in one line of room kept from the first key; where the tree moves, “Clear the search to move pages” shows under it with the narrowing, outside the live region, and is the field's aria-describedby while it shows; Down Arrow reaches the first match and Escape clears.",
         motion: :reduced,
         content_edges: %i[short long],
         widths: :fluid,
@@ -31,7 +32,7 @@ module Admin
         limits: [
           "It narrows only the rows the tree drew: a page the tree does not draw is not found.",
           "The narrowing is never stored: a branch it opens folds again when the field is cleared, and the open set is unchanged.",
-          "A tree that moves by drag does not move while narrowed, and its line says so.",
+          "A tree that moves by drag does not move while narrowed, and a sentence under the status line says so.",
           "With keep_across_frames the query outlives a navigation of the content frame (its tree is drawn again and narrowed by it); a visit of the whole page always empties the field."
         ],
         states: %i[rest focus],
@@ -62,11 +63,16 @@ module Admin
 
       def field_id = "#{controls}-find"
 
-      # The words the script writes into the status line: this noun's, and
-      # the moving sentence only where the tree moves.
-      def script_messages
-        return messages_data("components.ui.tree_find.count.#{noun}", "components.ui.tree_find.none.#{noun}", "components.ui.tree_find.no_moving") if moving
+      # The status line's room while the field holds a query: one line of its
+      # own type (`lh`), the count. Kept from the first key, so the count
+      # written after the typing stops moves nothing below it.
+      def reserve_class = "min-h-[1lh]"
 
+      # "Clear the search to move pages", the field's description while shown.
+      def moving_id = "#{field_id}-moving"
+
+      # The words the script writes into the status line: this noun's.
+      def script_messages
         messages_data("components.ui.tree_find.count.#{noun}", "components.ui.tree_find.none.#{noun}")
       end
     end
