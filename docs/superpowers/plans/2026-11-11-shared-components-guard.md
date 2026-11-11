@@ -79,6 +79,33 @@ Found while building Task 1: `Admin::Ui::TranslateButtonComponent#box_id` reads 
 `Admin::TranslationScreen::PendingComponent` (the waiting state a suggestion box shows, rendered once by `app/views/layouts/admin.html.erb` into `#translation-pending-template` for the script to clone) is drawn by the layout, so it is shared too: it moves the same way to `Admin::Ui::PendingComponent`, renamed `Admin::Ui::TranslationPendingComponent` if a bare `Pending` would be ambiguous among `ui/`'s names (check `ls app/components/admin/ui`), its literals keys, its contract (it takes no focus → the sentence, if its markup draws nothing focusable).
 - [ ] Steps as Task 1, plus run the suggestion's browser test alone. Commit (one per component): `ref: the AI suggestion box is a shared component (Admin::Ui::SuggestionComponent), its words keys` and `ref: the suggestion's waiting state is a shared component`.
 
+### Tasks 6–9: the 13 more the guard found (owner, 2026-11-11: "Move all 13 in this PR"; the design agent's names, cards and merges)
+
+The guard's first run (Task 4, stopped at Step 2) found 13 more components drawn outside their screen. Each task below is the same shape as Task 1 (move, contract, keys, preview, keyboard test or no-focus sentence, `COVERED_BY`, Removed line) unless it says otherwise.
+
+**Task 6: the Dashboard's parts from other screens**
+- `Admin::AuditScreen::SentenceComponent` → `Admin::Ui::AuditSentenceComponent`, `COVERED_BY "StudioAuditLog"`.
+- `Admin::NotesScreen::InboxRowComponent` → `Admin::Ui::NoteInboxRowComponent`, `COVERED_BY "StudioNotesInbox"`.
+- `Admin::NotesScreen::PersonNameComponent` is **merged**, not moved: `Admin::Ui::UserNameComponent` takes `short: true` (the label `PersonName.of(user)`, the short name), its callers (the notes screen's and `dashboard_screen/waiting_row_component.html.erb`) call it, and the subclass is deleted (Removed line). No new card mapping (UserName is `COVERED_BY "Person"`). UserName's contract gains the keyword and a preview example.
+
+**Task 7: the layout's dialogs**
+- `Admin::EditorScreen::NewPageDialogComponent` and `NewPostDialogComponent` **merge** into `Admin::Ui::NewRecordDialogComponent.new(kind: :page | :post, url_options:)`; its name is its card's (StudioNewRecordDialog), so no `COVERED_BY`. The markup, ids and words of each kind stay exactly as today (check with the existing system tests for New page and New post). Both old constants go under Removed.
+- `Admin::EditorScreen::RichTextDialogsComponent` → `Admin::Ui::RichTextDialogsComponent`, `COVERED_BY "RichTextEditor"`.
+
+**Task 8: the mail settings the setup wizard shares**
+- `Admin::SettingsScreen::MailFieldsComponent` → `Admin::Ui::MailFieldsComponent`.
+- `Admin::SettingsScreen::HostValueComponent` → `Admin::Ui::MailHostValueComponent`.
+- `Admin::SettingsScreen::MailTestOutcomeComponent` → `Admin::Ui::MailTestOutcomeComponent`.
+- `Admin::SettingsScreen::MailAlertComponent` → `Admin::Ui::MailAlertComponent` (it follows MailTestOutcome, which renders it; `MailStateComponent` keeps rendering it from its new name).
+- All four `COVERED_BY "StudioSettings"`. The setup wizard's Mail step (`app/views/setup/mail.html.erb`, `SetupController`) and Settings draw them by their new names.
+
+**Task 9: the two that are not moves, and the map's honest cases**
+- `Admin::EditorScreen::SharedFieldsComponent::Code` (a `Data.define(:text)` value `Admin::Fields::CodeField.display` returns) moves to the fields' side as `Admin::Fields::CodeDisplay`; `SharedFieldsComponent` stays in `editor_screen/` and reads the new constant. Removed line for the nested constant.
+- `Admin::NotesScreen::CountsComponent` drawn by `app/controllers/admin/answers/block_saved.rb`: the editor's answer redraws the Notes counts through the notes slot's stream (`Admin::Answers::RailTabStreams` / the slot registry, `docs/reference/slots.md`), so the core answer no longer names the feature's component. A test holds that a block save still refreshes the counts.
+- The guard's map (Task 4) records, as mappings with a one-line reason each, not exceptions: `Admin::Ui::MediaPickerComponent`'s use of `MediaLibrary::TileComponent` constants and `app/controllers/concerns/admin/media_upload_responses.rb` belong to `media_library` (the picker draws the Media screen's own listing, `/media?picker=1`); `Admin::PagesController` belongs to both `pages_screen` and `editor_screen` (the map lets a controller name several screens).
+
+Then Task 4 is finished (the guard, its docs), then Task 5.
+
 ### Task 4: The guard
 
 **Files:**
