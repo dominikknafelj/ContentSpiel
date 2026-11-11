@@ -32,7 +32,13 @@ module Admin
 
       STATUSES = %w[draft scheduled live].freeze
 
-      BASE_CLASS = "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs px-2 py-0.5 text-xs".freeze
+      # The chip's shell, and the Draft outline: `UnpublishedChipComponent`
+      # draws its chip from these two, so the two chips that stand side by side
+      # cannot drift apart. The hook class `admin-status-chip` is this chip's
+      # alone: the unpublished chip is not a status.
+      SHELL_CLASS = "inline-flex shrink-0 items-center gap-1.5 rounded-cs px-2 py-0.5 text-xs".freeze
+      OUTLINE_CLASS = "border border-field-line bg-transparent text-dim".freeze
+      BASE_CLASS = "admin-status-chip #{SHELL_CLASS}".freeze
 
       # Each state is a shape as well as a colour, and every one says its word:
       # Live is the solid green chip, Draft an outline with a ring, Scheduled
@@ -40,7 +46,7 @@ module Admin
       # and nowhere else (`AdminDesignRulesTest`).
       CLASSES = {
         "live" => "bg-live font-semibold text-on-live",
-        "draft" => "border border-field-line bg-transparent text-dim",
+        "draft" => OUTLINE_CLASS,
         "scheduled" => "bg-scheduled text-on-scheduled"
       }.freeze
 
