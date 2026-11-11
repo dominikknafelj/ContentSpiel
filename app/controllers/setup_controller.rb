@@ -283,7 +283,7 @@ class SetupController < ApplicationController
     # login half. The password is never put back into the form.
     def mail_attributes
       mail = MailSettings.current
-      attributes = @mail_values.reject { |name, _| mail.from_host?(Admin::SettingsScreen::MailFieldsComponent::SETTING.fetch(name)) }
+      attributes = @mail_values.reject { |name, _| mail.from_host?(Admin::Ui::MailFieldsComponent::SETTING.fetch(name)) }
       posted = params[:site_setting]
       if posted.is_a?(ActionController::Parameters)
         login = posted.permit(*MAIL_LOGIN).to_h.symbolize_keys.compact_blank

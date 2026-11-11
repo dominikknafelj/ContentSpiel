@@ -1,5 +1,5 @@
 module Admin
-  module SettingsScreen
+  module Ui
     # The Mail form's fields, one drawing for Settings → Mail
     # (`MailCardComponent`, inside `#settings-form`) and the setup wizard's
     # Mail step (`app/views/setup/mail.html.erb`), in two groups:
@@ -31,6 +31,27 @@ module Admin
     # - `errors` is the refused save's `ActiveModel::Errors`, or nil: each
     #   field's sentence stands under it.
     class MailFieldsComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Two role=group regions named by their meta lines (Server, Sender), their chips decoration, out of the reading order; every control is labelled, Security is a fieldset with a visible legend of radios, each field's error stands under it and a field the host sets is plain words with no input.",
+        motion: :none,
+        content_edges: %i[none long],
+        widths: :from_container,
+        interface: %i[mail_settings value name_prefix id_prefix errors changed],
+        limits: [
+          "It draws fields and nothing else: no form and no button, so each screen decides what Enter does and what saves.",
+          "The caller's root carries the mail-port controller, which this markup only feeds (the radios' action and data-port, Port's target); the wizard loads the application entry, so it is a top-level controller.",
+          "A field the host sets is Admin::Ui::MailHostValueComponent, never an input, so it is never posted.",
+          "Its columns, MailSettings fields and ports are its constants (FIELDS, SETTING, SECURITIES, PORTS), read by Settings, the wizard and Values."
+        ],
+        states: %i[rest from_host],
+        keys: %w[server_group sender_group server server_placeholder port security starttls tls sender_name sender_address sender_address_placeholder],
+        slots: %i[login],
+        controller: nil,
+        keyboard: [ "test/system/admin/settings_mail_test.rb", "the Mail card's fields are Tab stops in order, Security's radios move with the arrow keys and Send test mail answers on Enter" ]
+      )
+
       FIELDS = %i[mail_server mail_port mail_security mail_sender_name mail_sender_address].freeze
       # Each column's `MailSettings` field: what `from_host?` is asked of.
       SETTING = {

@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 // The Mail form's port rule, on Settings → Mail and in the setup wizard's
-// Mail step (`Admin::SettingsScreen::MailFieldsComponent`): choosing STARTTLS
+// Mail step (`Admin::Ui::MailFieldsComponent`): choosing STARTTLS
 // or TLS puts its port (587, 465: the radio's `data-port`) into Port, unless
 // a port of another kind was typed there -- only an empty Port, or one
 // holding the other choice's port, follows.

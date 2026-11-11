@@ -46,6 +46,7 @@ module DesignSystemEntries
     "Admin::Ui::ListStateComponent" => "RecordState",
     "Admin::Ui::MailAlertComponent" => "StudioSettings",
     "Admin::Ui::MailFailedNoticeComponent" => "Notice",
+    "Admin::Ui::MailFieldsComponent" => "StudioSettings",
     "Admin::Ui::MailHostValueComponent" => "StudioSettings",
     "Admin::Ui::MailTestOutcomeComponent" => "StudioSettings",
     "Admin::Ui::PaginationComponent" => "StudioListTable",

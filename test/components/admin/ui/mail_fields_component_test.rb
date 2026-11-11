@@ -1,11 +1,11 @@
 require "test_helper"
 
-class Admin::SettingsScreen::MailFieldsComponentTest < ViewComponent::TestCase
+class Admin::Ui::MailFieldsComponentTest < ViewComponent::TestCase
   STORED = { mail_server: "smtp.stored.test", mail_port: "2525", mail_security: "tls", mail_sender_name: "The Site", mail_sender_address: "hello@site.test" }.freeze
 
   def render_fields(env: {}, value: ->(name) { STORED.fetch(name) }, changed: nil, errors: nil, &login)
     site = SiteSetting.instance
-    component = Admin::SettingsScreen::MailFieldsComponent.new(mail_settings: MailSettings.current(site, env: env), value: value,
+    component = Admin::Ui::MailFieldsComponent.new(mail_settings: MailSettings.current(site, env: env), value: value,
       name_prefix: "site_setting", id_prefix: "settings-", errors: errors, changed: changed)
     render_inline(component) { |fields| fields.with_login { login ? login.call : "<p id='login-slot'>Login here</p>".html_safe } }
   end

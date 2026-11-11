@@ -448,3 +448,17 @@ en:
           starttls: "STARTTLS"
           tls: "TLS"
           none: "None"
+        # `Admin::Ui::MailFieldsComponent`: the Mail form's fields, on Settings
+        # and in the wizard's Mail step: a label per `MailSettings` field.
+        mail_fields:
+          server_group: "Server"
+          sender_group: "Sender"
+          server: "Server"
+          server_placeholder: "smtp.example.com"
+          port: "Port"
+          security: "Security"
+          starttls: "STARTTLS"
+          tls: "TLS"
+          sender_name: "Sender name"
+          sender_address: "Sender address"
+          sender_address_placeholder: "no-reply@yourdomain"

@@ -175,8 +175,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/images_dialog_component.html.erb
     app/components/admin/settings_screen/mail_card_component.rb
     app/components/admin/settings_screen/mail_card_component.html.erb
-    app/components/admin/settings_screen/mail_fields_component.rb
-    app/components/admin/settings_screen/mail_fields_component.html.erb
+    app/components/admin/ui/mail_fields_component.rb
+    app/components/admin/ui/mail_fields_component.html.erb
     app/components/admin/ui/mail_host_value_component.rb
     app/components/admin/settings_screen/mail_login_component.rb
     app/components/admin/settings_screen/mail_login_component.html.erb
