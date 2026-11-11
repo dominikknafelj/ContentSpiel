@@ -4,6 +4,9 @@ module Sessions
   # (`Session.from_cookies`); this ends the ones whose browser never came
   # back, so an expired row does not wait for a visit to leave the table.
   #
+  # It also deletes the spent passkey challenges past their expiry
+  # (`SignIn::SpentChallenge.sweep`), which nothing else would.
+  #
   # The absolute timeout is swept first, so the idle read after it holds only
   # sessions that are idle alone and each is counted under one reason. Rows
   # go in batches of BATCH, each in its own transaction, through
@@ -20,6 +23,7 @@ module Sessions
       Telemetry.in_span("auth.session_sweep") do |span|
         total = %w[expired_absolute expired_idle].sum { |reason| sweep(reason, at) }
         Telemetry.record(span, "auth.session.count" => total)
+        SignIn::SpentChallenge.sweep(at: at)
       end
     end
 

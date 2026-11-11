@@ -144,6 +144,15 @@ class PasskeySignInTest < ActionDispatch::IntegrationTest
     assert_equal 2, Session.count
   end
 
+  test "a database error while a challenge is spent refuses the passkey and signs nobody in" do
+    credential = assertion(options.fetch("challenge"))
+
+    with_singleton_override(SignIn::SpentChallenge, :insert_all, ->(*, **) { raise ActiveRecord::StatementInvalid, "the insert failed" }) do
+      refused_to_sign_in_page(send_passkey(credential))
+    end
+    assert_equal 0, Session.count
+  end
+
   test "under a policy that covers everyone a passkey sign-in owes no enrolment, a password sign-in without a passkey does, and auth.policy is on the request's span" do
     site_settings(:default).update!(passkey_policy: "everyone")
     exporter = Rails.application.config.x.otel_test_exporter

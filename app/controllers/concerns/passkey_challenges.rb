@@ -12,15 +12,19 @@
 # deleting the challenge from it only rewrites the browser's copy: whoever
 # kept the earlier cookie could send it again with a captured assertion,
 # and a synced passkey's counter (always 0) would not stop it. So taking a
-# challenge also writes a spent mark in `SignIn.store` with
-# `unless_exist`, for what is left of its lifetime, and a challenge whose
-# mark was already written (or whose mark could not be written) is no
-# challenge. The mark is keyed by an HMAC of the purpose and the
-# challenge, never the challenge itself. Every purpose is taken this way,
-# and a challenge is spent whatever its answer turns out to be.
+# challenge also spends it in `SignIn::SpentChallenge`, a table with a
+# unique digest, in one atomic insert that does nothing on a duplicate: of
+# any number of sends of one challenge, even at the same moment, exactly
+# one inserts the row and is let through. A database error is no spend, so
+# the challenge is refused. The row lives a second past the challenge's
+# own lifetime, so it never lapses before the challenge does, and sits in
+# a table so that no cache eviction can drop it. The digest is an HMAC of
+# the purpose and the challenge, never the challenge itself. Every purpose
+# is taken this way, and a challenge is spent whatever its answer turns out
+# to be.
 #
 # The challenge reaches no page, span or log line: it is only in the cookie,
-# which the browser cannot read, and the store holds only its HMAC.
+# which the browser cannot read, and the table holds only its HMAC.
 module PasskeyChallenges
   extend ActiveSupport::Concern
 
@@ -44,16 +48,20 @@ module PasskeyChallenges
     return nil unless kept.is_a?(Hash) && kept["purpose"] == purpose && kept["challenge"].is_a?(String)
     return nil unless kept["at"].is_a?(Integer)
 
-    left = LIFETIME.to_i - (Time.current.to_i - kept["at"])
-    return nil unless left >= 0 && spend_passkey_challenge(purpose, kept["challenge"], left)
+    expires_at = Time.zone.at(kept["at"] + LIFETIME.to_i)
+    return nil unless expires_at >= Time.current && spend_passkey_challenge(purpose, kept["challenge"], expires_at)
 
     kept["challenge"]
   end
 
-  # True for the one take that wrote the challenge's spent mark.
-  def spend_passkey_challenge(purpose, challenge, seconds_left)
-    key = "passkey_challenge:spent:#{VisitorAddress.digest("#{purpose}:#{challenge}", purpose: SPENT_PURPOSE)}"
-    SignIn.store.write(key, true, unless_exist: true, expires_in: [ seconds_left, 1 ].max) ? true : false
+  # True for the one take that inserted the challenge's digest.
+  def spend_passkey_challenge(purpose, challenge, expires_at)
+    digest = VisitorAddress.digest("#{purpose}:#{challenge}", purpose: SPENT_PURPOSE)
+    SignIn::SpentChallenge.spend!(digest, expires_at: expires_at + 1.second)
+  rescue ActiveRecord::ActiveRecordError => error
+    # Refused, never let through: only the class of the error is logged.
+    Rails.logger.warn("[passkey] a challenge could not be spent (#{error.class}), so it is refused")
+    false
   end
 
   # The relying party this request's passkeys belong to (`SignIn::RelyingParty`),

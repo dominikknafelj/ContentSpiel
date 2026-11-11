@@ -49,6 +49,7 @@
 - `20261111090000_add_expiry_to_sessions`: `sessions.last_seen_at`, `expires_at` and `authenticated_with` (none null), with an index on each of the first two; every open session is deleted.
 - `20261112090000_create_passkeys_and_recovery_codes`: the tables `passkeys` (a person's WebAuthn credentials: the credential id, unique, the public key, the sign count, a name, the transports and the last use) and `recovery_codes` (each code's HMAC, unique per account, with when it was made and used), and `users.webauthn_id` (unique, null until the account's first passkey).
 - `20261112090100_add_passkey_policy_and_confirmation`: `sessions.confirmed_at` (null for a session open before it, which is asked to confirm once) and `sessions.enrolment_due` (not null, false), and `site_settings.passkey_policy` (null: the environment's default).
+- `20261112090200_create_sign_in_spent_challenges`: the table `sign_in_spent_challenges` (the HMAC of each answered passkey challenge, unique, and when it expires, indexed), which the hourly session sweep empties of expired rows.
 
 ### Removed
 
