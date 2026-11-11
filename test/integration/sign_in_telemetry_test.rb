@@ -6,9 +6,13 @@ require "test_helper"
 # `Telemetry::WorkSampler` keeps it and none is a root of its own), and no
 # span of the request, nor of a job it queued, holds what a person typed.
 # The email, the password, the Turnstile token and secret are planted
-# fresh in each test and searched for in every name, attribute and event of
-# every exported span, so an instrumentation or an attribute that starts to
-# write one fails here whatever it is called.
+# fresh in each test and searched for in every name, attribute, status
+# description, link and event of every exported span, as typed, in either
+# case and URL-encoded, the email's local part and domain each alone, and
+# a password's SHA-1 whole, as its range prefix and as its suffix, so an
+# instrumentation or an attribute that starts to write one fails here
+# whatever it is called. The local part and the domain are words no
+# request holds otherwise, so neither can match by chance.
 class SignInTelemetryTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
@@ -19,9 +23,13 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
   setup do
     freeze_time
     site_settings(:default).update!(setup_completed_at: Time.current)
-    @email = "planted.#{SecureRandom.hex(6)}@example.test"
+    # Typed in mixed case: the account stores it downcased, so the typed
+    # form and the stored one are two searches.
+    @email = "Planted.Local.#{SecureRandom.hex(6)}@Planted-Domain-#{SecureRandom.hex(6)}.test"
     @password = "planted-#{SecureRandom.hex(12)}"
-    @token = "planted-token-#{SecureRandom.hex(12)}"
+    # A token and a secret carry characters a URL escapes, so their
+    # encoded forms are searches of their own.
+    @token = "planted-token-#{SecureRandom.hex(12)}+/="
     @user = User.create!(email_address: @email, password: @password)
     @exporter = Rails.application.config.x.otel_test_exporter
     @exporter.reset
@@ -40,10 +48,15 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
   end
 
   # Everything a span writes that a backend stores as text: its name, its
-  # attributes' keys and values, and its events' names and attributes.
+  # attributes' keys and values, its status's description, its links'
+  # attributes, and its events' names and attributes.
   def written(spans)
     spans.map do |span|
-      [ span.name, span.attributes.to_a, Array(span.events).map { |event| [ event.name, event.attributes.to_a ] } ].flatten.join(" ")
+      [
+        span.name, span.attributes.to_a, span.status&.description,
+        Array(span.links).map { |link| link.attributes.to_a },
+        Array(span.events).map { |event| [ event.name, event.attributes.to_a ] }
+      ].flatten.compact.join(" ")
     end.join("\n")
   end
 
@@ -69,19 +82,31 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
     assert_equal parent.span_id, span.parent_span_id, "#{span.name} is a child of #{parent.name}"
   end
 
-  def assert_holds_nothing_typed(spans)
+  # Every form a typed value could be written in: as typed, in either
+  # case, and URL-encoded as a query or a path would carry it.
+  def forms_of(value)
+    [ value, value.downcase, value.upcase ].flat_map { |form| [ form, CGI.escape(form), ERB::Util.url_encode(form) ] }.uniq
+  end
+
+  # A password and every part of its SHA-1 a lookup could send or receive:
+  # the whole hex, the range prefix and the suffix, each in both cases.
+  def password_forms(password)
+    digest = Digest::SHA1.hexdigest(password)
+    [ digest, digest[0, 5], digest[5..] ].flat_map { |part| [ part, part.upcase ] }.prepend(*forms_of(password))
+  end
+
+  # `passwords:` and `secrets:` are searched beside the test's own email,
+  # password and token.
+  def assert_holds_nothing_typed(spans, passwords: [], secrets: [])
     assert_not_empty spans
     text = written(spans)
-    digest = Digest::SHA1.hexdigest(@password)
+    local, domain = @email.split("@")
     {
-      "the email" => @email,
-      "the email as typed in capitals" => @email.upcase,
-      "the password" => @password,
-      "the password's SHA-1" => digest,
-      "the password's SHA-1 in capitals" => digest.upcase,
-      "the password's range prefix" => digest.upcase[0, 5]
-    }.each do |what, value|
-      assert_not_includes text, value, "a span holds #{what}"
+      "the email" => [ @email, local, domain ].flat_map { forms_of(it) },
+      "a password or a part of its SHA-1" => [ @password, *passwords ].flat_map { password_forms(it) },
+      "the Turnstile token or a secret" => [ @token, *secrets ].flat_map { forms_of(it) }
+    }.each do |what, values|
+      values.each { |value| assert_not_includes text, value, "a span holds #{what} (#{value})" }
     end
   end
 
@@ -121,7 +146,7 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
   end
 
   test "a required bot check is a CLIENT span under the sign-in and holds no token" do
-    secret = "planted-secret-#{SecureRandom.hex(12)}"
+    secret = "planted-secret-#{SecureRandom.hex(12)}+/="
     spans = nil
     with_bot_check(:failed) do
       with_sign_in_env("TURNSTILE_SECRET_KEY" => secret) do
@@ -140,10 +165,7 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
     assert_child_of(sign_in, bot_check)
     assert_equal "failed", bot_check.attributes["auth.bot_check.result"]
 
-    text = written(spans)
-    assert_not_includes text, @token, "a span holds the Turnstile token"
-    assert_not_includes text, secret, "a span holds the Turnstile secret"
-    assert_holds_nothing_typed(spans)
+    assert_holds_nothing_typed(spans, secrets: [ secret ])
   end
 
   test "a leaked-password lookup on Your account is a CLIENT span under the request's and holds no part of the hash" do
@@ -164,11 +186,7 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
     assert_under_request(spans, lookup)
     assert_equal "leaked", lookup.attributes["auth.leaked_password.result"]
 
-    text = written(spans)
-    [ chosen, digest, digest.upcase, digest.upcase[0, 5], digest.upcase[5..] ].each do |value|
-      assert_not_includes text, value, "a span holds the new password or a part of its SHA-1"
-    end
-    assert_holds_nothing_typed(spans)
+    assert_holds_nothing_typed(spans, passwords: [ chosen ])
   end
 
   test "a lock-out's mail is an auth.lockout_mail span under the request's, and its job's trace holds no email" do
@@ -187,7 +205,7 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
     end
 
     job_spans = spans_of { perform_enqueued_jobs while enqueued_jobs.any? }
-    assert_equal [ @email ], ActionMailer::Base.deliveries.flat_map(&:to), "the job found the account and mailed it"
+    assert_equal [ @email.downcase ], ActionMailer::Base.deliveries.flat_map(&:to), "the job found the account and mailed it"
     roots = job_spans.select { |span| root?(span) }
     assert_not_empty roots
     assert roots.all? { |span| span.kind == :consumer }, "each job's trace is its own: #{roots.map(&:name)}"
@@ -203,7 +221,7 @@ class SignInTelemetryTest < ActionDispatch::IntegrationTest
     assert_holds_nothing_typed(request_spans)
 
     job_spans = spans_of { perform_enqueued_jobs while enqueued_jobs.any? }
-    assert_equal [ @email ], ActionMailer::Base.deliveries.flat_map(&:to), "the job found the account and mailed it"
+    assert_equal [ @email.downcase ], ActionMailer::Base.deliveries.flat_map(&:to), "the job found the account and mailed it"
     assert_holds_nothing_typed(job_spans)
   end
 
