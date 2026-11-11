@@ -63,10 +63,15 @@ class ComponentScreensTest < ActiveSupport::TestCase
   # Each CS Studio view folder or file, controller and controller concern, by
   # the screen it draws. The most specific entry wins, so a view file may name
   # another screen than its folder. `:shared` is a file that more than one
-  # screen uses, or a screen with no component folder of its own (Your account,
-  # System status, sign-in, ⌘K, the error pages): either way it may draw shared
+  # screen uses, or a screen with no component folder of its own (System
+  # status, sign-in, ⌘K, the error pages): either way it may draw shared
   # components only.
   SCREENS = {
+    "account_screen" => %w[
+      app/views/admin/accounts
+      app/controllers/admin/accounts_controller.rb
+      app/controllers/admin/account_sessions_controller.rb
+    ],
     "audit_screen" => %w[
       app/views/admin/audit_events
       app/controllers/admin/audit_events_controller.rb
@@ -177,13 +182,11 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/users_list.rb
     ],
     shared: %w[
-      app/views/admin/accounts
       app/views/admin/errors
       app/views/admin/jump
       app/views/admin/passwords
       app/views/admin/sessions
       app/views/admin/system_status
-      app/controllers/admin/accounts_controller.rb
       app/controllers/admin/jump_controller.rb
       app/controllers/admin/passwords_controller.rb
       app/controllers/admin/sessions_controller.rb

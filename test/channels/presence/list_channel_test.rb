@@ -4,7 +4,7 @@ require "test_helper"
 # (presence spec §5.2); what it makes a tab fetch is scoped.
 class Presence::ListChannelTest < ActionCable::Channel::TestCase
   test "a signed-in user streams the list and the channel offers no action" do
-    stub_connection current_user: users(:reader), session_id: users(:reader).sessions.create!.id
+    stub_connection current_user: users(:reader), session_id: Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil).id
     subscribe
     assert subscription.confirmed?
     assert_has_stream "presence:list"
@@ -12,7 +12,7 @@ class Presence::ListChannelTest < ActionCable::Channel::TestCase
   end
 
   test "a socket whose session has ended is rejected" do
-    session = users(:reader).sessions.create!
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
     stub_connection current_user: users(:reader), session_id: session.id
     session.destroy!
     subscribe

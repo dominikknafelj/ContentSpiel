@@ -3,7 +3,8 @@ module Admin
   # edit/update (name, email, the groups, and a password only when one was
   # typed -- `Users::Save`'s own doc comment explains why a blank password
   # field means "leave it alone"), owner (the "Make owner…" / "Remove owner
-  # rights…" action, the only request that changes the owner flag), destroy
+  # rights…" action, the only request that changes the owner flag), sessions
+  # ("End all sessions…", `Sessions::EndAll`), destroy
   # (refused for the last owner, `Users::Destroy` ->
   # `User#ensure_not_last_owner`). A permission refusal from `Users::Save` (a
   # group the actor can't assign, an owner or an outranking user changed by
@@ -22,7 +23,7 @@ module Admin
 
     # The whole module is `users.manage`; `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
-    before_action :set_user, only: %i[edit update destroy owner]
+    before_action :set_user, only: %i[edit update destroy owner sessions]
 
     def index
       load_users_list
@@ -46,7 +47,7 @@ module Admin
     end
 
     def edit
-      @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+      load_editor_extras
     end
 
     # A stale form (`Admin::StaleForm`: the user's `updated_at`, which a group
@@ -61,7 +62,7 @@ module Admin
     def update
       if manageability(@user) == :editable && stale_form?(@user, params[:base_updated_at])
         @user.assign_attributes(user_params.slice(:name, :email_address))
-        @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+        load_editor_extras
         return render_stale(:edit, @user)
       end
 
@@ -72,7 +73,7 @@ module Admin
       else
         forbidden_or(result) do
           @user = result.record
-          @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+          load_editor_extras
           render :edit, status: :unprocessable_entity
         end
       end
@@ -94,6 +95,22 @@ module Admin
 
       if result.ok?
         redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: owner_notice(@user, was_owner)
+      else
+        forbidden_or(result) do
+          redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: a service's refusals, joined with the locale's support.array words
+        end
+      end
+    end
+
+    # "End all sessions…": an owner signs another user out everywhere,
+    # answered by `Sessions::EndAll` alone -- the owner rule, the refusal of your
+    # own account and the one `session.ended` event are its. A refusal is the 403
+    # page; your own account is a plain failure, a toast on the editor.
+    def sessions
+      result = Sessions::EndAll.call(@user)
+
+      if result.ok?
+        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: t("admin.components.users_screen.sessions_zone.ended", name: @user.name_or_email)
       else
         forbidden_or(result) do
           redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, alert: result.errors.to_sentence # i18n-ok: a service's refusals, joined with the locale's support.array words
@@ -133,6 +150,13 @@ module Admin
         user.owner? ? "now" : "no_longer"
       end
       t("admin.users.owner.#{key}", name: user.name_or_email)
+    end
+
+    # What the editor draws beside the form: the last sign-in and, for an owner
+    # viewer (the only one the sessions zone is drawn for), the open session count.
+    def load_editor_extras
+      @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+      @open_sessions = @user.open_session_count if Current.user&.owner?
     end
 
     def set_user

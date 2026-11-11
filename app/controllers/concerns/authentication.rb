@@ -50,7 +50,64 @@ module Authentication
       # remember a `HEAD` request's *referer* instead of the URL it was
       # actually for.
       session[:return_to_after_authenticating] = (request.get? || request.head?) ? request.url : request.referer
+      return load_whole_page if turbo_get?
+
+      forget_ended_session
       redirect_to admin_sign_in_path
+    end
+
+    # A page Turbo may not draw (`turbo-visit-control: reload`).
+    RELOAD_PAGE = '<!DOCTYPE html><html><head><meta name="turbo-visit-control" content="reload"></head><body></body></html>'.html_safe.freeze
+
+    # Turbo's own GET (a Drive visit, a frame's load, a hover's prefetch:
+    # `X-Turbo-Request-Id`), or a script's GET for a frame (`Turbo-Frame`),
+    # is not redirected. The redirect would be followed inside the fetch,
+    # which draws the sign-in page and spends "Your session ended." there;
+    # wherever the sign-in page asks to be loaded whole (on a site with the
+    # bot check's keys) Turbo then loads it again, without the notice, and a
+    # prefetch spends it before the click. Answered with a page Turbo may
+    # not draw, Turbo loads the address it asked for whole instead (a
+    # frame's response is visited, and a visit of an undrawable page
+    # reloads), and that load is a browser's own: it is told, the cookie is
+    # cleared and it goes to the sign-in page. Nothing here is spent or
+    # cleared, so a script's frame fetch (a live refresh, which finds no
+    # frame in this page, as it found none in the sign-in page) leaves the
+    # notice for the next page.
+    def turbo_get?
+      (request.get? || request.head?) && (turbo_frame_request? || request.headers["X-Turbo-Request-Id"].present?)
+    end
+
+    def load_whole_page
+      render html: RELOAD_PAGE, layout: false
+    end
+
+    # A signed `session_id` that `Session.from_cookies` did not resolve names
+    # a session that is gone (ended elsewhere, or expired): only that browser
+    # is told so, once, by a flash the sign-in page reads, and the cookie is
+    # cleared so the next visit is a plain sign-in. A browser with no cookie
+    # and a forged one (`cookies.signed` reads nil) are told nothing, and the
+    # sentence names no account.
+    #
+    # Only a page the person asked for (a GET or HEAD for HTML that is no
+    # XHR) is told, and only it clears the cookie. A write or a script's
+    # fetch (an autosave, a stream, JSON) that meets the gone session first
+    # leaves both: its redirect is followed inside the fetch, where the
+    # sign-in page drawn would spend the flash unseen, and a cookie cleared
+    # there would leave the person's next page nothing to name, so they
+    # would get a plain sign-in. Kept, the cookie still names a row that is
+    # gone (ids are never reused), and that next page says it. A script's
+    # GET for HTML with no `Turbo-Frame` header (the live editing refresh)
+    # still counts as a page: nothing in the request tells it from a visit.
+    # (Turbo's own GET and a frame's never come here: `turbo_get?`.)
+    def forget_ended_session
+      return if cookies.signed[:session_id].blank? || !page_request?
+
+      cookies.delete(:session_id)
+      flash[:session_ended] = true
+    end
+
+    def page_request?
+      (request.get? || request.head?) && !request.xhr? && request.format.html?
     end
 
     # The public site needs no authentication of its own (PagesController
@@ -64,10 +121,11 @@ module Authentication
       session.delete(:return_to_after_authenticating) || admin_root_url
     end
 
-    def start_new_session_for(user)
-      user.sessions.create!(user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
+    # The cookie ends with the session, never later: it is not permanent.
+    def start_new_session_for(user, method: "password")
+      Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
         Current.session = session
-        cookies.signed.permanent[:session_id] = { value: session.id, httponly: true, same_site: :lax }
+        cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax, expires: session.expires_at }
       end
     end
 

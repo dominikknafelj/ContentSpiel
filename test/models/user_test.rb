@@ -66,7 +66,7 @@ class UserTest < ActiveSupport::TestCase
   # both succeed.
   test "destroying the last owner is refused before dependent sessions are destroyed" do
     last = users(:one)
-    last.sessions.create!
+    Session.start(user: last, method: "password", user_agent: nil, ip_address: nil)
 
     statements = []
     subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }

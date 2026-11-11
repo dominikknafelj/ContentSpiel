@@ -22,7 +22,7 @@ module ContentHelper
   # (`Current.user`, which the reservations are read for), the actor (`can_edit?`)
   # and the tab (`Current.editing_tab`, from the `X-Notes-Tab` header).
   def as_viewer(user, tab: nil, &block)
-    Current.set(session: user.sessions.create!, editing_tab: tab) { Current.set(actor: user, channel: :admin, &block) }
+    Current.set(session: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil), editing_tab: tab) { Current.set(actor: user, channel: :admin, &block) }
   end
 
   # Every field of the rendered markup as [name, value], read the way a browser reads it

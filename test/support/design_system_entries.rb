@@ -20,7 +20,7 @@ module DesignSystemEntries
     SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
     StudioBlockCard StudioCommandPalette StudioDashboardCards StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
     StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail
-    StudioSectionTile StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
+    StudioSectionTile StudioSessions StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
     StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze
 

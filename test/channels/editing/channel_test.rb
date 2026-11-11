@@ -6,7 +6,7 @@ class Editing::ChannelTest < ActionCable::Channel::TestCase
     @stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
   end
 
-  def connect_as(user) = stub_connection(current_user: user, session_id: user.sessions.create!.id)
+  def connect_as(user) = stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
 
   test "a reader is subscribed to the record's stream, built from the record that was found" do
     connect_as users(:reader)

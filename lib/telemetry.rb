@@ -58,6 +58,8 @@ module Telemetry
     auth.bot_check
     auth.leaked_password
     auth.lockout_mail
+    auth.session
+    auth.session_sweep
   ].freeze
 
   ATTRIBUTES = %w[
@@ -71,6 +73,8 @@ module Telemetry
     auth.bot_check.result
     auth.leaked_password.result
     auth.mail.queued
+    auth.session.reason
+    auth.session.count
     server.address
     http.response.status_code
     error.type
@@ -89,11 +93,20 @@ module Telemetry
   # records whatever kind it is handed, so a misspelt one is refused here
   # rather than sent.
   def self.in_span(name, kind: :internal, attributes: {}, tracer: self.tracer, &block)
-    raise ArgumentError, "#{name.inspect} is not among Telemetry::SPANS" unless SPANS.include?(name)
-    raise ArgumentError, "#{kind.inspect} is not a span kind" unless span_kinds.include?(kind)
-    check_keys(attributes)
-
+    check_span(name, kind, attributes)
     tracer.in_span(name, kind: kind, attributes: attributes, &block)
+  end
+
+  # Like `in_span`, but only inside a span that records: with none (the
+  # cable's connect, which runs on Action Cable's worker pool outside any
+  # request's span) the block runs with no span, since one started there
+  # would be a root the work sampler drops. The block is handed the span, or
+  # nil.
+  def self.in_child_span(name, kind: :internal, attributes: {}, &block)
+    return in_span(name, kind: kind, attributes: attributes, &block) if OpenTelemetry::Trace.current_span.recording?
+
+    check_span(name, kind, attributes)
+    block.call(nil)
   end
 
   # Adds `attributes` to `span`, and answers the span.
@@ -101,6 +114,14 @@ module Telemetry
     check_keys(attributes)
     span.add_attributes(attributes)
     span
+  end
+
+  # A name from SPANS, a kind the API knows and keys from ATTRIBUTES, checked
+  # whether or not a span is started, so a misspelling fails everywhere.
+  def self.check_span(name, kind, attributes)
+    raise ArgumentError, "#{name.inspect} is not among Telemetry::SPANS" unless SPANS.include?(name)
+    raise ArgumentError, "#{kind.inspect} is not a span kind" unless span_kinds.include?(kind)
+    check_keys(attributes)
   end
 
   def self.check_keys(attributes)
@@ -114,5 +135,5 @@ module Telemetry
   def self.span_kinds
     OpenTelemetry::Trace::SpanKind.constants.map { |name| OpenTelemetry::Trace::SpanKind.const_get(name) }
   end
-  private_class_method :check_keys, :span_kinds
+  private_class_method :check_span, :check_keys, :span_kinds
 end

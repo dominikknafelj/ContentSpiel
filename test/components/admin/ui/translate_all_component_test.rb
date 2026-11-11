@@ -80,7 +80,7 @@ class Admin::Ui::TranslateAllComponentTest < ViewComponent::TestCase
         translations: { "en" => { settings: { "text" => "To be" } } }).record
       dana = users(:two)
       holds = lambda do
-        Current.set(session: users(:one).sessions.create!, editing_tab: "tab-aaaaaaaa") { Editing::Holds.on(page, viewer: users(:one), tab: "tab-aaaaaaaa") }
+        Current.set(session: Session.start(user: users(:one), method: "password", user_agent: nil, ip_address: nil), editing_tab: "tab-aaaaaaaa") { Editing::Holds.on(page, viewer: users(:one), tab: "tab-aaaaaaaa") }
       end
       render_inline Admin::Ui::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
       assert_selector "button", text: "Suggest translations for 2 empty fields"
@@ -99,7 +99,7 @@ class Admin::Ui::TranslateAllComponentTest < ViewComponent::TestCase
     post = english_post
     Editing::Reservation.claim(subject: post, record: post, user: users(:two), tab: "tab-bbbbbbbb", now: Time.current)
 
-    session = users(:one).sessions.create!
+    session = Session.start(user: users(:one), method: "password", user_agent: nil, ip_address: nil)
     Current.set(session: session, editing_tab: "tab-aaaaaaaa") do
       render_inline Admin::EditorScreen::PostFormComponent.new(post: post, locale: "de")
     end

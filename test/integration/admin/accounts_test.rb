@@ -49,6 +49,33 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "typed-new-password-9"
   end
 
+  # The controller loads the card's rows for every answer that draws the
+  # screen (`AccountsController#load_sessions`), and the view queries
+  # nothing itself: the screen, a refused password and a refused name all
+  # show the person's live sessions and none that expired. "Sign out
+  # everywhere else" waits for the forms (`admin--saving--pending-lock`).
+  test "the Sessions card shows the live sessions on the screen and on both refusals" do
+    user = users(:reader)
+    sign_in_as(user)
+    other = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil, at: 1.hour.ago)
+    expired = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil, at: 15.days.ago)
+
+    [
+      -> { get "/cs-studio/account" },
+      -> { patch "/cs-studio/account/password", params: { current_password: "wrong", password: "new-password-1", password_confirmation: "new-password-1" } },
+      -> { patch "/cs-studio/account/profile", params: { name: "a" * 121 } }
+    ].each do |request|
+      request.call
+      assert_select "#account-sessions li[id^='session-']", count: 2
+      assert_select "#session-#{other.id}"
+      assert_select "#session-#{expired.id}", count: 0
+      assert_select "#account-sessions-foot[data-controller~='admin--saving--pending-lock']" do
+        assert_select "button[data-admin--saving--pending-lock-target=control]", text: "Sign out everywhere else…"
+        assert_select "p[data-admin--saving--pending-lock-target=hint][hidden]"
+      end
+    end
+  end
+
   test "the screen promises what the code does, and links the reset flow from the card's footer" do
     put_mail_state(:working)
     sign_in_as(users(:reader))
@@ -56,11 +83,14 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/account"
 
     # The page is "Your account"; its cards are
-    # Profile, Notes and Password, in that order; and the promise about
-    # sessions stands directly under the Password card's title.
+    # Profile, Notes, Password and Sessions, in that order; and the promise
+    # about sessions stands directly under the Password card's title.
     assert_select "title", text: "Your account"
     assert_select "h1", text: "Your account", count: 1
-    assert_equal %w[Profile Notes Password], css_select("turbo-frame#content section h2").map { |heading| heading.text.strip }
+    assert_equal %w[Profile Notes Password Sessions], css_select("turbo-frame#content section h2").map { |heading| heading.text.strip }
+    # Sessions stands in neither form: nothing in it is a change either save bar counts.
+    assert_select "form section#account-sessions", count: 0
+    assert_select "form#password-form + section#account-sessions"
     assert_select "form#profile-form section", count: 2
     assert_select "form#password-form section[aria-labelledby=account-password]" do
       assert_select ".admin-settings-card__head:has(h2#account-password) > p", text: "You'll stay signed in here. Other sessions are signed out."
@@ -159,7 +189,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
   test "a success changes the password and signs out other sessions only" do
     user = users(:reader)
-    other_session = user.sessions.create!
+    other_session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
     sign_in_as(user)
     current_session = Current.session
 
@@ -379,14 +409,14 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "form#profile-form[action='/cs-studio/account/profile']"
   end
 
-  test "the three cards are card frames, the password card anchored at #password" do
+  test "the four cards are card frames, the password card anchored at #password and the sessions card at #sessions" do
     sign_in_as(users(:reader))
 
     get "/cs-studio/account"
 
     assert_select "turbo-frame#content .max-w-\\[560px\\] > h1", text: "Your account"
     cards = css_select("turbo-frame#content section.admin-settings-card")
-    assert_equal %w[account-profile account-notes account-password], cards.map { |card| card["aria-labelledby"] }
+    assert_equal %w[account-profile account-notes account-password sessions], cards.map { |card| card["aria-labelledby"] }
     # Profile and Notes are the person's, in the people pair; Password is neutral, its own key.
     assert_select "section.admin-settings-card[aria-labelledby=account-profile] .admin-settings-card__head" do
       assert_select "span.bg-ic-people-bg[aria-hidden=true] svg path[d^='M19 21v-2']"
@@ -402,6 +432,11 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       assert_select ".admin-settings-card__head span.bg-sunken[aria-hidden=true] svg path[d^='M2.586 17.414']"
       assert_select ".admin-settings-card__head h2#account-password", text: "Password"
       assert_select ".admin-settings-card__head p.text-small", text: "You'll stay signed in here. Other sessions are signed out."
+    end
+    # Sessions is neutral, its own monitor and phone; its heading is the anchor its answers come back to.
+    assert_select "section#account-sessions.admin-settings-card.scroll-mt-6.mt-8[aria-labelledby=sessions]" do
+      assert_select ".admin-settings-card__head span.bg-sunken[aria-hidden=true] svg path[d^='M18 8V6']"
+      assert_select ".admin-settings-card__head h2#sessions", text: "Sessions"
     end
     # The password form's words are keys of `admin.accounts.password`.
     assert_select "label[for=current_password]", text: "Current password"

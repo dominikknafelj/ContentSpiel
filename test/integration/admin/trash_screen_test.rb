@@ -224,14 +224,17 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /In 30 days/
 
     travel_to @now + 29.days
+    sign_in_as users(:one) # the last session is past its timeouts
     get admin_trash_path
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /Tomorrow/
 
     travel_to @now + 30.days
+    sign_in_as users(:one) # the last session is past its timeouts
     get admin_trash_path
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /Today/
 
     travel_to @now + 45.days # the sweep hasn't run yet
+    sign_in_as users(:one) # the last session is past its timeouts
     get admin_trash_path
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /Today/
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /-/, count: 0

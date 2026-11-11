@@ -396,7 +396,7 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
   test "the fallback command is a fixed string that sets a password, ends the sessions and is audited" do
     user = users(:reader)
-    user.sessions.create!
+    Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
     ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1]
       .sub("you@example.com", user.email_address).gsub("a new password", "a brand new pass 1")
 

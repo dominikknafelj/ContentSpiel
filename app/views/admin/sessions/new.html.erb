@@ -17,6 +17,11 @@
 <div class="flex flex-col gap-[18px]">
   <%= render "admin/shared/auth_heading", title: t(".title") %>
 
+  <%# Only to the browser whose cookie named a gone session
+      (`Authentication#forget_ended_session`), and never beside a refusal.
+      Said once: `data-turbo-temporary` keeps it out of Turbo's snapshot, so
+      a preview of this page drawn from the cache never says it again. %>
+  <%= render Admin::Ui::NoticeComponent.new(tone: :neutral, size: :compact, id: "flash-session-ended", data: { turbo_temporary: true }) do %><%= t("admin.sessions.ended") if flash[:session_ended] && flash[:alert].blank? %><% end %>
   <%= render Admin::Ui::NoticeComponent.new(tone: :danger, size: :compact, id: "alert") do %><%= flash[:alert] %><% end %>
   <%= render Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, id: "notice") do %><%= flash[:notice] %><% end %>
 

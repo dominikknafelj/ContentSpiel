@@ -393,6 +393,79 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  # --- The sessions endpoint ------------------------------------------------------
+
+  def open_sessions(user, count)
+    count.times { Session.start(user: user, method: "password", user_agent: nil, ip_address: nil) }
+  end
+
+  test "an owner ends every session of another user: both gone, one event with the count, the notice" do
+    open_sessions(users(:reader), 2)
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "[data-zone=sessions] button:not([disabled])", text: "End all sessions…"
+    assert_select "[data-zone=sessions]", text: /reader@example.com has 2 open sessions/
+
+    assert_difference -> { Audit::Event.where(action: "session.ended").count }, 1 do
+      delete "/cs-studio/users/#{users(:reader).id}/sessions"
+    end
+
+    assert_redirected_to "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_equal 303, response.status
+    assert_equal 0, users(:reader).sessions.count
+    assert_equal({ "reason" => "ended_by_owner", "count" => 2 }, Audit::Event.find_by!(action: "session.ended").metadata)
+    follow_redirect!
+    assert_includes response.body, "reader@example.com is signed out everywhere."
+    assert_select "[data-zone=sessions] button[disabled]", text: "End all sessions…"
+  end
+
+  test "the zone counts only live sessions, on the editor and on a refused update" do
+    open_sessions(users(:reader), 2)
+    stale = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+    stale.update_columns(last_seen_at: Session::IDLE_TIMEOUT.ago - 1.minute)
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "[data-zone=sessions]", text: /reader@example.com has 2 open sessions/
+
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: "" } }
+    assert_response :unprocessable_entity
+    assert_select "[data-zone=sessions]", text: /reader@example.com has 2 open sessions/
+  end
+
+  test "the sessions zone sits between the owner and delete zones, and is not drawn for a non-owner" do
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "[data-zone=owner] ~ [data-zone=sessions] ~ [data-zone=delete]"
+    assert_select "#user-form [data-zone=sessions]", count: 0
+
+    sign_in_manager
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "[data-zone=sessions]", count: 0
+  end
+
+  test "a non-owner's forged DELETE is refused and nothing is ended" do
+    open_sessions(users(:reader), 1)
+    sign_in_manager
+
+    delete "/cs-studio/users/#{users(:reader).id}/sessions"
+
+    assert_response :forbidden
+    assert_equal 1, users(:reader).sessions.count
+    assert_not Audit::Event.exists?(action: "session.ended")
+  end
+
+  test "your own account is drawn disabled and a forged DELETE ends nothing" do
+    get "/cs-studio/users/#{users(:one).id}/edit"
+    assert_select "[data-zone=sessions] button[disabled]", text: "End all sessions…"
+    assert_select "[data-zone=sessions]", text: /End your own sessions from Your account\./
+
+    before = users(:one).sessions.count
+    delete "/cs-studio/users/#{users(:one).id}/sessions"
+
+    assert_redirected_to "/cs-studio/users/#{users(:one).id}/edit"
+    assert_equal before, users(:one).sessions.count
+    assert_not Audit::Event.exists?(action: "session.ended")
+  end
+
   test "the owner endpoint takes 0 or 1 and nothing else" do
     [ nil, "", "yes", "2" ].each do |value|
       patch "/cs-studio/users/#{users(:reader).id}/owner", params: { owner: value }
@@ -515,7 +588,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     AccessControl::Membership.create!(user: target, group: access_control_groups(:branch_editors))
     posts_editors = AccessControl::Group.create!(name: "Posts editors")
     AccessControl::Grant.create!(group: posts_editors, permission: "posts.edit", scope: {})
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
     groups_before = target.reload.group_ids.sort
     digest_before = target.password_digest
     sessions_before = target.sessions.count
@@ -543,7 +616,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     params = rendered_params
     events_before = Audit::Event.count
     digest = target.password_digest
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
 
     patch "/cs-studio/users/#{target.id}", params: params
 
@@ -631,7 +704,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
 
   test "a typed password changes it and ends the user's sessions, still one service rule" do
     target = users(:two)
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
 
     patch "/cs-studio/users/#{target.id}", params: { user: { email_address: target.email_address, password: "brand-new-password", password_confirmation: "brand-new-password" } }
 

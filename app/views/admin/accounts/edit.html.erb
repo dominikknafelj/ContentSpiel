@@ -1,8 +1,8 @@
-<%# "Your account": the h1, then three cards in the settings card frame
+<%# "Your account": the h1, then four cards in the settings card frame
     (`Admin::Ui::SettingsCardComponent`), 560px wide -- Profile and Notes in
-    one form with one footer, and Password, a form of its own with its own
+    one form with one footer, Password, a form of its own with its own
     "Change password" footer and the promise about sessions as its card's
-    intro. Every signed-in user changes their own password here, behind their
+    intro, and Sessions, in no form (see it below). Every signed-in user changes their own password here, behind their
     current one, and the one profile field, their name. A deliberate submit,
     never autosave, like the Users module's own forms.
 
@@ -163,4 +163,13 @@
       <% end %>
     <% end %>
   <% end %>
+
+  <%# Sessions: after both forms and in neither, so nothing in it is a
+      change a save bar counts or "Leave without saving?" asks about. Its
+      endings are forms of their own (`Admin::AccountSessionsController`);
+      "Sign out everywhere else", which draws the screen again, waits for
+      both forms (`Admin::AccountScreen::SessionsFootComponent`). The
+      sessions are the controller's (`@sessions`). %>
+  <%= render Admin::AccountScreen::SessionsCardComponent.new(sessions: @sessions, current: Current.session,
+        url_options: admin_url_options, class: "mt-8") %>
 </div>

@@ -41,7 +41,7 @@
 # `own:` changes), `own:` (the call made on that user's record) and
 # `own_event:` (the audit action it records).
 module ServiceCalls
-  # The four services open to any signed-in user for their OWN record.
+  # The five services open to any signed-in user for their OWN record.
   # `manager_may:` is what a holder of the right to manage others (the Admin
   # group) gets when acting on someone else's record: the call, or a refusal
   # (`Users::UpdateProfile`'s anyone else goes through `Users::Save`, even
@@ -50,7 +50,8 @@ module ServiceCalls
     "ApiTokens::Issue" => { manager_may: true, reason: "any signed-in user may issue a token for themselves; anyone else needs tokens.manage" },
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
-    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" }
+    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" },
+    "Sessions::EndOthers" => { manager_may: false, reason: "any signed-in user may end their own other sessions; an owner ends someone else's through Sessions::EndAll, and nobody else may" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -84,6 +85,19 @@ module ServiceCalls
     "Invitations::Accept" => "the invitation's token is the right to make that one account (spec \"Invites\")"
   }.freeze
 
+  # Low-level services that ask no permission because every caller has
+  # decided already: nobody (an expiry) or a service that authorized. Instead
+  # of the refusal run, the contract proves the call is ok and audited for
+  # whoever runs it, and that it is called from `callers:` and nowhere else
+  # in app/ and lib/, so a new caller is a deliberate edit here. The factory
+  # returns `call:`.
+  UNGATED = {
+    "Sessions::End" => {
+      reason: "the ending of one expired session row: Session.from_cookies ends an expiry, which nobody asked for, so there is nobody to authorize",
+      callers: %w[app/models/session.rb]
+    }
+  }.freeze
+
   # `ApplicationService` subclasses that are not services of their own (a
   # base class other services inherit from).
   ABSTRACT = [].freeze
@@ -106,6 +120,7 @@ module ServiceCalls
 
   def self.exempt?(service_class)
     SELF_SERVICE.key?(service_class.name) || OWN_RESULT.key?(service_class.name) || TOKEN_CREDENTIAL.key?(service_class.name) ||
+      UNGATED.key?(service_class.name) ||
       ABSTRACT.include?(service_class.name)
   end
 
@@ -553,7 +568,7 @@ module ServiceCalls
       target = stranger_target
       ApiToken.generate!(target, group: access_control_groups(:read_only))
       AccessControl::Membership.create!(group: access_control_groups(:read_only), user: target)
-      target.sessions.create!
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       create_post(title: "Theirs", published: false).update_columns(author_id: target.id)
       create_media_asset.update_columns(created_by_id: target.id)
       { call: -> { Users::Destroy.call(target) }, permission: "users.manage", on: target }
@@ -567,7 +582,7 @@ module ServiceCalls
 
     "Users::UpdatePassword" => lambda {
       target = stranger_target
-      target.sessions.create!
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       mine = stranger_target(email: "mine@example.com")
       change = ->(user) { Users::UpdatePassword.call(user, password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2") }
       { call: -> { change.call(target) }, permission: "users.manage", on: target,
@@ -612,6 +627,32 @@ module ServiceCalls
       accept = ->(token) { Invitations::Accept.call(token: token, name: "Invited", password: PASSWORD, password_confirmation: PASSWORD) }
       token = target.generate_token_for(:accept)
       { call: -> { accept.call(token) }, bad_call: -> { accept.call(gone_token) }, owner: -> { User.find_by!(email_address: "invited@example.com") } }
+    },
+
+    # See UNGATED.
+    "Sessions::End" => lambda {
+      session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::End.call(session, reason: "ended_by_owner") } }
+    },
+
+    # See SELF_SERVICE. The control runs as the user themselves, with no
+    # session kept, so their one open session ends.
+    "Sessions::EndOthers" => lambda {
+      target = stranger_target
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
+      mine = stranger_target(email: "mine@example.com")
+      Session.start(user: mine, method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::EndOthers.call(user: target, keep: nil) }, permission: "users.manage", on: target,
+        control_actor: target,
+        owner: mine, own: -> { Sessions::EndOthers.call(user: mine, keep: nil) }, own_event: "session.ended" }
+    },
+
+    # Owner-only: a holder of no grants is refused for users.manage, the
+    # trusted actor passes, as every trusted code path does.
+    "Sessions::EndAll" => lambda {
+      target = stranger_target
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
+      { call: -> { Sessions::EndAll.call(target) }, permission: "users.manage", on: target }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

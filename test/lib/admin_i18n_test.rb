@@ -197,6 +197,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/users_screen/delete_zone_component.html.erb
     app/components/admin/users_screen/owner_zone_component.rb
     app/components/admin/users_screen/owner_zone_component.html.erb
+    app/components/admin/users_screen/sessions_zone_component.rb
+    app/components/admin/users_screen/sessions_zone_component.html.erb
     app/components/admin/users_screen/group_cards_component.rb
     app/components/admin/users_screen/group_cards_component.html.erb
     app/views/admin/users/index.html.erb
@@ -237,6 +239,11 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/api_tokens/index.html.erb
     app/views/admin/api_tokens/create.html.erb
     app/views/admin/accounts/edit.html.erb
+    app/components/admin/account_screen/sessions_card_component.rb
+    app/components/admin/account_screen/sessions_card_component.html.erb
+    app/components/admin/account_screen/sessions_foot_component.rb
+    app/components/admin/account_screen/sessions_foot_component.html.erb
+    app/controllers/admin/account_sessions_controller.rb
     app/controllers/admin/api_tokens_controller.rb
     app/views/layouts/admin.html.erb
     app/views/admin/dashboard/show.html.erb

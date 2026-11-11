@@ -25,6 +25,7 @@ module Admin
     }
 
     def edit
+      load_sessions
     end
 
     # The page's first address, `account/password` (the handoff's decision
@@ -57,6 +58,7 @@ module Admin
         # errors, only its sentence.
         @field_errors = result.record.errors.to_hash(true)
         @password_answer = "refused"
+        load_sessions
         render :edit, status: :unprocessable_entity
       end
     end
@@ -111,11 +113,18 @@ module Admin
         @profile_errors = result.errors
         @profile_values = Current.user.slice(:name, :notes_sound, :notes_desktop).symbolize_keys
         Current.user.restore_attributes
+        load_sessions
         render :edit, status: :unprocessable_entity
       end
     end
 
     private
+
+    # The Sessions card's rows, for every answer that draws the screen: the
+    # view runs no query of its own.
+    def load_sessions
+      @sessions = Current.user.open_sessions.to_a
+    end
 
     # A switch as the form sends it: "1" on, anything else off, absent nil.
     def switch(name) = params.key?(name) ? params[name] == "1" : nil

@@ -12,7 +12,7 @@ class Notes::RecordChannelTest < ActionCable::Channel::TestCase
 
   # A connection as the cable makes it: the user as loaded at connect, and
   # the session it was opened with.
-  def connect_as(user) = stub_connection(current_user: user, session_id: user.sessions.create!.id)
+  def connect_as(user) = stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
 
   test "a reader subscribes to a record they may read" do
     connect_as users(:reader)

@@ -285,7 +285,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # every session goes, including one in the very browser that follows the
   # emailed link (`Users::UpdatePassword` ends them with the write).
   test "update ends every session of the user, a signed-in one in this browser included" do
-    elsewhere = @user.sessions.create!
+    elsewhere = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)
     sign_in_as(@user)
     here = Current.session
 
@@ -315,7 +315,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   test "a tampered, lapsed, blank or missing token, and one that is no string, changes nothing and is the expired state" do
     lapsed = @user.password_reset_token
-    session = @user.sessions.create!
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)
     good = @user.password_reset_token
 
     cases = bad_tokens(good)
@@ -339,7 +339,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "a refused update ends no session" do
-    session = @user.sessions.create!
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)
 
     patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "another" }
 
@@ -543,7 +543,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # nothing of the user, of a session or of the audit log has moved.
   test "check writes nothing: no user, no session, no audit event, no cookie, and the token still sets the password" do
     token = @user.password_reset_token
-    session = @user.sessions.create!
+    session = Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil)
 
     statements = capture_sql do
       assert_no_difference -> { Audit::Event.count } do
