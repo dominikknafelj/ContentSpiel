@@ -3,6 +3,19 @@
 class Session < ApplicationRecord
   belongs_to :user
 
+  # The idle timeout is how long a session may go unseen, the absolute
+  # timeout how long it may live whatever is done with it (it is the cookie's
+  # expiry too), and `last_seen_at` is written at most this often.
+  IDLE_TIMEOUT = 12.hours
+  ABSOLUTE_TIMEOUT = 14.days
+  SEEN_EVERY = 5.minutes
+
+  # How a person proved who they are. Every session is made through
+  # `Session.start`, which refuses a method outside this list.
+  METHODS = %w[password passkey sso recovery_code].freeze
+
+  validates :authenticated_with, inclusion: { in: METHODS }
+
   # A SESSION THAT ENDS TAKES ITS CABLE WITH IT. A WebSocket is authenticated
   # once, when it connects (`ApplicationCable::Connection`), and then lives as
   # long as the tab: without this a tab open before a sign-out or a password
@@ -23,6 +36,12 @@ class Session < ApplicationRecord
   # `destroy_all`), `Users::Destroy` (`User`'s `dependent: :destroy`).
   # `test/models/session_test.rb` has each.
   after_destroy_commit :disconnect_cable
+
+  # The one way a session is made: seen now and ending ABSOLUTE_TIMEOUT on.
+  def self.start(user:, method:, user_agent:, ip_address:, at: Time.current)
+    create!(user: user, authenticated_with: method, user_agent: user_agent, ip_address: ip_address,
+      last_seen_at: at, expires_at: at + ABSOLUTE_TIMEOUT)
+  end
 
   # The session a request's cookies name, or nil: the ONE lookup, shared by
   # the controllers (`Authentication`) and the cable's connection, so the

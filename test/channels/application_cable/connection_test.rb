@@ -6,7 +6,7 @@ require "test_helper"
 # CS Studio's.
 class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
   test "a CS Studio session connects as its user" do
-    session = users(:reader).sessions.create!
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
     cookies.signed[:session_id] = session.id
 
     connect
@@ -22,7 +22,7 @@ class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
   end
 
   test "a session that was ended, and an id that is not signed, are no session" do
-    session = users(:reader).sessions.create!
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
     cookies[:session_id] = session.id.to_s
     assert_reject_connection { connect }
 

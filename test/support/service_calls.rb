@@ -553,7 +553,7 @@ module ServiceCalls
       target = stranger_target
       ApiToken.generate!(target, group: access_control_groups(:read_only))
       AccessControl::Membership.create!(group: access_control_groups(:read_only), user: target)
-      target.sessions.create!
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       create_post(title: "Theirs", published: false).update_columns(author_id: target.id)
       create_media_asset.update_columns(created_by_id: target.id)
       { call: -> { Users::Destroy.call(target) }, permission: "users.manage", on: target }
@@ -567,7 +567,7 @@ module ServiceCalls
 
     "Users::UpdatePassword" => lambda {
       target = stranger_target
-      target.sessions.create!
+      Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
       mine = stranger_target(email: "mine@example.com")
       change = ->(user) { Users::UpdatePassword.call(user, password: "a-new-long-password-2", password_confirmation: "a-new-long-password-2") }
       { call: -> { change.call(target) }, permission: "users.manage", on: target,

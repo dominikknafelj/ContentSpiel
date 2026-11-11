@@ -1,6 +1,6 @@
 module SessionTestHelper
   def sign_in_as(user)
-    Current.session = user.sessions.create!
+    Current.session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
 
     ActionDispatch::TestRequest.create.cookie_jar.tap do |cookie_jar|
       cookie_jar.signed[:session_id] = Current.session.id

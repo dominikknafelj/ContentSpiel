@@ -2,7 +2,7 @@ require "test_helper"
 
 class Admin::SettingsScreen::MailCardComponentTest < ViewComponent::TestCase
   def render_card(site: SiteSetting.instance.reload, env: {}, errors: nil)
-    Current.session = users(:one).sessions.create!
+    Current.session = Session.start(user: users(:one), method: "password", user_agent: nil, ip_address: nil)
     render_inline Admin::SettingsScreen::MailCardComponent.new(site_setting: site, values: Admin::SettingsScreen::Values.new(site: site),
       mail_settings: MailSettings.current(site, env: env), errors: errors)
   ensure

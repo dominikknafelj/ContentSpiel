@@ -41,7 +41,7 @@ class Admin::EditorScreen::ChangedElsewhereComponentTest < ViewComponent::TestCa
     as(users(:two), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "Theirs" } }) }
     as(users(:one), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "Mine" } }) }
 
-    Current.set(session: users(:one).sessions.create!) { render_bar(page, since: base) }
+    Current.set(session: Session.start(user: users(:one), method: "password", user_agent: nil, ip_address: nil)) { render_bar(page, since: base) }
 
     assert_text "Changed by two@example.com"
   end
@@ -53,7 +53,7 @@ class Admin::EditorScreen::ChangedElsewhereComponentTest < ViewComponent::TestCa
     travel 6.minutes
     as(users(:one), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "A in another tab" } }) }
 
-    Current.set(session: users(:one).sessions.create!) { render_bar(page, since: base) }
+    Current.set(session: Session.start(user: users(:one), method: "password", user_agent: nil, ip_address: nil)) { render_bar(page, since: base) }
 
     assert_text "Changed in another tab or window just now."
     assert_no_text "two@example.com"

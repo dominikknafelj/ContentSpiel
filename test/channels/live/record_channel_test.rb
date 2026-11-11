@@ -39,7 +39,7 @@ class Live::RecordChannelTest < ActionCable::Channel::TestCase
     @stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
   end
 
-  def connect_as(user) = stub_connection(current_user: user, session_id: user.sessions.create!.id)
+  def connect_as(user) = stub_connection(current_user: user, session_id: Session.start(user: user, method: "password", user_agent: nil, ip_address: nil).id)
 
   test "a reader subscribes to a record they may read, and the subclass is told" do
     connect_as users(:reader)

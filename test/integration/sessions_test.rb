@@ -7,6 +7,16 @@ class SessionsTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "admin@example.com", password: "password12345")
   end
 
+  test "the session cookie expires with the session" do
+    freeze_time do
+      post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
+
+      header = Array(response.headers["Set-Cookie"]).join("\n").lines.find { |line| line.start_with?("session_id=") }
+      expires = Time.httpdate(header[/expires=([^;]+)/i, 1])
+      assert_in_delta 14.days.from_now.to_f, expires.to_f, 60
+    end
+  end
+
   # The only reason anyone signs in at all is to reach CS Studio -- the public
   # site needs no authentication of its own, so a "cold" sign-in (one that
   # didn't arrive here via `request_authentication` redirecting from some
@@ -84,7 +94,7 @@ class SessionsTest < ActionDispatch::IntegrationTest
   # is no session any more.
   test "signing out disconnects the user's cable and nobody else's" do
     other = User.create!(email_address: "other@example.com", password: "password12345")
-    other.sessions.create!
+    Session.start(user: other, method: "password", user_agent: nil, ip_address: nil)
     post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
     session = @user.sessions.sole
 

@@ -159,7 +159,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
   test "a success changes the password and signs out other sessions only" do
     user = users(:reader)
-    other_session = user.sessions.create!
+    other_session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
     sign_in_as(user)
     current_session = Current.session
 

@@ -64,10 +64,11 @@ module Authentication
       session.delete(:return_to_after_authenticating) || admin_root_url
     end
 
-    def start_new_session_for(user)
-      user.sessions.create!(user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
+    # The cookie ends with the session, never later: it is not permanent.
+    def start_new_session_for(user, method: "password")
+      Session.start(user: user, method: method, user_agent: request.user_agent, ip_address: request.remote_ip).tap do |session|
         Current.session = session
-        cookies.signed.permanent[:session_id] = { value: session.id, httponly: true, same_site: :lax }
+        cookies.signed[:session_id] = { value: session.id, httponly: true, same_site: :lax, expires: session.expires_at }
       end
     end
 

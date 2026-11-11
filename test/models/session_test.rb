@@ -11,8 +11,8 @@ class SessionTest < ActiveSupport::TestCase
 
   setup do
     @user = users(:reader)
-    @sessions = Array.new(2) { @user.sessions.create! }
-    @other = users(:two).sessions.create!
+    @sessions = Array.new(2) { Session.start(user: @user, method: "password", user_agent: nil, ip_address: nil) }
+    @other = Session.start(user: users(:two), method: "password", user_agent: nil, ip_address: nil)
   end
 
   # Action Cable's own name for the channel a user's connections listen on.
@@ -21,6 +21,21 @@ class SessionTest < ActiveSupport::TestCase
   def disconnects(user) = broadcasts(cable_of(user)).map { |payload| ActiveSupport::JSON.decode(payload) }
 
   def cookie_jar(session) = ActionDispatch::TestRequest.create.cookie_jar.tap { |jar| jar.signed[:session_id] = session&.id }
+
+  test "a new session is seen now and ends fourteen days on" do
+    t = Time.zone.local(2026, 11, 11, 9, 0, 0)
+    session = Session.start(user: users(:reader), method: "password", user_agent: "UA", ip_address: "192.0.2.1", at: t)
+
+    assert_equal t, session.last_seen_at
+    assert_equal t + 14.days, session.expires_at
+    assert_equal "password", session.authenticated_with
+  end
+
+  test "a method outside METHODS is refused" do
+    assert_raises(ActiveRecord::RecordInvalid) do
+      Session.start(user: users(:reader), method: "magic", user_agent: "UA", ip_address: "192.0.2.1")
+    end
+  end
 
   test "the one lookup: a signed cookie's session, and nil for none" do
     assert_equal @other, Session.from_cookies(cookie_jar(@other))

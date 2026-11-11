@@ -515,7 +515,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     AccessControl::Membership.create!(user: target, group: access_control_groups(:branch_editors))
     posts_editors = AccessControl::Group.create!(name: "Posts editors")
     AccessControl::Grant.create!(group: posts_editors, permission: "posts.edit", scope: {})
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
     groups_before = target.reload.group_ids.sort
     digest_before = target.password_digest
     sessions_before = target.sessions.count
@@ -543,7 +543,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     params = rendered_params
     events_before = Audit::Event.count
     digest = target.password_digest
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
 
     patch "/cs-studio/users/#{target.id}", params: params
 
@@ -631,7 +631,7 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
 
   test "a typed password changes it and ends the user's sessions, still one service rule" do
     target = users(:two)
-    target.sessions.create!
+    Session.start(user: target, method: "password", user_agent: nil, ip_address: nil)
 
     patch "/cs-studio/users/#{target.id}", params: { user: { email_address: target.email_address, password: "brand-new-password", password_confirmation: "brand-new-password" } }
 

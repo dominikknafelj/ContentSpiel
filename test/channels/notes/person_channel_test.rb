@@ -1,7 +1,7 @@
 require "test_helper"
 
 class Notes::PersonChannelTest < ActionCable::Channel::TestCase
-  setup { @session = users(:reader).sessions.create! }
+  setup { @session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil) }
 
   test "it streams for the connected user, whatever parameters are sent" do
     stub_connection current_user: users(:reader), session_id: @session.id
@@ -15,7 +15,7 @@ class Notes::PersonChannelTest < ActionCable::Channel::TestCase
 
   # A socket is authenticated once, at connect: a subscription asks again.
   test "a socket whose session has ended, or names someone else's, is rejected" do
-    stub_connection current_user: users(:reader), session_id: users(:two).sessions.create!.id
+    stub_connection current_user: users(:reader), session_id: Session.start(user: users(:two), method: "password", user_agent: nil, ip_address: nil).id
     subscribe
     assert subscription.rejected?
 

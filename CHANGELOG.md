@@ -22,6 +22,7 @@
 
 ### Changed
 
+- The `session_id` cookie is no longer permanent: it ends with the session, 14 days after sign-in. A session records when it was last seen, when it ends and how its person signed in (`Session.start`, `Session::METHODS`).
 - A sign-in refused for any reason answers the same for an email that has an account and one that does not, in its status, redirect, sentence, cookies, statements and password hashing.
 - A reset request looks up nobody in the request: it queues `PasswordResetRequestJob` for every address typed, which finds the account and queues the reset mail, so a known and an unknown address take the same time. The job's arguments (the address typed) are not logged.
 - Sign-in's per-address limit (10 attempts in 3 minutes, every attempt counted) counts in the sign-in throttle's store (`SignIn.store`, Solid Cache in production as before, a memory store in tests, where it now trips), under an HMAC of the address and an IPv6 address by its /64, not the address itself, and answers inside an `auth.sign_in` span.
@@ -32,6 +33,14 @@
 - An outdated language's mark on the language tabs is ↻ in warn ink, as on a translation chip and under a language's progress bar, where it was a solid warn dot; a screen reader still hears "<language>: outdated" (#237).
 - A danger notice (a refusal, a broken link, a sign-in page's error) has a 1px danger edge, as a form's error summary has; warn kept its edge, and ok and neutral have none (#237).
 - A switch that is on in a form someone else is editing keeps its accent track, where it was drawn in meta as a switch nobody may change (#237).
+
+### Migrations needing action
+
+- Everyone is signed out once: `20261111090000_add_expiry_to_sessions` deletes every open session, since none of them has an end. Each person signs in again.
+
+### Migrations
+
+- `20261111090000_add_expiry_to_sessions`: `sessions.last_seen_at`, `expires_at` and `authenticated_with` (none null), with an index on each of the first two; every open session is deleted.
 
 ### Removed
 

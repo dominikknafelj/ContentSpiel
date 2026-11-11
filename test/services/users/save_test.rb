@@ -311,7 +311,7 @@ class Users::SaveTest < ActiveSupport::TestCase
     user = users(:reader)
     old_ids = user.group_ids.sort
     added = access_control_groups(:author)
-    session = user.sessions.create!
+    session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
     before = user.updated_at
     old_name = user.name
 
@@ -341,8 +341,8 @@ class Users::SaveTest < ActiveSupport::TestCase
 
   test "changing another user's password ends every session of that user" do
     user = users(:reader)
-    2.times { user.sessions.create! }
-    bystander = users(:author).sessions.create!
+    2.times { Session.start(user: user, method: "password", user_agent: nil, ip_address: nil) }
+    bystander = Session.start(user: users(:author), method: "password", user_agent: nil, ip_address: nil)
 
     result = as(users(:one)) { Users::Save.call(user, attributes: { password: "new-password-1", password_confirmation: "new-password-1" }) }
 
@@ -353,7 +353,7 @@ class Users::SaveTest < ActiveSupport::TestCase
 
   test "changing anything but the password leaves the user's sessions alone" do
     user = users(:reader)
-    session = user.sessions.create!
+    session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
 
     result = as(users(:one)) do
       Users::Save.call(user, attributes: { name: "A new name", email_address: "renamed@example.com",
@@ -367,8 +367,8 @@ class Users::SaveTest < ActiveSupport::TestCase
 
   test "changing your own password in the Users module keeps the session you act in and ends the others" do
     owner = users(:one)
-    current = owner.sessions.create!
-    other = owner.sessions.create!
+    current = Session.start(user: owner, method: "password", user_agent: nil, ip_address: nil)
+    other = Session.start(user: owner, method: "password", user_agent: nil, ip_address: nil)
 
     result = Current.set(session: current) do
       as(owner) { Users::Save.call(owner, attributes: { password: "new-password-1", password_confirmation: "new-password-1" }) }
@@ -381,7 +381,7 @@ class Users::SaveTest < ActiveSupport::TestCase
 
   test "a refused password change ends no session" do
     user = users(:reader)
-    session = user.sessions.create!
+    session = Session.start(user: user, method: "password", user_agent: nil, ip_address: nil)
 
     result = as(users(:one)) { Users::Save.call(user, attributes: { password: "new-password-1", password_confirmation: "something else" }) }
 
