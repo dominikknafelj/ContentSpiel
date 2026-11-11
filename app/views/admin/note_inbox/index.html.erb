@@ -23,8 +23,8 @@
   </div>
   <div class="admin-list-rail__grid">
     <div class="mb-4 flex">
-      <%= render Admin::Ui::TabLinksComponent.new(label: t(".filters.label"), link_data: { turbo_prefetch: false },
-            tabs: Dashboard::NotesForYou::SHOWS.map { |show| { label: t(".filters.#{show}"), count: @counts.fetch(show), current: show == @show, href: admin_notes_path(**admin_url_options, **(show == :all ? {} : { show: show })) } }) %>
+      <%= render Admin::Ui::SegmentedComponent.new(mode: :links, label: t(".filters.label"), control_data: { turbo_prefetch: false },
+            segments: Dashboard::NotesForYou::SHOWS.map { |show| { label: t(".filters.#{show}"), count: @counts.fetch(show), current: show == @show, href: admin_notes_path(**admin_url_options, **(show == :all ? {} : { show: show })) } }) %>
     </div>
     <% if @pagination.out_of_range? %>
       <div><%= render "admin/shared/out_of_range_page", url: admin_notes_path(**admin_url_options, **scope_params) %></div>

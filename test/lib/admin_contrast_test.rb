@@ -467,13 +467,25 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "a tab's words are 4.5:1 on the surface, the current one's on ink, and the focus outline 3:1 on the surface and on the current tab's paper ring" do
+  # `Admin::Ui::SegmentedComponent`: a segment at rest is dim on the track's
+  # surface, under the pointer ink on sunken, its count meta on either; the
+  # chosen one is accent words and a 1px accent edge on the accent tint over
+  # the surface, the edge 3:1 against the tint and against a neighbour at
+  # rest; the track's field-line edge is 3:1 on the paper and the surface it
+  # stands on, and the focus outline 3:1 on both.
+  test "a segment's words and count are 4.5:1, the chosen one's accent words, its edge and the track's edge 3:1 or better" do
     each_scheme do |scheme, colour|
-      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a tab's words on the surface (#{scheme})")
-      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-sunken"), "a hovered tab's words on sunken (#{scheme})")
-      assert_ratio(4.5, colour.("--cs-paper"), colour.("--cs-ink"), "the current tab's words on ink (#{scheme})")
-      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the focus outline on the surface (#{scheme})")
-      assert_ratio(3.0, colour.("--cs-paper"), colour.("--cs-ink"), "the paper ring on the current tab (#{scheme})")
+      tint = colour.("--cs-accent-tint", under: "--cs-surface")
+      assert_ratio(4.5, colour.("--cs-dim"), colour.("--cs-surface"), "a segment's words on the surface (#{scheme})")
+      assert_ratio(4.5, colour.("--cs-ink"), colour.("--cs-sunken"), "a hovered segment's words on sunken (#{scheme})")
+      %w[--cs-surface --cs-sunken].each { |ground| assert_ratio(4.5, colour.("--cs-meta"), colour.(ground), "a count on #{ground} (#{scheme})") }
+      assert_ratio(4.5, colour.("--cs-accent"), tint, "the chosen segment's words and count on its tint (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), tint, "the chosen segment's edge against its tint (#{scheme})")
+      assert_ratio(3.0, colour.("--cs-accent"), colour.("--cs-surface"), "the chosen segment's edge against a neighbour at rest (#{scheme})")
+      %w[--cs-paper --cs-surface].each do |ground|
+        assert_ratio(3.0, colour.("--cs-field-line"), colour.(ground), "the track's edge on #{ground} (#{scheme})")
+        assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the focus outline on #{ground} (#{scheme})")
+      end
     end
   end
 

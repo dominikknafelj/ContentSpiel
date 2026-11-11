@@ -9,7 +9,7 @@
       <% end %>
     <% end %>
     <% panel.with_action do %>
-      <%= render Admin::Ui::TabLinksComponent.new(tabs:, label: t(".filter_label"), link_data: filter_data) %>
+      <%= render Admin::Ui::SegmentedComponent.new(mode: :links, segments: tabs, label: t(".filter_label"), control_data: filter_data) %>
     <% end %>
     <% waiting.rows.each do |row| %>
       <% panel.with_row { render Admin::DashboardScreen::WaitingRowComponent.new(row:) } %>

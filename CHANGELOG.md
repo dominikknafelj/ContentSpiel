@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed
+
+- CS Studio's segmented controls are one component with one look: the posts list's scope, the media library's and the picker's segments, Translations' type, the Trash's types, a form's Form | Submissions, Waiting for you's and the Notes screen's filters, a `control: :segmented` select (the Note block's kind), Settings' mail security and image format, the form builder's "Shown as" and the New form dialog's start. The chosen segment is the accent tint with accent words and a 1px accent edge where it was ink with paper words; the track has no dividers, is 38px tall everywhere (34px outside a filter bar before), wraps whole segments at a narrow width, and a count is always drawn in tabular figures, 0 included. The keyboard is as before: a link is a Tab stop, a radio group one Tab stop the arrows move along (#237).
+
+### Removed
+
+- `Admin::Ui::TabLinksComponent`, with no alias: its links are `Admin::Ui::SegmentedComponent.new(mode: :links, label:, segments:, control_data:)`, a segment `{ label:, href:, current:, count: }` as a tab was, and `link_data:` is `control_data:`.
+- The class constants `Admin::Ui::TabLinksComponent::LINK_CLASS`, `Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS`, `Admin::MediaLibrary::ToolbarComponent::SEGMENT_CLASS` and `Admin::Fields::SelectField::SEGMENT_CLASS`: a segmented control is drawn by `Admin::Ui::SegmentedComponent`, never from a class string. With them went the filter bar's height rule for a segment (`.admin-filter-bar fieldset label`): the control is 38px by its own track.
+
+### For a gem or an outside caller
+
+- `Admin::Ui::SegmentedComponent` is the one segmented control, in `mode: :links` (a `<nav>` of links, the chosen one `aria-current="page"`) or `mode: :radios` (a `<fieldset>` of sr-only radios named `name:`, its legend `legend: :hidden` or `:visible`, with `required:`, `id:` and `describedby:` on the group). A segment is a Hash of `label:`, `current:` and `count:` (nil draws none), with `href:` for a link and `value:` and `id:` for a radio (each required by its key, so `value: ""` is a value), which also takes `count_id:`, `disabled:` and `data:`. A segment missing its mode's keys, holding a key of the other mode or an unknown one, and links handed `name:`, `required:`, `describedby:` or `legend:`, are refused with an `ArgumentError`. A `MediaLibrary::ToolbarComponent`'s count spans keep their ids (`count_id`).
+
 ## 0.2.0 (2026-11-10)
 
 ### Breaking

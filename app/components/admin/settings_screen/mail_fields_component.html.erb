@@ -29,19 +29,9 @@
       <% if from_host?(:mail_security) %>
         <%= render host_value(:mail_security) %>
       <% else %>
-        <%# The segmented control of a schema field's `control: :segmented` (`Admin::Fields::SelectField`). %>
-        <%= tag.fieldset id: input_id(:mail_security), class: "m-0 min-w-0 border-0 p-0" do %>
-          <legend class="<%= setup_label_class %> mb-1"><%= label(:mail_security) %></legend>
-          <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
-            <% SECURITIES.each do |option| %>
-              <label for="<%= input_id(:mail_security) %>-<%= option %>" class="<%= segment_class %>">
-                <%= radio_button_tag input_name(:mail_security), option, security == option, id: "#{input_id(:mail_security)}-#{option}", class: "sr-only",
-                      data: { action: "change->mail-port#security", port: PORTS.fetch(option) } %>
-                <span><%= t(".#{option}") %></span>
-              </label>
-            <% end %>
-          </div>
-        <% end %>
+        <%# The shared segmented control's radios, as a schema field's `control: :segmented` draws them (`Admin::Fields::SelectField`). %>
+        <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: input_name(:mail_security), label: label(:mail_security), legend: :visible,
+              id: input_id(:mail_security), segments: security_segments) %>
       <% end %>
       <%= helpers.render "admin/shared/field_errors", id: "#{input_id(:mail_security)}-errors", messages: field_errors(:mail_security) %>
     <% end %>

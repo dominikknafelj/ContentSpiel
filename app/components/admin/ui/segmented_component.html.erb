@@ -1,0 +1,27 @@
+<% if links? %>
+  <%= tag.nav id: id, aria: { label: label }, class: "#{TRACK_CLASS} self-start" do %>
+    <% segments.each do |segment| %>
+      <%= link_to segment.href, class: LINK_SEGMENT_CLASS, aria: { current: (segment.current ? "page" : nil) }, data: data_for(segment) do %>
+        <span><%= segment.label %></span>
+        <% unless segment.count.nil? %>
+          <span class="<%= COUNT_CLASS %>"><%= segment.count %></span>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= tag.fieldset id: id, aria: { describedby: describedby }, class: "m-0 min-w-0 border-0 p-0" do %>
+    <legend class="<%= legend_class %>"><%= label %></legend>
+    <div class="<%= TRACK_CLASS %>">
+      <% segments.each do |segment| %>
+        <label for="<%= segment.id %>" class="<%= RADIO_SEGMENT_CLASS %>">
+          <%= radio_button_tag name, segment.value, segment.current, id: segment.id, class: "sr-only", disabled: segment.disabled, required: required, data: data_for(segment) %>
+          <span><%= segment.label %></span>
+          <% unless segment.count.nil? %>
+            <%= tag.span segment.count, id: segment.count_id, class: COUNT_CLASS %>
+          <% end %>
+        </label>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

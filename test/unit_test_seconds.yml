@@ -166,7 +166,6 @@ test/components/admin/ui/save_bar_component_test.rb: 0.0
 test/components/admin/ui/save_status_component_test.rb: 0.0
 test/components/admin/ui/status_chip_component_test.rb: 0.0
 test/components/admin/ui/system_check_row_component_test.rb: 0.0
-test/components/admin/ui/tab_links_component_test.rb: 0.0
 test/components/admin/ui/theme_switch_component_test.rb: 0.0
 test/components/admin/ui/time_ago_component_test.rb: 0.0
 test/components/admin/ui/toast_component_test.rb: 0.1

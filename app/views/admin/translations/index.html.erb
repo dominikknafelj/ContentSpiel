@@ -22,19 +22,8 @@
   <%= form_with(**filter_form_options(admin_translations_path)) do %>
     <% if @language %><%= hidden_field_tag :language, @language, id: nil %><% end %>
     <% if @types.size > 1 %>
-      <fieldset class="m-0 min-w-0 border-0 p-0">
-        <legend class="sr-only"><%= t(".type") %></legend>
-        <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
-          <% all_count = @counts.values.sum %>
-          <% [ [ "", t(".all"), all_count ] ].concat(@types.map { |type| [ type, t(".types.#{type}"), @counts.fetch(type) ] }).each do |value, label, count| %>
-            <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
-              <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
-              <span><%= label %></span>
-              <span class="text-count"><%= count %></span>
-            </label>
-          <% end %>
-        </div>
-      </fieldset>
+      <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: :type, label: t(".type"),
+            segments: translation_type_segments(types: @types, counts: @counts, type: @type)) %>
       <noscript><%= render Admin::Ui::ButtonComponent.new(label: t(".filter"), variant: :secondary, type: "submit") %></noscript>
     <% end %>
     <% if filtered %>

@@ -3,18 +3,8 @@
 
   <div class="flex flex-col gap-4 p-4">
     <div class="admin-column" data-field-name="image_format" <%= tag.attributes(data: { save_bar_changed: values.saved_change("image_format") }) %>>
-      <%= tag.fieldset id: input_id(:image_format), class: "m-0 min-w-0 border-0 p-0", aria: { describedby: "#{input_id(:image_format)}-help" } do %>
-        <legend class="<%= setup_label_class %> mb-1"><%= t(".format") %></legend>
-        <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
-          <% ImageSettings::FORMATS.each do |option| %>
-            <% unavailable = option == "avif" && !avif_available? %>
-            <label for="<%= input_id(:image_format) %>-<%= option %>" class="<%= segment_class %>">
-              <%= radio_button_tag "site_setting[image_format]", option, format == option, id: "#{input_id(:image_format)}-#{option}", class: "sr-only", disabled: unavailable %>
-              <span><%= t(".#{option}") %></span>
-            </label>
-          <% end %>
-        </div>
-      <% end %>
+      <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: "site_setting[image_format]", label: t(".format"), legend: :visible,
+            id: input_id(:image_format), describedby: "#{input_id(:image_format)}-help", segments: format_segments) %>
       <p id="<%= input_id(:image_format) %>-help" class="mt-1.5 text-sm text-meta"><%= t(".format_help") %></p>
       <% if avif_available? %>
         <p class="mt-1 text-sm text-meta" data-images-avif-note><%= t(".avif_note") %></p>

@@ -9,6 +9,8 @@ require "application_system_test_case"
 class Admin::FilterBarSystemTest < ApplicationSystemTestCase
   BAR = "form.admin-filter-bar".freeze
   HEIGHT = 38
+  # A segment of the segmented control: the track's 38px less its 1px border and 2px padding, each side.
+  SEGMENT = 32
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -16,8 +18,9 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
   end
 
   # Every control under `root` as [description, height]: the fields and
-  # selects, the Clear link, and each segmented group's
-  # frame (its labels are the frame less its two border pixels). A filter
+  # selects, the Clear link, and each segmented control's
+  # track (`Admin::Ui::SegmentedComponent`: its segments are 32px inside the
+  # track's border and padding). A filter
   # panel's fieldset is no segmented group: its selects are measured as
   # selects.
   def heights(root: BAR)
@@ -154,7 +157,7 @@ class Admin::FilterBarSystemTest < ApplicationSystemTestCase
     assert_operator result.size, :>=, 4
     result.each do |label|
       assert label["inside"], "#{label["text"]} is clipped by its group: #{result}"
-      assert_operator label["height"], :>=, HEIGHT - 2 - 0.5, "#{label["text"]} is shorter than its row"
+      assert_operator label["height"], :>=, SEGMENT - 0.5, "#{label["text"]} is shorter than its row"
     end
   ensure
     page.current_window.resize_to(1400, 1400)

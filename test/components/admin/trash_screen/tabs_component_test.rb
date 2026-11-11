@@ -19,15 +19,12 @@ class Admin::TrashScreen::TabsComponentTest < ViewComponent::TestCase
     assert_selector "a[aria-current=page]", text: "Posts"
   end
 
-  # The current tab is the same control as a selected pill, ink with paper
-  # words, its count undimmed.
-  test "the current tab is ink with paper words and its count carries no opacity" do
+  # The tabs are the shared segmented control's links, the same control as a
+  # selected pill, its count undimmed.
+  test "the tabs are the shared segmented control's links and a count carries no opacity" do
     render_inline tabs(current: "posts")
 
-    classes = page.find("a[aria-current=page]")["class"].split
-    assert_includes classes, "bg-ink"
-    assert_includes classes, "text-paper"
-    assert_not_includes classes, "bg-sunken"
+    assert_equal Admin::Ui::SegmentedComponent::LINK_SEGMENT_CLASS, page.find("a[aria-current=page]")["class"]
     assert_empty page.all("nav a span").flat_map { |span| span["class"].to_s.split }.grep(/opacity/)
   end
 

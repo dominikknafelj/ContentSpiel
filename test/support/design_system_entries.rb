@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794360159-ac3d".freeze
+  VERSION = "1794363704-46b4".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -17,7 +17,7 @@ module DesignSystemEntries
     FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
     GroupFields IconChip ImageField ImageLoading ListState Mails MediaPicker Menu NoteMarker PasswordField PresenceMarker
     PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
-    PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar
+    PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar Segmented
     SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
     SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip
     StudioBlockCard StudioCommandPalette StudioDashboardCards
@@ -57,7 +57,6 @@ module DesignSystemEntries
     "Admin::Ui::SettingsCardComponent" => "StudioSettings",
     "Admin::Ui::StatusChipComponent" => "Badge",
     "Admin::Ui::SystemCheckRowComponent" => "Alerts",
-    "Admin::Ui::TabLinksComponent" => "StudioFilterBar",
     "Admin::Ui::ThemeSwitchComponent" => "StudioShell",
     "Admin::Ui::TimeAgoComponent" => "StudioListTable",
     "Admin::Ui::ToastRegionComponent" => "Toast",

@@ -57,7 +57,14 @@ module Admin
 
       def field_errors(name) = errors.respond_to?(:full_messages_for) ? errors.full_messages_for(name) : []
 
-      def segment_class = Admin::Fields::SelectField::SEGMENT_CLASS
+      # The formats as the shared segmented control's radios; AVIF is
+      # disabled on a server without its encoder.
+      def format_segments
+        ImageSettings::FORMATS.map do |option|
+          { label: t(".#{option}"), value: option, id: "#{input_id(:image_format)}-#{option}", current: format == option,
+            disabled: option == "avif" && !avif_available? }
+        end
+      end
 
       def total = progress[:total]
 

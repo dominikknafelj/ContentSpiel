@@ -46,17 +46,8 @@
             data: { action: "change->admin--forms--builder#required" }) %>
 
       <% if display? %>
-        <fieldset class="m-0 min-w-0 border-0 p-0">
-          <legend class="<%= setup_label_class %> mb-1"><%= t(".shown_as") %></legend>
-          <div class="inline-flex overflow-hidden rounded-cs border border-field-line bg-surface">
-            <% display_options.each do |value, label| %>
-              <label for="<%= id("display-#{value}") %>" class="<%= Admin::Fields::SelectField::SEGMENT_CLASS %>">
-                <%= radio_button_tag name(:display), value, row.display == value, id: id("display-#{value}"), class: "sr-only" %>
-                <span><%= label %></span>
-              </label>
-            <% end %>
-          </div>
-        </fieldset>
+        <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: name(:display), label: t(".shown_as"), legend: :visible,
+              segments: display_options.map { |value, label| { label:, value:, id: id("display-#{value}"), current: row.display == value } }) %>
       <% end %>
     <% end %>
 

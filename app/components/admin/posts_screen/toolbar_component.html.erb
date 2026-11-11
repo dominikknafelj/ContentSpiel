@@ -9,18 +9,7 @@
       <%= text_field_tag :q, filters[:q], placeholder: t(".search"), autocomplete: "off", class: "block w-56 px-3 py-1.5 text-ink" %>
     </div>
 
-    <fieldset class="m-0 min-w-0 border-0 p-0">
-      <legend class="sr-only"><%= t(".show") %></legend>
-      <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-field-line bg-surface">
-        <% scopes.each do |name| %>
-          <label for="posts-scope-<%= name %>" class="<%= SEGMENT_CLASS %>">
-            <%= radio_button_tag :scope, name, scope == name, id: "posts-scope-#{name}", class: "sr-only" %>
-            <span><%= t(".scopes.#{name}") %></span>
-            <span class="text-count"><%= count_for(name) %></span>
-          </label>
-        <% end %>
-      </div>
-    </fieldset>
+    <%= render Admin::Ui::SegmentedComponent.new(mode: :radios, name: :scope, label: t(".show"), segments: scope_segments) %>
 
     <noscript><%= render Admin::Ui::ButtonComponent.new(label: t(".filter"), variant: :secondary, type: "submit") %></noscript>
     <% if active? %>

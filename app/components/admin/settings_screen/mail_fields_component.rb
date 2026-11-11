@@ -76,7 +76,14 @@ module Admin
 
       def field_errors(name) = errors.respond_to?(:full_messages_for) ? errors.full_messages_for(name) : []
 
-      def segment_class = Admin::Fields::SelectField::SEGMENT_CLASS
+      # The securities as the shared segmented control's radios, each telling
+      # `mail-port` the port it goes with.
+      def security_segments
+        SECURITIES.map do |option|
+          { label: t(".#{option}"), value: option, id: "#{input_id(:mail_security)}-#{option}", current: security == option,
+            data: { action: "change->mail-port#security", port: PORTS.fetch(option) } }
+        end
+      end
 
       private
 
