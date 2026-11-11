@@ -20,6 +20,17 @@ class Session < ApplicationRecord
 
   validates :authenticated_with, inclusion: { in: METHODS }
 
+  # What a `session.ended` for an expiry stores of the timeout it ended by
+  # (`Sessions::End`, `Sessions::SweepJob`): the event's sentence reads it
+  # from there, so an old event keeps its words when a timeout changes.
+  def self.timeout_metadata(reason)
+    case reason
+    when "expired_idle" then { "after_hours" => (IDLE_TIMEOUT / 1.hour).to_i }
+    when "expired_absolute" then { "after_days" => (ABSOLUTE_TIMEOUT / 1.day).to_i }
+    else {}
+    end
+  end
+
   # A SESSION THAT ENDS TAKES ITS CABLE WITH IT. A WebSocket is authenticated
   # once, when it connects (`ApplicationCable::Connection`), and then lives as
   # long as the tab: without this a tab open before a sign-out or a password

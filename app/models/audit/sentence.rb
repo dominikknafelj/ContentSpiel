@@ -459,20 +459,28 @@ module Audit
 
       # One ending's sentence by its reason, with the number of sessions it
       # ended (`count`). An expiry met by a request names the user whose
-      # session it was; the sweep's has no subject and tells how many.
+      # session it was; the sweep's has no subject and tells how many. An
+      # expiry says the timeout the event stored.
       def ended_parts
         metadata = self.class.metadata_of(event)
         count = metadata.key?("count") ? metadata["count"].to_i : 1
         sessions = count == 1 ? "session" : "sessions"
         user = subject_label
         case metadata["reason"]
-        when "expired_idle" then expired_parts(user, count, sessions, "ended after #{Session::IDLE_TIMEOUT.inspect} unused")
-        when "expired_absolute" then expired_parts(user, count, sessions, "ended #{Session::ABSOLUTE_TIMEOUT.inspect} after sign-in")
+        when "expired_idle" then expired_parts(user, count, sessions, "ended after #{counted(metadata["after_hours"], "hour")} unused")
+        when "expired_absolute" then expired_parts(user, count, sessions, "ended #{counted(metadata["after_days"], "day")} after sign-in")
         when "ended_by_self" then [ text("ended #{count == 1 ? "one" : count} of #{@you ? "your" : "their"} other sessions") ]
         when "ended_by_owner" then user ? subject_parts("ended every session of ", " (#{count})") : [ text("ended #{count} #{sessions}") ]
         when "password_changed" then counted_of(user, count, sessions, " ended by a password change")
         else counted_of(user, count, sessions, " ended")
         end
+      end
+
+      # "12 hours", "1 day": the timeout the event stored
+      # (`Session.timeout_metadata`), never the constant as it is now.
+      def counted(number, unit)
+        number = number.to_i
+        "#{number} #{number == 1 ? unit : unit.pluralize}"
       end
 
       def expired_parts(user, count, sessions, after)

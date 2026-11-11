@@ -33,7 +33,7 @@ class Sessions::SweepJobTest < ActiveJob::TestCase
   test "a session that is both idle and absolute is counted once, as absolute" do
     start(seen: @now - 20.days, signed_in: @now - 21.days)
     Sessions::SweepJob.perform_now(at: @now)
-    assert_equal [ [ "expired_absolute", 1 ] ], ended_events.map { |e| [ e.metadata["reason"], e.metadata["count"] ] }
+    assert_equal [ { "reason" => "expired_absolute", "count" => 1, "after_days" => 14 } ], ended_events.map(&:metadata)
   end
 
   test "more than a batch is ended and counted in one event" do

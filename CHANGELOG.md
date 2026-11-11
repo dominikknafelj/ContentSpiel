@@ -22,7 +22,7 @@
 - Sessions have limits: idle after 12 hours unseen, and 14 days after sign-in whatever is done (`Session::IDLE_TIMEOUT`, `ABSOLUTE_TIMEOUT`). A request or a cable connection that meets an expired session ends it; `Sessions::SweepJob` ends the ones nobody met, hourly. The sign-in page says "Your session ended. Sign in again." to the browser it ended in, and to no other.
 - Your account has a Sessions card: every live session with its browser and system (`SessionDevice`, from the new `useragent` gem), address, last activity and how its person signed in, an End on each other one, and "Sign out everywhere else".
 - The user editor has a Sessions zone for an owner: "End all sessions" for another user (`Sessions::EndAll`, not offered on the owner's own account).
-- `session.ended` in the audit log (Security), one event per act with a count and a reason (`expired_idle`, `expired_absolute`, `ended_by_self`, `ended_by_owner`, `password_changed`); sign-out stays `session.destroyed`.
+- `session.ended` in the audit log (Security), one event per act with a count and a reason (`expired_idle`, `expired_absolute`, `ended_by_self`, `ended_by_owner`, `password_changed`), and for an expiry the timeout it ended by (`after_hours`, `after_days`), which its sentence reads; sign-out stays `session.destroyed`.
 - Spans `auth.session` (a session a request ended for expiry; a cable connection's expiry is audited only) and `auth.session_sweep`, with `auth.session.reason` and `auth.session.count` (`docs/reference/hosting.md`, "Telemetry").
 
 ### Changed

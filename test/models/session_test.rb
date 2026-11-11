@@ -82,7 +82,7 @@ class SessionTest < ActiveSupport::TestCase
 
     assert_not Session.exists?(session.id)
     event = Audit::Event.where(action: "session.ended").sole
-    assert_equal({ "reason" => "expired_idle", "count" => 1 }, event.metadata)
+    assert_equal({ "reason" => "expired_idle", "count" => 1, "after_hours" => 12 }, event.metadata)
     assert_nil event.actor_id
     assert_nil event.user_id
     assert_equal @user, event.subject

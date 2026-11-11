@@ -221,9 +221,18 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
   # `session.ended`, one sentence per reason. An expiry and a password
   # change are told with no actor; the two endings a person chose name them.
-  def ended(reason, count: 1, user: users(:two), **attributes)
+  def ended(reason, count: 1, user: users(:two), timeout: Session.timeout_metadata(reason), **attributes)
     subject = user ? { subject_type: "User", subject_id: user.id, subject_label: user.name_or_email } : {}
-    event("session.ended", metadata: { "reason" => reason, "count" => count }, **subject, **attributes)
+    event("session.ended", metadata: { "reason" => reason, "count" => count, **timeout }, **subject, **attributes)
+  end
+
+  # The words are the event's: a timeout changed later does not rewrite an
+  # old row.
+  test "an expiry says the timeout its event stored, not the timeout as it is now" do
+    assert_equal "Session of “#{users(:two).name_or_email}” ended after 8 hours unused",
+      read(sentence_for(ended("expired_idle", timeout: { "after_hours" => 8 }, user_id: nil)))
+    assert_equal "2 sessions ended 1 day after sign-in",
+      read(sentence_for(ended("expired_absolute", count: 2, user: nil, timeout: { "after_days" => 1 }, user_id: nil)))
   end
 
   test "an idle expiry names whose session it was, or counts them, with no actor, as a security event" do

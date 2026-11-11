@@ -31,7 +31,7 @@ module Sessions
         ended += batch
         break if batch.zero?
       end
-      Audit.record("session.ended", metadata: { "reason" => reason, "count" => ended }) if ended.positive?
+      Audit.record("session.ended", metadata: { "reason" => reason, "count" => ended, **Session.timeout_metadata(reason) }) if ended.positive?
       ended
     end
   end
