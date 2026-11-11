@@ -47,6 +47,7 @@ These are the owner's decisions, in his words and mine:
   - The server sanitizes the SVG against a strict allowlist before storing it, and refuses what it can't sanitize. The allowlist means: no script, no `foreignObject` or HTML labels, no event handlers, no external references and no `style` that can load anything.
 - **Theme colours:** a block type promises the theme's colours, never Tailwind's palette. Mermaid's output reads the theme's colour tokens, in light and in dark.
 - **Accessibility:** a required text description is a field of the block, like an image's alt. The public markup is `role="img"` with an accessible name and the description.
+- **After the cards (v211), 2026-11-11:** a large diagram scales down to about 60%, then scrolls sideways in its own figure box (call 13); the tile shows a small preview of the stored drawing (call 14).
 - **Questions left to this spec:**
   - inline SVG or `<img>`;
   - how the theme's colours reach the drawing;
@@ -303,7 +304,7 @@ The error is a polite live region, announced once per new error, never per keyst
 - The `summary` is the type's label, " · " and the first line after the keyword, in mono ("Flowchart · A --> B"). It is "Empty" as a `:hint` when there is no source.
 - It has two attention hints, in the meta colour and never danger: "No description", and "Last drawing kept" when `Drawing#current?` is false.
 - The `preview` is the description's opening words over the source's first three lines, in mono.
-- Text only: no picture on the tile (see "My calls").
+- A small preview of the stored drawing, scaled down, no script (see "My calls", 14).
 
 **The translation tab.**
 - The source and the description are inputs there.
@@ -404,8 +405,8 @@ The design agent draws these first:
 10. **No description, no diagram on the site** (and in the preview): the required description is enforced at drawing, not at save, because the picker makes an empty block and "Require nothing unless the block is useless without it". The card and the tile say why it isn't shown.
 11. **A public page shows nothing** for a block with no drawing, no description, or a drawing that fails on read. It never shows an error text or an empty box. A failure on read is logged once.
 12. **Limits:** 10,000 characters of source, 300 KB and 5,000 elements of drawing.
-13. **The drawing is scaled to its column,** never scrolled. A large diagram on a phone gets small. This is a limit, and the design agent may answer otherwise.
-14. **Text only on the tile.** Drawing the stored picture on the tile is possible (it is clean) but is left for the design agent to ask for.
+13. **The drawing is scaled to its column,** down to about 60% of its drawn size (where labels would fall under 9px); below that it keeps that size and scrolls sideways inside its own figure box. The page never scrolls sideways. *(Owner, 2026-11-11, replacing "never scrolled".)*
+14. **The tile shows a small preview:** the stored, cleaned SVG scaled down, with no script, painted by the same tokens, beside the summary line; "No description" and "Last drawing kept" as before. *(Owner, 2026-11-11, replacing "text only".)*
 15. **Archivo is the drawing's font,** fixed by a token (`--th-diagram-font`), because the boxes are measured in it.
 16. **The new top-level name is `Diagram`** (`Diagram::Source`, `Diagram::Drawing`), named under `### Breaking`.
 
