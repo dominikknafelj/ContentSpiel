@@ -27,10 +27,11 @@ module SignIn
   #    with the buckets its reservation closed, and is counted no further:
   #    the reservation was its count. A right password for an account that
   #    holds a second factor (`User#second_factor?`) is
-  #    `:second_factor_required`: only the address's counts are given back
-  #    (`Throttle#release_address`), and the account's (or the device's)
-  #    stands until the second proof (`SignIn::Proof`) succeeds, so the
-  #    password alone never clears a run nor signs anyone in.
+  #    `:second_factor_required` (`Throttle#await_second_proof`): the
+  #    address's counts are given back, and so is a lock its own
+  #    reservation wrote, but the account's (or the device's) count stands
+  #    until the second proof (`SignIn::Proof`) succeeds, so the password
+  #    alone never clears a run nor signs anyone in.
   #
   # The email and the password reach `authenticate_by` as Strings, a list or
   # a hash as "", so a junk parameter is refused as any wrong address is and
@@ -104,7 +105,7 @@ module SignIn
       return outcome(:refused, trips: reservation.closes) unless account
 
       if account.second_factor?
-        @throttle.release_address(address: address)
+        @throttle.await_second_proof(reservation, identifier: identifier, address: address, device: known_device_id)
         Telemetry.record(span, "auth.second_factor.required" => true)
         return outcome(:second_factor_required, account: account)
       end

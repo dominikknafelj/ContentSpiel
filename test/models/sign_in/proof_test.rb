@@ -55,6 +55,36 @@ class SignIn::ProofTest < ActiveSupport::TestCase
     assert_equal :locked, password_step.status, "the password step meets the same lock"
   end
 
+  test "after five wrong passwords from anyone, the right password and a right second proof sign in; a wrong proof then counts and the lock follows the back-off" do
+    5.times { password_step(password: "wrong") }
+    assert_equal :locked, password_step.status
+    travel 61.seconds
+
+    assert_equal SignIn::Outcome.new(status: :second_factor_required, account: @user, trips: [], bot_check_due: false), password_step,
+      "the sixth count's own lock is taken back, and no trip is reported"
+    assert_equal 6, count_of(:account)
+    assert proof.recovery_code(@codes.first).ok?, "the lock the right password wrote does not refuse its own proof"
+    assert_nil count_of(:account)
+
+    4.times { password_step(password: "wrong") }
+    assert_equal :second_factor_required, password_step.status, "the fifth count, a right password, goes on"
+    assert_equal refused(trips: [ Trip.new(bucket: :account, level: 1, seconds: 120) ]), proof.recovery_code("0000-0000"),
+      "the wrong proof is the sixth count and writes the next lock"
+    assert_equal :locked, proof.recovery_code(@codes.second).status
+    assert_equal :locked, password_step.status
+    travel 121.seconds
+    assert_equal :second_factor_required, password_step.status
+    assert proof.recovery_code(@codes.second).ok?
+  end
+
+  test "a right password while a lock from earlier failures stands is refused as locked" do
+    5.times { password_step(password: "wrong") }
+
+    assert_equal SignIn::Outcome.new(status: :locked, account: nil, trips: [ Trip.new(bucket: :account, level: 0, seconds: 60) ], bot_check_due: false), password_step
+    assert_equal :locked, proof.recovery_code(@codes.first).status
+    assert_equal 10, @user.recovery_codes.unused.count
+  end
+
   test "a used code and a wrong code are the same refusal" do
     assert proof.recovery_code(@codes.first).ok?
 

@@ -219,7 +219,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_equal %w[address_wide device], exporter.finished_spans.select { |span| span.name == "auth.throttle" }.map { |span| span.attributes["auth.bucket"] }
   end
 
-  test "reserve_address counts in the wide bucket alone, so an account's lock never refuses it, and release_address takes the address's counts back" do
+  test "reserve_address counts in the wide bucket alone, so an account's lock never refuses it, and release_address takes back its wide count alone" do
     attempts(5)
     assert_equal :account, attempt.refused_by.bucket
 
@@ -230,11 +230,48 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
     assert_nil @throttle.release_address(address: ADDRESS)
     assert_equal 5, count_of(:wide)
-    assert_equal 4, count_of(:bot_address), "this attempt's bot-check count is taken back with its wide one"
+    assert_equal 5, count_of(:bot_address), "reserve_address counted no bot check, so none is taken back"
     assert_equal :account, attempt.refused_by.bucket, "the account's lock stands"
 
     45.times { @throttle.reserve_address(address: ADDRESS) }
     assert_equal :address_wide, @throttle.reserve_address(address: ADDRESS).refused_by.bucket
+  end
+
+  test "passkey sign-ins again and again leave the address's bot-check count as it was, and no count goes below 0" do
+    attempt
+    5.times do
+      @throttle.reserve_address(address: ADDRESS)
+      @throttle.release_address(address: ADDRESS)
+    end
+    assert_equal 1, count_of(:bot_address)
+    assert_equal 1, count_of(:wide)
+
+    3.times { @throttle.release_address(address: ADDRESS) }
+    assert_equal 0, count_of(:wide), "a take-back of more than was counted stops at 0"
+    attempt
+    assert_equal 1, count_of(:wide)
+  end
+
+  test "await_second_proof takes back the lock its own reservation wrote and keeps the count; a lock written before it stands" do
+    attempts(4)
+    reservation = attempt
+    assert_equal [ Trip.new(bucket: :account, level: 0, seconds: 60) ], reservation.closes
+
+    assert_nil @throttle.await_second_proof(reservation, identifier: EMAIL, address: ADDRESS)
+    assert_equal 5, count_of(:account), "the run's count stands"
+    assert_equal 4, count_of(:wide), "the address's counts are taken back as a success's are"
+    assert_equal 4, count_of(:bot_address)
+    sixth = attempt
+    assert sixth.ok?, "the lock it wrote is gone"
+    assert_equal [ Trip.new(bucket: :account, level: 1, seconds: 120) ], sixth.closes, "the next attempt writes the next lock itself"
+    assert_equal :account, attempt.refused_by.bucket, "and it stands"
+
+    device = "d" * 32
+    attempts(4, device: device)
+    reservation = attempt(device: device)
+    @throttle.await_second_proof(reservation, identifier: EMAIL, address: ADDRESS, device: device)
+    assert attempt(device: device).ok?, "a known device's lock is taken back the same way"
+    assert_equal :account, attempt.refused_by.bucket, "the account's own lock was not touched"
   end
 
   test "a notice is due once an hour per account" do
