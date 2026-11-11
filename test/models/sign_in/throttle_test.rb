@@ -2,10 +2,30 @@ require "test_helper"
 
 # The sign-in throttle's counters, on a store of the test's own: the account
 # bucket's back-off, the wide address cap, the bot check's due mark and the
-# lock-out notice's hour.
+# lock-out notice's hour. An attempt is a `reserve`; one whose password was
+# wrong is told nothing more, one whose password was right is followed by
+# `record_success`.
 class SignIn::ThrottleTest < ActiveSupport::TestCase
   EMAIL = "ann@example.org".freeze
   ADDRESS = "203.0.113.7".freeze
+  Trip = SignIn::Throttle::Trip
+
+  # A store whose every count fails as Solid Cache's failsafe answers one.
+  class FailingCounts < ActiveSupport::Cache::MemoryStore
+    def increment(...) = nil
+    def decrement(...) = nil
+  end
+
+  # A store that yields the thread around every call, so attempts on
+  # several threads interleave between their read, increment and write.
+  class Interleaving < ActiveSupport::Cache::MemoryStore
+    %i[read write increment decrement exist?].each do |name|
+      define_method(name) do |*args, **options|
+        Thread.pass
+        super(*args, **options).tap { Thread.pass }
+      end
+    end
+  end
 
   setup do
     freeze_time
@@ -13,122 +33,139 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     @throttle = SignIn::Throttle.new(store: @store)
   end
 
-  def fail_times(count, identifier: EMAIL, address: ADDRESS, throttle: @throttle)
-    Array.new(count) { throttle.record_failure(identifier: identifier, address: address) }.last
+  def attempt(identifier: EMAIL, address: ADDRESS, throttle: @throttle)
+    throttle.reserve(identifier: identifier, address: address)
   end
 
-  def account_count = @store.read(@store.instance_variable_get(:@data).keys.find { |key| key.include?(":account:") })
+  def attempts(count, **options) = Array.new(count) { attempt(**options) }.last
+
+  def keys(store = @store) = store.instance_variable_get(:@data).keys
+  def count_of(counter, store = @store) = store.read(keys(store).find { |key| key.include?(":#{counter}:") })
 
   test "lock_seconds is nil below five failures, then 60, 120, 240 … and 3600 from the eleventh" do
-    assert_equal [ nil ] * 4 + [ 60, 120, 240, 480, 960, 1920, 3600, 3600 ], (1..12).map { |failures| SignIn::Throttle.lock_seconds(failures) }
+    assert_equal [ nil ] * 4 + [ 60, 120, 240, 480, 960, 1920, 3600, 3600 ], (1..12).map { |count| SignIn::Throttle.lock_seconds(count) }
   end
 
-  test "the fifth failure closes the account for a minute, and the bucket opens again after it" do
-    assert_empty fail_times(4)
-    assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
+  test "the fifth attempt goes on and closes the account for a minute, and the bucket opens again after it" do
+    4.times { assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), attempt }
 
-    trips = @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
-    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60) ], trips
-    assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60), @throttle.closed(identifier: EMAIL, address: ADDRESS)
-    assert_nil @throttle.closed(identifier: "bea@example.org", address: ADDRESS), "another account is open"
+    fifth = attempt
+    assert fifth.ok?
+    assert_equal [ Trip.new(bucket: :account, level: 0, seconds: 60) ], fifth.closes
+    assert_equal Trip.new(bucket: :account, level: 0, seconds: 60), attempt.refused_by
+    assert attempt(identifier: "bea@example.org").ok?, "another account is open"
 
     travel 30.seconds
-    assert_equal 30, @throttle.closed(identifier: EMAIL, address: ADDRESS).seconds
+    assert_equal 30, attempt.refused_by.seconds
 
     travel 31.seconds
-    assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
-    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 1, seconds: 120) ], @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
+    sixth = attempt
+    assert sixth.ok?
+    assert_equal [ Trip.new(bucket: :account, level: 1, seconds: 120) ], sixth.closes
   end
 
   test "an attempt during the lock checks no password and leaves the lock as it was" do
-    fail_times(5)
-    lock_key = @store.instance_variable_get(:@data).keys.find { |key| key.include?(":account_lock:") }
-    lock_end = @store.read(lock_key)
+    attempts(5)
+    lock_key = keys.find { |key| key.include?(":account_lock:") }
+    lock = @store.read(lock_key)
 
     travel 10.seconds
-    2.times { assert_equal :account, @throttle.closed(identifier: EMAIL, address: ADDRESS).bucket }
+    2.times { assert_equal :account, attempt.refused_by.bucket }
 
-    assert_equal 5, account_count
-    assert_equal lock_end, @store.read(lock_key)
+    assert_equal 5, count_of(:account)
+    assert_equal 5, count_of(:wide), "the refused attempts took their address count back"
+    assert_equal lock, @store.read(lock_key)
     travel 51.seconds
-    assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS), "the lock ends when it was set to"
+    assert attempt.ok?, "the lock ends when it was set to"
   end
 
-  test "a success clears the account's count and lock, and the next failure counts from one" do
-    fail_times(5)
-    assert_nil @throttle.record_success(identifier: EMAIL)
+  test "a success clears the account's count and lock, and the next attempt counts from one" do
+    attempts(5)
+    assert_nil @throttle.record_success(identifier: EMAIL, address: ADDRESS)
 
-    assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
-    assert_empty fail_times(1)
-    assert_equal 1, account_count
-    assert_empty fail_times(3)
-    assert_equal [ 0 ], fail_times(1).map(&:level)
+    assert_equal [], attempt.closes
+    assert_equal 1, count_of(:account)
+    attempts(3)
+    assert_equal [ 0 ], attempt.closes.map(&:level)
   end
 
-  test "an account's failures are forgotten 24 hours after the run's first" do
-    fail_times(2)
+  test "an account's attempts are forgotten 24 hours after the run's first" do
+    attempts(2)
     travel 23.hours
-    fail_times(2)
-    assert_equal 4, account_count
+    attempts(2)
+    assert_equal 4, count_of(:account)
 
     travel 1.hour + 1.second
-    assert_empty fail_times(4), "the run began again with the 24 hours"
-    assert_equal 4, account_count
-  end
-
-  test "the fiftieth failure from an address closes it until the hour ends, whatever accounts it tried" do
-    49.times { |index| assert_empty @throttle.record_failure(identifier: "person#{index}@example.org", address: ADDRESS) }
-    assert_nil @throttle.closed(identifier: "someone@example.org", address: ADDRESS)
-
-    travel 20.minutes
-    trips = @throttle.record_failure(identifier: "last@example.org", address: ADDRESS)
-    assert_equal [ SignIn::Throttle::Trip.new(bucket: :address_wide, level: nil, seconds: 40.minutes.to_i) ], trips
-    assert_equal :address_wide, @throttle.closed(identifier: "someone@example.org", address: ADDRESS).bucket
-    assert_nil @throttle.closed(identifier: "someone@example.org", address: "203.0.113.8"), "another address is open"
-
-    travel 40.minutes + 1.second
-    assert_nil @throttle.closed(identifier: "someone@example.org", address: ADDRESS)
-  end
-
-  test "a failure that closes both buckets answers both, the account's first" do
-    45.times { |index| @throttle.record_failure(identifier: "person#{index}@example.org", address: ADDRESS) }
-    assert_empty fail_times(4)
-
-    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60),
-      SignIn::Throttle::Trip.new(bucket: :address_wide, level: nil, seconds: 1.hour.to_i) ], fail_times(1)
-    assert_equal [], fail_times(1, identifier: "other@example.org", address: "198.51.100.1")
+    assert_empty attempts(4).closes, "the run began again with the 24 hours"
+    assert_equal 4, count_of(:account)
   end
 
   test "a lock that outlives its run's count keeps its level" do
-    fail_times(10)
-    travel 23.hours + 59.minutes
-    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 6, seconds: 3600) ], fail_times(1), "the 11th failure, inside the run"
+    start = Time.current
+    10.times { |index| attempt; travel SignIn::Throttle.lock_seconds(index + 1).to_i + 1 }
+
+    travel_to start + 23.hours + 59.minutes
+    assert_equal [ Trip.new(bucket: :account, level: 6, seconds: 3600) ], attempt.closes, "the eleventh, inside the run"
 
     travel 2.minutes
-    assert_nil account_count, "the run's count is forgotten"
-    assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 6, seconds: 3480), @throttle.closed(identifier: EMAIL, address: ADDRESS)
+    assert_nil count_of(:account), "the run's count is forgotten"
+    assert_equal Trip.new(bucket: :account, level: 6, seconds: 3480), attempt.refused_by
+  end
+
+  test "the fiftieth attempt from an address closes it until the hour ends, whatever accounts it tried" do
+    49.times { |index| assert_equal [], attempt(identifier: "person#{index}@example.org").closes }
+
+    travel 20.minutes
+    fiftieth = attempt(identifier: "last@example.org")
+    assert fiftieth.ok?
+    assert_equal [ Trip.new(bucket: :address_wide, level: nil, seconds: 40.minutes.to_i) ], fiftieth.closes
+    assert_equal Trip.new(bucket: :address_wide, level: nil, seconds: 40.minutes.to_i), attempt(identifier: "someone@example.org").refused_by
+    assert_equal 50, count_of(:wide), "a refused attempt is not counted"
+    assert attempt(identifier: "someone@example.org", address: "203.0.113.8").ok?, "another address is open"
+
+    travel 40.minutes + 1.second
+    assert attempt(identifier: "someone@example.org").ok?
+  end
+
+  test "a success takes back only its own count from the address" do
+    48.times { |index| attempt(identifier: "person#{index}@example.org") }
+    attempt(identifier: "right@example.org")
+    @throttle.record_success(identifier: "right@example.org", address: ADDRESS)
+    assert_equal 48, count_of(:wide)
+
+    assert_equal [], attempt(identifier: "next@example.org").closes
+    assert_equal :address_wide, attempt(identifier: "last@example.org").closes.sole.bucket
+  end
+
+  test "an attempt that closes both buckets answers both, the account's first" do
+    45.times { |index| attempt(identifier: "person#{index}@example.org") }
+    attempts(4)
+
+    assert_equal [ Trip.new(bucket: :account, level: 0, seconds: 60), Trip.new(bucket: :address_wide, level: nil, seconds: 1.hour.to_i) ], attempt.closes
+    assert attempt(identifier: "other@example.org", address: "198.51.100.1").ok?
   end
 
   test "the wide bucket is asked first" do
-    50.times { @throttle.record_failure(identifier: EMAIL, address: ADDRESS) }
-    assert_equal :address_wide, @throttle.closed(identifier: EMAIL, address: ADDRESS).bucket
+    attempts(5)
+    45.times { |index| attempt(identifier: "person#{index}@example.org") }
+    assert_equal :address_wide, attempt.refused_by.bucket
   end
 
-  test "the bot check is due after three failures from the address or for the account in 15 minutes, and not after the window" do
-    fail_times(2, identifier: "one@example.org")
+  test "the bot check is due after three attempts from the address or for the account in 15 minutes, and not after the window" do
+    attempts(2, identifier: "one@example.org")
     assert_not @throttle.bot_check_due?(address: ADDRESS)
-    fail_times(1, identifier: "two@example.org")
+    attempt(identifier: "two@example.org")
     assert @throttle.bot_check_due?(address: ADDRESS)
     assert @throttle.bot_check_due?(address: ADDRESS, identifier: "three@example.org")
 
     travel 15.minutes + 1.second
     assert_not @throttle.bot_check_due?(address: ADDRESS)
 
-    fail_times(1, address: "198.51.100.1")
-    fail_times(1, address: "198.51.100.2")
-    fail_times(1, address: "198.51.100.3")
+    attempt(address: "198.51.100.1")
+    attempt(address: "198.51.100.2")
+    attempt(address: "198.51.100.3")
     assert_not @throttle.bot_check_due?(address: "198.51.100.4")
-    assert @throttle.bot_check_due?(address: "198.51.100.4", identifier: EMAIL), "the account's own three failures"
+    assert @throttle.bot_check_due?(address: "198.51.100.4", identifier: EMAIL), "the account's own three attempts"
 
     travel 15.minutes + 1.second
     assert_not @throttle.bot_check_due?(address: "198.51.100.4", identifier: EMAIL)
@@ -145,13 +182,11 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
   test "two scopes count apart, and the store holds neither the address nor the IP" do
     members = SignIn::Throttle.new(scope: "members", store: @store)
-    fail_times(5)
-    assert_nil members.closed(identifier: EMAIL, address: ADDRESS)
-    assert_empty fail_times(4, throttle: members)
+    attempts(5)
+    assert attempt(throttle: members).ok?
     @throttle.bot_check_due?(address: ADDRESS)
     @throttle.notice_due?(identifier: EMAIL)
 
-    keys = @store.instance_variable_get(:@data).keys
     assert keys.any? { |key| key.include?(":members:") } && keys.any? { |key| key.include?(":studio:") }, keys.inspect
     keys.each do |key|
       [ EMAIL, "ann", "example.org", ADDRESS, "203.0.113" ].each { |text| assert_not_includes key, text }
@@ -159,20 +194,52 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     end
   end
 
-  test "closed makes one span per bucket asked, and record_failure one per bucket it closed" do
+  test "a count the store cannot make opens every bucket, and nothing raises" do
+    throttle = SignIn::Throttle.new(store: FailingCounts.new)
+
+    60.times { assert_equal SignIn::Throttle::Reservation.new(refused_by: nil, closes: []), attempt(throttle: throttle) }
+    assert_not throttle.bot_check_due?(address: ADDRESS, identifier: EMAIL)
+    assert_nil throttle.record_success(identifier: EMAIL, address: ADDRESS)
+  end
+
+  test "attempts at once on one account let exactly five through before the lock" do
+    store = Interleaving.new
+    throttle = SignIn::Throttle.new(store: store)
+
+    reservations = Array.new(24) { |index| Thread.new { throttle.reserve(identifier: EMAIL, address: "198.51.100.#{index + 1}") } }.map(&:value)
+
+    assert_equal 5, reservations.count(&:ok?)
+    assert_equal 1, reservations.sum { |reservation| reservation.closes.size }, "one of the five closed the account"
+    assert reservations.reject(&:ok?).all? { |reservation| reservation.refused_by.bucket == :account }
+    assert_equal 5, count_of(:account, store), "every refused attempt took its count back"
+  end
+
+  test "attempts at once from one address let exactly fifty through" do
+    store = Interleaving.new
+    throttle = SignIn::Throttle.new(store: store)
+
+    reservations = Array.new(70) { |index| Thread.new { throttle.reserve(identifier: "person#{index}@example.org", address: ADDRESS) } }.map(&:value)
+
+    assert_equal 50, reservations.count(&:ok?)
+    assert_equal [ :address_wide ], reservations.flat_map(&:closes).map(&:bucket)
+    assert_equal 50, count_of(:wide, store)
+  end
+
+  test "each bucket decided is one span, tripped when it refused the attempt or the attempt closed it" do
     exporter = Rails.application.config.x.otel_test_exporter
-    fail_times(4)
+    attempts(4)
     exporter.reset
 
     Telemetry.tracer.in_span("test request", kind: :server) do
-      @throttle.closed(identifier: EMAIL, address: ADDRESS)
-      @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
+      attempt
+      attempt
     end
 
     spans = exporter.finished_spans.select { |span| span.name == "auth.throttle" }
     assert_equal [
       { "auth.bucket" => "address_wide", "auth.tripped" => false },
-      { "auth.bucket" => "account", "auth.tripped" => false },
+      { "auth.bucket" => "account", "auth.tripped" => true, "auth.backoff_level" => 0 },
+      { "auth.bucket" => "address_wide", "auth.tripped" => false },
       { "auth.bucket" => "account", "auth.tripped" => true, "auth.backoff_level" => 0 }
     ], spans.map { |span| span.attributes.to_h }
     assert spans.all? { |span| span.kind == :internal }

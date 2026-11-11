@@ -26,6 +26,12 @@ class VisitorAddressTest < ActiveSupport::TestCase
     assert_match(/\A\h{64}\z/, VisitorAddress.key("203.0.113.7", purpose: PURPOSE))
   end
 
+  test "digest keys a text as written, under the purpose's own secret" do
+    assert_equal VisitorAddress.key("203.0.113.7", purpose: PURPOSE), VisitorAddress.digest("203.0.113.7", purpose: PURPOSE)
+    assert_not_equal VisitorAddress.key("2001:db8:1:2::a", purpose: PURPOSE), VisitorAddress.digest("2001:db8:1:2::a", purpose: PURPOSE), "not cut to its /64"
+    assert_match(/\A\h{64}\z/, VisitorAddress.digest("ann@example.org", purpose: PURPOSE))
+  end
+
   test "two purposes give two keys for one address" do
     assert_not_equal VisitorAddress.key("203.0.113.7", purpose: PURPOSE), VisitorAddress.key("203.0.113.7", purpose: "content_spiel another counter")
     assert_equal VisitorAddress.key("203.0.113.7", purpose: PURPOSE), VisitorAddress.key("203.0.113.7", purpose: PURPOSE)

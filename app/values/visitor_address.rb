@@ -28,8 +28,13 @@ module VisitorAddress
   end
 
   # 64 hex characters.
-  def self.key(ip, purpose:)
-    OpenSSL::HMAC.hexdigest("SHA256", secret(purpose), normalise(ip))
+  def self.key(ip, purpose:) = digest(normalise(ip), purpose: purpose)
+
+  # The same HMAC of a text as written, for a counter that keys something
+  # beside the address under the same purpose (sign-in's account, an email
+  # the caller normalised): an email is not cut as an address would be.
+  def self.digest(text, purpose:)
+    OpenSSL::HMAC.hexdigest("SHA256", secret(purpose), text.to_s)
   end
 
   # The application's key generator caches each purpose's key, so the PBKDF2

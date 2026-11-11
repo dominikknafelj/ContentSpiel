@@ -1,31 +1,51 @@
 module SignIn
   # The counters that close sign-in after repeated failures, in two buckets,
-  # and say when the bot check is due. The caller asks `closed` before it
-  # checks a password, and tells `record_failure` or `record_success` after.
+  # and say when the bot check is due. The caller asks `reserve` BEFORE it
+  # checks a password, checks the password only when the reservation is
+  # `ok?`, and tells `record_success` when it was right. A wrong one is not
+  # told: the reservation was its count.
   #
-  # THE ACCOUNT BUCKET counts the failures for one identifier (the caller's
+  # WHY BEFORE. A count made after the check would let attempts that run at
+  # once all pass an open bucket and all check a password before the first
+  # failure closed it, so the guesses per lock would be bounded by how many
+  # run at once, not by the back-off. Counted first, with one atomic
+  # `increment` per bucket, parallel attempts get no more guesses per lock
+  # than serial ones (`SignIn.store` names the one moment Solid Cache can
+  # lose a count).
+  #
+  # THE ACCOUNT BUCKET counts the attempts for one identifier (the caller's
   # normalised email), whether or not an account has it, so a closed bucket
-  # says nothing about who exists. The first ACCOUNT_FREE_FAILURES - 1 cost
-  # nothing; from the fifth on, each failure closes the bucket for
-  # `lock_seconds(failures)`: 1 minute, doubling to the 1 hour cap. A run is
-  # forgotten ACCOUNT_RUN after its first failure (without an end, one
-  # mistyped password a month would lock a person on the fifth), and a
-  # success forgets it at once.
+  # says nothing about who exists. The first ACCOUNT_FREE_FAILURES - 1 go
+  # on freely. From the fifth on, an attempt goes on only if it is the one
+  # that writes the lock its count earns (`lock_seconds`: 1 minute, doubling
+  # to the 1 hour cap); the lock is written with `unless_exist`, so of two
+  # that race for one lock exactly one wins, a standing lock is never
+  # overwritten by a shorter one, and the loser is refused as locked. The
+  # lock is written as the attempt goes on and stands if its password
+  # fails; a success takes it back. A run is forgotten ACCOUNT_RUN after its
+  # first attempt (without an end, one mistyped password a month would lock
+  # a person on the fifth).
   #
-  # An attempt while a bucket is closed checks no password and counts
-  # nothing: `closed` only reads. Counting such attempts would let a bot keep
-  # the person out for good; this way, once the lock ends, the right password
-  # signs them in and their next mistake counts from one.
+  # A REFUSED ATTEMPT NEVER COUNTS. One refused by a standing lock is
+  # refused on a read, before any increment, so a bot cannot keep a person
+  # out for good by trying through the lock: once it ends, the right
+  # password signs them in and their next mistake counts from one. The read
+  # before the increment is safe because a lock only ever moves the answer
+  # toward refusal: a lock written just after the read is met by the
+  # attempt's own `unless_exist` write, which it then loses. An attempt
+  # refused after its increment (it lost the race for the lock, or the
+  # other bucket refused it) takes its count back with a `decrement`.
   #
-  # THE WIDE BUCKET counts every failure from one address (`VisitorAddress`,
-  # an IPv6 one by its /64), whatever accounts it tried: the fiftieth in an
-  # hour from the first closes the address until that hour ends. A success
-  # does not clear it, or one account a bot holds would reopen it. `closed`
-  # asks it first.
+  # THE WIDE BUCKET counts every attempt from one address (`VisitorAddress`,
+  # an IPv6 one by its /64), whatever accounts it tried: WIDE_LIMIT go on in
+  # an hour from the first, and the address is then closed until that hour
+  # ends. A success takes back only its own count, never the others', or
+  # one account a bot holds would reopen it. It is asked first.
   #
   # THE BOT CHECK is due once the address or the account has BOT_CHECK_AFTER
-  # failures in a BOT_CHECK_WINDOW from the first, counted apart from the
-  # buckets' own counts because the window is another.
+  # attempts that went on, in a BOT_CHECK_WINDOW from the first, counted
+  # apart from the buckets because the window is another. A success takes
+  # its own back.
   #
   # THE STORE HOLDS NEITHER THE EMAIL NOR THE IP: every key is the scope, the
   # counter's name and an HMAC-SHA256 under KEY_PURPOSE, of the identifier or
@@ -33,15 +53,14 @@ module SignIn
   # sign-in counts apart from CS Studio's.
   #
   # A window is the expiry a count's first `increment` sets, which a later
-  # one keeps (`SignIn.store`). An account's lock is a key holding the epoch
-  # second it ends at and its back-off level, `[until, level]`, expiring
-  # then: the level stays the lock's own even once the run's count is
-  # forgotten (a lock of the run's last hour outlives the run). Integer
-  # seconds throughout: a Trip's `seconds` is what is left, rounded down, or
-  # the new lock's length.
+  # one keeps. An account's lock holds `[until, level]` (the epoch second it
+  # ends at and its back-off level) and expires then. Integer seconds
+  # throughout: a Trip's `seconds` is what is left, rounded down, or the new
+  # lock's length. A nil count or a failed write (Solid Cache's failsafe) is
+  # an open bucket.
   #
-  # Each bucket decided is one `auth.throttle` span: `closed` makes one per
-  # bucket asked, `record_failure` one per bucket the failure closed.
+  # Each bucket decided is one `auth.throttle` span, `auth.tripped` when it
+  # refused the attempt or the attempt closed it.
   class Throttle
     ACCOUNT_FREE_FAILURES = 5
     BACKOFF_FIRST = 1.minute
@@ -54,17 +73,26 @@ module SignIn
     NOTICE_EVERY = 1.hour
     KEY_PURPOSE = "content_spiel sign-in throttle".freeze
 
-    # A closed bucket: `:account` with its back-off level (failures - 5), or
+    # A closed bucket: `:account` with its back-off level (count - 5), or
     # `:address_wide` with none, and the seconds it stays closed.
     Trip = Data.define(:bucket, :level, :seconds)
 
-    # How long the failure-th failure of a run closes the account, or nil
+    # `refused_by`: the closed bucket that refuses the attempt, which then
+    # checks no password, or nil. `closes`: the buckets the attempt closed
+    # by going on, the account's then the address's; they stand when its
+    # password fails (the caller audits them and mails the account's), and
+    # a success takes the account's back.
+    Reservation = Data.define(:refused_by, :closes) do
+      def ok? = refused_by.nil?
+    end
+
+    # How long the count-th attempt of a run closes the account, or nil
     # while it is free. The shift's exponent is bounded so that a run of any
     # length stays a small number before the cap.
-    def self.lock_seconds(failures)
-      return nil if failures < ACCOUNT_FREE_FAILURES
+    def self.lock_seconds(count)
+      return nil if count < ACCOUNT_FREE_FAILURES
 
-      exponent = [ failures - ACCOUNT_FREE_FAILURES, 32 ].min
+      exponent = [ count - ACCOUNT_FREE_FAILURES, 32 ].min
       [ BACKOFF_FIRST.to_i << exponent, BACKOFF_CAP.to_i ].min
     end
 
@@ -75,26 +103,33 @@ module SignIn
       @store = store
     end
 
-    def closed(identifier:, address:)
-      wide_closed(address_digest(address)) || account_closed(identifier_digest(identifier))
-    end
-
-    # Counts one checked password that failed, and answers every bucket it
-    # closed: the account's, then the address's, or none. Both can close on
-    # one failure, and each is a lock of its own that the caller audits (and
-    # the account's mails), so neither may hide the other.
-    def record_failure(identifier:, address:)
+    def reserve(identifier:, address:)
       account = identifier_digest(identifier)
       address = address_digest(address)
+
+      wide_refusal, wide_closes = reserve_wide(address)
+      return Reservation.new(refused_by: wide_refusal, closes: []) if wide_refusal
+
+      account_refusal, account_closes = reserve_account(account)
+      if account_refusal
+        take_back(key(:wide, address), WIDE_WINDOW)
+        return Reservation.new(refused_by: account_refusal, closes: [])
+      end
+
       store.increment(key(:bot_address, address), 1, expires_in: BOT_CHECK_WINDOW)
       store.increment(key(:bot_account, account), 1, expires_in: BOT_CHECK_WINDOW)
-
-      [ count_account(account), count_wide(address) ].compact
+      Reservation.new(refused_by: nil, closes: [ account_closes, wide_closes ].compact)
     end
 
-    def record_success(identifier:)
+    # The attempt's password was right: the account's run, its lock and its
+    # bot-check count are forgotten, and the address's counts take back this
+    # attempt's own.
+    def record_success(identifier:, address:)
       account = identifier_digest(identifier)
+      address = address_digest(address)
       store.delete_multi([ key(:account, account), key(:account_lock, account), key(:bot_account, account) ])
+      take_back(key(:wide, address), WIDE_WINDOW)
+      take_back(key(:bot_address, address), BOT_CHECK_WINDOW)
       nil
     end
 
@@ -111,53 +146,78 @@ module SignIn
     end
 
     private
-      def wide_closed(address)
+      # [refusal, closes]: one of them a Trip, or neither.
+      #
+      # The window's end is written by the attempt that opened it, since an
+      # increment cannot say when its key expires. Were that mark lost, a
+      # closed address answers the whole window as what is left.
+      def reserve_wide(address)
         decide("address_wide") do
-          left = seconds_until(store.read(key(:wide_ends, address)))
-          Trip.new(bucket: :address_wide, level: nil, seconds: left) if left && store.read(key(:wide, address)).to_i >= WIDE_LIMIT
+          count_key = key(:wide, address)
+          next [ wide_trip(address), nil ] if store.read(count_key).to_i >= WIDE_LIMIT
+
+          count = store.increment(count_key, 1, expires_in: WIDE_WINDOW)
+          store.write(key(:wide_ends, address), now + WIDE_WINDOW.to_i, expires_in: WIDE_WINDOW) if count == 1
+          if count.nil? || count < WIDE_LIMIT
+            [ nil, nil ]
+          elsif count == WIDE_LIMIT
+            [ nil, wide_trip(address) ]
+          else
+            take_back(count_key, WIDE_WINDOW)
+            [ wide_trip(address), nil ]
+          end
         end
       end
 
-      def account_closed(account)
+      def reserve_account(account)
         decide("account") do
-          ends, level = store.read(key(:account_lock, account))
-          left = seconds_until(ends)
-          Trip.new(bucket: :account, level: level, seconds: left) if left
+          lock_key = key(:account_lock, account)
+          standing = account_lock(lock_key)
+          next [ standing, nil ] if standing
+
+          count = store.increment(key(:account, account), 1, expires_in: ACCOUNT_RUN)
+          next [ nil, nil ] if count.nil? || count < ACCOUNT_FREE_FAILURES
+
+          seconds = self.class.lock_seconds(count)
+          level = count - ACCOUNT_FREE_FAILURES
+          next [ nil, Trip.new(bucket: :account, level: level, seconds: seconds) ] if store.write(lock_key, [ now + seconds, level ], unless_exist: true, expires_in: seconds)
+
+          # Lost: another attempt's lock stands, and refuses this one. With
+          # none to be read the write failed (Solid Cache's failsafe answers
+          # false), and the bucket is open.
+          standing = account_lock(lock_key)
+          take_back(key(:account, account), ACCOUNT_RUN) if standing
+          [ standing, nil ]
         end
       end
 
-      def count_account(account)
-        failures = store.increment(key(:account, account), 1, expires_in: ACCOUNT_RUN)
-        seconds = self.class.lock_seconds(failures)
-        return unless seconds
-
-        level = failures - ACCOUNT_FREE_FAILURES
-        store.write(key(:account_lock, account), [ now + seconds, level ], expires_in: seconds)
-        decide("account") { Trip.new(bucket: :account, level: level, seconds: seconds) }
+      # The standing lock as a Trip, or nil.
+      def account_lock(lock_key)
+        ends, level = store.read(lock_key)
+        left = seconds_until(ends)
+        Trip.new(bucket: :account, level: level, seconds: left) if left
       end
 
-      # The window's end is written by the failure that opened it, since an
-      # increment cannot say when its key expires. Were that mark evicted,
-      # the bucket stays open: an eviction may open a bucket early and never
-      # closes one.
-      def count_wide(address)
-        failures = store.increment(key(:wide, address), 1, expires_in: WIDE_WINDOW)
-        store.write(key(:wide_ends, address), now + WIDE_WINDOW.to_i, expires_in: WIDE_WINDOW) if failures == 1
-        return unless failures == WIDE_LIMIT
-
-        left = seconds_until(store.read(key(:wide_ends, address)))
-        decide("address_wide") { Trip.new(bucket: :address_wide, level: nil, seconds: left) } if left
+      def wide_trip(address)
+        Trip.new(bucket: :address_wide, level: nil, seconds: seconds_until(store.read(key(:wide_ends, address))) || WIDE_WINDOW.to_i)
       end
 
-      # The block's Trip or nil, inside one `auth.throttle` span that says
-      # which bucket was decided and how.
+      # Takes one count back, only while its window stands: a decrement of a
+      # key that expired meanwhile would open the next window at -1.
+      def take_back(count_key, window)
+        store.decrement(count_key, 1, expires_in: window) if store.exist?(count_key)
+      end
+
+      # The block's [refusal, closes], inside one `auth.throttle` span that
+      # says which bucket was decided and how.
       def decide(bucket)
         Telemetry.in_span("auth.throttle", attributes: { "auth.bucket" => bucket }) do |span|
-          trip = yield
+          refusal, closes = yield
+          trip = refusal || closes
           attributes = { "auth.tripped" => !trip.nil? }
           attributes["auth.backoff_level"] = trip.level if trip&.level
           Telemetry.record(span, attributes)
-          trip
+          [ refusal, closes ]
         end
       end
 
@@ -172,10 +232,7 @@ module SignIn
 
       def address_digest(address) = VisitorAddress.key(address, purpose: KEY_PURPOSE)
 
-      # The identifier as the store knows it, under the same purpose's secret
-      # as the address (the key generator caches it).
-      def identifier_digest(identifier)
-        OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key(KEY_PURPOSE), identifier.to_s)
-      end
+      # An email as written, never cut as an address would be.
+      def identifier_digest(identifier) = VisitorAddress.digest(identifier, purpose: KEY_PURPOSE)
   end
 end

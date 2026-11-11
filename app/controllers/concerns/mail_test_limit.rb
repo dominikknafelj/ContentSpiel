@@ -13,11 +13,9 @@
 # person (a test mail is sent to them; nobody signed in has no test mail to
 # send, and counts by address).
 #
-# THE STORE is captured when the class is defined. It is `Rails.cache` (Solid
-# Cache in production, shared by every process), unless that is a
-# `NullStore` (the test environment's), whose every write is a no-op: a limit
-# that can never trip is no limit, so there it is one memory store for the
-# process (`store`, which a test clears).
+# THE STORE is `CounterStore.current`, captured when the class is defined:
+# the one every counter of the site shares, Solid Cache in production and a
+# memory store of the process in tests (it says why).
 module MailTestLimit
   extend ActiveSupport::Concern
 
@@ -25,9 +23,7 @@ module MailTestLimit
   LIMIT = 5
   WITHIN = 3.minutes
 
-  def self.store
-    @store ||= Rails.cache.is_a?(ActiveSupport::Cache::NullStore) ? ActiveSupport::Cache::MemoryStore.new : Rails.cache
-  end
+  def self.store = CounterStore.current
 
   class_methods do
     def limit_test_mails(with:, **options)

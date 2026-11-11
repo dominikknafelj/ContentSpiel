@@ -38,11 +38,8 @@ module Forms
   # `config.action_dispatch.trusted_proxies`. Nothing here detects the
   # mistake; the per-form limit is unaffected by it.
   #
-  # THE STORE follows `MailTestLimit.store`'s rule: `Rails.cache`, unless it
-  # is a `NullStore` (the test environment's), whose every write is a no-op
-  # and whose limit could never trip; there it is one memory store of the
-  # process (`store`, which a test clears). Captured when the class is
-  # defined.
+  # THE STORE is `CounterStore.current`, the one every counter of the site
+  # shares (it says why a test has a memory store).
   module SendLimit
     extend ActiveSupport::Concern
 
@@ -51,9 +48,7 @@ module Forms
     WITHIN = 10.minutes
     KEY_PURPOSE = "content_spiel form send visitor".freeze
 
-    def self.store
-      @store ||= Rails.cache.is_a?(ActiveSupport::Cache::NullStore) ? ActiveSupport::Cache::MemoryStore.new : Rails.cache
-    end
+    def self.store = CounterStore.current
 
     included do
       rate_limit to: VISITOR_LIMIT, within: WITHIN, name: "form_send_visitor", store: SendLimit.store,
