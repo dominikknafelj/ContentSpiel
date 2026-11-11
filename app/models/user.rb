@@ -7,7 +7,7 @@ class User < ApplicationRecord
   # A passkey or a recovery code is nothing without its account, and neither
   # has a callback, so they go in one statement each.
   has_many :passkeys, dependent: :delete_all # version: none (passkeys are on no public page)
-  has_many :recovery_codes, dependent: :delete_all # version: none (recovery codes are on no public page)
+  has_many :recovery_codes, dependent: :delete_all, extend: RecoveryCode::Redeem # version: none (recovery codes are on no public page)
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
@@ -88,9 +88,16 @@ class User < ApplicationRecord
 
   # The random user handle an authenticator keeps for this account in place
   # of its email (WebAuthn's `user.id`), made at the first ask and kept, so
-  # every passkey of the account carries the same one.
+  # every passkey of the account carries the same one. Written only where the
+  # row has none yet and then read back, so two first asks at once (two tabs
+  # adding a passkey) both answer the one handle that was stored, never each
+  # its own.
   def webauthn_handle!
-    update_column(:webauthn_id, WebAuthn.generate_user_id) if webauthn_id.nil? # version: none (a user's handle is on no public page)
+    if webauthn_id.nil?
+      User.where(id: id, webauthn_id: nil).update_all(webauthn_id: WebAuthn.generate_user_id) # version: none (a user's handle is on no public page)
+      self[:webauthn_id] = User.where(id: id).pick(:webauthn_id)
+      clear_attribute_changes([ :webauthn_id ])
+    end
     webauthn_id
   end
 

@@ -32,8 +32,13 @@ gem "useragent", "~> 0.16"
 # Passkeys (WebAuthn): the registration and sign-in ceremonies' options and their verification.
 gem "webauthn", "~> 3.5"
 
-# The registrable domain of the site's host (`PublicSuffix.domain`), a passkey's relying party id. Named here, not
-# only reached through addressable, because the code calls it itself.
+# webauthn asks only for openssl >= 2.2, which would take openssl 4, a major version above the 3.3 Ruby 3.4 ships,
+# under Active Record encryption, MessageEncryptor and Net::HTTP alike: held to the 3.x line. It compiles in the
+# image's build stage, whose libpq-dev brings libssl-dev.
+gem "openssl", "~> 3.3"
+
+# The registrable domain of the site's host (`PublicSuffix.domain`), a passkey's relying party id. Named here, not only
+# reached through addressable, because the passkey relying party calls it directly.
 gem "public_suffix", "~> 7.0"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]

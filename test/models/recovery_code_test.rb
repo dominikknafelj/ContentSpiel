@@ -44,6 +44,16 @@ class RecoveryCodeTest < ActiveSupport::TestCase
     assert_not users(:reader).recovery_codes.redeem(nil)
   end
 
+  test "a code is redeemed only through its own account: another account's code is false, and there is no redeem by digest alone" do
+    add_code(users(:two), "JKMN-PQRS")
+
+    assert_not users(:reader).recovery_codes.redeem("JKMN-PQRS")
+    assert_nil users(:two).recovery_codes.sole.used_at
+    assert_not RecoveryCode.respond_to?(:redeem)
+    assert_raises(NoMethodError) { RecoveryCode.where(user: users(:two)).redeem("JKMN-PQRS") }
+    assert users(:two).recovery_codes.redeem("JKMN-PQRS")
+  end
+
   test "the digest is an HMAC under the application's key, never the code itself" do
     digest = RecoveryCode.digest("ABCD-EFGH")
 

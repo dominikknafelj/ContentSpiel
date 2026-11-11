@@ -195,6 +195,16 @@ class UserTest < ActiveSupport::TestCase
     assert_not_equal handle, users(:two).webauthn_handle!
   end
 
+  test "a first ask for the handle that meets one stored meanwhile answers the stored one and writes nothing" do
+    stale = User.find(users(:reader).id)
+    stored = User.find(users(:reader).id).webauthn_handle!
+
+    assert_nil stale.webauthn_id
+    assert_equal stored, stale.webauthn_handle!
+    assert_equal stored, users(:reader).reload.webauthn_id
+    assert_not stale.changed?
+  end
+
   test "an account's passkeys and recovery codes go with it" do
     user = users(:reader)
     user.passkeys.create!(name: "Phone", external_id: "credential-1", public_key: "pk")

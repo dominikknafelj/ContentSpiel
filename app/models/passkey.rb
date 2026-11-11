@@ -2,8 +2,10 @@
 # account. `external_id` is the credential id and `public_key` the COSE key,
 # both base64url, as the authenticator handed them over at registration;
 # `sign_count` is the authenticator's counter at its last use (a synced
-# passkey's stays 0). Neither the id nor the key reaches a page, a log line,
-# a span or an audit snapshot (`Audit::Snapshot` names a passkey's fields).
+# passkey's stays 0). Neither the id nor the key reaches a page, a span, an
+# audit snapshot (`Audit::Snapshot` names a passkey's fields) or production's
+# log, which holds no SQL; development's and test's SQL log prints the id
+# among a statement's values.
 class Passkey < ApplicationRecord
   belongs_to :user
 

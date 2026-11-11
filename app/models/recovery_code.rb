@@ -44,14 +44,18 @@ class RecoveryCode < ApplicationRecord
   def self.key = Rails.application.key_generator.generate_key(KEY_PURPOSE)
   private_class_method :key
 
-  # Uses the code among this relation's (`user.recovery_codes.redeem(text)`):
-  # true when an unused one matched and is now used. One UPDATE whose WHERE
-  # holds `used_at IS NULL`, so two requests that race with the same code
-  # cannot both use it.
-  def self.redeem(text, at: Time.current)
-    digest = digest(text)
-    return false unless digest
+  # Uses one of an account's codes: `user.recovery_codes.redeem(text)`, true
+  # when an unused one matched and is now used. It is an extension of the
+  # association (`User`'s `has_many :recovery_codes`) and nothing else, so no
+  # caller can redeem a code by its digest alone, without its account. One
+  # UPDATE whose WHERE holds `used_at IS NULL`, so two requests that race with
+  # the same code cannot both use it.
+  module Redeem
+    def redeem(text, at: Time.current)
+      digest = RecoveryCode.digest(text)
+      return false unless digest
 
-    unused.where(digest: digest).update_all(used_at: at) == 1 # version: none (recovery codes are on no public page)
+      unused.where(digest: digest).update_all(used_at: at) == 1 # version: none (recovery codes are on no public page)
+    end
   end
 end
