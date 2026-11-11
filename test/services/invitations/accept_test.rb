@@ -103,38 +103,33 @@ class Invitations::AcceptTest < ActiveSupport::TestCase
   test "a leaked password is refused, the invitation stays open, and the lookup runs before the invitation is locked" do
     leaked = "correct horse battery"
     sentence = "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
-    order = []
-    result = nil
 
-    with_leaked_password_check(leaked: [ leaked ]) do
-      looked_up = SignIn::LeakedPassword.method(:range)
-      range = ->(prefix, url: nil) { order << :looked_up; looked_up.call(prefix) }
-      with_singleton_override(SignIn::LeakedPassword, :range, range) do
-        callback = ->(*, payload) { order << :locked if payload[:sql].include?("FOR UPDATE") }
-        assert_no_difference [ -> { User.count }, -> { AccessControl::Membership.count } ] do
-          ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { result = accept(password: leaked) }
+    # The lookups and the row locks of the block, in the order they ran.
+    order_of = lambda do |&block|
+      order = []
+      with_leaked_password_check(leaked: [ leaked ]) do
+        looked_up = SignIn::LeakedPassword.method(:range)
+        range = ->(prefix, url: nil) { order << :looked_up; looked_up.call(prefix) }
+        with_singleton_override(SignIn::LeakedPassword, :range, range) do
+          callback = ->(*, payload) { order << :locked if payload[:sql].include?("FOR UPDATE") }
+          ActiveSupport::Notifications.subscribed(callback, "sql.active_record", &block)
         end
       end
+      order
     end
 
+    result = nil
+    assert_no_difference [ -> { User.count }, -> { AccessControl::Membership.count } ] do
+      assert_equal [ :looked_up ], order_of.call { result = accept(password: leaked) }
+    end
     assert_not result.ok?
     assert_equal [ sentence ], result.errors
     assert_equal @invitation, result.record
     assert_equal [ sentence ], result.record.errors.messages_for(:password)
-    assert_equal [ :looked_up ], order
     assert @invitation.reload.open?
     assert_empty Audit::Event.all
 
-    accepted = []
-    with_leaked_password_check(leaked: [ leaked ]) do
-      looked_up = SignIn::LeakedPassword.method(:range)
-      range = ->(prefix, url: nil) { accepted << :looked_up; looked_up.call(prefix) }
-      with_singleton_override(SignIn::LeakedPassword, :range, range) do
-        callback = ->(*, payload) { accepted << :locked if payload[:sql].include?("FOR UPDATE") }
-        ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { assert accept.ok? }
-      end
-    end
-    assert_equal [ :looked_up, :locked ], accepted
+    assert_equal [ :looked_up, :locked ], order_of.call { assert accept.ok? }
   end
 
   test "a password the model refuses is never looked up" do

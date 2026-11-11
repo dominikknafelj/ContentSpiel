@@ -133,6 +133,9 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_select "#password .admin-error-summary[role=alert] li", text: "This password is in a list of leaked passwords, so it isn't safe to use. Choose another one."
+    # And under the new password's own field, tied to its input.
+    assert_select "#new_password-errors", text: /#{Regexp.escape("This password is in a list of leaked passwords, so it isn't safe to use. Choose another one.")}/
+    assert_select "#new_password[aria-invalid=true][aria-describedby~='new_password-errors']"
     assert_not_includes response.body, "correct horse battery"
     assert users(:reader).reload.authenticate("password")
   end

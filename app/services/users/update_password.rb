@@ -58,7 +58,7 @@ module Users
       return blank_password if @password.blank?
 
       @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
-      return leaked_password_failure(@user) if @user.valid? && leaked_password?(@password)
+      return leaked_password_failure(@user) if leaked_password?(@user, @password)
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)

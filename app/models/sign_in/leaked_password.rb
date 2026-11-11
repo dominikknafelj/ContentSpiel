@@ -75,7 +75,9 @@ module SignIn
       response.body.to_s
     end
 
-    def self.on?(env)
+    # Whether the check is switched on (see ON IN PRODUCTION above): a
+    # caller asks this before paying for anything it does only to look up.
+    def self.on?(env = ENV)
       case env["LEAKED_PASSWORD_CHECK"].to_s.strip
       when "off" then false
       when "" then Rails.env.production?
@@ -92,6 +94,6 @@ module SignIn
 
       matches.any? { |match| match[1] == suffix && match[2].to_i.positive? }
     end
-    private_class_method :on?, :listed?
+    private_class_method :listed?
   end
 end

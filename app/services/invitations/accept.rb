@@ -39,9 +39,11 @@ module Invitations
   # run while the invitation's row is locked (a second press would wait on
   # it). Only then is the row locked and asked again, and the account saved
   # under the lock, so a second press that arrives while the first is in
-  # flight reads `:used`. The save validates again: an account made for the
-  # address meanwhile is `:used` (`used?` under the lock, or the unique
-  # index).
+  # flight reads `:used`. The save validates again. An account made for the
+  # address after the row is locked is `:used` (`used?` under the lock, or
+  # the unique index); one made in the moment between the first `used?` and
+  # the account's judging is refused by the uniqueness rule instead, "Email
+  # address has already been taken", and the next press reads `:used`.
   class Accept < ApplicationService
     include Users::LeakedPasswordRule
 
@@ -107,7 +109,7 @@ module Invitations
       user = User.new(email_address: @invitation.email_address, name: @name, password: @password, password_confirmation: @password_confirmation)
       user.validate
       user.errors.add(:password_confirmation, :blank) if @password.present? && @password_confirmation.blank?
-      user.errors.add(:password, :leaked) if user.errors.empty? && leaked_password?(@password)
+      user.errors.add(:password, :leaked) if user.errors.empty? && leaked_password?(user, @password)
       user
     end
 

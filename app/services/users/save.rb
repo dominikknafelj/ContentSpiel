@@ -75,7 +75,7 @@ module Users
 
       @user.assign_attributes(attrs)
       return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
-      return leaked_password_failure(@user) if attrs.key?(:password) && @user.valid? && leaked_password?(attrs[:password])
+      return leaked_password_failure(@user) if attrs.key?(:password) && leaked_password?(@user, attrs[:password])
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
