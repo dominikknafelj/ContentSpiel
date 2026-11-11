@@ -53,8 +53,8 @@ module Admin
       private
 
       # The label, and the count after it with a hidden no-break space
-      # between, so the name read out is "Notes 3" ("Notes 2 new" once the
-      # notes script writes its words into the count), never "Notes3". A
+      # between, so the name read out is "Label 3" ("Label 2 new" once a
+      # feature's script writes its words into the count), never "Label3". A
       # no-break space, because a plain one inside an `sr-only` span, out of
       # the flow, collapses away; out of the flow it is no flex item either,
       # so the tab's gap is unchanged. Only the count's own text is a script's.
