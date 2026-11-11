@@ -27,26 +27,29 @@ module Admin
     def new
     end
 
+    # THE REQUEST LOOKS NOBODY UP. Whether the address has an account is
+    # the job's question (`PasswordResetRequestJob`, which finds the user and
+    # queues the reset mail through `ApplicationMailer.queue`): here a known
+    # and an unknown address enqueue the same one job and take the same
+    # redirect, so neither the answer nor the time it takes says which
+    # addresses have an account. A lookup here, and an enqueue for a known
+    # address alone, would be a database write's difference in time. The
+    # address goes as the String typed, or "" for anything else (a list, a
+    # hash, nothing), which no account has.
+    #
+    # The link in the mail is the site's configured address when there is
+    # one, else the request's origin in development and test only
+    # (`Admin::MailLinkOrigin`, which says why); anywhere else without an
+    # address the mailer builds no mail and logs why, and the answer is the
+    # same words either way.
+    #
+    # The "sent" state is a param on the request page, not a flash and not
+    # something the lookup decides: the page renders the same words for
+    # every address.
     def create
-      if user = User.find_by(email_address: params[:email_address])
-        # The link in the mail is the site's configured address when there
-        # is one, and then the request's origin is not handed over at all
-        # (it is whatever Host this request named). Without one, and in
-        # development and test only (`PasswordsMailer.request_origin_used?`,
-        # which says why), this request's origin is the only address anybody
-        # knows: a String, because a job delivers the mail, which
-        # `PasswordsMailer` parses before it uses any of it. Anywhere else
-        # without an address the mailer builds no mail and logs why; the
-        # answer below is the same words either way. Queued through
-        # `ApplicationMailer.queue`, so the job carries the fingerprint of
-        # the mail settings it was asked under.
-        ApplicationMailer.queue(PasswordsMailer, :reset, user, **mail_link_origin)
-      end
+      email = params[:email_address]
+      PasswordResetRequestJob.perform_later(email.is_a?(String) ? email : "", **mail_link_origin)
 
-      # The "sent" state is a param on the request page, not a flash and not
-      # something the lookup decides: a known and an unknown address take the
-      # same redirect and render the same words, so the page can't be used
-      # to find out which addresses have an account.
       redirect_to new_admin_password_path(sent: 1)
     end
 
