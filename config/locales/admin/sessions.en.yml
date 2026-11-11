@@ -18,6 +18,10 @@ en:
         # In the hint's place when Turnstile's script cannot be loaded
         # (read by the `bot-check` script from its `data-messages`).
         check_unavailable: "The check couldn't load. Reload the page to try again."
+        # Between the password form and the passkey button, drawn only
+        # where the browser can use a passkey.
+        or: "or"
+        passkey: "Sign in with a passkey"
       # A wrong address or password: one answer for both, so the page does
       # not say which addresses have an account.
       refused: "Try another email address or password."
@@ -33,3 +37,8 @@ en:
       # Shown only to a browser whose signed cookie named a session that is
       # gone; it names no account.
       ended: "Your session ended. Sign in again."
+      # A passkey that was not accepted, whatever the reason (unknown, a
+      # bad signature, an answer that came too late): one sentence for all.
+      passkey_failed: "That passkey didn't work. Try again, or sign in with your password."
+      # The second step of a sign-in was not answered in time.
+      second_factor_expired: "That took too long. Sign in again."

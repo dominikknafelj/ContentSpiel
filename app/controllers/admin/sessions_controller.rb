@@ -20,13 +20,30 @@ module Admin
   #                        so an address with no account locks and answers
   #                        exactly alike. The attempt that closed it is
   #                        answered so too, and so is a known device's own
-  #                        bucket (`DEVICE_COOKIE`), which only a browser
-  #                        that signed in to the account meets.
+  #                        bucket (`SignInCompletion::DEVICE_COOKIE`),
+  #                        which only a browser that signed in to the
+  #                        account meets.
   #   :locked, address     "Try again later.", as the per-address rate limit
   #                        answers: an address's bucket says nothing of an
   #                        account. It wins over the account's when an
   #                        attempt closed both, being the longer.
   #   :bot_check_*         "Complete the check, then sign in again."
+  #
+  # A PASSKEY SIGN-IN (`passkey_options`, `passkey`) names no account until
+  # its assertion is verified, so it counts in the address's wide bucket
+  # alone (`Throttle#reserve_address`) and no account's lock refuses it: a
+  # passkey cannot be guessed, and a bot naming a credential must not lock
+  # out its owner. It never asks for the bot check. The browser's script
+  # posts the assertion as `credential` and is answered 200 JSON
+  # `{ "location" }` whatever happened, so it cannot tell one refusal from
+  # another: the dashboard (or the page the person was sent from) on
+  # success; on a refusal (an unknown passkey, a bad signature, a challenge
+  # used, late or issued for another purpose) the sign-in page with "That
+  # passkey didn't work. Try again, or sign in with your password."; past
+  # the wide bucket or the rate limit, the sign-in page with "Try again
+  # later.". At an IP address there is no relying party (`SignIn::
+  # RelyingParty`), so the page draws no passkey button and both actions
+  # answer 404.
   #
   # THE BOT CHECK'S FLAG. `new` cannot know which email will be typed, so it
   # shows the check when the address's count is due or when
@@ -51,9 +68,14 @@ module Admin
   # address can have, so the log can't be stuffed through it. An attempt
   # refused by a closed bucket or the bot check records nothing: it checked
   # no password, and an event each would bury the log under a bot's run
-  # (its spans carry the run instead).
+  # (its spans carry the run instead). A refused passkey names no account
+  # and no email, so it records nothing of its own (its `auth.passkey` span
+  # carries it); only the wide bucket it closed is one `session.locked`. A
+  # passkey's `session.created` says `{ "method" => "passkey" }`.
   class SessionsController < ApplicationController
     include MailLinkOrigin
+    include PasskeyChallenges
+    include SignInCompletion
 
     layout "product"
 
@@ -61,21 +83,11 @@ module Admin
     # the most of one `session.failed` or `session.locked` keeps.
     MAX_EMAIL_LENGTH = 254
 
-    allow_unauthenticated_access only: %i[ new create ]
+    allow_unauthenticated_access only: %i[ new create passkey_options passkey ]
+    helper_method :passkey_relying_party
+    before_action :require_passkey_relying_party, only: %i[ passkey_options passkey ]
 
     RATE_LIMIT_PURPOSE = "content_spiel sign-in rate limit".freeze
-
-    # THE KNOWN DEVICE (`SignIn::KnownDevice`): written after a right
-    # password only, so a bot never holds one, and read back on every
-    # attempt, so a browser that signed in to an account before is counted
-    # apart from the account's bucket a bot may hold closed. Encrypted and
-    # signed (`cookies.encrypted`): a cookie that does not open, or that
-    # names another account, is no known device and the attempt goes the
-    # common way. HttpOnly, SameSite Lax, Secure where the site is HTTPS,
-    # for DEVICE_LIFETIME from its last sign-in. It holds a random id and
-    # the HMACs of the accounts, never an email.
-    DEVICE_COOKIE = :cs_known_device
-    DEVICE_LIFETIME = 90.days
 
     # Where Turnstile's script is loaded from and its widget framed from.
     BOT_CHECK_ORIGIN = "https://challenges.cloudflare.com".freeze
@@ -85,13 +97,14 @@ module Admin
     # answer carries it too.
     before_action :allow_bot_check_origin, only: %i[ new create ], if: -> { SignIn::BotCheck.current }
     # The per-address bucket, Rails' `rate_limit`: it counts every POST to
-    # `create`, a success and a refusal alike, not failures alone. Its
+    # `create` and `passkey`, one count shared by both, a success and a
+    # refusal alike, not failures alone. Its
     # store is the throttle's (`SignIn.store`), so it counts where every
     # process sees it, and trips in tests too, whose cache is a null store.
     # Keyed as the throttle keys an address (`VisitorAddress`): an HMAC, so
     # the store holds no IP, and an IPv6 visitor by their /64, so rotating
     # within it is one visitor.
-    rate_limit to: 10, within: 3.minutes, only: :create, store: SignIn.store,
+    rate_limit to: 10, within: 3.minutes, only: %i[ create passkey ], store: SignIn.store,
       by: -> { VisitorAddress.key(request.remote_ip, purpose: RATE_LIMIT_PURPOSE) }, with: -> { answer_address_limited }
 
     def new
@@ -110,11 +123,7 @@ module Admin
       outcome = attempt.call
 
       if outcome.ok?
-        session.delete(:sign_in_bot_check)
-        start_new_session_for outcome.account
-        remember_device(attempt.identifier)
-        Current.actor = outcome.account
-        Audit.record("session.created", subject: outcome.account)
+        complete_sign_in(outcome.account, method: "password")
         redirect_to after_authentication_url
       else
         if outcome.status == :refused
@@ -130,6 +139,37 @@ module Admin
           session.delete(:sign_in_bot_check)
         end
         redirect_to admin_sign_in_path, alert: refusal_sentence(outcome)
+      end
+    end
+
+    # The options for a sign-in that names nobody (`allow` empty: the
+    # browser offers any passkey of this site), and their challenge kept for
+    # `passkey`.
+    def passkey_options
+      options, challenge = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party).options(allow: [])
+      issue_passkey_challenge("sign_in", challenge)
+      render json: options
+    end
+
+    # The address is counted before anything is checked, and the challenge
+    # is taken before the assertion is read, so a refused or a late answer
+    # spends it too.
+    def passkey
+      throttle = SignIn::Throttle.new
+      reservation = throttle.reserve_address(address: request.remote_ip)
+      return answer_passkey_refused(t("admin.sessions.limited")) unless reservation.ok?
+
+      challenge = take_passkey_challenge("sign_in")
+      result = SignIn::PasskeyCheck.new(relying_party: passkey_relying_party)
+        .verify(params[:credential], challenge: challenge, credentials: Passkey, ceremony: "sign_in")
+
+      if result.ok
+        throttle.release_address(address: request.remote_ip)
+        complete_sign_in(result.credential.user, method: "passkey")
+        render json: { location: after_authentication_url }
+      else
+        reservation.closes.each { |trip| Audit.record("session.locked", metadata: { "bucket" => "address_wide", "seconds" => trip.seconds }) }
+        answer_passkey_refused(t("admin.sessions.passkey_failed"))
       end
     end
 
@@ -186,13 +226,31 @@ module Admin
     end
 
     # Past the per-address rate limit: answered as the wide address bucket
-    # is, inside the attempt's span with the one bucket that decided it.
+    # is, inside the attempt's span with the one bucket that decided it. A
+    # passkey sign-in has no `auth.sign_in` span (its ceremony is
+    # `auth.passkey`), so its limit is the bucket's span alone.
     def answer_address_limited
+      return limited_span { answer_passkey_refused(t("admin.sessions.limited")) } if action_name == "passkey"
+
       Telemetry.in_span("auth.sign_in", attributes: { "auth.method" => "password", "auth.outcome" => "locked" }) do
-        Telemetry.in_span("auth.throttle", attributes: { "auth.bucket" => "address", "auth.tripped" => true }) do
-          redirect_to admin_sign_in_path, alert: t("admin.sessions.limited")
-        end
+        limited_span { redirect_to admin_sign_in_path, alert: t("admin.sessions.limited") }
       end
+    end
+
+    def limited_span(&block)
+      Telemetry.in_span("auth.throttle", attributes: { "auth.bucket" => "address", "auth.tripped" => true }) { block.call }
+    end
+
+    # Every refusal of a passkey sign-in is the same 200 JSON, back to the
+    # sign-in page with one alert, so the script that posted it learns
+    # nothing it could tell apart.
+    def answer_passkey_refused(sentence)
+      flash[:alert] = sentence
+      render json: { location: admin_sign_in_path }
+    end
+
+    def require_passkey_relying_party
+      head :not_found if passkey_relying_party.nil?
     end
 
     # The account's pause mail, at most once an hour per email
@@ -208,15 +266,6 @@ module Admin
         end
         Telemetry.record(span, "auth.mail.queued" => due)
       end
-    end
-
-    def known_device = SignIn::KnownDevice.read(cookies.encrypted[DEVICE_COOKIE])
-
-    def remember_device(identifier)
-      cookies.encrypted[DEVICE_COOKIE] = {
-        value: known_device.remember(identifier).to_h,
-        expires: DEVICE_LIFETIME, httponly: true, same_site: :lax, secure: request.ssl?
-      }
     end
 
     def locked_metadata(trip, email)

@@ -26,6 +26,8 @@ Rails.application.routes.draw do
   scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
     get "sign-in", to: "sessions#new", as: :sign_in
     post "sign-in", to: "sessions#create"
+    post "sign-in/passkey/options", to: "sessions#passkey_options", as: :sign_in_passkey_options
+    post "sign-in/passkey", to: "sessions#passkey", as: :sign_in_passkey
     delete "sign-out", to: "sessions#destroy", as: :sign_out
 
     # ⌘K "Jump to..." results: a layout-less HTML

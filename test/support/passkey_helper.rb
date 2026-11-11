@@ -16,6 +16,19 @@ require "webauthn/fake_client"
 #   browser sends for a sign-in, answered to `challenge` with user
 #   verification; `user_handle` is the stored handle (`User#webauthn_id`),
 #   which the response carries as the authenticator kept it.
+#
+# In a browser test, Chrome's own virtual authenticator (the DevTools
+# protocol's `WebAuthn` domain), so the page's real `navigator.credentials`
+# answers:
+# - `with_virtual_authenticator { |authenticator| … }`: the app reached at
+#   `localhost` (an IP has no relying party, so Capybara's 127.0.0.1 would
+#   offer no passkey), and an authenticator that holds discoverable
+#   credentials and verifies its user without a prompt; both are taken
+#   back after the block, also when it fails. `on_localhost { … }` is the
+#   address alone, for a page with no authenticator.
+# - `add_virtual_passkey(user, authenticator)`: a P-256 key made here,
+#   handed to the authenticator as a discoverable credential of `localhost`
+#   for the user's handle, and stored as that user's passkey.
 module PasskeyHelper
   PASSKEY_ORIGIN = "http://www.example.com".freeze
   PASSKEY_SITE_NAME = "ContentSpiel".freeze
@@ -49,5 +62,46 @@ module PasskeyHelper
     raw_handle = user_handle && WebAuthn.standard_encoder.decode(user_handle)
     rp_id ||= passkey_relying_party(client)&.id
     client.get(challenge: challenge, rp_id: rp_id, user_verified: true, user_handle: raw_handle, sign_count: sign_count).to_json
+  end
+
+  def with_virtual_authenticator
+    on_localhost do
+      devtools = page.driver.browser.page
+      devtools.command("WebAuthn.enable")
+      authenticator = devtools.command("WebAuthn.addVirtualAuthenticator", options: {
+        protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true,
+        isUserVerified: true, automaticPresenceSimulation: true
+      }).fetch("authenticatorId")
+      yield authenticator
+    ensure
+      if authenticator
+        devtools.command("WebAuthn.removeVirtualAuthenticator", authenticatorId: authenticator)
+        devtools.command("WebAuthn.disable")
+      end
+    end
+  end
+
+  # The app reached at `localhost`, where it has a relying party, for the
+  # block.
+  def on_localhost
+    app_host = Capybara.app_host
+    Capybara.app_host = "http://localhost:#{page.server.port}"
+    yield
+  ensure
+    Capybara.app_host = app_host
+  end
+
+  def add_virtual_passkey(user, authenticator, name: "This browser")
+    key = OpenSSL::PKey::EC.generate("prime256v1")
+    credential_id = SecureRandom.random_bytes(16)
+    handle = WebAuthn.standard_encoder.decode(user.webauthn_handle!)
+    page.driver.browser.page.command("WebAuthn.addCredential", authenticatorId: authenticator, credential: {
+      credentialId: Base64.strict_encode64(credential_id), isResidentCredential: true, rpId: "localhost",
+      privateKey: Base64.strict_encode64(key.private_to_der), userHandle: Base64.strict_encode64(handle), signCount: 0
+    })
+    cose = COSE::Key::EC2.from_pkey(OpenSSL::PKey::EC.new(key.public_to_der))
+    cose.alg = -7
+    user.passkeys.create!(name: name, external_id: WebAuthn.standard_encoder.encode(credential_id),
+      public_key: WebAuthn.standard_encoder.encode(cose.serialize), sign_count: 0)
   end
 end

@@ -200,6 +200,7 @@ class SourceLayoutTest < ActiveSupport::TestCase
   SHARED_MODULE_FOLDERS = {
     "i18n" => "the script messages every screen reads (messages(element).t), no one topic's",
     "live" => "the cable connection and the merge core (keep_merge), shared by the notes, presence and editing topics",
+    "passkeys" => "the WebAuthn ceremony, imported by the sign-in's site controller until the admin topic of that name lands",
     "search" => "the title and tag search every picker shares, no one topic's"
   }.freeze
 

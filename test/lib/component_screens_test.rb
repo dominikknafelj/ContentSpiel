@@ -203,6 +203,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/concerns/admin/mail_link_origin.rb
       app/controllers/concerns/admin/record_of_kind.rb
       app/controllers/concerns/admin/refusal_status.rb
+      app/controllers/concerns/admin/sign_in_completion.rb
       app/controllers/concerns/admin/stale_form.rb
       app/controllers/concerns/admin/toast_stream.rb
       app/controllers/concerns/admin/translatable_record_loading.rb
