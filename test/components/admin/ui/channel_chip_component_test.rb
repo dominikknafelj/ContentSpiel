@@ -22,6 +22,25 @@ class Admin::Ui::ChannelChipComponentTest < ViewComponent::TestCase
     assert_selector ".admin-channel-chip.text-meta", text: "Public"
   end
 
+  # The chip's classes as its own template spelled them before it drew
+  # through `BadgeComponent`. The badge adds `gap-1` alone, a gap between
+  # flex items, of which the chip has one (its word): nothing moves.
+  BEFORE = {
+    "mcp" => "admin-channel-chip inline-flex shrink-0 items-center rounded-cs px-1.5 py-px text-label bg-accent-tint text-accent",
+    "admin" => "admin-channel-chip inline-flex shrink-0 items-center rounded-cs px-1.5 py-px text-label bg-sunken text-meta"
+  }.freeze
+
+  test "drawn as a compact badge, its classes are the ones it had, but the badge's inert gap" do
+    BEFORE.each do |channel, before|
+      render_inline(Admin::Ui::ChannelChipComponent.new(channel: channel))
+      chip = page.find(".admin-channel-chip")
+
+      assert_equal (before.split + %w[gap-1]).sort, chip[:class].split.sort, channel
+      assert_equal 1, chip.native.children.size, "#{channel}: one child, so the gap draws nothing"
+      assert_equal "span", chip.tag_name
+    end
+  end
+
   test "no channel draws nothing" do
     render_inline(Admin::Ui::ChannelChipComponent.new(channel: nil))
     assert_no_selector ".admin-channel-chip"
