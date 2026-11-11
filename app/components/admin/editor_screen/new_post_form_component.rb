@@ -11,7 +11,7 @@ module Admin
     # refused create.
     #
     # Loaded when the dialog OPENS, into the shell's turbo-frame (see
-    # `NewPostDialogComponent`), so the listing paths are never stale.
+    # `Admin::Ui::NewRecordDialogComponent`), so the listing paths are never stale.
     #
     # A post's URL is its canonical listing page's path plus its own slug
     # (`PublicSite::Paths.canonical_pages`, asked once for an unsaved post of
@@ -22,10 +22,11 @@ module Admin
     # The first type is preselected unless one was asked for (a split
     # button's type, the posts list) or typed before a refusal.
     class NewPostFormComponent < Admin::AdminComponent
-      FORM_ID = "new-post-form".freeze
+      # The dialog's Create button names this form, so the dialog writes its id.
+      FORM_ID = Admin::Ui::NewRecordDialogComponent::KINDS.fetch(:post).form_id
       TITLE_ID = "new-post-title".freeze
       TYPE_ID = "new-post-type".freeze
-      # The URL line's words, shared with the script (`NewRecordMessages`).
+      # The URL line's words, shared with the script (`Admin::Ui::NewRecordDialogComponent::MESSAGES`).
       NEW_RECORD = "admin.components.editor_screen.new_record".freeze
 
       Choice = Struct.new(:name, :label, :path, keyword_init: true)

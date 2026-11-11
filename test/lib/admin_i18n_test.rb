@@ -246,17 +246,14 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/helpers/admin/posts_list_helper.rb
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb
-    app/components/admin/editor_screen/new_post_dialog_component.rb
+    app/components/admin/ui/new_record_dialog_component.rb
     app/components/admin/editor_screen/changed_elsewhere_component.rb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
-    app/components/admin/editor_screen/new_post_dialog_component.html.erb
+    app/components/admin/ui/new_record_dialog_component.html.erb
     app/components/admin/editor_screen/new_post_form_component.rb
     app/components/admin/editor_screen/new_post_form_component.html.erb
-    app/components/admin/editor_screen/new_page_dialog_component.rb
-    app/components/admin/editor_screen/new_page_dialog_component.html.erb
     app/components/admin/editor_screen/new_page_form_component.rb
     app/components/admin/editor_screen/new_page_form_component.html.erb
-    app/components/admin/editor_screen/new_record_messages.rb
     app/javascript/controllers/admin/editor/new_record_controller.js
     app/components/admin/dashboard_screen/panel_component.rb
     app/components/admin/dashboard_screen/panel_component.html.erb

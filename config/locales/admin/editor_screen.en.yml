@@ -423,20 +423,13 @@ en:
           change_address: "Change address…"
           template: "Template"
           shared: "Shared by all languages."
-        # The New post and New page dialogs' shells (`new_*_dialog`), their
-        # forms (`new_*_form`), and the three sentences their shared script
-        # rewrites as the person types (`new_record`, handed over as
-        # `Admin::EditorScreen::NewRecordMessages::KEYS`). The forms draw the
+        # The New post and New page forms (`new_*_form`; their dialogs' shells
+        # are `Admin::Ui::NewRecordDialogComponent`'s, under `ui`), and the
+        # three sentences the dialogs' shared script rewrites as the person
+        # types (`new_record`, handed over as
+        # `Admin::Ui::NewRecordDialogComponent::MESSAGES`). The forms draw the
         # URL line and the New page note from `new_record` too, so the
         # server's first drawing and the script's are one source.
-        new_post_dialog:
-          title: "New post"
-          loading: "Loading…"
-          load_failed: "The form couldn’t be loaded."
-          submit_failed: "Couldn’t save. Check your connection and try again."
-          retry: "Try again"
-          cancel: "Cancel"
-          create: "Create draft"
         new_post_form:
           title: "Title"
           type: "Type"
@@ -444,14 +437,6 @@ en:
           # type there is no select, and the note names it.
           note: "Created as a draft in %{language}. Everything can be changed in the editor."
           note_typed: "Created as a draft (%{type}) in %{language}. Everything can be changed in the editor."
-        new_page_dialog:
-          title: "New page"
-          loading: "Loading…"
-          load_failed: "The form couldn’t be loaded."
-          submit_failed: "Couldn’t save. Check your connection and try again."
-          retry: "Try again"
-          cancel: "Cancel"
-          create: "Create page"
         new_page_form:
           title: "Title"
           inside: "Inside"

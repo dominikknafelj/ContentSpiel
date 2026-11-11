@@ -394,3 +394,19 @@ en:
             post: "Post · %{title}"
             media: "Image · %{title}"
             block: "%{place} · %{block}"
+        # `Admin::Ui::NewRecordDialogComponent`: the New page and New post
+        # dialogs' shells; each kind's title and Create, the rest shared. The
+        # standalone no-JS pages (`admin/pages/new`, `admin/posts/new`) read
+        # the same words.
+        new_record_dialog:
+          page:
+            title: "New page"
+            create: "Create page"
+          post:
+            title: "New post"
+            create: "Create draft"
+          loading: "Loading…"
+          load_failed: "The form couldn’t be loaded."
+          submit_failed: "Couldn’t save. Check your connection and try again."
+          retry: "Try again"
+          cancel: "Cancel"

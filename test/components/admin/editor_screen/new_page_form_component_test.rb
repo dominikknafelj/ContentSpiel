@@ -1,7 +1,8 @@
 require "test_helper"
 
-# The New page dialog's shell and its form (design pass round 2, Task 15).
-class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
+# The New page dialog's form (design pass round 2, Task 15); the dialog's
+# shell is `Admin::Ui::NewRecordDialogComponent`'s test.
+class Admin::EditorScreen::NewPageFormComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   setup do
@@ -10,40 +11,8 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
     @other = create_page(title: "Other")
   end
 
-  def render_shell(user = users(:one))
-    as(user, channel: :admin) { render_inline(Admin::EditorScreen::NewPageDialogComponent.new) }
-  end
-
   def render_form(user = users(:one), **options)
     as(user, channel: :admin) { render_inline(Admin::EditorScreen::NewPageFormComponent.new(**options)) }
-  end
-
-  test "the shell is a 560 wide dialog with a loading line, an empty frame and a disabled Create button" do
-    render_shell
-    assert_selector "dialog#new-page-dialog[data-dialog-width=form]", visible: :all
-    # Its height changes when the form loads into the shell, so it hangs from a fixed
-    # top edge like the media picker (`.admin-dialog[data-dialog-hang]`).
-    assert_selector "dialog#new-page-dialog[data-dialog-hang]", visible: :all
-    assert_selector "#new-page-dialog-title", text: "New page", visible: :all
-    assert_selector "[data-controller=admin--editor--new-record][data-admin--editor--new-record-kind-value=page][data-admin--editor--new-record-url-value='/cs-studio/pages/new']", visible: :all
-    assert_selector "[data-admin--editor--new-record-target=loading]", text: "Loading…", visible: :all
-    assert_selector "[data-admin--editor--new-record-target=failure][hidden] button", text: "Try again", visible: :all
-    assert_selector "turbo-frame#new-page-form-frame:empty", visible: :all
-    assert_selector "dialog footer button[form=new-page-form][disabled]", text: "Create page", visible: :all
-    assert_selector "dialog footer button", text: "Cancel", visible: :all
-    assert_no_selector "form#new-page-form", visible: :all
-  end
-
-  test "the shell runs no query for pages and renders for a viewer who holds the right anywhere" do
-    queries = []
-    callback = ->(*, payload) { queries << payload[:sql] if payload[:sql].match?(/FROM "pages"|public_paths/) }
-    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { render_shell }
-    assert_empty queries
-  end
-
-  test "nothing renders for a viewer who may create no page" do
-    render_shell(users(:reader))
-    assert_no_selector "dialog", visible: :all
   end
 
   test "the form: Title, Inside, Template, a URL line and the draft note, posting to pages" do

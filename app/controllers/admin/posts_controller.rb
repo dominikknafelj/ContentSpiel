@@ -112,7 +112,7 @@ module Admin
         content_type: params[:type], title: params[:title])
       return forbidden! unless @form.creatable?
 
-      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPostDialogComponent::FRAME_ID
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::Ui::NewRecordDialogComponent::KINDS.fetch(:post).frame_id
     end
 
     # From the dialog (type, title) or the standalone form: a draft of the

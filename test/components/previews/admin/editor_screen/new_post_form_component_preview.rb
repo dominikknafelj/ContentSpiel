@@ -1,14 +1,10 @@
 module Admin
   module EditorScreen
-    # `Admin::EditorScreen::NewPostDialogComponent`: closed to start with, like
-    # the New page dialog's preview. `form` is the form alone; `with_error` is a
-    # refused create's replacement form; `one_type` is the form of a viewer who
-    # may create one type only, with no Type select.
-    class NewPostDialogComponentPreview < ViewComponent::Preview
-      def default
-        render Admin::EditorScreen::NewPostDialogComponent.new
-      end
-
+    # The New post dialog's form (its shell is
+    # `Admin::Ui::NewRecordDialogComponentPreview`): `form` is the form alone;
+    # `with_error` is a refused create's replacement form; `one_type` is the
+    # form of a viewer who may create one type only, with no Type select.
+    class NewPostFormComponentPreview < ViewComponent::Preview
       def form
         render Admin::EditorScreen::NewPostFormComponent.new
       end

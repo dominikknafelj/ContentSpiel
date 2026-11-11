@@ -1,8 +1,9 @@
 require "test_helper"
 
-# The New post dialog's shell and its form: a Title, a Type select (or, with
-# one creatable type, a hidden input) and one primary button, every word a key.
-class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
+# The New post dialog's form: a Title, a Type select (or, with one creatable
+# type, a hidden input), every word a key; the dialog's shell is
+# `Admin::Ui::NewRecordDialogComponent`'s test.
+class Admin::EditorScreen::NewPostFormComponentTest < ViewComponent::TestCase
   include ContentHelper
 
   # Tests here store words into the shared backend, and reloading in teardown
@@ -12,62 +13,12 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
   setup { I18n.backend.eager_load! }
   teardown { I18n.reload! }
 
-  def render_shell(user = users(:one))
-    as(user, channel: :admin) { render_inline(Admin::EditorScreen::NewPostDialogComponent.new) }
-  end
-
   def render_form(user = users(:one), **options)
     as(user, channel: :admin) { render_inline(Admin::EditorScreen::NewPostFormComponent.new(**options)) }
   end
 
   def only_now_update_for_branch_editors
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.create", scope: { "content_types" => [ "now_update" ] })
-  end
-
-  test "the shell is a 560 wide dialog with a loading line, an empty frame and a disabled Create draft button" do
-    render_shell
-    assert_selector "dialog#new-post-dialog[data-dialog-width=form]", visible: :all
-    # Its height changes when the form loads into the shell, so it hangs from a fixed
-    # top edge like the media picker (`.admin-dialog[data-dialog-hang]`).
-    assert_selector "dialog#new-post-dialog[data-dialog-hang]", visible: :all
-    assert_selector "#new-post-dialog-title", text: "New post", visible: :all
-    assert_selector "[data-admin--editor--new-record-kind-value=post][data-admin--editor--new-record-url-value='/cs-studio/posts/new']", visible: :all
-    assert_selector "turbo-frame#new-post-form-frame:empty", visible: :all
-    assert_selector "dialog footer button[form=new-post-form][disabled]", text: "Create draft", visible: :all
-    assert_no_selector "form#new-post-form", visible: :all
-  end
-
-  test "the dialog's words are keys: its title, Loading…, its failures, Try again, Cancel and Create draft" do
-    render_shell
-    assert_selector "[data-admin--editor--new-record-target=loading]", text: "Loading…", visible: :all
-    assert_selector "[data-admin--editor--new-record-target=failure][data-message='The form couldn’t be loaded.'] button", text: "Try again", visible: :all
-    assert_selector "[data-admin--editor--new-record-target=submitFailure][data-message='Couldn’t save. Check your connection and try again.']", visible: :all
-    assert_selector "dialog footer button", text: "Cancel", visible: :all
-
-    I18n.backend.store_translations(:en, admin: { components: { editor_screen: { new_post_dialog: { create: "Make it", title: "A new one" } } } })
-    render_shell
-    assert_selector "dialog footer button[form=new-post-form]", text: "Make it", visible: :all
-    assert_selector "#new-post-dialog-title", text: "A new one", visible: :all
-  end
-
-  test "both dialogs hand the script the same three sentences" do
-    expected = {
-      "components.editor_screen.new_record.url" => "URL: %{path}",
-      "components.editor_screen.new_record.not_listed" => "Not listed on any page yet",
-      "components.editor_screen.new_record.page_note" => "Created as a draft at the end of %{title}. Drag it in the tree to move it."
-    }
-    assert_equal expected.keys, Admin::EditorScreen::NewRecordMessages::KEYS
-
-    [ Admin::EditorScreen::NewPostDialogComponent, Admin::EditorScreen::NewPageDialogComponent ].each do |dialog|
-      as(users(:one), channel: :admin) { render_inline(dialog.new) }
-      holder = page.find("[data-controller='admin--editor--new-record']", visible: :all)
-      assert_equal expected, JSON.parse(holder["data-messages"]).except("@locale"), dialog.name
-    end
-  end
-
-  test "nothing renders for a viewer who may create no type" do
-    render_shell(users(:reader))
-    assert_no_selector "dialog", visible: :all
   end
 
   test "the form: Title first, then a labelled Type select with each type's listing path, the URL line and the draft note" do

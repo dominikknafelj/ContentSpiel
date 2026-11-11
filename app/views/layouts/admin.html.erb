@@ -227,8 +227,8 @@
         the same form on their own and skip the dialogs (`:standalone_new_record`),
         so no id appears twice. %>
     <% unless content_for?(:standalone_new_record) %>
-      <%= render Admin::EditorScreen::NewPageDialogComponent.new(url_options: admin_url_options) %>
-      <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options) %>
+      <%= render Admin::Ui::NewRecordDialogComponent.new(kind: :page, url_options: admin_url_options) %>
+      <%= render Admin::Ui::NewRecordDialogComponent.new(kind: :post, url_options: admin_url_options) %>
     <% end %>
 
     <%# The rich-text editor's image, YouTube and Page link dialogs: one of

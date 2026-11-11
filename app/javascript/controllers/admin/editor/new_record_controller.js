@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus"
 import { slugify } from "controllers/admin/editor/slug_preview_controller"
 import { messages } from "i18n/messages"
 
-// The New page / New post dialogs (`NewPageDialogComponent`,
-// `NewPostDialogComponent`; one instance per dialog, on a wrapper inside its
+// The New page / New post dialogs (`Admin::Ui::NewRecordDialogComponent`,
+// one per kind; one instance per dialog, on a wrapper inside its
 // body, `kind` says which). The layout renders only the shell -- a loading
 // line, an empty <turbo-frame> and a disabled Create button -- and this
 // controller fills it:
@@ -30,7 +30,7 @@ import { messages } from "i18n/messages"
 //    lists says "Not listed on any page yet". The type is the Type select's
 //    chosen option, or, with one creatable type, the hidden input that carries
 //    it. The sentences are the dialog's `data-messages`
-//    (`Admin::EditorScreen::NewRecordMessages::KEYS`), the same words the
+//    (`Admin::Ui::NewRecordDialogComponent::MESSAGES`), the same words the
 //    server drew the line in first.
 // 4. Guards the Create button, which sits in the dialog's footer outside the
 //    form (tied to it with `form=`, so found by that attribute): disabled
