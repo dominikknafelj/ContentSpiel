@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::EditorScreen::SharedFieldsComponent::Code`, with no alias: it is `Admin::Fields::CodeDisplay`, the same `Data.define(:text)`, which `Admin::Fields::CodeField.display` answers for a value and `SharedFieldsComponent` draws in the same read-only `pre`.
 - `Admin::SettingsScreen::MailFieldsComponent`, with no alias: it is `Admin::Ui::MailFieldsComponent`, with the same keywords, `login` slot, `FIELDS`, `SETTING`, `SECURITIES` and `PORTS`, drawing the same form; its words moved from `admin.components.settings_screen.mail_fields.*` to `admin.components.ui.mail_fields.*`, unchanged, and the Mail card and the wizard's Mail step draw it by its new name.
 - `Admin::SettingsScreen::HostValueComponent`, with no alias: it is `Admin::Ui::MailHostValueComponent` (a bare `HostValue` would read as any host's value), with the same `field:`, `label:` and `mail_settings:` keywords and `BOX`, drawing the same box; `MailLoginComponent::MASK` and `MailLoginComponent.secret?` went with it, being the host-value box's: they are `MailHostValueComponent::MASK` and `.secret?`; its words moved from `admin.components.settings_screen.host_value.*` to `admin.components.ui.mail_host_value.*`, unchanged.
 - `Admin::SettingsScreen::MailTestOutcomeComponent`, with no alias: it is `Admin::Ui::MailTestOutcomeComponent`, with the same `address:`, `sent:`, `alert:` and `line:` keywords, drawing the same answer; its one sentence moved from `admin.components.settings_screen.mail_test_outcome.sent` to `admin.components.ui.mail_test_outcome.sent`, unchanged.

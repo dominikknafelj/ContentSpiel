@@ -9,8 +9,9 @@ module Admin
     #
     # `fields:` is a list of `[label, value]` pairs; `.display` turns a typed
     # field's value into the text shown (a nested group or list can't be shown
-    # flat, so it is summarised). A select is shown by its label and code in a
-    # scrolling `pre`, both read-only like the rest.
+    # flat, so it is summarised). A select is shown by its label and code
+    # (`Admin::Fields::CodeDisplay`) in a scrolling `pre`, both read-only like
+    # the rest.
     #
     # CODE KEEPS ITS FRAME (design answer C6): the sunken ground, a line
     # around it, the monospace face in full ink. One 12px line above it says
@@ -27,9 +28,6 @@ module Admin
     # (the `:code` type's cast, `ContentModel::FieldTypes`), but this component is handed
     # whatever its caller read.
     class SharedFieldsComponent < Admin::AdminComponent
-      # Code shown read-only: the template draws it in a `pre`, not as a line of text.
-      Code = Data.define(:text)
-
       # A scalar reads as its input says (`Admin::Fields::<Type>Field.display`);
       # a nested group or list can't be shown flat, so it is summarised.
       def self.display(field, value)

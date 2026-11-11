@@ -36,7 +36,7 @@ module Admin
     # because a page that arrives is read by its own means.
     class CodeField < Base
       # Code keeps its frame where it is shown read-only: a `pre`, not a line.
-      def self.display(_field, value) = value.present? ? Admin::EditorScreen::SharedFieldsComponent::Code.new(value.to_s) : nil
+      def self.display(_field, value) = value.present? ? CodeDisplay.new(value.to_s) : nil
 
       def rows = 12
 

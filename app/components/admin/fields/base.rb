@@ -14,8 +14,8 @@ module Admin
     class Base < Admin::AdminComponent
       # How a value of this type reads where it cannot be edited (a
       # translation tab's "Shared fields", `EditorScreen::SharedFieldsComponent`):
-      # a String, nil for nothing to show, or a
-      # `SharedFieldsComponent::Code` for code drawn in a `pre`. A type's
+      # a String, nil for nothing to show, or a `CodeDisplay` for code drawn
+      # in a `pre`. A type's
       # input answers it, so the read-only view asks no type by its name.
       def self.display(_field, value) = value.to_s
 
