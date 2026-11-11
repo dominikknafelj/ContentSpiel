@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
-# The test files of one CI shard, one per line: `bin/test-shard system 2 4` is
-# the third of four shards of the browser suite, `bin/test-shard unit 0 2` the
+# The test files of one CI shard, one per line: `bin/test-shard system 2 6` is
+# the third of six shards of the browser suite, `bin/test-shard unit 0 2` the
 # first of two of the unit suite (every test file outside test/system/). CI runs
 # both suites as several jobs side by side (.github/workflows/ci.yml), because a
 # GitHub runner has two cores and the browser suite on two processes takes half
