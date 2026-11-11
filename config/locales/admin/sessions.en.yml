@@ -13,6 +13,11 @@ en:
         # It names no console command: the page is shown to anyone.
         forgot_without_mail: "Forgot your password? Ask the site's owner to reset it."
         submit: "Sign in"
+        # Above the bot check's widget, shown only after repeated failures.
+        check_hint: "A quick check is needed before you can sign in."
+        # In the hint's place when Turnstile's script cannot be loaded
+        # (read by the `bot-check` script from its `data-messages`).
+        check_unavailable: "The check couldn't load. Reload the page to try again."
       # A wrong address or password: one answer for both, so the page does
       # not say which addresses have an account.
       refused: "Try another email address or password."

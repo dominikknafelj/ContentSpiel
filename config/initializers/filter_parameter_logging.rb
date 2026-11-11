@@ -10,7 +10,10 @@ Rails.application.config.filter_parameters += [
   :lookup_digest,
   # The mail login's username (docs/reference/mail.md): a credential for several providers (Postmark's
   # server token, SES's access key id). Its password is :passw's.
-  :mail_username
+  :mail_username,
+  # The bot check's answer, posted by the Turnstile widget as `cf-turnstile-response` (`SignIn::BotCheck`):
+  # a one-time pass that must reach no log, and whose name no entry above matches.
+  :turnstile
 ]
 
 # A visitor's answers to a form (personal data reaches no log). The endpoint (`FormSendsController`, controller

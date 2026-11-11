@@ -59,6 +59,10 @@ module Admin
     MAX_EMAIL_LENGTH = 254
 
     allow_unauthenticated_access only: %i[ new create ]
+
+    # Where Turnstile's widget is framed from (`bot-check` loads its script
+    # from there too: the site's policy sets no script-src).
+    BOT_CHECK_ORIGIN = "https://challenges.cloudflare.com".freeze
     # The per-address bucket, Rails' `rate_limit`: it counts every POST to
     # `create`, a success and a refusal alike, not failures alone. Its
     # store is the throttle's (`SignIn.store`), so it counts where every
@@ -68,6 +72,7 @@ module Admin
     def new
       bot_check = SignIn::BotCheck.current
       @bot_check = bot_check if bot_check && (session[:sign_in_bot_check] || SignIn::Throttle.new.bot_check_due?(address: request.remote_ip))
+      allow_bot_check_frame if @bot_check
     end
 
     def create
@@ -108,6 +113,18 @@ module Admin
     end
 
     private
+
+    # Turnstile's widget is an iframe from Cloudflare, and the site's policy
+    # frames only itself and youtube-nocookie.com. A sign-in page that draws
+    # the widget frames itself and Cloudflare instead; every other page,
+    # this one without the widget included, keeps the site's policy. Set on
+    # the request, which the policy's middleware writes as the header after
+    # the action.
+    def allow_bot_check_frame
+      policy = current_content_security_policy
+      policy.frame_src :self, BOT_CHECK_ORIGIN
+      request.content_security_policy = policy
+    end
 
     def refusal_sentence(outcome)
       case outcome.status
