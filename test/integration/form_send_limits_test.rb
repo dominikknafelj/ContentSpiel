@@ -26,6 +26,8 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
 
   def store_keys = Forms::SendLimit.store.instance_variable_get(:@data).keys
 
+  def visitor_key(ip) = VisitorAddress.key(ip, purpose: Forms::SendLimit::KEY_PURPOSE)
+
   test "the sixth send from one address in ten minutes is answered 429 with too many messages, and stored nowhere" do
     5.times { send_form }
     assert_response :ok
@@ -106,10 +108,10 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     send_form(from: "203.0.113.7")
 
     keys = store_keys
-    assert_equal [ "rate-limit:form_sends:form_send_form:#{@form.id}", "rate-limit:form_sends:form_send_visitor:#{Forms::SendLimit.visitor_key("203.0.113.7")}" ].sort, keys.sort
+    assert_equal [ "rate-limit:form_sends:form_send_form:#{@form.id}", "rate-limit:form_sends:form_send_visitor:#{visitor_key("203.0.113.7")}" ].sort, keys.sort
     assert keys.none? { |key| key.include?("203.0.113.7") }, keys.inspect
-    assert_match(/\A\h{64}\z/, Forms::SendLimit.visitor_key("203.0.113.7"))
-    assert_not_equal Forms::SendLimit.visitor_key("203.0.113.7"), Forms::SendLimit.visitor_key("203.0.113.8")
+    assert_match(/\A\h{64}\z/, visitor_key("203.0.113.7"))
+    assert_not_equal visitor_key("203.0.113.7"), visitor_key("203.0.113.8")
   end
 
   # One IPv6 visitor holds a whole /64 and may send from any address in it:
@@ -124,8 +126,8 @@ class FormSendLimitsTest < ActionDispatch::IntegrationTest
     send_form(from: "2001:db8:1:3::a")
     assert_response :ok, "the next /64 is another visitor"
 
-    assert_equal Forms::SendLimit.visitor_key("2001:db8:1:2::a"), Forms::SendLimit.visitor_key("2001:db8:1:2:ffff::b")
-    assert_not_equal Forms::SendLimit.visitor_key("203.0.113.7"), Forms::SendLimit.visitor_key("203.0.113.8")
+    assert_equal visitor_key("2001:db8:1:2::a"), visitor_key("2001:db8:1:2:ffff::b")
+    assert_not_equal visitor_key("203.0.113.7"), visitor_key("203.0.113.8")
     keys = store_keys
     assert_equal 3, keys.size, keys.inspect # the form, and two visitors
     # A hex digest can hold "db8" or "2001" by chance, so the shape is what is

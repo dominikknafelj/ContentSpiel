@@ -148,6 +148,11 @@ module ActiveSupport
     # from ever being observable.
     setup { Setup.reset! }
 
+    # The throttle's counters live in one memory store of the process in this
+    # environment (`SignIn.store`), so a test's failures would close the next
+    # test's buckets.
+    setup { SignIn.store.clear }
+
     # Runs the block as `actor` (a User or ApiToken) on `channel`, the way a
     # CS Studio request would -- so a service called inside it is authorized
     # and audited for that actor.
