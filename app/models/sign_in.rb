@@ -5,6 +5,10 @@
 # Studio's sign-in is one caller; a later members' sign-in is another, and
 # counts apart under a scope of its own.
 module SignIn
+  # What a sign-in attempt can come to (`SignIn::Outcome#status`), and the
+  # words its span's `auth.outcome` may carry.
+  OUTCOMES = %i[ok refused locked bot_check_required bot_check_failed].freeze
+
   # Where the throttle's counters live: `CounterStore.current`, Solid Cache
   # in production (every process counts in one place) and one memory store
   # of the process in tests, cleared before each.

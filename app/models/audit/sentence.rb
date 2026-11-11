@@ -7,8 +7,9 @@ module Audit
   # of components, helpers or HTML: a `Sentence` is
   #
   #   actor          who did it, as facts (`Actor`): the viewer ("You"), a user
-  #                  by id/record, nobody (`session.failed` has no user, and
-  #                  the sentence must not invent one), plus the token's name
+  #                  by id/record, nobody (`NO_ACTOR`: a sign-in's refusal
+  #                  has no user, and the sentence must not invent one),
+  #                  plus the token's name
   #                  for a change made through one
   #   parts          `[Part(kind, text)]`, kind `:text`, `:strong` (a named
   #                  thing that is never a link: a permission, a language) or
@@ -128,7 +129,7 @@ module Audit
     SPECIAL_ACTIONS = %w[
       starter_content.added trash.emptied media.regenerated user.owner_changed invitation.accepted
       language.enabled language.disabled language.configured language.default_changed
-      session.created session.destroyed session.failed access.denied
+      session.created session.destroyed session.failed session.locked access.denied
     ].freeze
 
     ACTIONS = (
@@ -136,7 +137,11 @@ module Audit
       BLOCK_ACTIONS + OTHER_VERBS.keys + NOTE_VERBS.keys + SUBMISSION_ACTIONS + SPECIAL_ACTIONS
     ).uniq.freeze
 
-    SECURITY_ACTIONS = %w[session.failed access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
+    # Sign-in's refusals: nobody signed in, and the sentence must not invent
+    # an actor.
+    NO_ACTOR = %w[session.failed session.locked].freeze
+
+    SECURITY_ACTIONS = %w[session.failed session.locked access.denied user.owner_changed token.issued token.revoked user.deleted group.deleted].freeze
 
     class << self
       # One event for one viewer (resolving its target by itself).
@@ -166,7 +171,7 @@ module Audit
         end
         raise ArgumentError, "at_least is for a counted sentence (count above 1)" if at_least && count <= 1
         visitor = visitor?(event)
-        actor = actor_for(event, viewer, none: action == "session.failed" || visitor)
+        actor = actor_for(event, viewer, none: NO_ACTOR.include?(action) || visitor)
         parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you, count:, mixed:, at_least:).parts
         parts = [ Wording.visitor_part ] + parts if visitor
         new(
@@ -409,6 +414,8 @@ module Audit
         # No user, no email: the attempted address is in `metadata` for the
         # record, but the log never showed it and still doesn't.
         when "session.failed" then [ text("Failed sign-in attempt") ]
+        # Nor the address of a lock-out, which is the event's own `ip`.
+        when "session.locked" then [ text(locked_sentence) ]
         when "access.denied" then denied_parts
         when "user.owner_changed" then owner_parts
         # The actor IS the subject: the account the invitation's token made.
@@ -422,6 +429,13 @@ module Audit
       def regenerated_parts
         count = event.metadata.is_a?(Hash) ? event.metadata["count"].to_i : 0
         [ text("regenerated #{count} #{count == 1 ? "image" : "images"}") ]
+      end
+
+      # A lock-out of the account's bucket or of the address's (`bucket` in
+      # the metadata).
+      def locked_sentence
+        bucket = event.metadata.is_a?(Hash) ? event.metadata["bucket"] : nil
+        bucket == "address_wide" ? "Sign-in from one address paused after repeated failures" : "Sign-in to one account paused after repeated failures"
       end
 
       def denied_parts

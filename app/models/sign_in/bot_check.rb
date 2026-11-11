@@ -91,6 +91,11 @@ module SignIn
       answer
     end
 
+    # Whether `token` is worth sending to Cloudflare: a String, not blank
+    # and at most TOKEN_MAX characters. A caller that must tell a missing
+    # token from a refused one asks this first.
+    def self.usable_token?(token) = token.is_a?(String) && token.present? && token.length <= TOKEN_MAX
+
     def initialize(site_key:, secret_key:)
       @site_key = site_key
       @secret_key = secret_key
@@ -99,7 +104,7 @@ module SignIn
     # :passed, :failed or :unavailable (which the caller treats as passed).
     # `hostname` is the request's host.
     def verify(token, address:, hostname:)
-      return :failed unless token.is_a?(String) && token.present? && token.length <= TOKEN_MAX
+      return :failed unless self.class.usable_token?(token)
 
       Telemetry.in_span("auth.bot_check", kind: :client, attributes: { "server.address" => SERVER }) do |span|
         answer = self.class.siteverify({ "secret" => @secret_key, "response" => token, "remoteip" => address }.compact)
