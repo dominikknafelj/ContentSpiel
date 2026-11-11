@@ -44,6 +44,7 @@ module DesignSystemEntries
     "Admin::Ui::LanguageTabsComponent" => "Tabs",
     "Admin::Ui::LibraryImageComponent" => "StudioMediaGrid",
     "Admin::Ui::ListStateComponent" => "RecordState",
+    "Admin::Ui::MailAlertComponent" => "StudioSettings",
     "Admin::Ui::MailFailedNoticeComponent" => "Notice",
     "Admin::Ui::PaginationComponent" => "StudioListTable",
     "Admin::Ui::RailPanelComponent" => "StudioRail",

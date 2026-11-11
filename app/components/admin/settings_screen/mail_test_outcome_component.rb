@@ -25,7 +25,7 @@ module Admin
 
       def result
         if @alert
-          render(MailAlertComponent.new(sentence: @alert, line: @line))
+          render(Admin::Ui::MailAlertComponent.new(sentence: @alert, line: @line))
         elsif @sent
           render(Admin::Ui::NoticeComponent.new(tone: :ok, size: :compact, role: nil).with_content(t(".sent", address: @address)))
         end
