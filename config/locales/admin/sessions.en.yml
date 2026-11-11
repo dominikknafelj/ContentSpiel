@@ -30,3 +30,6 @@ en:
       # The bot check was due and its answer was missing or refused: no
       # password was tried.
       bot_check: "Complete the check, then sign in again."
+      # Shown only to a browser whose signed cookie named a session that is
+      # gone; it names no account.
+      ended: "Your session ended. Sign in again."

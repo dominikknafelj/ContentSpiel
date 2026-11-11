@@ -120,6 +120,84 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_empty @user.sessions
   end
 
+  ENDED_SENTENCE = "Your session ended. Sign in again.".freeze
+
+  def sign_in_cookie_value
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
+    cookies[:session_id]
+  end
+
+  def cookie_cleared?
+    Array(response.headers["Set-Cookie"]).join("\n").lines.any? { |line| line.start_with?("session_id=") && line.include?("1970") }
+  end
+
+  test "a session ended elsewhere says so once to the browser it ended in, and clears the cookie" do
+    sign_in_cookie_value
+    @user.sessions.sole.destroy!
+
+    get "/cs-studio"
+    assert_redirected_to "/cs-studio/sign-in"
+    assert cookie_cleared?
+    follow_redirect!
+    assert_select "#flash-session-ended[role=note]", text: ENDED_SENTENCE
+    assert_select "#alert", count: 0
+
+    get admin_sign_in_url
+    assert_no_match ENDED_SENTENCE, response.body
+    get "/cs-studio"
+    follow_redirect!
+    assert_no_match ENDED_SENTENCE, response.body
+  end
+
+  test "an idle-expired session says so at sign-in" do
+    freeze_time
+    sign_in_cookie_value
+    travel 12.hours do
+      get "/cs-studio"
+    end
+    follow_redirect!
+    assert_select "#flash-session-ended", text: ENDED_SENTENCE
+  end
+
+  test "the ended sentence names no email" do
+    sign_in_cookie_value
+    @user.sessions.sole.destroy!
+    get "/cs-studio"
+    follow_redirect!
+    assert_no_match "admin@example.com", response.body
+  end
+
+  test "signing out says nothing at sign-in" do
+    sign_in_cookie_value
+    delete admin_sign_out_url
+    follow_redirect!
+    assert_no_match ENDED_SENTENCE, response.body
+    get "/cs-studio"
+    follow_redirect!
+    assert_no_match ENDED_SENTENCE, response.body
+  end
+
+  test "a browser with no cookie, or a forged one, is told nothing" do
+    get "/cs-studio"
+    follow_redirect!
+    assert_no_match ENDED_SENTENCE, response.body
+
+    cookies[:session_id] = "forged-unsigned-value"
+    get "/cs-studio"
+    follow_redirect!
+    assert_no_match ENDED_SENTENCE, response.body
+  end
+
+  test "the ended sentence does not stand with a refusal alert" do
+    sign_in_cookie_value
+    @user.sessions.sole.destroy!
+    get "/cs-studio"
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "wrong" }
+    follow_redirect!
+    assert_select "#alert", text: /Try another/
+    assert_no_match ENDED_SENTENCE, response.body
+  end
+
   # The expiry's span (`auth.session`) is drawn only for a session ended at
   # this request, as a child of the request's server span, and says only
   # why: the user's email and the session's id are planted and searched for

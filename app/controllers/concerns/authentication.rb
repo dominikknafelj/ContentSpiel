@@ -50,7 +50,21 @@ module Authentication
       # remember a `HEAD` request's *referer* instead of the URL it was
       # actually for.
       session[:return_to_after_authenticating] = (request.get? || request.head?) ? request.url : request.referer
+      forget_ended_session
       redirect_to admin_sign_in_path
+    end
+
+    # A signed `session_id` that `Session.from_cookies` did not resolve names
+    # a session that is gone (ended elsewhere, or expired): only that browser
+    # is told so, once, by a flash the sign-in page reads, and the cookie is
+    # cleared so the next visit is a plain sign-in. A browser with no cookie
+    # and a forged one (`cookies.signed` reads nil) are told nothing, and the
+    # sentence names no account.
+    def forget_ended_session
+      return if cookies.signed[:session_id].blank?
+
+      cookies.delete(:session_id)
+      flash[:session_ended] = true
     end
 
     # The public site needs no authentication of its own (PagesController
