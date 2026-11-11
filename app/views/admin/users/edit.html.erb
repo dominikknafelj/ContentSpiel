@@ -1,7 +1,7 @@
 <%# Edit a user: the heading is the user's name (as stored: a refused save's
     typed name isn't the title), "Last signed in …" under it (from
     `session.created` audit events), the form, then -- for an editable user --
-    the owner zone (owners only) and the delete zone, both AFTER the form
+    the owner and sessions zones (owners only) and the delete zone, both AFTER the form
     (forms don't nest) and both instant actions that wait for pending changes.
     A user the viewer can't manage (`Users::Manageability`) is read-only, and
     a neutral notice says why: a note, read where it stands and never a Tab
@@ -41,6 +41,7 @@
   <% if state == :editable %>
     <% if Current.user&.owner? %>
       <%= render Admin::UsersScreen::OwnerZoneComponent.new(user: @user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
+      <%= render Admin::UsersScreen::SessionsZoneComponent.new(user: @user, own: @user == Current.user, count: @user.sessions.live(Time.current).count, url_options: admin_url_options) %>
     <% end %>
     <%= render Admin::UsersScreen::DeleteZoneComponent.new(user: @user, own: @user == Current.user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
   <% end %>

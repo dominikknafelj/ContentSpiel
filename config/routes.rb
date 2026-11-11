@@ -276,6 +276,9 @@ Rails.application.routes.draw do
       # action of its own, `owner=1|0`, answered by `Users::Save` like any other
       # change to a user -- never a field of the editor's form.
       member { patch :owner }
+      # "End all sessions…": an owner signs another user out everywhere
+      # (`Sessions::EndAll`, which refuses a non-owner and your own account).
+      member { delete :sessions }
     end
 
     # Invites (`Admin::InvitesController`): "Invite

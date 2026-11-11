@@ -63,7 +63,18 @@ en:
           make_confirm: "Make owner"
           remove_confirm: "Remove owner rights"
         sessions_zone:
+          heading: "Sessions"
+          body:
+            one: "%{name} has 1 open session. Ending it signs %{name} out everywhere."
+            other: "%{name} has %{count} open sessions. Ending them signs %{name} out everywhere."
+          body_none: "Ending sessions signs a person out everywhere."
+          reason_none: "%{name} has no open sessions."
           reason_own: "End your own sessions from Your account."
+          trigger: "End all sessions…"
+          title: "End all of %{name}'s sessions?"
+          confirm_body: "%{name} is signed out on every browser and must sign in again. Their saved work stays; text they were still typing may be lost."
+          confirm: "End all sessions"
+          ended: "%{name} is signed out everywhere."
     invites:
       sent: "Invite sent to %{email}."
       resent: "New invite sent to %{email}."
