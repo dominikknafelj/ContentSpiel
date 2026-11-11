@@ -6,7 +6,7 @@ module Admin
     # channel a person didn't type on, so it stands out); the rest are meta.
     # Colour is never the only cue: the word is the chip, and `aria-label`
     # spells the channel for a screen reader. It is a badge
-    # (`BadgeComponent`, compact, MCP in the accent tone): this component
+    # (`BadgeComponent`, MCP in the accent tone): this component
     # owns only the channel's word, tone and label.
     class ChannelChipComponent < AdminComponent
       include Admin::Ui::Contract
@@ -45,7 +45,7 @@ module Admin
       def aria_label = "Channel: #{channel == "mcp" ? "MCP" : channel.downcase}"
 
       def call
-        render(BadgeComponent.new(label: label, tone: channel == "mcp" ? :accent : :neutral, size: :compact,
+        render(BadgeComponent.new(label: label, tone: channel == "mcp" ? :accent : :neutral,
           class: "admin-channel-chip", data: { channel: channel }, aria: { label: aria_label }))
       end
 

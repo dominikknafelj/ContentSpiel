@@ -6,6 +6,7 @@
 
 - CS Studio's segmented controls are one component with one look: the posts list's scope, the media library's and the picker's segments, Translations' type, the Trash's types, a form's Form | Submissions, Waiting for you's and the Notes screen's filters, a `control: :segmented` select (the Note block's kind), Settings' mail security and image format, the form builder's "Shown as" and the New form dialog's start. The chosen segment is the accent tint with accent words and a 1px accent edge where it was ink with paper words; the track has no dividers, is 38px tall everywhere (34px outside a filter bar before), wraps whole segments at a narrow width, and a count is always drawn in tabular figures, 0 included. The keyboard is as before: a link is a Tab stop, a radio group one Tab stop the arrows move along (#237).
 - The language tabs' chosen language is underlined in the accent, as a rail tab is, where it was ink (#237).
+- The channel chip (the audit log's rows, the dashboard's token-made changes) is a badge at the badge's one height, 2px taller than it was (#237).
 - A rail tab with a count, and a rail of one tab's heading, is read out as its label and its count apart ("Notes 3", "Notes 2 new"), where a screen reader was handed them run together (#237).
 - An outdated language's mark on the language tabs is ↻ in warn ink, as on a translation chip and under a language's progress bar, where it was a solid warn dot; a screen reader still hears "<language>: outdated" (#237).
 - A danger notice (a refusal, a broken link, a sign-in page's error) has a 1px danger edge, as a form's error summary has; warn kept its edge, and ok and neutral have none (#237).
@@ -15,14 +16,14 @@
 
 - `Admin::Ui::TabLinksComponent`, with no alias: its links are `Admin::Ui::SegmentedComponent.new(mode: :links, label:, segments:, control_data:)`, a segment `{ label:, href:, current:, count: }` as a tab was, and `link_data:` is `control_data:`.
 - `Admin::NotesScreen::AvatarComponent`, with no alias: a person a note names is `Admin::Ui::ActorAvatarComponent.new(user:, viewer:, size: :md | :sm)` (a thread or inbox row's `:row` was `:md`, a message's `:message` `:sm`), drawing the same circle; `user_id:` is not taken, a nil user being a deleted one (#237).
-- `Admin::Ui::ChannelChipComponent#tone_class`, with no alias: the chip draws through `Admin::Ui::BadgeComponent` (`tone: :accent` for MCP, else `:neutral`, `size: :compact`); `label` and `aria_label` stay (#237).
+- `Admin::Ui::ChannelChipComponent#tone_class`, with no alias: the chip draws through `Admin::Ui::BadgeComponent` (`tone: :accent` for MCP, else `:neutral`); `label` and `aria_label` stay (#237).
 - The class constants `Admin::Ui::TabLinksComponent::LINK_CLASS`, `Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS`, `Admin::MediaLibrary::ToolbarComponent::SEGMENT_CLASS` and `Admin::Fields::SelectField::SEGMENT_CLASS`: a segmented control is drawn by `Admin::Ui::SegmentedComponent`, never from a class string. With them went the filter bar's height rule for a segment (`.admin-filter-bar fieldset label`): the control is 38px by its own track.
 
 ### For a gem or an outside caller
 
 - `Admin::Ui::SegmentedComponent` is the one segmented control, in `mode: :links` (a `<nav>` of links, the chosen one `aria-current="page"`) or `mode: :radios` (a `<fieldset>` of sr-only radios named `name:`, its legend `legend: :hidden` or `:visible`, with `required:`, `id:` and `describedby:` on the group). A segment is a Hash of `label:`, `current:` and `count:` (nil draws none), with `href:` for a link and `value:` and `id:` for a radio (each required by its key, so `value: ""` is a value), which also takes `count_id:`, `disabled:` and `data:`. A segment missing its mode's keys, holding a key of the other mode or an unknown one, and links handed `name:`, `required:`, `describedby:` or `legend:`, are refused with an `ArgumentError`. A `MediaLibrary::ToolbarComponent`'s count spans keep their ids (`count_id`).
 - `Admin::Ui::ActorAvatarComponent` also takes `user:` with an optional `viewer:` in place of `actor:` (the two together are refused with an `ArgumentError`), and a 26px slot, `size: :md`: the one rule that turns a user into a circle, for an audit actor and for a person a note names alike (#237).
-- `Admin::Ui::BadgeComponent` takes `tone: :accent` (the accent tint with accent words) and `size: :compact` (1px above and below the label, `COMPACT_CLASS`), and `Admin::Ui::ChannelChipComponent` draws through it, as it looked. (#237).
+- `Admin::Ui::BadgeComponent` takes `tone: :accent` (the accent tint with accent words), and `Admin::Ui::ChannelChipComponent` draws through it (#237).
 - `Admin::Ui::StatusChipComponent::SHELL_CLASS` (the chip's shell without its `admin-status-chip` hook) and `OUTLINE_CLASS` (the Draft outline) are the classes `Admin::Ui::UnpublishedChipComponent` draws from; `BASE_CLASS` is unchanged (#237).
 
 ## 0.2.0 (2026-11-10)

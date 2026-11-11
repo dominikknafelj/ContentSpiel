@@ -24,19 +24,8 @@ class Admin::Ui::BadgeComponentTest < ViewComponent::TestCase
     assert_no_selector "span.bg-sunken"
   end
 
-  test "compact is 1px above and below the label where a badge is 2px, and nothing else changes" do
-    render_inline Admin::Ui::BadgeComponent.new(label: "Admin", size: :compact)
-    compact = page.find("span", text: "Admin")[:class].split
-    render_inline Admin::Ui::BadgeComponent.new(label: "Admin")
-    regular = page.find("span", text: "Admin")[:class].split
-
-    assert_equal %w[py-px], compact - regular
-    assert_equal %w[py-0.5], regular - compact
-  end
-
-  test "an unknown tone or size is a programming error" do
+  test "an unknown tone is a programming error" do
     assert_raises(ArgumentError) { Admin::Ui::BadgeComponent.new(label: "x", tone: :loud) }
-    assert_raises(ArgumentError) { Admin::Ui::BadgeComponent.new(label: "x", size: :large) }
   end
 
   test "a mark stands before the label, hidden from a screen reader" do

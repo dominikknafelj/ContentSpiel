@@ -9,54 +9,53 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794363704-46b4".freeze
+  VERSION = "1794375269-16dc".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
-    ActionZone ActorAvatar Alerts Avatar Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FormControls
-    FoundationComponentContract FoundationContrast FoundationFocus FoundationIcons FoundationLayout FoundationMotion
-    GroupFields IconChip ImageField ImageLoading ListState Mails MediaPicker Menu NoteMarker PasswordField PresenceMarker
-    PatternDestructiveActions PatternEmptyStates PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation
-    PatternNotifications PatternSaving PrefixInput RichTextEditor SaveBar Segmented
-    SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage SiteNotFound SiteNote SitePageChrome
-    SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip
-    StudioBlockCard StudioCommandPalette StudioDashboardCards
-    StudioAccount StudioAuditLog StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid
-    StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail StudioSectionTile
-    StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations StudioTrash StudioTree StudioUsers StudioWizard
-    TableGrid TextFields Toast Tooltip UserName
+    ActionZone Badge Brand Busy Button ChipInput ChoiceFields CopyValue Cover Dialog FieldFrame FoundationComponentContract FoundationContrast
+    FoundationFocus FoundationIcons FoundationLayout FoundationMotion GroupFields IconChip ImageField Mails MediaPicker Menu NoteMarker Notice
+    PasswordField PatternDestructiveActions PatternFormsAndErrors PatternLoadingAndBusy PatternNavigation PatternNotifications PatternSaving Person
+    PrefixInput PresenceMarker RecordState RichTextEditor SaveBar Segmented SiteCard SiteCodeBlock SiteFooter SiteForm SiteHeader SiteImage
+    SiteNotFound SiteNote SitePageChrome SitePostList SitePreviewBar SiteRichText SiteSection SiteTable Slot StateChip StudioAccount StudioAuditLog
+    StudioBlockCard StudioCommandPalette StudioDashboardCards StudioEditorHeader StudioEmptyState StudioErrors StudioFilterBar StudioForms
+    StudioGroups StudioHeldStrip StudioListTable StudioMediaGrid StudioMindGraph StudioNewRecordDialog StudioNotesInbox StudioNotesThread StudioRail
+    StudioSectionTile StudioSettings StudioShell StudioSignIn StudioSystemStatus StudioTagDetail StudioTokens StudioTranslationPair StudioTranslations
+    StudioTrash StudioTree StudioUsers StudioWizard TableGrid Tabs TextFields Toast Tooltip
   ].freeze
 
   # A component whose card has another name: the card whose "Code" section
   # names the component. A component whose card is its own name less
   # `Component` (`Admin::Ui::ButtonComponent`, Button) is not listed.
   COVERED_BY = {
+    "Admin::Ui::ActorAvatarComponent" => "Person",
+    "Admin::Ui::AvatarComponent" => "Person",
     "Admin::Ui::BlockIconComponent" => "IconChip",
     "Admin::Ui::ChannelChipComponent" => "Badge",
-    "Admin::Ui::CheckboxComponent" => "FormControls",
+    "Admin::Ui::CheckboxComponent" => "ChoiceFields",
     "Admin::Ui::ConfirmDialogComponent" => "Dialog",
-    "Admin::Ui::ContentTypeDotComponent" => "StudioListTable",
+    "Admin::Ui::ContentTypeDotComponent" => "Badge",
     "Admin::Ui::EmptyStateComponent" => "StudioEmptyState",
-    "Admin::Ui::ErrorSummaryComponent" => "Alerts",
+    "Admin::Ui::ErrorSummaryComponent" => "Notice",
     "Admin::Ui::FieldComponent" => "FieldFrame",
     "Admin::Ui::FileDropComponent" => "ImageField",
-    "Admin::Ui::InsecureNoticeComponent" => "Alerts",
+    "Admin::Ui::InsecureNoticeComponent" => "Notice",
     "Admin::Ui::LanguageProgressComponent" => "StudioTranslations",
-    "Admin::Ui::LanguageTabsComponent" => "StudioTranslationPair",
+    "Admin::Ui::LanguageTabsComponent" => "Tabs",
     "Admin::Ui::LibraryImageComponent" => "StudioMediaGrid",
-    "Admin::Ui::MailFailedNoticeComponent" => "Alerts",
-    "Admin::Ui::NoticeComponent" => "Alerts",
+    "Admin::Ui::ListStateComponent" => "RecordState",
+    "Admin::Ui::MailFailedNoticeComponent" => "Notice",
     "Admin::Ui::PaginationComponent" => "StudioListTable",
     "Admin::Ui::RailPanelComponent" => "StudioRail",
     "Admin::Ui::RailSlotComponent" => "StudioRail",
-    "Admin::Ui::RailTabComponent" => "StudioRail",
-    "Admin::Ui::RailTabsComponent" => "StudioRail",
+    "Admin::Ui::RailTabComponent" => "Tabs",
+    "Admin::Ui::RailTabsComponent" => "Tabs",
     "Admin::Ui::RecordChipComponent" => "IconChip",
     "Admin::Ui::SaveStatusComponent" => "SaveBar",
     "Admin::Ui::ScheduledDateComponent" => "StudioDashboardCards",
     "Admin::Ui::SettingsCardComponent" => "StudioSettings",
-    "Admin::Ui::StatusChipComponent" => "Badge",
-    "Admin::Ui::SystemCheckRowComponent" => "Alerts",
+    "Admin::Ui::StatusChipComponent" => "RecordState",
+    "Admin::Ui::SystemCheckRowComponent" => "StudioSystemStatus",
     "Admin::Ui::ThemeSwitchComponent" => "StudioShell",
     "Admin::Ui::TimeAgoComponent" => "StudioListTable",
     "Admin::Ui::ToastRegionComponent" => "Toast",
@@ -64,7 +63,8 @@ module DesignSystemEntries
     "Admin::Ui::TreeFindComponent" => "StudioTree",
     "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",
-    "Admin::Ui::UnpublishedChipComponent" => "Badge",
+    "Admin::Ui::UnpublishedChipComponent" => "RecordState",
+    "Admin::Ui::UserNameComponent" => "Person",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"
   }.freeze
 
