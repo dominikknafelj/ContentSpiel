@@ -60,7 +60,7 @@ class Sessions::EndOthersTest < ActiveSupport::TestCase
     assert_equal({ "reason" => "ended_by_self", "count" => 1 }, Audit::Event.where(action: "session.ended").sole.metadata)
   end
 
-  # Review Focus 3: an id that is not one of yours answers exactly as one of
+  # An id that is not one of yours answers exactly as one of
   # yours that had already ended, so the id tells nothing.
   test "only: another user's session, an unknown id or the kept one ends nothing and records nothing" do
     theirs = start(users(:author))

@@ -351,7 +351,7 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert Session.exists?(bystander.id)
   end
 
-  # Review Focus 5: the acting session is not the user's, so all of theirs end.
+  # The acting session is not the user's, so all of theirs end.
   test "an owner changing another user's password ends all their sessions and records password_changed once with the count" do
     user = users(:reader)
     3.times { Session.start(user: user, method: "password", user_agent: nil, ip_address: nil) }

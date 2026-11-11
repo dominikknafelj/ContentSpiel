@@ -51,7 +51,7 @@ class Sessions::EndAllTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert_not result.denied?
-    assert_equal [ I18n.t("admin.components.users_screen.sessions_zone.reason_own") ], result.errors
+    assert_equal [ "End your own sessions from Your account." ], result.errors
     assert Session.exists?(session.id)
     assert_not Audit::Event.exists?(action: "session.ended")
   end
