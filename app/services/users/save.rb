@@ -89,6 +89,10 @@ module Users
       end
       return failure(@user) unless saved
 
+      # A password set here (the wizard's owner, a manager's typed one)
+      # opens sign-in for the account in every browser, as
+      # `Users::UpdatePassword` does, after the commit.
+      SignIn::Throttle.new.clear(identifier: @user.email_address) if attrs.key?(:password)
       success(@user)
     end
 

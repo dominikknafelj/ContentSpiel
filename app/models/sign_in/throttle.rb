@@ -47,8 +47,9 @@ module SignIn
   # account bucket alone cannot stop (one attempt an hour, from anywhere),
   # does not keep the person out of their own browser; and a device bucket
   # that closes closes that device alone. The wide bucket and the bot check
-  # apply to a known device as to anyone. `clear` (a reset of the password,
-  # the console's) opens the account's bucket for every browser.
+  # apply to a known device as to anyone. `clear` (a new password set by
+  # anyone who proved the account) opens the account's bucket and every
+  # device's at once.
   #
   # THE WIDE BUCKET counts every attempt from one address (`VisitorAddress`,
   # an IPv6 one by its /64), whatever accounts it tried: WIDE_LIMIT go on in
@@ -85,6 +86,10 @@ module SignIn
     BOT_CHECK_AFTER = 3
     BOT_CHECK_WINDOW = 15.minutes
     NOTICE_EVERY = 1.hour
+    # How long an account's generation is kept (`clear`). Its loss only ever
+    # opens device buckets, never closes one; it outlives a device cookie's
+    # 90 days so a reset is not undone by it within a cookie's life.
+    GENERATION_KEPT = 1.year
     KEY_PURPOSE = "content_spiel sign-in throttle".freeze
 
     # A closed bucket: `:account` or `:device` with its back-off level
@@ -156,12 +161,17 @@ module SignIn
       nil
     end
 
-    # The account's run, its lock and its bot-check count are forgotten:
-    # its password was set by someone who proved the account (a reset's
-    # token, the console), so the bucket opens for every browser.
+    # The account's run, its lock and its bot-check count are forgotten,
+    # and every known device's run and lock with them: its password was set
+    # by someone who proved the account (a reset's token, the current
+    # password, a manager, the console), so sign-in opens for every
+    # browser. A device's keys cannot be listed, so they are not deleted:
+    # each names the account's generation, which this replaces, and a
+    # device's next attempt reads a bucket nobody has counted in.
     def clear(identifier:)
       account = identifier_digest(identifier)
       store.delete_multi([ key(:account, account), key(:account_lock, account), key(:bot_account, account) ])
+      store.write(key(:generation, account), SecureRandom.hex(8), expires_in: GENERATION_KEPT)
       nil
     end
 
@@ -270,7 +280,11 @@ module SignIn
       # An email as written, never cut as an address would be.
       def identifier_digest(identifier) = VisitorAddress.digest(identifier, purpose: KEY_PURPOSE)
 
-      # One account on one device.
-      def device_digest(identifier, device) = VisitorAddress.digest("#{identifier_digest(identifier)}:#{device}", purpose: KEY_PURPOSE)
+      # One account on one device, in the account's current generation
+      # (`clear`): one more read, on a known device's attempts only.
+      def device_digest(identifier, device)
+        account = identifier_digest(identifier)
+        VisitorAddress.digest("#{account}:#{store.read(key(:generation, account))}:#{device}", purpose: KEY_PURPOSE)
+      end
   end
 end

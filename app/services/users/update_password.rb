@@ -27,11 +27,13 @@ module Users
   # emailed token made the change, not a session, so a session that happens
   # to be signed in in the same browser goes with the rest.
   #
-  # A change opens the account's sign-in bucket (`SignIn::Throttle#clear`),
-  # after the commit: whoever set the password proved the account (the
-  # reset's token, the current password, a manager's grant, the console),
-  # and a bot holding the bucket closed must not keep them out with the
-  # new password. The reset mail and the lock-out mail send a person here.
+  # A change opens sign-in for the account in every browser
+  # (`SignIn::Throttle#clear`: the account's bucket and every known
+  # device's), after the commit: whoever set the password proved the
+  # account (the reset's token, the current password, the console; a
+  # manager's set is `Users::Save`'s, which clears the same way), and a bot
+  # holding the bucket closed must not keep them out with the new password.
+  # The reset mail and the lock-out mail send a person here.
   #
   # A password in the list of leaked passwords is refused
   # (`Users::LeakedPasswordRule`), asked only once the user is otherwise

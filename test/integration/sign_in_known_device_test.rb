@@ -149,6 +149,33 @@ class SignInKnownDeviceTest < ActionDispatch::IntegrationTest
     assert_equal "/cs-studio", URI(fresh.response.location).path
   end
 
+  test "a reset opens the browser whose own failures closed it, at once, with the new password" do
+    sign_in
+    signed_in_here
+    5.times { sign_in(password: "forgotten") }
+    sign_in
+    assert_equal I18n.t("admin.sessions.locked"), flash[:alert]
+    assert_equal "device", locked_events.last.metadata["bucket"]
+
+    patch admin_update_password_path, params: { token: @user.password_reset_token, password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+    sign_in(password: "a-new-password-1")
+    signed_in_here
+  end
+
+  test "a password a manager sets in the user editor opens the account to every browser" do
+    sign_in
+    signed_in_here
+    5.times { sign_in(password: "forgotten") }
+    bot_locks(open_session)
+
+    assert as(users(:one)) { Users::Save.call(@user, attributes: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }) }.ok?
+    sign_in(password: "a-new-password-1")
+    signed_in_here
+    fresh = open_session
+    sign_in(fresh, password: "a-new-password-1")
+    assert_equal "/cs-studio", URI(fresh.response.location).path
+  end
+
   test "the console's password command opens the account" do
     bot_locks(open_session)
 

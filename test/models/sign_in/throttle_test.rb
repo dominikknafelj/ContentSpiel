@@ -200,6 +200,17 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_not @throttle.bot_check_due?(address: "198.51.100.9", identifier: EMAIL), "the account's bot-check count is forgotten too"
   end
 
+  test "clear opens every known device's lock and count of the account at once, and no other account's" do
+    5.times { attempt(device: "d" * 32) }
+    5.times { attempt(identifier: "bea@example.org", device: "d" * 32) }
+    assert_equal :device, attempt(device: "d" * 32).refused_by.bucket
+
+    @throttle.clear(identifier: EMAIL)
+    assert_empty Array.new(4) { attempt(device: "d" * 32) }.map(&:refused_by).compact, "the device's run began again"
+    assert_equal [ 0 ], attempt(device: "d" * 32).closes.map(&:level)
+    assert_equal :device, attempt(identifier: "bea@example.org", device: "d" * 32).refused_by.bucket, "another account's device lock stands"
+  end
+
   test "a device's bucket is decided in an auth.throttle span of its own name" do
     exporter = Rails.application.config.x.otel_test_exporter
     exporter.reset
