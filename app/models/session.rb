@@ -75,15 +75,18 @@ class Session < ApplicationRecord
   # shared by the controllers (`Authentication`) and the cable's connection,
   # so the two can never authenticate by different rules. A session past
   # either timeout is ended here, at the first request or connection that
-  # meets it, audited without an actor (nobody ended it) and traced as
-  # `auth.session`; a live one is marked seen.
+  # meets it, audited without an actor (nobody ended it) and, inside a
+  # request, traced as `auth.session`; a live one is marked seen. The cable's
+  # connect runs outside any request's span, where the span would be a root
+  # the sampler drops, so there the ending is audited and not traced
+  # (`Telemetry.in_child_span`).
   def self.from_cookies(cookies, at: Time.current)
     id = cookies.signed[:session_id]
     session = find_by(id: id) if id
     return unless session
 
     if (reason = session.expiry(at))
-      Telemetry.in_span("auth.session", attributes: { "auth.session.reason" => reason }) do
+      Telemetry.in_child_span("auth.session", attributes: { "auth.session.reason" => reason }) do
         Sessions::End.call(session, reason: reason, actor: nil)
       end
       return

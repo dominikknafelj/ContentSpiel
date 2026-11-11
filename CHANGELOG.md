@@ -23,7 +23,7 @@
 - Your account has a Sessions card: every live session with its browser and system (`SessionDevice`, from the new `useragent` gem), address, last activity and how its person signed in, an End on each other one, and "Sign out everywhere else".
 - The user editor has a Sessions zone for an owner: "End all sessions" for another user (`Sessions::EndAll`, not offered on the owner's own account).
 - `session.ended` in the audit log (Security), one event per act with a count and a reason (`expired_idle`, `expired_absolute`, `ended_by_self`, `ended_by_owner`, `password_changed`); sign-out stays `session.destroyed`.
-- Spans `auth.session` (a session ended for expiry) and `auth.session_sweep`, with `auth.session.reason` and `auth.session.count` (`docs/reference/hosting.md`, "Telemetry").
+- Spans `auth.session` (a session a request ended for expiry; a cable connection's expiry is audited only) and `auth.session_sweep`, with `auth.session.reason` and `auth.session.count` (`docs/reference/hosting.md`, "Telemetry").
 
 ### Changed
 
@@ -61,7 +61,7 @@
 - `Admin::Ui::ActorAvatarComponent` also takes `user:` with an optional `viewer:` in place of `actor:` (the two together are refused with an `ArgumentError`), and a 26px slot, `size: :md`: the one rule that turns a user into a circle, for an audit actor and for a person a note names alike (#237).
 - `Admin::Ui::BadgeComponent` takes `tone: :accent` (the accent tint with accent words), and `Admin::Ui::ChannelChipComponent` draws through it (#237).
 - `Admin::Ui::StatusChipComponent::SHELL_CLASS` (the chip's shell without its `admin-status-chip` hook) and `OUTLINE_CLASS` (the Draft outline) are the classes `Admin::Ui::UnpublishedChipComponent` draws from; `BASE_CLASS` is unchanged (#237).
-- `Session.from_cookies` answers only a live session and ends an expired one (audited, traced); a session is made through `Session.start(user:, method:, user_agent:, ip_address:)`, and `start_new_session_for(user, method: "password")` takes the method.
+- `Session.from_cookies` answers only a live session and ends an expired one (audited, and traced inside a request's span); a session is made through `Session.start(user:, method:, user_agent:, ip_address:)`, and `start_new_session_for(user, method: "password")` takes the method.
 
 ## 0.2.0 (2026-11-10)
 

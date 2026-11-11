@@ -42,4 +42,18 @@ class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
     assert_not Session.exists?(session.id)
     assert_equal "expired_absolute", Audit::Event.where(action: "session.ended").sole.metadata["reason"]
   end
+
+  # The connect runs outside any request's span: an `auth.session` there would
+  # be a root the sampler drops, so the cable's expiry is audited, not traced.
+  test "an expiry met at connect is audited and draws no span" do
+    session = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil, at: 13.hours.ago)
+    cookies.signed[:session_id] = session.id
+    exporter = Rails.application.config.x.otel_test_exporter
+    exporter.reset
+
+    assert_reject_connection { connect }
+
+    assert_empty exporter.finished_spans.select { |span| span.name == "auth.session" }
+    assert_equal "expired_idle", Audit::Event.where(action: "session.ended").sole.metadata["reason"]
+  end
 end
