@@ -419,6 +419,19 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "[data-zone=sessions] button[disabled]", text: "End all sessions…"
   end
 
+  test "the zone counts only live sessions, on the editor and on a refused update" do
+    open_sessions(users(:reader), 2)
+    stale = Session.start(user: users(:reader), method: "password", user_agent: nil, ip_address: nil)
+    stale.update_columns(last_seen_at: Session::IDLE_TIMEOUT.ago - 1.minute)
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "[data-zone=sessions]", text: /reader@example.com has 2 open sessions/
+
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: "" } }
+    assert_response :unprocessable_entity
+    assert_select "[data-zone=sessions]", text: /reader@example.com has 2 open sessions/
+  end
+
   test "the sessions zone sits between the owner and delete zones, and is not drawn for a non-owner" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
     assert_select "[data-zone=owner] ~ [data-zone=sessions] ~ [data-zone=delete]"

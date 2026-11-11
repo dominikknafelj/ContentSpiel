@@ -72,6 +72,9 @@ class User < ApplicationRecord
 
   def name_or_email = name.presence || email_address
 
+  # How many sessions of this user are open at `at` (not past either timeout).
+  def open_session_count(at = Time.current) = sessions.live(at).count
+
   private
 
   # Owner is the only privilege with no group behind it ("Owner is a protected user flag, not a

@@ -41,7 +41,7 @@
   <% if state == :editable %>
     <% if Current.user&.owner? %>
       <%= render Admin::UsersScreen::OwnerZoneComponent.new(user: @user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
-      <%= render Admin::UsersScreen::SessionsZoneComponent.new(user: @user, own: @user == Current.user, count: @user.sessions.live(Time.current).count, url_options: admin_url_options) %>
+      <%= render Admin::UsersScreen::SessionsZoneComponent.new(user: @user, own: @user == Current.user, count: @open_sessions, url_options: admin_url_options) %>
     <% end %>
     <%= render Admin::UsersScreen::DeleteZoneComponent.new(user: @user, own: @user == Current.user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
   <% end %>

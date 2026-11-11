@@ -47,7 +47,7 @@ module Admin
     end
 
     def edit
-      @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+      load_editor_extras
     end
 
     # A stale form (`Admin::StaleForm`: the user's `updated_at`, which a group
@@ -62,7 +62,7 @@ module Admin
     def update
       if manageability(@user) == :editable && stale_form?(@user, params[:base_updated_at])
         @user.assign_attributes(user_params.slice(:name, :email_address))
-        @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+        load_editor_extras
         return render_stale(:edit, @user)
       end
 
@@ -73,7 +73,7 @@ module Admin
       else
         forbidden_or(result) do
           @user = result.record
-          @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+          load_editor_extras
           render :edit, status: :unprocessable_entity
         end
       end
@@ -150,6 +150,13 @@ module Admin
         user.owner? ? "now" : "no_longer"
       end
       t("admin.users.owner.#{key}", name: user.name_or_email)
+    end
+
+    # What the editor draws beside the form: the last sign-in and, for an owner
+    # viewer (the only one the sessions zone is drawn for), the open session count.
+    def load_editor_extras
+      @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+      @open_sessions = @user.open_session_count if Current.user&.owner?
     end
 
     def set_user
