@@ -8,6 +8,7 @@
 - The language tabs' chosen language is underlined in the accent, as a rail tab is, where it was ink (#237).
 - An outdated language's mark on the language tabs is ↻ in warn ink, as on a translation chip and under a language's progress bar, where it was a solid warn dot; a screen reader still hears "<language>: outdated" (#237).
 - A danger notice (a refusal, a broken link, a sign-in page's error) has a 1px danger edge, as a form's error summary has; warn kept its edge, and ok and neutral have none (#237).
+- A switch that is on in a form someone else is editing keeps its accent track, where it was drawn in meta as a switch nobody may change (#237).
 
 ### Removed
 

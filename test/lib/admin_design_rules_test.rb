@@ -2296,7 +2296,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # A switch that cannot be changed is never faded either: off, the sunken
   # track and field-line outline it has at rest with the meta knob; on, a
   # meta track (not the accent, which says it can be pressed) with the
-  # surface knob; its label reads meta. A disabled segment keeps its
+  # surface knob, but for a held form's, which keeps the accent; its label
+  # reads meta. A disabled segment keeps its
   # colour too: meta words, no hover, and a chosen one keeps the chosen look.
   test "a disabled switch keeps its colour, refuses the pointer, is meta when on and its label reads meta" do
     switch = single_rule(".cs-toggle:disabled")
@@ -2311,6 +2312,12 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     assert_match(/border-color:\s*var\(--cs-meta\);/, on)
     assert_match(/background:\s*var\(--cs-surface\);/, single_rule(".cs-toggle:disabled:checked::before"))
     assert_match(/(?<![-\w])color:\s*var\(--cs-meta\);/, rule_for([ ".cs-toggle:disabled + label", "label:has(> .cs-toggle:disabled)" ]))
+    # A held form is read-only, not off-limits: its switch that is on keeps
+    # the accent (`test/system/admin/editing_holds_test.rb`: "a held post's
+    # switch that is on keeps its accent").
+    held = single_rule(".admin-held .cs-toggle:disabled:checked")
+    assert_match(/background:\s*var\(--cs-accent\);/, held)
+    assert_match(/border-color:\s*var\(--cs-accent\);/, held)
     rules = self.class.css_rules("content-spiel.tailwind.css").select { |selectors, _| selectors.any? { |selector| selector.include?(".cs-toggle") } }
     rules.each { |selectors, body| assert_no_match(/opacity:\s*0/, body, selectors.join(", ")) }
 

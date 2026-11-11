@@ -1771,6 +1771,10 @@ a:focus-visible > .admin-row-verb { color: var(--cs-accent); }
 .admin-held select:disabled,
 .admin-held :is(.admin-column, .admin-field) :is(.admin-rich-text-editor, .admin-chip-field, .admin-prefix-input) { border-style: solid; border-width: 1px; border-radius: var(--cs-radius-field); }
 .admin-held :is(select, input, button):disabled { cursor: default; }
+/* A held switch that is on stays the accent of a switch that is on: the form is
+   read-only, not disabled-looking, so the meta of `.cs-toggle:disabled:checked`
+   (a switch nobody may change) would say off-limits where it means held. */
+.admin-held .cs-toggle:disabled:checked { background: var(--cs-accent); border-color: var(--cs-accent); }
 
 /* A link `admin--saving--pending-lock` has locked (an instant action waiting for the
    main form's unsaved changes): it can't be `disabled`
