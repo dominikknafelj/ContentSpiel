@@ -255,7 +255,7 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
   - `SignIn::Throttle::Trip = Data.define(:bucket, :level, :seconds)`, where `bucket` is `:account` or `:address_wide`, `level` is an Integer or nil, and `seconds` is the time left or the new lock's length;
   - `SignIn::Throttle.lock_seconds(failures) -> Integer | nil`;
   - `#closed(identifier:, address:) -> Trip | nil`, which asks the wide bucket first;
-  - `#record_failure(identifier:, address:) -> Trip | nil`: the bucket this failure closed, if any;
+  - `#record_failure(identifier:, address:) -> Array<Trip>`: every bucket this failure closed, the account's then the address's (`address_wide`), empty when none closed (both can close on one failure, and the audit and the mail must see the account's);
   - `#record_success(identifier:) -> nil`;
   - `#bot_check_due?(address:, identifier: nil) -> Boolean`;
   - `#notice_due?(identifier:) -> Boolean`, which writes the hour's mark.
@@ -266,11 +266,13 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
 
 - [ ] **Step 1: Write the failing tests** in `throttle_test.rb`, each on a fresh `ActiveSupport::Cache::MemoryStore` and with `travel`:
   - `test "lock_seconds is nil below five failures, then 60, 120, 240 … and 3600 from the eleventh"`, which asserts `[nil]*4 + [60, 120, 240, 480, 960, 1920, 3600, 3600]` for 1..12;
-  - `test "the fifth failure closes the account for a minute, and the bucket opens again after it"`, where the Trip is `bucket: :account, level: 0, seconds: 60`;
+  - `test "the fifth failure closes the account for a minute, and the bucket opens again after it"`, where the answer is `[Trip(bucket: :account, level: 0, seconds: 60)]`;
   - `test "an attempt during the lock checks no password and leaves the lock as it was"` (Review Focus 3): `closed` twice in the minute leaves the count at 5 and the lock's end unchanged;
   - `test "a success clears the account's count and lock, and the next failure counts from one"`;
   - `test "an account's failures are forgotten 24 hours after the run's first"`;
-  - `test "the fiftieth failure from an address closes it until the hour ends, whatever accounts it tried"`, where the Trip is `bucket: :address_wide`;
+  - `test "the fiftieth failure from an address closes it until the hour ends, whatever accounts it tried"`, where the answer is `[Trip(bucket: :address_wide, …)]`;
+  - `test "a failure that closes both buckets answers both, the account's first"`;
+  - `test "a lock that outlives its run's count keeps its level"`;
   - `test "the bot check is due after three failures from the address or for the account in 15 minutes, and not after the window"`;
   - `test "a notice is due once an hour per account"`;
   - `test "two scopes count apart, and the store holds neither the address nor the IP"` (scan `store.instance_variable_get(:@data).keys`).
@@ -278,7 +280,7 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
 - [ ] **Step 2: Run them, and verify they fail.** `bin/rails test test/models/sign_in test/values/visitor_address_test.rb`. Expected: `NameError: uninitialized constant SignIn`.
 - [ ] **Step 3: Implement.**
   - Counts use `store.increment(key, 1, expires_in:)`, which sets the window at the first write, as Rails' `rate_limit` does.
-  - A lock is `store.write(lock_key, until_epoch, expires_in: seconds)`.
+  - An account's lock is `store.write(lock_key, [until_epoch, level], expires_in: seconds)`, so `closed` reads the level from the lock even after the run's count expired.
   - `SignIn.store`'s comment states the NullStore rule and Solid Cache's sharing.
   - `sign_in.rb`'s comment says what the namespace is for: plain objects that any kind of sign-in calls, and nothing that knows a session, a cookie, a route or a mail.
 - [ ] **Step 4: Run.** `bin/rails test test/models/sign_in test/values test/integration/form_send_limits_test.rb test/controllers/form_sends_controller_test.rb test/lib/admin_namespace_shadow_test.rb test/lib/dependency_direction_test.rb`. Expected: PASS. Then `git grep -n "SendLimit.visitor"` prints nothing outside `docs/superpowers/`.
@@ -400,7 +402,7 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
 - Consumes: Task 2's `Throttle`, Task 3's `BotCheck`, Task 1's `Telemetry.in_span`.
 - Produces:
   - `SignIn::OUTCOMES = %i[ok refused locked bot_check_required bot_check_failed].freeze` (in `sign_in.rb`);
-  - `SignIn::Outcome = Data.define(:status, :account, :trip, :bot_check_due)`, where `trip` is the `Throttle::Trip` that closed a bucket now or that refused this attempt, and `bot_check_due` is whether the next attempt must carry the check;
+  - `SignIn::Outcome = Data.define(:status, :account, :trips, :bot_check_due)`, where `trips` is an Array of `Throttle::Trip`: for `:refused`, every bucket this attempt's failure closed (`record_failure`'s answer, the account's first, often empty); for `:locked`, the one closed bucket that refused it (`[closed]`); empty otherwise. A trip that began with this attempt is one of a `:refused` outcome's, and `bot_check_due` is whether the next attempt must carry the check;
   - `SignIn::PasswordAttempt.new(email:, password:, address:, bot_check_token:, accounts: User, throttle: SignIn::Throttle.new, bot_check: SignIn::BotCheck.current)`;
   - `#call -> SignIn::Outcome`;
   - `#identifier -> String` (`accounts.normalize_value_for(:email_address, email.is_a?(String) ? email : "")`).
@@ -409,11 +411,12 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
   1. `throttle.closed` → `:locked`;
   2. if `bot_check` and `throttle.bot_check_due?(address:, identifier:)`: no usable token → `:bot_check_required`, a `:failed` verify → `:bot_check_failed` (records `auth.bot_check.required`);
   3. `accounts.authenticate_by(email_address: email, password: password)`, with each value a String or `""`;
-  4. an account → `throttle.record_success` → `:ok`; none → `throttle.record_failure` → `:refused`, with the trip it closed.
+  4. an account → `throttle.record_success` → `:ok`; none → `throttle.record_failure` → `:refused`, with the trips it closed.
 
 - [ ] **Step 1: Write the failing tests.**
   - `password_attempt_test.rb` (a fake throttle store, `with_bot_check`):
     - `test "the right password is ok and clears the count; a wrong one is refused and counts; the fifth refusal carries the trip that began"`;
+    - `test "a failure that closes the account and the address carries both trips, the account's first"`;
     - `test "a closed bucket is locked before any password is checked"`. `BCrypt::Engine.hash_secret` is counted at 0 with `with_singleton_override`;
     - `test "a due bot check without a token is bot_check_required, a refused one bot_check_failed, and neither checks a password or counts"`;
     - `test "with Cloudflare unreachable the attempt goes on to the password, and the span says unavailable"` (Review Focus 5);
@@ -437,7 +440,7 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
   - `create`:
     - builds the attempt from `params[:email_address]`, `params[:password]`, `request.remote_ip` and `params["cf-turnstile-response"]`;
     - on `:ok` deletes the flag, starts the session, records `session.created` and redirects as today;
-    - otherwise records `session.failed` (only for `:refused`) and `session.locked` (only when `outcome.trip` began with this attempt);
+    - otherwise records `session.failed` (only for `:refused`) and one `session.locked` per trip in `outcome.trips` when the status is `:refused` (those trips began with this attempt);
     - sets the flag when `outcome.bot_check_due`;
     - redirects with the sentence from the decisions table.
   - `answer_address_limited` wraps its redirect in an `auth.sign_in` span (`auth.outcome` `locked`) holding one `auth.throttle` span (`auth.bucket` `address`, `auth.tripped` true).
@@ -457,12 +460,12 @@ Checked against main cb7f4cb1 (`admin/sessions/new.html.erb`, the product layout
   - `app/views/sign_in_mailer/locked.html.erb` and `locked.text.erb`;
   - `test/mailers/sign_in_mailer_test.rb`, `test/mailers/previews/sign_in_mailer_preview.rb`, `test/jobs/sign_in/lockout_mail_job_test.rb`.
 - Modify:
-  - `app/controllers/admin/sessions_controller.rb`: on an account-bucket trip that began, when `throttle.notice_due?(identifier:)`, enqueue the job inside `Telemetry.in_span("auth.lockout_mail")`, recording `auth.mail.queued`;
+  - `app/controllers/admin/sessions_controller.rb`: on an account-bucket trip among a `:refused` outcome's `trips` (one that began), when `throttle.notice_due?(identifier:)`, enqueue the job inside `Telemetry.in_span("auth.lockout_mail")`, recording `auth.mail.queued`;
   - `config/locales/mail.en.yml`;
   - `test/lib/admin_design_rules_test.rb`: `MAIL_SOURCES` gains `app/views/sign_in_mailer`.
 
 **Interfaces:**
-- Consumes: Task 6's `Outcome#trip`, Task 2's `notice_due?`.
+- Consumes: Task 6's `Outcome#trips`, Task 2's `notice_due?`.
 - Produces:
   - `SignIn::LockoutMailJob.perform_later(email_address, locked_at:, from_address:, minutes:, origin: nil)`, with `log_arguments = false`;
   - `SignInMailer.locked(user, locked_at:, from_address:, minutes:, origin: nil)`.
@@ -697,7 +700,7 @@ Done while writing this plan, against `main` at ee85098a plus the spec. No test 
 2. **Step scan.** Each code step names its file, signature and pinned values. Each test step names its test and its assertions. The one look is deferred to the card, with a stop.
 3. **Type consistency.**
    - `Throttle::Trip` is consumed in Tasks 6, 7 and 9.
-   - `SignIn::Outcome`'s `status`, `account`, `trip` and `bot_check_due` are used in 6, 7 and 10.
+   - `SignIn::Outcome`'s `status`, `account`, `trips` and `bot_check_due` are used in 6, 7 and 10.
    - `BotCheck.current` and `#site_key` are used in 6 and 10.
    - `LeakedPassword.check` is used in 5.
    - `Telemetry.in_span` and `Telemetry.record` are used in 2 to 7.

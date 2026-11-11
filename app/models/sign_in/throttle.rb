@@ -33,9 +33,12 @@ module SignIn
   # sign-in counts apart from CS Studio's.
   #
   # A window is the expiry a count's first `increment` sets, which a later
-  # one keeps (`SignIn.store`). A lock is a key holding the epoch second it
-  # ends at, expiring then. Integer seconds throughout: a Trip's `seconds`
-  # is what is left, rounded down, or the new lock's length.
+  # one keeps (`SignIn.store`). An account's lock is a key holding the epoch
+  # second it ends at and its back-off level, `[until, level]`, expiring
+  # then: the level stays the lock's own even once the run's count is
+  # forgotten (a lock of the run's last hour outlives the run). Integer
+  # seconds throughout: a Trip's `seconds` is what is left, rounded down, or
+  # the new lock's length.
   #
   # Each bucket decided is one `auth.throttle` span: `closed` makes one per
   # bucket asked, `record_failure` one per bucket the failure closed.
@@ -76,18 +79,17 @@ module SignIn
       wide_closed(address_digest(address)) || account_closed(identifier_digest(identifier))
     end
 
-    # Counts one checked password that failed, and answers the bucket it
-    # closed. Were both to close on one failure, the wide one is answered,
-    # as `closed` would answer it next; the account's lock is written all
-    # the same.
+    # Counts one checked password that failed, and answers every bucket it
+    # closed: the account's, then the address's, or none. Both can close on
+    # one failure, and each is a lock of its own that the caller audits (and
+    # the account's mails), so neither may hide the other.
     def record_failure(identifier:, address:)
       account = identifier_digest(identifier)
       address = address_digest(address)
       store.increment(key(:bot_address, address), 1, expires_in: BOT_CHECK_WINDOW)
       store.increment(key(:bot_account, account), 1, expires_in: BOT_CHECK_WINDOW)
 
-      account_trip = count_account(account)
-      count_wide(address) || account_trip
+      [ count_account(account), count_wide(address) ].compact
     end
 
     def record_success(identifier:)
@@ -116,12 +118,11 @@ module SignIn
         end
       end
 
-      # The level is nil when the run's count was forgotten while its last
-      # lock still stands (a lock of the run's last hour outlives the run).
       def account_closed(account)
         decide("account") do
-          left = seconds_until(store.read(key(:account_lock, account)))
-          Trip.new(bucket: :account, level: level(store.read(key(:account, account))), seconds: left) if left
+          ends, level = store.read(key(:account_lock, account))
+          left = seconds_until(ends)
+          Trip.new(bucket: :account, level: level, seconds: left) if left
         end
       end
 
@@ -130,8 +131,9 @@ module SignIn
         seconds = self.class.lock_seconds(failures)
         return unless seconds
 
-        store.write(key(:account_lock, account), now + seconds, expires_in: seconds)
-        decide("account") { Trip.new(bucket: :account, level: level(failures), seconds: seconds) }
+        level = failures - ACCOUNT_FREE_FAILURES
+        store.write(key(:account_lock, account), [ now + seconds, level ], expires_in: seconds)
+        decide("account") { Trip.new(bucket: :account, level: level, seconds: seconds) }
       end
 
       # The window's end is written by the failure that opened it, since an
@@ -158,8 +160,6 @@ module SignIn
           trip
         end
       end
-
-      def level(failures) = failures && failures - ACCOUNT_FREE_FAILURES
 
       def seconds_until(epoch)
         left = epoch.to_i - now

@@ -24,11 +24,11 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
   end
 
   test "the fifth failure closes the account for a minute, and the bucket opens again after it" do
-    assert_nil fail_times(4)
+    assert_empty fail_times(4)
     assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
 
-    trip = @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
-    assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60), trip
+    trips = @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
+    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60) ], trips
     assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60), @throttle.closed(identifier: EMAIL, address: ADDRESS)
     assert_nil @throttle.closed(identifier: "bea@example.org", address: ADDRESS), "another account is open"
 
@@ -37,7 +37,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
 
     travel 31.seconds
     assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
-    assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 1, seconds: 120), @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
+    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 1, seconds: 120) ], @throttle.record_failure(identifier: EMAIL, address: ADDRESS)
   end
 
   test "an attempt during the lock checks no password and leaves the lock as it was" do
@@ -59,10 +59,10 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_nil @throttle.record_success(identifier: EMAIL)
 
     assert_nil @throttle.closed(identifier: EMAIL, address: ADDRESS)
-    assert_nil fail_times(1)
+    assert_empty fail_times(1)
     assert_equal 1, account_count
-    assert_nil fail_times(3)
-    assert_equal 0, fail_times(1).level
+    assert_empty fail_times(3)
+    assert_equal [ 0 ], fail_times(1).map(&:level)
   end
 
   test "an account's failures are forgotten 24 hours after the run's first" do
@@ -72,22 +72,41 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     assert_equal 4, account_count
 
     travel 1.hour + 1.second
-    assert_nil fail_times(4), "the run began again with the 24 hours"
+    assert_empty fail_times(4), "the run began again with the 24 hours"
     assert_equal 4, account_count
   end
 
   test "the fiftieth failure from an address closes it until the hour ends, whatever accounts it tried" do
-    49.times { |index| assert_nil @throttle.record_failure(identifier: "person#{index}@example.org", address: ADDRESS) }
+    49.times { |index| assert_empty @throttle.record_failure(identifier: "person#{index}@example.org", address: ADDRESS) }
     assert_nil @throttle.closed(identifier: "someone@example.org", address: ADDRESS)
 
     travel 20.minutes
-    trip = @throttle.record_failure(identifier: "last@example.org", address: ADDRESS)
-    assert_equal SignIn::Throttle::Trip.new(bucket: :address_wide, level: nil, seconds: 40.minutes.to_i), trip
+    trips = @throttle.record_failure(identifier: "last@example.org", address: ADDRESS)
+    assert_equal [ SignIn::Throttle::Trip.new(bucket: :address_wide, level: nil, seconds: 40.minutes.to_i) ], trips
     assert_equal :address_wide, @throttle.closed(identifier: "someone@example.org", address: ADDRESS).bucket
     assert_nil @throttle.closed(identifier: "someone@example.org", address: "203.0.113.8"), "another address is open"
 
     travel 40.minutes + 1.second
     assert_nil @throttle.closed(identifier: "someone@example.org", address: ADDRESS)
+  end
+
+  test "a failure that closes both buckets answers both, the account's first" do
+    45.times { |index| @throttle.record_failure(identifier: "person#{index}@example.org", address: ADDRESS) }
+    assert_empty fail_times(4)
+
+    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 0, seconds: 60),
+      SignIn::Throttle::Trip.new(bucket: :address_wide, level: nil, seconds: 1.hour.to_i) ], fail_times(1)
+    assert_equal [], fail_times(1, identifier: "other@example.org", address: "198.51.100.1")
+  end
+
+  test "a lock that outlives its run's count keeps its level" do
+    fail_times(10)
+    travel 23.hours + 59.minutes
+    assert_equal [ SignIn::Throttle::Trip.new(bucket: :account, level: 6, seconds: 3600) ], fail_times(1), "the 11th failure, inside the run"
+
+    travel 2.minutes
+    assert_nil account_count, "the run's count is forgotten"
+    assert_equal SignIn::Throttle::Trip.new(bucket: :account, level: 6, seconds: 3480), @throttle.closed(identifier: EMAIL, address: ADDRESS)
   end
 
   test "the wide bucket is asked first" do
@@ -128,7 +147,7 @@ class SignIn::ThrottleTest < ActiveSupport::TestCase
     members = SignIn::Throttle.new(scope: "members", store: @store)
     fail_times(5)
     assert_nil members.closed(identifier: EMAIL, address: ADDRESS)
-    assert_nil fail_times(4, throttle: members)
+    assert_empty fail_times(4, throttle: members)
     @throttle.bot_check_due?(address: ADDRESS)
     @throttle.notice_due?(identifier: EMAIL)
 
