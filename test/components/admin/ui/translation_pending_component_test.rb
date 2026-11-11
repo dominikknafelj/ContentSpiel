@@ -5,9 +5,9 @@ require "test_helper"
 # `admin--translation--translate` before each request. Two states in one element -- the
 # running one (spinner, elapsed seconds, two skeleton bars, Cancel) and the
 # 25-second one -- the controller flips with `hidden`.
-class Admin::TranslationScreen::PendingComponentTest < ViewComponent::TestCase
+class Admin::Ui::TranslationPendingComponentTest < ViewComponent::TestCase
   test "the running state: spinner, elapsed seconds, two skeleton bars and Cancel" do
-    render_inline Admin::TranslationScreen::PendingComponent.new
+    render_inline Admin::Ui::TranslationPendingComponent.new
 
     assert_selector "[data-translation-pending].bg-accent-tint"
     assert_selector "[data-pending-running] [data-translate-spinner]"
@@ -17,7 +17,7 @@ class Admin::TranslationScreen::PendingComponentTest < ViewComponent::TestCase
   end
 
   test "the 25 second state is there but hidden, with Try again" do
-    render_inline Admin::TranslationScreen::PendingComponent.new
+    render_inline Admin::Ui::TranslationPendingComponent.new
 
     assert_selector "[data-pending-timeout][hidden]", visible: :hidden
     # The message is written when the time comes, not un-hidden: the text
@@ -25,14 +25,21 @@ class Admin::TranslationScreen::PendingComponentTest < ViewComponent::TestCase
     assert_equal "", page.find("[data-pending-timeout] p", visible: :all).text(:all)
     assert_selector "[data-translation-pending][data-pending-timeout-text='No suggestion after 25 seconds.']"
     assert_selector "[data-pending-timeout] button[type='button'][data-action='admin--translation--translate#retry']", text: "Try again", visible: :hidden
-    assert_equal 25, Admin::TranslationScreen::PendingComponent::TIMEOUT_SECONDS
+    assert_equal 25, Admin::Ui::TranslationPendingComponent::TIMEOUT_SECONDS
+  end
+
+  test "the script's elapsed words come from the box's own messages" do
+    render_inline Admin::Ui::TranslationPendingComponent.new
+
+    messages = JSON.parse(page.find("[data-translation-pending]")["data-messages"])
+    assert_equal "%{seconds}s", messages["components.ui.translation_pending.elapsed"]
   end
 
   # Final review C, I3: the box is a child of a polite live region that
   # announces its insertion once; its own `role=status` plus a counter
   # rewritten every second made a screen reader read it out every second.
   test "the box is not a live region of its own and its counter is hidden from screen readers" do
-    render_inline Admin::TranslationScreen::PendingComponent.new
+    render_inline Admin::Ui::TranslationPendingComponent.new
 
     assert_no_selector "[role=status], [aria-live]", visible: :all
     assert_selector "[data-pending-elapsed][aria-hidden='true']"

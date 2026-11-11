@@ -335,6 +335,16 @@ en:
           formatting_note: "Formatting changed"
           too_long_note: "The text is too long to compare word by word."
           no_source_note: "%{language} changed since this was translated."
+        # `Admin::Ui::TranslationPendingComponent`: the waiting box a field's
+        # suggestion slot shows. `elapsed` is also written by
+        # `admin--translation--translate` every second; `timeout` is written
+        # into the box when the provider's time is up.
+        translation_pending:
+          running: "Suggesting a translation…"
+          elapsed: "%{seconds}s"
+          cancel: "Cancel"
+          timeout: "No suggestion after %{seconds} seconds."
+          try_again: "Try again"
         # `Admin::Ui::SuggestionComponent`: the box an AI suggestion streams
         # into under a translatable field. `field_label` names the editable
         # textarea; `current` is the existing translation shown in update mode.

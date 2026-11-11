@@ -362,7 +362,7 @@ let jobCounter = 0
 let muteChanges = false
 
 // The seconds a request may take before the pending box gives up, as the
-// layout's template declares it (`PendingComponent::TIMEOUT_SECONDS`).
+// layout's template declares it (`Admin::Ui::TranslationPendingComponent::TIMEOUT_SECONDS`).
 function timeoutSeconds(template) {
   return Number(template.content.firstElementChild?.dataset.pendingTimeoutSeconds) || 25
 }
@@ -392,7 +392,7 @@ function startJob(fields, { url, locale, signal, focus }) {
       fields.forEach(({ box }) => {
         const node = pending.get(box)?.node
         const elapsed = node?.isConnected ? node.querySelector("[data-pending-elapsed]") : null
-        if (elapsed) elapsed.textContent = `${seconds}s`
+        if (elapsed) elapsed.textContent = messages(node).t("components.ui.translation_pending.elapsed", { seconds })
       })
     }, 1000)
     const timeout = setTimeout(() => {

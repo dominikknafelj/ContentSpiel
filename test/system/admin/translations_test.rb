@@ -348,6 +348,25 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_nil post.reload.title(locale: "de", fallback: false)
   end
 
+  test "a pending box's Cancel is one Tab stop that Enter presses" do
+    post = post_with_excerpt
+    GatedProvider.hold!
+
+    visit_editor(post, locale: "de")
+    track_suggestion_requests
+    press_within slot("title"), "Translate"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+    await_provider_request
+
+    find_field(id: "post-title").click
+    stop_on "#translation-suggestion-post-title [data-pending-running] button"
+    assert_equal "Cancel", focused_text
+    page.send_keys(:enter)
+
+    assert_no_selector "[data-translation-pending]"
+    await_late_answer
+  end
+
   test "Cancel on one pending box stops that request only" do
     post = post_with_excerpt
     GatedProvider.hold!

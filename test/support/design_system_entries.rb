@@ -63,6 +63,7 @@ module DesignSystemEntries
     "Admin::Ui::TreeFindComponent" => "StudioTree",
     "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",
+    "Admin::Ui::TranslationPendingComponent" => "StudioTranslationPair",
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
     "Admin::Ui::ReferenceCardComponent" => "StudioTranslationPair",
