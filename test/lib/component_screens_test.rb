@@ -1,6 +1,5 @@
 require "test_helper"
-require_relative "source_layout_test"
-require_relative "dependency_direction_test"
+require_relative "../support/source_code"
 
 # A component in a screen's folder (`app/components/admin/<screen>/`) is drawn
 # by that screen alone (CLAUDE.md, "Where a component goes";
@@ -27,9 +26,11 @@ require_relative "dependency_direction_test"
 # folder by design, `docs/reference/slots.md`).
 #
 # Which screens a file draws for is read from where it lives: its own
-# screen's folder; SCREENS or SEVERAL_SCREENS, the map of CS Studio's views,
-# controllers and controller concerns; or SHARED. Anything else under `app/`
-# (the setup wizard, a job, a mailer) counts as shared.
+# screen's folder; the map (SCREENS for CS Studio's views, controllers and
+# controller concerns, SEVERAL_SCREENS for one of those that draws more than one
+# screen, SCREEN_FILES for any other file that is one screen's); or else
+# shared, as SHARED and anything else under `app/` (the setup wizard, a job, a
+# mailer) are.
 class ComponentScreensTest < ActiveSupport::TestCase
   ROOT = Rails.root
   COMPONENTS = "app/components/admin"
@@ -54,16 +55,17 @@ class ComponentScreensTest < ActiveSupport::TestCase
     app/controllers/application_controller.rb
   ].freeze
 
-  # Every file under these is in SHARED or mapped by SCREENS or SEVERAL_SCREENS.
+  # CS Studio's views, controllers and controller concerns: every file under
+  # these is in SHARED or mapped by SCREENS or SEVERAL_SCREENS, and SCREENS
+  # names nothing else.
   CALLERS = %w[app/views/admin app/controllers/admin app/controllers/concerns/admin].freeze
 
   # Each CS Studio view folder or file, controller and controller concern, by
   # the screen it draws. The most specific entry wins, so a view file may name
-  # another screen than its folder, and an entry wins over SHARED, so a shared
-  # folder's file that draws one screen's listing is that screen's. `:shared` is a file that more than one
-  # screen uses, or a screen with no component folder of its own (Your
-  # account, System status, sign-in, ⌘K, the error pages): either way it may
-  # draw shared components only.
+  # another screen than its folder. `:shared` is a file that more than one
+  # screen uses, or a screen with no component folder of its own (Your account,
+  # System status, sign-in, ⌘K, the error pages): either way it may draw shared
+  # components only.
   SCREENS = {
     "audit_screen" => %w[
       app/views/admin/audit_events
@@ -115,8 +117,7 @@ class ComponentScreensTest < ActiveSupport::TestCase
       app/controllers/admin/media_controller.rb
       app/controllers/admin/media_originals_controller.rb
       app/controllers/concerns/admin/media_upload_responses.rb
-      app/components/admin/ui/media_picker_component.html.erb
-    ], # the picker draws the Media screen's own listing (/media?picker=1), and the upload answers with its tile
+    ], # media_upload_responses: an upload, the library's or the picker's, is answered with the library's tile
     "mind_graph_screen" => %w[
       app/views/admin/mind_graph
       app/controllers/admin/mind_graph_controller.rb
@@ -205,9 +206,10 @@ class ComponentScreensTest < ActiveSupport::TestCase
     ] # media_assets: the picker's upload; rail_tab_streams and slot_streams: the slots' streams, whatever screen hosts them
   }.freeze
 
+
   # A file that draws more than one screen, each by name, with the reason. It is
-  # here and never under two keys of SCREENS, where a file listed twice is a
-  # mistake the map refuses.
+  # one of CALLERS' files, here and never under two keys of SCREENS, where a
+  # file listed twice is a mistake the map refuses.
   SEVERAL_SCREENS = {
     "app/controllers/admin/pages_controller.rb" => [
       %w[editor_screen pages_screen],
@@ -215,19 +217,27 @@ class ComponentScreensTest < ActiveSupport::TestCase
     ]
   }.freeze
 
-  FIX = "Move it to app/components/admin/ui/ and give it Admin::Ui::Contract (docs/reference/design-system.md, 'Component contract')."
+  # A file outside CALLERS that is one screen's, with the reason: one existing
+  # file, never a folder, and never a file in a screen's folder, which is that
+  # screen's already. A shared folder's file belongs here only when what it
+  # draws is that screen's own.
+  SCREEN_FILES = {
+    "app/components/admin/ui/media_picker_component.html.erb" => [
+      "media_library",
+      "the picker draws the Media screen's own listing (/media?picker=1), so it names the library tile's class and words"
+    ]
+  }.freeze
 
-  # The code of a file, its comments blanked: Ruby's by Ripper
-  # (`DependencyDirectionTest.without_comments`, so a `#` in a string stays);
-  # ERB's `<%# … %>` blocks, then the `#` lines of its Ruby
-  # (`SourceLayoutTest::COMMENT_LINES`).
-  def self.code_of(path, source = File.read(path))
-    case File.extname(path)
-    when ".rb" then DependencyDirectionTest.without_comments(source)
-    when ".erb" then source.gsub(/<%#.*?%>/m) { |comment| comment.gsub(/[^\n]/, "") }.gsub(SourceLayoutTest::COMMENT_LINES.fetch(".erb"), "")
-    else source
-    end
-  end
+  # The (class, file) pairs that name a screen class, its own screen's included:
+  # 239 today. The guard's floor ("the guard is looking at the code").
+  USERS_FLOOR = 150
+
+  MAP = { screens: SCREENS, several: SEVERAL_SCREENS, files: SCREEN_FILES }.freeze
+
+  FIX = "Move it to app/components/admin/ui/ and give it Admin::Ui::Contract (docs/reference/design-system.md, 'Component contract'). " \
+        "Or, if the file belongs to that screen, map it in SCREENS (SEVERAL_SCREENS for a file that draws more than one screen)."
+
+  def self.code_of(path, source = File.read(path)) = SourceCode.code_of(path, source)
 
   def self.relative(path) = Pathname(path).relative_path_from(ROOT).to_s
 
@@ -253,33 +263,48 @@ class ComponentScreensTest < ActiveSupport::TestCase
     /(?<![\w:])(?:::)?(?:Admin::)?#{Regexp.escape(cpath.delete_prefix("Admin::"))}(?!\w)/
   end
 
-  # The screens a caller file is mapped to: SEVERAL_SCREENS' list, or its most
-  # specific SCREENS entry's one screen, or nil.
-  def self.mapped_screens(path, map = SCREENS, several = SEVERAL_SCREENS)
-    return several[path].first if several.key?(path)
+  def self.under?(path, entry) = path == entry || path.start_with?("#{entry}/")
 
-    screen = map.flat_map { |key, entries| entries.map { |entry| [ entry, key ] } }
-                .select { |entry, _| path == entry || path.start_with?("#{entry}/") }
-                .max_by { |entry, _| entry.length }&.last
-    screen && [ screen ]
+  def self.in_callers?(path) = CALLERS.any? { |root| under?(path, root) }
+
+  # The most specific SCREENS entry for a path, as [entry, screen], or nil.
+  def self.winning_entry(path, screens)
+    screens.flat_map { |screen, entries| entries.map { |entry| [ entry, screen ] } }
+           .select { |entry, _| under?(path, entry) }.max_by { |entry, _| entry.length }
+  end
+
+  # The screens a file is mapped to, or nil: SEVERAL_SCREENS' list, SCREEN_FILES'
+  # screen, or its most specific SCREENS entry's screen.
+  def self.mapped_screens(path, map = MAP)
+    return map[:several][path].first if map[:several].key?(path)
+    return [ map[:files][path].first ] if map[:files].key?(path)
+
+    entry = winning_entry(path, map[:screens])
+    entry && [ entry.last ]
   end
 
   # The screens a file draws for: its screen folder, its map entry, or "shared".
-  def self.screens_of(path, map = SCREENS, several = SEVERAL_SCREENS)
+  def self.screens_of(path, map = MAP)
     folder = path[%r{\A#{COMPONENTS}/([^/]+)/}, 1]
     return [ folder ] if folder && !REGISTRIES.include?(folder)
 
-    mapped_screens(path, map, several) || [ :shared ]
+    mapped_screens(path, map) || [ :shared ]
+  end
+
+  # [Const, path] for every file that names a screen class, its own screen's included.
+  def self.users(classes = screen_classes, sources = self.sources)
+    classes.flat_map do |cpath, _|
+      pattern = pattern_for(cpath)
+      sources.filter_map { |path, code| [ cpath, path ] if code.match?(pattern) }
+    end
   end
 
   # [Const, path, its screens] for every user of a screen class outside its screen.
-  def self.strangers(classes = screen_classes, sources = self.sources, map = SCREENS, several = SEVERAL_SCREENS)
-    classes.flat_map do |cpath, screen|
-      pattern = pattern_for(cpath)
-      sources.filter_map do |path, code|
-        user_screens = screens_of(path, map, several)
-        [ cpath, path, user_screens ] if !user_screens.include?(screen) && code.match?(pattern)
-      end
+  def self.strangers(classes = screen_classes, sources = self.sources, map = MAP)
+    screen_of_class = classes.to_h
+    users(classes, sources).filter_map do |cpath, path|
+      user_screens = screens_of(path, map)
+      [ cpath, path, user_screens ] unless user_screens.include?(screen_of_class.fetch(cpath))
     end
   end
 
@@ -294,28 +319,48 @@ class ComponentScreensTest < ActiveSupport::TestCase
            .reject { |path| SHARED.any? { |prefix| path.start_with?(prefix) } }.sort
   end
 
-  # [unmapped callers, entries mapped twice, entries that name nothing]. An
-  # entry is mapped twice when it is under two keys of SCREENS, or in SCREENS
-  # and SEVERAL_SCREENS both. An entry outside CALLERS (a shared folder's file)
-  # needs only to exist; one inside must be the entry that wins for a file.
-  def self.map_problems(map = SCREENS, callers = self.callers, several = SEVERAL_SCREENS, exists: ->(entry) { ROOT.join(entry).exist? })
-    entries = map.flat_map { |screen, list| list.map { |entry| [ entry, screen ] } } +
-              several.map { |entry, (screens, _)| [ entry, screens.join(" and ") ] }
+  # The map's problems, by kind:
+  # - unmapped: a CALLERS file the map does not place;
+  # - twice: an entry under two keys of SCREENS, or in two of the three hashes;
+  # - stale: a SCREENS or SEVERAL_SCREENS entry that is no CALLERS file's entry
+  #   (it names nothing, or a more specific entry takes all its files);
+  # - outside: a SCREENS or SEVERAL_SCREENS entry not under CALLERS, where a
+  #   folder (`app/components/admin/ui`, `app/views/layouts`) would make every
+  #   shared file in it one screen's;
+  # - files: a SCREEN_FILES entry that is not one existing file outside CALLERS
+  #   and outside a screen's folder, names no screen folder, or gives no reason.
+  def self.map_problems(map = MAP, callers = self.callers, file: ->(path) { ROOT.join(path).file? }, screen_folders: self.screen_folders)
+    entries = map[:screens].flat_map { |screen, list| list.map { |entry| [ entry, screen.to_s ] } } +
+              map[:several].map { |entry, (screens, _)| [ entry, screens.join(" and ") ] } +
+              map[:files].map { |entry, (screen, _)| [ entry, "#{screen} (SCREEN_FILES)" ] }
     twice = entries.group_by(&:first).select { |_, found| found.size > 1 }
                    .map { |entry, found| "#{entry}: #{found.map(&:last).join(", ")}" }
-    unmapped = callers.reject { |path| mapped_screens(path, map, several) }
-    winners = callers.map { |path| several.key?(path) ? path : map.values.flatten.select { |entry| path == entry || path.start_with?("#{entry}/") }.max_by(&:length) }
-    in_callers = ->(entry) { CALLERS.any? { |root| entry == root || entry.start_with?("#{root}/") } }
-    stale = entries.map(&:first).uniq.reject { |entry| exists.call(entry) && (winners.include?(entry) || !in_callers.call(entry)) }
-    [ unmapped, twice, stale ]
+    unmapped = callers.reject { |path| mapped_screens(path, map) }
+    winners = callers.map { |path| map[:several].key?(path) ? path : winning_entry(path, map[:screens])&.first }
+    mapped = (map[:screens].values.flatten + map[:several].keys).uniq
+    stale = mapped.reject { |entry| winners.include?(entry) }
+    outside = mapped.reject { |entry| in_callers?(entry) }
+    in_a_screen = %r{\A#{COMPONENTS}/(?!(?:#{REGISTRIES.join("|")})/)[^/]+/}
+    files = map[:files].filter_map do |path, (screen, reason)|
+      wrong = [ ("not one existing file" unless file.call(path)),
+                ("under CALLERS: map it in SCREENS" if in_callers?(path)),
+                ("in a screen's folder, which is that screen's already" if path.match?(in_a_screen)),
+                ("#{screen.inspect} is no screen folder" unless screen_folders.include?(screen)),
+                ("no reason written out" unless reason.to_s.length > 40) ].compact
+      "#{path}: #{wrong.join("; ")}" if wrong.any?
+    end
+    { unmapped:, twice:, stale:, outside:, files: }
   end
 
-  # Floors well under today's counts (147 screen classes, 132 callers): a broken
-  # glob or path finds a handful or none and fails here, and moving more
-  # components to ui/ does not.
+  # Floors well under today's counts (147 screen classes, 132 callers, 1075
+  # files read, 239 users): a broken glob, path, matcher or comment stripper
+  # finds a handful or none and fails here, and moving more components to ui/
+  # does not.
   test "the guard is looking at the code" do
     assert_operator self.class.screen_classes.size, :>, 100, "too few screen classes found"
     assert_operator self.class.callers.size, :>, 100, "too few CS Studio views, controllers and concerns found"
+    assert_operator self.class.sources.size, :>, 700, "too few files under app/ read"
+    assert_operator self.class.users.size, :>, USERS_FLOOR, "too few users of screen classes found: the matcher or the comment stripper reads nothing"
   end
 
   test "every screen component is drawn by its own screen only" do
@@ -324,14 +369,20 @@ class ComponentScreensTest < ActiveSupport::TestCase
   end
 
   test "every admin view folder, controller and concern is mapped to one screen or shared" do
-    unmapped, twice, = self.class.map_problems
-    assert_empty unmapped, "not in ComponentScreensTest::SCREENS: map each to the screen it draws, or :shared (SEVERAL_SCREENS for a file that draws more than one):\n#{unmapped.join("\n")}"
-    assert_empty twice, "listed twice in the map (a file that draws several screens goes in SEVERAL_SCREENS only):\n#{twice.join("\n")}"
+    problems = self.class.map_problems
+    assert_empty problems[:unmapped], "not in ComponentScreensTest::SCREENS: map each to the screen it draws, or :shared (SEVERAL_SCREENS for a file that draws more than one):\n#{problems[:unmapped].join("\n")}"
+    assert_empty problems[:twice], "listed twice in the map (a file that draws several screens goes in SEVERAL_SCREENS only):\n#{problems[:twice].join("\n")}"
   end
 
   test "the map names only folders and files that exist" do
-    _, _, stale = self.class.map_problems
-    assert_empty stale, "a SCREENS entry names no file on disk (or only files a more specific entry takes): delete it\n#{stale.join("\n")}"
+    stale = self.class.map_problems[:stale]
+    assert_empty stale, "a SCREENS or SEVERAL_SCREENS entry names no file on disk (or only files a more specific entry takes): delete it\n#{stale.join("\n")}"
+  end
+
+  test "SCREENS and SEVERAL_SCREENS name only CS Studio's views, controllers and concerns, and SCREEN_FILES one file each with its reason" do
+    problems = self.class.map_problems
+    assert_empty problems[:outside], "not under #{CALLERS.join(", ")}: a file elsewhere that is one screen's goes in SCREEN_FILES with its reason\n#{problems[:outside].join("\n")}"
+    assert_empty problems[:files], "SCREEN_FILES:\n#{problems[:files].join("\n")}"
   end
 
   test "every key of the map is a screen folder or :shared" do
@@ -364,26 +415,55 @@ class ComponentScreensTest < ActiveSupport::TestCase
     assert_empty planted.("app/views/admin/dashboard/sample.html.erb", "<%= render Admin::DashboardScreen::PanelComponent.new %>")
   end
 
+  REASON = "a reason long enough to say why the file is the screen's".freeze
+
   test "the map's own checks: an unmapped file, an entry listed twice, an override, a stale entry and a file of several screens" do
-    map = { "a_screen" => %w[app/views/admin/x app/views/admin/gone app/controllers/admin/z_controller.rb app/components/admin/ui/p.html.erb],
-            "b_screen" => %w[app/views/admin/x/one.html.erb app/views/admin/x] }
-    several = { "app/controllers/admin/z_controller.rb" => [ %w[a_screen b_screen], "reason" ], "app/controllers/admin/w_controller.rb" => [ %w[a_screen b_screen], "reason" ] }
+    map = { screens: { "a_screen" => %w[app/views/admin/x app/views/admin/gone app/controllers/admin/z_controller.rb],
+                       "b_screen" => %w[app/views/admin/x/one.html.erb app/views/admin/x] },
+            several: { "app/controllers/admin/z_controller.rb" => [ %w[a_screen b_screen], REASON ],
+                       "app/controllers/admin/w_controller.rb" => [ %w[a_screen b_screen], REASON ] },
+            files: { "app/components/admin/ui/p.html.erb" => [ "a_screen", REASON ] } }
     callers = %w[app/views/admin/x/one.html.erb app/views/admin/x/two.html.erb app/views/admin/y/three.html.erb
                  app/controllers/admin/z_controller.rb app/controllers/admin/w_controller.rb]
-    unmapped, twice, stale = self.class.map_problems(map, callers, several, exists: ->(entry) { !entry.end_with?("gone") })
+    problems = self.class.map_problems(map, callers, file: ->(_) { true }, screen_folders: %w[a_screen b_screen])
 
-    assert_equal %w[app/views/admin/y/three.html.erb], unmapped
-    assert_equal [ "app/views/admin/x: a_screen, b_screen", "app/controllers/admin/z_controller.rb: a_screen, a_screen and b_screen" ], twice
-    assert_equal %w[app/views/admin/gone], stale, "a shared folder's file in the map needs only to exist"
-    assert_equal [ "b_screen" ], self.class.mapped_screens("app/views/admin/x/one.html.erb", map, several)
-    assert_equal %w[a_screen b_screen], self.class.screens_of("app/controllers/admin/w_controller.rb", map, several)
-    assert_equal [ "a_screen" ], self.class.screens_of("app/components/admin/ui/p.html.erb", map, several)
-    assert_equal [ :shared ], self.class.screens_of("app/components/admin/ui/q.html.erb", map, several)
-    assert_equal [ :shared ], self.class.screens_of("app/views/setup/mail.html.erb", map, several)
-    assert_equal [ :shared ], self.class.screens_of("app/views/layouts/admin.html.erb", map, several)
+    assert_equal %w[app/views/admin/y/three.html.erb], problems[:unmapped]
+    assert_equal [ "app/views/admin/x: a_screen, b_screen", "app/controllers/admin/z_controller.rb: a_screen, a_screen and b_screen" ], problems[:twice]
+    assert_equal %w[app/views/admin/gone], problems[:stale]
+    assert_empty problems[:outside]
+    assert_empty problems[:files]
+    assert_equal [ "b_screen" ], self.class.mapped_screens("app/views/admin/x/one.html.erb", map)
+    assert_equal %w[a_screen b_screen], self.class.screens_of("app/controllers/admin/w_controller.rb", map)
+    assert_equal [ "a_screen" ], self.class.screens_of("app/components/admin/ui/p.html.erb", map)
+    assert_equal [ :shared ], self.class.screens_of("app/components/admin/ui/q.html.erb", map)
+    assert_equal [ :shared ], self.class.screens_of("app/views/setup/mail.html.erb", map)
+    assert_equal [ :shared ], self.class.screens_of("app/views/layouts/admin.html.erb", map)
 
     classes = [ [ "Admin::BScreen::RowComponent", "b_screen" ], [ "Admin::CScreen::RowComponent", "c_screen" ] ]
-    drawn = self.class.strangers(classes, { "app/controllers/admin/w_controller.rb" => "Admin::BScreen::RowComponent; CScreen::RowComponent" }, map, several)
+    drawn = self.class.strangers(classes, { "app/controllers/admin/w_controller.rb" => "Admin::BScreen::RowComponent; CScreen::RowComponent" }, map)
     assert_equal [ [ "Admin::CScreen::RowComponent", "app/controllers/admin/w_controller.rb", %w[a_screen b_screen] ] ], drawn
+  end
+
+  test "the map refuses a shared folder made one screen's, and a SCREEN_FILES entry that is a folder, has no reason or belongs elsewhere" do
+    escape = { screens: { "a_screen" => %w[app/components/admin/ui app/views/layouts app/helpers app] },
+               several: { "app/jobs" => [ %w[a_screen b_screen], REASON ] }, files: {} }
+    assert_equal %w[app/components/admin/ui app/views/layouts app/helpers app app/jobs],
+      self.class.map_problems(escape, [], screen_folders: %w[a_screen b_screen])[:outside]
+
+    files = { "app/components/admin/ui" => [ "a_screen", REASON ],
+              "app/views/layouts" => [ "a_screen", REASON ],
+              "app/views/layouts/admin.html.erb" => [ "a_screen", "" ],
+              "app/views/admin/x.html.erb" => [ "a_screen", REASON ],
+              "app/components/admin/b_screen/x_component.rb" => [ "a_screen", REASON ],
+              "app/helpers/x_helper.rb" => [ "z_screen", REASON ] }
+    problems = self.class.map_problems({ screens: {}, several: {}, files: files }, [], file: ->(path) { path.end_with?(".rb", ".erb") },
+                                       screen_folders: %w[a_screen b_screen])[:files]
+
+    assert_equal [ "app/components/admin/ui: not one existing file",
+                   "app/views/layouts: not one existing file",
+                   "app/views/layouts/admin.html.erb: no reason written out",
+                   "app/views/admin/x.html.erb: under CALLERS: map it in SCREENS",
+                   "app/components/admin/b_screen/x_component.rb: in a screen's folder, which is that screen's already",
+                   "app/helpers/x_helper.rb: \"z_screen\" is no screen folder" ], problems
   end
 end

@@ -1,4 +1,5 @@
 require "test_helper"
+require_relative "../support/source_code"
 
 # Where a screen's parts live (docs/superpowers/specs/2026-10-10-source-layout-cleanup-design.md).
 # A Stimulus identifier follows its controller's path, and a name left behind
@@ -19,12 +20,10 @@ class SourceLayoutTest < ActiveSupport::TestCase
   # The Ruby hash-key spelling: `data: { admin__notes_live_unread_url_value: }`.
   UNDERSCORE_TOKEN = /(?<![A-Za-z0-9_])admin__[a-z0-9]+(?:_{1,2}[a-z0-9]+)*/
 
-  # Prose in a comment may wrap an identifier across lines; only code is scanned.
-  # Comment syntax is per language: a CSS line may begin with "#id".
-  COMMENT_LINES = { ".rb" => /^\s*#.*$/, ".erb" => /^\s*#.*$/, ".js" => %r{^\s*//.*$} }.freeze
-
+  # Prose in a comment may wrap an identifier across lines; only code is scanned,
+  # by whole comment lines per language (`SourceCode::COMMENT_LINES`).
   def self.code_of(path)
-    File.read(path).gsub(COMMENT_LINES.fetch(File.extname(path), /\A\z/), "")
+    File.read(path).gsub(SourceCode::COMMENT_LINES.fetch(File.extname(path), /\A\z/), "")
   end
 
   def self.written_in(path)
