@@ -251,6 +251,24 @@ class AdminContrastTest < ActiveSupport::TestCase
     end
   end
 
+  # The language tabs (`Admin::Ui::LanguageTabsComponent`) stand on a card's
+  # surface and on the rail. The chosen language's 2px underline is the
+  # accent, a rail tab's, so a state's mark: 3:1. The figures are the
+  # design's measure, so a token that drifts is caught before it nears the
+  # floor.
+  test "the language tabs: the accent underline is 3:1 on the surface and the rail" do
+    source = Rails.root.join("app/components/admin/ui/language_tabs_component.html.erb").read
+    assert_match(/has-\[\[aria-selected=true\]\]:border-accent/, source, "buttons mode's underline is the accent")
+    assert_match(/current\?\(code\) \? "border-accent"/, source, "links mode's underline is the accent")
+    figures = { "--cs-surface" => { light: 6.8, dark: 7.0 }, "--cs-rail" => { light: 6.0, dark: 6.2 } }
+    each_scheme do |scheme, colour|
+      figures.each do |ground, floor|
+        assert_ratio(3.0, colour.("--cs-accent"), colour.(ground), "the chosen language's accent underline on #{ground} (#{scheme})")
+        assert_ratio(floor.fetch(scheme), colour.("--cs-accent"), colour.(ground), "the chosen language's accent underline on #{ground}, at the measured figure (#{scheme})")
+      end
+    end
+  end
+
   # The section chosen in the page editor's rail (`.admin-section-card[data-chosen]`):
   # an outline 2px outside the frame, so it stands on the canvas. Its colour is
   # read from the rule that draws it.

@@ -27,6 +27,17 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
     assert_selector "[title='Missing required fields']", count: 1
   end
 
+  test "the chosen language's 2px underline is the accent, a rail tab's, in links and in buttons mode" do
+    render_inline(Admin::Ui::LanguageTabsComponent.new(current: "de", url: @url))
+    assert_selector "li.border-b-2.border-accent", text: "Deutsch"
+    assert_selector "li.border-b-2.border-transparent", text: "English"
+    assert_no_selector "li[class~='border-ink']"
+
+    render_inline(Admin::Ui::LanguageTabsComponent.new(current: "de", mode: :buttons, button_data: ->(code) { {} }, panel_id: ->(code) { "panel-#{code}" }))
+    assert_selector "li.border-b-2.border-transparent[class~='has-[[aria-selected=true]]:border-accent']", count: 3
+    assert_no_selector "li[class*='border-ink']"
+  end
+
   test "no markers when nothing is missing or outdated" do
     render_inline(Admin::Ui::LanguageTabsComponent.new(current: "en", url: @url))
     assert_no_selector "[data-language-state]"
