@@ -4,11 +4,11 @@ ContentSpiel is a content management system built on Rails 8.1. It draws a
 public website from a tree of pages, and editors work in its own admin,
 CS Studio. It is released as versioned Docker images, and a site is created,
 run and upgraded with the `contentspiel` command (latest release:
-[v0.3.0](https://github.com/dominikknafelj/ContentSpiel/releases)).
+[v0.3.0](https://github.com/dominikknafelj/ContentSpiel/releases); every change is in the [changelog](CHANGELOG.md)).
 
 **Documentation:** the guide for editors, administrators and integrators is at
 <https://content-spiel-docs.studio-nordlicht.agency>. For how the code works,
-see `docs/reference/`, in this repository, below.
+see [`docs/reference/`](docs/reference/), in this repository, below.
 
 - **Pages in a tree.** Editors build pages from ordered content blocks:
   - rich text, images, code, notes and tables;
@@ -54,7 +54,7 @@ contentspiel new my-site      # a site folder: its theme, its deploy file, the v
 A site pins the CMS release it runs in `.contentspiel-version`.
 `contentspiel upgrade` moves it to a newer one and prints the changelog
 sections in between. What production asks of its host is in
-`docs/reference/hosting.md`, and step by step in the guide's administrator
+[`docs/reference/hosting.md`](docs/reference/hosting.md), and step by step in the guide's administrator
 pages.
 
 ## Working on the CMS
@@ -91,31 +91,32 @@ Run the test suite with `bin/rails test`, the browser tests with
   The tests run as 2 unit shards and 6 browser shards with 4 workers each.
   `bin/test-shard` deals the files by the seconds each took in a real CI run
   (`test/*_test_seconds.yml`), so the shards finish together
-  (`.github/workflows/ci.yml`).
+  ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 - **Guard tests hold the architecture**, beside the behaviour:
   - the direction of dependencies between layers;
   - a contract for every shared CS Studio component;
   - that a screen's component is drawn by that screen only;
   - words as translation keys, and SQL strings with a reason.
 - **Every merge to `main`** builds the production image and pushes it to the
-  GitHub container registry (`image.yml`). Then it generates a client site with
+  GitHub container registry ([`image.yml`](.github/workflows/image.yml)). Then it generates a client site with
   that image's own `contentspiel` command and checks it end to end.
 - **A release** is a pull request made by `bin/rails 'release:prepare[X.Y.Z]'`.
   Merging it tags `vX.Y.Z` and publishes amd64 and arm64 images as `X.Y.Z` and
-  `stable`, with the GitHub Release (`release.yml`).
+  `stable`, with the GitHub Release ([`release.yml`](.github/workflows/release.yml)).
 
 ## Learning the code
 
-`CLAUDE.md` holds the commands, the conventions and the rules no test holds.
-`docs/reference/` explains each part of the system and holds the rules a test
+[`CLAUDE.md`](CLAUDE.md) holds the commands, the conventions and the rules no test holds.
+[`docs/reference/`](docs/reference/) explains each part of the system and holds the rules a test
 guards, one file per topic: start with the one that covers what you are about to change.
-Hosting a site is `docs/reference/hosting.md`, and writing a theme is
-`docs/reference/theming.md`. The guide
+Hosting a site is [`docs/reference/hosting.md`](docs/reference/hosting.md), and writing a theme is
+[`docs/reference/theming.md`](docs/reference/theming.md). The guide
 (<https://content-spiel-docs.studio-nordlicht.agency>) is the reader's side
 of the same system: how to use CS Studio, run a site and build a theme.
 
 ## Contributing, security and licence
 
-How a change gets in is `CONTRIBUTING.md`. Report a vulnerability privately, as
-`SECURITY.md` says. ContentSpiel is
-released under the MIT licence (`LICENSE`).
+How a change gets in is [`CONTRIBUTING.md`](CONTRIBUTING.md). Report a vulnerability privately, as
+[`SECURITY.md`](SECURITY.md) says. Every release's changes are in
+[`CHANGELOG.md`](CHANGELOG.md). ContentSpiel is released under the MIT licence
+([`LICENSE`](LICENSE)).
