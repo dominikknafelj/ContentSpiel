@@ -34,7 +34,7 @@
 
 1. **A cable connection resuming an expired session** — the WebSocket's connect goes through `Session.from_cookies` too, so an expired cookie must be rejected there and the row ended (Task 2 test).
 2. **Two tabs racing the five-minute `last_seen_at` write** — both may write; neither may raise or bump `updated_at` (Task 2 test: `update_column`, and `updated_at` unchanged).
-3. **Ending a session id that is not yours** (a crafted DELETE with another user's session id) — must be 404, never ending it (Task 6 test).
+3. **Ending a session id that is not yours** (a crafted DELETE with another user's session id, or one already gone) — ends nothing and answers exactly as for one of yours that had already ended ("That session had already ended."), so an id tells nothing (Task 3 and Task 6 tests).
 4. **The current session in "Sign out everywhere else"** — must survive, and the person stays signed in on the answer (Task 6 test).
 5. **A password change made by an owner for another user** — ends ALL that user's sessions (the acting session is not theirs) and audits `password_changed` once with the count; a change with no other sessions records nothing (Task 3 test).
 
@@ -106,10 +106,10 @@
 **Interfaces:**
 - Consumes: `Sessions::End`, `Session::END_REASONS`.
 - Produces:
-  - `Sessions::EndOthers.call(user: Current.user, keep: Current.session, only: nil) -> Result`: ends the user's sessions but `keep`; `only:` a session id ends that one session (found through `user.sessions.find_by(id:)`; nil → `not_found` result, the controller answers 404). Records ONE `session.ended` `{ reason: "ended_by_self", count: n }` with the user as actor and subject, nothing when n = 0. `ok` result with `value: n`.
-  - `Sessions::EndAll.call(user, actor: Current.actor) -> Result`: owner-only (`Users::Manageability.actor_owner?(actor)`; else `denied("users.manage", user)` as `OwnerProtection#owner_only_denial` answers), refused for `user == actor` (R4) with the error key `admin.users.sessions_zone.own_account` (Task 7 adds the words; in the service use `I18n.t` with that key); ends all; one event `{ reason: "ended_by_owner", count: n }`, nothing when n = 0.
+  - `Sessions::EndOthers.call(user: Current.user, keep: Current.session, only: nil) -> Result`: ends the user's sessions but `keep`; `only:` a session id ends that one session (found through `user.sessions.find_by(id:)`; nil, or `keep` itself, → an `ok` result with `value: 0`, nothing ended or recorded: the controller answers it as already ended). Records ONE `session.ended` `{ reason: "ended_by_self", count: n }` with the user as actor and subject, nothing when n = 0. `ok` result with `value: n`.
+  - `Sessions::EndAll.call(user, actor: Current.actor) -> Result`: owner-only (`Users::Manageability.actor_owner?(actor)`; else `denied("users.manage", user)` as `OwnerProtection#owner_only_denial` answers), refused for `user == actor` (R4) with `I18n.t("admin.components.users_screen.sessions_zone.reason_own")` (Task 7 adds the words); ends all; one event `{ reason: "ended_by_owner", count: n }`, nothing when n = 0.
   - `end_sessions_after_password_change` keeps its rule (which sessions) and records one `session.ended` `{ reason: "password_changed", count: n }` subject the user, when n > 0, in the service's transaction.
-- [ ] **Step 1: Failing tests**: each service's counts, events (exactly one, the metadata above), the kept session alive, cable disconnects of the ended rows; `only:` with another user's session id → not found and nothing ended (Review Focus 3, service half); `EndAll` by a non-owner admin → denied, nothing ended; on own account → refused; Review Focus 5: an owner changing another user's password through `Users::Save` ends all that user's sessions and records `password_changed` with the count; a change with none open records no `session.ended`.
+- [ ] **Step 1: Failing tests**: each service's counts, events (exactly one, the metadata above), the kept session alive, cable disconnects of the ended rows; `only:` with another user's session id, an unknown id, or `keep`'s id → `value: 0`, nothing ended, nothing recorded (Review Focus 3, service half); `EndAll` by a non-owner admin → denied, nothing ended; on own account → refused; Review Focus 5: an owner changing another user's password through `Users::Save` ends all that user's sessions and records `password_changed` with the count; a change with none open records no `session.ended`.
 - [ ] **Step 2: Run; fail. Step 3: Implement. Step 4: Run plus `test/services/users`; pass.**
 - [ ] **Step 5: Commit** `feat: ending your other sessions, an owner ending all of someone's, and a password change say so in the audit log`.
 
@@ -126,22 +126,120 @@
 - [ ] **Step 2–4: fail, implement, pass.**
 - [ ] **Step 5: Commit** `feat: an hourly sweep removes expired sessions`.
 
-### Task 5: Your account's Sessions card
+## Screens (Design System v205, card `StudioSessions`; owner's answers 2026-11-11)
 
-*(Words, layout and the confirm decision from the Design System card — filled in once the design agent's card is published; see "Screens" below.)*
+The owner chose: one row's End acts at once (no confirm), the two bulk endings confirm; the sign-in panel says the session ended only to a browser whose cookie names a gone session; on your own account the user editor's Sessions zone is drawn disabled with its reason. The words below are the card's, verbatim; every one is a key.
 
-### Task 6: Routes and controllers for the endings
+`config/locales/admin/accounts.en.yml`, `admin.accounts.sessions`:
 
-*(Filled in with Task 5.)*
+```yaml
+title: "Sessions"
+intro: "Where you're signed in. End a session you don't recognise, then change your password."
+this_session: "This session"
+device: "%{browser} on %{os}"
+browser_only: "%{browser}"
+os_only: "A browser on %{os}"
+unknown_device: "Unknown browser"
+active: "Active %{time}"
+active_now: "Active now"
+signed_in_with:
+  password: "Signed in with password"
+  passkey: "Signed in with a passkey"
+  sso: "Signed in with single sign-on"
+  recovery_code: "Signed in with a recovery code"
+end: "End"
+end_label: "End the session in %{device}"
+others: { one: "1 other session", other: "%{count} other sessions" }
+none_else: "You're not signed in anywhere else."
+end_others: "Sign out everywhere else…"
+end_others_title: "Sign out everywhere else?"
+end_others_body:
+  one: "Your other session ends, and that browser must sign in again. You stay signed in here."
+  other: "Your %{count} other sessions end, and those browsers must sign in again. You stay signed in here."
+end_others_confirm: "Sign out everywhere else"
+ended: "Session ended."
+already_ended: "That session had already ended."
+ended_others: { one: "Signed out of 1 other session.", other: "Signed out of %{count} other sessions." }
+```
 
-### Task 7: The user editor's "End all sessions"
+`config/locales/admin/users_screen.en.yml`, `admin.components.users_screen.sessions_zone`:
 
-*(Filled in with Task 5.)*
+```yaml
+heading: "Sessions"
+body:
+  one: "%{name} has 1 open session. Ending it signs %{name} out everywhere."
+  other: "%{name} has %{count} open sessions. Ending them signs %{name} out everywhere."
+body_none: "Ending sessions signs a person out everywhere."
+reason_none: "%{name} has no open sessions."
+reason_own: "End your own sessions from Your account."
+trigger: "End all sessions…"
+title: "End all of %{name}'s sessions?"
+confirm_body: "%{name} is signed out on every browser and must sign in again. Their saved work stays; text they were still typing may be lost."
+confirm: "End all sessions"
+ended: "%{name} is signed out everywhere."
+```
+
+`admin.sessions.ended`: "Your session ended. Sign in again." (with the sign-in panel's keys).
+
+### Task 5: The device a session is in
+
+**Files:**
+- Create: `app/values/session_device.rb`
+- Modify: `Gemfile` (`gem "useragent"`, the version already locked), `config/locales/admin/accounts.en.yml` (the `admin.accounts.sessions` block above)
+- Test: `test/values/session_device_test.rb`
+
+**Interfaces:**
+- Produces: `SessionDevice.new(user_agent_string) -> SessionDevice`; `#browser -> String | nil` (the `useragent` gem's browser name, nil for none/unknown), `#os -> String | nil` (a person's OS name: "macOS", "Windows", "iOS", "Android", "Linux", "ChromeOS"; nil otherwise), `#key_and_values -> [String, Hash]` (`["device", {browser:, os:}]`, `["browser_only", …]`, `["os_only", …]` or `["unknown_device", {}]`). A value object: it reads no locale; the component turns it into words.
+- [ ] **Step 1: Failing tests** with real user agent strings: Firefox on macOS → `["device", { browser: "Firefox", os: "macOS" }]`; Chrome on Windows; Safari on iOS (iPhone); Chrome on Android; `curl/8.4.0` → browser "curl"? — whatever the gem answers for a non-browser is NOT shown: a non-browser (`UserAgent#bot?`, or a product the gem names outside its browser list) is `os_only`/`unknown_device`; nil and "" → `unknown_device`; a 1000-character junk string → `unknown_device`, no raise.
+- [ ] **Step 2–4: fail, implement, pass.** **Step 5: Commit** `feat: a session's browser and system, read from its user agent`.
+
+### Task 6: Your account's Sessions card and its two endings
+
+**Files:**
+- Create: `app/components/admin/account_screen/sessions_card_component.rb` + `.html.erb`, `app/controllers/admin/account_sessions_controller.rb`, `app/assets/images/icons/monitor-smartphone.svg` (Lucide's `monitor-smartphone`, in the same form as `user.svg`; `LICENSE-lucide` covers it)
+- Modify: `config/routes.rb`, `app/views/admin/accounts/edit.html.erb` (the third card after the Password card, OUTSIDE both forms), the icon registry the settings card reads (`icon: :monitor_smartphone`, `family: :neutral`), `test/lib/admin_i18n_test.rb` (`CONVERTED` gains the component), `config/locales/admin/account_screen.en.yml` only if the component scope demands its own file (`test/lib/source_layout_test.rb` decides: one locale file per component folder; then the `admin.accounts.sessions` keys move there as `admin.components.account_screen.sessions_card.*` — follow the guard, keep the words)
+- Test: `test/components/admin/account_screen/sessions_card_component_test.rb`, `test/controllers/admin/account_sessions_controller_test.rb`, `test/system/admin/account_sessions_test.rb`
+
+**Interfaces:**
+- Consumes: `SessionDevice`, `Sessions::EndOthers` (Task 3), `Session` columns.
+- Produces: routes `delete "account/sessions/:id", to: "account_sessions#destroy", as: :account_session` and `delete "account/sessions", to: "account_sessions#destroy_others", as: :account_sessions`; `Admin::AccountScreen::SessionsCardComponent.new(sessions:, current:)`, its row's DOM id `session-<id>`, the card's id `account-sessions`.
+- The card (from `StudioSessions`): `SettingsCardComponent` heading "Sessions", intro, icon `:monitor_smartphone`; rows: the current session first, then the others by `last_seen_at` desc. Line 1: the device words, plus `Admin::Ui::BadgeComponent` (neutral) "This session" on the current one. Line 2 joined by " · ": the address (`ip_address`, omitted when blank), "Active now" on the current one / "Active %{time}" with `Admin::Ui::TimeAgoComponent` on the others, and `signed_in_with.<method>`. Each other row: a small secondary `button_to` "End" (`aria-label` `end_label`) DELETE `account_session_path`. Foot: `others` count and "Sign out everywhere else…" (small secondary) opening `Admin::Ui::ConfirmDialogComponent` (not destructive; the primary confirms with `end_others_confirm`, body `end_others_body` by count); with no other session the foot says `none_else` and the button is not drawn. Narrow: the details wrap under the device; End stays at the row's end. Not a form field of either form; no save bar, never counted by "Leave without saving?".
+- Answers: `destroy` → `Sessions::EndOthers.call(only: params[:id])`; Turbo Stream: remove `session-<id>` (also when nothing was ended), redraw the foot, a toast `ended` (n = 1) or `already_ended` (n = 0), via `Admin::ToastStream`; focus moves to the next row's End or the foot's button (a small Stimulus controller `admin--account--sessions` in `app/javascript/controllers/admin/account/`, which exists for the password answer, connected on the card; it moves focus after the stream's removal). Without Turbo: redirect to `account#sessions` anchor with the flash. `destroy_others` → `Sessions::EndOthers.call`; redirect to the account page (`status: :see_other`, `anchor: "sessions"`), toast `ended_others` by count. Both are open to every signed-in user, for `Current.user` only (the request names no user).
+- [ ] **Step 1: Failing tests**
+  - Component: current first with "This session" and no End; others ordered; device words for the four `SessionDevice` cases; "Active now" vs "Active …"; blank address omitted; the foot's count and button vs `none_else` with no button.
+  - Controller: End of my other session → 200 stream removing it, `session.ended` `ended_by_self` count 1; End of another user's session id → the same 200 answer with `already_ended`, their session alive, nothing recorded (Review Focus 3); End of my own current id → `already_ended`, still signed in; `destroy_others` → only the current remains, redirect with the toast, still signed in (Review Focus 4); signed out → redirect to sign-in.
+  - Browser (one file; `visit_screen`): End a row → it goes, the toast reads "Session ended.", focus on the next End; "Sign out everywhere else…" → the dialog, confirm → only "This session" left and "You're not signed in anywhere else.".
+- [ ] **Step 2–4: fail, implement, pass** (`bin/rails tailwindcss:build` once before the browser test, never during).
+- [ ] **Step 5: Commit** `feat: Your account lists your sessions, and ends one or all the others`.
+
+### Task 7: The user editor's Sessions zone
+
+**Files:**
+- Create: `app/components/admin/users_screen/sessions_zone_component.rb` + `.html.erb`
+- Modify: `app/views/admin/users/edit.html.erb` (between the Owner zone and the Delete zone, for an owner viewer only, as the Owner zone is drawn), `config/routes.rb` (`member { delete :sessions }` in the users resources → `Admin::UsersController#sessions`), `app/controllers/admin/users_controller.rb`, `config/locales/admin/users_screen.en.yml` (the block above)
+- Test: `test/components/admin/users_screen/sessions_zone_component_test.rb`, `test/controllers/admin/users_controller_test.rb`
+
+**Interfaces:**
+- Consumes: `Sessions::EndAll` (Task 3).
+- Produces: `Admin::UsersScreen::SessionsZoneComponent.new(user:, own:, count:, url_options: {})`, `self.dialog_id(user) = "sessions-user-#{user.id}"`.
+- The zone: `Admin::Ui::ActionZoneComponent` heading "Sessions", body `body` by count (`body_none` at 0), `pending_lock: true` like the Owner zone; trigger "End all sessions…" (small secondary) opening a `ConfirmDialogComponent` (title, `confirm_body`, primary `confirm`) whose form DELETEs `sessions_admin_user_path`. Disabled with `reason_none` at 0 sessions, with `reason_own` on your own account (owner's answer: drawn, disabled). The action: `Sessions::EndAll.call(@user)`; ok → redirect to the editor (`see_other`) with notice `ended`; refused → as `owner` does (`forbidden_or(result)`).
+- [ ] **Step 1: Failing tests**: the zone's body by count, disabled states and reasons; an owner ends another user's 2 sessions → both gone, one event `ended_by_owner` count 2, the notice; a non-owner admin → 403/404 as the owner action answers, nothing ended; own account → refused, nothing ended; the zone is not drawn for a non-owner viewer.
+- [ ] **Step 2–4. Step 5: Commit** `feat: an owner ends every session of another user from the user editor`.
 
 ### Task 8: The sign-in panel after an ended session
 
-*(Filled in with Task 5.)*
+**Files:**
+- Modify: `app/controllers/concerns/authentication.rb` (`request_authentication`), `app/views/admin/sessions/new.html.erb`, `config/locales/admin/sessions.en.yml` (`admin.sessions.ended`)
+- Test: `test/integration/sessions_test.rb`
 
-### Task 9: Reference docs, the Design System stamp and the changelog's rest
+**Interfaces:**
+- `request_authentication`: when the request carries a signed `session_id` cookie that `Session.from_cookies` did not resolve, it deletes the cookie and sets `flash[:session_ended] = true` before the redirect; the sign-in page draws `Admin::Ui::NoticeComponent` neutral, compact, role note, `admin.sessions.ended`, above the form, only for that flash (and not together with an `alert`). A browser without the cookie never sees it; Sign out (`terminate_session` deletes the cookie first) says nothing; it names no email.
+- [ ] **Step 1: Failing tests**: a session ended elsewhere (destroy it) → the next GET redirects to sign-in, which shows "Your session ended. Sign in again." once, and the `session_id` cookie is cleared; idle expiry → the same; after Sign out → no notice; a fresh browser → no notice; a forged unsigned cookie → no notice.
+- [ ] **Step 2–4. Step 5: Commit** `feat: sign-in says a session ended to the browser it ended in`.
 
-*(Filled in with Task 5.)*
+### Task 9: Docs, the Design System stamp and the changelog
+
+**Files:**
+- Modify: `docs/reference/access-control-and-audit.md` (sessions: the limits, the lookup's expiry, the endings and `session.ended`'s reasons, R1/R2 as invariants), `docs/reference/hosting.md` ("Telemetry": `auth.session` and `auth.session_sweep` with their attributes; a Honeycomb query for sessions ended by reason), `docs/reference/users-groups-tokens.md` (the Sessions zone), `test/support/design_system_entries.rb` (`VERSION` → the Design System's latest index id at the time of this task — `1794401715-7a0f` (v205) unless the design agent has published since — and an entry for `StudioSessions` as its other Studio · Screens entries are written), `CHANGELOG.md` `## Unreleased` (`### Added`: the limits, Your account's Sessions card, the owner's End all sessions, the sweep, the sign-in sentence, `session.ended`, the spans; `### Changed`: a password change's endings are now audited; `### For a gem or an outside caller`: `Session.from_cookies` answers only a live session and ends an expired one; `start_new_session_for` takes `method:`)
+- Test: `test/lib` (the docs guards, the environment-variable table, the Design System entries test), `bin/changelog-guard origin/main`
+- [ ] **Step 1:** write; **Step 2:** `PGGSSENCMODE=disable bin/rails test test/lib`; `bin/changelog-guard origin/main`; pass. **Step 3: Commit** `docs: sessions in the reference, the changelog and the Design System stamp`.
