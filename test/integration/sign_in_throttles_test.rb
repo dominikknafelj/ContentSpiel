@@ -34,11 +34,13 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
   end
 
   # One attempt's whole answer, from a fresh session: what a bot can read
-  # of it, and the work it took.
-  def answer_to(email, password: "wrong")
+  # of it, and the work it took. `statements` compares the SQL's shape, not
+  # its values: binds are `$n` in the text, so an insert's ids and the email
+  # typed never differ in it, and need no stripping.
+  def answer_to(email, password: "wrong", **params)
     reset!
     statements = nil
-    hashed = hashes { statements = capture_sql { attempt(email, password: password) } }
+    hashed = hashes { statements = capture_sql { attempt(email, password: password, **params) } }
     answer = {
       status: response.status, location: response.location, flash: flash[:alert], cookies: cookies.to_hash.keys.sort,
       statements: statements, hashes: hashed
@@ -58,6 +60,68 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     assert_equal I18n.t("admin.sessions.refused"), known[:flash]
     assert_equal 1, known[:hashes]
     assert known[:statements].any? { |sql| sql.include?("audit_events") }, "the refusal is audited"
+  end
+
+  test "the right password typed with an email that has no account answers as a wrong one for a known email" do
+    known = answer_to(EMAIL)
+    unknown = answer_to(UNKNOWN, password: PASSWORD)
+
+    assert_equal known, unknown
+    assert_equal I18n.t("admin.sessions.refused"), known[:flash]
+    assert_equal 1, known[:hashes]
+  end
+
+  test "a required and a refused bot check answer the same for a known and an unknown address, and check no password" do
+    with_bot_check(:failed) do
+      3.times { |index| attempt("person#{index}@example.org") }
+
+      required = [ answer_to(EMAIL, password: PASSWORD), answer_to(UNKNOWN) ]
+      assert_equal(*required)
+      failed = [ answer_to(EMAIL, password: PASSWORD, "cf-turnstile-response" => "token"), answer_to(UNKNOWN, "cf-turnstile-response" => "token") ]
+      assert_equal(*failed)
+
+      [ required.first, failed.first ].each do |answer|
+        assert_equal I18n.t("admin.sessions.bot_check"), answer[:flash]
+        assert_equal 0, answer[:hashes]
+        assert_empty answer[:statements]
+      end
+    end
+  end
+
+  test "a limited address answers the same for a known and an unknown address, past the rate limit and past the wide cap" do
+    10.times { |index| attempt("person#{index}@example.org", paced: false) }
+    limited = [ answer_to(EMAIL, password: PASSWORD), answer_to(UNKNOWN) ]
+    assert_equal(*limited)
+    assert_equal I18n.t("admin.sessions.limited"), limited.first[:flash]
+
+    travel 3.minutes
+    40.times { |index| attempt("other#{index}@example.org") }
+    wide = [ answer_to(EMAIL, password: PASSWORD), answer_to(UNKNOWN) ]
+    assert_equal(*wide)
+    assert_equal I18n.t("admin.sessions.limited"), wide.first[:flash]
+    assert_equal 0, wide.first[:hashes]
+    assert_empty wide.first[:statements]
+  end
+
+  test "an email Postgres would refuse is an ordinary refusal, counted in the empty address's bucket, never a 500" do
+    [ "ann\0@example.org", "\0", "ann@example.org\0" ].each do |typed|
+      attempt(typed, password: PASSWORD)
+      assert_redirected_to admin_sign_in_path
+      assert_equal I18n.t("admin.sessions.refused"), flash[:alert]
+    end
+    assert_equal [ {} ] * 3, Audit::Event.where(action: "session.failed").map(&:metadata)
+
+    # Bytes that are no UTF-8 are Rails' own 400, before the action: nothing
+    # is counted or recorded.
+    assert_no_difference -> { Audit::Event.count } do
+      attempt("\xFF@example.org".b, password: PASSWORD)
+    end
+    assert_response :bad_request
+
+    2.times { attempt("ann\0@example.org") }
+    assert_equal I18n.t("admin.sessions.locked"), flash[:alert], "the fifth in the bucket of an empty address"
+    attempt(EMAIL, password: PASSWORD)
+    assert_redirected_to admin_root_path
   end
 
   test "a closed account bucket answers the same for a known and an unknown address, and checks no password" do
@@ -214,7 +278,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the eleventh attempt in three minutes is limited, now in tests too" do
+  test "the eleventh attempt in three minutes from one address is limited until the three minutes end" do
     10.times { |index| attempt("person#{index}@example.org", paced: false) }
     assert_equal I18n.t("admin.sessions.refused"), flash[:alert]
 

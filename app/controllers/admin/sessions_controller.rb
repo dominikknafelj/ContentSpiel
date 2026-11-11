@@ -55,7 +55,8 @@ module Admin
     MAX_EMAIL_LENGTH = 254
 
     allow_unauthenticated_access only: %i[ new create ]
-    # The per-address bucket: every POST counts, a success included. Its
+    # The per-address bucket, Rails' `rate_limit`: it counts every POST to
+    # `create`, a success and a refusal alike, not failures alone. Its
     # store is the throttle's (`SignIn.store`), so it counts where every
     # process sees it, and trips in tests too, whose cache is a null store.
     rate_limit to: 10, within: 3.minutes, only: :create, store: SignIn.store, with: -> { answer_address_limited }
@@ -66,11 +67,12 @@ module Admin
     end
 
     def create
-      outcome = SignIn::PasswordAttempt.new(
+      attempt = SignIn::PasswordAttempt.new(
         email: params[:email_address], password: params[:password],
         address: request.remote_ip, hostname: request.host,
         bot_check_token: params["cf-turnstile-response"]
-      ).call
+      )
+      outcome = attempt.call
 
       if outcome.ok?
         session.delete(:sign_in_bot_check)
@@ -80,8 +82,8 @@ module Admin
         redirect_to after_authentication_url
       else
         if outcome.status == :refused
-          Audit.record("session.failed", metadata: email_metadata)
-          outcome.trips.each { |trip| Audit.record("session.locked", metadata: locked_metadata(trip)) }
+          Audit.record("session.failed", metadata: email_metadata(attempt.email))
+          outcome.trips.each { |trip| Audit.record("session.locked", metadata: locked_metadata(trip, attempt.email)) }
         end
         if outcome.bot_check_due
           session[:sign_in_bot_check] = true
@@ -122,17 +124,18 @@ module Admin
       end
     end
 
-    def locked_metadata(trip)
+    def locked_metadata(trip, email)
       if trip.bucket == :account
-        { "bucket" => "account", **email_metadata, "level" => trip.level, "seconds" => trip.seconds }
+        { "bucket" => "account", **email_metadata(email), "level" => trip.level, "seconds" => trip.seconds }
       else
         { "bucket" => "address_wide", "seconds" => trip.seconds }
       end
     end
 
-    def email_metadata
-      email = params[:email_address]
-      email.is_a?(String) && email.include?("@") ? { "email_address" => email.first(MAX_EMAIL_LENGTH) } : {}
+    # `email` is the attempt's (`SignIn::PasswordAttempt#email`): a String
+    # Postgres takes, or "".
+    def email_metadata(email)
+      email.include?("@") ? { "email_address" => email.first(MAX_EMAIL_LENGTH) } : {}
     end
   end
 end

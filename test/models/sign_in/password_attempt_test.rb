@@ -147,9 +147,15 @@ class SignIn::PasswordAttemptTest < ActiveSupport::TestCase
       spans.find { |span| span.name == "auth.sign_in" }.attributes.to_h)
   end
 
+  test "an empty password checks none, and the span says nothing of the account" do
+    spans = spans_of { assert_equal :refused, attempt(password: "").status }
+    assert_equal({ "auth.method" => "password", "auth.outcome" => "refused" }, spans.find { |span| span.name == "auth.sign_in" }.attributes.to_h)
+    assert_equal 1, count_of(:account), "it counts as any refusal"
+  end
+
   test "the identifier is the email as User normalises it, and a list or a hash is the empty one" do
     assert_equal EMAIL, SignIn::PasswordAttempt.new(email: " Ann@Example.ORG ", password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
-    [ [ EMAIL ], { "a" => EMAIL }, nil ].each do |junk|
+    [ [ EMAIL ], { "a" => EMAIL }, nil, "ann\0@example.org", "\xFF@example.org".b.force_encoding("UTF-8") ].each do |junk|
       assert_equal "", SignIn::PasswordAttempt.new(email: junk, password: "", address: ADDRESS, hostname: HOSTNAME, bot_check_token: nil).identifier
     end
   end

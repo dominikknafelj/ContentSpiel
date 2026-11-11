@@ -28,15 +28,20 @@ module SignIn
   #
   # The email and the password reach `authenticate_by` as Strings, a list or
   # a hash as "", so a junk parameter is refused as any wrong address is and
-  # counts in the bucket of "". The account bucket's identifier is the email
+  # counts in the bucket of "". So is an email Postgres would refuse to
+  # compare (a NUL byte, or bytes that are no UTF-8): it is made "" before
+  # the reservation (`#email`), so it is counted as an ordinary refusal and
+  # never reaches a query, nor the caller's audit metadata, as an error
+  # after its count. The account bucket's identifier is the email
   # as `accounts` normalises it, so " Ann@Example.ORG " and "ann@example.org"
   # are one bucket, and a long address counts whole.
   #
   # One `auth.sign_in` span holds the attempt: `auth.outcome` at the end,
   # `auth.bot_check.required` when the site has a check, and
-  # `auth.account_exists` once a password was checked. That last one is
-  # asked with one more query on a refusal, for a known and an unknown
-  # address alike, and never reaches the answer.
+  # `auth.account_exists` once a password was checked (`authenticate_by`
+  # checks none for an empty one). That last one is asked with one more
+  # query on a refusal, for a known and an unknown address alike, and never
+  # reaches the answer.
   class PasswordAttempt
     attr_reader :address
 
@@ -51,9 +56,16 @@ module SignIn
       @bot_check = bot_check
     end
 
+    # The email as it is looked up: the String typed, or "" for anything
+    # else (no String, a NUL byte, bytes that are no UTF-8). The caller keeps
+    # this one, never the raw parameter.
+    def email
+      @email_text ||= @email.is_a?(String) && @email.valid_encoding? && !@email.include?("\0") ? @email : ""
+    end
+
     # The account bucket's key: the email as the accounts store it.
     def identifier
-      @identifier ||= @accounts.normalize_value_for(:email_address, text(@email))
+      @identifier ||= @accounts.normalize_value_for(:email_address, email)
     end
 
     def call
@@ -77,9 +89,9 @@ module SignIn
       reservation = @throttle.reserve(identifier: identifier, address: address)
       return outcome(:locked, trips: [ reservation.refused_by ]) unless reservation.ok?
 
-      email = text(@email)
-      account = @accounts.authenticate_by(email_address: email, password: text(@password))
-      Telemetry.record(span, "auth.account_exists" => account.present? || @accounts.exists?(email_address: email))
+      password = @password.is_a?(String) ? @password : ""
+      account = @accounts.authenticate_by(email_address: email, password: password)
+      Telemetry.record(span, "auth.account_exists" => account.present? || @accounts.exists?(email_address: email)) unless password.empty?
       return outcome(:refused, trips: reservation.closes) unless account
 
       @throttle.record_success(identifier: identifier, address: address)
@@ -93,7 +105,5 @@ module SignIn
     def bot_check_due?
       !@bot_check.nil? && @throttle.bot_check_due?(address: address, identifier: identifier)
     end
-
-    def text(value) = value.is_a?(String) ? value : ""
   end
 end
