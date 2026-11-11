@@ -1,0 +1,4 @@
+<p><%= t("mail.locked.intro", site: site_name, count: @minutes) %></p>
+<p><%= t("mail.locked.details", time: locked_time, address: @from_address) %></p>
+<%= render "mails/button", url: reset_request_url, label: t("mail.locked.button") %>
+<p><%= t("mail.locked.outro") %></p>

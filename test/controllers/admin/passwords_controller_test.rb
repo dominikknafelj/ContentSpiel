@@ -122,7 +122,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   # request's origin is never used for the link, so it is not handed over
   # either: no mail is sent, and the page says the same words.
   test "create in production with no address configured hands over no origin, sends no mail and answers the same" do
-    with_singleton_override(PasswordsMailer, :request_origin_used?, ->(*) { false }) do
+    with_singleton_override(ApplicationMailer, :request_origin_used?, ->(*) { false }) do
       with_site_address(nil) do
         post admin_password_path, params: { email_address: @user.email_address }, headers: { "Host" => "evil.example" }
 

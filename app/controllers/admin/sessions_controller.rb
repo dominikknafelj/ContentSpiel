@@ -40,7 +40,9 @@ module Admin
   # each bucket that attempt closed is one `session.locked`: neither has a
   # user to name (looking one up would make a refusal for a known address
   # cost more than for an unknown one), so both carry the email that was
-  # tried in `metadata`, never the password. Nor a password typed into the
+  # tried in `metadata`, never the password. For the same reason the
+  # account's pause mail is a job queued for any email, known or not
+  # (`SignIn::LockoutMailJob`, which looks the account up). Nor a password typed into the
   # email box by mistake: a value without an "@" isn't an address, so
   # nothing is kept; an address is cut to the 254 characters an email
   # address can have, so the log can't be stuffed through it. An attempt
@@ -48,6 +50,8 @@ module Admin
   # no password, and an event each would bury the log under a bot's run
   # (its spans carry the run instead).
   class SessionsController < ApplicationController
+    include MailLinkOrigin
+
     layout "product"
 
     # The longest an email address can be (RFC 5321's path limit), and so
@@ -83,7 +87,10 @@ module Admin
       else
         if outcome.status == :refused
           Audit.record("session.failed", metadata: email_metadata(attempt.email))
-          outcome.trips.each { |trip| Audit.record("session.locked", metadata: locked_metadata(trip, attempt.email)) }
+          outcome.trips.each do |trip|
+            Audit.record("session.locked", metadata: locked_metadata(trip, attempt.email))
+            queue_lockout_mail(trip, attempt) if trip.bucket == :account
+          end
         end
         if outcome.bot_check_due
           session[:sign_in_bot_check] = true
@@ -121,6 +128,21 @@ module Admin
         Telemetry.in_span("auth.throttle", attributes: { "auth.bucket" => "address", "auth.tripped" => true }) do
           redirect_to admin_sign_in_path, alert: t("admin.sessions.limited")
         end
+      end
+    end
+
+    # The account's pause mail, at most once an hour per email
+    # (`Throttle#notice_due?` writes the hour's mark). Queued for an email
+    # with no account as for one with an account: the job looks the account
+    # up, so both do the same work here, a cache write and an enqueue.
+    def queue_lockout_mail(trip, attempt)
+      Telemetry.in_span("auth.lockout_mail") do |span|
+        due = SignIn::Throttle.new.notice_due?(identifier: attempt.identifier)
+        if due
+          SignIn::LockoutMailJob.perform_later(attempt.email, locked_at: Time.current, from_address: request.remote_ip,
+            minutes: trip.seconds.fdiv(60).ceil, **mail_link_origin)
+        end
+        Telemetry.record(span, "auth.mail.queued" => due)
       end
     end
 

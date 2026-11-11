@@ -2,6 +2,8 @@ module Admin
   # CS Studio's password reset -- see the comment on
   # Admin::SessionsController for why this isn't an Admin::BaseController.
   class PasswordsController < ApplicationController
+    include MailLinkOrigin
+
     layout "product"
 
     allow_unauthenticated_access
@@ -38,7 +40,7 @@ module Admin
         # answer below is the same words either way. Queued through
         # `ApplicationMailer.queue`, so the job carries the fingerprint of
         # the mail settings it was asked under.
-        ApplicationMailer.queue(PasswordsMailer, :reset, user, **reset_mail_origin)
+        ApplicationMailer.queue(PasswordsMailer, :reset, user, **mail_link_origin)
       end
 
       # The "sent" state is a param on the request page, not a flash and not
@@ -120,12 +122,6 @@ module Admin
         else
           redirect_to admin_sign_in_path
         end
-      end
-
-      def reset_mail_origin
-        return {} if SiteAddress.current.configured? || !PasswordsMailer.request_origin_used?
-
-        { origin: request.base_url }
       end
 
       # The user a token from a request's body stands for, or nil. Anything

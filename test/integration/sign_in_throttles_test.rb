@@ -4,6 +4,8 @@ require "test_helper"
 # outcome answers, what it audits, and that a known and an unknown address
 # are answered alike.
 class SignInThrottlesTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   EMAIL = "ann@example.org".freeze
   UNKNOWN = "nobody@example.org".freeze
   PASSWORD = "password12345".freeze
@@ -36,14 +38,16 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
   # One attempt's whole answer, from a fresh session: what a bot can read
   # of it, and the work it took. `statements` compares the SQL's shape, not
   # its values: binds are `$n` in the text, so an insert's ids and the email
-  # typed never differ in it, and need no stripping.
+  # typed never differ in it, and need no stripping. `jobs` are the classes
+  # it enqueued, whose arguments differ by the email alone.
   def answer_to(email, password: "wrong", **params)
     reset!
     statements = nil
+    queued = enqueued_jobs.size
     hashed = hashes { statements = capture_sql { attempt(email, password: password, **params) } }
     answer = {
       status: response.status, location: response.location, flash: flash[:alert], cookies: cookies.to_hash.keys.sort,
-      statements: statements, hashes: hashed
+      statements: statements, hashes: hashed, jobs: enqueued_jobs.drop(queued).map { it[:job].name }
     }
     follow_redirect!
     answer.merge(page: response.body.gsub(/(name="authenticity_token" value=|name="csrf-token" content=|nonce=)"[^"]*"/, '\1""'))
@@ -132,6 +136,7 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
 
     assert_equal(*fifth)
     assert_equal I18n.t("admin.sessions.locked"), fifth.first[:flash]
+    assert_equal [ "SignIn::LockoutMailJob" ], fifth.first[:jobs], "the pause mail's job, for an email with no account too"
     assert_equal(*sixth)
     assert_equal I18n.t("admin.sessions.locked"), sixth.first[:flash]
     assert_equal 0, sixth.first[:hashes]
@@ -153,6 +158,21 @@ class SignInThrottlesTest < ActionDispatch::IntegrationTest
       attempt(EMAIL)
     end
     assert_equal I18n.t("admin.sessions.locked"), flash[:alert]
+  end
+
+  test "the fifth failure enqueues one lock-out job for a known and an unknown address alike, and the next lock within the hour enqueues none" do
+    [ EMAIL, UNKNOWN ].each do |email|
+      wrong_attempts(4, email)
+      assert_enqueued_with(job: SignIn::LockoutMailJob, args: [ email, { locked_at: Time.current, from_address: "127.0.0.1", minutes: 1, origin: "http://www.example.com" } ]) do
+        attempt(email)
+      end
+
+      travel 1.minute
+      assert_difference -> { locked_events.count }, 1 do
+        assert_no_enqueued_jobs(only: SignIn::LockoutMailJob) { attempt(email) }
+      end
+      assert_equal 1, locked_events.last.metadata["level"], "the sixth failure is the next lock, two minutes"
+    end
   end
 
   test "the fiftieth failure from an address answers Try again later and records session.locked for address_wide" do
