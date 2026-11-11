@@ -12,10 +12,12 @@ class Admin::Ui::LanguageTabsComponentTest < ViewComponent::TestCase
     assert_no_selector "a", text: "Deutsch"
   end
 
-  test "missing is a hollow ring, outdated a solid warn dot, each with screen-reader text and no red" do
+  test "missing is a hollow ring, outdated the ↻ in warn ink, each with screen-reader text and no red" do
     render_inline(Admin::Ui::LanguageTabsComponent.new(current: "en", missing: %w[de], outdated: %w[es], url: @url))
     assert_selector "span[data-language-state=missing][class~='border-field-line'][class~='border-[1.5px]']"
-    assert_selector "span.bg-warn[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
+    assert_selector "span.text-warn-ink[data-language-state=outdated]##{Admin::Ui::LanguageTabsComponent.outdated_marker_id('es')}"
+    assert_selector "[data-language-state=outdated] > span[aria-hidden=true]:first-child", exact_text: "↻"
+    assert_no_selector "[data-language-state=outdated].bg-warn, [data-language-state=outdated].rounded-full"
     assert_selector ".sr-only", text: "Deutsch: missing"
     assert_selector ".sr-only", text: "Español: outdated"
     assert_no_selector "[class*=danger]"

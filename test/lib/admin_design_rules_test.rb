@@ -1964,7 +1964,6 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     app/components/admin/ui/chip_input_component.rb
     app/components/admin/ui/error_summary_component.html.erb
     app/components/admin/ui/language_progress_component.html.erb
-    app/components/admin/ui/language_tabs_component.html.erb
     app/components/admin/ui/notice_component.rb
     app/components/admin/ui/state_chip_component.rb
     app/components/admin/ui/translation_chip_component.rb

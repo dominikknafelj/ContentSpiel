@@ -6,6 +6,7 @@
 
 - CS Studio's segmented controls are one component with one look: the posts list's scope, the media library's and the picker's segments, Translations' type, the Trash's types, a form's Form | Submissions, Waiting for you's and the Notes screen's filters, a `control: :segmented` select (the Note block's kind), Settings' mail security and image format, the form builder's "Shown as" and the New form dialog's start. The chosen segment is the accent tint with accent words and a 1px accent edge where it was ink with paper words; the track has no dividers, is 38px tall everywhere (34px outside a filter bar before), wraps whole segments at a narrow width, and a count is always drawn in tabular figures, 0 included. The keyboard is as before: a link is a Tab stop, a radio group one Tab stop the arrows move along (#237).
 - The language tabs' chosen language is underlined in the accent, as a rail tab is, where it was ink (#237).
+- An outdated language's mark on the language tabs is ↻ in warn ink, as on a translation chip and under a language's progress bar, where it was a solid warn dot; a screen reader still hears "<language>: outdated" (#237).
 
 ### Removed
 
