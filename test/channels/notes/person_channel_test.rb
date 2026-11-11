@@ -26,6 +26,23 @@ class Notes::PersonChannelTest < ActionCable::Channel::TestCase
     assert_empty subscription.streams
   end
 
+  # The socket connected while its session lived; its row stands after
+  # either timeout until a request or the sweep ends it, and is no session.
+  test "a socket whose session has passed either timeout is rejected, though its row stands" do
+    stub_connection current_user: users(:reader), session_id: @session.id
+
+    travel Session::IDLE_TIMEOUT + 1.minute do
+      subscribe
+      assert subscription.rejected?
+      assert_empty subscription.streams
+    end
+
+    @session.update_columns(last_seen_at: Time.current, expires_at: 1.minute.ago)
+    subscribe
+    assert subscription.rejected?
+    assert Session.exists?(@session.id)
+  end
+
   test "a user deleted since the socket connected is rejected" do
     connected = User.find(users(:reader).id)
     stub_connection current_user: connected, session_id: @session.id

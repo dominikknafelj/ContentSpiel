@@ -10,10 +10,13 @@ module ApplicationCable
     # every subscription is judged on this, never on `current_user` -- an
     # owner demoted since, or a user deleted since, is judged as what they
     # are. (The grants need no such care: they are read from the database
-    # per unit of work, `AccessControl::ActorGrants`.) One query; a channel
-    # rejects on nil.
+    # per unit of work, `AccessControl::ActorGrants`.) The session must be
+    # live too (`Session.live`, the rule `Session.from_cookies` ends by): a
+    # socket open since before its session passed either timeout subscribes
+    # to nothing, though its row stands until a request or the sweep ends it.
+    # One query; a channel rejects on nil.
     def subscriber
-      @subscriber ||= User.where(id: Session.where(id: connection.session_id, user_id: current_user.id).select(:user_id)).first
+      @subscriber ||= User.where(id: Session.live(Time.current).where(id: connection.session_id, user_id: current_user.id).select(:user_id)).first
     end
   end
 end
