@@ -8,6 +8,8 @@ class PasswordResetRequestJobTest < ActiveJob::TestCase
 
   setup do
     @user = users(:one)
+    # Integration and job tests clear no deliveries of their own.
+    ActionMailer::Base.deliveries.clear
     put_mail_state(:working)
   end
 
@@ -28,6 +30,17 @@ class PasswordResetRequestJobTest < ActiveJob::TestCase
     assert_includes log, "PasswordResetRequestJob", "the job's own lines are in the capture"
     assert_not_includes log, @user.email_address
     assert_not_includes log, "nobody@example.org"
+  end
+
+  test "with mail not ready when it runs the job sends nothing and logs nothing of the address" do
+    %i[ not_set_up untested ].each do |state|
+      with_mail_state(state) do
+        log = capture_log do
+          assert_no_enqueued_emails { PasswordResetRequestJob.perform_now(@user.email_address) }
+        end
+        assert_not_includes log, @user.email_address
+      end
+    end
   end
 
   test "the origin reaches the mail as before" do

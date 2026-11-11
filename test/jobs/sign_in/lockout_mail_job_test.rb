@@ -10,6 +10,8 @@ class SignIn::LockoutMailJobTest < ActiveJob::TestCase
 
   setup do
     freeze_time
+    # Integration and job tests clear no deliveries of their own.
+    ActionMailer::Base.deliveries.clear
     @user = users(:one)
   end
 
