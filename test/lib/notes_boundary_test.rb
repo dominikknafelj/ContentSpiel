@@ -21,6 +21,11 @@ require "test_helper"
 # through the header's `editor.header.actions` and the rail's
 # `editor.rail.tabs`, and what the views hand every slot is generic (`reads:`,
 # a Hash the screen's slot components share, and the request's `query:`).
+#
+# The answers are hosts too: a block delete's answer (`BlockSaved#removed`)
+# draws what is registered at the stream slot `editor.block.removed`
+# (`Admin::Answers::SlotStreams`), so the page's notes counts reach it without
+# the answer naming them.
 class NotesBoundaryTest < ActiveSupport::TestCase
   CONTENT_SOURCES = %w[
     app/models/page.rb app/models/page/**/*.rb app/models/post.rb app/models/post/**/*.rb app/models/content_block.rb
@@ -110,6 +115,8 @@ class NotesBoundaryTest < ActiveSupport::TestCase
     app/components/admin/ui/rail_panel_component.rb
     app/components/admin/ui/rail_slot_component.rb
     app/controllers/admin/answers/rail_tab_streams.rb
+    app/controllers/admin/answers/block_saved.rb
+    app/controllers/admin/answers/slot_streams.rb
     app/views/admin/media/index.html.erb
     app/views/admin/pages/show.html.erb
     app/views/admin/posts/show.html.erb
@@ -145,7 +152,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   }.freeze
 
   test "the editors' header, the media panel, the rail and the two editor views do not name notes: they draw their slots" do
-    assert_equal 21, SLOT_HOSTS.size
+    assert_equal 23, SLOT_HOSTS.size
     offences = SLOT_HOSTS.flat_map do |path|
       Rails.root.join(path).read.lines.each_with_index.filter_map { |line, index| "#{path}:#{index + 1}: #{line.strip}" if line.match?(NOTES_WORD) }
     end

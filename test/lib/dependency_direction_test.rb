@@ -1,5 +1,5 @@
 require "test_helper"
-require "ripper"
+require_relative "../support/source_code"
 
 # The direction of dependency (CLAUDE.md, "Dependency order"): models, queries,
 # services, value objects and route constraints know nothing of components, controllers or the application's
@@ -66,7 +66,7 @@ class DependencyDirectionTest < ActiveSupport::TestCase
 
   # A path and its offences, as "relative/path:line: pattern: matched text".
   def self.offences(path, source)
-    code = without_comments(source)
+    code = SourceCode.without_ruby_comments(source)
     relative = path.to_s.delete_prefix("#{Rails.root}/")
     PATTERNS.flat_map do |name, pattern|
       code.to_enum(:scan, pattern).map { Regexp.last_match }.filter_map do |match|
@@ -75,16 +75,6 @@ class DependencyDirectionTest < ActiveSupport::TestCase
         { path: relative, line: code[0...match.begin(0)].count("\n") + 1, pattern: name, text: match[0] }
       end
     end
-  end
-
-  # The source with every comment (a `#` line or tail, an `=begin` block)
-  # blanked and the line breaks kept, so a line number still names the line.
-  # Ripper does the lexing, so a `#` inside a string or an interpolation is
-  # not mistaken for a comment.
-  def self.without_comments(source)
-    Ripper.lex(source).map do |(_position, type, token, _state)|
-      type.to_s.match?(/\Aon_(comment|embdoc)/) ? token.gsub(/[^\n]/, "") : token
-    end.join
   end
 
   def self.allowed?(offence, entry)

@@ -14,7 +14,7 @@ module Dashboard
   # names, what the thread is on, and where it opens as a ROUTE NAME with its
   # arguments -- the record's editor with its notes open at the thread, or for
   # an image the Media screen with that image chosen and the thread in its
-  # panel (`Admin::NotesScreen::InboxRowComponent` words and resolves it).
+  # panel (`Admin::Ui::NoteInboxRowComponent` words and resolves it).
   # A thread that has gone by the time the link is followed is ordinary: its
   # view answers the list with "This note is gone".
   #

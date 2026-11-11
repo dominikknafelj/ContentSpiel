@@ -87,6 +87,17 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/shell/top_bar_component.rb
     app/components/admin/shell/top_bar_component.html.erb
     app/components/admin/ui/tree_hide_component.rb
+    app/components/admin/ui/audit_sentence_component.rb
+    app/components/admin/ui/reference_card_component.rb
+    app/components/admin/ui/reference_card_component.html.erb
+    app/components/admin/ui/suggestion_component.rb
+    app/components/admin/ui/suggestion_component.html.erb
+    app/components/admin/ui/translation_pending_component.rb
+    app/components/admin/ui/translation_pending_component.html.erb
+    app/components/admin/ui/translate_all_component.rb
+    app/components/admin/ui/translate_all_component.html.erb
+    app/components/admin/ui/translate_button_component.rb
+    app/components/admin/ui/translate_button_component.html.erb
     app/helpers/admin/shell_helper.rb
     app/components/admin/ui/icon_chip_component.rb
     app/components/admin/forms_screen/list_component.rb
@@ -164,16 +175,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/settings_screen/images_dialog_component.html.erb
     app/components/admin/settings_screen/mail_card_component.rb
     app/components/admin/settings_screen/mail_card_component.html.erb
-    app/components/admin/settings_screen/mail_fields_component.rb
-    app/components/admin/settings_screen/mail_fields_component.html.erb
-    app/components/admin/settings_screen/host_value_component.rb
+    app/components/admin/ui/mail_fields_component.rb
+    app/components/admin/ui/mail_fields_component.html.erb
+    app/components/admin/ui/mail_host_value_component.rb
     app/components/admin/settings_screen/mail_login_component.rb
     app/components/admin/settings_screen/mail_login_component.html.erb
     app/components/admin/settings_screen/mail_state_component.rb
     app/components/admin/settings_screen/ai_state.rb
     app/components/admin/settings_screen/ai_test_result_component.rb
-    app/components/admin/settings_screen/mail_alert_component.rb
-    app/components/admin/settings_screen/mail_test_outcome_component.rb
+    app/components/admin/ui/mail_alert_component.rb
+    app/components/admin/ui/mail_test_outcome_component.rb
     app/components/admin/settings_screen/mail_test_result_component.rb
     app/controllers/admin/mail_logins_controller.rb
     app/javascript/controllers/admin/settings/mail_controller.js
@@ -242,18 +253,19 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/helpers/admin/posts_list_helper.rb
     app/components/admin/posts_screen/toolbar_component.rb
     app/components/admin/posts_screen/toolbar_component.html.erb
-    app/components/admin/editor_screen/new_post_dialog_component.rb
+    app/components/admin/ui/new_record_dialog_component.rb
+    app/components/admin/ui/rich_text_dialogs_component.rb
+    app/components/admin/ui/rich_text_dialogs_component.html.erb
+    app/javascript/controllers/admin/rich_text/dialog_controller.js
     app/components/admin/editor_screen/changed_elsewhere_component.rb
     app/components/admin/editor_screen/changed_elsewhere_component.html.erb
-    app/components/admin/editor_screen/new_post_dialog_component.html.erb
+    app/components/admin/ui/new_record_dialog_component.html.erb
     app/components/admin/editor_screen/new_post_form_component.rb
     app/components/admin/editor_screen/new_post_form_component.html.erb
-    app/components/admin/editor_screen/new_page_dialog_component.rb
-    app/components/admin/editor_screen/new_page_dialog_component.html.erb
     app/components/admin/editor_screen/new_page_form_component.rb
     app/components/admin/editor_screen/new_page_form_component.html.erb
-    app/components/admin/editor_screen/new_record_messages.rb
     app/javascript/controllers/admin/editor/new_record_controller.js
+    app/javascript/controllers/admin/translation/translate_controller.js
     app/components/admin/dashboard_screen/panel_component.rb
     app/components/admin/dashboard_screen/panel_component.html.erb
     app/components/admin/dashboard_screen/translation_panel_component.rb
@@ -487,9 +499,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/notes/merge.js
     app/javascript/controllers/admin/notes/alert_controller.js
     app/javascript/controllers/admin/notes/permission_controller.js
-    app/components/admin/notes_screen/inbox_row_component.rb
-    app/components/admin/notes_screen/inbox_row_component.html.erb
-    app/components/admin/notes_screen/person_name_component.rb
+    app/components/admin/ui/note_inbox_row_component.rb
+    app/components/admin/ui/note_inbox_row_component.html.erb
     app/components/admin/notes_screen/quote_component.rb
     app/views/admin/note_inbox/index.html.erb
     app/views/admin/note_inbox/_card.html.erb

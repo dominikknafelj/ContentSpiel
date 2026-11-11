@@ -37,7 +37,7 @@ class ScriptMessagesTest < ActiveSupport::TestCase
       source.scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten.map { |call| [ call, path ] }
     end
     literals = calls.flat_map { |call, _path| call.scan(/"([^"]+)"/).flatten }
-    # A list handed over whole, `messages_data(*Admin::EditorScreen::NewRecordMessages::KEYS)`,
+    # A list handed over whole, `messages_data(*Admin::Ui::NewRecordDialogComponent::MESSAGES)`,
     # or a constant of the file's own class, `messages_data(*SCRIPT_MESSAGES)`.
     splats = calls.flat_map do |call, path|
       call.scan(/\*((?:[A-Z]\w*::)*[A-Z][A-Z0-9_]+)\b/).flatten.flat_map do |name|

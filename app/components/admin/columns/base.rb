@@ -59,13 +59,12 @@ module Admin
       def errors_id = "#{id}-errors"
 
       # The card showing the primary-language original beside (or, in a
-      # narrow column, above) the field (`Admin::EditorScreen
-      # ::ReferenceCardComponent`). An `:outdated` card carries the "Original
+      # narrow column, above) the field (`Admin::Ui::ReferenceCardComponent`). An `:outdated` card carries the "Original
       # changed" note (translation helpers spec §4) and its "Mark as up to
       # date" button; `:unknown` (a translation older than tracking) and
       # `:current` show nothing extra.
       def reference_card
-        Admin::EditorScreen::ReferenceCardComponent.new(
+        Admin::Ui::ReferenceCardComponent.new(
           field: name, locale: locale, original: card_original, kind: card_kind,
           state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
@@ -85,7 +84,7 @@ module Admin
       def translate_button
         return unless translation_confirm && translation_field_empty?
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
+        Admin::Ui::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
       end
 
       # **Suggest update** in an outdated card (same wrapper as Translate,
@@ -94,7 +93,7 @@ module Admin
       def suggest_update_button
         return unless translation_state == :outdated && translation_confirm
 
-        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
+        Admin::Ui::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
       end
 
       # What the field holds as it was rendered; the rich-text column reads its

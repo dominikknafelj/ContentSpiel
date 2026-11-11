@@ -147,7 +147,7 @@ module Admin
       def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(asset)
 
       # See `Admin::EditorScreen::PageSettingsFormComponent#translation`.
-      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::Ui::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
 
       # The tabs keep `selected` and the grid's state; only the language changes.
       def language_url

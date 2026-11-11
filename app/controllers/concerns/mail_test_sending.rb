@@ -4,7 +4,7 @@
 # this request with the SAVED settings (`ApplicationMailer.deliver_now_and_record`,
 # bounded by `MailSettings`' timeouts), its outcome recorded as any send's is.
 #
-# Answers a Hash the caller hands to `Admin::SettingsScreen::MailTestOutcomeComponent`
+# Answers a Hash the caller hands to `Admin::Ui::MailTestOutcomeComponent`
 # (and, for the status, reads `:status`):
 #   { sent: true, status: :ok }
 #   { alert: <sentence>, line: <the server's line>, status: :unprocessable_entity }

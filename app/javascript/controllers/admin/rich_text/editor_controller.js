@@ -41,7 +41,7 @@ import { createTargetSearch } from "rich_text/target_search"
 //
 // Dialogs (design pass round 2, Task 13): the image, YouTube and "Page link"
 // forms are three shared `<dialog>`s rendered once by the layout
-// (`Admin::EditorScreen::RichTextDialogsComponent`, `admin--rich-text--dialog`).
+// (`Admin::Ui::RichTextDialogsComponent`, `admin--rich-text--dialog`).
 // `openDialog` asks for one on `window`, naming this element as the opener;
 // the answer is a `rich-text-dialog:closed` event on this element alone (so
 // two editors on a page never cross wires), applied by `#dialogClosed`

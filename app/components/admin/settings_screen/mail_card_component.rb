@@ -3,7 +3,7 @@ module Admin
     # The Mail card (docs/reference/mail.md), after AI translation, for
     # `settings.manage`.
     #
-    # - The fields are `MailFieldsComponent`, the Mail form the wizard's Mail
+    # - The fields are `Admin::Ui::MailFieldsComponent`, the Mail form the wizard's Mail
     #   step draws too: Server (server, port, security, the login) and Sender
     #   (name, address), fields of the one Settings form saved with its save
     #   bar. The root carries `mail-port`, which puts a security's port into
@@ -31,7 +31,7 @@ module Admin
       def all_from_host? = mail_settings.all_from_host?
 
       def fields
-        Admin::SettingsScreen::MailFieldsComponent.new(mail_settings: mail_settings, value: values.method(:mail), changed: values.method(:saved_change),
+        Admin::Ui::MailFieldsComponent.new(mail_settings: mail_settings, value: values.method(:mail), changed: values.method(:saved_change),
           name_prefix: "site_setting", id_prefix: "settings-", errors: errors)
       end
 

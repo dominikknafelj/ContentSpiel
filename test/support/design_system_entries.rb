@@ -9,7 +9,7 @@
 module DesignSystemEntries
   # The artifact and the version of it this copy was read from.
   ARTIFACT = "https://claude.ai/artifact/Pg9o6tAeyWk98YFsrMmXxT".freeze
-  VERSION = "1794405244-3f22".freeze
+  VERSION = "1794417878-dfbf".freeze
 
   # The folder names of the artifact's `project/components/`, one per card.
   ENTRIES = %w[
@@ -44,7 +44,11 @@ module DesignSystemEntries
     "Admin::Ui::LanguageTabsComponent" => "Tabs",
     "Admin::Ui::LibraryImageComponent" => "StudioMediaGrid",
     "Admin::Ui::ListStateComponent" => "RecordState",
+    "Admin::Ui::MailAlertComponent" => "StudioSettings",
     "Admin::Ui::MailFailedNoticeComponent" => "Notice",
+    "Admin::Ui::MailFieldsComponent" => "StudioSettings",
+    "Admin::Ui::MailHostValueComponent" => "StudioSettings",
+    "Admin::Ui::MailTestOutcomeComponent" => "StudioSettings",
     "Admin::Ui::PaginationComponent" => "StudioListTable",
     "Admin::Ui::RailPanelComponent" => "StudioRail",
     "Admin::Ui::RailSlotComponent" => "StudioRail",
@@ -63,8 +67,17 @@ module DesignSystemEntries
     "Admin::Ui::TreeFindComponent" => "StudioTree",
     "Admin::Ui::TreeHideComponent" => "StudioTree",
     "Admin::Ui::TreeItemComponent" => "StudioTree",
+    "Admin::Ui::TranslationPendingComponent" => "StudioTranslationPair",
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
+    "Admin::Ui::AuditSentenceComponent" => "StudioAuditLog",
+    "Admin::Ui::NoteInboxRowComponent" => "StudioNotesInbox",
+    "Admin::Ui::NewRecordDialogComponent" => "StudioNewRecordDialog",
+    "Admin::Ui::ReferenceCardComponent" => "StudioTranslationPair",
+    "Admin::Ui::RichTextDialogsComponent" => "RichTextEditor",
+    "Admin::Ui::SuggestionComponent" => "StudioTranslationPair",
+    "Admin::Ui::TranslateAllComponent" => "StudioTranslationPair",
+    "Admin::Ui::TranslateButtonComponent" => "StudioTranslationPair",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"
   }.freeze
 

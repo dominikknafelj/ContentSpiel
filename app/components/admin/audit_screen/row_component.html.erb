@@ -4,7 +4,7 @@
       describes it, so a list of links is not a list of bare times. %>
   <%= link_to time_text, event_path, aria: { label: t(".details", time: time_text), describedby: "#{dom_id}-sentence" }, class: "admin-row-link w-28 shrink-0 text-label text-meta tabular-nums hover:underline" %>
   <%= render Admin::Ui::ActorAvatarComponent.new(actor: sentence.actor, size: :sm) %>
-  <p id="<%= dom_id %>-sentence" class="min-w-0 flex-1 basis-60 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
+  <p id="<%= dom_id %>-sentence" class="min-w-0 flex-1 basis-60 text-sm text-ink"><%= render Admin::Ui::AuditSentenceComponent.new(sentence: sentence) %></p>
   <%= render Admin::Ui::ChannelChipComponent.new(channel: event.channel) %>
   <% if sentence.security %>
     <%= render Admin::Ui::StateChipComponent.new(tone: :warn, label: t(".security")) %>

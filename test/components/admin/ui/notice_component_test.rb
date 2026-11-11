@@ -69,7 +69,7 @@ class Admin::Ui::NoticeComponentTest < ViewComponent::TestCase
   # it is heard once; the stale banner is a notice of its own role, and its
   # Reload stays the leave guard's way out into the content frame.
   test "a notice inside a live region adds no role of its own, and the stale banner keeps its Reload way out" do
-    render_inline(Admin::SettingsScreen::MailTestOutcomeComponent.new(address: "ada@example.com", sent: true))
+    render_inline(Admin::Ui::MailTestOutcomeComponent.new(address: "ada@example.com", sent: true))
     assert_selector "div[role=status] > div.rounded-card.bg-ok-tint.text-ok-ink:not([role])", text: "Test mail sent to ada@example.com. Check your inbox.", count: 1
 
     render_in_view_context do

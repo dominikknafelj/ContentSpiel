@@ -99,6 +99,32 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_equal :current, post.translation_state("title", "de")
   end
 
+  test "Translate is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "#{slot("title")} button"
+    assert_equal "Translate", focused_text
+    page.send_keys(:enter)
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
+  end
+
+  test "a suggestion's Use is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    press_within slot("title"), "Translate"
+    find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]").click
+    stop_on "#translation-suggestion-post-title [data-translate-use]"
+    assert_equal "Use", focused_text
+    page.send_keys(:enter)
+    assert_equal "[de] Hello", find_field(id: "post-title").value
+    assert_eventually { post.reload.title(locale: "de", fallback: false) == "[de] Hello" }
+  end
+
   test "an edited suggestion is what Use applies, and editing it saves nothing by itself" do
     post = create_post(title: "Hello")
 
@@ -180,6 +206,19 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "[de] Typed after Use all" }
       assert_no_text "CHANGED ELSEWHERE"
     end
+  end
+
+  test "Suggest translations is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "[data-admin--translation--translate-target='idle'] button", keys: %i[shift tab], limit: 80
+    assert_equal "Suggest translations for 1 empty field", focused_text
+    page.send_keys(:enter)
+    assert_text "1 suggestion ready"
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
   end
 
   test "Use all across two blocks leaves the page settings form able to save" do
@@ -307,6 +346,25 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     await_late_answer
     assert_no_selector "[data-translation-suggestion]"
     assert_nil post.reload.title(locale: "de", fallback: false)
+  end
+
+  test "a pending box's Cancel is one Tab stop that Enter presses" do
+    post = post_with_excerpt
+    GatedProvider.hold!
+
+    visit_editor(post, locale: "de")
+    track_suggestion_requests
+    press_within slot("title"), "Translate"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+    await_provider_request
+
+    find_field(id: "post-title").click
+    stop_on "#translation-suggestion-post-title [data-pending-running] button"
+    assert_equal "Cancel", focused_text
+    page.send_keys(:enter)
+
+    assert_no_selector "[data-translation-pending]"
+    await_late_answer
   end
 
   test "Cancel on one pending box stops that request only" do
@@ -453,6 +511,21 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-original-for='title'] ins", wait: 5
     assert_equal :current, post.reload.translation_state("title", "de")
     assert_equal "Hallo", post.title(locale: "de", fallback: false)
+  end
+
+  test "Still correct is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: "Hello there" } }).ok?
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "[data-original-for='title'] button[form='translation-confirm-form']", keys: %i[shift tab], limit: 80
+    assert_equal "Still correct — mark up to date", focused_text
+    page.send_keys(:enter)
+    assert_no_button "Still correct — mark up to date", wait: 5
+    assert_equal :current, post.reload.translation_state("title", "de")
   end
 
   test "the matrix lists a post missing in German and links into its German editor" do

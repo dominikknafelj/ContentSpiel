@@ -703,6 +703,25 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
   end
 
+  test "the YouTube dialog by the keyboard: its field takes the focus, Tab reaches Insert video and Enter inserts" do
+    visit_editor(@post)
+    await_editors
+
+    editor.click
+    press_insert "YouTube"
+    assert_selector "dialog#rich-text-youtube-dialog[open]"
+    assert_eventually { page.evaluate_script("document.activeElement.id") == "rich-text-youtube-url" }
+    page.send_keys(YOUTUBE_ID)
+    assert_selector "#rich-text-youtube-status", text: "Video id: #{YOUTUBE_ID}"
+
+    stop_on "dialog#rich-text-youtube-dialog button[form='rich-text-youtube-form']"
+    assert_equal "Insert video", focused_text
+    page.send_keys(:enter)
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+    saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
+  end
+
   # Review B, M3: a refused Insert marks the field invalid; the next opening
   # starts clean -- no message, and no invalid border without one.
   test "the YouTube dialog reopens without the invalid mark a refused Insert left" do

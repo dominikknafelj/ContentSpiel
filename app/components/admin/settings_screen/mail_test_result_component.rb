@@ -43,7 +43,7 @@ module Admin
               ])
             end,
             tag.p(t(".pending"), class: "mt-1 text-sm text-meta", hidden: true, data: { "admin--saving--pending-lock-target": "hint" }),
-            render(MailTestOutcomeComponent.new(address: @address, sent: @sent, alert: @alert, line: @line))
+            render(Admin::Ui::MailTestOutcomeComponent.new(address: @address, sent: @sent, alert: @alert, line: @line))
           ])
         end
       end

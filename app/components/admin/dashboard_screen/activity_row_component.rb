@@ -12,7 +12,7 @@ module Admin
     # is the one recorded on the event (the sentence's actor), escaped like any
     # text; no part of the token's value is ever rendered, and the row does
     # not even carry the token. The wording is the audit log's own
-    # (`Admin::AuditScreen::SentenceComponent` over `Audit::Sentence`).
+    # (`Admin::Ui::AuditSentenceComponent` over `Audit::Sentence`).
     # Everything comes from a `Dashboard::Activity::Row` (record, user and time
     # already loaded), so a row never queries.
     class ActivityRowComponent < Admin::AdminComponent

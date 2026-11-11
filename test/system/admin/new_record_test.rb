@@ -57,6 +57,26 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal @services.id.to_s, find("#new-page-inside").value
   end
 
+  test "the New page dialog by the keyboard: Enter on + New page opens it on Title, Tab reaches Create and Enter creates" do
+    visit_editor(@about)
+
+    stop_on "a[data-admin--ui--dialog-id-param='new-page-dialog']", limit: 80
+    assert_equal "+ New page", focused_text
+    page.send_keys(:enter)
+    assert_selector "dialog#new-page-dialog[open] form#new-page-form"
+    assert_eventually { page.evaluate_script("document.activeElement.id") == "new-page-title" }
+
+    page.send_keys("By keyboard")
+    stop_on "dialog#new-page-dialog button[form='new-page-form']"
+    assert_equal "Create page", focused_text
+    page.send_keys(:enter)
+
+    assert_selector "header.admin-editor-header", wait: 10
+    created = Page.order(:id).last
+    assert_equal "By keyboard", created.title
+    assert_current_path admin_page_path(created)
+  end
+
   test "a blank title stays inside the open dialog with the summary focused and the typed choices kept" do
     visit admin_page_path(@about)
     await_admin_controllers

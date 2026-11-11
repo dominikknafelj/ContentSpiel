@@ -47,7 +47,7 @@ module Admin
       def failure_alert
         return unless state == :failed
 
-        render(MailAlertComponent.new(sentence: failure.sentence(server: mail_settings.value(:server), port: mail_settings.value(:port)), line: failure.line, class: "mt-2"))
+        render(Admin::Ui::MailAlertComponent.new(sentence: failure.sentence(server: mail_settings.value(:server), port: mail_settings.value(:port)), line: failure.line, class: "mt-2"))
       end
     end
   end

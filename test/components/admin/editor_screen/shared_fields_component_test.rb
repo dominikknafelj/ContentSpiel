@@ -90,7 +90,7 @@ class Admin::EditorScreen::SharedFieldsComponentTest < ViewComponent::TestCase
   # with one keeps it, also through the held form's rewrite.
   test "code that begins with a line break keeps it in the pre's markup, also in a held form" do
     [ "\n  a\n\nb", "  a\n\nb", "\n\n" ].each do |text|
-      render_inline(Admin::EditorScreen::SharedFieldsComponent.new(fields: [ [ "Code", Admin::EditorScreen::SharedFieldsComponent::Code.new(text) ] ]))
+      render_inline(Admin::EditorScreen::SharedFieldsComponent.new(fields: [ [ "Code", Admin::Fields::CodeDisplay.new(text) ] ]))
 
       assert_equal text, Nokogiri::HTML5.fragment(rendered_content).at_css("dd pre").text, text.inspect
       assert_equal text, Nokogiri::HTML5.fragment(Admin::EditorScreen::HeldFields.call(rendered_content)).at_css("dd pre").text, "held: #{text.inspect}"

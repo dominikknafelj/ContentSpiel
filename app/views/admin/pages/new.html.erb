@@ -1,24 +1,24 @@
 <%# The no-JS fallback of the New page dialog: the dialog's own form, as a
-    page, in the dialog's own words (`new_page_dialog`). `:standalone_new_record`
+    page, in the dialog's own words (`new_record_dialog`). `:standalone_new_record`
     keeps the layout from rendering the dialog as well (the same form ids
     twice). A refused create answers with this page again (422), errors in
     the form's summary and the typed values kept. `data-turbo-frame="_top"`
     on the form makes the redirect to the new page's editor a full visit, so
     the tree shows it. %>
 <% content_for :standalone_new_record, "page" %>
-<% words = "admin.components.editor_screen.new_page_dialog" %>
+<% words = "admin.components.ui.new_record_dialog" %>
 <%= render "admin/pages/tree", selected: @page %>
 
 <%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>
 <% form = @form || Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
       parent_id: @page.parent_id, title: new_page_params[:title], template: new_page_params[:template], errors: @page.errors) %>
 <div class="max-w-md">
-  <h1 class="mb-4 text-base font-semibold"><%= t("#{words}.title") %></h1>
+  <h1 class="mb-4 text-base font-semibold"><%= t("#{words}.page.title") %></h1>
 
   <%= render form %>
 
   <div class="mt-4 flex gap-2">
-    <%= render Admin::Ui::ButtonComponent.new(label: t("#{words}.create"), variant: :primary, type: "submit", form: form.form_id) %>
+    <%= render Admin::Ui::ButtonComponent.new(label: t("#{words}.page.create"), variant: :primary, type: "submit", form: form.form_id) %>
     <%= link_to t("#{words}.cancel"), admin_pages_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_tertiary_link_class %>
   </div>
 </div>

@@ -1,6 +1,6 @@
 <div class="mb-4 flex flex-col gap-2">
   <span class="text-label text-meta"><%= link_to t(".breadcrumb"), back_path, class: "text-meta hover:underline" %> /</span>
-  <h1 class="text-h1 text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></h1>
+  <h1 class="text-h1 text-ink"><%= render Admin::Ui::AuditSentenceComponent.new(sentence: sentence) %></h1>
 </div>
 
 <%# Each cell draws its line on its right and at its foot, and the grid stands

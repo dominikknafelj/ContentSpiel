@@ -36,7 +36,7 @@
         <% else %>
           <ul class="px-4">
             <% @rows.each do |row| %>
-              <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= render Admin::NotesScreen::InboxRowComponent.new(row: row) %></li>
+              <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= render Admin::Ui::NoteInboxRowComponent.new(row: row) %></li>
             <% end %>
           </ul>
           <%= render Admin::Ui::PaginationComponent.new(pagination: @pagination, url: ->(page) { admin_notes_path(**admin_url_options, **scope_params, page: page) }) %>

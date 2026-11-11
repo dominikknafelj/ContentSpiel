@@ -99,7 +99,7 @@ module Admin
       # The New page dialog loading its form (`admin--editor--new-record` sets the
       # frame's `src` to this URL): just the frame, no layout. A normal request
       # renders the standalone page.
-      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::Ui::NewRecordDialogComponent::KINDS.fetch(:page).frame_id
     end
 
     # From the New page dialog (title, Inside, Template) or the standalone

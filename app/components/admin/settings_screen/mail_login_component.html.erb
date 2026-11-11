@@ -4,7 +4,7 @@
   <% FIELDS.each_key do |field| %>
     <% next unless mail_settings.from_host?(field) %>
     <div class="mt-1">
-      <%= render Admin::SettingsScreen::HostValueComponent.new(field: field, label: t(".#{field}"), mail_settings: mail_settings) %>
+      <%= render Admin::Ui::MailHostValueComponent.new(field: field, label: t(".#{field}"), mail_settings: mail_settings) %>
     </div>
   <% end %>
 

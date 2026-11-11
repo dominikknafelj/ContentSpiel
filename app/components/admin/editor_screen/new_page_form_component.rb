@@ -19,7 +19,7 @@ module Admin
     # `parent_id` is 404 (unreadable) or a `denied` from `Pages::Save`.
     #
     # The form is loaded when the dialog OPENS, into the shell's turbo-frame
-    # (`NewPageDialogComponent`, `GET /pages/new` in a frame request), never with
+    # (`Admin::Ui::NewRecordDialogComponent`, `GET /pages/new` in a frame request), never with
     # the layout: it costs a page load and a permission check per page, and a
     # rendered copy would go stale after every rename. A site with no page at all
     # has nothing to put Inside: the form then omits the field and the page
@@ -31,11 +31,12 @@ module Admin
     # the typed title exactly like `admin--editor--slug-preview`. The server renders a
     # first guess (`parameterize`) so the line is right before any script runs.
     class NewPageFormComponent < Admin::AdminComponent
-      FORM_ID = "new-page-form".freeze
+      # The dialog's Create button names this form, so the dialog writes its id.
+      FORM_ID = Admin::Ui::NewRecordDialogComponent::KINDS.fetch(:page).form_id
       TITLE_ID = "new-page-title".freeze
       INSIDE_ID = "new-page-inside".freeze
       TEMPLATE_ID = "new-page-template".freeze
-      # The URL line's and the note's words, shared with the script (`NewRecordMessages`).
+      # The URL line's and the note's words, shared with the script (`Admin::Ui::NewRecordDialogComponent::MESSAGES`).
       NEW_RECORD = "admin.components.editor_screen.new_record".freeze
 
       # The refusal a create answers when the chosen parent went meanwhile

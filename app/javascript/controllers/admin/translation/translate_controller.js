@@ -1,11 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
 
 // AI translation suggestions in the editor (translation helpers spec
 // §6.4, design pass round 2 handoff §10). One controller, three places:
 //
 // - on a field's Translate / Suggest update wrapper (`Admin::
-//   TranslationScreen::TranslateButtonComponent`): `#translate` asks for that
+//   Ui::TranslateButtonComponent`): `#translate` asks for that
 //   one field (`data-translate-mode="update"` sends `mode=update`, and the box
 //   it gets back also shows the current translation);
 // - on the suggestion box under every such field (`admin/shared/
@@ -57,17 +58,6 @@ export default class extends Controller {
     maxCharacters: Number
   }
 
-  static texts = {
-    failed: "Couldn't get a suggestion — reload the page and try again",
-    gone: "This field is no longer on the page — reload and try again",
-    notApplied: "This text can't be replaced here",
-    noAnswer: "No suggestion came back for this field — try again",
-    nothingEmpty: "No empty fields to translate",
-    label: (count) => `Suggest translations for ${count} empty ${count === 1 ? "field" : "fields"}`,
-    progress: (index, total) => `Suggesting ${index} of ${total} ${total === 1 ? "field" : "fields"}`,
-    ready: (count) => `${count} ${count === 1 ? "suggestion" : "suggestions"} ready`
-  }
-
   // A request must not outlive the page it was asked on: after a language
   // tab or any Turbo navigation the same input ids exist again, in another
   // language, and a late answer would land under the wrong field. So jobs
@@ -102,7 +92,7 @@ export default class extends Controller {
     const fields = emptyFields()
     if (fields.length === 0) {
       this.refresh()
-      this.showStatus(this.constructor.texts.nothingEmpty)
+      this.showStatus(messages(this.element).t("components.ui.translate_all.nothing_empty"))
       return
     }
 
@@ -179,12 +169,12 @@ export default class extends Controller {
         focused.forEach(({ box }) => box.querySelector("[data-translate-use]")?.focus())
         // A box nothing answered (the stream named no such field) must not
         // wait forever.
-        fields.forEach((field) => { if (isPendingOf(field.box, job)) showError(field.box, this.constructor.texts.noAnswer) })
+        fields.forEach((field) => { if (isPendingOf(field.box, job)) showError(field.box, messages(this.element).t("components.ui.translate_all.no_answer")) })
       } else {
-        fields.forEach((field) => showError(field.box, this.constructor.texts.failed))
+        fields.forEach((field) => showError(field.box, messages(this.element).t("components.ui.translate_all.failed")))
       }
     } catch (error) {
-      if (error.name !== "AbortError" && !job.over && !job.timedOut) fields.forEach((field) => showError(field.box, this.constructor.texts.failed))
+      if (error.name !== "AbortError" && !job.over && !job.timedOut) fields.forEach((field) => showError(field.box, messages(this.element).t("components.ui.translate_all.failed")))
     } finally {
       fields.forEach((field) => setBusy(field.button, false))
       if (!job.timedOut || job.over) endJob(job)
@@ -225,7 +215,7 @@ export default class extends Controller {
     const box = button.closest("[data-translation-box]")
     const input = document.getElementById(button.dataset.translateInputId)
     if (!input) {
-      showError(box, this.constructor.texts.gone)
+      showError(box, messages(this.element).t("components.ui.translate_all.gone"))
       return
     }
     const hadFocus = box?.contains(document.activeElement)
@@ -242,7 +232,7 @@ export default class extends Controller {
       // something it can't show).
       input.dispatchEvent(new CustomEvent("translate:use", { bubbles: true, detail }))
       if (!detail.applied) {
-        showError(box, this.constructor.texts.notApplied)
+        showError(box, messages(this.element).t("components.ui.translate_all.not_applied"))
         return
       }
     } else {
@@ -250,7 +240,7 @@ export default class extends Controller {
       // has typed into it now is what gets applied, not what the server sent.
       const text = button.closest("[data-translation-suggestion]")?.querySelector("[data-translate-suggestion-text]")
       if (!text) {
-        showError(box, this.constructor.texts.notApplied)
+        showError(box, messages(this.element).t("components.ui.translate_all.not_applied"))
         return
       }
       input.value = text.value
@@ -266,7 +256,7 @@ export default class extends Controller {
   // Editing a suggestion is not editing the form: its textarea sits inside
   // the autosave `<form>`, whose `input`/`change`/`focusout` listeners would
   // otherwise save on every keystroke of text that isn't a field's value
-  // yet. The box stops them here (`SuggestionComponent` wires this).
+  // yet. The box stops them here (`Admin::Ui::SuggestionComponent` wires this).
   contain(event) {
     event.stopPropagation()
   }
@@ -317,7 +307,7 @@ export default class extends Controller {
     const suggestions = Array.from(document.querySelectorAll("[data-translate-use]")).filter(onScreen).length
     if (suggestions > 0) {
       this.show("ready")
-      const text = this.constructor.texts.ready(suggestions)
+      const text = messages(this.element).t("components.ui.translate_all.ready", { count: suggestions })
       this.readyTarget.querySelector("[data-translate-ready-text]").textContent = text
       this.showStatus(text)
       return
@@ -326,14 +316,14 @@ export default class extends Controller {
     this.showStatus("")
 
     const empty = emptyFields().length
-    this.idleTarget.querySelector("[data-translate-label]").textContent = this.constructor.texts.label(empty)
+    this.idleTarget.querySelector("[data-translate-label]").textContent = messages(this.element).t("components.ui.translate_all.label", { count: empty })
     this.show(empty > 0 ? "idle" : null)
   }
 
   showRunning(answered, total) {
     this.show("running")
     // Counted per field: the one being waited on (never past the total).
-    const text = this.constructor.texts.progress(Math.min(answered + 1, total), total)
+    const text = messages(this.element).t("components.ui.translate_all.progress", { count: total, index: Math.min(answered + 1, total) })
     this.runningTarget.querySelector("[data-translate-progress-text]").textContent = text
     // Also in the persistent live region: the running line itself is shown and
     // hidden with the state, and a region that appears is not announced.
@@ -372,7 +362,7 @@ let jobCounter = 0
 let muteChanges = false
 
 // The seconds a request may take before the pending box gives up, as the
-// layout's template declares it (`PendingComponent::TIMEOUT_SECONDS`).
+// layout's template declares it (`Admin::Ui::TranslationPendingComponent::TIMEOUT_SECONDS`).
 function timeoutSeconds(template) {
   return Number(template.content.firstElementChild?.dataset.pendingTimeoutSeconds) || 25
 }
@@ -402,7 +392,7 @@ function startJob(fields, { url, locale, signal, focus }) {
       fields.forEach(({ box }) => {
         const node = pending.get(box)?.node
         const elapsed = node?.isConnected ? node.querySelector("[data-pending-elapsed]") : null
-        if (elapsed) elapsed.textContent = `${seconds}s`
+        if (elapsed) elapsed.textContent = messages(node).t("components.ui.translation_pending.elapsed", { seconds })
       })
     }, 1000)
     const timeout = setTimeout(() => {
@@ -618,11 +608,11 @@ function setBusy(button, busy) {
   if (spinner) spinner.hidden = !busy
 }
 
-// The same shape as `SuggestionComponent`'s error variant -- including its
+// The same shape as `Admin::Ui::SuggestionComponent`'s error variant -- including its
 // Dismiss, so a client-side error can be cleared like a server-sent one --
 // built from text nodes only. The button is `type="button"`: the box sits
 // inside an autosave form, and a default (submit) button would post it.
-// Its classes are `SuggestionComponent::BUTTON_CLASS`, read from the box's
+// Its classes are `Admin::Ui::SuggestionComponent::BUTTON_CLASS`, read from the box's
 // `data-dismiss-class` (`_translation_box`), so no copy of them lives here.
 function showError(box, message) {
   if (!box) return
@@ -639,7 +629,7 @@ function showError(box, message) {
   dismiss.type = "button"
   dismiss.className = box.dataset.dismissClass || ""
   dismiss.dataset.action = "admin--translation--translate#discard"
-  dismiss.textContent = "Dismiss"
+  dismiss.textContent = messages(box).t("components.ui.suggestion.dismiss")
   actions.append(dismiss)
   wrapper.append(text, actions)
   box.replaceChildren(wrapper)

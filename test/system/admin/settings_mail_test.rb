@@ -74,4 +74,30 @@ class Admin::SettingsMailSystemTest < ApplicationSystemTestCase
     # The port set by the switch counts as a change of the form.
     assert_selector "[data-admin--saving--save-bar-target=count]", text: "Port"
   end
+
+  test "the Mail card's fields are Tab stops in order, Security's radios move with the arrow keys and Send test mail answers on Enter" do
+    site_settings(:default).update!(mail_port: nil, mail_security: nil)
+    visit_screen "/cs-studio/settings"
+
+    page.execute_script("document.getElementById('settings-mail_server').focus()")
+    page.send_keys("smtp.keys.test")
+    stop_on "#settings-mail_port"
+    stop_on "#settings-mail_security-starttls"
+    page.send_keys(:right)
+    assert_eventually { page.evaluate_script("document.activeElement.id") == "settings-mail_security-tls" }
+    assert_field "Port", with: "465"
+    stop_on "#settings-mail_sender_name"
+    stop_on "#settings-mail_sender_address"
+
+    # The save bar's Save, then Send test mail, which is Enter's: the answer stands under it.
+    stop_on "[data-admin--saving--save-bar-target=save]"
+    page.send_keys(:enter)
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    await_admin_controllers
+    page.execute_script("document.getElementById('settings-mail_sender_address').focus()")
+    stop_on test_button
+    assert_equal "Send test mail", focused_text
+    page.send_keys(:enter)
+    assert_selector "#settings-mail-test", text: "Test mail sent to one@example.com. Check your inbox."
+  end
 end

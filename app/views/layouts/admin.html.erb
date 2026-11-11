@@ -177,10 +177,10 @@
           action: { label: t("admin.notes.script.toast.open"), url: admin_notes_path, method: :get }) %></template>
 
     <%# The pending-suggestion box `admin--translation--translate` clones into a field's
-        suggestion slot before each AI request (`Admin::TranslationScreen::
-        PendingComponent`): a `<template>` is inert, so its buttons and spinner
+        suggestion slot before each AI request (`Admin::Ui::
+        TranslationPendingComponent`): a `<template>` is inert, so its buttons and spinner
         do nothing here, and it sits outside every form. %>
-    <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
+    <template id="translation-pending-template"><%= render Admin::Ui::TranslationPendingComponent.new %></template>
 
     <%# The one Leave dialog:
         `admin--saving--save-bar` opens it when a Turbo visit, a link into the content
@@ -227,24 +227,24 @@
         the same form on their own and skip the dialogs (`:standalone_new_record`),
         so no id appears twice. %>
     <% unless content_for?(:standalone_new_record) %>
-      <%= render Admin::EditorScreen::NewPageDialogComponent.new(url_options: admin_url_options) %>
-      <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options) %>
+      <%= render Admin::Ui::NewRecordDialogComponent.new(kind: :page, url_options: admin_url_options) %>
+      <%= render Admin::Ui::NewRecordDialogComponent.new(kind: :post, url_options: admin_url_options) %>
     <% end %>
 
     <%# The rich-text editor's image, YouTube and Page link dialogs: one of
         each, here for the same reason as the picker
         -- outside `#content` and every autosave form. The editor that opens
         one is the only one that hears its answer. %>
-    <%= render Admin::EditorScreen::RichTextDialogsComponent.new %>
+    <%= render Admin::Ui::RichTextDialogsComponent.new %>
 
     <%# The one form every "Still correct — mark up to date" button submits
-        (`Admin::EditorScreen::ReferenceCardComponent`): empty, here
+        (`Admin::Ui::ReferenceCardComponent`): empty, here
         outside `#content` and every autosave form for the same reason as
         the picker -- forms can't nest, so each button names this one as
         its owner (`form=`) and its own record in `formaction`. It carries
         only the CSRF token. %>
     <%= form_with url: admin_translation_confirmation_path, method: :post,
-          id: Admin::EditorScreen::ReferenceCardComponent::FORM_ID, class: "hidden" do %>
+          id: Admin::Ui::ReferenceCardComponent::FORM_ID, class: "hidden" do %>
     <% end %>
   </body>
 </html>

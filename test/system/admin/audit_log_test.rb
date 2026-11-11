@@ -54,6 +54,21 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
     assert_selector "dd", text: "test.recent"
   end
 
+  test "the subject's link in a row's sentence is reached with Tab and pressed with Enter" do
+    post = create_post(title: "Spare room")
+    event = Audit::Event.create!(action: "post.published", channel: "admin", user_id: users(:one).id, subject: post, subject_label: "Spare room",
+      occurred_at: 30.minutes.ago, last_occurred_at: 30.minutes.ago)
+    visit_screen admin_audit_events_path
+
+    link = "#audit_event_#{event.id} a.font-medium[href$='/posts/#{post.id}']"
+    time_link = "#audit_event_#{event.id} a.admin-row-link"
+    page.execute_script("document.querySelector(#{time_link.to_json}).focus()")
+    page.send_keys(:tab)
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{link.to_json})"), "Tab from the row's time did not reach the subject's link"
+    page.send_keys(:enter)
+    assert_current_path(/\/posts\/#{post.id}/)
+  end
+
   # Below 1280px the shell's top bar stands over the page and every sticky top
   # keeps clear of it (`--admin-top-offset`). A band is held inside its own
   # day's section, so the next day's band pushes it out as that day arrives.
