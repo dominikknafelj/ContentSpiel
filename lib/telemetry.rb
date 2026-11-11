@@ -38,4 +38,73 @@ module Telemetry
 
     :none
   end
+
+  # The CMS's own spans and the attributes they may carry. A span is started
+  # through `in_span` and written through it or `record`, and both refuse a
+  # name or a key that is not here, so a new span or attribute is named in
+  # this file or it fails (`test/lib/telemetry_spans_test.rb` holds that no
+  # other file starts a span). The lists carry names only: what a value may be
+  # (a fixed word, a number or a Boolean, never text that came in a request:
+  # an email, a password or a part of its hash, a token) is held by the tests
+  # that plant such text and search every exported span for it.
+  #
+  # None of these is a root. `Telemetry::WorkSampler` drops an INTERNAL or a
+  # CLIENT root with its whole trace, so each is recorded only as a child of
+  # a request's SERVER span or a job's CONSUMER span; started anywhere else
+  # it is a no-op, as every span is when the SDK is not configured.
+  SPANS = %w[
+    auth.sign_in
+    auth.throttle
+    auth.bot_check
+    auth.leaked_password
+    auth.lockout_mail
+  ].freeze
+
+  ATTRIBUTES = %w[
+    auth.method
+    auth.outcome
+    auth.account_exists
+    auth.bucket
+    auth.tripped
+    auth.backoff_level
+    auth.bot_check.required
+    auth.bot_check.result
+    auth.leaked_password.result
+    auth.mail.queued
+    server.address
+    http.response.status_code
+    error.type
+  ].freeze
+
+  # The API's provider is a proxy until `config/initializers/opentelemetry.rb`
+  # configures the SDK, and a tracer it handed out delegates from then on, so
+  # one memoised before that still records; with no SDK at all it stays the
+  # API's no-op.
+  def self.tracer
+    @tracer ||= OpenTelemetry.tracer_provider.tracer("contentspiel", ContentSpiel::VERSION)
+  end
+
+  # The block's value, inside a span `name` of `kind`, a child of the current
+  # span. `tracer` is for a test that needs a provider of its own.
+  def self.in_span(name, kind: :internal, attributes: {}, tracer: self.tracer, &block)
+    raise ArgumentError, "#{name.inspect} is not among Telemetry::SPANS" unless SPANS.include?(name)
+    check_keys(attributes)
+
+    tracer.in_span(name, kind: kind, attributes: attributes, &block)
+  end
+
+  # Adds `attributes` to `span`, and answers the span.
+  def self.record(span, attributes)
+    check_keys(attributes)
+    span.add_attributes(attributes)
+    span
+  end
+
+  def self.check_keys(attributes)
+    unlisted = attributes.keys.reject { |key| ATTRIBUTES.include?(key) }
+    return if unlisted.empty?
+
+    raise ArgumentError, "#{unlisted.map(&:inspect).join(", ")} not among Telemetry::ATTRIBUTES"
+  end
+  private_class_method :check_keys
 end
