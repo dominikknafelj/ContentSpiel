@@ -65,6 +65,7 @@ module DesignSystemEntries
     "Admin::Ui::TreeItemComponent" => "StudioTree",
     "Admin::Ui::UnpublishedChipComponent" => "RecordState",
     "Admin::Ui::UserNameComponent" => "Person",
+    "Admin::Ui::TranslateAllComponent" => "StudioTranslationPair",
     "Admin::Ui::TranslateButtonComponent" => "StudioTranslationPair",
     "Admin::Ui::WordDiffComponent" => "StudioTranslationPair"
   }.freeze

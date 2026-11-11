@@ -194,6 +194,19 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "Suggest translations is one Tab stop that Enter presses" do
+    post = create_post(title: "Hello")
+
+    visit_editor(post, locale: "de")
+
+    find_field(id: "post-title").click
+    stop_on "[data-admin--translation--translate-target='idle'] button", keys: %i[shift tab], limit: 80
+    assert_equal "Suggest translations for 1 empty field", focused_text
+    page.send_keys(:enter)
+    assert_text "1 suggestion ready"
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
+  end
+
   test "Use all across two blocks leaves the page settings form able to save" do
     with_test_types do
       page_record = create_page(title: "About")

@@ -303,3 +303,22 @@ en:
         translate_button:
           label: "Translate"
           update_label: "Suggest update"
+        # `Admin::Ui::TranslateAllComponent`: the header of a page, post or
+        # settings editor in a non-default language. `label`, `progress` and
+        # `ready` are also written by `admin--translation--translate`, which
+        # reads them from `data-messages`; `progress` counts by its total.
+        translate_all:
+          label:
+            one: "Suggest translations for %{count} empty field"
+            other: "Suggest translations for %{count} empty fields"
+          progress:
+            one: "Suggesting %{index} of %{count} field"
+            other: "Suggesting %{index} of %{count} fields"
+          ready:
+            one: "%{count} suggestion ready"
+            other: "%{count} suggestions ready"
+          ready_initial: "0 suggestions ready"
+          suggesting: "Suggesting…"
+          cancel: "Cancel"
+          use_all: "Use all"
+          discard_all: "Discard all"

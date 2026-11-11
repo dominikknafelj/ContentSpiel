@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
 
 // AI translation suggestions in the editor (translation helpers spec
 // §6.4, design pass round 2 handoff §10). One controller, three places:
@@ -62,10 +63,7 @@ export default class extends Controller {
     gone: "This field is no longer on the page — reload and try again",
     notApplied: "This text can't be replaced here",
     noAnswer: "No suggestion came back for this field — try again",
-    nothingEmpty: "No empty fields to translate",
-    label: (count) => `Suggest translations for ${count} empty ${count === 1 ? "field" : "fields"}`,
-    progress: (index, total) => `Suggesting ${index} of ${total} ${total === 1 ? "field" : "fields"}`,
-    ready: (count) => `${count} ${count === 1 ? "suggestion" : "suggestions"} ready`
+    nothingEmpty: "No empty fields to translate"
   }
 
   // A request must not outlive the page it was asked on: after a language
@@ -317,7 +315,7 @@ export default class extends Controller {
     const suggestions = Array.from(document.querySelectorAll("[data-translate-use]")).filter(onScreen).length
     if (suggestions > 0) {
       this.show("ready")
-      const text = this.constructor.texts.ready(suggestions)
+      const text = messages(this.element).t("components.ui.translate_all.ready", { count: suggestions })
       this.readyTarget.querySelector("[data-translate-ready-text]").textContent = text
       this.showStatus(text)
       return
@@ -326,14 +324,14 @@ export default class extends Controller {
     this.showStatus("")
 
     const empty = emptyFields().length
-    this.idleTarget.querySelector("[data-translate-label]").textContent = this.constructor.texts.label(empty)
+    this.idleTarget.querySelector("[data-translate-label]").textContent = messages(this.element).t("components.ui.translate_all.label", { count: empty })
     this.show(empty > 0 ? "idle" : null)
   }
 
   showRunning(answered, total) {
     this.show("running")
     // Counted per field: the one being waited on (never past the total).
-    const text = this.constructor.texts.progress(Math.min(answered + 1, total), total)
+    const text = messages(this.element).t("components.ui.translate_all.progress", { count: total, index: Math.min(answered + 1, total) })
     this.runningTarget.querySelector("[data-translate-progress-text]").textContent = text
     // Also in the persistent live region: the running line itself is shown and
     // hidden with the state, and a region that appears is not announced.

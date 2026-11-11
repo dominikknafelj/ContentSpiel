@@ -1445,9 +1445,9 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   POST_FORM_SOURCES = [
     "app/components/admin/editor_screen/post_form_component.html.erb",
     "app/components/admin/columns/*", "app/components/admin/fields/*",
-    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input}_component.*",
+    "app/components/admin/ui/{field,chip_input,rail_panel,word_diff,prefix_input,translate_all,translate_button}_component.*",
     "app/components/admin/editor_screen/{related_posts,shared_fields,reference_card}_component.*",
-    "app/components/admin/translation_screen/{suggestion,translate_button}_component.*",
+    "app/components/admin/translation_screen/suggestion_component.*",
     "app/views/admin/shared/{_translation_box,_field_errors,_base_updated_at_field,_override_field}.html.erb",
     "app/javascript/rich_text/*.js", "app/javascript/controllers/admin/rich_text/*.js"
   ].freeze
@@ -1586,7 +1586,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     "app/javascript/controllers/admin/notes/inbox_controller.js" => "the unread bubble",
     "app/javascript/mind_graph/card_notes.js" => "the unread bubble",
     "app/javascript/notes/merge.js" => "the NEW divider",
-    "app/components/admin/translation_screen/translate_all_component.html.erb" => "a progress bar",
+    "app/components/admin/ui/translate_all_component.html.erb" => "a progress bar",
     "app/javascript/media/upload_tiles.js" => "a progress bar",
     "app/javascript/rich_text/popover.js" => "a script-built button that cannot render the component",
     "app/views/admin/posts/index.html.erb" => "the primary's own split half, New post's type chooser",

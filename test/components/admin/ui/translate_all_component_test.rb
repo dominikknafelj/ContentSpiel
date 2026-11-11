@@ -4,7 +4,7 @@ require "test_helper"
 # helpers spec §6.4): only in a non-default language, for a viewer who may
 # edit the record, with AI set up and `ai.translate`. The caps it splits
 # its requests by come from `AI::Translate`.
-class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestCase
+class Admin::Ui::TranslateAllComponentTest < ViewComponent::TestCase
   include TestTypes
 
   class StubProvider
@@ -31,7 +31,7 @@ class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestC
   end
 
   def render_all(record, locale: "de", editable: true)
-    render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: record, locale: locale, editable: editable)
+    render_inline Admin::Ui::TranslateAllComponent.new(record: record, locale: locale, editable: editable)
   end
 
   test "it counts the fields that are empty in this language and have an original" do
@@ -69,15 +69,15 @@ class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestC
       holds = lambda do
         Current.set(session: users(:one).sessions.create!, editing_tab: "tab-aaaaaaaa") { Editing::Holds.on(page, viewer: users(:one), tab: "tab-aaaaaaaa") }
       end
-      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      render_inline Admin::Ui::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
       assert_selector "button", text: "Suggest translations for 2 empty fields"
 
       Editing::Reservation.claim(subject: block, record: page, user: dana, tab: "tab-bbbbbbbb", now: Time.current)
-      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      render_inline Admin::Ui::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
       assert_selector "button", text: "Suggest translations for 1 empty field"
 
       Editing::Reservation.claim(subject: page, record: page, user: dana, tab: "tab-bbbbbbbb", now: Time.current)
-      render_inline Admin::TranslationScreen::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
+      render_inline Admin::Ui::TranslateAllComponent.new(record: page.reload, locale: "de", editable: true, holds: holds.call)
       assert_no_selector "button", text: /Suggest translations/
     end
   end

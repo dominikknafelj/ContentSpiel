@@ -17,7 +17,7 @@
             aria: ({ labelledby: "language-tab-#{code}" } if codes.size > 1),
             data: { language_panel: code, "admin--settings--tabs-target": "panel" } do %>
         <%# Suggest translations for N empty fields -- this language's. %>
-        <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: code, editable: true) %>
+        <%= render Admin::Ui::TranslateAllComponent.new(record: site_setting, locale: code, editable: true) %>
 
         <%= render Admin::Columns::PlainColumnComponent.new(
               name: "title", label: t(".title_label"), id: field_id(code, "title"), html_name: html_name(code, "title"),

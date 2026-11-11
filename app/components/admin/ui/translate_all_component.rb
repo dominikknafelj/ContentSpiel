@@ -1,5 +1,5 @@
 module Admin
-  module TranslationScreen
+  module Ui
     # **Suggest translations for N empty fields**, and the two states after it
     # (translation helpers spec §6.4, design pass round 2 handoff §4.1/§10), in
     # the header of the page, post and settings editors in a non-default
@@ -20,7 +20,7 @@ module Admin
     # and Discard (`admin--translation--translate#refresh`).
     #
     # Pressing it asks for every field on the screen that has a Translate
-    # button (`TranslateButtonComponent` -- so exactly the fields this viewer
+    # button (`Admin::Ui::TranslateButtonComponent` -- so exactly the fields this viewer
     # may translate, the record's and, on a page, its blocks') and whose input
     # is empty *right now*, which is what `:missing` means at the moment the
     # button is pressed (an input typed into, or filled by Use, since the page
@@ -40,7 +40,34 @@ module Admin
     # whether the button shows at all (the per-field buttons follow the same
     # rule, so there'd be nothing to ask for otherwise).
     class TranslateAllComponent < Admin::AdminComponent
-      def self.label(count) = "Suggest translations for #{count} empty #{"field".pluralize(count)}"
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "A real button named Suggest translations for N empty fields, then Cancel while it runs, then Use all and Discard all, each a button that is one Tab stop; the progress is also spoken through a polite status line.",
+        motion: :reduced,
+        content_edges: %i[short],
+        widths: :fluid,
+        interface: %i[record locale editable holds],
+        limits: [
+          "It draws nothing in the default language, for a viewer who may not edit the record, without AI set up and ai.translate, or when no field is empty.",
+          "It leaves out the fields of a block or page settings that someone else holds, and is not offered at all for a held post.",
+          "Its three states (idle, running, ready) are one element flipped by admin--translation--translate; the script writes the words it shows from data-messages."
+        ],
+        states: %i[idle],
+        script_states: {
+          running: [ "test/system/admin/translations_test.rb", "Suggest translations for N empty fields, then Use all, fills the page's fields and its block's" ],
+          ready: [ "test/system/admin/translations_test.rb", "Suggest translations for N empty fields, then Use all, fills the page's fields and its block's" ]
+        },
+        keys: %w[label progress ready ready_initial suggesting cancel use_all discard_all],
+        slots: [],
+        controller: "admin--translation--translate",
+        keyboard: [ "test/system/admin/translations_test.rb", "Suggest translations is one Tab stop that Enter presses" ]
+      )
+
+      # What the script writes into the header, by key below `admin`.
+      MESSAGES = %w[
+        components.ui.translate_all.label components.ui.translate_all.progress components.ui.translate_all.ready
+      ].freeze
 
       def initialize(record:, locale:, editable:, holds: nil)
         @record = record
@@ -56,10 +83,11 @@ module Admin
         @count ||= owners.sum { |owner| held?(owner) ? 0 : empty_fields(owner) }
       end
 
-      def label = self.class.label(count)
+      def label = t(".label", count: count)
 
       def wrapper_data
         {
+          messages: messages_data(*MESSAGES),
           controller: "admin--translation--translate",
           "admin--translation--translate-url-value": helpers.admin_translation_suggestions_path,
           "admin--translation--translate-locale-value": locale,

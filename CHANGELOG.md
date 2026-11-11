@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::TranslationScreen::TranslateAllComponent`, with no alias: it is `Admin::Ui::TranslateAllComponent`, with the same keywords; its `label(count)` class method went, the words being the plural key `admin.components.ui.translate_all.label` (with `progress`, `ready`, `ready_initial`, `suggesting`, `cancel`, `use_all` and `discard_all`), and `admin--translation--translate` reads its label, progress and ready words from the header's `data-messages`.
 - `Admin::TranslationScreen::TranslateButtonComponent`, with no alias: it is `Admin::Ui::TranslateButtonComponent`, with the same keywords, `BUTTON_CLASS` and `SPINNER_CLASS`; its `LABEL` and `UPDATE_LABEL` constants went, the words being the keys `admin.components.ui.translate_button.label` and `.update_label`.
 - `Admin::Ui::TabLinksComponent`, with no alias: its links are `Admin::Ui::SegmentedComponent.new(mode: :links, label:, segments:, control_data:)`, a segment `{ label:, href:, current:, count: }` as a tab was, and `link_data:` is `control_data:`.
 - `Admin::NotesScreen::AvatarComponent`, with no alias: a person a note names is `Admin::Ui::ActorAvatarComponent.new(user:, viewer:, size: :md | :sm)` (a thread or inbox row's `:row` was `:md`, a message's `:message` `:sm`), drawing the same circle; `user_id:` is not taken, a nil user being a deleted one (#237).
