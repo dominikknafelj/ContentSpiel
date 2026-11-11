@@ -1,5 +1,5 @@
 <%= render Admin::Ui::ActorAvatarComponent.new(actor: sentence.actor) %>
-<p class="min-w-0 flex-1 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
+<p class="min-w-0 flex-1 text-sm text-ink"><%= render Admin::Ui::AuditSentenceComponent.new(sentence: sentence) %></p>
 <% if via_token? %>
   <%= render Admin::Ui::ChannelChipComponent.new(channel: channel) %>
 <% end %>

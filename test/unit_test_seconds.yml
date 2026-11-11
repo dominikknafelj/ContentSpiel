@@ -20,7 +20,7 @@ test/components/admin/audit_screen/changes_component_test.rb: 0.1
 test/components/admin/audit_screen/day_list_component_test.rb: 0.1
 test/components/admin/audit_screen/event_header_component_test.rb: 0.0
 test/components/admin/audit_screen/row_component_test.rb: 0.1
-test/components/admin/audit_screen/sentence_component_test.rb: 0.1
+test/components/admin/ui/audit_sentence_component_test.rb: 0.1
 test/components/admin/audit_screen/time_span_test.rb: 0.0
 test/components/admin/audit_screen/toolbar_component_test.rb: 0.1
 test/components/admin/columns/media_column_component_test.rb: 1.2

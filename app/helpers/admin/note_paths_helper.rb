@@ -11,7 +11,7 @@ module Admin
     # query is DATA from below, and `public_send` on unchecked data is a
     # method call chosen by data; so the name is checked against this list
     # before it is called, however trustworthy its source looks today, as
-    # `Admin::AuditScreen::SentenceComponent::ROUTES` and
+    # `Admin::Ui::AuditSentenceComponent::ROUTES` and
     # `Admin::JumpHelper.routes` do for theirs. Symbols only:
     # `"admin_page_path"` is not on the list.
     NOTE_ROUTES = %i[admin_page_path admin_post_path admin_media_path].freeze

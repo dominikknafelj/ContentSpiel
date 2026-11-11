@@ -355,3 +355,11 @@ en:
           dismiss: "Dismiss"
           use: "Use"
           discard: "Discard"
+        # `Admin::Ui::AuditSentenceComponent`: the actor's own words, the rest
+        # of a sentence being `Audit::Sentence`'s. The viewer is "You" and
+        # their own token follows after a comma; another person's token
+        # follows after a space.
+        audit_sentence:
+          you: "You"
+          via_you: ", via %{label}"
+          via_other: " via %{label}"

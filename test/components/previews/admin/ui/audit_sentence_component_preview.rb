@@ -1,8 +1,8 @@
 module Admin
-  module AuditScreen
+  module Ui
     # One audit sentence: the viewer's own, another person's, through a token,
     # a failed sign-in (no actor) and a refused permission.
-    class SentenceComponentPreview < ViewComponent::Preview
+    class AuditSentenceComponentPreview < ViewComponent::Preview
       def you = render(sentence("post.published", user_id: 1))
       def another_person = render(sentence("post.published", user_id: 2))
       def through_a_token = render(sentence("post.created", user_id: 2, actor_type: "ApiToken", actor_id: 1, actor_label: "claude-desktop"))
@@ -14,7 +14,7 @@ module Admin
       def sentence(action, **attributes)
         event = Audit::Event.new({ action:, channel: "admin", subject_label: "Welcome to our new site", occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes))
         render_sentence = Audit::Sentence.build(event, viewer: User.new(id: 1), target: Audit::Sentence::Target.new("Welcome to our new site", nil))
-        Admin::AuditScreen::SentenceComponent.new(sentence: render_sentence)
+        Admin::Ui::AuditSentenceComponent.new(sentence: render_sentence)
       end
     end
   end

@@ -35,6 +35,7 @@
 
 ### Removed
 
+- `Admin::AuditScreen::SentenceComponent`, with no alias: it is `Admin::Ui::AuditSentenceComponent`, with the same `sentence:` keyword and `ROUTES`; the actor's words ("You", ", via <token>", " via <token>") are the keys `admin.components.ui.audit_sentence.you`, `.via_you` and `.via_other`.
 - `Admin::TranslationScreen::PendingComponent`, with no alias: it is `Admin::Ui::TranslationPendingComponent` (a bare `Pending` would read as any waiting state), with the same `TIMEOUT_SECONDS`; its `TIMEOUT_TEXT` constant went, the words being the keys `admin.components.ui.translation_pending.running`, `.elapsed`, `.cancel`, `.timeout` and `.try_again`, and the script writes the elapsed seconds from the box's own `data-messages`.
 - `Admin::TranslationScreen::SuggestionComponent`, with no alias: it is `Admin::Ui::SuggestionComponent`, with the same keywords, `dom_id` and `BUTTON_CLASS`; its `LABEL` constant went, the words being the keys `admin.components.ui.suggestion.label`, `.field_label`, `.current`, `.dismiss`, `.use` and `.discard`.
 - `Admin::EditorScreen::ReferenceCardComponent`, with no alias: it is `Admin::Ui::ReferenceCardComponent`, with the same keywords, `FORM_ID`, `dom_id`, `options_for` and `current_for`; its `CONFIRM_LABEL`, `FORMATTING_NOTE` and `TOO_LONG_NOTE` constants went, the words being the keys `admin.components.ui.reference_card.confirm`, `.changed`, `.formatting_note`, `.too_long_note` and `.no_source_note`.

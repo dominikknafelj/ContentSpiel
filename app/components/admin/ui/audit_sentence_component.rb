@@ -1,5 +1,5 @@
 module Admin
-  module AuditScreen
+  module Ui
     # One `Audit::Sentence` as markup: the log's rows, the event page's title
     # and the dashboard's "Recent activity" all draw a sentence here, so the
     # wording AND the look agree. The names (the actor, the subject, a strong
@@ -11,7 +11,26 @@ module Admin
     # linked when the sentence carries a route (a route NAME and params,
     # resolved here with this request's URL options), every stored value
     # escaped as the text it is.
-    class SentenceComponent < Admin::AdminComponent
+    class AuditSentenceComponent < Admin::AdminComponent
+      include Admin::Ui::Contract
+
+      contract(
+        accessibility: "Inline text with no role: the subject is a link only when the sentence carries a route, one Tab stop reached in reading order and pressed with Enter; every name and part is plain text.",
+        motion: :none,
+        content_edges: %i[short long missing],
+        widths: :fluid,
+        interface: %i[sentence],
+        limits: [
+          "A route name not on ROUTES draws the subject as plain text and calls nothing.",
+          "An event with no user draws no actor at all, and every stored value is escaped as the text it is."
+        ],
+        states: %i[you another_person through_a_token failed_sign_in refused],
+        keys: %w[you via_you via_other],
+        slots: [],
+        controller: nil,
+        keyboard: [ "test/system/admin/audit_log_test.rb", "the subject's link in a row's sentence is reached with Tab and pressed with Enter" ]
+      )
+
       # Every route a sentence may name (`Audit::Sentence.route_for`,
       # `Audit::Sentence::Targets#for`). The name reaches `public_send` below,
       # so it is checked against this list rather than trusted for coming from
@@ -37,8 +56,8 @@ module Admin
       def actor_html
         return if actor.none
 
-        name = actor.you ? "You" : render(Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id))
-        via = actor.via_label.present? ? (actor.you ? ", via #{actor.via_label}" : " via #{actor.via_label}") : ""
+        name = actor.you ? t(".you") : render(Admin::Ui::UserNameComponent.new(user: actor.user, user_id: actor.user_id))
+        via = actor.via_label.present? ? t(actor.you ? ".via_you" : ".via_other", label: actor.via_label) : ""
         safe_join([ content_tag(:span, name, class: "font-medium"), via, " " ])
       end
 
