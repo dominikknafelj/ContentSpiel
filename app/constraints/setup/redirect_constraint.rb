@@ -2,8 +2,9 @@
 # 2026-09-26 §3). A route constraint rather than a before_action so it also
 # covers CS Studio itself. Exempt: the wizard itself, CS Studio's sign-in,
 # sign-out and password reset (an admin resuming setup -- cs-studio spec §3),
-# the health check, the MCP endpoint (own bearer auth; no tokens exist yet
-# anyway) and Active Storage (the logo preview while setup runs). The
+# the health check, the MCP endpoint at /<ADMIN_PATH>/mcp (own bearer auth; no
+# tokens exist yet anyway) and Active Storage (the logo preview while setup
+# runs). The
 # exemption check runs first so those paths never cost a database query.
 #
 # ONLY A PAGE LOAD IS SENT INTO THE WIZARD (`#page_load?`): a GET or HEAD
@@ -18,8 +19,9 @@
 #
 # Deliberately narrower than the whole `/#{ContentSpiel::ADMIN_PATH}` scope:
 # CS Studio's own root and every other admin screen still redirect to /<ADMIN_PATH>/setup
-# while setup is pending -- only the three paths an admin needs to *resume*
-# setup by signing back in are carved out.
+# while setup is pending -- only EXEMPT_PREFIXES are carved out: the wizard,
+# the three paths an admin needs to *resume* setup by signing back in
+# (sign-in, sign-out, password reset), MCP, the health check and Active Storage.
 module Setup
   module RedirectConstraint
     EXEMPT_PREFIXES = [

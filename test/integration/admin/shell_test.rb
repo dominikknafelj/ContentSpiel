@@ -29,7 +29,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # process. A subprocess is what actually re-triggers it: one static
   # reserved word (`up`) and one locale code (`de`), enough to prove
   # both halves of the denylist actually reach the raise, not every one of
-  # `RESERVED_PATHS`' several dozen entries -- the list itself is already
+  # `RESERVED_PATHS`' 43 entries (the five static words and the 38 locale codes) -- the list itself is already
   # covered exhaustively, without a subprocess, just above.
   test "booting with a reserved ADMIN_PATH actually fails" do
     %w[up de].each do |reserved|

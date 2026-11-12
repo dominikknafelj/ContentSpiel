@@ -1,7 +1,7 @@
 require "test_helper"
 
 # Rate limiting for the MCP endpoint (config/initializers/rack_attack.rb):
-# per-token, not per-IP, since /mcp is a bearer-token API where many agents
+# per-token, not per-IP, since /<ADMIN_PATH>/mcp is a bearer-token API where many agents
 # could legitimately share an IP. See that initializer's comment for why.
 class McpRateLimitTest < ActionDispatch::IntegrationTest
   include ActiveSupport::Testing::TimeHelpers

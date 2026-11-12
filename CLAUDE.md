@@ -195,7 +195,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 **`docs/reference/access-control-and-audit.md`, passkeys:**
 
 - Four actions change how a person signs in and are behind `Admin::RecentConfirmation` (`require_recent_confirmation`): the registration options, the add, the remove and making recovery codes. **No guard** for a new action that changes how a person signs in and is not declared behind it.
-- A session marked `enrolment_due` reaches nothing of CS Studio but enrolment, through `Admin::PasskeyEnrolment` in `Admin::BaseController` and `PreviewController`, and Action Cable's `subscriber`. **No guard** for a new door outside those (a controller on `ApplicationController`, Active Storage's direct uploads) that a held session reaches.
+- A session marked `enrolment_due` reaches nothing of CS Studio but enrolment, through `Admin::PasskeyEnrolment` in `Admin::BaseController` and `PreviewController`, and Action Cable's `subscriber`. **No guard** for a new door outside those (a controller on `ApplicationController`) that a held session reaches.
 - An admin for the passkey policy is a holder of `users.manage`, `groups.manage` or `tokens.manage` (`Passkeys::Policy::ADMIN_PERMISSIONS`). **No guard** for a new right of that weight left off the list.
 - A passkey's relying party is decided by `SignIn::RelyingParty` alone, and a browser binds a passkey to its id for good: a change of what it answers orphans every passkey already made. **No guard**.
 
@@ -210,7 +210,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 **`docs/reference/forms.md`:**
 
 - A form delivery's state is written outside a service: `Forms::Delivery#record_attempt!`, `#record_sent!`, `#record_failed!` and `#resend!`, one statement each with `# version: none`, called by `Forms::DeliveryJob` and `Forms::Resend` alone, because a delivery's state is a job's (as mail's state columns are), nobody asks for it by name, and auditing every attempt would bury the log; Send again and a delete are services that audit. `test/lib/version_bump_test.rb` holds the line's mark, and **no guard** keeps another caller from writing a delivery's state.
-- A send from `/preview` is a real submission (the endpoint cannot tell), stored with no page: **no guard**, by design.
+- A send from `/<ADMIN_PATH>/preview` is a real submission (the endpoint cannot tell), stored with no page: **no guard**, by design.
 
 ### Pitfalls
 
