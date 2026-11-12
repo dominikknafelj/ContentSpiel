@@ -81,7 +81,10 @@ env:
     # pages and mails carry it.
     PUBLIC_HOST: https://<%%= host %>
     # Only for a backend behind a DMZ: CS Studio's own address, served on
-    # that host alone (docs/reference/hosting.md, "Behind a DMZ").
+    # that host alone (docs/reference/hosting.md, "Behind a DMZ"). It
+    # needs its own proxy entry (proxy.hosts, or a proxy of its own) and a
+    # certificate it can get, which Let's Encrypt cannot issue for an
+    # internal-only name ("What the host arranges").
     # ADMIN_HOST: https://studio.example.internal
 
     # The theme folder in the image. The Dockerfile sets the same value and

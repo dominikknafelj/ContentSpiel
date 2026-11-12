@@ -163,7 +163,7 @@ A visitor's form placed on a page: the block names a form built on CS Studio's F
 
 **The stylesheet and the strong band.** `form.css` is plain rules on tokens; the six tokens are defined from base tokens in `tokens.css` and re-valued inside `.content-section--strong` in `sections.css`, where the block is also `color-scheme: dark` so the browser draws its native controls for a dark ground. Their values are the design's and the contrast test held every pair as designed (60 pairs, `test/integration/design_tokens_test.rb`: "a form's field text, line, focus ring, error and thank-you are readable on the page, a tinted band and a strong band, in both themes").
 
-**Limits as built** (rows of `docs/roadmap.md`, "Forms"): a theme's own Form template is not read for the honeypot's hiding or for `data-turbo="false"` (`docs/reference/theming.md`, "Rules a change can break silently"); a send from `/<ADMIN_PATH>/preview` is a real submission; the five inputs' label markup is repeated in each template, the price of each being a contract component of its own.
+**Limits as built** (rows of `docs/roadmap.md`, "Forms"): a theme's own Form template is not read for the honeypot's hiding or for `data-turbo="false"` (`docs/reference/theming.md`, "Rules a change can break silently"); a send from `/<ADMIN_PATH>/preview` is a real submission (with `ADMIN_HOST` set, refused on the admin host); the five inputs' label markup is repeated in each template, the price of each being a contract component of its own.
 
 ## Sections
 

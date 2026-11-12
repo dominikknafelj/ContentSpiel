@@ -47,7 +47,7 @@
 
 ### Environment
 
-- `ADMIN_HOST` (optional): the address, with its scheme, of a host that serves CS Studio alone, for a backend behind a DMZ. With it, every address under `/<ADMIN_PATH>/` answers only on that host and the public site does not answer on it; `/up` and images answer on both. It needs `PUBLIC_HOST`, another host name and the same scheme, or production does not start (`docs/reference/hosting.md`, "Behind a DMZ").
+- `ADMIN_HOST` (optional): the address, with its scheme, of a host that serves CS Studio alone, for a backend behind a DMZ. With it, every address under `/<ADMIN_PATH>/` answers only on that host and the public site does not answer on it; `/up` and images answer on both. It needs `PUBLIC_HOST`, another host name and the same scheme, or production does not start (`docs/reference/hosting.md`, "Behind a DMZ"). Passkeys then belong to the admin host's registrable domain, so turning it on or off, or changing it, orphans every passkey already made unless the old and the new host share a registrable domain: people sign in with their password and a recovery code (or are let back in from the console with `remove_passkeys: true`) and add a passkey again.
 
 ### Migrations
 

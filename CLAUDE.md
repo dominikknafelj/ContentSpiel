@@ -210,7 +210,7 @@ A rule a test holds is in the reference file for its area, under this same headi
 **`docs/reference/forms.md`:**
 
 - A form delivery's state is written outside a service: `Forms::Delivery#record_attempt!`, `#record_sent!`, `#record_failed!` and `#resend!`, one statement each with `# version: none`, called by `Forms::DeliveryJob` and `Forms::Resend` alone, because a delivery's state is a job's (as mail's state columns are), nobody asks for it by name, and auditing every attempt would bury the log; Send again and a delete are services that audit. `test/lib/version_bump_test.rb` holds the line's mark, and **no guard** keeps another caller from writing a delivery's state.
-- A send from `/<ADMIN_PATH>/preview` is a real submission (the endpoint cannot tell), stored with no page: **no guard**, by design.
+- A send from `/<ADMIN_PATH>/preview` is a real submission (the endpoint cannot tell), stored with no page: **no guard**, by design; with `ADMIN_HOST` set, the send is refused on the admin host (a 404), so a preview there makes none.
 
 ### Pitfalls
 
