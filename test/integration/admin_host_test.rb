@@ -135,6 +135,54 @@ class AdminHostTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a password sign-in on the admin host opens CS Studio there" do
+    site_settings(:default).update!(passkey_policy: "nobody")
+    both_hosts do
+      https!
+      host! "studio.example.internal"
+      post "/cs-studio/sign-in", params: { email_address: users(:one).email_address, password: "password" }
+      assert_redirected_to "https://studio.example.internal/cs-studio"
+
+      follow_redirect!
+      assert_response :success
+      get "/cs-studio/posts"
+      assert_response :success
+    end
+  end
+
+  # Every passkey ceremony runs on the admin host, so the relying party is
+  # its address: the id a browser signs for and the origin the server checks.
+  test "a passkey signs in on the admin host, under the admin host's relying party" do
+    user = User.create!(email_address: "ann@example.org", password: "password12345")
+    both_hosts do
+      client = fake_authenticator(origin: ADMIN_ADDRESS)
+      add_passkey(user, client: client)
+
+      https!
+      host! "studio.example.internal"
+      post "/cs-studio/sign-in/passkey/options", as: :json
+      assert_response :success
+      options = response.parsed_body
+      assert_equal "example.internal", options.fetch("rpId")
+
+      credential = passkey_assertion(client, challenge: options.fetch("challenge"), user_handle: user.webauthn_id)
+      post "/cs-studio/sign-in/passkey", params: { credential: credential }, as: :json
+      assert_equal "https://studio.example.internal/cs-studio", response.parsed_body.fetch("location")
+      assert_equal "passkey", Session.find_by!(user: user).authenticated_with
+    end
+  end
+
+  test "the registration options on the admin host name the admin host's relying party" do
+    both_hosts do
+      https!
+      host! "studio.example.internal"
+      sign_in_as(users(:one))
+      post "/cs-studio/account/passkeys/options", as: :json
+      assert_response :success
+      assert_equal "example.internal", response.parsed_body.dig("rp", "id")
+    end
+  end
+
   test "the editor's copy link to a published page names the public host" do
     both_hosts do
       host! "studio.example.internal"
